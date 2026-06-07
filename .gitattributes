@@ -1,0 +1,8 @@
+# Normalizar line endings — el repo guarda LF, evita churn entre Windows (Lau) y WSL (Fran).
+* text=auto eol=lf
+
+# Binarios
+*.png binary
+*.jpg binary
+*.svg text
+*.woff2 binary

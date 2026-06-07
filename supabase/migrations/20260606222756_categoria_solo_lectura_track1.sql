@@ -1,0 +1,11 @@
+-- =====================================================================
+--  categoria_movimiento: solo lectura en Track 1 (menos privilegio)
+--
+--  En Track 1 las categorías custom por empresa (escritura) son Fase 2; sólo
+--  se leen las globales sembradas. Eliminamos la policy de escritura
+--  `categoria_mod` (FOR ALL): reduce superficie y deja una sola policy
+--  permissive de SELECT (se va el warning multiple_permissive_policies).
+--  Cuando Fase 2 habilite categorías custom, se reañaden policies de
+--  INSERT/UPDATE/DELETE scopeadas a empresa_id IN (select auth_empresa_ids()).
+-- =====================================================================
+drop policy categoria_mod on categoria_movimiento;
