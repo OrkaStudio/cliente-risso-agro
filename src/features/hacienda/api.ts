@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
 type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
-type SexoAnimal = Database['public']['Enums']['sexo_animal']
 
 export type AnimalConCaravana =
   Database['public']['Views']['v_animal_con_caravana']['Row']
@@ -70,7 +69,7 @@ export type NuevoAnimal = {
   numeroRfid: string
   numeroVisual?: string
   categoria: CategoriaAnimal
-  sexo: SexoAnimal
+  // sexo NO se carga: lo deriva Postgres desde la categoría (columna generada).
   potreroId?: string | null
   origen?: string
   fechaNacimiento?: string | null
@@ -103,7 +102,6 @@ export async function crearAnimal(input: NuevoAnimal): Promise<string> {
     .insert({
       empresa_id: input.empresaId,
       categoria: input.categoria,
-      sexo: input.sexo,
       potrero_id: input.potreroId || null,
       origen: input.origen?.trim() || null,
       fecha_nacimiento: input.fechaNacimiento || null,

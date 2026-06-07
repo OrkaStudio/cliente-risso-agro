@@ -29,7 +29,6 @@ test('golden path Hacienda: login → alta → ficha → stock', async ({ page }
   await expect(page.getByText('Nuevo animal')).toBeVisible()
   await page.getByLabel('Caravana (RFID) *').fill(RFID)
   await page.selectOption('#categoria', 'vaca')
-  await page.selectOption('#sexo', 'hembra')
   await page.selectOption('#potrero', { label: 'Potrero 1' })
   await page.getByRole('button', { name: 'Dar de alta' }).click()
 

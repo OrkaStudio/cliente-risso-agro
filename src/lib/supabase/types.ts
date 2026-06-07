@@ -29,7 +29,7 @@ export type Database = {
           notas: string | null
           origen: string | null
           potrero_id: string | null
-          sexo: Database["public"]["Enums"]["sexo_animal"]
+          sexo: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at: string
         }
         Insert: {
@@ -42,7 +42,7 @@ export type Database = {
           notas?: string | null
           origen?: string | null
           potrero_id?: string | null
-          sexo: Database["public"]["Enums"]["sexo_animal"]
+          sexo?: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at?: string
         }
         Update: {
@@ -55,7 +55,7 @@ export type Database = {
           notas?: string | null
           origen?: string | null
           potrero_id?: string | null
-          sexo?: Database["public"]["Enums"]["sexo_animal"]
+          sexo?: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at?: string
         }
         Relationships: [

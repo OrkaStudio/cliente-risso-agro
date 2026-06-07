@@ -36,9 +36,9 @@ insert into miembro_empresa (user_id, empresa_id) values
 insert into campo (empresa_id, nombre) values
   ('aaaaaaaa-0000-0000-0000-000000000000','Campo A'),
   ('bbbbbbbb-0000-0000-0000-000000000000','Campo B');
-insert into animal (empresa_id, categoria, sexo) values
-  ('aaaaaaaa-0000-0000-0000-000000000000','vaca','hembra'),
-  ('bbbbbbbb-0000-0000-0000-000000000000','toro','macho');
+insert into animal (empresa_id, categoria) values
+  ('aaaaaaaa-0000-0000-0000-000000000000','vaca'),
+  ('bbbbbbbb-0000-0000-0000-000000000000','toro');
 
 -- ---- Simular al usuario A autenticado ----
 set local role authenticated;

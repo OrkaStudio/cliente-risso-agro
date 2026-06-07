@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Constants } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { usePotreros, useCrearAnimal } from '@/features/hacienda/hooks'
-import { categoriaLabel, sexoLabel } from '@/features/hacienda/labels'
+import { categoriaLabel } from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,7 +20,6 @@ const schema = z.object({
   numeroRfid: z.string().trim().min(1, 'Ingresá el número de caravana'),
   numeroVisual: z.string().trim().optional(),
   categoria: z.enum(Constants.public.Enums.categoria_animal),
-  sexo: z.enum(Constants.public.Enums.sexo_animal),
   potreroId: z.string().optional(),
   origen: z.string().trim().optional(),
   fechaNacimiento: z.string().optional(),
@@ -38,7 +37,6 @@ export function AltaAnimalPage() {
   const [numeroRfid, setNumeroRfid] = useState('')
   const [numeroVisual, setNumeroVisual] = useState('')
   const [categoria, setCategoria] = useState('')
-  const [sexo, setSexo] = useState('')
   const [potreroId, setPotreroId] = useState('')
   const [origen, setOrigen] = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
@@ -52,7 +50,6 @@ export function AltaAnimalPage() {
       numeroRfid,
       numeroVisual,
       categoria,
-      sexo,
       potreroId,
       origen,
       fechaNacimiento,
@@ -73,7 +70,6 @@ export function AltaAnimalPage() {
         numeroRfid: parsed.data.numeroRfid,
         numeroVisual: parsed.data.numeroVisual,
         categoria: parsed.data.categoria,
-        sexo: parsed.data.sexo,
         potreroId: parsed.data.potreroId || null,
         origen: parsed.data.origen,
         fechaNacimiento: parsed.data.fechaNacimiento || null,
@@ -119,39 +115,24 @@ export function AltaAnimalPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="categoria">Categoría *</Label>
-                <select
-                  id="categoria"
-                  className={selectClass}
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                >
-                  <option value="">Elegí…</option>
-                  {Constants.public.Enums.categoria_animal.map((c) => (
-                    <option key={c} value={c}>
-                      {categoriaLabel[c]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sexo">Sexo *</Label>
-                <select
-                  id="sexo"
-                  className={selectClass}
-                  value={sexo}
-                  onChange={(e) => setSexo(e.target.value)}
-                >
-                  <option value="">Elegí…</option>
-                  {Constants.public.Enums.sexo_animal.map((s) => (
-                    <option key={s} value={s}>
-                      {sexoLabel[s]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="categoria">Categoría *</Label>
+              <select
+                id="categoria"
+                className={selectClass}
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+              >
+                <option value="">Elegí…</option>
+                {Constants.public.Enums.categoria_animal.map((c) => (
+                  <option key={c} value={c}>
+                    {categoriaLabel[c]}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                El sexo se completa solo según la categoría.
+              </p>
             </div>
 
             <div className="grid gap-2">
