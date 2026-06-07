@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    name: Lint + Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build (incluye chequeo de tipos)
+        run: pnpm build
+        env:
+          # Placeholders: el build no despliega, solo verifica que compila.
+          # Los valores reales viven en el entorno de deploy (Vercel), no acá.
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+
+  # NOTA: el E2E (Playwright) no corre acá porque pega contra Supabase real y
+  # necesita credenciales (secrets E2E_EMAIL / E2E_PASSWORD). Se puede sumar como
+  # job aparte cuando definamos un proyecto Supabase de test. Por ahora el E2E se
+  # corre local con `pnpm test:e2e`.
