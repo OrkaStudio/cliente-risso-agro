@@ -47,7 +47,7 @@ Al no haber servidor (Server Actions), el cliente habla directo con Postgres:
 - **Persistencia de sesión en Capacitor:** hoy la sesión Supabase usa localStorage (web). En el shell nativo conviene un storage seguro nativo — pendiente al armar la PoC en device.
 - **Code-splitting:** el bundle inicial supera 500 kB (warning de Vite). Dividir con `import()` dinámico cuando crezca.
 - **Build iOS:** requiere macOS/Xcode o CI con runner Mac (Lau desarrolla en Windows). Las plataformas `ios/` y `android/` no están agregadas todavía (gitignoreadas).
-- **Alta de animal transaccional:** hoy `crearAnimal` (`src/features/hacienda/api.ts`) hace inserts secuenciales (animal → caravana → evento) con pre-check de RFID + compensación si la caravana falla. Aceptable para single-user. Hardening para multi-usuario: mover a una RPC Postgres `crear_animal` (SECURITY INVOKER) que lo haga en una transacción.
+- **Operaciones de Hacienda = RPCs transaccionales** (`SECURITY INVOKER`, RLS del usuario): `crear_animal`, `cambiar_caravana`, `dar_baja_animal`. Las multi-tabla (alta, cambio de caravana, baja) son atómicas. `registrar_evento` es un insert directo (append-only). Migración `hacienda_rpcs`.
 - **Verificación E2E:** golden path verificado a nivel datos (RLS + vistas) **y** en navegador real (`pnpm test:e2e`, Playwright — login → alta → ficha → stock). Credenciales seed: `orka.arg@gmail.com` / `RissoAgro.2026` (empresa "Risso Agro", campo "Don Gilberto" con 3 potreros). El test toma las credenciales de `E2E_EMAIL`/`E2E_PASSWORD`.
 - **Auth — leaked password protection:** desactivado (advisor de Supabase). Activar en el dashboard (Auth → Password security, HaveIBeenPwned). Toggle de consola, no código.
 

@@ -43,3 +43,49 @@ test('golden path Hacienda: login → alta → ficha → stock', async ({ page }
   await expect(page.getByRole('cell', { name: RFID })).toBeVisible()
   await expect(page.getByText('Potrero 1')).toBeVisible()
 })
+
+test('acciones del animal: registrar evento → cambiar caravana → dar de baja', async ({
+  page,
+}) => {
+  const ts = Date.now()
+  const rfidA = `E2E${ts}A`
+  const rfidB = `E2E${ts}B`
+
+  // login
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(EMAIL)
+  await page.getByLabel('Contraseña').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Ingresar' }).click()
+  await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible()
+
+  // alta
+  await page.goto('/hacienda/nuevo')
+  await page.getByLabel('Caravana (RFID) *').fill(rfidA)
+  await page.selectOption('#categoria', 'vaca')
+  await page.getByRole('button', { name: 'Dar de alta' }).click()
+  await expect(page.getByText(`Caravana ${rfidA}`)).toBeVisible()
+
+  const historial = page.getByRole('listitem')
+
+  // registrar evento (sanidad)
+  await page.getByRole('button', { name: 'Registrar evento' }).click()
+  await page.selectOption('#ev-tipo', 'sanidad')
+  await page.getByRole('button', { name: 'Registrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(historial.filter({ hasText: 'Sanidad' })).toBeVisible()
+
+  // cambiar caravana
+  await page.getByRole('button', { name: 'Cambiar caravana' }).click()
+  await page.locator('#cc-rfid').fill(rfidB)
+  await page.getByRole('button', { name: 'Confirmar cambio' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByText(`Caravana ${rfidB}`)).toBeVisible()
+  await expect(historial.filter({ hasText: 'Cambio de caravana' })).toBeVisible()
+
+  // dar de baja
+  await page.getByRole('button', { name: 'Dar de baja' }).click()
+  await page.selectOption('#db-estado', 'vendido')
+  await page.getByRole('button', { name: 'Confirmar baja' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByText('Animal dado de baja')).toBeVisible()
+})

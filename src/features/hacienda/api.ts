@@ -77,59 +77,83 @@ export type NuevoAnimal = {
 
 /**
  * Alta de animal con caravana MANUAL (Bluetooth diferido).
- *
- * Sin servidor no hay transacción multi-tabla nativa; el par crítico
- * (animal + caravana) se hace con pre-check de RFID + compensación si la
- * caravana falla. El evento 'alta' es best-effort (arranca el historial).
- * Hardening pendiente para multi-usuario: mover esto a una RPC transaccional
- * `crear_animal` (ver CLAUDE.md del repo).
+ * Usa la RPC transaccional `crear_animal` (animal + caravana + evento 'alta'
+ * en una sola transacción atómica). Devuelve el id del animal.
  */
 export async function crearAnimal(input: NuevoAnimal): Promise<string> {
-  const rfid = input.numeroRfid.trim()
-
-  // Pre-check: RFID único en la empresa (buena UX + evita orphan).
-  const { data: existente, error: checkErr } = await supabase
-    .from('caravana')
-    .select('id')
-    .eq('numero_rfid', rfid)
-    .maybeSingle()
-  if (checkErr) throw checkErr
-  if (existente) throw new Error(`La caravana ${rfid} ya está registrada.`)
-
-  // 1) animal
-  const { data: animal, error: animalErr } = await supabase
-    .from('animal')
-    .insert({
-      empresa_id: input.empresaId,
-      categoria: input.categoria,
-      potrero_id: input.potreroId || null,
-      origen: input.origen?.trim() || null,
-      fecha_nacimiento: input.fechaNacimiento || null,
-    })
-    .select('id')
-    .single()
-  if (animalErr) throw animalErr
-
-  // 2) caravana (crítico): si falla, compensar borrando el animal.
-  const { error: caravanaErr } = await supabase.from('caravana').insert({
-    empresa_id: input.empresaId,
-    animal_id: animal.id,
-    numero_rfid: rfid,
-    numero_visual: input.numeroVisual?.trim() || null,
-    vigente: true,
+  const { data, error } = await supabase.rpc('crear_animal', {
+    p_empresa_id: input.empresaId,
+    p_categoria: input.categoria,
+    p_numero_rfid: input.numeroRfid.trim(),
+    p_numero_visual: input.numeroVisual?.trim() || undefined,
+    p_potrero_id: input.potreroId || undefined,
+    p_origen: input.origen?.trim() || undefined,
+    p_fecha_nacimiento: input.fechaNacimiento || undefined,
   })
-  if (caravanaErr) {
-    await supabase.from('animal').delete().eq('id', animal.id)
-    throw caravanaErr
-  }
+  if (error) throw new Error(error.message)
+  return data
+}
 
-  // 3) evento 'alta' (best-effort).
-  await supabase.from('evento').insert({
-    empresa_id: input.empresaId,
-    animal_id: animal.id,
-    tipo: 'alta',
-    datos: { caravana: rfid },
+/** Cambiar la caravana conservando la identidad del animal (RPC transaccional). */
+export async function cambiarCaravana(input: {
+  animalId: string
+  nuevoRfid: string
+  nuevaVisual?: string
+  motivo?: string
+}): Promise<void> {
+  const { error } = await supabase.rpc('cambiar_caravana', {
+    p_animal_id: input.animalId,
+    p_nuevo_rfid: input.nuevoRfid.trim(),
+    p_nueva_visual: input.nuevaVisual?.trim() || undefined,
+    p_motivo: input.motivo?.trim() || undefined,
   })
+  if (error) throw new Error(error.message)
+}
 
-  return animal.id
+/** Dar de baja (vendido/muerto) + dejar el evento en el historial (RPC). */
+export async function darBaja(input: {
+  animalId: string
+  estado: 'vendido' | 'muerto'
+  motivo?: string
+  fecha?: string
+}): Promise<void> {
+  const { error } = await supabase.rpc('dar_baja_animal', {
+    p_animal_id: input.animalId,
+    p_estado: input.estado,
+    p_motivo: input.motivo?.trim() || undefined,
+    p_fecha: input.fecha || undefined,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Tipos de evento que se cargan a mano (alta/baja/cambio_caravana son automáticos). */
+export const TIPOS_EVENTO_MANUAL = [
+  'sanidad',
+  'parto',
+  'pesaje',
+  'servicio',
+  'tacto',
+  'destete',
+  'castracion',
+  'movimiento',
+  'nota',
+] as const
+export type TipoEventoManual = (typeof TIPOS_EVENTO_MANUAL)[number]
+
+/** Registrar un evento en el historial append-only del animal (insert directo). */
+export async function registrarEvento(input: {
+  empresaId: string
+  animalId: string
+  tipo: TipoEventoManual
+  fecha: string
+  nota?: string
+}): Promise<void> {
+  const { error } = await supabase.from('evento').insert({
+    empresa_id: input.empresaId,
+    animal_id: input.animalId,
+    tipo: input.tipo,
+    fecha: input.fecha,
+    nota: input.nota?.trim() || null,
+  })
+  if (error) throw new Error(error.message)
 }

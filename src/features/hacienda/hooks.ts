@@ -26,3 +26,36 @@ export function useCrearAnimal() {
     },
   })
 }
+
+export function useRegistrarEvento(animalId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.registrarEvento,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos', animalId] }),
+  })
+}
+
+export function useCambiarCaravana(animalId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.cambiarCaravana,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['animal', animalId] })
+      qc.invalidateQueries({ queryKey: ['eventos', animalId] })
+      qc.invalidateQueries({ queryKey: ['animales'] })
+    },
+  })
+}
+
+export function useDarBaja(animalId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.darBaja,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['animal', animalId] })
+      qc.invalidateQueries({ queryKey: ['eventos', animalId] })
+      qc.invalidateQueries({ queryKey: ['animales'] })
+      qc.invalidateQueries({ queryKey: ['stock-potrero'] })
+    },
+  })
+}

@@ -6,6 +6,11 @@ import {
   sexoLabel,
   tipoEventoLabel,
 } from '@/features/hacienda/labels'
+import {
+  CambiarCaravanaDialog,
+  DarBajaDialog,
+  RegistrarEventoDialog,
+} from '@/features/hacienda/acciones-animal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 function Dato({ label, value }: { label: string; value: string }) {
@@ -45,9 +50,25 @@ export function FichaAnimalPage() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="font-mono">
-                Caravana {animal.data.caravana_rfid ?? '—'}
-              </CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle className="font-mono">
+                  Caravana {animal.data.caravana_rfid ?? '—'}
+                </CardTitle>
+                {animal.data.estado === 'activo' && animal.data.empresa_id ? (
+                  <div className="flex flex-wrap gap-2">
+                    <RegistrarEventoDialog
+                      animalId={id}
+                      empresaId={animal.data.empresa_id}
+                    />
+                    <CambiarCaravanaDialog animalId={id} />
+                    <DarBajaDialog animalId={id} />
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    Animal dado de baja
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">

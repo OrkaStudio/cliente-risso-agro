@@ -179,7 +179,10 @@ export function AltaAnimalPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={crear.isPending}>
+            <Button
+              type="submit"
+              disabled={crear.isPending || !empresa.data}
+            >
               {crear.isPending ? 'Guardando…' : 'Dar de alta'}
             </Button>
           </form>

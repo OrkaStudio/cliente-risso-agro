@@ -851,6 +851,36 @@ export type Database = {
     }
     Functions: {
       auth_empresa_ids: { Args: never; Returns: string[] }
+      cambiar_caravana: {
+        Args: {
+          p_animal_id: string
+          p_motivo?: string
+          p_nueva_visual?: string
+          p_nuevo_rfid: string
+        }
+        Returns: undefined
+      }
+      crear_animal: {
+        Args: {
+          p_categoria: Database["public"]["Enums"]["categoria_animal"]
+          p_empresa_id: string
+          p_fecha_nacimiento?: string
+          p_numero_rfid: string
+          p_numero_visual?: string
+          p_origen?: string
+          p_potrero_id?: string
+        }
+        Returns: string
+      }
+      dar_baja_animal: {
+        Args: {
+          p_animal_id: string
+          p_estado: Database["public"]["Enums"]["estado_animal"]
+          p_fecha?: string
+          p_motivo?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       agua_estado: "llena" | "normal" | "baja" | "seca"
