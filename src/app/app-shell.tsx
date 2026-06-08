@@ -22,6 +22,7 @@ export function AppShell() {
               { to: '/', label: 'Inicio', end: true },
               { to: '/hacienda', label: 'Hacienda', end: false },
               { to: '/campos', label: 'Campos', end: false },
+              { to: '/analitica', label: 'Analítica', end: false },
             ].map((item) => (
               <NavLink
                 key={item.to}

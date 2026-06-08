@@ -35,6 +35,11 @@ const CampoDetailPage = lazy(() =>
     default: m.CampoDetailPage,
   })),
 )
+const AnaliticaPage = lazy(() =>
+  import('@/features/analitica/analitica-page').then((m) => ({
+    default: m.AnaliticaPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -53,6 +58,7 @@ export const router = createBrowserRouter([
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },
           { path: 'campos', element: <CamposPage /> },
           { path: 'campos/:id', element: <CampoDetailPage /> },
+          { path: 'analitica', element: <AnaliticaPage /> },
         ],
       },
     ],
