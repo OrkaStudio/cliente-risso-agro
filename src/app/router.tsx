@@ -27,6 +27,14 @@ const FichaAnimalPage = lazy(() =>
     default: m.FichaAnimalPage,
   })),
 )
+const CamposPage = lazy(() =>
+  import('@/features/campos/campos-page').then((m) => ({ default: m.CamposPage })),
+)
+const CampoDetailPage = lazy(() =>
+  import('@/features/campos/campo-detail-page').then((m) => ({
+    default: m.CampoDetailPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -43,6 +51,8 @@ export const router = createBrowserRouter([
           { path: 'hacienda', element: <AnimalesPage /> },
           { path: 'hacienda/nuevo', element: <AltaAnimalPage /> },
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },
+          { path: 'campos', element: <CamposPage /> },
+          { path: 'campos/:id', element: <CampoDetailPage /> },
         ],
       },
     ],
