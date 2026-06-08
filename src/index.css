@@ -3,14 +3,13 @@
 @import "shadcn/tailwind.css";
 
 /* ============================================================
-   Identidad Risso Agro — handoff de Claude Design (2026-06-08)
-   4 familias: Lima (acción) · Celeste (IA/vínculos) · Sol (alerta
-   amable) · Tinta (texto/superficies). Tipografía de campo:
-   Inter (cuerpo) + Archivo (títulos), self-hosted.
+   Identidad Risso Agro — "Agro-Analytical Modernism" (Stitch)
+   Campo moderno, sobrio y robusto: verde campo + hueso + ámbar
+   (destaque/atención) + celeste (clima/info). Tipografía de
+   campo: Inter (cuerpo) + Archivo condensado (títulos/números).
    ============================================================ */
 
-/* Archivo viene SIN tabla DSIG (la original la trae y Chrome la
-   rechaza como NetworkError → los títulos caen a fallback). */
+/* Archivo SIN tabla DSIG (la original la trae y Chrome la rechaza). */
 @font-face {
   font-family: "Archivo";
   src: url("./assets/fonts/Archivo-Variable.ttf") format("truetype-variations");
@@ -33,21 +32,14 @@
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
     --font-heading: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
 
-    /* Escalas de marca expuestas como utilidades (bg-lime-500, text-celeste-700, …) */
-    --color-lime-100: var(--lime-100);
-    --color-lime-300: var(--lime-300);
-    --color-lime-500: var(--lime-500);
-    --color-lime-700: var(--lime-700);
-    --color-celeste-100: var(--celeste-100);
-    --color-celeste-300: var(--celeste-300);
-    --color-celeste-500: var(--celeste-500);
-    --color-celeste-700: var(--celeste-700);
-    --color-sol-100: var(--sol-100);
-    --color-sol-300: var(--sol-300);
-    --color-sol-500: var(--sol-500);
-    --color-sol-700: var(--sol-700);
-    --color-ink: var(--ink);
-    --color-ink-soft: var(--ink-soft);
+    /* Acentos de marca como utilidades (bg-amber, text-sky, …) */
+    --color-field: var(--field);
+    --color-field-soft: var(--field-soft);
+    --color-amber: var(--amber);
+    --color-amber-soft: var(--amber-soft);
+    --color-sky: var(--sky);
+    --color-sky-soft: var(--sky-soft);
+    --color-terracotta: var(--terracotta);
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -80,70 +72,58 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
+    --radius-sm: calc(var(--radius) * 0.55);
+    --radius-md: calc(var(--radius) * 0.7);
     --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-xl: calc(var(--radius) * 1.35);
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-    /* 4 familias (oklch) */
-    --lime-100: oklch(0.95 0.10 124);
-    --lime-300: oklch(0.90 0.18 126);
-    --lime-500: oklch(0.85 0.215 128);
-    --lime-700: oklch(0.66 0.18 132);
-    --celeste-100: oklch(0.93 0.05 232);
-    --celeste-300: oklch(0.84 0.11 232);
-    --celeste-500: oklch(0.70 0.155 233);
-    --celeste-700: oklch(0.52 0.15 240);
-    --sol-100: oklch(0.95 0.07 90);
-    --sol-300: oklch(0.90 0.14 88);
-    --sol-500: oklch(0.83 0.175 84);
-    --sol-700: oklch(0.70 0.175 66);
-    --ink: oklch(0.21 0.035 165);
-    --ink-soft: oklch(0.40 0.025 165);
-    --line: oklch(0.91 0.012 150);
-    --surface: oklch(0.98 0.010 140);
-    --bg: oklch(0.995 0.006 140);
-    --danger: oklch(0.58 0.19 35);
-    --danger-100: oklch(0.95 0.06 40);
+    /* Acentos de marca */
+    --field: #2f5d3a;        /* verde campo (primary) */
+    --field-soft: #a1d4a8;   /* verde claro (tints) */
+    --amber: #fdba46;        /* destaque / atención */
+    --amber-soft: #ffdeae;
+    --sky: #025a7b;          /* clima / info */
+    --sky-soft: #90d0f6;
+    --terracotta: #b4541f;   /* alerta suave */
 
-    /* Semánticos (shadcn) */
-    --background: var(--bg);
-    --foreground: var(--ink);
-    --card: oklch(1 0 0);
-    --card-foreground: var(--ink);
-    --popover: oklch(1 0 0);
-    --popover-foreground: var(--ink);
-    --primary: var(--lime-500);
-    --primary-foreground: var(--ink);
-    --secondary: var(--surface);
-    --secondary-foreground: var(--ink);
-    --muted: var(--surface);
-    --muted-foreground: oklch(0.54 0.018 165);
-    --accent: var(--celeste-500);
-    --accent-foreground: oklch(1 0 0);
-    --destructive: var(--danger);
-    --border: var(--line);
-    --input: var(--line);
-    --ring: var(--celeste-500);
-    --chart-1: var(--lime-500);
-    --chart-2: var(--celeste-500);
-    --chart-3: var(--sol-500);
-    --chart-4: var(--ink-soft);
-    --chart-5: var(--danger);
-    --radius: 0.875rem;
-    --sidebar: var(--surface);
-    --sidebar-foreground: var(--ink);
-    --sidebar-primary: var(--lime-500);
-    --sidebar-primary-foreground: var(--ink);
-    --sidebar-accent: var(--celeste-100);
-    --sidebar-accent-foreground: var(--ink);
-    --sidebar-border: var(--line);
-    --sidebar-ring: var(--celeste-500);
+    /* Semánticos (shadcn) — Material 3 "Agro-Analytical Modernism" */
+    --background: #fbf9f1;          /* hueso */
+    --foreground: #1b1c17;          /* carbón cálido */
+    --card: #ffffff;
+    --card-foreground: #1b1c17;
+    --popover: #ffffff;
+    --popover-foreground: #1b1c17;
+    --primary: #2f5d3a;             /* verde campo */
+    --primary-foreground: #ffffff;
+    --secondary: #f0eee6;           /* surface-container */
+    --secondary-foreground: #1b1c17;
+    --muted: #f6f4ec;
+    --muted-foreground: #414941;    /* on-surface-variant */
+    --accent: #fdba46;              /* ámbar */
+    --accent-foreground: #704b00;
+    --destructive: #ba1a1a;
+    --border: #c1c9be;              /* outline-variant */
+    --input: #c1c9be;
+    --ring: #2f5d3a;
+    --chart-1: #2f5d3a;
+    --chart-2: #fdba46;
+    --chart-3: #025a7b;
+    --chart-4: #414941;
+    --chart-5: #ba1a1a;
+    --radius: 1rem;                 /* cards 16px; botones ≈ 11px */
+    --sidebar: #f6f4ec;
+    --sidebar-foreground: #1b1c17;
+    --sidebar-primary: #2f5d3a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f0eee6;
+    --sidebar-accent-foreground: #1b1c17;
+    --sidebar-border: #c1c9be;
+    --sidebar-ring: #2f5d3a;
 }
 
 @layer base {
@@ -152,15 +132,16 @@
   }
   html {
     @apply font-sans;
-    font-size: 17px; /* base de campo, más legible */
+    font-size: 17px; /* base de campo, legible */
   }
   body {
     @apply bg-background text-foreground;
   }
-  /* Títulos en Archivo (incluye CardTitle de shadcn, sin tocar el componente) */
+  /* Títulos en Archivo condensado ("Narrow"), tracking ajustado */
   h1, h2, h3, h4, h5,
   [data-slot="card-title"] {
     font-family: var(--font-heading);
-    letter-spacing: -0.02em;
+    font-stretch: 78%;
+    letter-spacing: -0.01em;
   }
 }

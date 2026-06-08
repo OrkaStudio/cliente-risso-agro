@@ -90,7 +90,7 @@ export function AnimalesPage() {
                         {a.id && (
                           <Link
                             to={`/hacienda/${a.id}`}
-                            className="text-celeste-700 hover:underline"
+                            className="text-primary hover:underline"
                           >
                             Ver ficha
                           </Link>
