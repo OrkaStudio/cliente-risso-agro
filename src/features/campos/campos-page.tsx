@@ -53,7 +53,7 @@ export function CamposPage() {
                     />
                     <Link
                       to={`/campos/${c.id}`}
-                      className="text-sm text-primary hover:underline"
+                      className="text-sm text-celeste-700 hover:underline"
                     >
                       Ver potreros →
                     </Link>

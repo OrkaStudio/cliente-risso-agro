@@ -1,13 +1,54 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+/* ============================================================
+   Identidad Risso Agro — handoff de Claude Design (2026-06-08)
+   4 familias: Lima (acción) · Celeste (IA/vínculos) · Sol (alerta
+   amable) · Tinta (texto/superficies). Tipografía de campo:
+   Inter (cuerpo) + Archivo (títulos), self-hosted.
+   ============================================================ */
+
+/* Archivo viene SIN tabla DSIG (la original la trae y Chrome la
+   rechaza como NetworkError → los títulos caen a fallback). */
+@font-face {
+  font-family: "Archivo";
+  src: url("./assets/fonts/Archivo-Variable.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/Inter-Variable.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+
+    /* Escalas de marca expuestas como utilidades (bg-lime-500, text-celeste-700, …) */
+    --color-lime-100: var(--lime-100);
+    --color-lime-300: var(--lime-300);
+    --color-lime-500: var(--lime-500);
+    --color-lime-700: var(--lime-700);
+    --color-celeste-100: var(--celeste-100);
+    --color-celeste-300: var(--celeste-300);
+    --color-celeste-500: var(--celeste-500);
+    --color-celeste-700: var(--celeste-700);
+    --color-sol-100: var(--sol-100);
+    --color-sol-300: var(--sol-300);
+    --color-sol-500: var(--sol-500);
+    --color-sol-700: var(--sol-700);
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,82 +90,77 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
+    /* 4 familias (oklch) */
+    --lime-100: oklch(0.95 0.10 124);
+    --lime-300: oklch(0.90 0.18 126);
+    --lime-500: oklch(0.85 0.215 128);
+    --lime-700: oklch(0.66 0.18 132);
+    --celeste-100: oklch(0.93 0.05 232);
+    --celeste-300: oklch(0.84 0.11 232);
+    --celeste-500: oklch(0.70 0.155 233);
+    --celeste-700: oklch(0.52 0.15 240);
+    --sol-100: oklch(0.95 0.07 90);
+    --sol-300: oklch(0.90 0.14 88);
+    --sol-500: oklch(0.83 0.175 84);
+    --sol-700: oklch(0.70 0.175 66);
+    --ink: oklch(0.21 0.035 165);
+    --ink-soft: oklch(0.40 0.025 165);
+    --line: oklch(0.91 0.012 150);
+    --surface: oklch(0.98 0.010 140);
+    --bg: oklch(0.995 0.006 140);
+    --danger: oklch(0.58 0.19 35);
+    --danger-100: oklch(0.95 0.06 40);
 
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    /* Semánticos (shadcn) */
+    --background: var(--bg);
+    --foreground: var(--ink);
+    --card: oklch(1 0 0);
+    --card-foreground: var(--ink);
+    --popover: oklch(1 0 0);
+    --popover-foreground: var(--ink);
+    --primary: var(--lime-500);
+    --primary-foreground: var(--ink);
+    --secondary: var(--surface);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface);
+    --muted-foreground: oklch(0.54 0.018 165);
+    --accent: var(--celeste-500);
+    --accent-foreground: oklch(1 0 0);
+    --destructive: var(--danger);
+    --border: var(--line);
+    --input: var(--line);
+    --ring: var(--celeste-500);
+    --chart-1: var(--lime-500);
+    --chart-2: var(--celeste-500);
+    --chart-3: var(--sol-500);
+    --chart-4: var(--ink-soft);
+    --chart-5: var(--danger);
+    --radius: 0.875rem;
+    --sidebar: var(--surface);
+    --sidebar-foreground: var(--ink);
+    --sidebar-primary: var(--lime-500);
+    --sidebar-primary-foreground: var(--ink);
+    --sidebar-accent: var(--celeste-100);
+    --sidebar-accent-foreground: var(--ink);
+    --sidebar-border: var(--line);
+    --sidebar-ring: var(--celeste-500);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+    font-size: 17px; /* base de campo, más legible */
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Títulos en Archivo (incluye CardTitle de shadcn, sin tocar el componente) */
+  h1, h2, h3, h4, h5,
+  [data-slot="card-title"] {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
 }
