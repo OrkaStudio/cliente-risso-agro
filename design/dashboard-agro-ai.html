@@ -369,10 +369,13 @@
   .dstate{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .dstate .it{background:var(--inset);border:1px solid rgba(0,0,0,0.03);border-radius:14px;padding:12px 14px}
   .dstate .it .l{font-size:12px;color:var(--muted);font-weight:500}.dstate .it .v{font-weight:600;font-size:15px;margin-top:2px;color:var(--ink)}
-  .dhist{display:flex;align-items:flex-end;gap:10px;height:80px;background:var(--inset);border:1px solid rgba(0,0,0,0.03);border-radius:14px;padding:14px}
+  .dhist{display:flex;align-items:flex-end;gap:10px;height:120px;background:var(--inset);border:1px solid rgba(0,0,0,0.03);border-radius:14px;padding:16px}
   .dhist .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end;height:100%}
-  .dhist .b i{width:60%;background:linear-gradient(0deg, var(--verde-deep), var(--verde));border-radius:4px 4px 0 0;display:block;box-shadow:0 -2px 6px var(--verde-glow)}
-  .dhist .b small{font-size:10px;color:var(--muted);font-weight:600}
+  .dhist .b i{width:62%;background:#aecbb7;border-radius:4px 4px 0 0;display:block}
+  .dhist .b.last i{background:linear-gradient(0deg, var(--verde-deep), var(--verde));box-shadow:0 -2px 8px var(--verde-glow)}
+  .dhist .b small{font-size:11px;color:var(--muted);font-weight:600}
+  .dhist .b.last small{color:var(--ink);font-weight:700;font-size:12px}
+  .ai-note{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--sol-deep);background:var(--sol-soft);border-radius:12px;padding:10px 14px;margin-top:10px;font-weight:500;line-height:1.5}
   .dact{display:flex;gap:12px;margin-top:auto;padding-top:10px}
   .dact button{flex:1;border-radius:12px;padding:14px;font-weight:600;font-size:14.5px;cursor:pointer;font-family:inherit;border:1px solid var(--border);transition:all 0.2s}
   .dact .primary{background:var(--verde);color:#fff;border-color:var(--verde);box-shadow:0 4px 12px var(--verde-glow)}
@@ -407,7 +410,11 @@
   
   .moverow{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
   .mf{flex:1;min-width:180px}.mf label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;font-family:'Archivo'}
-  .mf select,.mf input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14.5px;font-weight:500;font-family:inherit;color:var(--ink);box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);transition:border-color 0.2s}
+  .mf select,.mf input{width:100%;background:var(--surface-hi);border:1px solid #d8d0bc;border-radius:12px;padding:12px 14px;font-size:14.5px;font-weight:500;font-family:inherit;color:var(--ink);box-shadow:0 2px 6px rgba(63,54,30,0.04);transition:border-color 0.2s, box-shadow 0.2s}
+  .mf select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%234d574a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;cursor:pointer}
+  .mf input::placeholder{color:var(--faint)}
+  .mf input[type=date]{color-scheme:light}
+  .mf select:hover,.mf input:hover{border-color:var(--faint)}
   .mf select:focus, .mf input:focus{outline:none;border-color:var(--verde);box-shadow:0 0 0 3px var(--verde-soft)}
   .arrow2{font-size:24px;color:var(--muted);padding-bottom:10px;font-family:'Archivo'}
   
@@ -438,6 +445,42 @@
   .expbtns button{flex:1;background:var(--inset);border:1px solid rgba(0,0,0,0.05);border-radius:12px;padding:12px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit;transition:all 0.2s}
   .expbtns button:hover{background:var(--card);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.05)}
   .mf+.mf{margin-top:0}
+
+  /* preview de impacto del movimiento (hechos, D13) */
+  .move-preview{font-size:13.5px;color:var(--muted);background:var(--inset);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:12px;line-height:1.55}
+  .move-preview b{color:var(--ink)}
+  .move-preview:empty{display:none}
+
+  /* ticker responsive */
+  @media(max-width:1380px){.tk .stale{display:none}}
+  @media(max-width:1240px){.tk-clima,.sep-clima{display:none}}
+  @media(max-width:1100px){.tk .lab{display:none}}
+
+  /* EL CAPATAZ — asistente IA conversacional */
+  .capataz-btn{display:flex;align-items:center;gap:8px;background:linear-gradient(110deg,#a06f15,#e0a235);color:#fff;border:none;border-radius:20px;padding:9px 18px;font-weight:700;font-size:13.5px;font-family:'Archivo',sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(224,162,53,.35);transition:transform .2s,box-shadow .2s;white-space:nowrap}
+  .capataz-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(224,162,53,.5)}
+  .capataz-btn svg{width:15px;height:15px}
+  .chat{display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:90%;padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.55}
+  .msg-u{align-self:flex-end;background:var(--verde-soft);color:var(--verde-deep);font-weight:600;border-bottom-right-radius:6px}
+  .msg-c{align-self:flex-start;background:var(--surface-hi);border:1px solid var(--border);border-left:3px solid var(--sol);border-bottom-left-radius:6px;box-shadow:0 2px 10px rgba(63,54,30,.05)}
+  .msg-c b{display:block;margin-bottom:4px}
+  .msg-c .why{font-size:12.5px;color:var(--faint);font-style:italic;margin-top:8px;padding-left:10px;border-left:2px solid var(--sol-soft)}
+  .msg-c .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .msg-c .acts span{font-size:12.5px;font-weight:600;color:var(--verde-deep);background:var(--verde-soft);border-radius:10px;padding:6px 12px;cursor:pointer;transition:background .2s}
+  .msg-c .acts span:hover{background:#d0e3c8}
+  .qsug{display:flex;gap:8px;flex-wrap:wrap}
+  .qsug span{font-size:13px;font-weight:500;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;cursor:pointer;transition:all .2s}
+  .qsug span:hover{border-color:var(--sol);background:var(--sol-soft)}
+  .capin{display:flex;align-items:center;gap:10px;background:var(--surface-hi);border:1px solid #d8d0bc;border-radius:16px;padding:6px 6px 6px 16px;margin-top:auto}
+  .capin input{flex:1;border:none;background:none;outline:none;font-size:14px;font-family:inherit;color:var(--ink)}
+  .capin input::placeholder{color:var(--faint)}
+  .capin .mic,.capin .send{width:36px;height:36px;border-radius:12px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+  .capin .mic{background:var(--inset);color:var(--muted)}
+  .capin .mic:hover{background:var(--sol-soft);color:var(--sol-deep)}
+  .capin .send{background:var(--verde);color:#fff}
+  .capin .send:hover{background:var(--verde-deep)}
+  .capin svg{width:16px;height:16px}
 
   /* placeholders */
   .placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:55vh;text-align:center;color:var(--muted);background:var(--card);border-radius:32px;border:1px dashed var(--faint);margin-top:20px}
@@ -480,9 +523,10 @@
         <div class="tk"><span class="lab"><i data-lucide="beef" style="width:14px;height:14px;color:#c9b393"></i>Gordo</span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
         <div class="sep"></div>
         <div class="tk"><span class="lab"><i data-lucide="banknote" style="width:14px;height:14px;color:#8fc7a0"></i>Blue</span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
-        <div class="sep"></div>
-        <div class="tk"><span class="lab"><i data-lucide="sun" style="width:14px;height:14px;color:#ecc25c"></i>Clima</span><b>24°</b><span style="color:#9ccbe6;display:inline-flex;align-items:center;gap:4px"><i data-lucide="cloud-rain" style="width:13px;height:13px"></i>38mm sem</span></div>
+        <div class="sep sep-clima"></div>
+        <div class="tk tk-clima"><span class="lab"><i data-lucide="sun" style="width:14px;height:14px;color:#ecc25c"></i>Clima</span><b>24°</b><span style="color:#9ccbe6;display:inline-flex;align-items:center;gap:4px"><i data-lucide="cloud-rain" style="width:13px;height:13px"></i>38mm sem</span></div>
       </div>
+      <button class="capataz-btn" onclick="openCapataz()"><i data-lucide="sparkles"></i>Capataz</button>
     </div>
 
     <div class="scroll">
@@ -628,6 +672,7 @@
               <div id="cant-extra"></div>
             </div>
             <div class="renspa-check" id="renspa-check"></div>
+            <div class="move-preview" id="move-preview"></div>
             <button class="btn" style="margin-top:14px" onclick="confirmMove()">Confirmar movimiento</button>
             <div id="move-result"></div>
           </div>
@@ -874,7 +919,14 @@
         : [['Conteo',(p.cab??'—')+' cab'],['Agua',p.agua],['Pasto',p.pasto],['Eléctrico',p.elec]];
     const itemsHtml = items.map(([l,v])=>`<div class="it"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')+`<div class="it"><div class="l">RENSPA</div><div class="v" style="font-size:12px">${p.renspa}</div></div>`;
     const mx=p.hist.length?Math.max(...p.hist):1;
-    const hist=p.hist.length?`<div class="dsec"><h4>Conteo · últimas recorridas</h4><div class="dhist">${p.hist.map(v=>`<div class="b"><i style="height:${Math.round(v/mx*100)}%"></i><small>${v}</small></div>`).join('')}</div></div>`:'';
+    let hist='';
+    if(p.hist.length){
+      const delta=p.hist[p.hist.length-1]-p.hist[0];
+      const lectura=delta===0
+        ? `Estable: el conteo coincide con lo esperado en las últimas ${p.hist.length} recorridas.`
+        : `${delta>0?'+':'−'}${Math.abs(delta)} cabezas en ${p.hist.length} recorridas${delta<0?' — tendencia sostenida a la baja':''}.`;
+      hist=`<div class="dsec"><h4>Conteo · últimas recorridas</h4><div class="dhist">${p.hist.map((v,i)=>`<div class="b${i===p.hist.length-1?' last':''}"><i style="height:${Math.round(v/mx*100)}%"></i><small>${v}</small></div>`).join('')}</div><div class="ai-note">✦ ${lectura}</div></div>`;
+    }
     const contenido=p.e==='ganadero'?`${p.cab} cabezas`:agri?`${p.cultivo||ESTADO[p.e]}${p.etapa?' · '+p.etapa:''}`:(p.listo?'En descanso · lista para animales ✓':'En descanso');
     const sigChips=p.sig&&p.sig.length?`<div class="sigs" style="margin-top:9px">${p.sig.map(s=>`<span class="sig ${s==='agua'?'sig-destete':s==='pasto'?'sig-vender':'sig-trat'}">${PSIG[s]}</span>`).join('')}</div>`:'';
     document.getElementById('drawer').innerHTML=`
@@ -977,6 +1029,16 @@
     if(m==='cat')ex.innerHTML=`<div class="radios" style="margin-top:9px"><span class="rad">Vacas 90</span><span class="rad">Terneros 38</span></div><div style="font-size:11.5px;color:var(--faint);margin-top:5px;font-style:italic">Ej: dejás las madres, sacás los terneros (destete).</div>`;
     else if(m==='num')ex.innerHTML=`<div style="margin-top:9px;display:flex;align-items:center;gap:8px"><input type="number" value="50" style="width:120px"> cabezas</div>`;
     else ex.innerHTML='';
+    /* preview de impacto: hechos antes de confirmar (D13) */
+    const o=pot(document.getElementById('mv-origen').value), d=pot(document.getElementById('mv-destino').value);
+    const mp=document.getElementById('move-preview');
+    if(mp){
+      const oCab=(o&&o.cab)||0;
+      if(o&&d&&oCab){
+        const n=m==='todos'?oCab:m==='cat'?38:50;
+        mp.innerHTML=`Si confirmás: <b>${o.nm}</b> queda en <b>${Math.max(oCab-n,0)} cab</b> · <b>${d.nm}</b> pasa a <b>${(d.cab||0)+n} cab</b> (${(((d.cab||0)+n)/d.ha).toFixed(1).replace('.',',')} cab/ha en ${d.ha} ha).`;
+      } else mp.innerHTML='';
+    }
   }
   function prefill(oid){ document.getElementById('mv-origen').value=oid; moverChange(); document.querySelector('#campos-planificar .panel:last-child').scrollIntoView({behavior:'smooth',block:'center'}); }
   function usarSug(){ document.getElementById('mv-origen').value='la-loma'; document.getElementById('mv-destino').value='la-canada'; moverChange(); }
@@ -1017,6 +1079,35 @@
     if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
   function cargaOk(){const m=document.getElementById('carga-msg');if(m){m.innerHTML='<div class="move-ok">✓ Guardado (demo). Aparece en Movimientos y suma a la rentabilidad del potrero/campo.</div>';}setTimeout(closeDrawer,1500);}
+
+  /* ===== EL CAPATAZ — asistente IA (D3 Motor 2 + D13 "certero o nada") ===== */
+  const CAPQA={
+    'la-loma':{q:'¿Cómo viene La Loma?',a:`<b>La Loma viene cargada y con poco pasto.</b>128 cabezas en 80 ha (1,6 cab/ha). Pasto escaso y agua baja en las últimas 3 recorridas; el conteo bajó de 140 a 128 en 5 recorridas.<div class="why">Datos: recorridas del 02/05 al 06/06 · stock por caravana.</div><div class="acts"><span onclick="capPlan()">⇄ Planificar movimiento</span><span onclick="closeDrawer();nav('campos')">Ver potrero</span></div>`},
+    'aliviar':{q:'¿Qué potrero conviene aliviar?',a:`<b>La Loma — y tenés a La Cañada lista.</b>Es el único potrero ganadero con pasto escaso y agua baja a la vez. La Cañada está vacía con pasto abundante y comparte RENSPA: movés sin guía.<div class="why">Porqué: 3 recorridas seguidas con pasto escaso + receptor disponible en el mismo RENSPA.</div><div class="acts"><span onclick="capPlan()">⇄ Planificar movimiento</span></div>`},
+    'arrendado':{q:'¿Cuánta plata hizo El Arrendado?',a:`<b>El Arrendado va −$1,2M este ciclo (devengado).</b>Es el segundo ciclo en pérdida: el alquiler ($2,1M) se come el resultado ganadero. En caja la pérdida es mayor por los pagos adelantados.<div class="why">Datos: movimientos cargados del ciclo · vista devengado vs caja.</div><div class="acts"><span onclick="closeDrawer();nav('analitica')">Ver Analítica</span></div>`},
+    'lluvia':{q:'¿Cómo venimos de lluvia?',a:`<b>Mayo cerró seco: 38 mm, un 38% abajo del promedio.</b>Tercer mes consecutivo por debajo. Todavía no alcanza para una opinión de venta — falta cruzarlo con precio y temporada.<div class="why">Datos: pluviómetro cargado + Open-Meteo. Sin las otras patas (D13), no opino de vender.</div>`},
+  };
+  function openCapataz(){
+    document.getElementById('drawer').innerHTML=`
+      <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3 style="display:flex;align-items:center;gap:10px">El Capataz <span class="tag-ia">✦ IA</span></h3><div class="ds">Preguntale a tus datos — siempre con el porqué</div></div>
+      <div class="db">
+        <div class="chat" id="cap-chat"></div>
+        <div class="dsec"><h4>Probá preguntarle</h4><div class="qsug" id="cap-sugs"></div></div>
+        <div class="capin"><input placeholder="Escribí o dictá tu pregunta…"><button class="mic" title="Dictar (voz narrada)"><i data-lucide="mic"></i></button><button class="send"><i data-lucide="send"></i></button></div>
+        <div style="font-size:12px;color:var(--faint);text-align:center;padding-bottom:4px">Responde solo con tus datos. Si no le alcanzan para opinar, te lo dice — no inventa.</div>
+      </div>`;
+    capMsg('la-loma');
+    document.getElementById('drawer').classList.add('open');
+    document.querySelector('.scroll').classList.add('with-drawer');
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
+  }
+  function capMsg(k){
+    const x=CAPQA[k];
+    document.getElementById('cap-chat').innerHTML=`<div class="msg msg-u">${x.q}</div><div class="msg msg-c">${x.a}</div>`;
+    document.getElementById('cap-sugs').innerHTML=Object.entries(CAPQA).filter(([kk])=>kk!==k).map(([kk,v])=>`<span onclick="capMsg('${kk}')">${v.q}</span>`).join('');
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
+  }
+  function capPlan(){closeDrawer();nav('campos');setCamposMode('planificar');}
 
   renderCampos();
 

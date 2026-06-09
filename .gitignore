@@ -37,3 +37,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capturas del tour visual de la maqueta (design/tour.js)
+/design/shots
