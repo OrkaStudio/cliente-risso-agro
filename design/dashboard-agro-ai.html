@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risso Agro — Maqueta navegable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --canvas:#d4d9c9; --card:#eef1e8; --card-2:#e7ebdd; --inset:#dfe3d4; --surface-hi:#d6dbca;
+    --border:#c4cbb3; --border-hi:#aeb898;
+    --ink:#1f281f; --muted:#586353; --faint:#86907b;
+    --side:#22372a; --side-2:#1b2d22; --side-text:#d2e2d4; --side-muted:#8ba493; --side-border:#314a39;
+    --verde:#3f8a4f; --verde-deep:#2c6739; --verde-soft:#dce8d4; --verde-glow:rgba(63,138,79,.14);
+    --sol:#cd9128; --sol-soft:#efe2c2;
+    --cielo:#3a87ab; --cielo-soft:#d7e6ec;
+    --tierra:#bb6038; --tierra-soft:#ebddd1;
+    --rojo:#c64a3b; --rojo-soft:#f0dcd7;
+    --ia:#1f8e6c;
+    --shadow:0 5px 16px rgba(34,52,30,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);font-size:14px;line-height:1.5;
+    background:linear-gradient(180deg,#dce1d2 0%, var(--canvas) 42%, #cdd2bf 100%)}
+  h1,h2,h3,h4,.h{font-family:'Archivo',sans-serif;letter-spacing:-.02em}
+  .tnum{font-variant-numeric:tabular-nums}
+  .app{display:flex;min-height:100vh;position:relative;z-index:1}
+
+  /* fondo campo */
+  .field-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .field-bg .sun{position:absolute;top:-10%;right:4%;width:40vw;height:40vw;max-width:520px;max-height:520px;background:radial-gradient(circle at 50% 50%, rgba(205,145,40,.10), transparent 62%)}
+  .field-bg .hills{position:absolute;bottom:0;left:0;width:100%;height:30vh;min-height:200px;opacity:.55}
+  .grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.22;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* SIDEBAR */
+  .side{width:248px;flex:0 0 248px;border-right:1px solid var(--side-border);padding:20px 14px;display:flex;flex-direction:column;gap:5px;background:var(--side)}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .brand .mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#5fb46f,#2c6739);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+  .brand b{font-family:'Archivo';font-size:17px;font-weight:700;color:#fff}
+  .brand small{display:block;color:var(--side-muted);font-size:11px;font-weight:500;letter-spacing:.04em}
+  .navlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--side-muted);padding:14px 10px 6px;font-weight:600}
+  .nav{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;color:var(--side-muted);font-weight:500;cursor:pointer;font-size:13.5px}
+  .nav .i{width:18px;text-align:center;font-size:15px;opacity:.9}
+  .nav:hover{background:var(--side-2);color:var(--side-text)}
+  .nav.on{background:rgba(255,255,255,.08);color:#fff}
+  .nav.on .i{color:#7fcf86}
+  .nav .badge{margin-left:auto;background:var(--rojo);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px}
+  .side .grow{flex:1}
+  .user{display:flex;align-items:center;gap:9px;padding:11px 8px;margin-top:8px;border-top:1px solid var(--side-border)}
+  .user .av{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9fe0a6}
+  .user .nm{font-size:12.5px;font-weight:600;color:var(--side-text)}.user .em{font-size:11px;color:var(--side-muted)}
+
+  /* MAIN + TOPBAR */
+  main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .topbar{display:flex;align-items:center;gap:18px;padding:14px 26px;border-bottom:1px solid var(--side-border);background:var(--side);position:sticky;top:0;z-index:5}
+  .scope{display:flex;align-items:center;gap:8px;font-family:'Archivo';font-weight:700;font-size:16px;color:#fff}
+  .scope .chev{color:var(--side-muted);font-size:12px}
+  .ticker{display:flex;align-items:center;gap:18px;margin-left:auto;font-size:13px;color:var(--side-text)}
+  .tk{display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .tk .lab{color:var(--side-muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .tk b{font-weight:600;color:#fff}
+  .up{color:var(--verde-deep)} .down{color:var(--rojo)}
+  .topbar .up{color:#82d28c} .topbar .down{color:#f0988b}
+  .tk .stale{color:#f1c878;font-size:11px;border:1px solid rgba(232,178,90,.45);background:rgba(232,178,90,.16);border-radius:8px;padding:1px 6px}
+  .sep{width:1px;height:22px;background:var(--side-border)}
+
+  .scroll{padding:22px 26px 60px;overflow-y:auto;max-width:1280px;width:100%;transition:padding-right .22s}
+  .scroll.with-drawer{padding-right:404px}
+  .page{display:none}
+  .page.active{display:flex;flex-direction:column;gap:18px}
+
+  /* paneles base */
+  .panel{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:18px;box-shadow:var(--shadow)}
+  .panel .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .panel .ph h3{font-size:15px}
+  .panel .ph .sub{color:var(--faint);font-size:12px}
+  .tag-ia{font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--ia),var(--verde));border-radius:6px;padding:2px 8px;letter-spacing:.03em}
+  .row{display:grid;gap:14px}
+  .row.a{grid-template-columns:1.35fr 1fr}.row.b{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:1100px){.row.a,.row.b{grid-template-columns:1fr}}
+
+  /* KPIs (Inicio) */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kpi{border:1px solid var(--border);border-radius:14px;padding:15px 16px;background:var(--card);position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .kpi .lab{color:var(--muted);font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px}
+  .kpi .v{font-family:'Archivo';font-size:30px;font-weight:700;margin-top:6px;line-height:1}
+  .kpi .d{font-size:12px;margin-top:6px;display:flex;align-items:center;gap:5px}
+  .kpi svg{position:absolute;right:10px;bottom:10px;opacity:.95}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .kpi.k1::before{background:var(--verde)}.kpi.k2::before{background:var(--sol)}.kpi.k3::before{background:var(--cielo)}.kpi.k4::before{background:var(--tierra)}
+  @media(max-width:1100px){.kpis,.campos{grid-template-columns:repeat(2,1fr)}}
+
+  .insight{display:flex;gap:12px;padding:12px;border-radius:12px;background:var(--inset);border:1px solid var(--border);margin-bottom:10px}
+  .insight:last-child{margin-bottom:0}
+  .insight .ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 34px}
+  .ic-rojo{background:var(--rojo-soft);color:var(--rojo)}.ic-sol{background:var(--sol-soft);color:#9a6c10}
+  .ic-cielo{background:var(--cielo-soft);color:var(--cielo)}.ic-verde{background:var(--verde-soft);color:var(--verde-deep)}
+  .insight .tx{flex:1}.insight .tx b{font-size:13.5px;font-weight:600;display:block}.insight .tx p{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .insight .why{font-size:11.5px;color:var(--faint);margin-top:4px;font-style:italic}
+  .insight .act{align-self:center;font-size:12px;color:var(--verde-deep);font-weight:600;white-space:nowrap;cursor:pointer}
+  .donut-wrap{display:flex;align-items:center;gap:18px}
+  .legend{display:flex;flex-direction:column;gap:8px;font-size:12.5px}
+  .legend div{display:flex;align-items:center;gap:8px}.legend .sw{width:10px;height:10px;border-radius:3px}.legend .n{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+  .campos{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .pcard{border:1px solid var(--border);border-radius:13px;padding:13px;background:var(--card-2);cursor:pointer;transition:.12s}
+  .pcard:hover{border-color:var(--border-hi);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .pcard .top{display:flex;justify-content:space-between;align-items:start}
+  .pcard .nm{font-family:'Archivo';font-weight:600;font-size:14px}.pcard .cmp{color:var(--faint);font-size:11px}
+  .pstate{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:5px}
+  .ps-gan{background:var(--verde-soft);color:var(--verde-deep)}.ps-des{background:var(--sol-soft);color:#9a6c10}
+  .ps-cul{background:var(--cielo-soft);color:var(--cielo)}.ps-cos{background:var(--rojo-soft);color:var(--tierra)}
+  .pcard .big{font-family:'Archivo';font-size:26px;font-weight:700;margin-top:14px;line-height:1}
+  .pcard .meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:8px}
+  .warn-dot{color:var(--rojo)}
+
+  /* HACIENDA */
+  .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  .pagehead h1{font-size:26px}.pagehead .sub{color:var(--muted);font-size:13.5px;margin-top:2px}
+  .btn{background:var(--verde);color:#fff;border:none;border-radius:11px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:var(--shadow);font-family:inherit}
+  .resumen{display:grid;grid-template-columns:1.5fr 1fr;gap:14px}
+  @media(max-width:1000px){.resumen{grid-template-columns:1fr}}
+  .total{display:flex;align-items:baseline;gap:8px;margin-bottom:14px}
+  .total .v{font-family:'Archivo';font-size:34px;font-weight:700;line-height:1}.total .l{color:var(--muted);font-size:13px}
+  .stackbar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:14px}.stackbar span{height:100%}
+  .catleg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12.5px}
+  .catleg div{display:flex;align-items:center;gap:7px}.catleg .dot{width:9px;height:9px;border-radius:3px}.catleg .n{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
+  .signals{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sigstat{display:flex;align-items:center;gap:11px;padding:11px;border-radius:12px;background:var(--inset);border:1px solid var(--border);cursor:pointer;transition:.1s}
+  .sigstat:hover{border-color:var(--border-hi)}
+  .sigstat .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 32px}
+  .sigstat .v{font-family:'Archivo';font-size:19px;font-weight:700;line-height:1}.sigstat .l{font-size:11.5px;color:var(--muted)}
+  .ic-trat{background:var(--rojo-soft);color:var(--rojo)}.ic-pre{background:var(--verde-soft);color:var(--verde-deep)}
+  .ic-vender{background:var(--sol-soft);color:#9a6c10}.ic-destete{background:var(--cielo-soft);color:var(--cielo)}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .search{flex:1;min-width:230px;display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);border-radius:11px;padding:9px 13px;box-shadow:var(--shadow)}
+  .search input{flex:1;border:none;background:none;outline:none;font-size:14px;font-family:inherit;color:var(--ink)}.search input::placeholder{color:var(--faint)}
+  .select{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:9px 13px;font-size:13px;color:var(--muted);cursor:pointer;box-shadow:var(--shadow);font-family:inherit}
+  .toggle{display:flex;background:var(--inset);border:1px solid var(--border);border-radius:11px;padding:3px;margin-left:auto}
+  .toggle button{border:none;background:none;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit}
+  .toggle button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+  .qviews{display:flex;gap:8px;flex-wrap:wrap}
+  .qv{font-size:12.5px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 13px;cursor:pointer;display:flex;gap:6px;align-items:center}
+  .qv:hover{border-color:var(--border-hi)}.qv.on{background:var(--verde-soft);border-color:var(--verde);color:var(--verde-deep);font-weight:600}
+  .qv .c{color:var(--faint);font-weight:600}.qv.on .c{color:var(--verde)}
+  .tbl{width:100%;border-collapse:collapse}
+  .tbl th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--border)}
+  .tbl td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tbody tr{cursor:pointer}.tbl tbody tr:hover td{background:var(--inset)}
+  .cv{font-weight:600;font-variant-numeric:tabular-nums}
+  .cat{display:inline-flex;align-items:center;gap:8px}.cat .dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+  .sigs{display:flex;gap:5px;flex-wrap:wrap}
+  .sig{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-flex;gap:4px;white-space:nowrap}
+  .sig-trat{background:var(--rojo-soft);color:var(--rojo)}.sig-pre{background:var(--verde-soft);color:var(--verde-deep)}
+  .sig-vender{background:var(--sol-soft);color:#9a6c10}.sig-destete{background:var(--cielo-soft);color:var(--cielo)}
+  .arrow{color:var(--faint);text-align:right}.empty{color:var(--faint);text-align:center;padding:30px}
+  .potblock{margin-bottom:14px}.pothead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .pothead .nm{font-family:'Archivo';font-weight:700;font-size:15px}
+  .pothead .cnt{font-size:12px;color:var(--muted);background:var(--inset);border:1px solid var(--border);border-radius:20px;padding:2px 10px}
+
+  /* CAMPOS */
+  .campos-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .campos-head h1{font-size:26px}.campos-head .sub{color:var(--muted);font-size:13.5px;margin-top:2px}
+  .cselect{display:flex;gap:8px;flex-wrap:wrap}
+  .cs{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;box-shadow:var(--shadow);font-family:inherit}
+  .cs.on{background:var(--side);color:#fff;border-color:var(--side)}
+  .cs small{font-weight:500;opacity:.7;margin-left:5px}
+  .viewbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .vtoggle{display:flex;background:var(--inset);border:1px solid var(--border);border-radius:11px;padding:3px}
+  .vtoggle button{border:none;background:none;padding:7px 13px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit}
+  .vtoggle button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+  .vtoggle button:disabled{opacity:.45;cursor:not-allowed}
+  .cleg{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+  .cl{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 11px;cursor:pointer}
+  .cl.dim{opacity:.4}.cl .dot{width:9px;height:9px;border-radius:3px}
+  .mosaic{display:flex;flex-wrap:wrap;gap:8px}
+  .tile{border-radius:12px;padding:12px 13px;min-width:128px;height:118px;cursor:pointer;color:#21281c;border:1px solid rgba(20,40,20,.08);display:flex;flex-direction:column;justify-content:space-between;transition:.12s}
+  .tile:hover{transform:translateY(-2px);box-shadow:var(--shadow);filter:brightness(1.03)}
+  .tile.dim{opacity:.25}
+  .tile .nm{font-family:'Archivo';font-weight:700;font-size:14.5px;line-height:1.1;display:flex;justify-content:space-between;gap:6px}
+  .tile .nm .ha{font-size:11px;font-weight:600;opacity:.65;white-space:nowrap}
+  .tile .mid{font-family:'Archivo';font-weight:700;font-size:22px;line-height:1.05}
+  .tile .mid small{font-size:11px;font-weight:600;opacity:.75}
+  .tile .tsig{display:flex;gap:4px;flex-wrap:wrap}
+  .tile .tsig span{font-size:10px;font-weight:600;background:rgba(255,255,255,.55);border-radius:20px;padding:1px 7px}
+  .e-ganadero{background:#bcd7a2}.e-descanso{background:#ecd596}.e-preparacion{background:#d9b69e}
+  .e-siembra{background:#d3e2bf}.e-cultivo{background:#a6ce88}.e-cosecha{background:#ecca7e}.e-rastrojo{background:#ddd2ad}
+  .scrim{position:fixed;inset:0;background:rgba(20,30,18,.34);z-index:29;opacity:0;pointer-events:none;transition:.2s}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:57px;right:0;height:calc(100vh - 57px);width:380px;max-width:92vw;background:var(--card);border-left:1px solid var(--border);box-shadow:-12px 0 34px rgba(20,40,20,.16);z-index:30;transform:translateX(100%);transition:transform .22s;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer .dh{padding:18px;border-bottom:1px solid var(--border)}
+  .drawer .dh .x{float:right;cursor:pointer;color:var(--muted);font-size:18px;background:none;border:none}
+  .drawer .dh h3{font-size:18px}.drawer .dh .ds{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .drawer .db{padding:18px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:16px}
+  .dsec h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px}
+  .dstate{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .dstate .it{background:var(--inset);border:1px solid var(--border);border-radius:10px;padding:9px 11px}
+  .dstate .it .l{font-size:11px;color:var(--muted)}.dstate .it .v{font-weight:600;font-size:14px;margin-top:1px}
+  .dhist{display:flex;align-items:flex-end;gap:8px;height:74px;background:var(--inset);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .dhist .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%}
+  .dhist .b i{width:58%;background:var(--verde);border-radius:3px 3px 0 0;display:block}
+  .dhist .b small{font-size:9px;color:var(--faint)}
+  .dact{display:flex;gap:8px}
+  .dact button{flex:1;border-radius:10px;padding:10px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;border:1px solid var(--border)}
+  .dact .primary{background:var(--verde);color:#fff;border-color:var(--verde)}.dact .ghost{background:var(--card);color:var(--ink)}
+  #campos-map{border-radius:16px}
+  .pottip{background:rgba(18,28,16,.76)!important;border:none!important;color:#fff!important;font-family:'Archivo',sans-serif!important;padding:4px 10px!important;text-align:center!important;line-height:1.2!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important;border-radius:8px!important}
+  .pottip b{display:block;font-size:12px;font-weight:700}
+  .pottip span{display:block;font-size:10px;font-weight:600;opacity:.9;margin-top:1px}
+  .pottip::before{display:none!important}
+  /* PLANIFICAR MOVIMIENTOS */
+  .segment{display:flex;gap:6px;background:var(--inset);border:1px solid var(--border);border-radius:12px;padding:4px;width:fit-content}
+  .segment button{border:none;background:none;padding:9px 16px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit}
+  .segment button.on{background:var(--side);color:#fff;box-shadow:var(--shadow)}
+  .planhead{font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 15px}
+  .planhead b{color:var(--ink)}
+  .suggest{border-left:4px solid var(--verde);background:linear-gradient(90deg,var(--verde-soft),var(--card) 62%)}
+  .plan-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.plan-cols{grid-template-columns:1fr}}
+  .prow{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;background:var(--inset);border:1px solid var(--border);margin-bottom:9px}
+  .prow:last-child{margin-bottom:0}
+  .prow .pn{font-family:'Archivo';font-weight:600;font-size:14px}.prow .pm{font-size:12px;color:var(--muted);margin-top:1px}
+  .prow .pa{margin-left:auto;font-size:12.5px;font-weight:600;color:var(--verde-deep);cursor:pointer;white-space:nowrap}
+  .moverow{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .mf{flex:1;min-width:170px}.mf label{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+  .mf select,.mf input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:14px;font-family:inherit;color:var(--ink)}
+  .arrow2{font-size:20px;color:var(--muted);padding-bottom:9px}
+  .radios{display:flex;gap:8px;flex-wrap:wrap}
+  .rad{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer}
+  .rad.on{background:var(--verde-soft);border-color:var(--verde);color:var(--verde-deep);font-weight:600}
+  .rad input{accent-color:var(--verde)}
+  .renspa-check{margin-top:13px;font-size:13px;font-weight:600;border-radius:10px;padding:10px 13px}
+  .rc-ok{background:var(--verde-soft);color:var(--verde-deep)}.rc-warn{background:var(--sol-soft);color:#9a6c10}
+  .move-ok{margin-top:12px;background:var(--verde-soft);border:1px solid var(--verde);border-radius:11px;padding:13px;font-size:13.5px;color:var(--verde-deep);line-height:1.5}
+  /* ANALÍTICA */
+  .rentbar{display:flex;flex-direction:column;gap:11px}
+  .rb{display:flex;align-items:center;gap:12px;font-size:13px}
+  .rb .rn{flex:0 0 104px;font-weight:600}
+  .rb .track{flex:1;height:16px;background:var(--inset);border-radius:8px;overflow:hidden}
+  .rb .fill{height:100%;border-radius:8px;background:var(--verde)}
+  .rb.loss .fill{background:var(--rojo)}
+  .rb .rv{flex:0 0 70px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--verde-deep)}
+  .rb.loss .rv{color:var(--rojo)}
+  .expbtns{display:flex;gap:8px;margin-top:14px}
+  .expbtns button{flex:1;background:var(--inset);border:1px solid var(--border);border-radius:10px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit}
+  .mf+.mf{margin-top:0}
+
+  /* placeholders */
+  .placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:55vh;text-align:center;color:var(--muted)}
+  .placeholder .ico{font-size:42px;opacity:.55}.placeholder h2{font-size:22px;color:var(--ink)}.placeholder p{font-size:13.5px;max-width:360px}
+  .legendnote{text-align:center;color:var(--faint);font-size:12px;padding:18px;margin-top:6px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="field-bg" aria-hidden="true">
+  <div class="sun"></div>
+  <svg class="hills" viewBox="0 0 1440 240" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0,150 C240,104 480,134 720,116 C960,98 1200,140 1440,108 L1440,240 L0,240 Z" fill="#b9c2a4"/>
+    <path d="M0,182 C320,148 600,176 920,158 C1140,146 1330,178 1440,166 L1440,240 L0,240 Z" fill="#a6b18d"/>
+  </svg>
+</div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mark">🌾</div><div><b>Risso Agro</b><small>Gestión de campo</small></div></div>
+    <div class="navlabel">Oficina</div>
+    <div class="nav on" data-page="inicio" onclick="nav('inicio')"><span class="i">◎</span> Inicio</div>
+    <div class="nav" data-page="hacienda" onclick="nav('hacienda')"><span class="i">🐄</span> Hacienda</div>
+    <div class="nav" data-page="campos" onclick="nav('campos')"><span class="i">🗺️</span> Campos</div>
+    <div class="nav" data-page="analitica" onclick="nav('analitica')"><span class="i">📊</span> Analítica</div>
+    <div class="navlabel">Campo</div>
+    <div class="nav" data-page="recorrida" onclick="nav('recorrida')"><span class="i">📍</span> Recorrida</div>
+    <div class="nav" data-page="clima" onclick="nav('clima')"><span class="i">☔</span> Clima <span class="badge">2</span></div>
+    <div class="grow"></div>
+    <div class="user"><div class="av">L</div><div><div class="nm">Risso</div><div class="em">orka.arg@gmail.com</div></div></div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="scope">Toda la empresa <span class="chev">▾</span></div>
+      <div class="ticker">
+        <div class="tk"><span class="lab">🐂 Gordo</span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
+        <div class="sep"></div>
+        <div class="tk"><span class="lab">💵 Blue</span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
+        <div class="sep"></div>
+        <div class="tk"><span class="lab">Clima</span><b>☀️ 24°</b><span style="color:#7ec6e6">🌧️ 38mm sem</span></div>
+      </div>
+    </div>
+
+    <div class="scroll">
+
+      <!-- ============ INICIO ============ -->
+      <div class="page active" id="page-inicio">
+        <section class="kpis">
+          <div class="kpi k1"><div class="lab">🐄 Stock total</div><div class="v tnum">545</div><div class="d up">▲ 18 partos este mes</div>
+            <svg width="78" height="34" viewBox="0 0 78 34"><polyline points="0,28 13,26 26,27 39,20 52,18 65,12 78,9" fill="none" stroke="var(--verde)" stroke-width="2"/></svg></div>
+          <div class="kpi k2"><div class="lab">💰 Rentabilidad</div><div class="v tnum up">+$18,4M</div><div class="d"><span style="color:var(--muted)">ciclo · 3 campos</span></div>
+            <svg width="78" height="34" viewBox="0 0 78 34"><polyline points="0,24 13,26 26,18 39,22 52,12 65,14 78,6" fill="none" stroke="var(--sol)" stroke-width="2"/></svg></div>
+          <div class="kpi k3"><div class="lab">☔ Lluvia (mayo)</div><div class="v tnum">38<span style="font-size:16px;color:var(--muted)">mm</span></div><div class="d down">▼ 38% vs promedio · seco</div>
+            <svg width="78" height="34" viewBox="0 0 78 34"><rect x="2" y="14" width="8" height="20" rx="2" fill="var(--cielo)" opacity=".45"/><rect x="14" y="10" width="8" height="24" rx="2" fill="var(--cielo)" opacity=".45"/><rect x="26" y="20" width="8" height="14" rx="2" fill="var(--cielo)"/><rect x="38" y="22" width="8" height="12" rx="2" fill="var(--cielo)"/><rect x="50" y="24" width="8" height="10" rx="2" fill="var(--cielo)"/><rect x="62" y="26" width="8" height="8" rx="2" fill="var(--cielo)"/></svg></div>
+          <div class="kpi k4"><div class="lab">🏦 Por pagar</div><div class="v tnum">$1,2M</div><div class="d" style="color:#9a6c10">● 1 cheque vence en 2 días</div></div>
+        </section>
+
+        <section><div class="panel">
+          <div class="ph"><h3>Estado de los campos</h3><span class="sub">tocá un potrero para entrar</span></div>
+          <div class="campos">
+            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot">⚠ pasto escaso</span> · 💧 baja</div></div>
+            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · 💧 ok</div></div>
+            <div class="pcard"><div class="top"><div><div class="nm">El Bajo</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-cul">● Maíz</span></div><div class="big tnum" style="font-size:18px;color:var(--cielo)">Creciendo</div><div class="meta">cosecha ~jul</div></div>
+            <div class="pcard"><div class="top"><div><div class="nm">La Cañada</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-des">● Descanso</span></div><div class="big tnum" style="font-size:18px;color:var(--verde-deep)">Lista ✓</div><div class="meta">pasto abundante</div></div>
+          </div>
+        </div></section>
+
+        <section class="row a">
+          <div class="panel">
+            <div class="ph"><h3>Requiere atención</h3><span class="tag-ia">✦ IA</span></div>
+            <div class="insight"><div class="ic ic-verde">💡</div><div class="tx"><b>Conviene mover hacienda de La Loma → La Cañada</b><p>La Loma está sobrecargada y La Cañada está lista para recibir.</p><div class="why">Porque La Loma tiene 128 animales con pasto escaso hace 3 recorridas, y La Cañada está vacía con pasto abundante.</div></div><div class="act">Planificar →</div></div>
+            <div class="insight"><div class="ic ic-rojo">🩹</div><div class="tx"><b>Animal #412 en tratamiento — día 3</b><p>Cojera en El Monte. Retiro vigente: no vender hasta 12/06.</p></div><div class="act" onclick="nav('hacienda')">Ver ficha →</div></div>
+            <div class="insight"><div class="ic ic-sol">🏦</div><div class="tx"><b>Cheque de $900k vence en 2 días</b><p>A Mario Bartomea · Banco Nación.</p></div><div class="act">Ver →</div></div>
+            <div class="insight"><div class="ic ic-cielo">🕐</div><div class="tx"><b>El Fondo lleva 12 días sin recorrer</b><p>Potrero en descanso — conviene chequear pasto y aguada.</p></div><div class="act">Recorrer →</div></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h3>Stock por categoría</h3><span class="sub">545 cabezas</span></div>
+            <div class="donut-wrap">
+              <svg width="140" height="140" viewBox="0 0 42 42">
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--surface-hi)" stroke-width="6"/>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--verde)" stroke-width="6" stroke-dasharray="46 54" stroke-dashoffset="25"/>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--sol)" stroke-width="6" stroke-dasharray="22 78" stroke-dashoffset="79"/>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--cielo)" stroke-width="6" stroke-dasharray="17 83" stroke-dashoffset="57"/>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--tierra)" stroke-width="6" stroke-dasharray="15 85" stroke-dashoffset="40"/>
+                <text x="21" y="20.5" text-anchor="middle" font-size="7" font-weight="700" fill="var(--ink)" font-family="Archivo">545</text>
+                <text x="21" y="26" text-anchor="middle" font-size="3" fill="var(--muted)">cabezas</text>
+              </svg>
+              <div class="legend">
+                <div><span class="sw" style="background:var(--verde)"></span> Vacas <span class="n">251</span></div>
+                <div><span class="sw" style="background:var(--sol)"></span> Terneros <span class="n">120</span></div>
+                <div><span class="sw" style="background:var(--cielo)"></span> Vaquillonas <span class="n">92</span></div>
+                <div><span class="sw" style="background:var(--tierra)"></span> Novillos <span class="n">64</span></div>
+                <div><span class="sw" style="background:#9aa48c"></span> Toros <span class="n">18</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="row b">
+          <div class="panel"><div class="ph"><h3>Rentabilidad x mes</h3><span class="sub">en pesos de hoy</span></div>
+            <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--verde)" stop-opacity=".28"/><stop offset="1" stop-color="var(--verde)" stop-opacity="0"/></linearGradient></defs><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30 L300,120 L0,120 Z" fill="url(#g1)"/><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30" fill="none" stroke="var(--verde)" stroke-width="2.5"/></svg></div>
+          <div class="panel"><div class="ph"><h3>Lluvia vs promedio</h3><span class="sub">2026</span></div>
+            <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none"><g><rect x="14" y="50" width="22" height="70" rx="3" fill="var(--surface-hi)"/><rect x="14" y="74" width="22" height="46" rx="3" fill="var(--cielo)"/><rect x="64" y="44" width="22" height="76" rx="3" fill="var(--surface-hi)"/><rect x="64" y="86" width="22" height="34" rx="3" fill="var(--cielo)"/><rect x="114" y="56" width="22" height="64" rx="3" fill="var(--surface-hi)"/><rect x="114" y="58" width="22" height="62" rx="3" fill="var(--cielo)"/><rect x="164" y="40" width="22" height="80" rx="3" fill="var(--surface-hi)"/><rect x="164" y="92" width="22" height="28" rx="3" fill="var(--cielo)"/><rect x="214" y="54" width="22" height="66" rx="3" fill="var(--surface-hi)"/><rect x="214" y="98" width="22" height="22" rx="3" fill="var(--cielo)"/><rect x="264" y="60" width="22" height="60" rx="3" fill="var(--surface-hi)"/><rect x="264" y="100" width="22" height="20" rx="3" fill="var(--cielo)"/></g></svg></div>
+          <div class="panel"><div class="ph"><h3>Compras vs ventas</h3><span class="sub">cabezas · año</span></div>
+            <div style="display:flex;flex-direction:column;gap:14px;padding-top:8px">
+              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Compras · 40</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:30%;height:100%;background:var(--sol)"></div></div></div>
+              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Ventas · 120</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:78%;height:100%;background:var(--verde)"></div></div></div>
+              <div style="font-size:12px;color:var(--faint);font-style:italic;margin-top:2px">Vendiste 3× lo que compraste — rodeo en reducción.</div>
+            </div></div>
+        </section>
+      </div>
+
+      <!-- ============ HACIENDA ============ -->
+      <div class="page" id="page-hacienda">
+        <div class="pagehead"><div><h1>Hacienda</h1><div class="sub">545 cabezas activas · 3 potreros con animales</div></div><button class="btn">+ Nuevo animal</button></div>
+
+        <section class="resumen">
+          <div class="panel">
+            <div class="ph"><h3>Stock por categoría</h3><span class="sub">animales activos</span></div>
+            <div class="total"><span class="v tnum">545</span><span class="l">cabezas</span></div>
+            <div class="stackbar"><span style="width:46%;background:var(--verde)"></span><span style="width:17%;background:var(--cielo)"></span><span style="width:12%;background:var(--tierra)"></span><span style="width:22%;background:var(--sol)"></span><span style="width:3%;background:#9aa48c"></span></div>
+            <div class="catleg">
+              <div><span class="dot" style="background:var(--verde)"></span> Vacas <span class="n">251</span></div>
+              <div><span class="dot" style="background:var(--cielo)"></span> Vaquillonas <span class="n">92</span></div>
+              <div><span class="dot" style="background:var(--tierra)"></span> Novillos <span class="n">64</span></div>
+              <div><span class="dot" style="background:var(--sol)"></span> Terneros/as <span class="n">120</span></div>
+              <div><span class="dot" style="background:#9aa48c"></span> Toros <span class="n">18</span></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h3>Señales</h3><span class="sub">tocá para filtrar</span></div>
+            <div class="signals">
+              <div class="sigstat" onclick="setQ('trat')"><div class="ic ic-trat">🩹</div><div><div class="v tnum">5</div><div class="l">En tratamiento</div></div></div>
+              <div class="sigstat" onclick="setQ('pre')"><div class="ic ic-pre">🐮</div><div><div class="v tnum">187</div><div class="l">Preñadas</div></div></div>
+              <div class="sigstat" onclick="setQ('vender')"><div class="ic ic-vender">🏷️</div><div><div class="v tnum">24</div><div class="l">Para vender</div></div></div>
+              <div class="sigstat" onclick="setQ('destete')"><div class="ic ic-destete">✂️</div><div><div class="v tnum">31</div><div class="l">Para destetar</div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="toolbar">
+          <div class="search"><span style="color:var(--faint)">🔎</span><input id="q" placeholder="Buscar por caravana…" oninput="render()"></div>
+          <div class="select">Categoría ▾</div><div class="select">Potrero ▾</div><div class="select">Estado: Activos ▾</div>
+          <div class="toggle"><button id="t-tabla" class="on" onclick="setView('tabla')">Tabla</button><button id="t-pot" onclick="setView('potrero')">Por potrero</button></div>
+        </div>
+        <div class="qviews">
+          <div class="qv on" data-q="todos" onclick="setQ('todos')">Todos <span class="c">545</span></div>
+          <div class="qv" data-q="trat" onclick="setQ('trat')">⚠ En tratamiento <span class="c">5</span></div>
+          <div class="qv" data-q="pre" onclick="setQ('pre')">🐮 Preñadas <span class="c">187</span></div>
+          <div class="qv" data-q="vender" onclick="setQ('vender')">🏷️ Para vender <span class="c">24</span></div>
+          <div class="qv" data-q="destete" onclick="setQ('destete')">✂️ Para destetar <span class="c">31</span></div>
+        </div>
+        <div class="panel" id="content"></div>
+      </div>
+
+      <!-- ============ PLACEHOLDERS ============ -->
+      <div class="page" id="page-campos">
+        <div class="campos-head"><div><h1>Campos</h1><div class="sub" id="campos-sub"></div></div><button class="btn">+ Nuevo campo</button></div>
+        <div class="segment"><button id="cm-mapa" class="on" onclick="setCamposMode('mapa')">🗺️ Mapa de potreros</button><button id="cm-plan" onclick="setCamposMode('planificar')">⇄ Planificar movimientos</button></div>
+        <div id="campos-mapa" style="display:flex;flex-direction:column;gap:14px">
+        <div class="cselect" id="campos-selector"></div>
+        <div class="viewbar">
+          <div class="vtoggle"><button id="cv-mosaico" class="on" onclick="setCamposView('mosaico')">🟦 Mosaico</button><button id="cv-sat" onclick="setCamposView('satelital')">🛰️ Satelital</button></div>
+          <div class="cleg" id="campos-legend"></div>
+        </div>
+        <div class="panel" id="campos-mosaic-wrap"><div class="mosaic" id="campos-mosaic"></div></div>
+        <div class="panel" id="campos-map-wrap" style="display:none;padding:0;overflow:hidden"><div id="campos-map" style="height:480px;width:100%"></div></div>
+        <div style="text-align:center;color:var(--faint);font-size:12px;font-style:italic" id="campos-foot">Tamaño del tile = hectáreas · color = estado del ciclo · tocá un potrero para el detalle.</div>
+        </div>
+
+        <div id="campos-planificar" style="display:none;flex-direction:column;gap:14px">
+          <div class="planhead">Planificación a nivel <b>empresa</b> · el sistema <b>sugiere</b>, vos decidís. Toda sugerencia con su porqué.</div>
+          <div class="panel suggest" id="plan-suggest"></div>
+          <div class="plan-cols">
+            <div class="panel"><div class="ph"><h3>⚠️ Conviene aliviar</h3><span class="sub">sobrecargados</span></div><div id="plan-donantes"></div></div>
+            <div class="panel"><div class="ph"><h3>✅ Disponibles</h3><span class="sub">para recibir</span></div><div id="plan-receptores"></div></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h3>Mover hacienda</h3></div>
+            <div class="moverow">
+              <div class="mf"><label>De</label><select id="mv-origen" onchange="moverChange()"></select></div>
+              <span class="arrow2">→</span>
+              <div class="mf"><label>A</label><select id="mv-destino" onchange="moverChange()"></select></div>
+            </div>
+            <div class="mf" style="margin-top:13px;min-width:0"><label>¿Cuántos?</label>
+              <div class="radios">
+                <label class="rad on" id="rad-todos" onclick="setCant('todos')"><input type="radio" name="cant" checked> Todos <b id="cant-todos-n"></b></label>
+                <label class="rad" id="rad-cat" onclick="setCant('cat')"><input type="radio" name="cant"> Por categoría</label>
+                <label class="rad" id="rad-num" onclick="setCant('num')"><input type="radio" name="cant"> Cantidad</label>
+              </div>
+              <div id="cant-extra"></div>
+            </div>
+            <div class="renspa-check" id="renspa-check"></div>
+            <button class="btn" style="margin-top:14px" onclick="confirmMove()">Confirmar movimiento</button>
+            <div id="move-result"></div>
+          </div>
+        </div>
+
+      </div>
+      <div class="page" id="page-analitica">
+        <div class="pagehead"><div><h1>Analítica</h1><div class="sub">Cargá la plata, decidí con la data · Toda la empresa · 2026</div></div><button class="btn" onclick="openCarga()">+ Cargar gasto/ingreso</button></div>
+
+        <div class="viewbar">
+          <div class="vtoggle"><button id="dc-dev" class="on" onclick="setDC('dev')">Devengado</button><button id="dc-caja" onclick="setDC('caja')">Caja</button></div>
+          <span id="dc-help" style="color:var(--faint);font-size:12px">Devengado: la economía real, sin importar cuándo entró/salió la plata.</span>
+        </div>
+
+        <section class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi k1"><div class="lab">💰 Ingresos</div><div class="v tnum" id="an-ing">$42,8M</div><div class="d up">▲ ventas de hacienda</div></div>
+          <div class="kpi k4"><div class="lab">🧾 Gastos</div><div class="v tnum" id="an-gas">$24,4M</div><div class="d">veterinario + agrícola</div></div>
+          <div class="kpi k2"><div class="lab">📈 Resultado</div><div class="v tnum up" id="an-res">+$18,4M</div><div class="d up">ciclo · 3 campos</div></div>
+        </section>
+
+        <div class="panel"><div class="ph"><h3>Para decidir</h3><span class="tag-ia">✦ IA</span></div>
+          <div class="insight"><div class="ic ic-verde">🏆</div><div class="tx"><b>Don Gilberto es tu potrero más rentable</b><p>+$9,1M en el ciclo — la mejor relación del rodeo.</p></div></div>
+          <div class="insight"><div class="ic ic-rojo">📉</div><div class="tx"><b>El Arrendado lleva 2 ciclos en pérdida</b><p>−$3,2M — el alquiler se come la ganadería. Conviene revisar el contrato.</p></div></div>
+          <div class="insight"><div class="ic ic-sol">🩺</div><div class="tx"><b>Gastaste 42% en veterinario</b><p>+50% vs el año pasado — el salto fue en abril (antiparasitarios).</p></div></div>
+        </div>
+
+        <section class="row a">
+          <div class="panel"><div class="ph"><h3>Rentabilidad por potrero</h3><div class="vtoggle"><button class="on">Potrero</button><button>Campo</button></div></div>
+            <div class="rentbar">
+              <div class="rb"><span class="rn">Don Gilberto</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="rv">+9,1M</span></div>
+              <div class="rb"><span class="rn">La Loma</span><div class="track"><div class="fill" style="width:68%"></div></div><span class="rv">+6,2M</span></div>
+              <div class="rb"><span class="rn">El Bajo</span><div class="track"><div class="fill" style="width:33%"></div></div><span class="rv">+3,0M</span></div>
+              <div class="rb"><span class="rn">El Monte</span><div class="track"><div class="fill" style="width:14%"></div></div><span class="rv">+1,3M</span></div>
+              <div class="rb loss"><span class="rn">El Arrendado</span><div class="track"><div class="fill" style="width:13%"></div></div><span class="rv">−1,2M</span></div>
+            </div>
+          </div>
+          <div class="panel"><div class="ph"><h3>Gastos por categoría</h3></div>
+            <div class="stackbar"><span style="width:42%;background:var(--verde)"></span><span style="width:31%;background:var(--sol)"></span><span style="width:12%;background:var(--cielo)"></span><span style="width:9%;background:var(--tierra)"></span><span style="width:6%;background:#9aa48c"></span></div>
+            <div class="catleg" style="margin-top:12px">
+              <div><span class="dot" style="background:var(--verde)"></span> Veterinario <span class="n">42%</span></div>
+              <div><span class="dot" style="background:var(--sol)"></span> Agrícola <span class="n">31%</span></div>
+              <div><span class="dot" style="background:var(--cielo)"></span> Bancario <span class="n">12%</span></div>
+              <div><span class="dot" style="background:var(--tierra)"></span> Estructura <span class="n">9%</span></div>
+              <div><span class="dot" style="background:#9aa48c"></span> Impuestos <span class="n">6%</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="row b">
+          <div class="panel"><div class="ph"><h3>Compras vs ventas</h3><span class="sub">cabezas · año</span></div>
+            <div style="display:flex;flex-direction:column;gap:14px;padding-top:8px">
+              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Compras · 40</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:30%;height:100%;background:var(--sol)"></div></div></div>
+              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Ventas · 120</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:78%;height:100%;background:var(--verde)"></div></div></div>
+              <div style="font-size:12px;color:var(--faint);font-style:italic">Vendiste 3× lo que compraste — rodeo en reducción.</div>
+            </div>
+          </div>
+          <div class="panel"><div class="ph"><h3>Rentabilidad x mes</h3><span class="sub">pesos de hoy</span></div>
+            <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--verde)" stop-opacity=".28"/><stop offset="1" stop-color="var(--verde)" stop-opacity="0"/></linearGradient></defs><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30 L300,120 L0,120 Z" fill="url(#g2)"/><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30" fill="none" stroke="var(--verde)" stroke-width="2.5"/></svg>
+          </div>
+          <div class="panel"><div class="ph"><h3>Movimientos recientes</h3></div>
+            <table class="tbl"><tbody>
+              <tr><td>12/05</td><td>Venta · 18 novillos</td><td style="text-align:right;font-weight:600;color:var(--verde-deep)">+$8,9M</td></tr>
+              <tr><td>03/05</td><td>Veterinario · antiparasitario</td><td style="text-align:right;font-weight:600">−$1,4M</td></tr>
+              <tr><td>28/04</td><td>Combustible · gasoil</td><td style="text-align:right;font-weight:600">−$680k</td></tr>
+              <tr><td>20/04</td><td>Alquiler · El Arrendado</td><td style="text-align:right;font-weight:600">−$2,1M</td></tr>
+            </tbody></table>
+            <div class="expbtns"><button>⬇ PDF</button><button>⬇ Excel</button></div>
+          </div>
+        </section>
+      </div>
+      <div class="page" id="page-recorrida"><div class="placeholder"><div class="ico">📍</div><h2>Recorrida (Modo Campo)</h2><p>Esto vive en el celular — recorrida fechada por potrero. Ya hay un prototipo aparte: <code>prototipo-modo-campo.html</code>.</p></div></div>
+      <div class="page" id="page-clima"><div class="placeholder"><div class="ico">☔</div><h2>Clima</h2><p>Lluvia acumulada vs promedio, pronóstico y alertas (pulverización, estrés calórico). Próxima tanda.</p></div></div>
+
+      <div class="legendnote">Maqueta navegable · "Agro profesional" · datos demo.</div>
+      <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+      <div class="drawer" id="drawer"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+  /* ---- navegación entre apartados ---- */
+  function nav(p){
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    document.getElementById('page-'+p).classList.add('active');
+    document.querySelectorAll('.side .nav').forEach(n=>n.classList.toggle('on', n.dataset.page===p));
+    document.querySelector('.scroll').scrollTop=0;
+  }
+
+  /* ---- Hacienda ---- */
+  const CAT={vaca:{l:'Vaca',c:'var(--verde)'},vaquillona:{l:'Vaquillona',c:'var(--cielo)'},novillo:{l:'Novillo',c:'var(--tierra)'},ternero:{l:'Ternero',c:'var(--sol)'},ternera:{l:'Ternera',c:'var(--sol)'},toro:{l:'Toro',c:'#9aa48c'},capon:{l:'Capón',c:'#9aa48c'}};
+  const SIG={trat:{l:'retiro vigente',cls:'sig-trat',ic:'⚠'},pre:{l:'preñada',cls:'sig-pre',ic:'🐮'},vender:{l:'para vender',cls:'sig-vender',ic:'🏷️'},destete:{l:'destete',cls:'sig-destete',ic:'✂️'}};
+  const animales=[
+    {cv:'AR 138 001234567',cat:'vaca',sexo:'Hembra',pot:'La Loma',edad:'5 a',sig:['trat','pre']},
+    {cv:'AR 138 001230088',cat:'vaca',sexo:'Hembra',pot:'La Loma',edad:'6 a',sig:['pre']},
+    {cv:'AR 138 001245511',cat:'vaquillona',sexo:'Hembra',pot:'La Loma',edad:'2 a',sig:['pre']},
+    {cv:'DEMO000128',cat:'ternero',sexo:'Macho',pot:'La Loma',edad:'7 m',sig:['destete']},
+    {cv:'DEMO000129',cat:'ternera',sexo:'Hembra',pot:'La Loma',edad:'6 m',sig:['destete']},
+    {cv:'AR 138 000999412',cat:'novillo',sexo:'Macho',pot:'El Monte',edad:'2 a',sig:['trat','vender']},
+    {cv:'AR 138 000777123',cat:'novillo',sexo:'Macho',pot:'El Monte',edad:'2 a',sig:['vender']},
+    {cv:'AR 138 000777890',cat:'novillo',sexo:'Macho',pot:'El Monte',edad:'2 a',sig:['vender']},
+    {cv:'DEMO000301',cat:'vaca',sexo:'Hembra',pot:'Don Gilberto',edad:'7 a',sig:['pre']},
+    {cv:'DEMO000302',cat:'vaca',sexo:'Hembra',pot:'Don Gilberto',edad:'4 a',sig:[]},
+    {cv:'DEMO000303',cat:'vaquillona',sexo:'Hembra',pot:'Don Gilberto',edad:'2 a',sig:['destete']},
+    {cv:'DEMO000304',cat:'toro',sexo:'Macho',pot:'Don Gilberto',edad:'4 a',sig:[]},
+    {cv:'DEMO000305',cat:'vaca',sexo:'Hembra',pot:'Don Gilberto',edad:'5 a',sig:['pre']},
+    {cv:'DEMO000306',cat:'capon',sexo:'Macho',pot:'El Monte',edad:'3 a',sig:['vender']},
+    {cv:'DEMO000307',cat:'vaca',sexo:'Hembra',pot:'La Loma',edad:'8 a',sig:['vender']},
+    {cv:'DEMO000308',cat:'ternera',sexo:'Hembra',pot:'Don Gilberto',edad:'5 m',sig:['destete']},
+  ];
+  const POT_STATE={'La Loma':'Ganadero','Don Gilberto':'Ganadero','El Monte':'Ganadero'};
+  let view='tabla', q='todos';
+  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
+  function sigsHtml(a){return `<div class="sigs">${a.sig.map(s=>`<span class="sig ${SIG[s].cls}">${SIG[s].ic} ${SIG[s].l}</span>`).join('')}</div>`;}
+  function catHtml(a){const c=CAT[a.cat];return `<span class="cat"><span class="dot" style="background:${c.c}"></span>${c.l}</span>`;}
+  function rowHtml(a){return `<tr><td class="cv">${a.cv}</td><td>${catHtml(a)}</td><td>${a.sexo}</td><td>${a.pot}</td><td>${a.edad}</td><td>${sigsHtml(a)}</td><td class="arrow">→</td></tr>`;}
+  function render(){const list=filtered();const el=document.getElementById('content');
+    if(view==='tabla'){el.innerHTML=list.length?`<table class="tbl"><thead><tr><th>Caravana</th><th>Categoría</th><th>Sexo</th><th>Potrero</th><th>Edad</th><th>Señales</th><th></th></tr></thead><tbody>${list.map(rowHtml).join('')}</tbody></table>`:`<div class="empty">Sin animales con ese filtro.</div>`;}
+    else{const pots=[...new Set(list.map(a=>a.pot))];el.innerHTML=pots.length?pots.map(p=>{const inp=list.filter(a=>a.pot===p);return `<div class="potblock"><div class="pothead"><span class="nm">${p}</span><span class="cnt">${inp.length} animales</span><span class="pstate ps-gan">● ${POT_STATE[p]||''}</span></div><table class="tbl"><tbody>${inp.map(rowHtml).join('')}</tbody></table></div>`;}).join(''):`<div class="empty">Sin animales con ese filtro.</div>`;}
+  }
+  function setView(v){view=v;document.getElementById('t-tabla').classList.toggle('on',v==='tabla');document.getElementById('t-pot').classList.toggle('on',v==='potrero');render();}
+  function setQ(nq){q=nq;document.querySelectorAll('.qv').forEach(c=>c.classList.toggle('on',c.dataset.q===nq));render();}
+  render();
+
+  /* ===== CAMPOS (mosaico de potreros) ===== */
+  const ESTADO={ganadero:'Ganadero',descanso:'Descanso',preparacion:'Preparación',siembra:'Siembra',cultivo:'Cultivo',cosecha:'Cosecha',rastrojo:'Rastrojo'};
+  const PSIG={pasto:'⚠ pasto escaso',agua:'💧 agua baja',trat:'🩹 en tratam.'};
+  const CAMPOS={
+    esperanza:{nombre:'La Esperanza',tenencia:'Propio',potreros:[
+      {id:'la-loma',nm:'La Loma',e:'ganadero',ha:80,cab:128,agua:'Baja',pasto:'Escaso',elec:'OK',renspa:'01.234.5.67890',sig:['pasto','agua'],hist:[140,135,132,130,128]},
+      {id:'don-gilberto',nm:'Don Gilberto',e:'ganadero',ha:120,cab:353,agua:'Normal',pasto:'Normal',elec:'OK',renspa:'01.234.5.99999 (propio)',sig:[],hist:[350,351,352,353,353]},
+      {id:'el-monte',nm:'El Monte',e:'ganadero',ha:70,cab:64,agua:'Normal',pasto:'Normal',elec:'OK',renspa:'01.234.5.67890',sig:['trat'],hist:[66,65,64,64,64]},
+      {id:'el-bajo',nm:'El Bajo',e:'cultivo',ha:60,cultivo:'Maíz',etapa:'Creciendo',comoViene:'Regular',maleza:'No',elec:'OK',renspa:'01.234.5.67890',sig:[],hist:[]},
+      {id:'la-canada',nm:'La Cañada',e:'descanso',ha:45,listo:true,agua:'Normal',pasto:'Abundante',elec:'OK',renspa:'01.234.5.67890',sig:[],hist:[]},
+      {id:'el-fondo',nm:'El Fondo',e:'rastrojo',ha:30,agua:'Normal',pasto:'Escaso',elec:'OK',renspa:'01.234.5.67890',sig:[],hist:[]},
+    ]},
+    arrendado:{nombre:'El Arrendado',tenencia:'Alquilado',potreros:[
+      {id:'potrero-1',nm:'Potrero 1',e:'ganadero',ha:90,cab:64,agua:'Normal',pasto:'Normal',elec:'Cortado',renspa:'02.345.6.11111',sig:[],hist:[64,64,64,64,64]},
+      {id:'lote-norte',nm:'Lote Norte',e:'descanso',ha:130,listo:false,agua:'Baja',pasto:'Escaso',elec:'OK',renspa:'02.345.6.11111',sig:['agua'],hist:[]},
+    ]},
+  };
+  let campoSel='esperanza', estadoHi=null, camposView='mosaico', _map=null, _polys=null;
+  function tileMid(p){
+    if(p.e==='ganadero')return `<div class="mid">${p.cab}<small> cab</small></div>`;
+    if(p.e==='cultivo')return `<div class="mid" style="font-size:15px">${p.cultivo} · ${p.etapa}</div>`;
+    if(p.e==='descanso')return `<div class="mid" style="font-size:15px">${p.listo?'Lista ✓':'Descanso'}</div>`;
+    return `<div class="mid" style="font-size:15px">${ESTADO[p.e]}</div>`;
+  }
+  function renderCampos(){
+    const c=CAMPOS[campoSel];
+    document.getElementById('campos-selector').innerHTML=Object.entries(CAMPOS).map(([k,v])=>`<div class="cs ${k===campoSel?'on':''}" onclick="selCampo('${k}')">${v.nombre}<small>${v.tenencia}</small></div>`).join('');
+    const totalHa=c.potreros.reduce((s,p)=>s+p.ha,0);
+    document.getElementById('campos-sub').textContent=`${c.nombre} · ${c.tenencia} · ${c.potreros.length} potreros · ${totalHa} ha`;
+    const counts={};c.potreros.forEach(p=>{(counts[p.e]=counts[p.e]||{n:0,ha:0}).n++;counts[p.e].ha+=p.ha;});
+    document.getElementById('campos-legend').innerHTML=Object.keys(ESTADO).filter(e=>counts[e]).map(e=>`<div class="cl ${estadoHi&&estadoHi!==e?'dim':''}" onclick="hiEstado('${e}')"><span class="dot e-${e}"></span>${ESTADO[e]} <b style="color:var(--ink)">${counts[e].n}</b> · ${counts[e].ha}ha</div>`).join('');
+    document.getElementById('campos-mosaic').innerHTML=c.potreros.map(p=>{
+      const dim=estadoHi&&estadoHi!==p.e?'dim':'';
+      const sigs=p.sig.map(s=>`<span>${PSIG[s]}</span>`).join('');
+      return `<div class="tile e-${p.e} ${dim}" style="flex:${p.ha} 1 140px" onclick="openPotrero('${p.id}')"><div class="nm">${p.nm}<span class="ha">${p.ha} ha</span></div>${tileMid(p)}<div class="tsig">${sigs}</div></div>`;
+    }).join('');
+  }
+  function selCampo(k){campoSel=k;estadoHi=null;closeDrawer();renderCampos();if(camposView==='satelital')drawCampoPolys();}
+  function hiEstado(e){estadoHi=(estadoHi===e?null:e);renderCampos();}
+  function openPotrero(id){
+    const p=CAMPOS[campoSel].potreros.find(x=>x.id===id);
+    const agri=['cultivo','siembra','cosecha','rastrojo'].includes(p.e);
+    const items = agri
+      ? [['¿Cómo viene?',p.comoViene||'—'],['Etapa',p.etapa||'—'],['Maleza/plaga',p.maleza||'—'],['Eléctrico',p.elec]]
+      : p.e==='descanso'
+        ? [['Agua',p.agua],['Pasto',p.pasto],['Eléctrico',p.elec],['¿Listo p/ animales?',p.listo?'Sí ✓':'No']]
+        : [['Conteo',(p.cab??'—')+' cab'],['Agua',p.agua],['Pasto',p.pasto],['Eléctrico',p.elec]];
+    const itemsHtml = items.map(([l,v])=>`<div class="it"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')+`<div class="it"><div class="l">RENSPA</div><div class="v" style="font-size:12px">${p.renspa}</div></div>`;
+    const mx=p.hist.length?Math.max(...p.hist):1;
+    const hist=p.hist.length?`<div class="dsec"><h4>Conteo · últimas recorridas</h4><div class="dhist">${p.hist.map(v=>`<div class="b"><i style="height:${Math.round(v/mx*100)}%"></i><small>${v}</small></div>`).join('')}</div></div>`:'';
+    const contenido=p.e==='ganadero'?`${p.cab} cabezas`:agri?`${p.cultivo||ESTADO[p.e]}${p.etapa?' · '+p.etapa:''}`:(p.listo?'En descanso · lista para animales ✓':'En descanso');
+    const sigChips=p.sig&&p.sig.length?`<div class="sigs" style="margin-top:9px">${p.sig.map(s=>`<span class="sig ${s==='agua'?'sig-destete':s==='pasto'?'sig-vender':'sig-trat'}">${PSIG[s]}</span>`).join('')}</div>`:'';
+    document.getElementById('drawer').innerHTML=`
+      <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3>${p.nm}</h3><div class="ds">${CAMPOS[campoSel].nombre} · ${ESTADO[p.e]} · ${p.ha} ha</div></div>
+      <div class="db">
+        <div class="dsec"><h4>Contenido</h4><div style="font-weight:600;font-size:15px">${contenido}</div>${sigChips}</div>
+        <div class="dsec"><h4>Estado actual · última recorrida</h4><div class="dstate">${itemsHtml}</div></div>
+        ${hist}
+        <div class="dact"><button class="primary" onclick="nav('hacienda')">Mover hacienda</button><button class="ghost">Registrar</button></div>
+      </div>`;
+    document.getElementById('drawer').classList.add('open');
+    document.querySelector('.scroll').classList.add('with-drawer');
+    if(camposView==='satelital'&&_map) setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},260);
+  }
+  function closeDrawer(){const d=document.getElementById('drawer');if(d)d.classList.remove('open');document.querySelector('.scroll').classList.remove('with-drawer');if(camposView==='satelital'&&_map) setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},260);}
+
+  /* --- vista SATELITAL (Leaflet + Esri World Imagery, gratis) --- */
+  function rect(n,s,w,e){return [[n,w],[n,e],[s,e],[s,w]];}
+  const GEO={
+    'la-loma':rect(-35.480,-35.500,-59.540,-59.518),'don-gilberto':rect(-35.480,-35.500,-59.518,-59.496),
+    'el-monte':rect(-35.500,-35.520,-59.540,-59.518),'el-bajo':rect(-35.500,-35.520,-59.518,-59.496),
+    'la-canada':rect(-35.520,-35.540,-59.540,-59.518),'el-fondo':rect(-35.520,-35.540,-59.518,-59.496),
+    'potrero-1':rect(-35.468,-35.495,-59.588,-59.560),'lote-norte':rect(-35.468,-35.500,-59.560,-59.524),
+  };
+  const MAPCOLOR={ganadero:'#6db84e',descanso:'#e0ad34',preparacion:'#c06a3a',siembra:'#8fbf6a',cultivo:'#52ad3a',cosecha:'#e0a93a',rastrojo:'#c2a85e'};
+  function initMap(){
+    _map=L.map('campos-map',{attributionControl:false});
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(_map);
+    _polys=L.layerGroup().addTo(_map);
+  }
+  function contStr(p){return p.e==='ganadero'?`${p.cab} cab`:p.e==='cultivo'?`${p.cultivo} · ${p.etapa}`:p.e==='descanso'?(p.listo?'Lista ✓':'Descanso'):ESTADO[p.e];}
+  function drawCampoPolys(){
+    if(!_map)return;_polys.clearLayers();
+    const pts=CAMPOS[campoSel].potreros.filter(p=>GEO[p.id]); if(!pts.length)return;
+    const all=[];
+    pts.forEach(p=>{
+      const col=MAPCOLOR[p.e]||'#6db84e';
+      const sig=p.sig&&p.sig.length?' '+p.sig.map(s=>s==='pasto'?'⚠':s==='agua'?'💧':'🩹').join(''):'';
+      const poly=L.polygon(GEO[p.id],{color:'#ffffff',weight:2,fillColor:col,fillOpacity:.5}).addTo(_polys);
+      poly.bindTooltip(`<b>${p.nm}</b><span>${contStr(p)}${sig}</span>`,{permanent:true,direction:'center',className:'pottip',opacity:1});
+      poly.on('click',()=>openPotrero(p.id));
+      poly.on('mouseover',()=>poly.setStyle({fillOpacity:.72,weight:3}));
+      poly.on('mouseout',()=>poly.setStyle({fillOpacity:.5,weight:2}));
+      all.push(...GEO[p.id]);
+    });
+    _map.fitBounds(L.latLngBounds(all),{padding:[50,50],maxZoom:14});
+  }
+  function setCamposView(v){
+    camposView=v;
+    document.getElementById('cv-mosaico').classList.toggle('on',v==='mosaico');
+    document.getElementById('cv-sat').classList.toggle('on',v==='satelital');
+    document.getElementById('campos-mosaic-wrap').style.display=v==='mosaico'?'':'none';
+    document.getElementById('campos-map-wrap').style.display=v==='satelital'?'':'none';
+    document.getElementById('campos-foot').textContent=v==='satelital'
+      ? 'Imágenes satelitales (Esri, gratis) · polígonos demo. En la app real el productor dibuja sus potreros una vez y guardamos la geometría.'
+      : 'Tamaño del tile = hectáreas · color = estado del ciclo · tocá un potrero para el detalle.';
+    if(v==='satelital'){ if(!_map)initMap(); setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},170); }
+  }
+
+  /* ===== PLANIFICAR MOVIMIENTOS ===== */
+  const ALLPOT=Object.entries(CAMPOS).flatMap(([k,v])=>v.potreros.map(p=>({...p,campo:v.nombre,campoKey:k})));
+  function renspaBase(r){return (r||'').split(' ')[0];}
+  function pot(id){return ALLPOT.find(p=>p.id===id);}
+  let cantMode='todos';
+  function setCamposMode(m){
+    document.getElementById('cm-mapa').classList.toggle('on',m==='mapa');
+    document.getElementById('cm-plan').classList.toggle('on',m==='planificar');
+    document.getElementById('campos-mapa').style.display=m==='mapa'?'flex':'none';
+    document.getElementById('campos-planificar').style.display=m==='planificar'?'flex':'none';
+    if(m==='planificar')renderPlan();
+    if(m==='mapa'&&camposView==='satelital'&&_map)setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},80);
+  }
+  function renderPlan(){
+    document.getElementById('plan-suggest').innerHTML=`<div class="insight" style="background:none;border:none;padding:0;margin:0"><div class="ic ic-verde">💡</div><div class="tx"><b>Conviene mover hacienda de La Loma → La Cañada</b><p>La Loma está sobrecargada y La Cañada está lista para recibir.</p><div class="why">Porque La Loma tiene 128 animales con pasto escaso y agua baja hace 3 recorridas, y La Cañada está vacía con pasto abundante (mismo RENSPA, sin guía).</div></div><div class="act" onclick="usarSug()">Usar esta sugerencia →</div></div>`;
+    const don=ALLPOT.filter(p=>p.e==='ganadero'&&p.cab>0&&(p.sig.includes('pasto')||p.sig.includes('agua')));
+    const rec=ALLPOT.filter(p=>['descanso','rastrojo'].includes(p.e)&&p.pasto!=='Pelado');
+    document.getElementById('plan-donantes').innerHTML=don.length?don.map(p=>`<div class="prow"><div><div class="pn">${p.nm}</div><div class="pm">${p.campo} · 🐄${p.cab} · pasto ${p.pasto}${p.agua==='Baja'?' · 💧 baja':''}</div></div><div class="pa" onclick="prefill('${p.id}')">Aliviar →</div></div>`).join(''):`<div class="empty">Ningún potrero sobrecargado hoy ✓</div>`;
+    document.getElementById('plan-receptores').innerHTML=rec.length?rec.map(p=>`<div class="prow"><div><div class="pn">${p.nm}</div><div class="pm">${p.campo} · ${p.e==='descanso'?(p.listo?'vacío · listo ✓':'vacío'):'rastrojo'} · pasto ${p.pasto}</div></div></div>`).join(''):`<div class="empty">Sin receptores disponibles.</div>`;
+    const opts=ALLPOT.map(p=>`<option value="${p.id}">${p.nm} · ${p.campo}</option>`).join('');
+    document.getElementById('mv-origen').innerHTML=opts;
+    document.getElementById('mv-destino').innerHTML=opts;
+    document.getElementById('mv-origen').value='la-loma';
+    document.getElementById('mv-destino').value='la-canada';
+    cantMode='todos';moverChange();
+  }
+  function moverChange(){
+    const o=pot(document.getElementById('mv-origen').value), d=pot(document.getElementById('mv-destino').value);
+    document.getElementById('cant-todos-n').textContent=o&&o.cab?`(${o.cab})`:'';
+    const same=renspaBase(o.renspa)===renspaBase(d.renspa);
+    const rc=document.getElementById('renspa-check');
+    rc.className='renspa-check '+(same?'rc-ok':'rc-warn');
+    rc.innerHTML=same?'✓ Mismo RENSPA — no requiere guía':'⚠ Cruza RENSPA → necesitás guía / DTe para mover';
+    setCant(cantMode);
+    document.getElementById('move-result').innerHTML='';
+  }
+  function setCant(m){
+    cantMode=m;['todos','cat','num'].forEach(x=>document.getElementById('rad-'+x).classList.toggle('on',x===m));
+    const ex=document.getElementById('cant-extra');
+    if(m==='cat')ex.innerHTML=`<div class="radios" style="margin-top:9px"><span class="rad">Vacas 90</span><span class="rad">Terneros 38</span></div><div style="font-size:11.5px;color:var(--faint);margin-top:5px;font-style:italic">Ej: dejás las madres, sacás los terneros (destete).</div>`;
+    else if(m==='num')ex.innerHTML=`<div style="margin-top:9px;display:flex;align-items:center;gap:8px"><input type="number" value="50" style="width:120px"> cabezas</div>`;
+    else ex.innerHTML='';
+  }
+  function prefill(oid){ document.getElementById('mv-origen').value=oid; moverChange(); document.querySelector('#campos-planificar .panel:last-child').scrollIntoView({behavior:'smooth',block:'center'}); }
+  function usarSug(){ document.getElementById('mv-origen').value='la-loma'; document.getElementById('mv-destino').value='la-canada'; moverChange(); }
+  function confirmMove(){
+    const o=pot(document.getElementById('mv-origen').value), d=pot(document.getElementById('mv-destino').value);
+    const cuantos=cantMode==='todos'?`${o.cab||0} cabezas`:cantMode==='cat'?'los terneros (38)':'50 cabezas';
+    const same=renspaBase(o.renspa)===renspaBase(d.renspa);
+    document.getElementById('move-result').innerHTML=`<div class="move-ok">✓ <b>Listo (demo):</b> movés <b>${cuantos}</b> de <b>${o.nm}</b> a <b>${d.nm}</b>.<br>Se actualiza el stock de los dos potreros y queda en el historial de cada animal.${same?'':'<br>⚠ Acordate de sacar la <b>guía / DTe</b> (este movimiento cruza RENSPA).'}</div>`;
+  }
+
+  /* ===== ANALÍTICA ===== */
+  function setDC(v){
+    document.getElementById('dc-dev').classList.toggle('on',v==='dev');
+    document.getElementById('dc-caja').classList.toggle('on',v==='caja');
+    const dev=v==='dev';
+    document.getElementById('an-ing').textContent=dev?'$42,8M':'$38,1M';
+    document.getElementById('an-gas').textContent=dev?'$24,4M':'$22,9M';
+    document.getElementById('an-res').textContent=dev?'+$18,4M':'+$15,2M';
+    document.getElementById('dc-help').textContent=dev?'Devengado: la economía real, sin importar cuándo entró/salió la plata.':'Caja: solo la plata que realmente entró y salió (lo cobrado/pagado).';
+  }
+  function openCarga(){
+    document.getElementById('drawer').innerHTML=`
+      <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3>Cargar movimiento</h3><div class="ds">Gasto o ingreso del campo</div></div>
+      <div class="db">
+        <div class="mf"><label>Tipo</label><div class="vtoggle"><button class="on">Gasto</button><button>Ingreso</button></div></div>
+        <div class="mf"><label>Categoría</label><select><option>Medicamentos / veterinario</option><option>Compra de hacienda</option><option>Semillas</option><option>Combustible</option><option>Maquinaria / labores</option><option>Alquiler de campo</option><option>Gastos bancarios</option><option>Impuestos</option></select></div>
+        <div class="mf"><label>Monto</label><input placeholder="$ 0"></div>
+        <div class="mf"><label>Fecha de operación (devengo)</label><input type="date"></div>
+        <div class="mf"><label>Fecha de cobro / pago real</label><input type="date"><div style="font-size:11px;color:var(--faint);margin-top:4px">Vacío = pendiente. Las dos fechas son la clave (D5/D6): economía real vs caja.</div></div>
+        <div class="mf"><label>Atribuir a — Campo</label><select><option>La Esperanza</option><option>El Arrendado</option></select></div>
+        <div class="mf"><label>Potrero (opcional)</label><select><option>— sin asignar —</option><option>La Loma</option><option>Don Gilberto</option><option>El Bajo</option><option>El Monte</option></select></div>
+        <div class="mf"><label>Comprobante</label><button class="rad" style="width:100%;justify-content:center">📷 Subir foto</button></div>
+        <button class="btn" onclick="cargaOk()">Guardar</button>
+        <div id="carga-msg"></div>
+      </div>`;
+    document.getElementById('drawer').classList.add('open');
+    document.querySelector('.scroll').classList.add('with-drawer');
+  }
+  function cargaOk(){const m=document.getElementById('carga-msg');if(m){m.innerHTML='<div class="move-ok">✓ Guardado (demo). Aparece en Movimientos y suma a la rentabilidad del potrero/campo.</div>';}setTimeout(closeDrawer,1500);}
+
+  renderCampos();
+</script>
+</body>
+</html>
