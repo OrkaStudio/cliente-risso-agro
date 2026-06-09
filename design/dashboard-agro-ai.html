@@ -6,43 +6,44 @@
 <title>Risso Agro — Maqueta navegable</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
-    /* Premium Palette */
-    --canvas:#f4f7f4; --card:rgba(255,255,255,0.75); --card-2:rgba(255,255,255,0.5); --inset:rgba(240,245,240,0.6); --surface-hi:rgba(255,255,255,0.9);
-    --border:rgba(255,255,255,0.8); --border-hi:rgba(16,185,129,0.4);
-    --ink:#0f172a; --muted:#475569; --faint:#94a3b8;
-    
-    /* Dark Sidebar */
-    --side:rgba(10, 25, 15, 0.85); --side-2:rgba(255,255,255,0.06); --side-text:#f8fafc; --side-muted:#94a3b8; --side-border:rgba(255,255,255,0.08);
-    
-    /* Semantic Colors */
-    --verde:#10b981; --verde-deep:#047857; --verde-soft:#d1fae5; --verde-glow:rgba(16,185,129,0.25);
-    --sol:#f59e0b; --sol-soft:#fef3c7;
-    --cielo:#3b82f6; --cielo-soft:#dbeafe;
-    --tierra:#d97706; --tierra-soft:#fef3c7;
-    --rojo:#ef4444; --rojo-soft:#fee2e2;
-    --ia:#059669;
-    
-    --shadow:0 8px 32px rgba(10,30,20,0.04);
-    --shadow-hover:0 12px 48px rgba(16,185,129,0.12);
+    /* Pampa cálida — glass sobre crema ("El campo como mapa vivo") */
+    --canvas:#faf6ec; --card:rgba(255,253,246,0.78); --card-2:rgba(255,252,243,0.55); --inset:rgba(243,238,226,0.65); --surface-hi:rgba(255,254,250,0.94);
+    --border:rgba(220,210,186,0.7); --border-hi:rgba(58,122,78,0.45);
+    --ink:#1f261d; --muted:#4d574a; --faint:#79816f;
+
+    /* Sidebar verde profundo cálido */
+    --side:rgba(24,44,30,0.92); --side-2:rgba(247,245,236,0.07); --side-text:#f7f5ec; --side-muted:#a9b4a0; --side-border:rgba(247,245,236,0.1);
+
+    /* Semánticos pampa */
+    --verde:#3a7a4e; --verde-deep:#1f4a2e; --verde-soft:#e3eedd; --verde-glow:rgba(58,122,78,0.28);
+    --verde-vivo:#8fc7a0;
+    --sol:#e0a235; --sol-soft:#f7e8c6; --sol-deep:#a06f15;
+    --cielo:#3f86b3; --cielo-soft:#dcebf3;
+    --tierra:#b15b36; --tierra-soft:#f0ddd0;
+    --rojo:#bf3b2b; --rojo-soft:#f3ded9;
+    --ia:#a06f15;
+
+    --shadow:0 8px 28px rgba(63,54,30,0.06);
+    --shadow-hover:0 12px 40px rgba(58,122,78,0.14);
   }
   *{box-sizing:border-box;margin:0;padding:0; -webkit-font-smoothing: antialiased;}
-  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);font-size:14px;line-height:1.5;
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.5;
     background-color: var(--canvas); overflow-x: hidden;}
-    
-  h1,h2,h3,h4,.h{font-family:'Outfit',sans-serif;letter-spacing:-.02em}
-  .tnum{font-variant-numeric:tabular-nums; font-family:'Outfit', sans-serif;}
+
+  h1,h2,h3,h4,.h{font-family:'Archivo',sans-serif;font-stretch:87%;letter-spacing:-.01em}
+  .tnum{font-variant-numeric:tabular-nums; font-family:'Archivo', sans-serif;font-stretch:94%;}
   
   .app{display:flex;min-height:100vh;position:relative;z-index:1}
 
   /* Animated Premium Background */
-  .field-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(180deg,#e8f3ec 0%, #f4fbf7 100%);}
-  .orb-1{position:absolute;top:-10%;right:-5%;width:50vw;height:50vw;background:#a7f3d0;filter:blur(120px);opacity:0.4;border-radius:50%; animation: float 20s ease-in-out infinite alternate;}
-  .orb-2{position:absolute;bottom:-20%;left:-10%;width:60vw;height:60vw;background:#bae6fd;filter:blur(140px);opacity:0.3;border-radius:50%; animation: float 25s ease-in-out infinite alternate-reverse;}
+  .field-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(180deg,#f6efdd 0%, #faf6ec 100%);}
+  .orb-1{position:absolute;top:-10%;right:-5%;width:50vw;height:50vw;background:#cfe3c2;filter:blur(90px);opacity:0.5;border-radius:50%; animation: float 26s ease-in-out infinite alternate;}
+  .orb-2{position:absolute;bottom:-20%;left:-10%;width:60vw;height:60vw;background:#f3e2b8;filter:blur(100px);opacity:0.45;border-radius:50%; animation: float 32s ease-in-out infinite alternate-reverse;}
   @keyframes float { 0% { transform: translateY(0px) scale(1); } 100% { transform: translateY(40px) scale(1.05); } }
   
   .grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.15;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
@@ -57,7 +58,7 @@
     padding:24px 16px;
     display:flex;flex-direction:column;gap:6px;
     background:var(--side);
-    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), padding 0.3s;
     overflow: hidden;
     box-shadow: 0 12px 40px rgba(0,0,0,0.1);
@@ -107,45 +108,45 @@
     position: absolute;
     left: 0; top: 10%; bottom: 10%;
     width: 4px; border-radius: 4px;
-    background: var(--verde);
-    box-shadow: 0 0 10px var(--verde-glow);
+    background: var(--verde-vivo);
+    box-shadow: 0 0 10px rgba(143,199,160,.5);
   }
   .side.collapsed .nav.on::before { left: 4px; }
 
   /* --- estilos base del sidebar (restaurados) --- */
   .side{position:relative;color:var(--side-text)}
   .brand{display:flex;align-items:center;gap:12px;padding:6px 8px 22px;white-space:nowrap}
-  .brand .mark{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:linear-gradient(135deg,#10b981,#047857);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(16,185,129,.35)}
-  .brand b{font-family:'Outfit';font-size:17px;font-weight:700;color:#fff;display:block;line-height:1.15}
+  .brand .mark{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:linear-gradient(135deg,#3a7a4e,#1f4a2e);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(58,122,78,.4)}
+  .brand b{font-family:'Archivo';font-size:17px;font-weight:700;color:#fff;display:block;line-height:1.15}
   .brand small{display:block;color:var(--side-muted);font-size:11px;font-weight:500;letter-spacing:.02em}
   .navlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--side-muted);padding:16px 12px 7px;font-weight:700;white-space:nowrap}
   .nav{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;color:var(--side-muted);font-weight:500;cursor:pointer;font-size:14px;white-space:nowrap;transition:background .15s,color .15s}
   .nav .i{color:var(--side-muted)}
   .nav:hover{background:var(--side-2);color:var(--side-text)}
   .nav:hover .i{color:var(--side-text)}
-  .nav.on{background:rgba(255,255,255,0.08);color:#fff}
-  .nav.on .i{color:var(--verde)}
+  .nav.on{background:rgba(247,245,236,0.09);color:#fff}
+  .nav.on .i{color:var(--verde-vivo)}
   .nav .badge{margin-left:auto;background:var(--rojo);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px}
   .side .grow{flex:1}
   .user{display:flex;align-items:center;gap:10px;padding:13px 8px 2px;margin-top:6px;border-top:1px solid var(--side-border);white-space:nowrap}
-  .user .av{width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:linear-gradient(135deg,#10b981,#047857);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;font-family:'Outfit'}
+  .user .av{width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:linear-gradient(135deg,#3a7a4e,#1f4a2e);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;font-family:'Archivo'}
   .user .nm{font-size:13px;font-weight:600;color:var(--side-text)}
   .user .em{font-size:11px;color:var(--side-muted)}
 
 
   /* MAIN + TOPBAR */
   main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
-  .topbar{display:flex;align-items:center;gap:20px;padding:14px 24px;margin:16px 16px 0 16px;border:1px solid var(--side-border);border-radius:24px;background:var(--side);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 12px 40px rgba(0,0,0,0.1);position:sticky;top:16px;z-index:5}
-  .scope{display:flex;align-items:center;gap:10px;font-family:'Outfit';font-weight:600;font-size:15px;color:#fff;background:rgba(255,255,255,0.08);padding:8px 16px;border-radius:20px;border:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.2s}
+  .topbar{display:flex;align-items:center;gap:20px;padding:14px 24px;margin:16px 16px 0 16px;border:1px solid var(--side-border);border-radius:24px;background:var(--side);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.1);position:sticky;top:16px;z-index:5}
+  .scope{display:flex;align-items:center;gap:10px;font-family:'Archivo';font-weight:600;font-size:15px;color:#fff;background:rgba(255,255,255,0.08);padding:8px 16px;border-radius:20px;border:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.2s}
   .scope:hover{background:rgba(255,255,255,0.12)}
   .scope .chev{color:var(--side-muted);font-size:10px}
   .ticker{display:flex;align-items:center;gap:24px;margin-left:auto;font-size:13px;color:var(--side-text)}
   .tk{display:flex;align-items:center;gap:8px;white-space:nowrap}
-  .tk .lab{color:var(--side-muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .tk .lab{color:var(--side-muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;display:inline-flex;align-items:center;gap:5px}
   .tk b{font-weight:600;color:#fff;font-size:14px}
   .up{color:var(--verde)} .down{color:var(--rojo)}
-  .topbar .up{color:#34d399} .topbar .down{color:#f87171}
-  .tk .stale{color:#fbbf24;font-size:11px;font-weight:600;border:1px solid rgba(251,191,36,.3);background:rgba(251,191,36,.1);border-radius:12px;padding:2px 8px}
+  .topbar .up{color:#8fc7a0} .topbar .down{color:#e08a76}
+  .tk .stale{color:#ecc25c;font-size:11px;font-weight:600;border:1px solid rgba(224,162,53,.35);background:rgba(224,162,53,.12);border-radius:12px;padding:2px 8px}
   .sep{width:1px;height:24px;background:var(--side-border)}
 
   .scroll{padding:32px 36px 80px;overflow-y:auto;max-width:1340px;width:100%;transition:padding-right .3s cubic-bezier(0.4,0,0.2,1);margin:0 auto}
@@ -161,15 +162,15 @@
   
 
   /* Bento Panels (Glassmorphism) */
-  .panel{border:1px solid var(--border);border-radius:24px;background:var(--card);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:24px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:box-shadow 0.3s ease, transform 0.3s ease;}
+  .panel{border:1px solid var(--border);border-radius:24px;background:var(--card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:24px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:box-shadow 0.3s ease, transform 0.3s ease;}
   .panel::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.8),rgba(255,255,255,0));}
   .panel .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
   .panel .ph h3{font-size:17px;font-weight:600}
-  .panel .ph .sub{color:var(--faint);font-size:13px;font-weight:500}
+  .panel .ph .sub{color:var(--faint);font-size:13.5px;font-weight:500}
   
   /* Shimmer IA Tag */
   @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-  .tag-ia{font-size:11px;font-family:'Outfit';font-weight:700;color:#fff;background:linear-gradient(110deg, #10b981 20%, #34d399 40%, #10b981 60%);background-size:200% auto;animation:shimmer 3s linear infinite;border-radius:8px;padding:3px 10px;letter-spacing:.04em;box-shadow:0 4px 12px rgba(16,185,129,0.3)}
+  .tag-ia{font-size:11px;font-family:'Archivo';font-weight:700;color:#fff;background:linear-gradient(110deg, #a06f15 20%, #e0a235 40%, #a06f15 60%);background-size:200% auto;animation:shimmer 3s linear infinite;border-radius:8px;padding:3px 10px;letter-spacing:.04em;box-shadow:0 4px 12px rgba(224,162,53,0.35)}
   
   .row{display:grid;gap:20px}
   .row.a{grid-template-columns:1.4fr 1fr}.row.b{grid-template-columns:1fr 1fr 1fr}
@@ -177,10 +178,10 @@
 
   /* KPIs (Inicio) */
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-  .kpi{border:1px solid var(--border);border-radius:24px;padding:20px 24px;background:var(--card);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);position:relative;overflow:hidden;box-shadow:var(--shadow);transition:transform 0.3s ease, box-shadow 0.3s ease;cursor:default;}
+  .kpi{border:1px solid var(--border);border-radius:24px;padding:20px 24px;background:var(--card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:relative;overflow:hidden;box-shadow:var(--shadow);transition:transform 0.3s ease, box-shadow 0.3s ease;cursor:default;}
   .kpi:hover{transform:translateY(-4px);box-shadow:var(--shadow-hover)}
   .kpi .lab{color:var(--muted);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
-  .kpi .v{font-family:'Outfit';font-size:36px;font-weight:700;margin-top:8px;line-height:1;letter-spacing:-0.02em}
+  .kpi .v{font-family:'Archivo';font-size:36px;font-weight:700;margin-top:8px;line-height:1;letter-spacing:-0.02em}
   .kpi .d{font-size:13px;margin-top:10px;display:flex;align-items:center;gap:6px;font-weight:500}
   .kpi svg{position:absolute;right:16px;bottom:16px;opacity:.95;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.05))}
   .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
@@ -191,12 +192,12 @@
   .insight:hover{background:rgba(255,255,255,0.85);box-shadow:0 4px 12px rgba(0,0,0,0.03)}
   .insight:last-child{margin-bottom:0}
   .insight .ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 40px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
-  .ic-rojo{background:var(--rojo-soft);color:var(--rojo);border:1px solid rgba(239,68,68,0.2)}.ic-sol{background:var(--sol-soft);color:#d97706;border:1px solid rgba(245,158,11,0.2)}
-  .ic-cielo{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(59,130,246,0.2)}.ic-verde{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(16,185,129,0.2)}
-  .insight .tx{flex:1}.insight .tx b{font-size:14.5px;font-weight:600;display:block;color:var(--ink)}.insight .tx p{font-size:13px;color:var(--muted);margin-top:4px}
+  .ic-rojo{background:var(--rojo-soft);color:var(--rojo);border:1px solid rgba(191,59,43,0.25)}.ic-sol{background:var(--sol-soft);color:#a06f15;border:1px solid rgba(224,162,53,0.3)}
+  .ic-cielo{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(63,134,179,0.25)}.ic-verde{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(58,122,78,0.25)}
+  .insight .tx{flex:1}.insight .tx b{font-size:15px;font-weight:600;display:block;color:var(--ink)}.insight .tx p{font-size:13.5px;color:var(--muted);margin-top:4px}
   .insight .why{font-size:12px;color:var(--faint);margin-top:6px;font-style:italic;padding-left:12px;border-left:2px solid var(--border-hi)}
   .insight .act{align-self:center;font-size:13px;color:var(--verde-deep);font-weight:600;white-space:nowrap;cursor:pointer;padding:8px 16px;background:var(--verde-soft);border-radius:10px;transition:background 0.2s}
-  .insight .act:hover{background:#a7f3d0}
+  .insight .act:hover{background:#d0e3c8}
   
   .donut-wrap{display:flex;align-items:center;gap:24px;justify-content:center}
   .legend{display:flex;flex-direction:column;gap:10px;font-size:13.5px}
@@ -207,21 +208,24 @@
   .pcard{border:none;border-radius:16px;padding:16px;background:var(--card-2);box-shadow:0 2px 10px rgba(10,30,20,.05);cursor:pointer;transition:transform .2s, box-shadow .2s;position:relative}
   .pcard:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(10,30,20,.09);background:var(--surface-hi)}
   /* KPIs: barra unificada con sub-tiles diferenciados adentro */
-  .statbar{display:flex;gap:10px;padding:10px;border:1px solid var(--border);border-radius:24px;background:var(--card);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:var(--shadow);position:relative}
+  .statbar{display:flex;gap:10px;padding:10px;border:1px solid var(--border);border-radius:24px;background:var(--card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(--shadow);position:relative}
   .stat{flex:1;padding:16px 20px;border-radius:16px;background:var(--inset);box-shadow:0 2px 10px rgba(10,30,20,.05);position:relative;display:flex;flex-direction:column;justify-content:center;min-height:96px;transition:box-shadow .2s, transform .2s}
   .stat:hover{box-shadow:0 6px 16px rgba(10,30,20,.08);transform:translateY(-2px)}
-  .stat .lab{color:var(--muted);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
-  .stat .v{font-family:'Outfit';font-size:30px;font-weight:700;margin-top:6px;line-height:1;letter-spacing:-0.02em}
+  .stat .lab{color:var(--muted);font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .stat .lab svg,.kpi .lab svg{width:16px;height:16px;flex:0 0 16px}
+  .insight .ic svg{width:20px;height:20px}
+  .sigstat .ic svg{width:18px;height:18px}
+  .stat .v{font-family:'Archivo';font-size:30px;font-weight:700;margin-top:6px;line-height:1;letter-spacing:-0.02em}
   .stat .d{font-size:12px;margin-top:6px}
   @media(max-width:900px){.statbar{flex-wrap:wrap}.stat{flex:1 1 calc(50% - 5px)}}
   /* dashboard: paneles más calmos */
   #page-inicio .panel{box-shadow:0 4px 16px rgba(10,30,20,.05)}
   .pcard .top{display:flex;justify-content:space-between;align-items:start}
-  .pcard .nm{font-family:'Outfit';font-weight:600;font-size:16px;color:var(--ink)}.pcard .cmp{color:var(--faint);font-size:12px;margin-top:2px}
-  .pstate{font-size:11px;font-family:'Outfit';font-weight:700;padding:4px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;letter-spacing:0.02em}
-  .ps-gan{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(16,185,129,0.2)}.ps-des{background:var(--sol-soft);color:#d97706;border:1px solid rgba(245,158,11,0.2)}
-  .ps-cul{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(59,130,246,0.2)}.ps-cos{background:var(--rojo-soft);color:var(--rojo);border:1px solid rgba(239,68,68,0.2)}
-  .pcard .big{font-family:'Outfit';font-size:32px;font-weight:700;margin-top:18px;line-height:1;letter-spacing:-0.02em}
+  .pcard .nm{font-family:'Archivo';font-weight:600;font-size:16px;color:var(--ink)}.pcard .cmp{color:var(--faint);font-size:12px;margin-top:2px}
+  .pstate{font-size:11px;font-family:'Archivo';font-weight:700;padding:4px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;letter-spacing:0.02em}
+  .ps-gan{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(58,122,78,0.25)}.ps-des{background:var(--sol-soft);color:#a06f15;border:1px solid rgba(224,162,53,0.3)}
+  .ps-cul{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(63,134,179,0.25)}.ps-cos{background:var(--rojo-soft);color:var(--rojo);border:1px solid rgba(191,59,43,0.25)}
+  .pcard .big{font-family:'Archivo';font-size:32px;font-weight:700;margin-top:18px;line-height:1;letter-spacing:-0.02em}
   .pcard .meta{font-size:12px;font-weight:500;color:var(--muted);margin-top:8px;display:flex;gap:10px}
   .warn-dot{color:var(--rojo);font-weight:600}
 
@@ -234,7 +238,7 @@
   .resumen{display:grid;grid-template-columns:1.5fr 1fr;gap:20px}
   @media(max-width:1000px){.resumen{grid-template-columns:1fr}}
   .total{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
-  .total .v{font-family:'Outfit';font-size:42px;font-weight:700;line-height:1;letter-spacing:-0.03em}.total .l{color:var(--muted);font-size:14px;font-weight:500}
+  .total .v{font-family:'Archivo';font-size:42px;font-weight:700;line-height:1;letter-spacing:-0.03em}.total .l{color:var(--muted);font-size:14px;font-weight:500}
   .stackbar{display:flex;height:16px;border-radius:8px;overflow:hidden;margin-bottom:16px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.05)}.stackbar span{height:100%}
   .catleg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px}
   .catleg div{display:flex;align-items:center;gap:8px}.catleg .dot{width:10px;height:10px;border-radius:4px}.catleg .n{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
@@ -242,10 +246,11 @@
   .signals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .sigstat{display:flex;align-items:center;gap:14px;padding:14px;border-radius:16px;background:var(--inset);border:1px solid var(--border);cursor:pointer;transition:all 0.2s}
   .sigstat:hover{background:rgba(255,255,255,0.85);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.04);border-color:var(--border-hi)}
+  .sigstat.on{background:var(--verde-soft);border-color:var(--verde);box-shadow:0 4px 12px var(--verde-glow)}
   .sigstat .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 36px;box-shadow:0 2px 6px rgba(0,0,0,0.05)}
-  .sigstat .v{font-family:'Outfit';font-size:22px;font-weight:700;line-height:1}.sigstat .l{font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
+  .sigstat .v{font-family:'Archivo';font-size:22px;font-weight:700;line-height:1}.sigstat .l{font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
   .ic-trat{background:var(--rojo-soft);color:var(--rojo)}.ic-pre{background:var(--verde-soft);color:var(--verde-deep)}
-  .ic-vender{background:var(--sol-soft);color:#d97706}.ic-destete{background:var(--cielo-soft);color:var(--cielo)}
+  .ic-vender{background:var(--sol-soft);color:#a06f15}.ic-destete{background:var(--cielo-soft);color:var(--cielo)}
   
   .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .search{flex:1;min-width:260px;display:flex;align-items:center;gap:10px;background:var(--card);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);transition:border-color 0.2s}
@@ -257,30 +262,24 @@
   .toggle button{border:none;background:none;padding:8px 16px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;transition:all 0.2s}
   .toggle button.on{background:var(--card);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,0.05)}
   
-  .qviews{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0}
-  .qv{font-size:13px;font-weight:500;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:24px;padding:8px 16px;cursor:pointer;display:flex;gap:8px;align-items:center;transition:all 0.2s;box-shadow:0 2px 6px rgba(0,0,0,0.02)}
-  .qv:hover{border-color:var(--faint);background:var(--surface-hi)}
-  .qv.on{background:var(--verde-soft);border-color:var(--verde);color:var(--verde-deep);font-weight:600;box-shadow:0 4px 12px var(--verde-glow)}
-  .qv .c{color:var(--faint);font-weight:600;font-size:12px;background:rgba(0,0,0,0.05);padding:2px 6px;border-radius:10px}.qv.on .c{color:var(--verde-deep);background:rgba(16,185,129,0.2)}
-  
   .tbl{width:100%;border-collapse:collapse}
   .tbl th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600;padding:14px 16px;border-bottom:1px solid var(--border)}
-  .tbl td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.5);font-size:14px;vertical-align:middle;font-weight:500}
+  .tbl td{padding:14px 16px;border-bottom:1px solid rgba(220,210,186,0.45);font-size:14.5px;vertical-align:middle;font-weight:500}
   .tbl tr:last-child td{border-bottom:none}
   .tbl tbody tr{cursor:pointer;transition:background 0.2s}.tbl tbody tr:hover td{background:var(--inset)}
   .cv{font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
   .cat{display:inline-flex;align-items:center;gap:8px}.cat .dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
   .sigs{display:flex;gap:6px;flex-wrap:wrap}
-  .sig{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap;font-family:'Outfit'}
-  .sig-trat{background:var(--rojo-soft);color:var(--rojo);border:1px solid rgba(239,68,68,0.2)}
-  .sig-pre{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(16,185,129,0.2)}
-  .sig-vender{background:var(--sol-soft);color:#d97706;border:1px solid rgba(245,158,11,0.2)}
-  .sig-destete{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(59,130,246,0.2)}
+  .sig{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap;font-family:'Archivo'}
+  .sig-trat{background:var(--rojo-soft);color:var(--rojo);border:1px solid rgba(191,59,43,0.25)}
+  .sig-pre{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(58,122,78,0.25)}
+  .sig-vender{background:var(--sol-soft);color:#a06f15;border:1px solid rgba(224,162,53,0.3)}
+  .sig-destete{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(63,134,179,0.25)}
   .arrow{color:var(--faint);text-align:right;font-size:18px}.empty{color:var(--faint);text-align:center;padding:40px;font-size:15px}
   
   .potblock{margin-bottom:20px;background:var(--inset);border-radius:20px;padding:4px;border:1px solid var(--border)}
   .pothead{display:flex;align-items:center;gap:12px;padding:12px 16px}
-  .pothead .nm{font-family:'Outfit';font-weight:700;font-size:17px;color:var(--ink)}
+  .pothead .nm{font-family:'Archivo';font-weight:700;font-size:17px;color:var(--ink)}
   .pothead .cnt{font-size:13px;color:var(--muted);font-weight:600;background:rgba(255,255,255,0.6);border:1px solid var(--border);border-radius:20px;padding:4px 12px}
 
   /* CAMPOS */
@@ -304,30 +303,30 @@
   .cl.dim{opacity:.4;filter:grayscale(1)}.cl .dot{width:12px;height:12px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)}
   .mosaic{display:flex;flex-direction:column;gap:18px}
   
-  .tile{border-radius:20px;padding:16px;min-width:140px;height:140px;cursor:pointer;color:#0f172a;border:1px solid rgba(255,255,255,0.4);display:flex;flex-direction:column;justify-content:space-between;transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);box-shadow:0 4px 12px rgba(0,0,0,0.03)}
+  .tile{border-radius:20px;padding:16px;min-width:140px;height:140px;cursor:pointer;color:#2a3324;border:1px solid rgba(255,255,255,0.4);display:flex;flex-direction:column;justify-content:space-between;transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);box-shadow:0 4px 12px rgba(0,0,0,0.03)}
   .tile:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 12px 24px rgba(0,0,0,0.08);filter:brightness(1.05);z-index:2}
   .tile.dim{opacity:.25;transform:scale(0.98)}
-  .tile .nm{font-family:'Outfit';font-weight:700;font-size:16px;line-height:1.2;display:flex;justify-content:space-between;gap:8px}
+  .tile .nm{font-family:'Archivo';font-weight:700;font-size:16px;line-height:1.2;display:flex;justify-content:space-between;gap:8px}
   .tile .nm .ha{font-size:12px;font-weight:600;opacity:.7;white-space:nowrap;font-family:'Inter'}
-  .tile .mid{font-family:'Outfit';font-weight:700;font-size:26px;line-height:1;letter-spacing:-0.02em}
+  .tile .mid{font-family:'Archivo';font-weight:700;font-size:26px;line-height:1;letter-spacing:-0.02em}
   .tile .mid small{font-size:13px;font-weight:600;opacity:.8;font-family:'Inter'}
   .tile .tsig{display:flex;gap:6px;flex-wrap:wrap}
   .tile .tsig span{font-size:10px;font-weight:700;background:rgba(255,255,255,.7);color:var(--ink);border-radius:20px;padding:2px 8px;box-shadow:0 2px 4px rgba(0,0,0,0.05);backdrop-filter:blur(4px)}
   
-  /* Tile Gradients Premium */
-  .e-ganadero{background:linear-gradient(135deg, #a7f3d0, #6ee7b7);border-color:#34d399}
-  .e-descanso{background:linear-gradient(135deg, #fde68a, #fcd34d);border-color:#fbbf24}
-  .e-preparacion{background:linear-gradient(135deg, #fed7aa, #fdba74);border-color:#fb923c}
-  .e-siembra{background:linear-gradient(135deg, #d9f99d, #bef264);border-color:#a3e635}
-  .e-cultivo{background:linear-gradient(135deg, #86efac, #4ade80);border-color:#22c55e}
-  .e-cosecha{background:linear-gradient(135deg, #fef08a, #fde047);border-color:#facc15}
-  .e-rastrojo{background:linear-gradient(135deg, #fef3c7, #fde68a);border-color:#fcd34d}
+  /* Tile Gradients Pampa — hue distinto por estado (oliva≠verde franco), no 4 verdes iguales */
+  .e-ganadero{background:linear-gradient(135deg, #d3dca4, #b9c97f);border-color:#9aad5d}
+  .e-descanso{background:linear-gradient(135deg, #f5e9c8, #eeda9e);border-color:#d9bd6e}
+  .e-preparacion{background:linear-gradient(135deg, #eccaaf, #dfab85);border-color:#c98e62}
+  .e-siembra{background:linear-gradient(135deg, #e2efb9, #cde092);border-color:#aec763}
+  .e-cultivo{background:linear-gradient(135deg, #a8d5a3, #7cbd80);border-color:#569a61}
+  .e-cosecha{background:linear-gradient(135deg, #f3dd92, #ecc95f);border-color:#d4a93c}
+  .e-rastrojo{background:linear-gradient(135deg, #e8d9b5, #d6bd8a);border-color:#b89a5f}
 
   /* Campos agrupados + treemap de potreros */
   .campo-block{margin-bottom:18px}
   .campo-block:last-child{margin-bottom:0}
   .cb-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 4px 10px;flex-wrap:wrap}
-  .cb-nm{font-family:'Outfit';font-weight:700;font-size:18px;color:var(--ink)}
+  .cb-nm{font-family:'Archivo';font-weight:700;font-size:18px;color:var(--ink)}
   .cb-ten{font-size:12px;font-weight:600;color:var(--muted);background:var(--inset);border:1px solid var(--border);border-radius:20px;padding:2px 10px;margin-left:8px}
   .cb-meta{font-size:13px;color:var(--muted);font-weight:500}
   .tmap{position:relative;width:100%;border-radius:18px;overflow:hidden;background:var(--inset)}
@@ -335,8 +334,8 @@
   .tcell:hover{filter:brightness(1.05);z-index:3;box-shadow:0 8px 22px rgba(0,0,0,.16)}
   .tcell.dim{opacity:.3}
   .tcell>*{position:relative;z-index:1}
-  .tcell .tn{font-family:'Outfit';font-weight:700;font-size:14.5px;line-height:1.15}
-  .tcell .tv{font-family:'Outfit';font-weight:700;font-size:18px;line-height:1.05}
+  .tcell .tn{font-family:'Archivo';font-weight:700;font-size:14.5px;line-height:1.15}
+  .tcell .tv{font-family:'Archivo';font-weight:700;font-size:18px;line-height:1.05}
   .tcell .th{font-size:11px;opacity:.72;font-weight:600}
   .tcell .tn,.tcell .tv,.tcell .th{text-shadow:0 1px 2px rgba(255,255,255,.5)}
   .tcell .twm{position:absolute;right:11px;top:10px;z-index:1;pointer-events:none;opacity:.5;color:#0a3a26}
@@ -355,15 +354,15 @@
   .tcell.e-preparacion::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12'%3E%3Cg fill='none' stroke='%236b4a1e' stroke-width='1.3'%3E%3Cpath d='M0 4 Q5 2 10 4 T20 4'/%3E%3Cpath d='M0 9 Q5 7 10 9 T20 9'/%3E%3C/g%3E%3C/svg%3E");background-size:20px 12px}
   .tcell.e-rastrojo::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14'%3E%3Cg fill='none' stroke='%236b4a1e' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M4 13 L4 7 M4 7 L6 5'/%3E%3Cpath d='M11 13 L11 8 M11 8 L9 6'/%3E%3C/g%3E%3C/svg%3E");background-size:16px 14px}
   
-  .scrim{position:fixed;inset:0;background:rgba(10,25,15,.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:29;opacity:0;pointer-events:none;transition:opacity .3s ease}
+  .scrim{position:fixed;inset:0;background:rgba(24,44,30,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:29;opacity:0;pointer-events:none;transition:opacity .3s ease}
   .scrim.open{opacity:1;pointer-events:auto}
   
-  .drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;background:rgba(255,255,255,0.9);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-left:1px solid var(--border);box-shadow:-12px 0 40px rgba(10,30,15,.1);z-index:30;transform:translateX(100%);transition:transform .4s cubic-bezier(0.175, 0.885, 0.32, 1.1);display:flex;flex-direction:column}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;background:rgba(255,253,246,0.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-left:1px solid var(--border);box-shadow:-12px 0 40px rgba(63,54,30,.12);z-index:30;transform:translateX(100%);transition:transform .4s cubic-bezier(0.175, 0.885, 0.32, 1.1);display:flex;flex-direction:column}
   .drawer.open{transform:translateX(0)}
   .drawer .dh{padding:24px;border-bottom:1px solid rgba(0,0,0,0.05);background:rgba(255,255,255,0.5)}
   .drawer .dh .x{float:right;cursor:pointer;color:var(--muted);font-size:20px;background:var(--inset);border:none;width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;transition:background 0.2s}
   .drawer .dh .x:hover{background:var(--rojo-soft);color:var(--rojo)}
-  .drawer .dh h3{font-size:22px;font-family:'Outfit';font-weight:700}
+  .drawer .dh h3{font-size:22px;font-family:'Archivo';font-weight:700}
   .drawer .dh .ds{color:var(--muted);font-size:13.5px;margin-top:4px;font-weight:500}
   .drawer .db{padding:24px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:20px}
   .dsec h4{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:12px;font-weight:700}
@@ -382,7 +381,7 @@
   .dact .ghost:hover{background:var(--surface-hi);transform:translateY(-2px)}
   
   #campos-map{border-radius:24px;box-shadow:inset 0 2px 10px rgba(0,0,0,0.1)}
-  .pottip{background:rgba(10,25,15,.85)!important;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1)!important;color:#fff!important;font-family:'Outfit',sans-serif!important;padding:8px 14px!important;text-align:center!important;line-height:1.3!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important;border-radius:12px!important}
+  .pottip{background:rgba(24,44,30,.88)!important;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1)!important;color:#fff!important;font-family:'Archivo',sans-serif!important;padding:8px 14px!important;text-align:center!important;line-height:1.3!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important;border-radius:12px!important}
   .pottip b{display:block;font-size:14px;font-weight:700;letter-spacing:0.02em}
   .pottip span{display:block;font-size:11.5px;font-weight:500;opacity:.9;margin-top:2px}
   .pottip::before{display:none!important}
@@ -402,15 +401,15 @@
   .prow{display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:16px;background:var(--inset);border:1px solid var(--border);margin-bottom:12px;transition:transform 0.2s}
   .prow:hover{transform:translateY(-2px);background:rgba(255,255,255,0.9)}
   .prow:last-child{margin-bottom:0}
-  .prow .pn{font-family:'Outfit';font-weight:700;font-size:15px;color:var(--ink)}.prow .pm{font-size:13px;color:var(--muted);margin-top:2px;font-weight:500}
+  .prow .pn{font-family:'Archivo';font-weight:700;font-size:15px;color:var(--ink)}.prow .pm{font-size:13px;color:var(--muted);margin-top:2px;font-weight:500}
   .prow .pa{margin-left:auto;font-size:13.5px;font-weight:700;color:var(--verde-deep);cursor:pointer;white-space:nowrap;background:var(--verde-soft);padding:6px 12px;border-radius:10px;transition:background 0.2s}
-  .prow .pa:hover{background:#a7f3d0}
+  .prow .pa:hover{background:#d0e3c8}
   
   .moverow{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
-  .mf{flex:1;min-width:180px}.mf label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;font-family:'Outfit'}
+  .mf{flex:1;min-width:180px}.mf label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;font-family:'Archivo'}
   .mf select,.mf input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14.5px;font-weight:500;font-family:inherit;color:var(--ink);box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);transition:border-color 0.2s}
   .mf select:focus, .mf input:focus{outline:none;border-color:var(--verde);box-shadow:0 0 0 3px var(--verde-soft)}
-  .arrow2{font-size:24px;color:var(--muted);padding-bottom:10px;font-family:'Outfit'}
+  .arrow2{font-size:24px;color:var(--muted);padding-bottom:10px;font-family:'Archivo'}
   
   .radios{display:flex;gap:10px;flex-wrap:wrap}
   .rad{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:10px 18px;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 6px rgba(0,0,0,0.02)}
@@ -419,8 +418,8 @@
   .rad input{accent-color:var(--verde);width:16px;height:16px}
   
   .renspa-check{margin-top:16px;font-size:14px;font-weight:600;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:8px}
-  .rc-ok{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(16,185,129,0.2)}
-  .rc-warn{background:var(--sol-soft);color:#d97706;border:1px solid rgba(245,158,11,0.2)}
+  .rc-ok{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(58,122,78,0.25)}
+  .rc-warn{background:var(--sol-soft);color:#a06f15;border:1px solid rgba(224,162,53,0.3)}
   
   .move-ok{margin-top:16px;background:var(--verde-soft);border:1px solid var(--verde);border-radius:16px;padding:16px;font-size:14.5px;color:var(--verde-deep);line-height:1.6;animation:fadeInUp 0.4s ease}
   @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -430,9 +429,9 @@
   .rb{display:flex;align-items:center;gap:14px;font-size:14px}
   .rb .rn{flex:0 0 110px;font-weight:600;color:var(--ink)}
   .rb .track{flex:1;height:18px;background:rgba(0,0,0,0.04);border-radius:9px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,0.05)}
-  .rb .fill{height:100%;border-radius:9px;background:linear-gradient(90deg, var(--verde), #34d399);box-shadow:0 0 10px rgba(52,211,153,0.5)}
-  .rb.loss .fill{background:linear-gradient(90deg, var(--rojo), #f87171);box-shadow:0 0 10px rgba(248,113,113,0.5)}
-  .rb .rv{flex:0 0 80px;text-align:right;font-family:'Outfit';font-weight:700;font-variant-numeric:tabular-nums;color:var(--verde-deep);font-size:15px}
+  .rb .fill{height:100%;border-radius:9px;background:linear-gradient(90deg, var(--verde-deep), var(--verde));box-shadow:0 0 10px var(--verde-glow)}
+  .rb.loss .fill{background:linear-gradient(90deg, #9c3023, var(--rojo));box-shadow:0 0 10px rgba(191,59,43,0.35)}
+  .rb .rv{flex:0 0 80px;text-align:right;font-family:'Archivo';font-weight:700;font-variant-numeric:tabular-nums;color:var(--verde-deep);font-size:15px}
   .rb.loss .rv{color:var(--rojo)}
   
   .expbtns{display:flex;gap:12px;margin-top:20px}
@@ -478,11 +477,11 @@
     <div class="topbar">
       <div class="scope">Toda la empresa <span class="chev">▾</span></div>
       <div class="ticker">
-        <div class="tk"><span class="lab">🐂 Gordo</span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
+        <div class="tk"><span class="lab"><i data-lucide="beef" style="width:14px;height:14px;color:#c9b393"></i>Gordo</span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
         <div class="sep"></div>
-        <div class="tk"><span class="lab">💵 Blue</span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
+        <div class="tk"><span class="lab"><i data-lucide="banknote" style="width:14px;height:14px;color:#8fc7a0"></i>Blue</span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
         <div class="sep"></div>
-        <div class="tk"><span class="lab">Clima</span><b>☀️ 24°</b><span style="color:#7ec6e6">🌧️ 38mm sem</span></div>
+        <div class="tk"><span class="lab"><i data-lucide="sun" style="width:14px;height:14px;color:#ecc25c"></i>Clima</span><b>24°</b><span style="color:#9ccbe6;display:inline-flex;align-items:center;gap:4px"><i data-lucide="cloud-rain" style="width:13px;height:13px"></i>38mm sem</span></div>
       </div>
     </div>
 
@@ -491,29 +490,19 @@
       <!-- ============ INICIO ============ -->
       <div class="page active" id="page-inicio">
         <div class="statbar">
-          <div class="stat"><div class="lab">🐄 Stock total</div><div class="v tnum">545</div><div class="d up">▲ 18 partos este mes</div></div>
-          <div class="stat"><div class="lab">💰 Rentabilidad</div><div class="v tnum up">+$18,4M</div><div class="d"><span style="color:var(--muted)">ciclo · 3 campos</span></div></div>
-          <div class="stat"><div class="lab">☔ Lluvia (mayo)</div><div class="v tnum">38<span style="font-size:16px;color:var(--muted)">mm</span></div><div class="d down">▼ 38% vs promedio</div></div>
-          <div class="stat"><div class="lab">🏦 Por pagar</div><div class="v tnum">$1,2M</div><div class="d" style="color:#9a6c10">● 1 cheque en 2 días</div></div>
+          <div class="stat"><div class="lab"><i data-lucide="beef" style="color:var(--verde)"></i>Stock total</div><div class="v tnum">545</div><div class="d up">▲ 18 partos este mes</div></div>
+          <div class="stat"><div class="lab"><i data-lucide="wallet" style="color:var(--sol-deep)"></i>Rentabilidad</div><div class="v tnum up">+$18,4M</div><div class="d"><span style="color:var(--muted)">Esperanza <b style="color:var(--verde-deep)">+$19,6M</b> · Arrendado <b style="color:var(--rojo)">−$1,2M</b></span></div></div>
+          <div class="stat"><div class="lab"><i data-lucide="cloud-rain" style="color:var(--cielo)"></i>Lluvia (mayo)</div><div class="v tnum">38<span style="font-size:16px;color:var(--muted)">mm</span></div><div class="d down">▼ 38% vs promedio</div></div>
+          <div class="stat"><div class="lab"><i data-lucide="landmark" style="color:var(--tierra)"></i>Por pagar</div><div class="v tnum">$1,2M</div><div class="d" style="color:var(--sol-deep)">● 1 cheque en 2 días</div></div>
         </div>
-
-        <section><div class="panel">
-          <div class="ph"><h3>Estado de los campos</h3><span class="sub">tocá un potrero para entrar</span></div>
-          <div class="campos">
-            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot">⚠ pasto escaso</span> · 💧 baja</div></div>
-            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · 💧 ok</div></div>
-            <div class="pcard"><div class="top"><div><div class="nm">El Bajo</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-cul">● Maíz</span></div><div class="big tnum" style="font-size:18px;color:var(--cielo)">Creciendo</div><div class="meta">cosecha ~jul</div></div>
-            <div class="pcard"><div class="top"><div><div class="nm">La Cañada</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-des">● Descanso</span></div><div class="big tnum" style="font-size:18px;color:var(--verde-deep)">Lista ✓</div><div class="meta">pasto abundante</div></div>
-          </div>
-        </div></section>
 
         <section class="row a">
           <div class="panel">
             <div class="ph"><h3>Requiere atención</h3><span class="tag-ia">✦ IA</span></div>
-            <div class="insight"><div class="ic ic-verde">💡</div><div class="tx"><b>Conviene mover hacienda de La Loma → La Cañada</b><p>La Loma está sobrecargada y La Cañada está lista para recibir.</p><div class="why">Porque La Loma tiene 128 animales con pasto escaso hace 3 recorridas, y La Cañada está vacía con pasto abundante.</div></div><div class="act">Planificar →</div></div>
-            <div class="insight"><div class="ic ic-rojo">🩹</div><div class="tx"><b>Animal #412 en tratamiento — día 3</b><p>Cojera en El Monte. Retiro vigente: no vender hasta 12/06.</p></div><div class="act" onclick="nav('hacienda')">Ver ficha →</div></div>
-            <div class="insight"><div class="ic ic-sol">🏦</div><div class="tx"><b>Cheque de $900k vence en 2 días</b><p>A Mario Bartomea · Banco Nación.</p></div><div class="act">Ver →</div></div>
-            <div class="insight"><div class="ic ic-cielo">🕐</div><div class="tx"><b>El Fondo lleva 12 días sin recorrer</b><p>Potrero en descanso — conviene chequear pasto y aguada.</p></div><div class="act">Recorrer →</div></div>
+            <div class="insight"><div class="ic ic-verde"><i data-lucide="lightbulb"></i></div><div class="tx"><b>Conviene mover hacienda de La Loma → La Cañada</b><p>La Loma está sobrecargada y La Cañada está lista para recibir.</p><div class="why">Porque La Loma tiene 128 animales con pasto escaso hace 3 recorridas, y La Cañada está vacía con pasto abundante.</div></div><div class="act">Planificar →</div></div>
+            <div class="insight"><div class="ic ic-rojo"><i data-lucide="stethoscope"></i></div><div class="tx"><b>Animal #412 en tratamiento — día 3</b><p>Cojera en El Monte. Retiro vigente: no vender hasta 12/06.</p></div><div class="act" onclick="nav('hacienda')">Ver ficha →</div></div>
+            <div class="insight"><div class="ic ic-sol"><i data-lucide="landmark"></i></div><div class="tx"><b>Cheque de $900k vence en 2 días</b><p>A Mario Bartomea · Banco Nación.</p></div><div class="act">Ver →</div></div>
+            <div class="insight"><div class="ic ic-cielo"><i data-lucide="clock"></i></div><div class="tx"><b>El Fondo lleva 12 días sin recorrer</b><p>Potrero en descanso — conviene chequear pasto y aguada.</p></div><div class="act">Recorrer →</div></div>
           </div>
           <div class="panel">
             <div class="ph"><h3>Stock por categoría</h3><span class="sub">545 cabezas</span></div>
@@ -537,6 +526,16 @@
             </div>
           </div>
         </section>
+
+        <section><div class="panel">
+          <div class="ph"><h3>Estado de los campos</h3><span class="sub">tocá un potrero para entrar</span></div>
+          <div class="campos">
+            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot">⚠ pasto escaso</span> · 💧 baja</div></div>
+            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · 💧 ok</div></div>
+            <div class="pcard"><div class="top"><div><div class="nm">El Bajo</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-cul">● Maíz</span></div><div class="big tnum" style="font-size:18px;color:var(--cielo)">Creciendo</div><div class="meta">cosecha ~jul</div></div>
+            <div class="pcard"><div class="top"><div><div class="nm">La Cañada</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-des">● Descanso</span></div><div class="big tnum" style="font-size:18px;color:var(--verde-deep)">Lista ✓</div><div class="meta">pasto abundante</div></div>
+          </div>
+        </div></section>
 
         <section class="row b">
           <div class="panel"><div class="ph"><h3>Rentabilidad x mes</h3><span class="sub">en pesos de hoy</span></div>
@@ -570,27 +569,20 @@
             </div>
           </div>
           <div class="panel">
-            <div class="ph"><h3>Señales</h3><span class="sub">tocá para filtrar</span></div>
+            <div class="ph"><h3>Señales</h3><span class="sub" id="sig-clear" style="cursor:pointer" onclick="setQ('todos')">tocá para filtrar</span></div>
             <div class="signals">
-              <div class="sigstat" onclick="setQ('trat')"><div class="ic ic-trat">🩹</div><div><div class="v tnum">5</div><div class="l">En tratamiento</div></div></div>
-              <div class="sigstat" onclick="setQ('pre')"><div class="ic ic-pre">🐮</div><div><div class="v tnum">187</div><div class="l">Preñadas</div></div></div>
-              <div class="sigstat" onclick="setQ('vender')"><div class="ic ic-vender">🏷️</div><div><div class="v tnum">24</div><div class="l">Para vender</div></div></div>
-              <div class="sigstat" onclick="setQ('destete')"><div class="ic ic-destete">✂️</div><div><div class="v tnum">31</div><div class="l">Para destetar</div></div></div>
+              <div class="sigstat" data-q="trat" onclick="setQ(q==='trat'?'todos':'trat')"><div class="ic ic-trat"><i data-lucide="stethoscope"></i></div><div><div class="v tnum">5</div><div class="l">En tratamiento</div></div></div>
+              <div class="sigstat" data-q="pre" onclick="setQ(q==='pre'?'todos':'pre')"><div class="ic ic-pre"><i data-lucide="heart-pulse"></i></div><div><div class="v tnum">187</div><div class="l">Preñadas</div></div></div>
+              <div class="sigstat" data-q="vender" onclick="setQ(q==='vender'?'todos':'vender')"><div class="ic ic-vender"><i data-lucide="tag"></i></div><div><div class="v tnum">24</div><div class="l">Para vender</div></div></div>
+              <div class="sigstat" data-q="destete" onclick="setQ(q==='destete'?'todos':'destete')"><div class="ic ic-destete"><i data-lucide="scissors"></i></div><div><div class="v tnum">31</div><div class="l">Para destetar</div></div></div>
             </div>
           </div>
         </section>
 
         <div class="toolbar">
-          <div class="search"><span style="color:var(--faint)">🔎</span><input id="q" placeholder="Buscar por caravana…" oninput="render()"></div>
+          <div class="search"><i data-lucide="search" style="width:16px;height:16px;color:var(--faint)"></i><input id="q" placeholder="Buscar por caravana…" oninput="render()"></div>
           <div class="select">Categoría ▾</div><div class="select">Potrero ▾</div><div class="select">Estado: Activos ▾</div>
           <div class="toggle"><button id="t-tabla" class="on" onclick="setView('tabla')">Tabla</button><button id="t-pot" onclick="setView('potrero')">Por potrero</button></div>
-        </div>
-        <div class="qviews">
-          <div class="qv on" data-q="todos" onclick="setQ('todos')">Todos <span class="c">545</span></div>
-          <div class="qv" data-q="trat" onclick="setQ('trat')">⚠ En tratamiento <span class="c">5</span></div>
-          <div class="qv" data-q="pre" onclick="setQ('pre')">🐮 Preñadas <span class="c">187</span></div>
-          <div class="qv" data-q="vender" onclick="setQ('vender')">🏷️ Para vender <span class="c">24</span></div>
-          <div class="qv" data-q="destete" onclick="setQ('destete')">✂️ Para destetar <span class="c">31</span></div>
         </div>
         <div class="panel" id="content"></div>
       </div>
@@ -600,12 +592,12 @@
         <div class="campos-head">
           <div><h1>Campos</h1><div class="sub" id="campos-sub"></div></div>
           <div class="head-actions">
-            <div class="segment"><button id="cm-mapa" class="on" onclick="setCamposMode('mapa')">🗺️ Mapa de potreros</button><button id="cm-plan" onclick="setCamposMode('planificar')">⇄ Planificar</button></div>
+            <div class="segment"><button id="cm-mapa" class="on" onclick="setCamposMode('mapa')">Mapa de potreros</button><button id="cm-plan" onclick="setCamposMode('planificar')">⇄ Planificar</button></div>
             <button class="btn">+ Nuevo campo</button>
           </div>
         </div>
         <div id="campos-mapa" style="display:flex;flex-direction:column;gap:12px">
-        <div class="selrow"><div class="cselect" id="campos-selector"></div><div class="vtoggle"><button id="cv-mosaico" class="on" onclick="setCamposView('mosaico')">🟦 Mosaico</button><button id="cv-sat" onclick="setCamposView('satelital')">🛰️ Satelital</button></div></div>
+        <div class="selrow"><div class="cselect" id="campos-selector"></div><div class="vtoggle"><button id="cv-mosaico" class="on" onclick="setCamposView('mosaico')">Mosaico</button><button id="cv-sat" onclick="setCamposView('satelital')">Satelital</button></div></div>
         <div class="statbar" id="campos-stats"></div>
         <div class="cleg" id="campos-legend" style="margin-left:0;padding:0 2px"></div>
         <div class="panel" id="campos-mosaic-wrap"><div class="mosaic" id="campos-mosaic"></div></div>
@@ -617,8 +609,8 @@
           <div class="planhead">Planificación a nivel <b>empresa</b> · el sistema <b>sugiere</b>, vos decidís. Toda sugerencia con su porqué.</div>
           <div class="panel suggest" id="plan-suggest"></div>
           <div class="plan-cols">
-            <div class="panel"><div class="ph"><h3>⚠️ Conviene aliviar</h3><span class="sub">sobrecargados</span></div><div id="plan-donantes"></div></div>
-            <div class="panel"><div class="ph"><h3>✅ Disponibles</h3><span class="sub">para recibir</span></div><div id="plan-receptores"></div></div>
+            <div class="panel"><div class="ph"><h3 style="display:flex;align-items:center;gap:8px"><i data-lucide="triangle-alert" style="width:18px;height:18px;color:var(--sol-deep)"></i>Conviene aliviar</h3><span class="sub">sobrecargados</span></div><div id="plan-donantes"></div></div>
+            <div class="panel"><div class="ph"><h3 style="display:flex;align-items:center;gap:8px"><i data-lucide="circle-check" style="width:18px;height:18px;color:var(--verde)"></i>Disponibles</h3><span class="sub">para recibir</span></div><div id="plan-receptores"></div></div>
           </div>
           <div class="panel">
             <div class="ph"><h3>Mover hacienda</h3></div>
@@ -651,15 +643,15 @@
         </div>
 
         <div class="statbar">
-          <div class="stat"><div class="lab">💰 Ingresos</div><div class="v tnum" id="an-ing">$42,8M</div><div class="d up">▲ ventas de hacienda</div></div>
-          <div class="stat"><div class="lab">🧾 Gastos</div><div class="v tnum" id="an-gas">$24,4M</div><div class="d"><span style="color:var(--muted)">veterinario + agrícola</span></div></div>
-          <div class="stat"><div class="lab">📈 Resultado</div><div class="v tnum up" id="an-res">+$18,4M</div><div class="d up">ciclo · 3 campos</div></div>
+          <div class="stat"><div class="lab"><i data-lucide="banknote" style="color:var(--verde)"></i>Ingresos</div><div class="v tnum" id="an-ing">$42,8M</div><div class="d up">▲ ventas de hacienda</div></div>
+          <div class="stat"><div class="lab"><i data-lucide="receipt" style="color:var(--tierra)"></i>Gastos</div><div class="v tnum" id="an-gas">$24,4M</div><div class="d"><span style="color:var(--muted)">veterinario + agrícola</span></div></div>
+          <div class="stat"><div class="lab"><i data-lucide="trending-up" style="color:var(--sol-deep)"></i>Resultado</div><div class="v tnum up" id="an-res">+$18,4M</div><div class="d up">ciclo · 3 campos</div></div>
         </div>
 
         <div class="panel"><div class="ph"><h3>Para decidir</h3><span class="tag-ia">✦ IA</span></div>
-          <div class="insight"><div class="ic ic-verde">🏆</div><div class="tx"><b>Don Gilberto es tu potrero más rentable</b><p>+$9,1M en el ciclo — la mejor relación del rodeo.</p></div></div>
-          <div class="insight"><div class="ic ic-rojo">📉</div><div class="tx"><b>El Arrendado lleva 2 ciclos en pérdida</b><p>−$3,2M — el alquiler se come la ganadería. Conviene revisar el contrato.</p></div></div>
-          <div class="insight"><div class="ic ic-sol">🩺</div><div class="tx"><b>Gastaste 42% en veterinario</b><p>+50% vs el año pasado — el salto fue en abril (antiparasitarios).</p></div></div>
+          <div class="insight"><div class="ic ic-verde"><i data-lucide="trophy"></i></div><div class="tx"><b>Don Gilberto es tu potrero más rentable</b><p>+$9,1M en el ciclo — la mejor relación del rodeo.</p></div></div>
+          <div class="insight"><div class="ic ic-rojo"><i data-lucide="trending-down"></i></div><div class="tx"><b>El Arrendado lleva 2 ciclos en pérdida</b><p>−$3,2M — el alquiler se come la ganadería. Conviene revisar el contrato.</p></div></div>
+          <div class="insight"><div class="ic ic-sol"><i data-lucide="stethoscope"></i></div><div class="tx"><b>Gastaste 42% en veterinario</b><p>+50% vs el año pasado — el salto fue en abril (antiparasitarios).</p></div></div>
         </div>
 
         <section class="row a">
@@ -702,14 +694,14 @@
               <tr><td>28/04</td><td>Combustible · gasoil</td><td style="text-align:right;font-weight:600">−$680k</td></tr>
               <tr><td>20/04</td><td>Alquiler · El Arrendado</td><td style="text-align:right;font-weight:600">−$2,1M</td></tr>
             </tbody></table>
-            <div class="expbtns"><button>⬇ PDF</button><button>⬇ Excel</button></div>
+            <div class="expbtns"><button style="display:inline-flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="download" style="width:14px;height:14px"></i>PDF</button><button style="display:inline-flex;align-items:center;justify-content:center;gap:6px"><i data-lucide="download" style="width:14px;height:14px"></i>Excel</button></div>
           </div>
         </section>
       </div>
       <div class="page" id="page-recorrida"><div class="placeholder"><div class="ico">📍</div><h2>Recorrida (Modo Campo)</h2><p>Esto vive en el celular — recorrida fechada por potrero. Ya hay un prototipo aparte: <code>prototipo-modo-campo.html</code>.</p></div></div>
       <div class="page" id="page-clima"><div class="placeholder"><div class="ico">☔</div><h2>Clima</h2><p>Lluvia acumulada vs promedio, pronóstico y alertas (pulverización, estrés calórico). Próxima tanda.</p></div></div>
 
-      <div class="legendnote">Maqueta navegable · "Agro profesional" · datos demo.</div>
+      <div class="legendnote">Maqueta navegable · "El campo como mapa vivo" · datos demo.</div>
       <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
       <div class="drawer" id="drawer"></div>
     </div>
@@ -773,12 +765,11 @@
     else{const pots=[...new Set(list.map(a=>a.pot))];el.innerHTML=pots.length?pots.map(p=>{const inp=list.filter(a=>a.pot===p);return `<div class="potblock"><div class="pothead"><span class="nm">${p}</span><span class="cnt">${inp.length} animales</span><span class="pstate ps-gan">● ${POT_STATE[p]||''}</span></div><table class="tbl"><tbody>${inp.map(rowHtml).join('')}</tbody></table></div>`;}).join(''):`<div class="empty">Sin animales con ese filtro.</div>`;}
   }
   function setView(v){view=v;document.getElementById('t-tabla').classList.toggle('on',v==='tabla');document.getElementById('t-pot').classList.toggle('on',v==='potrero');render();}
-  function setQ(nq){q=nq;document.querySelectorAll('.qv').forEach(c=>c.classList.toggle('on',c.dataset.q===nq));render();}
+  function setQ(nq){q=nq;document.querySelectorAll('.sigstat').forEach(c=>c.classList.toggle('on',c.dataset.q===nq));const sc=document.getElementById('sig-clear');if(sc)sc.textContent=nq==='todos'?'tocá para filtrar':'✕ quitar filtro';render();}
   render();
 
   /* ===== CAMPOS (mosaico de potreros) ===== */
   const ESTADO={ganadero:'Ganadero',descanso:'Descanso',preparacion:'Preparación',siembra:'Siembra',cultivo:'Cultivo',cosecha:'Cosecha',rastrojo:'Rastrojo'};
-  const EICON={ganadero:'🐄',descanso:'💤',preparacion:'🚜',siembra:'🌱',cultivo:'🌿',cosecha:'🌾',rastrojo:'🍂'};
   const LICON={ganadero:'beef',descanso:'leaf',preparacion:'tractor',siembra:'sprout',cultivo:'wheat',cosecha:'wheat',rastrojo:'wheat'};
   const PSIG={pasto:'⚠ pasto escaso',agua:'💧 agua baja',trat:'🩹 en tratam.'};
   const CAMPOS={
@@ -805,7 +796,7 @@
   function renderCampos(){
     const isAll=campoSel==='all';
     const pots=isAll?ALLPOT:CAMPOS[campoSel].potreros;
-    let selHtml=`<div class="cs ${isAll?'on':''}" onclick="selCampo('all')">🏢 Toda la empresa</div>`;
+    let selHtml=`<div class="cs ${isAll?'on':''}" onclick="selCampo('all')">Toda la empresa</div>`;
     selHtml+=Object.entries(CAMPOS).map(([k,v])=>`<div class="cs ${k===campoSel?'on':''}" onclick="selCampo('${k}')">${v.nombre}<small>${v.tenencia}</small></div>`).join('');
     document.getElementById('campos-selector').innerHTML=selHtml;
     const totalHa=pots.reduce((s,p)=>s+p.ha,0);
@@ -816,12 +807,12 @@
       ? `Toda la empresa · ${Object.keys(CAMPOS).length} campos · ${pots.length} potreros · ${totalHa} ha`
       : `${CAMPOS[campoSel].nombre} · ${CAMPOS[campoSel].tenencia} · ${pots.length} potreros · ${totalHa} ha`;
     const cuarta=isAll
-      ? `<div class="stat"><div class="lab">🏞️ Campos</div><div class="v tnum">${Object.keys(CAMPOS).length}</div><div class="d"><span style="color:var(--muted)">propio + alquilados</span></div></div>`
-      : `<div class="stat"><div class="lab">🏷️ Tenencia</div><div class="v" style="font-size:22px">${CAMPOS[campoSel].tenencia}</div><div class="d"><span style="color:var(--muted)">${CAMPOS[campoSel].nombre}</span></div></div>`;
+      ? `<div class="stat"><div class="lab"><i data-lucide="map" style="color:var(--tierra)"></i>Campos</div><div class="v tnum">${Object.keys(CAMPOS).length}</div><div class="d"><span style="color:var(--muted)">propio + alquilados</span></div></div>`
+      : `<div class="stat"><div class="lab"><i data-lucide="file-badge" style="color:var(--tierra)"></i>Tenencia</div><div class="v" style="font-size:22px">${CAMPOS[campoSel].tenencia}</div><div class="d"><span style="color:var(--muted)">${CAMPOS[campoSel].nombre}</span></div></div>`;
     document.getElementById('campos-stats').innerHTML=`
-      <div class="stat"><div class="lab">📐 Superficie</div><div class="v tnum">${totalHa}<span style="font-size:15px;color:var(--muted)"> ha</span></div><div class="d"><span style="color:var(--muted)">${pots.length} potreros</span></div></div>
-      <div class="stat"><div class="lab">🐄 Hacienda</div><div class="v tnum">${totalCab}</div><div class="d"><span style="color:var(--muted)">${ganaderos} potreros ganaderos</span></div></div>
-      <div class="stat"><div class="lab">✅ Listos p/ animales</div><div class="v tnum">${listos}</div><div class="d"><span style="color:var(--muted)">en descanso</span></div></div>
+      <div class="stat"><div class="lab"><i data-lucide="land-plot" style="color:var(--sol-deep)"></i>Superficie</div><div class="v tnum">${totalHa}<span style="font-size:15px;color:var(--muted)"> ha</span></div><div class="d"><span style="color:var(--muted)">${pots.length} potreros</span></div></div>
+      <div class="stat"><div class="lab"><i data-lucide="beef" style="color:var(--verde)"></i>Hacienda</div><div class="v tnum">${totalCab}</div><div class="d"><span style="color:var(--muted)">${ganaderos} potreros ganaderos</span></div></div>
+      <div class="stat"><div class="lab"><i data-lucide="circle-check" style="color:var(--verde)"></i>Listos p/ animales</div><div class="v tnum">${listos}</div><div class="d"><span style="color:var(--muted)">en descanso</span></div></div>
       ${cuarta}`;
     const counts={};pots.forEach(p=>{(counts[p.e]=counts[p.e]||{n:0,ha:0}).n++;counts[p.e].ha+=p.ha;});
     document.getElementById('campos-legend').innerHTML=Object.keys(ESTADO).filter(e=>counts[e]).map(e=>`<div class="cl ${estadoHi&&estadoHi!==e?'dim':''}" onclick="hiEstado('${e}')"><span class="dot e-${e}"></span>${ESTADO[e]} <b style="color:var(--ink)">${counts[e].n}</b> · ${counts[e].ha}ha</div>`).join('');
@@ -908,7 +899,7 @@
     'la-canada':rect(-35.520,-35.540,-59.540,-59.518),'el-fondo':rect(-35.520,-35.540,-59.518,-59.496),
     'potrero-1':rect(-35.468,-35.495,-59.588,-59.560),'lote-norte':rect(-35.468,-35.500,-59.560,-59.524),
   };
-  const MAPCOLOR={ganadero:'#6db84e',descanso:'#e0ad34',preparacion:'#c06a3a',siembra:'#8fbf6a',cultivo:'#52ad3a',cosecha:'#e0a93a',rastrojo:'#c2a85e'};
+  const MAPCOLOR={ganadero:'#9aad5d',descanso:'#e0ba4a',preparacion:'#c0703f',siembra:'#aec763',cultivo:'#4f9a5e',cosecha:'#e0a93a',rastrojo:'#c2a85e'};
   function initMap(){
     _map=L.map('campos-map',{attributionControl:false});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(_map);
@@ -957,7 +948,7 @@
     if(m==='mapa'&&camposView==='satelital'&&_map)setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},80);
   }
   function renderPlan(){
-    document.getElementById('plan-suggest').innerHTML=`<div class="insight" style="background:none;border:none;padding:0;margin:0"><div class="ic ic-verde">💡</div><div class="tx"><b>Conviene mover hacienda de La Loma → La Cañada</b><p>La Loma está sobrecargada y La Cañada está lista para recibir.</p><div class="why">Porque La Loma tiene 128 animales con pasto escaso y agua baja hace 3 recorridas, y La Cañada está vacía con pasto abundante (mismo RENSPA, sin guía).</div></div><div class="act" onclick="usarSug()">Usar esta sugerencia →</div></div>`;
+    document.getElementById('plan-suggest').innerHTML=`<div class="insight" style="background:none;border:none;padding:0;margin:0"><div class="ic ic-verde"><i data-lucide="lightbulb"></i></div><div class="tx"><b>Conviene mover hacienda de La Loma → La Cañada</b><p>La Loma está sobrecargada y La Cañada está lista para recibir.</p><div class="why">Porque La Loma tiene 128 animales con pasto escaso y agua baja hace 3 recorridas, y La Cañada está vacía con pasto abundante (mismo RENSPA, sin guía).</div></div><div class="act" onclick="usarSug()">Usar esta sugerencia →</div></div>`;
     const don=ALLPOT.filter(p=>p.e==='ganadero'&&p.cab>0&&(p.sig.includes('pasto')||p.sig.includes('agua')));
     const rec=ALLPOT.filter(p=>['descanso','rastrojo'].includes(p.e)&&p.pasto!=='Pelado');
     document.getElementById('plan-donantes').innerHTML=don.length?don.map(p=>`<div class="prow"><div><div class="pn">${p.nm}</div><div class="pm">${p.campo} · 🐄${p.cab} · pasto ${p.pasto}${p.agua==='Baja'?' · 💧 baja':''}</div></div><div class="pa" onclick="prefill('${p.id}')">Aliviar →</div></div>`).join(''):`<div class="empty">Ningún potrero sobrecargado hoy ✓</div>`;
@@ -968,6 +959,7 @@
     document.getElementById('mv-origen').value='la-loma';
     document.getElementById('mv-destino').value='la-canada';
     cantMode='todos';moverChange();
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
   function moverChange(){
     const o=pot(document.getElementById('mv-origen').value), d=pot(document.getElementById('mv-destino').value);
@@ -1016,16 +1008,21 @@
         <div class="mf"><label>Fecha de cobro / pago real</label><input type="date"><div style="font-size:11px;color:var(--faint);margin-top:4px">Vacío = pendiente. Las dos fechas son la clave (D5/D6): economía real vs caja.</div></div>
         <div class="mf"><label>Atribuir a — Campo</label><select><option>La Esperanza</option><option>El Arrendado</option></select></div>
         <div class="mf"><label>Potrero (opcional)</label><select><option>— sin asignar —</option><option>La Loma</option><option>Don Gilberto</option><option>El Bajo</option><option>El Monte</option></select></div>
-        <div class="mf"><label>Comprobante</label><button class="rad" style="width:100%;justify-content:center">📷 Subir foto</button></div>
+        <div class="mf"><label>Comprobante</label><button class="rad" style="width:100%;justify-content:center;gap:8px"><i data-lucide="camera" style="width:16px;height:16px"></i> Subir foto</button></div>
         <button class="btn" onclick="cargaOk()">Guardar</button>
         <div id="carga-msg"></div>
       </div>`;
     document.getElementById('drawer').classList.add('open');
     document.querySelector('.scroll').classList.add('with-drawer');
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
   function cargaOk(){const m=document.getElementById('carga-msg');if(m){m.innerHTML='<div class="move-ok">✓ Guardado (demo). Aparece en Movimientos y suma a la rentabilidad del potrero/campo.</div>';}setTimeout(closeDrawer,1500);}
 
   renderCampos();
+
+  /* deep-link: dashboard-agro-ai.html#campos abre esa sección */
+  const _h=location.hash.replace('#','');
+  if(_h&&document.getElementById('page-'+_h))nav(_h);
 </script>
 </body>
 </html>
