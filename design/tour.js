@@ -57,10 +57,10 @@ await page.evaluate(() => { setQ('todos'); nav('analitica'); openCarga(); });
 await page.waitForTimeout(800);
 await page.screenshot({ path: shot('analitica-carga') });
 
-// El Capataz (asistente IA)
-await page.evaluate(() => { closeDrawer(); nav('inicio'); openCapataz(); });
-await page.waitForTimeout(800);
-await page.screenshot({ path: shot('capataz') });
+// El Ingeniero (asistente IA) — espera a que termine el tipeo en vivo
+await page.evaluate(() => { closeDrawer(); nav('inicio'); openIngeniero(); });
+await page.waitForTimeout(4500);
+await page.screenshot({ path: shot('ingeniero') });
 
 // Sidebar colapsado
 await page.evaluate(() => { closeDrawer(); toggleSidebar(); });
