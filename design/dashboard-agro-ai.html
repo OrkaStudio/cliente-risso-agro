@@ -274,6 +274,7 @@
   .search input{flex:1;border:none;background:none;outline:none;font-size:14.5px;font-family:inherit;color:var(--ink)}.search input::placeholder{color:var(--faint)}
   .select{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;box-shadow:var(--shadow);font-family:inherit;transition:all 0.2s}
   .select:hover{border-color:var(--faint)}
+  .pot-chip{display:inline-flex;align-items:center;gap:5px;background:var(--verde-soft);border:1px solid var(--verde);color:var(--verde-deep);border-radius:14px;padding:11px 16px;font-size:13.5px;font-weight:600;white-space:nowrap}
   .toggle{display:flex;background:var(--inset);border:1px solid var(--border);border-radius:14px;padding:4px;margin-left:auto}
   .toggle button{border:none;background:none;padding:8px 16px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;transition:all 0.2s}
   .toggle button.on{background:var(--card);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,0.05)}
@@ -354,24 +355,43 @@
   .tcell .tv{font-family:'Archivo';font-weight:700;font-size:18px;line-height:1.05}
   .tcell .th{font-size:11px;opacity:.72;font-weight:600}
   .tcell .tn,.tcell .tv,.tcell .th{text-shadow:0 1px 2px rgba(255,255,255,.5)}
-  .tcell .twm{position:absolute;right:11px;top:10px;z-index:1;pointer-events:none;opacity:.5;color:#0a3a26}
-  .tcell .twm svg{width:38px;height:38px;stroke-width:1.4}
   /* chip de actividad: QUÉ se está haciendo en el potrero, de un vistazo */
   .tcell .echip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.65);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;font-family:'Archivo',sans-serif;color:#2a3324;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:6px;width:fit-content}
   .tcell .echip svg{width:12px;height:12px;flex:0 0 12px}
-  /* Textura figurativa por actividad — confinada a una "franja de suelo" abajo (no tapiz). Color=estado, forma=qué hay */
-  .tcell::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;opacity:.6;background-repeat:repeat;background-position:bottom left;-webkit-mask-image:linear-gradient(to top,#000 0,#000 24%,transparent 60%);mask-image:linear-gradient(to top,#000 0,#000 24%,transparent 60%)}
-  .tcell.e-ganadero::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38'%3E%3Cg fill='%230a3a26'%3E%3Cellipse cx='10' cy='11' rx='5' ry='3'/%3E%3Ccircle cx='15.5' cy='10' r='1.7'/%3E%3Cellipse cx='27' cy='27' rx='5' ry='3'/%3E%3Ccircle cx='32.5' cy='26' r='1.7'/%3E%3C/g%3E%3C/svg%3E");background-size:38px 38px}
-  .tcell.e-descanso::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='22'%3E%3Cg fill='none' stroke='%230a3a26' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M6 20 C6 14 6 13 6 12'/%3E%3Cpath d='M6 20 C3 16 2 15 2 15'/%3E%3Cpath d='M6 20 C9 16 10 15 10 15'/%3E%3Cpath d='M18 21 C18 15 18 14 18 13'/%3E%3Cpath d='M18 21 C15 17 14 16 14 16'/%3E%3Cpath d='M18 21 C21 17 22 16 22 16'/%3E%3C/g%3E%3C/svg%3E");background-size:26px 22px}
-  .tcell.e-cultivo::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='20'%3E%3Cpath d='M7 20 L7 2' stroke='%230a3a26' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");background-size:14px 20px}
-  .tcell.e-cultivo.tex-maiz::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='30'%3E%3Cg fill='none' stroke='%230a3a26' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M11 29 L11 7'/%3E%3Cpath d='M11 16 C7 14 5 15 4 18'/%3E%3Cpath d='M11 13 C15 11 17 12 18 15'/%3E%3Cpath d='M11 8 C9 5 10 4 11 3'/%3E%3Cpath d='M11 8 C13 5 12 4 11 3'/%3E%3C/g%3E%3C/svg%3E");background-size:22px 30px}
-  .tcell.e-cultivo.tex-soja::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cg fill='none' stroke='%230a3a26' stroke-width='1.3'%3E%3Ccircle cx='7' cy='8' r='3'/%3E%3Ccircle cx='17' cy='16' r='3'/%3E%3C/g%3E%3C/svg%3E");background-size:24px 24px}
-  .tcell.e-cultivo.tex-trigo::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='26'%3E%3Cg fill='none' stroke='%236b4a1e' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M9 25 L9 8'/%3E%3Cpath d='M9 8 L6 11 M9 8 L12 11 M9 12 L6 15 M9 12 L12 15 M9 16 L6 19 M9 16 L12 19'/%3E%3C/g%3E%3C/svg%3E");background-size:18px 26px}
-  .tcell.e-cultivo.tex-girasol::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cg fill='none' stroke='%23a06a10' stroke-width='1.2'%3E%3Ccircle cx='9' cy='9' r='2.5'/%3E%3Cpath d='M9 3 L9 1 M9 17 L9 15 M3 9 L1 9 M17 9 L15 9 M5 5 L3.5 3.5 M13 13 L14.5 14.5 M13 5 L14.5 3.5 M5 13 L3.5 14.5'/%3E%3C/g%3E%3C/svg%3E");background-size:26px 26px}
-  .tcell.e-siembra::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cg fill='none' stroke='%230a3a26' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M6 18 L6 12 M6 12 C4 10 3 11 3 11 M6 12 C8 10 9 11 9 11'/%3E%3Cpath d='M16 19 L16 14 M16 14 C14 12 13 13 13 13 M16 14 C18 12 19 13 19 13'/%3E%3C/g%3E%3C/svg%3E");background-size:22px 22px}
-  .tcell.e-cosecha::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='26'%3E%3Cg fill='none' stroke='%23a06a10' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M9 25 L9 8'/%3E%3Cpath d='M9 8 L6 11 M9 8 L12 11 M9 12 L6 15 M9 12 L12 15 M9 16 L6 19 M9 16 L12 19'/%3E%3C/g%3E%3C/svg%3E");background-size:18px 26px}
-  .tcell.e-preparacion::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12'%3E%3Cg fill='none' stroke='%236b4a1e' stroke-width='1.3'%3E%3Cpath d='M0 4 Q5 2 10 4 T20 4'/%3E%3Cpath d='M0 9 Q5 7 10 9 T20 9'/%3E%3C/g%3E%3C/svg%3E");background-size:20px 12px}
-  .tcell.e-rastrojo::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='14'%3E%3Cg fill='none' stroke='%236b4a1e' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M4 13 L4 7 M4 7 L6 5'/%3E%3Cpath d='M11 13 L11 8 M11 8 L9 6'/%3E%3C/g%3E%3C/svg%3E");background-size:16px 14px}
+  /* Textura por actividad — VISTA AÉREA del lote (como imagen satelital), no dibujitos.
+     Surcos de siembra con ancho de hilera según cultivo · pastura moteada · franjas de cosecha. */
+  .tcell::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit}
+  /* ganadero: pastura moteada (manchones de pasto vistos desde arriba) */
+  .tcell.e-ganadero::before{background:
+    radial-gradient(ellipse at 30% 40%, rgba(45,85,40,.14) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 70%, rgba(45,85,40,.11) 0%, transparent 50%),
+    radial-gradient(ellipse at 55% 15%, rgba(255,255,255,.1) 0%, transparent 45%);
+    background-size:130px 95px, 190px 150px, 160px 120px}
+  /* descanso: lote quieto — moteado mínimo, casi liso */
+  .tcell.e-descanso::before{background:
+    radial-gradient(ellipse at 40% 55%, rgba(170,130,45,.09) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 25%, rgba(255,255,255,.08) 0%, transparent 50%);
+    background-size:150px 115px, 200px 160px}
+  /* cultivo: surcos de siembra en diagonal (genérico) */
+  .tcell.e-cultivo::before{background:repeating-linear-gradient(105deg, rgba(18,70,32,.13) 0 2px, transparent 2px 9px)}
+  /* maíz: hilera ancha (70 cm) bien marcada */
+  .tcell.e-cultivo.tex-maiz::before{background:repeating-linear-gradient(105deg, rgba(18,70,32,.17) 0 2.5px, transparent 2.5px 14px)}
+  /* soja: hilera fina y cerrada */
+  .tcell.e-cultivo.tex-soja::before{background:repeating-linear-gradient(105deg, rgba(18,70,32,.13) 0 1.8px, transparent 1.8px 7px)}
+  /* trigo: trama densa y fina */
+  .tcell.e-cultivo.tex-trigo::before{background:repeating-linear-gradient(105deg, rgba(110,82,22,.13) 0 1.4px, transparent 1.4px 4.5px)}
+  /* girasol: plantas en grilla punteada */
+  .tcell.e-cultivo.tex-girasol::before{background:radial-gradient(circle, rgba(140,95,18,.2) 1.6px, transparent 2.2px);background-size:15px 15px}
+  /* siembra: surcos recién marcados, tierra entre líneas */
+  .tcell.e-siembra::before{background:repeating-linear-gradient(100deg, rgba(115,82,40,.13) 0 1.6px, transparent 1.6px 9px)}
+  /* preparación: pasadas de disco/arado, surco grueso */
+  .tcell.e-preparacion::before{background:repeating-linear-gradient(0deg, rgba(100,58,28,.16) 0 2.2px, transparent 2.2px 8px)}
+  /* cosecha: franjas anchas de cosechadora alternadas */
+  .tcell.e-cosecha::before{background:repeating-linear-gradient(100deg, rgba(150,105,25,.11) 0 20px, rgba(150,105,25,.025) 20px 40px)}
+  /* rastrojo: caña cortada rala + hilera de pasada tenue */
+  .tcell.e-rastrojo::before{background:
+    repeating-linear-gradient(90deg, rgba(125,92,42,.12) 0 1.6px, transparent 1.6px 6.5px),
+    repeating-linear-gradient(0deg, transparent 0 12px, rgba(125,92,42,.05) 12px 15px)}
   
   .scrim{position:fixed;inset:0;background:rgba(24,44,30,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:29;opacity:0;pointer-events:none;transition:opacity .3s ease}
   .scrim.open{opacity:1;pointer-events:auto}
@@ -470,10 +490,14 @@
   .move-preview b{color:var(--ink)}
   .move-preview:empty{display:none}
 
-  /* ticker responsive */
+  /* ticker responsive — prioridad: precios (varas D4) > labels > clima > frescura */
   @media(max-width:1380px){.tk .stale{display:none}}
   @media(max-width:1240px){.tk-clima,.sep-clima{display:none}}
   @media(max-width:1100px){.tk .lab{display:none}}
+  /* con drawer abierto el espacio se achica sin cambiar el viewport: mismo orden */
+  .topbar.with-drawer .tk .stale{display:none}
+  .topbar.with-drawer .tk-clima,.topbar.with-drawer .sep-clima{display:none}
+  @media(max-width:1560px){.topbar.with-drawer .tk .lab{display:none}}
 
   /* EL INGENIERO — asistente IA conversacional (burbuja flotante) */
   .fab-ing{position:fixed;right:28px;bottom:28px;z-index:28;display:flex;align-items:center;gap:9px;background:linear-gradient(110deg,#a06f15,#e0a235);color:#fff;border:none;border-radius:28px;padding:14px 24px;font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;letter-spacing:.01em;cursor:pointer;box-shadow:0 10px 30px rgba(224,162,53,.4);transition:transform .2s,box-shadow .2s}
@@ -606,24 +630,37 @@
         <section><div class="panel">
           <div class="ph"><h3>Estado de los campos</h3><span class="sub">tocá un potrero para entrar</span></div>
           <div class="campos">
-            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot">⚠ pasto escaso</span> · 💧 baja</div></div>
-            <div class="pcard" onclick="nav('hacienda')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · 💧 ok</div></div>
+            <div class="pcard" onclick="nav('hacienda');setPotF('La Loma')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot">⚠ pasto escaso</span> · 💧 baja</div></div>
+            <div class="pcard" onclick="nav('hacienda');setPotF('Don Gilberto')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · 💧 ok</div></div>
             <div class="pcard"><div class="top"><div><div class="nm">El Bajo</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-cul">● Maíz</span></div><div class="big tnum" style="font-size:18px;color:var(--cielo)">Creciendo</div><div class="meta">cosecha ~jul</div></div>
             <div class="pcard"><div class="top"><div><div class="nm">La Cañada</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-des">● Descanso</span></div><div class="big tnum" style="font-size:18px;color:var(--verde-deep)">Lista ✓</div><div class="meta">pasto abundante</div></div>
           </div>
         </div></section>
 
         <section class="row b">
-          <div class="panel"><div class="ph"><h3>Rentabilidad x mes</h3><span class="sub">en pesos de hoy</span></div>
-            <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--verde)" stop-opacity=".28"/><stop offset="1" stop-color="var(--verde)" stop-opacity="0"/></linearGradient></defs><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30 L300,120 L0,120 Z" fill="url(#g1)"/><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30" fill="none" stroke="var(--verde)" stroke-width="2.5"/></svg></div>
-          <div class="panel"><div class="ph"><h3>Lluvia vs promedio</h3><span class="sub">2026</span></div>
-            <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none"><g><rect x="14" y="50" width="22" height="70" rx="3" fill="var(--surface-hi)"/><rect x="14" y="74" width="22" height="46" rx="3" fill="var(--cielo)"/><rect x="64" y="44" width="22" height="76" rx="3" fill="var(--surface-hi)"/><rect x="64" y="86" width="22" height="34" rx="3" fill="var(--cielo)"/><rect x="114" y="56" width="22" height="64" rx="3" fill="var(--surface-hi)"/><rect x="114" y="58" width="22" height="62" rx="3" fill="var(--cielo)"/><rect x="164" y="40" width="22" height="80" rx="3" fill="var(--surface-hi)"/><rect x="164" y="92" width="22" height="28" rx="3" fill="var(--cielo)"/><rect x="214" y="54" width="22" height="66" rx="3" fill="var(--surface-hi)"/><rect x="214" y="98" width="22" height="22" rx="3" fill="var(--cielo)"/><rect x="264" y="60" width="22" height="60" rx="3" fill="var(--surface-hi)"/><rect x="264" y="100" width="22" height="20" rx="3" fill="var(--cielo)"/></g></svg></div>
-          <div class="panel"><div class="ph"><h3>Compras vs ventas</h3><span class="sub">cabezas · año</span></div>
-            <div style="display:flex;flex-direction:column;gap:14px;padding-top:8px">
-              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Compras · 40</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:30%;height:100%;background:var(--sol)"></div></div></div>
-              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Ventas · 120</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:78%;height:100%;background:var(--verde)"></div></div></div>
-              <div style="font-size:12px;color:var(--faint);font-style:italic;margin-top:2px">Vendiste 3× lo que compraste — rodeo en reducción.</div>
-            </div></div>
+          <div class="panel"><div class="ph"><h3>Últimas recorridas</h3><span class="sub">qué tan fresco está el dato</span></div>
+            <table class="tbl"><tbody>
+              <tr onclick="nav('campos')"><td style="font-weight:600">Don Gilberto</td><td style="color:var(--muted)">hoy</td><td style="color:var(--verde-deep);font-weight:600;text-align:right">✓ sin novedades</td></tr>
+              <tr onclick="nav('campos')"><td style="font-weight:600">La Loma</td><td style="color:var(--muted)">hace 2 días</td><td style="color:var(--sol-deep);font-weight:600;text-align:right">⚠ pasto escaso</td></tr>
+              <tr onclick="nav('campos')"><td style="font-weight:600">El Monte</td><td style="color:var(--muted)">hace 3 días</td><td style="color:var(--rojo);font-weight:600;text-align:right">1 en tratamiento</td></tr>
+              <tr onclick="nav('recorrida')"><td style="font-weight:600">El Fondo</td><td style="color:var(--rojo);font-weight:600">hace 12 días</td><td style="color:var(--verde-deep);font-weight:600;text-align:right">recorrer →</td></tr>
+            </tbody></table>
+          </div>
+          <div class="panel"><div class="ph"><h3>Vencimientos</h3><span class="sub">próximos 30 días</span></div>
+            <table class="tbl"><tbody>
+              <tr><td><b>Cheque</b> · M. Bartomea</td><td style="color:var(--rojo);font-weight:600">en 2 días</td><td class="cv" style="text-align:right">$900k</td></tr>
+              <tr><td><b>Alquiler</b> · El Arrendado</td><td style="color:var(--muted)">20/06</td><td class="cv" style="text-align:right">$2,1M</td></tr>
+              <tr><td><b>IIBB</b> · cuota 3</td><td style="color:var(--muted)">28/06</td><td class="cv" style="text-align:right">$310k</td></tr>
+            </tbody></table>
+            <div style="margin-top:10px;font-size:13px"><span style="color:var(--verde-deep);font-weight:600;cursor:pointer" onclick="nav('analitica')">Ver Analítica →</span></div>
+          </div>
+          <div class="panel"><div class="ph"><h3>No vender</h3><span class="sub">retiros sanitarios vigentes</span></div>
+            <table class="tbl"><tbody>
+              <tr onclick="nav('hacienda');setQ('trat')"><td class="cv">#412</td><td>Novillo · cojera · El Monte</td><td style="color:var(--rojo);font-weight:600;text-align:right">hasta 12/06</td></tr>
+              <tr onclick="nav('hacienda');setQ('trat')"><td class="cv">#234</td><td>Vaca · antibiótico · La Loma</td><td style="color:var(--rojo);font-weight:600;text-align:right">hasta 15/06</td></tr>
+            </tbody></table>
+            <div style="margin-top:10px;font-size:13px"><span style="color:var(--verde-deep);font-weight:600;cursor:pointer" onclick="nav('hacienda');setQ('trat')">Ver los 5 en tratamiento →</span></div>
+          </div>
         </section>
       </div>
 
@@ -657,7 +694,8 @@
 
         <div class="toolbar">
           <div class="search"><i data-lucide="search" style="width:16px;height:16px;color:var(--faint)"></i><input id="q" placeholder="Buscar por caravana…" oninput="render()"></div>
-          <div class="select">Categoría ▾</div><div class="select">Potrero ▾</div><div class="select">Estado: Activos ▾</div>
+          <div class="pot-chip" id="pot-chip" style="display:none"></div>
+          <div class="select">Categoría ▾</div><div class="select">Estado: Activos ▾</div>
           <div class="toggle"><button id="t-tabla" class="on" onclick="setView('tabla')">Tabla</button><button id="t-pot" onclick="setView('potrero')">Por potrero</button></div>
         </div>
         <div class="panel" id="content"></div>
@@ -833,8 +871,10 @@
     {cv:'DEMO000308',cat:'ternera',sexo:'Hembra',pot:'Don Gilberto',edad:'5 m',sig:['destete']},
   ];
   const POT_STATE={'La Loma':'Ganadero','Don Gilberto':'Ganadero','El Monte':'Ganadero'};
-  let view='tabla', q='todos';
-  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
+  let view='tabla', q='todos', potF=null;
+  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(potF&&a.pot!==potF)return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
+  /* filtro por potrero: el puente mapa → animales ("qué animales tengo acá") */
+  function setPotF(n){potF=n;const c=document.getElementById('pot-chip');if(c){if(n){c.style.display='inline-flex';c.innerHTML=`Potrero: <b>${n}</b> <span onclick="setPotF(null)" style="cursor:pointer;margin-left:4px">✕</span>`;}else{c.style.display='none';c.innerHTML='';}}render();}
   function sigsHtml(a){return `<div class="sigs">${a.sig.map(s=>`<span class="sig ${SIG[s].cls}">${SIG[s].ic} ${SIG[s].l}</span>`).join('')}</div>`;}
   function catHtml(a){const c=CAT[a.cat];return `<span class="cat"><span class="dot" style="background:${c.c}"></span>${c.l}</span>`;}
   function rowHtml(a){return `<tr><td class="cv">${a.cv}</td><td>${catHtml(a)}</td><td>${a.sexo}</td><td>${a.pot}</td><td>${a.edad}</td><td>${sigsHtml(a)}</td><td class="arrow">→</td></tr>`;}
@@ -938,15 +978,14 @@
       const big=p.rect.w>150 && p.rect.h>86;
       const med=p.rect.w>110 && p.rect.h>60;
       const sigs=p.sig&&p.sig.length?` <span style="opacity:.85">${p.sig.map(s=>s==='pasto'?'⚠':s==='agua'?'💧':'🩹').join('')}</span>`:'';
-      const wm=`<span class="twm"><i data-lucide="${LICON[p.e]||'leaf'}"></i></span>`;
       const c=(p.cultivo||'');
       const tex=p.e==='cultivo'?(/ma[íi]z/i.test(c)?'tex-maiz':/soja/i.test(c)?'tex-soja':/trigo/i.test(c)?'tex-trigo':/girasol/i.test(c)?'tex-girasol':''):'';
       const everb=everbOf(p);
       const tvStr=p.e==='ganadero'?`${p.cab} cab`:p.e==='cultivo'?(p.cultivo||'Cultivo'):['descanso','rastrojo'].includes(p.e)?`Pasto ${(p.pasto||'—').toLowerCase()}`:ESTADO[p.e];
       const content=big
-        ? `<div class="tn">${p.nm}${sigs}</div>${wm}<div><span class="echip"><i data-lucide="${LICON[p.e]||'leaf'}"></i>${everb}</span><div class="tv">${tvStr}</div><div class="th">${p.ha} ha</div></div>`
+        ? `<div class="tn">${p.nm}${sigs}</div><div><span class="echip"><i data-lucide="${LICON[p.e]||'leaf'}"></i>${everb}</span><div class="tv">${tvStr}</div><div class="th">${p.ha} ha</div></div>`
         : med
-        ? `<div class="tn" style="font-size:13px">${p.nm}</div>${wm}<div><div class="tv" style="font-size:15px">${tvStr}</div><div class="th">${everb} · ${p.ha} ha</div></div>`
+        ? `<div class="tn" style="font-size:13px">${p.nm}</div><div><div class="tv" style="font-size:15px">${tvStr}</div><div class="th">${everb} · ${p.ha} ha</div></div>`
         : `<div class="tn" style="font-size:12px">${p.nm}</div><div class="th">${p.ha} ha</div>`;
       return `<div class="tcell e-${p.e} ${tex} ${dim}" style="left:calc(${Lp}% + 2px);top:calc(${Tp}% + 2px);width:calc(${Wp}% - 4px);height:calc(${Hp}% - 4px)" onclick="openPotrero('${p.id}')">${content}</div>`;
     }).join('');
@@ -980,7 +1019,7 @@
         <div class="dsec"><h4>Contenido</h4><div style="font-weight:600;font-size:15px">${contenido}</div>${sigChips}</div>
         <div class="dsec"><h4>Estado actual · última recorrida</h4><div class="dstate">${itemsHtml}</div></div>
         ${hist}
-        <div class="dact"><button class="primary" onclick="nav('hacienda')">Mover hacienda</button><button class="ghost">Registrar</button></div>
+        <div class="dact">${p.cab?`<button class="primary" onclick="closeDrawer();nav('hacienda');setPotF('${p.nm}')">Ver los ${p.cab} animales</button><button class="ghost" onclick="moverDesde('${p.id}')">Mover hacienda</button>`:`<button class="primary" onclick="closeDrawer();nav('recorrida')">Registrar recorrida</button><button class="ghost" onclick="moverDesde('${p.id}')">Planificar</button>`}</div>
       </div>`;
     openDrawerUI();
     if(camposView==='satelital'&&_map) setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},260);
@@ -1167,6 +1206,7 @@
     setTimeout(()=>{typeHTML(c,x.a,()=>{c.classList.remove('typing');if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();});},700);
   }
   function ingPlan(){closeDrawer();nav('campos');setCamposMode('planificar');}
+  function moverDesde(id){closeDrawer();nav('campos');setCamposMode('planificar');prefill(id);}
 
   renderCampos();
 

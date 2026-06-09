@@ -52,6 +52,12 @@ await page.evaluate(() => { setCamposMode('mapa'); nav('hacienda'); setQ('trat')
 await page.waitForTimeout(600);
 await page.screenshot({ path: shot('hacienda-filtro') });
 
+// Hacienda: filtrada por potrero (flujo mapa → animales)
+await page.evaluate(() => { setQ('todos'); setPotF('La Loma'); });
+await page.waitForTimeout(500);
+await page.screenshot({ path: shot('hacienda-potrero') });
+await page.evaluate(() => setPotF(null));
+
 // Analítica: drawer de carga de movimiento
 await page.evaluate(() => { setQ('todos'); nav('analitica'); openCarga(); });
 await page.waitForTimeout(800);
