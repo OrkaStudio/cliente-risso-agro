@@ -53,6 +53,9 @@
   .side{
     width:260px;flex:0 0 260px;
     margin: 16px 0 16px 16px;
+    position:sticky;top:16px;
+    height:calc(100vh - 32px);
+    align-self:flex-start;
     border:1px solid var(--side-border);
     border-radius:24px;
     padding:24px 16px;
@@ -83,15 +86,27 @@
   .side-toggle:hover { color: var(--ink); transform: scale(1.1); }
   .side-toggle svg { width: 14px; height: 14px; }
   
-  .side.collapsed .nav span.txt, 
+  .side.collapsed .nav span.txt,
   .side.collapsed .navlabel,
   .side.collapsed .brand b,
   .side.collapsed .brand small,
   .side.collapsed .user .nm,
   .side.collapsed .user .em,
+  .side.collapsed .side-hoy,
   .side.collapsed .nav .badge {
     display: none;
   }
+
+  /* widget "Hoy" — llena el espacio muerto del sidebar con lo que importa ahora */
+  .side-hoy{background:var(--side-2);border:1px solid var(--side-border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;margin-bottom:8px}
+  .side-hoy .sh-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--side-muted);font-weight:700}
+  .side-hoy .sh-row{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--side-text);font-weight:500}
+  .side-hoy .sh-row svg{width:15px;height:15px;flex:0 0 15px}
+  .side-hoy .sh-row b{font-weight:700}
+  .side-hoy .sh-row.warn{color:#ecc25c;cursor:pointer}
+  .side-hoy .sh-ing{display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(110deg,#a06f15,#e0a235);color:#fff;border:none;border-radius:12px;padding:10px;font-family:'Archivo',sans-serif;font-weight:700;font-size:12.5px;cursor:pointer;box-shadow:0 4px 12px rgba(224,162,53,.3);transition:transform .2s}
+  .side-hoy .sh-ing:hover{transform:translateY(-2px)}
+  .side-hoy .sh-ing svg{width:14px;height:14px}
   
   .side.collapsed .brand { justify-content: center; padding: 8px 0 24px 0; }
   .side.collapsed .nav { justify-content: center; padding: 12px; }
@@ -114,7 +129,7 @@
   .side.collapsed .nav.on::before { left: 4px; }
 
   /* --- estilos base del sidebar (restaurados) --- */
-  .side{position:relative;color:var(--side-text)}
+  .side{color:var(--side-text)}
   .brand{display:flex;align-items:center;gap:12px;padding:6px 8px 22px;white-space:nowrap}
   .brand .mark{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:linear-gradient(135deg,#3a7a4e,#1f4a2e);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(58,122,78,.4)}
   .brand b{font-family:'Archivo';font-size:17px;font-weight:700;color:#fff;display:block;line-height:1.15}
@@ -341,6 +356,9 @@
   .tcell .tn,.tcell .tv,.tcell .th{text-shadow:0 1px 2px rgba(255,255,255,.5)}
   .tcell .twm{position:absolute;right:11px;top:10px;z-index:1;pointer-events:none;opacity:.5;color:#0a3a26}
   .tcell .twm svg{width:38px;height:38px;stroke-width:1.4}
+  /* chip de actividad: QUÉ se está haciendo en el potrero, de un vistazo */
+  .tcell .echip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.65);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;font-family:'Archivo',sans-serif;color:#2a3324;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:6px;width:fit-content}
+  .tcell .echip svg{width:12px;height:12px;flex:0 0 12px}
   /* Textura figurativa por actividad — confinada a una "franja de suelo" abajo (no tapiz). Color=estado, forma=qué hay */
   .tcell::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;opacity:.6;background-repeat:repeat;background-position:bottom left;-webkit-mask-image:linear-gradient(to top,#000 0,#000 24%,transparent 60%);mask-image:linear-gradient(to top,#000 0,#000 24%,transparent 60%)}
   .tcell.e-ganadero::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38'%3E%3Cg fill='%230a3a26'%3E%3Cellipse cx='10' cy='11' rx='5' ry='3'/%3E%3Ccircle cx='15.5' cy='10' r='1.7'/%3E%3Cellipse cx='27' cy='27' rx='5' ry='3'/%3E%3Ccircle cx='32.5' cy='26' r='1.7'/%3E%3C/g%3E%3C/svg%3E");background-size:38px 38px}
@@ -521,6 +539,13 @@
     <div class="nav" data-page="clima" onclick="nav('clima')"><span class="i"><i data-lucide="cloud-rain"></i></span> <span class="txt">Clima</span> <span class="badge">2</span></div>
     
     <div class="grow"></div>
+    <div class="side-hoy">
+      <div class="sh-t">Hoy en el campo</div>
+      <div class="sh-row"><i data-lucide="sun" style="color:#ecc25c"></i><b>24°</b> · sin lluvia prevista</div>
+      <div class="sh-row"><i data-lucide="sprout" style="color:#8fc7a0"></i>Pulverización: <b>ventana OK</b></div>
+      <div class="sh-row warn" onclick="nav('inicio')"><i data-lucide="triangle-alert"></i><b>4</b> requieren atención</div>
+      <button class="sh-ing" onclick="openIngeniero()"><i data-lucide="sparkles"></i>Preguntale al Ingeniero</button>
+    </div>
     <div class="user"><div class="av">L</div><div><div class="nm">Risso</div><div class="em">orka.arg@gmail.com</div></div></div>
   </aside>
 
@@ -824,6 +849,16 @@
   /* ===== CAMPOS (mosaico de potreros) ===== */
   const ESTADO={ganadero:'Ganadero',descanso:'Descanso',preparacion:'Preparación',siembra:'Siembra',cultivo:'Cultivo',cosecha:'Cosecha',rastrojo:'Rastrojo'};
   const LICON={ganadero:'beef',descanso:'leaf',preparacion:'tractor',siembra:'sprout',cultivo:'wheat',cosecha:'wheat',rastrojo:'wheat'};
+  /* qué se está HACIENDO (verbo), no solo el estado */
+  function everbOf(p){
+    if(p.e==='ganadero')return 'Pastoreando';
+    if(p.e==='descanso')return p.listo?'Lista p/ recibir':'Descansando';
+    if(p.e==='preparacion')return 'Preparando suelo';
+    if(p.e==='siembra')return 'Sembrando';
+    if(p.e==='cultivo')return p.etapa||'Cultivando';
+    if(p.e==='cosecha')return 'Cosechando';
+    return 'Rastrojo';
+  }
   const PSIG={pasto:'⚠ pasto escaso',agua:'💧 agua baja',trat:'🩹 en tratam.'};
   const CAMPOS={
     esperanza:{nombre:'La Esperanza',tenencia:'Propio',potreros:[
@@ -906,10 +941,12 @@
       const wm=`<span class="twm"><i data-lucide="${LICON[p.e]||'leaf'}"></i></span>`;
       const c=(p.cultivo||'');
       const tex=p.e==='cultivo'?(/ma[íi]z/i.test(c)?'tex-maiz':/soja/i.test(c)?'tex-soja':/trigo/i.test(c)?'tex-trigo':/girasol/i.test(c)?'tex-girasol':''):'';
+      const everb=everbOf(p);
+      const tvStr=p.e==='ganadero'?`${p.cab} cab`:p.e==='cultivo'?(p.cultivo||'Cultivo'):['descanso','rastrojo'].includes(p.e)?`Pasto ${(p.pasto||'—').toLowerCase()}`:ESTADO[p.e];
       const content=big
-        ? `<div class="tn">${p.nm}${sigs}</div>${wm}<div><div class="tv">${contStr(p)}</div><div class="th">${p.ha} ha · ${ESTADO[p.e]}</div></div>`
+        ? `<div class="tn">${p.nm}${sigs}</div>${wm}<div><span class="echip"><i data-lucide="${LICON[p.e]||'leaf'}"></i>${everb}</span><div class="tv">${tvStr}</div><div class="th">${p.ha} ha</div></div>`
         : med
-        ? `<div class="tn" style="font-size:13px">${p.nm}</div>${wm}<div><div class="tv" style="font-size:15px">${contStr(p)}</div><div class="th">${p.ha} ha</div></div>`
+        ? `<div class="tn" style="font-size:13px">${p.nm}</div>${wm}<div><div class="tv" style="font-size:15px">${tvStr}</div><div class="th">${everb} · ${p.ha} ha</div></div>`
         : `<div class="tn" style="font-size:12px">${p.nm}</div><div class="th">${p.ha} ha</div>`;
       return `<div class="tcell e-${p.e} ${tex} ${dim}" style="left:calc(${Lp}% + 2px);top:calc(${Tp}% + 2px);width:calc(${Wp}% - 4px);height:calc(${Hp}% - 4px)" onclick="openPotrero('${p.id}')">${content}</div>`;
     }).join('');
@@ -974,7 +1011,7 @@
       const col=MAPCOLOR[p.e]||'#6db84e';
       const sig=p.sig&&p.sig.length?' '+p.sig.map(s=>s==='pasto'?'⚠':s==='agua'?'💧':'🩹').join(''):'';
       const poly=L.polygon(GEO[p.id],{color:'#ffffff',weight:2,fillColor:col,fillOpacity:.5}).addTo(_polys);
-      poly.bindTooltip(`<b>${p.nm}</b><span>${contStr(p)}${sig}</span>`,{permanent:true,direction:'center',className:'pottip',opacity:1});
+      poly.bindTooltip(`<b>${p.nm}</b><span>${everbOf(p)} · ${contStr(p)}${sig}</span>`,{permanent:true,direction:'center',className:'pottip',opacity:1});
       poly.on('click',()=>openPotrero(p.id));
       poly.on('mouseover',()=>poly.setStyle({fillOpacity:.72,weight:3}));
       poly.on('mouseout',()=>poly.setStyle({fillOpacity:.5,weight:2}));
