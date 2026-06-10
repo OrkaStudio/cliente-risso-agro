@@ -26,11 +26,23 @@ await page.goto(URL);
 await page.waitForTimeout(1800);
 
 // Secciones base
-for (const p of ['inicio', 'hacienda', 'campos', 'analitica']) {
+for (const p of ['inicio', 'hacienda', 'campos', 'analitica', 'recorrida', 'clima']) {
   await page.evaluate((x) => nav(x), p);
   await page.waitForTimeout(500);
   await page.screenshot(shot(p));
 }
+
+// Recorrida: parte de potrero abierto en el teléfono
+await page.evaluate(() => { nav('recorrida'); mOpen('la-loma'); });
+await page.waitForTimeout(600);
+await page.screenshot(shot('recorrida-parte'));
+await page.evaluate(() => { REC.cur = null; renderPhone(); });
+
+// Clima: drawer de carga de lluvia
+await page.evaluate(() => { nav('clima'); openLluvia(); });
+await page.waitForTimeout(700);
+await page.screenshot(shot('clima-lluvia'));
+await page.evaluate(() => closeDrawer());
 
 // Campos: drawer de potrero
 await page.evaluate(() => { nav('campos'); openPotrero('la-loma'); });
