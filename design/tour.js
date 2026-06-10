@@ -38,6 +38,15 @@ await page.waitForTimeout(600);
 await page.screenshot(shot('recorrida-parte'));
 await page.evaluate(() => { REC.cur = null; renderPhone(); });
 
+// Manga: setup de sesión y sesión activa con escaneos
+await page.evaluate(() => { PH.tab = 'manga'; MG.preset = 'aftosa'; renderPhone(); });
+await page.waitForTimeout(500);
+await page.screenshot(shot('manga-setup'));
+await page.evaluate(() => { mgStart(); mgScan(); mgScan(); mgScan(); });
+await page.waitForTimeout(500);
+await page.screenshot(shot('manga-sesion'));
+await page.evaluate(() => { MG.active = false; MG.preset = null; PH.tab = 'rec'; renderPhone(); });
+
 // Clima: drawer de carga de lluvia
 await page.evaluate(() => { nav('clima'); openLluvia(); });
 await page.waitForTimeout(700);

@@ -604,6 +604,18 @@
   .m-cta .big{width:100%;padding:17px;border-radius:16px;border:none;background:var(--verde);color:#fff;font-size:17px;font-weight:700;font-family:'Archivo',sans-serif;cursor:pointer;box-shadow:0 8px 20px var(--verde-glow)}
   .m-cta .alt{width:100%;margin-top:8px;padding:12px;border-radius:14px;border:1.5px solid var(--border);background:#fff;color:var(--ink);font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit}
   .campo-notes{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+  /* tab bar inferior del teléfono */
+  .m-tabs{position:sticky;bottom:0;display:flex;background:#fff;border-top:1px solid var(--border);border-radius:0 0 34px 34px;z-index:3}
+  .m-tabs button{flex:1;padding:11px 0 16px;border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--faint);cursor:pointer;font-family:'Archivo',sans-serif;letter-spacing:.02em}
+  .m-tabs button.on{color:var(--verde-deep)}
+  .m-tabs svg{width:20px;height:20px}
+  /* manga: presets de sesión */
+  .mg-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mg-grid button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;border:1.5px solid var(--border);background:var(--inset);font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;font-family:'Archivo',sans-serif}
+  .mg-grid button.on{background:var(--verde-soft);border-color:var(--verde);color:var(--verde-deep)}
+  .mg-grid svg{width:20px;height:20px}
+  /* toast de confirmación */
+  .m-toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:var(--verde-deep);color:#fff;padding:11px 20px;border-radius:14px;font-weight:700;font-size:13.5px;box-shadow:0 8px 22px rgba(31,74,46,.4);z-index:5;white-space:nowrap;animation:fadeInUp .3s ease}
 
   /* ===== CLIMA ===== */
   .fcast{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
@@ -929,7 +941,7 @@
       </div>
       <!-- ============ RECORRIDA (MODO CAMPO) ============ -->
       <div class="page" id="page-recorrida">
-        <div class="pagehead"><div><h1>Recorrida</h1><div class="sub">Modo Campo — así se carga desde el celular, arriba de la camioneta. Probalo: es interactivo.</div></div><button class="btn" onclick="recReset()">↺ Reiniciar demo</button></div>
+        <div class="pagehead"><div><h1>Modo Campo</h1><div class="sub">Recorrida y Manga — así se trabaja desde el celular. Probalo: es interactivo.</div></div><button class="btn" onclick="recReset()">↺ Reiniciar demo</button></div>
         <div class="campo-layout">
           <div class="phone"><div class="pscreen" id="pscreen"></div></div>
           <div class="campo-notes">
@@ -939,6 +951,7 @@
               <div class="insight"><div class="ic ic-sol"><i data-lucide="mic"></i></div><div class="tx"><b>La novedad se dicta, no se tipea</b><p>Voz narrada arriba de la camioneta. El audio queda guardado offline y se transcribe al volver la señal.</p></div></div>
               <div class="insight"><div class="ic ic-cielo"><i data-lucide="wifi-off"></i></div><div class="tx"><b>Anda sin señal</b><p>Todo queda en el teléfono y sincroniza solo cuando hay datos.</p></div></div>
               <div class="insight"><div class="ic ic-rojo"><i data-lucide="calendar-check"></i></div><div class="tx"><b>Cada recorrida es un registro fechado</b><p>El conteo observado vs esperado mantiene el stock honesto. Alimenta "Últimas recorridas" del Inicio y el historial de cada potrero.</p></div></div>
+              <div class="insight"><div class="ic ic-verde"><i data-lucide="scan-line"></i></div><div class="tx"><b>La manga es una sesión, no una carga</b><p>Elegís "hoy aftosa" una vez. Cada escaneo del bastón Bluetooth la aplica solo a la ficha — el teléfono va colgado, la interfaz es el bastón.</p></div></div>
             </div>
             <div class="panel">
               <div class="ph"><h3>Lo que va generando</h3><span class="sub">la historia día a día del campo</span></div>
@@ -1430,21 +1443,64 @@
   function ingPlan(){closeDrawer();nav('campos');setCamposMode('planificar');}
   function moverDesde(id){closeDrawer();nav('campos');setCamposMode('planificar');prefill(id);}
 
-  /* ===== RECORRIDA (Modo Campo) — teléfono interactivo (D8/D9) ===== */
-  const REC={lluvia:null,done:{},cur:null};
+  /* ===== MODO CAMPO — teléfono interactivo: Recorrida (D8/D9) + Manga (D10) ===== */
+  const PH={tab:'rec'};
+  const REC={lluvia:null,done:{},cur:null,toast:null};
+  const MG={preset:null,scans:[],active:false};
   const RPOT=CAMPOS.esperanza.potreros;
-  function recReset(){REC.lluvia=null;REC.done={};REC.cur=null;renderPhone();}
+  const PRESETS=[['aftosa','syringe','Vacuna aftosa'],['anti','shield','Antiparasitario'],['destete','scissors','Destete'],['aparte','split','Aparte'],['tacto','hand','Tacto']];
+  function recReset(){REC.lluvia=null;REC.done={};REC.cur=null;MG.preset=null;MG.scans=[];MG.active=false;PH.tab='rec';renderPhone();}
   function potResumen(p){
     if(p.e==='ganadero')return `${p.cab} cab · pasto ${p.pasto.toLowerCase()} · agua ${p.agua.toLowerCase()}`;
     if(p.e==='cultivo')return `${p.cultivo} · ${(p.etapa||'').toLowerCase()}`;
     return `${ESTADO[p.e]} · pasto ${(p.pasto||'—').toLowerCase()}`;
   }
+  function phoneTabs(){
+    return `<div class="m-tabs">
+      <button class="${PH.tab==='rec'?'on':''}" onclick="PH.tab='rec';renderPhone()"><i data-lucide="map-pin"></i>Recorrida</button>
+      <button class="${PH.tab==='manga'?'on':''}" onclick="PH.tab='manga';renderPhone()"><i data-lucide="scan-line"></i>Manga</button>
+    </div>`;
+  }
   function renderPhone(){
     const el=document.getElementById('pscreen'); if(!el)return;
-    el.innerHTML=REC.cur?phoneParte():phoneList();
+    let html, fullscreen=false;
+    if(PH.tab==='manga'){ html=MG.active?phoneManga():phoneMangaSetup(); fullscreen=MG.active; }
+    else{ html=REC.cur?phoneParte():phoneList(); fullscreen=!!REC.cur; }
+    el.innerHTML=html+(fullscreen?'':phoneTabs());
+    if(REC.toast){
+      el.insertAdjacentHTML('beforeend',`<div class="m-toast">${REC.toast}</div>`);
+      const msg=REC.toast; REC.toast=null;
+      setTimeout(()=>{const t=el.querySelector('.m-toast');if(t&&t.textContent===msg)t.remove();},1900);
+    }
     el.scrollTop=0;
     if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
+  /* --- Manga: sesión con acción preestablecida (D10) --- */
+  function phoneMangaSetup(){
+    return `
+    <div class="m-head"><h2>Manga</h2><div class="mh-sub">elegís la acción UNA vez — después el teléfono queda colgado y trabaja el bastón</div></div>
+    <div class="m-body">
+      <div class="m-card"><h5>¿Qué hacés hoy?</h5><div class="mg-grid">${PRESETS.map(([k,ic,l])=>`<button class="${MG.preset===k?'on':''}" onclick="MG.preset='${k}';renderPhone()"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div></div>
+      <div class="m-card"><h5>Lote</h5><div class="m-chips"><button class="on" onclick="mSel(this)">La Loma</button><button onclick="mSel(this)">Don Gilberto</button><button onclick="mSel(this)">El Monte</button></div></div>
+      <div class="m-cta"><button class="big" ${MG.preset?'':'disabled style="opacity:.45;cursor:not-allowed"'} onclick="mgStart()">▶ Iniciar sesión</button></div>
+    </div>`;
+  }
+  function phoneManga(){
+    const pl=PRESETS.find(x=>x[0]===MG.preset)||PRESETS[0];
+    const last=MG.scans[0];
+    return `
+    <div class="m-head" style="background:#7a5510"><h2>${pl[2]}</h2><div class="mh-sub">La Loma · sesión activa <span class="m-off">⬤ OFFLINE</span></div></div>
+    <div class="m-body">
+      <div class="m-card" style="text-align:center"><h5>Escaneados</h5><div class="tnum" style="font-family:'Archivo';font-size:56px;font-weight:700;line-height:1">${MG.scans.length}</div><div class="m-exp">cada escaneo del bastón aplica "${pl[2]}" solo</div></div>
+      ${last?`<div class="m-card" style="background:var(--verde-soft);border-color:var(--verde)"><h5 style="color:var(--verde-deep)">Último escaneo</h5><div class="tnum" style="font-family:'Archivo';font-weight:700;font-size:17px">${last}</div><div style="font-size:12.5px;color:var(--verde-deep);font-weight:600;margin-top:3px">✓ ${pl[2]} registrada en su ficha</div></div>`:`<div class="m-card" style="text-align:center;color:var(--faint);font-size:13.5px;border-style:dashed">Esperando el primer escaneo del bastón…</div>`}
+      ${MG.scans.length>1?`<div class="m-card"><h5>Anteriores</h5>${MG.scans.slice(1,5).map(s=>`<div class="tnum" style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--inset)">✓ ${s}</div>`).join('')}${MG.scans.length>5?`<div style="font-size:12px;color:var(--faint);padding-top:6px">+ ${MG.scans.length-5} más</div>`:''}</div>`:''}
+      <button class="m-voice"><i data-lucide="mic"></i> Nota de este animal (voz)</button>
+      <div class="m-cta"><button class="alt" onclick="mgScan()">⚡ Simular escaneo del bastón</button><button class="big" style="background:var(--rojo);box-shadow:0 8px 20px rgba(191,59,43,.3)" onclick="mgEnd()">■ Terminar — ${MG.scans.length} animales</button></div>
+    </div>`;
+  }
+  function mgStart(){if(!MG.preset)return;MG.active=true;MG.scans=[];renderPhone();}
+  function mgScan(){const pool=animales.map(a=>a.cv);MG.scans.unshift(pool[MG.scans.length%pool.length]);renderPhone();}
+  function mgEnd(){const n=MG.scans.length;MG.active=false;MG.preset=null;REC.toast=`✓ Sesión guardada — ${n} animales`;renderPhone();}
   function phoneList(){
     const done=Object.keys(REC.done).length, total=RPOT.length;
     return `
@@ -1498,7 +1554,7 @@
   function mCount(d){const n=document.getElementById('m-n');n.textContent=Math.max(0,parseInt(n.textContent)+d);}
   function mLluvia(v){REC.lluvia=v;renderPhone();}
   function mOpen(id){REC.cur=id;renderPhone();}
-  function mDone(){REC.done[REC.cur]=true;REC.cur=null;renderPhone();}
+  function mDone(){const p=RPOT.find(x=>x.id===REC.cur);REC.done[REC.cur]=true;REC.cur=null;REC.toast=`✓ ${p?p.nm:'Potrero'} confirmado`;renderPhone();}
 
   /* ===== CLIMA: carga de lluvia desacoplada (corrección D8) ===== */
   function openLluvia(){
