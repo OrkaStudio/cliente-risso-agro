@@ -336,7 +336,15 @@
   .sig-pre{background:var(--verde-soft);color:var(--verde-deep);border:1px solid rgba(58,122,78,0.25)}
   .sig-vender{background:var(--sol-soft);color:#a06f15;border:1px solid rgba(224,162,53,0.3)}
   .sig-destete{background:var(--cielo-soft);color:var(--cielo);border:1px solid rgba(63,134,179,0.25)}
-  .arrow{color:var(--faint);text-align:right;font-size:18px}.empty{color:var(--faint);text-align:center;padding:40px;font-size:15px}
+  .arrow{color:var(--faint);text-align:right;font-size:18px}
+  .empty{color:var(--faint);text-align:center;padding:48px 20px;font-size:14.5px}
+  .empty::before{content:'';display:block;width:42px;height:42px;margin:0 auto 12px;border-radius:14px;background:var(--inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239a9277' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") center no-repeat}
+  /* terminación: scrollbars y selección con la paleta */
+  ::selection{background:rgba(58,122,78,.22)}
+  .scroll::-webkit-scrollbar,.drawer::-webkit-scrollbar,.db::-webkit-scrollbar{width:9px}
+  .scroll::-webkit-scrollbar-thumb,.drawer::-webkit-scrollbar-thumb,.db::-webkit-scrollbar-thumb{background:#cfc5a9;border-radius:5px;border:2px solid transparent;background-clip:content-box}
+  .scroll::-webkit-scrollbar-thumb:hover,.drawer::-webkit-scrollbar-thumb:hover,.db::-webkit-scrollbar-thumb:hover{background:#b9ae8f;border:2px solid transparent;background-clip:content-box}
+  .scroll::-webkit-scrollbar-track,.drawer::-webkit-scrollbar-track,.db::-webkit-scrollbar-track{background:transparent}
   
   .potblock{margin-bottom:20px;background:var(--inset);border-radius:20px;padding:4px;border:1px solid var(--border)}
   .pothead{display:flex;align-items:center;gap:12px;padding:12px 16px}
@@ -580,6 +588,7 @@
   .msg-c.typing .acts{display:none}
   .chat{display:flex;flex-direction:column;gap:12px}
   .msg{max-width:90%;padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.55}
+  .msg-who{font-size:11px;font-weight:700;color:var(--sol-deep);letter-spacing:.05em;margin:2px 0 -6px 4px;font-family:'Archivo',sans-serif;align-self:flex-start}
   .msg-u{align-self:flex-end;background:var(--verde-soft);color:var(--verde-deep);font-weight:600;border-bottom-right-radius:6px}
   .msg-c{align-self:flex-start;background:var(--surface-hi);border:1px solid var(--border);border-left:3px solid var(--sol);border-bottom-left-radius:6px;box-shadow:0 2px 10px rgba(63,54,30,.05)}
   .msg-c b{display:block;margin-bottom:4px}
@@ -1524,7 +1533,7 @@
   function ingMsg(k){
     const x=INGQA[k];
     const chat=document.getElementById('ing-chat');
-    chat.innerHTML=`<div class="msg msg-u">${x.q}</div><div class="msg msg-c typing"><span class="dots"><i></i><i></i><i></i></span></div>`;
+    chat.innerHTML=`<div class="msg msg-u">${x.q}</div><div class="msg-who">✦ EL INGENIERO</div><div class="msg msg-c typing"><span class="dots"><i></i><i></i><i></i></span></div>`;
     document.getElementById('ing-sugs').innerHTML=Object.entries(INGQA).filter(([kk])=>kk!==k).map(([kk,v])=>`<span onclick="ingMsg('${kk}')">${v.q}</span>`).join('');
     const c=chat.querySelector('.msg-c');
     setTimeout(()=>{typeHTML(c,x.a,()=>{c.classList.remove('typing');if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();});},700);
