@@ -32,6 +32,12 @@ for (const p of ['inicio', 'hacienda', 'campos', 'analitica', 'recorrida', 'clim
   await page.screenshot(shot(p));
 }
 
+// Recorrida: lluvia "sí" con input manual de mm abierto
+await page.evaluate(() => { nav('recorrida'); mLluvia('si'); mMMOtro(); });
+await page.waitForTimeout(500);
+await page.screenshot(shot('recorrida-lluvia'));
+await page.evaluate(() => { REC.lluvia = null; REC.mm = null; REC.mmOtro = false; renderPhone(); });
+
 // Recorrida: parte de potrero abierto en el teléfono
 await page.evaluate(() => { nav('recorrida'); mOpen('la-loma'); });
 await page.waitForTimeout(600);

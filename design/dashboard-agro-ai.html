@@ -568,8 +568,11 @@
   .phone::after{content:'';position:absolute;top:22px;left:50%;transform:translateX(-50%);width:110px;height:24px;background:#16271c;border-radius:13px;z-index:3}
   .pscreen{background:#f6f1e3;border-radius:34px;height:100%;overflow-y:auto;overflow-x:hidden;position:relative;scrollbar-width:none}
   .pscreen::-webkit-scrollbar{display:none}
-  .m-head{position:sticky;top:0;z-index:2;background:var(--verde-deep);color:#f7f5ec;padding:38px 18px 14px;border-radius:34px 34px 0 0}
+  .m-head{position:sticky;top:0;z-index:2;background:var(--verde-deep);color:#f7f5ec;padding:42px 18px 14px;border-radius:34px 34px 0 0}
   .m-head h2{font-size:21px;color:#fff}
+  .m-status{position:absolute;top:11px;left:26px;right:24px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;color:#f7f5ec;font-variant-numeric:tabular-nums;pointer-events:none}
+  .m-status .ms-r{display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:600;opacity:.92}
+  .m-status svg{width:14px;height:14px}
   .m-head .mh-sub{font-size:12.5px;opacity:.9;margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .m-off{font-size:10px;font-weight:700;background:rgba(224,162,53,.28);color:#ecc25c;padding:2px 8px;border-radius:10px;letter-spacing:.05em}
   .m-prog{height:5px;background:rgba(255,255,255,.18);border-radius:3px;margin-top:12px;overflow:hidden}
@@ -614,6 +617,16 @@
   .mg-grid button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;border:1.5px solid var(--border);background:var(--inset);font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;font-family:'Archivo',sans-serif}
   .mg-grid button.on{background:var(--verde-soft);border-color:var(--verde);color:var(--verde-deep)}
   .mg-grid svg{width:20px;height:20px}
+  /* respuesta táctil: todo botón del teléfono se hunde al presionar */
+  .m-chips button,.m-llu button,.mg-grid button,.m-count button,.m-voice,.m-cta .big,.m-cta .alt,.m-tabs button{transition:transform .12s,filter .12s;-webkit-tap-highlight-color:transparent}
+  .m-chips button:active,.m-llu button:active,.mg-grid button:active,.m-count button:active,.m-voice:active{transform:scale(.94)}
+  .m-cta .big:active,.m-cta .alt:active,.m-tabs button:active{transform:scale(.97);filter:brightness(.94)}
+  /* lluvia: fila de entrada manual de mm */
+  .m-mmrow{display:flex;gap:8px;margin-top:10px}
+  .m-mmrow input{flex:1;min-width:0;padding:13px 14px;border-radius:13px;border:1.5px solid var(--verde);background:#fff;font-size:17px;font-weight:700;font-family:'Archivo',sans-serif;color:var(--ink);outline:none}
+  .m-mmrow input::placeholder{color:var(--faint);font-weight:600;font-size:14px}
+  .m-mmrow button{padding:13px 20px;border-radius:13px;border:none;background:var(--verde);color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:'Archivo',sans-serif}
+  .m-mmrow button:active{transform:scale(.95)}
   /* toast de confirmación */
   .m-toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:var(--verde-deep);color:#fff;padding:11px 20px;border-radius:14px;font-weight:700;font-size:13.5px;box-shadow:0 8px 22px rgba(31,74,46,.4);z-index:5;white-space:nowrap;animation:fadeInUp .3s ease}
 
@@ -1445,11 +1458,13 @@
 
   /* ===== MODO CAMPO — teléfono interactivo: Recorrida (D8/D9) + Manga (D10) ===== */
   const PH={tab:'rec'};
-  const REC={lluvia:null,done:{},cur:null,toast:null};
+  const REC={lluvia:null,mm:null,mmOtro:false,done:{},cur:null,toast:null};
   const MG={preset:null,scans:[],active:false};
   const RPOT=CAMPOS.esperanza.potreros;
   const PRESETS=[['aftosa','syringe','Vacuna aftosa'],['anti','shield','Antiparasitario'],['destete','scissors','Destete'],['aparte','split','Aparte'],['tacto','hand','Tacto']];
-  function recReset(){REC.lluvia=null;REC.done={};REC.cur=null;MG.preset=null;MG.scans=[];MG.active=false;PH.tab='rec';renderPhone();}
+  function recReset(){REC.lluvia=null;REC.mm=null;REC.mmOtro=false;REC.done={};REC.cur=null;MG.preset=null;MG.scans=[];MG.active=false;PH.tab='rec';renderPhone();}
+  /* status bar del teléfono: hora, señal baja (campo) y batería */
+  const mStatus=()=>`<div class="m-status"><span>07:42</span><span class="ms-r"><i data-lucide="signal-low"></i><i data-lucide="battery-medium"></i>71%</span></div>`;
   function potResumen(p){
     if(p.e==='ganadero')return `${p.cab} cab · pasto ${p.pasto.toLowerCase()} · agua ${p.agua.toLowerCase()}`;
     if(p.e==='cultivo')return `${p.cultivo} · ${(p.etapa||'').toLowerCase()}`;
@@ -1478,7 +1493,7 @@
   /* --- Manga: sesión con acción preestablecida (D10) --- */
   function phoneMangaSetup(){
     return `
-    <div class="m-head"><h2>Manga</h2><div class="mh-sub">elegís la acción UNA vez — después el teléfono queda colgado y trabaja el bastón</div></div>
+    <div class="m-head">${mStatus()}<h2>Manga</h2><div class="mh-sub">elegís la acción UNA vez — después el teléfono queda colgado y trabaja el bastón</div></div>
     <div class="m-body">
       <div class="m-card"><h5>¿Qué hacés hoy?</h5><div class="mg-grid">${PRESETS.map(([k,ic,l])=>`<button class="${MG.preset===k?'on':''}" onclick="MG.preset='${k}';renderPhone()"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div></div>
       <div class="m-card"><h5>Lote</h5><div class="m-chips"><button class="on" onclick="mSel(this)">La Loma</button><button onclick="mSel(this)">Don Gilberto</button><button onclick="mSel(this)">El Monte</button></div></div>
@@ -1489,7 +1504,7 @@
     const pl=PRESETS.find(x=>x[0]===MG.preset)||PRESETS[0];
     const last=MG.scans[0];
     return `
-    <div class="m-head" style="background:#7a5510"><h2>${pl[2]}</h2><div class="mh-sub">La Loma · sesión activa <span class="m-off">⬤ OFFLINE</span></div></div>
+    <div class="m-head" style="background:#7a5510">${mStatus()}<h2>${pl[2]}</h2><div class="mh-sub">La Loma · sesión activa <span class="m-off">⬤ OFFLINE</span></div></div>
     <div class="m-body">
       <div class="m-card" style="text-align:center"><h5>Escaneados</h5><div class="tnum" style="font-family:'Archivo';font-size:56px;font-weight:700;line-height:1">${MG.scans.length}</div><div class="m-exp">cada escaneo del bastón aplica "${pl[2]}" solo</div></div>
       ${last?`<div class="m-card" style="background:var(--verde-soft);border-color:var(--verde)"><h5 style="color:var(--verde-deep)">Último escaneo</h5><div class="tnum" style="font-family:'Archivo';font-weight:700;font-size:17px">${last}</div><div style="font-size:12.5px;color:var(--verde-deep);font-weight:600;margin-top:3px">✓ ${pl[2]} registrada en su ficha</div></div>`:`<div class="m-card" style="text-align:center;color:var(--faint);font-size:13.5px;border-style:dashed">Esperando el primer escaneo del bastón…</div>`}
@@ -1504,12 +1519,12 @@
   function phoneList(){
     const done=Object.keys(REC.done).length, total=RPOT.length;
     return `
-    <div class="m-head"><h2>La Esperanza</h2><div class="mh-sub">miércoles 10/06 · recorrida <span class="m-off">⬤ OFFLINE</span></div><div class="m-prog"><i style="width:${Math.round(done/total*100)}%"></i></div></div>
+    <div class="m-head">${mStatus()}<h2>La Esperanza</h2><div class="mh-sub">miércoles 10/06 · recorrida <span class="m-off">⬤ OFFLINE</span></div><div class="m-prog"><i style="width:${Math.round(done/total*100)}%"></i></div></div>
     <div class="m-body">
       <div class="m-card"><h5>¿Llovió desde la última vez?</h5><div class="m-llu">
         <button class="${REC.lluvia==='no'?'on':''}" onclick="mLluvia('no')">No</button>
         <button class="${REC.lluvia==='si'?'on':''}" onclick="mLluvia('si')">Sí</button>
-      </div>${REC.lluvia==='si'?`<div class="m-chips" style="margin-top:10px"><button onclick="mSel(this)">5 mm</button><button class="on" onclick="mSel(this)">10 mm</button><button onclick="mSel(this)">20 mm</button><button onclick="mSel(this)">otro…</button></div>`:''}</div>
+      </div>${REC.lluvia==='si'?`<div class="m-chips" style="margin-top:10px">${[5,10,20].map(v=>`<button class="${REC.mm===v&&!REC.mmOtro?'on':''}" onclick="mMM(${v})">${v} mm</button>`).join('')}<button class="${REC.mmOtro||(REC.mm&&![5,10,20].includes(REC.mm))?'on':''}" onclick="mMMOtro()">${REC.mm&&![5,10,20].includes(REC.mm)&&!REC.mmOtro?REC.mm+' mm':'otro…'}</button></div>${REC.mmOtro?`<div class="m-mmrow"><input id="mm-in" type="number" inputmode="numeric" placeholder="¿Cuántos mm marcó el pluviómetro?" onkeydown="if(event.key==='Enter')mMMOk()"><button onclick="mMMOk()">Listo</button></div>`:''}${REC.mm&&!REC.mmOtro?`<div class="m-exp" style="text-align:left;margin-top:9px">Queda cargada como lluvia del 10/06 en La Esperanza — el pluviómetro manda.</div>`:''}`:''}</div>
       <div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:700;margin:6px 2px -4px">Potreros · ${done}/${total}</div>
       ${RPOT.map(p=>`<div class="m-pot ${REC.done[p.id]?'done':''}" onclick="mOpen('${p.id}')">
         <div class="mp-ic e-${p.e}"><i data-lucide="${LICON[p.e]||'leaf'}"></i></div>
@@ -1543,7 +1558,7 @@
       <div class="m-card"><h5>¿Lista para animales?</h5>${chips(['Sí','No'],p.listo?'Sí':'No')}</div>`;
     }
     return `
-    <div class="m-head"><div class="m-back" style="color:#cfe3c2" onclick="REC.cur=null;renderPhone()">← Potreros</div><h2>${p.nm}</h2><div class="mh-sub">${ESTADO[p.e]} · ${p.ha} ha · precargado del 08/06</div></div>
+    <div class="m-head">${mStatus()}<div class="m-back" style="color:#cfe3c2" onclick="REC.cur=null;renderPhone()">← Potreros</div><h2>${p.nm}</h2><div class="mh-sub">${ESTADO[p.e]} · ${p.ha} ha · precargado del 08/06</div></div>
     <div class="m-body">
       ${cards}
       <div class="m-card"><h5>Novedad</h5><button class="m-voice"><i data-lucide="mic"></i> Dictar novedad (voz)</button></div>
@@ -1552,7 +1567,10 @@
   }
   function mSel(b){[...b.parentNode.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');}
   function mCount(d){const n=document.getElementById('m-n');n.textContent=Math.max(0,parseInt(n.textContent)+d);}
-  function mLluvia(v){REC.lluvia=v;renderPhone();}
+  function mLluvia(v){REC.lluvia=v;if(v==='no'){REC.mm=null;REC.mmOtro=false;}renderPhone();}
+  function mMM(v){REC.mm=v;REC.mmOtro=false;renderPhone();}
+  function mMMOtro(){REC.mmOtro=true;renderPhone();setTimeout(()=>{const i=document.getElementById('mm-in');if(i)i.focus();},60);}
+  function mMMOk(){const i=document.getElementById('mm-in');const v=parseInt(i&&i.value);if(!v||v<=0){if(i)i.focus();return;}REC.mm=v;REC.mmOtro=false;REC.toast=`✓ ${v} mm registrados`;renderPhone();}
   function mOpen(id){REC.cur=id;renderPhone();}
   function mDone(){const p=RPOT.find(x=>x.id===REC.cur);REC.done[REC.cur]=true;REC.cur=null;REC.toast=`✓ ${p?p.nm:'Potrero'} confirmado`;renderPhone();}
 
