@@ -32,17 +32,22 @@ for (const p of ['inicio', 'hacienda', 'campos', 'analitica', 'recorrida', 'clim
   await page.screenshot(shot(p));
 }
 
+// Recorrida paso 2: potreros del campo elegido
+await page.evaluate(() => { nav('recorrida'); REC.campo = 'esperanza'; renderPhone(); });
+await page.waitForTimeout(500);
+await page.screenshot(shot('recorrida-potreros'));
+
 // Recorrida: lluvia "sí" con input manual de mm abierto
-await page.evaluate(() => { nav('recorrida'); mLluvia('si'); mMMOtro(); });
+await page.evaluate(() => { mLluvia('si'); mMMOtro(); });
 await page.waitForTimeout(500);
 await page.screenshot(shot('recorrida-lluvia'));
-await page.evaluate(() => { REC.lluvia = null; REC.mm = null; REC.mmOtro = false; renderPhone(); });
+await page.evaluate(() => { REC.lluvia = {}; REC.mm = {}; REC.mmOtro = false; renderPhone(); });
 
-// Recorrida: parte de potrero abierto en el teléfono
-await page.evaluate(() => { nav('recorrida'); mOpen('la-loma'); });
+// Recorrida paso 3: parte de potrero abierto en el teléfono
+await page.evaluate(() => mOpen('la-loma'));
 await page.waitForTimeout(600);
 await page.screenshot(shot('recorrida-parte'));
-await page.evaluate(() => { REC.cur = null; renderPhone(); });
+await page.evaluate(() => { REC.cur = null; REC.campo = null; renderPhone(); });
 
 // Manga: setup de sesión y sesión activa con escaneos
 await page.evaluate(() => { PH.tab = 'manga'; MG.preset = 'aftosa'; renderPhone(); });
