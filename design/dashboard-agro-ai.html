@@ -977,7 +977,7 @@
       </div>
       <!-- ============ RECORRIDA (MODO CAMPO) ============ -->
       <div class="page" id="page-recorrida">
-        <div class="pagehead"><div><h1>Modo Campo</h1><div class="sub">Recorrida y Manga — así se trabaja desde el celular. Probalo: es interactivo.</div></div><button class="btn" onclick="recReset()">↺ Reiniciar demo</button></div>
+        <div class="pagehead"><div><h1>Modo Campo</h1><div class="sub">Recorrida, Clima y Manga — así se trabaja desde el celular. Probalo: es interactivo.</div></div><button class="btn" onclick="recReset()">↺ Reiniciar demo</button></div>
         <div class="campo-layout">
           <div class="phone"><div class="pscreen" id="pscreen"></div></div>
           <div class="campo-notes">
@@ -988,6 +988,7 @@
               <div class="insight"><div class="ic ic-cielo"><i data-lucide="wifi-off"></i></div><div class="tx"><b>Anda sin señal</b><p>Todo queda en el teléfono y sincroniza solo cuando hay datos.</p></div></div>
               <div class="insight"><div class="ic ic-rojo"><i data-lucide="calendar-check"></i></div><div class="tx"><b>Cada recorrida es un registro fechado</b><p>El conteo observado vs esperado mantiene el stock honesto. Alimenta "Últimas recorridas" del Inicio y el historial de cada potrero.</p></div></div>
               <div class="insight"><div class="ic ic-verde"><i data-lucide="scan-line"></i></div><div class="tx"><b>La manga es una sesión, no una carga</b><p>Elegís "hoy aftosa" una vez. Cada escaneo del bastón Bluetooth la aplica solo a la ficha — el teléfono va colgado, la interfaz es el bastón.</p></div></div>
+              <div class="insight"><div class="ic ic-cielo"><i data-lucide="cloud-sun"></i></div><div class="tx"><b>El clima, antes de salir</b><p>Tab Clima: pulverización con su porqué, ITH y los 7 días. La lluvia del pluviómetro se carga en dos toques y manda sobre el satélite.</p></div></div>
             </div>
             <div class="panel">
               <div class="ph"><h3>Lo que va generando</h3><span class="sub">la historia día a día del campo</span></div>
@@ -1551,7 +1552,7 @@
       <div class="m-card" style="background:var(--verde-soft);border-color:var(--verde)"><h5 style="color:var(--verde-deep)">Pulverización</h5><div style="font-weight:700;font-size:15px;color:var(--verde-deep)">✓ Ventana OK hasta las 18:00</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">viento 12 km/h (límite 15) · sin lluvia en 24 h · humedad 48%</div></div>
       <div class="m-card" style="background:var(--sol-soft);border-color:var(--sol)"><h5 style="color:var(--sol-deep)">Jueves: calor para la hacienda</h5><div style="font-size:13px;color:var(--muted)">ITH 78 previsto — revisá agua y sombra en los potreros cargados.</div></div>
       <div class="m-card"><h5>Próximos 7 días</h5><div class="mfc">${days.map(([d,ic,t,mn,mm],i)=>`<div class="d ${i===0?'today':''}"><b>${d}</b><i data-lucide="${ic}"></i><span class="t tnum">${t}°</span><small>${mn}°</small><span class="mm">${mm?mm+'mm':''}</span></div>`).join('')}</div><div class="m-exp" style="text-align:left;margin-top:9px">Llueve el sábado — si vas a mover hacienda, hacelo antes del viernes.</div></div>
-      <div class="m-card"><h5>Lluvia de junio</h5><div style="display:flex;align-items:baseline;gap:8px"><span class="tnum" style="font-family:'Archivo',sans-serif;font-size:32px;font-weight:700">38<small style="font-size:15px;color:var(--muted)">mm</small></span><span style="font-size:12.5px;color:var(--rojo);font-weight:700">▼ 38% vs promedio (61 mm)</span></div>
+      <div class="m-card"><h5>Lluvia de junio</h5><div style="display:flex;align-items:baseline;gap:8px"><span class="tnum" style="font-family:'Archivo',sans-serif;font-size:32px;font-weight:700">12<small style="font-size:15px;color:var(--muted)">mm</small></span><span style="font-size:12.5px;color:var(--rojo);font-weight:700">▼ 79% vs promedio (58 mm)</span></div>
       ${CL.carga?`<div class="m-chips" style="margin-top:12px">${[5,10,20].map(v=>`<button onclick="clMM(${v})">${v} mm</button>`).join('')}<button onclick="clMM(0)">cancelar</button></div>`:`<button class="m-voice" style="margin-top:12px;border-color:var(--cielo);background:rgba(63,134,179,.1);color:#2f6587" onclick="CL.carga=true;renderPhone()"><i data-lucide="cloud-rain"></i> Cargar lluvia del pluviómetro</button>`}</div>
     </div>`;
   }
