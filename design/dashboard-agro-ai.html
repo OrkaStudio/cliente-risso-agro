@@ -218,11 +218,16 @@
   .insight .act:hover{background:#d0e3c8}
   
   .donut-wrap{display:flex;align-items:center;gap:24px;justify-content:center}
-  .valor-hac{margin-top:18px;border-top:1px dashed var(--border);padding-top:14px;text-align:center}
+  .valor-hac{margin-top:18px;border-top:1px dashed var(--border);padding-top:14px}
   .valor-hac .vh-lab{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:700}
-  .valor-hac .vh-num{font-family:'Archivo',sans-serif;font-size:34px;font-weight:700;color:var(--verde-deep);margin-top:4px;font-stretch:87%}
-  .valor-hac .vh-sub{font-size:13px;color:var(--muted);margin-top:2px;font-weight:600}
-  .valor-hac .vh-note{font-size:11.5px;color:var(--faint);margin-top:6px}
+  .usobar{display:flex;height:13px;border-radius:7px;overflow:hidden;margin-top:10px}
+  .usobar span{display:block;height:100%}
+  .usobar span+span{margin-left:2px}
+  .usoleg{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-top:12px;font-size:13px}
+  .usoleg div{display:flex;align-items:center;gap:8px}
+  .usoleg .sw{width:11px;height:11px;border-radius:4px;flex:0 0 11px}
+  .usoleg b{margin-left:auto;font-variant-numeric:tabular-nums}
+  .usoleg small{color:var(--faint);font-size:11.5px;min-width:46px;text-align:right}
   .legend{display:flex;flex-direction:column;gap:10px;font-size:13.5px}
   .legend div{display:flex;align-items:center;gap:10px}.legend .sw{width:12px;height:12px;border-radius:4px}.legend .n{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
   
@@ -1612,19 +1617,19 @@
     const delta=(GORDO.precio-GORDO.prev)/GORDO.prev*100;
     const fl=delta>=0?`<span class="up">▲ ${Math.abs(delta).toFixed(1).replace('.',',')}%</span>`:`<span class="down">▼ ${Math.abs(delta).toFixed(1).replace('.',',')}%</span>`;
     document.getElementById('tk-gordo').innerHTML=`<span class="lab"><i data-lucide="beef" style="width:15px;height:15px;color:#d4b896"></i><span class="lt">Gordo</span></span><b class="tnum">$${GORDO.precio.toLocaleString('es-AR')}</b>${fl}${d>7?`<span class="stale">actualizar · ${d}d</span>`:''}`;
-    renderValor();
     if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
-  /* valor estimado de la hacienda: cabezas × kg promedio por categoría × Gordo (vara D4) */
-  const KGCAT=[['Vacas',251,420],['Terneros',120,180],['Vaquillonas',92,300],['Novillos',64,380],['Toros',18,650]];
-  function renderValor(){
+  /* uso del suelo: % de hectáreas por actividad, calculado de los potreros reales */
+  function renderUso(){
     const el=document.getElementById('valor-hac'); if(!el)return;
-    const kg=KGCAT.reduce((s,[,n,k])=>s+n*k,0);
-    const pesos=kg*GORDO.precio, usd=pesos/1180;
-    el.innerHTML=`<div class="vh-lab">Valor estimado de la hacienda</div>
-      <div class="vh-num tnum">$${(pesos/1e6).toFixed(1).replace('.',',')} M</div>
-      <div class="vh-sub">≈ US$ ${Math.round(usd/1000).toLocaleString('es-AR')}.000 blue · ${(kg/1000).toFixed(1).replace('.',',')} t × Gordo $${GORDO.precio.toLocaleString('es-AR')}</div>
-      <div class="vh-note">estimado con kg promedio por categoría — el peso real lo da la consignataria al vender</div>`;
+    const tot=ALLPOT.reduce((s,p)=>s+p.ha,0);
+    const grupos={};
+    ALLPOT.forEach(p=>{grupos[p.e]=(grupos[p.e]||0)+p.ha;});
+    const META={ganadero:['Animales','var(--verde)'],cultivo:['Siembra','var(--cielo)'],descanso:['Descanso','var(--sol)'],rastrojo:['Rastrojo','var(--tierra)'],siembra:['Siembra','var(--cielo)'],cosecha:['Cosecha','var(--tierra)']};
+    const rows=Object.entries(grupos).sort((a,b)=>b[1]-a[1]);
+    el.innerHTML=`<div class="vh-lab">Uso del suelo — ${tot} ha entre los 2 campos</div>
+      <div class="usobar">${rows.map(([e,ha])=>`<span style="width:${(ha/tot*100).toFixed(1)}%;background:${(META[e]||[,'#9aa48c'])[1]}"></span>`).join('')}</div>
+      <div class="usoleg">${rows.map(([e,ha])=>`<div><span class="sw" style="background:${(META[e]||[,'#9aa48c'])[1]}"></span>${(META[e]||[ESTADO[e]||e])[0]} <b class="tnum">${Math.round(ha/tot*100)}%</b><small>${ha} ha</small></div>`).join('')}</div>`;
   }
   function openGordo(){
     const d=gordoDias(), f=GORDO.fecha.slice(8,10)+'/'+GORDO.fecha.slice(5,7);
@@ -1672,6 +1677,7 @@
   renderCampos();
   renderPhone();
   renderGordo();
+  renderUso();
 
   /* deep-link: dashboard-agro-ai.html#campos abre esa sección */
   const _h=location.hash.replace('#','');
