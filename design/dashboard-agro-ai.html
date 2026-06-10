@@ -1615,6 +1615,7 @@
       <div class="db">
         ${d>7?`<div class="ai-note" style="border-color:rgba(224,162,53,.4)">⚠ El precio cargado tiene <b>${d} días</b>. Las varas en kg de novillo y las comparaciones lo usan — conviene refrescarlo.</div>`:''}
         <div class="dsec"><h4>Último cargado</h4><div style="font-size:15px"><b class="tnum">$${GORDO.precio.toLocaleString('es-AR')}</b> /kg · ${f} (hace ${d} días)</div></div>
+        <a href="https://www.mercadoagroganadero.com.ar/" target="_blank" rel="noopener" class="rad" style="display:flex;justify-content:center;align-items:center;gap:8px;width:100%;text-decoration:none;margin-bottom:14px"><i data-lucide="external-link" style="width:15px;height:15px"></i> Ver el precio publicado — Cañuelas (MAG)</a>
         <div class="mf"><label>Precio de hoy ($/kg novillo)</label><input id="gordo-in" type="number" value="${GORDO.precio}" onkeydown="if(event.key==='Enter')gordoOk()"></div>
         <div class="mf"><label>Fecha</label><input type="date" value="2026-06-10"></div>
         <button class="btn" onclick="gordoOk()">Actualizar</button>
