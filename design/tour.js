@@ -101,6 +101,14 @@ await page.evaluate(() => { setQ('todos'); nav('analitica'); openCarga(); });
 await page.waitForTimeout(800);
 await page.screenshot(shot('analitica-carga'));
 
+// Ticker: carga manual del precio del Gordo (D14)
+await page.evaluate(() => { closeDrawer(); nav('inicio'); openGordo(); });
+await page.waitForTimeout(600);
+await page.screenshot(shot('gordo-drawer'));
+await page.evaluate(() => { document.getElementById('gordo-in').value = '4450'; gordoOk(); });
+await page.waitForTimeout(2000); // el drawer se cierra solo tras guardar
+await page.screenshot(shot('gordo-actualizado'));
+
 // El Ingeniero (asistente IA) — espera a que termine el tipeo en vivo
 await page.evaluate(() => { closeDrawer(); nav('inicio'); openIngeniero(); });
 await page.waitForTimeout(4500);

@@ -163,6 +163,8 @@
   .up{color:var(--verde)} .down{color:var(--rojo)}
   .topbar .up{color:#8fc7a0} .topbar .down{color:#e08a76}
   .tk .stale{color:#ecc25c;font-size:11px;font-weight:600;border:1px solid rgba(224,162,53,.35);background:rgba(224,162,53,.12);border-radius:12px;padding:2px 8px}
+  .tk-click{cursor:pointer;padding:5px 9px;margin:-5px -9px;border-radius:10px;transition:background .15s}
+  .tk-click:hover{background:rgba(255,255,255,.09)}
   .sep{width:1px;height:24px;background:var(--side-border)}
 
   .scroll{padding:32px 36px 80px;overflow-y:auto;max-width:1340px;width:100%;transition:padding-right .3s cubic-bezier(0.4,0,0.2,1);margin:0 auto}
@@ -707,7 +709,7 @@
     <div class="topbar">
       <div class="scope">Toda la empresa <span class="chev">▾</span></div>
       <div class="ticker">
-        <div class="tk"><span class="lab"><i data-lucide="beef" style="width:15px;height:15px;color:#d4b896"></i><span class="lt">Gordo</span></span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
+        <div class="tk tk-click" id="tk-gordo" onclick="openGordo()" title="Tocá para actualizar el precio del Gordo"></div>
         <div class="sep"></div>
         <div class="tk"><span class="lab"><i data-lucide="circle-dollar-sign" style="width:15px;height:15px;color:#8fc7a0"></i><span class="lt">Blue</span></span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
         <div class="sep sep-clima"></div>
@@ -1594,6 +1596,44 @@
   function mOpen(id){REC.cur=id;renderPhone();}
   function mDone(){const p=ALLPOT.find(x=>x.id===REC.cur);REC.done[REC.cur]=true;REC.cur=null;REC.toast=`✓ ${p?p.nm:'Potrero'} confirmado`;renderPhone();}
 
+  /* ===== TICKER: precio del Gordo — carga manual con alerta de frescura (D14) =====
+     Cañuelas (MAG) publica el precio pero sin API limpia: MVP = carga manual.
+     El sistema guarda la fecha y avisa si el dato tiene más de 7 días (D13: nada viejo como actual). */
+  const GORDO={precio:4373,prev:4321,fecha:'2026-06-01'};
+  function gordoDias(){return Math.round((new Date('2026-06-10')-new Date(GORDO.fecha))/86400000);}
+  function renderGordo(){
+    const d=gordoDias();
+    const delta=(GORDO.precio-GORDO.prev)/GORDO.prev*100;
+    const fl=delta>=0?`<span class="up">▲ ${Math.abs(delta).toFixed(1).replace('.',',')}%</span>`:`<span class="down">▼ ${Math.abs(delta).toFixed(1).replace('.',',')}%</span>`;
+    document.getElementById('tk-gordo').innerHTML=`<span class="lab"><i data-lucide="beef" style="width:15px;height:15px;color:#d4b896"></i><span class="lt">Gordo</span></span><b class="tnum">$${GORDO.precio.toLocaleString('es-AR')}</b>${fl}${d>7?`<span class="stale">actualizar · ${d}d</span>`:''}`;
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
+  }
+  function openGordo(){
+    const d=gordoDias(), f=GORDO.fecha.slice(8,10)+'/'+GORDO.fecha.slice(5,7);
+    document.getElementById('drawer').innerHTML=`
+      <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3>Precio del Gordo</h3><div class="ds">$ por kg de novillo — Cañuelas (MAG)</div></div>
+      <div class="db">
+        ${d>7?`<div class="ai-note" style="border-color:rgba(224,162,53,.4)">⚠ El precio cargado tiene <b>${d} días</b>. Las varas en kg de novillo y las comparaciones lo usan — conviene refrescarlo.</div>`:''}
+        <div class="dsec"><h4>Último cargado</h4><div style="font-size:15px"><b class="tnum">$${GORDO.precio.toLocaleString('es-AR')}</b> /kg · ${f} (hace ${d} días)</div></div>
+        <div class="mf"><label>Precio de hoy ($/kg novillo)</label><input id="gordo-in" type="number" value="${GORDO.precio}" onkeydown="if(event.key==='Enter')gordoOk()"></div>
+        <div class="mf"><label>Fecha</label><input type="date" value="2026-06-10"></div>
+        <button class="btn" onclick="gordoOk()">Actualizar</button>
+        <div id="gordo-msg"></div>
+        <div style="font-size:12px;color:var(--faint);padding-top:4px">Cañuelas publica el precio pero sin API limpia: en el MVP lo cargás vos (una vez por semana alcanza). Con scraping (Fase 2) se actualiza solo y este formulario desaparece. El dólar blue sí es automático.</div>
+      </div>`;
+    openDrawerUI();
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
+  }
+  function gordoOk(){
+    const i=document.getElementById('gordo-in'), v=parseInt(i&&i.value);
+    if(!v||v<=0){if(i)i.focus();return;}
+    GORDO.prev=GORDO.precio;GORDO.precio=v;GORDO.fecha='2026-06-10';
+    renderGordo();
+    const m=document.getElementById('gordo-msg');
+    if(m)m.innerHTML='<div class="move-ok">✓ Actualizado. El ticker y las varas en kg de novillo usan este precio desde hoy.</div>';
+    setTimeout(closeDrawer,1600);
+  }
+
   /* ===== CLIMA: carga de lluvia desacoplada (corrección D8) ===== */
   function openLluvia(){
     document.getElementById('drawer').innerHTML=`
@@ -1612,6 +1652,7 @@
 
   renderCampos();
   renderPhone();
+  renderGordo();
 
   /* deep-link: dashboard-agro-ai.html#campos abre esa sección */
   const _h=location.hash.replace('#','');
