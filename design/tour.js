@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const URL = 'file:///' + path.resolve(__dirname, 'dashboard-agro-ai.html').replace(/\\/g, '/');
 const OUT = path.join(__dirname, 'shots');
 fs.mkdirSync(OUT, { recursive: true });
-const shot = (name) => path.join(OUT, name + '.png');
+const shot = (name) => ({ path: path.join(OUT, name + '.png'), animations: 'disabled', timeout: 60000 });
 
 const browser = await chromium.launch({ channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
@@ -29,49 +29,55 @@ await page.waitForTimeout(1800);
 for (const p of ['inicio', 'hacienda', 'campos', 'analitica']) {
   await page.evaluate((x) => nav(x), p);
   await page.waitForTimeout(500);
-  await page.screenshot({ path: shot(p) });
+  await page.screenshot(shot(p));
 }
 
 // Campos: drawer de potrero
 await page.evaluate(() => { nav('campos'); openPotrero('la-loma'); });
 await page.waitForTimeout(800);
-await page.screenshot({ path: shot('campos-drawer') });
+await page.screenshot(shot('campos-drawer'));
 
 // Campos: vista satelital (tiles de Esri tardan en cargar)
 await page.evaluate(() => { closeDrawer(); setCamposView('satelital'); });
 await page.waitForTimeout(4000);
-await page.screenshot({ path: shot('campos-satelital') });
+await page.screenshot(shot('campos-satelital'));
 
 // Campos: modo planificar
 await page.evaluate(() => { setCamposView('mosaico'); setCamposMode('planificar'); });
 await page.waitForTimeout(700);
-await page.screenshot({ path: shot('campos-planificar') });
+await page.screenshot(shot('campos-planificar'));
 
 // Hacienda: filtro de señal activo
 await page.evaluate(() => { setCamposMode('mapa'); nav('hacienda'); setQ('trat'); });
 await page.waitForTimeout(600);
-await page.screenshot({ path: shot('hacienda-filtro') });
+await page.screenshot(shot('hacienda-filtro'));
 
 // Hacienda: filtrada por potrero (flujo mapa → animales)
 await page.evaluate(() => { setQ('todos'); setPotF('La Loma'); });
 await page.waitForTimeout(500);
-await page.screenshot({ path: shot('hacienda-potrero') });
+await page.screenshot(shot('hacienda-potrero'));
 await page.evaluate(() => setPotF(null));
+
+// Ficha de animal (D15)
+await page.evaluate(() => openFicha('AR 138 001234567'));
+await page.waitForTimeout(700);
+await page.screenshot(shot('ficha-animal'));
+await page.evaluate(() => closeDrawer());
 
 // Analítica: drawer de carga de movimiento
 await page.evaluate(() => { setQ('todos'); nav('analitica'); openCarga(); });
 await page.waitForTimeout(800);
-await page.screenshot({ path: shot('analitica-carga') });
+await page.screenshot(shot('analitica-carga'));
 
 // El Ingeniero (asistente IA) — espera a que termine el tipeo en vivo
 await page.evaluate(() => { closeDrawer(); nav('inicio'); openIngeniero(); });
 await page.waitForTimeout(4500);
-await page.screenshot({ path: shot('ingeniero') });
+await page.screenshot(shot('ingeniero'));
 
 // Sidebar colapsado
 await page.evaluate(() => { closeDrawer(); toggleSidebar(); });
 await page.waitForTimeout(700);
-await page.screenshot({ path: shot('inicio-colapsado') });
+await page.screenshot(shot('inicio-colapsado'));
 
 console.log('shots →', OUT);
 console.log('console errors:', errors.length ? errors.join(' | ') : 'ninguno');

@@ -415,6 +415,15 @@
   .dhist .b small{font-size:11px;color:var(--muted);font-weight:600}
   .dhist .b.last small{color:var(--ink);font-weight:700;font-size:12px}
   .ai-note{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--sol-deep);background:var(--sol-soft);border-radius:12px;padding:10px 14px;margin-top:10px;font-weight:500;line-height:1.5}
+  /* ficha de animal: historial append-only (D15) */
+  .tl{display:flex;flex-direction:column}
+  .tl .ev{display:flex;gap:12px;position:relative;padding-bottom:16px}
+  .tl .ev::before{content:'';position:absolute;left:5px;top:16px;bottom:2px;width:2px;background:var(--border)}
+  .tl .ev:last-child{padding-bottom:0}
+  .tl .ev:last-child::before{display:none}
+  .tl .dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px;margin-top:4px;box-shadow:0 0 0 3px var(--card)}
+  .tl .ed{font-size:12px;color:var(--faint);font-weight:600;flex:0 0 46px;margin-top:3px;font-variant-numeric:tabular-nums}
+  .tl .et{font-size:13.5px;color:var(--ink);font-weight:500;line-height:1.45}
   .dact{display:flex;gap:12px;margin-top:auto;padding-top:10px}
   .dact button{flex:1;border-radius:12px;padding:14px;font-weight:600;font-size:14.5px;cursor:pointer;font-family:inherit;border:1px solid var(--border);transition:all 0.2s}
   .dact .primary{background:var(--verde);color:#fff;border-color:var(--verde);box-shadow:0 4px 12px var(--verde-glow)}
@@ -490,14 +499,13 @@
   .move-preview b{color:var(--ink)}
   .move-preview:empty{display:none}
 
-  /* ticker responsive — prioridad: precios (varas D4) > labels > clima > frescura */
+  /* ticker responsive — al comprimir: el TEXTO se va, el SÍMBOLO queda, el clima no desaparece */
   @media(max-width:1380px){.tk .stale{display:none}}
-  @media(max-width:1240px){.tk-clima,.sep-clima{display:none}}
-  @media(max-width:1100px){.tk .lab{display:none}}
-  /* con drawer abierto el espacio se achica sin cambiar el viewport: mismo orden */
+  @media(max-width:1200px){.tk .lab .lt{display:none}.ticker{gap:16px}}
+  /* con drawer abierto el espacio se achica sin cambiar el viewport: mismo criterio */
   .topbar.with-drawer .tk .stale{display:none}
-  .topbar.with-drawer .tk-clima,.topbar.with-drawer .sep-clima{display:none}
-  @media(max-width:1560px){.topbar.with-drawer .tk .lab{display:none}}
+  @media(max-width:1700px){.topbar.with-drawer .tk .lab .lt{display:none}.topbar.with-drawer .ticker{gap:14px}}
+  @media(max-width:1460px){.topbar.with-drawer .sep{display:none}}
 
   /* EL INGENIERO — asistente IA conversacional (burbuja flotante) */
   .fab-ing{position:fixed;right:28px;bottom:28px;z-index:28;display:flex;align-items:center;gap:9px;background:linear-gradient(110deg,#a06f15,#e0a235);color:#fff;border:none;border-radius:28px;padding:14px 24px;font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;letter-spacing:.01em;cursor:pointer;box-shadow:0 10px 30px rgba(224,162,53,.4);transition:transform .2s,box-shadow .2s}
@@ -577,11 +585,11 @@
     <div class="topbar">
       <div class="scope">Toda la empresa <span class="chev">▾</span></div>
       <div class="ticker">
-        <div class="tk"><span class="lab"><i data-lucide="beef" style="width:14px;height:14px;color:#c9b393"></i>Gordo</span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
+        <div class="tk"><span class="lab"><i data-lucide="beef" style="width:15px;height:15px;color:#d4b896"></i><span class="lt">Gordo</span></span><b class="tnum">$4.373</b><span class="up">▲ 1,2%</span><span class="stale">actualizar · 9d</span></div>
         <div class="sep"></div>
-        <div class="tk"><span class="lab"><i data-lucide="banknote" style="width:14px;height:14px;color:#8fc7a0"></i>Blue</span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
+        <div class="tk"><span class="lab"><i data-lucide="circle-dollar-sign" style="width:15px;height:15px;color:#8fc7a0"></i><span class="lt">Blue</span></span><b class="tnum">$1.180</b><span class="down">▼ 0,4%</span></div>
         <div class="sep sep-clima"></div>
-        <div class="tk tk-clima"><span class="lab"><i data-lucide="sun" style="width:14px;height:14px;color:#ecc25c"></i>Clima</span><b>24°</b><span style="color:#9ccbe6;display:inline-flex;align-items:center;gap:4px"><i data-lucide="cloud-rain" style="width:13px;height:13px"></i>38mm sem</span></div>
+        <div class="tk tk-clima"><span class="lab"><i data-lucide="sun" style="width:15px;height:15px;color:#ecc25c"></i><span class="lt">Clima</span></span><b>24°</b><span style="color:#9ccbe6;display:inline-flex;align-items:center;gap:4px"><i data-lucide="cloud-rain" style="width:13px;height:13px"></i>38mm</span></div>
       </div>
     </div>
 
@@ -695,7 +703,8 @@
         <div class="toolbar">
           <div class="search"><i data-lucide="search" style="width:16px;height:16px;color:var(--faint)"></i><input id="q" placeholder="Buscar por caravana…" oninput="render()"></div>
           <div class="pot-chip" id="pot-chip" style="display:none"></div>
-          <div class="select">Categoría ▾</div><div class="select">Estado: Activos ▾</div>
+          <select class="select" id="catF" onchange="render()" style="appearance:auto"><option value="todas">Categoría: todas</option><option value="vaca">Vacas</option><option value="vaquillona">Vaquillonas</option><option value="novillo">Novillos</option><option value="ternero">Terneros/as</option><option value="toro">Toros</option><option value="capon">Capones</option></select>
+          <div class="select">Estado: Activos ▾</div>
           <div class="toggle"><button id="t-tabla" class="on" onclick="setView('tabla')">Tabla</button><button id="t-pot" onclick="setView('potrero')">Por potrero</button></div>
         </div>
         <div class="panel" id="content"></div>
@@ -872,12 +881,44 @@
   ];
   const POT_STATE={'La Loma':'Ganadero','Don Gilberto':'Ganadero','El Monte':'Ganadero'};
   let view='tabla', q='todos', potF=null;
-  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(potF&&a.pot!==potF)return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
+  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();const cf=(document.getElementById('catF')||{}).value||'todas';return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(potF&&a.pot!==potF)return false;if(cf!=='todas'&&!a.cat.startsWith(cf))return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
   /* filtro por potrero: el puente mapa → animales ("qué animales tengo acá") */
   function setPotF(n){potF=n;const c=document.getElementById('pot-chip');if(c){if(n){c.style.display='inline-flex';c.innerHTML=`Potrero: <b>${n}</b> <span onclick="setPotF(null)" style="cursor:pointer;margin-left:4px">✕</span>`;}else{c.style.display='none';c.innerHTML='';}}render();}
   function sigsHtml(a){return `<div class="sigs">${a.sig.map(s=>`<span class="sig ${SIG[s].cls}">${SIG[s].ic} ${SIG[s].l}</span>`).join('')}</div>`;}
   function catHtml(a){const c=CAT[a.cat];return `<span class="cat"><span class="dot" style="background:${c.c}"></span>${c.l}</span>`;}
-  function rowHtml(a){return `<tr><td class="cv">${a.cv}</td><td>${catHtml(a)}</td><td>${a.sexo}</td><td>${a.pot}</td><td>${a.edad}</td><td>${sigsHtml(a)}</td><td class="arrow">→</td></tr>`;}
+  function rowHtml(a){return `<tr onclick="openFicha('${a.cv}')"><td class="cv">${a.cv}</td><td>${catHtml(a)}</td><td>${a.sexo}</td><td>${a.pot}</td><td>${a.edad}</td><td>${sigsHtml(a)}</td><td class="arrow">→</td></tr>`;}
+  /* ===== FICHA DE ANIMAL (D15: registro puro, historial append-only) ===== */
+  const PESOS={vaca:480,vaquillona:320,novillo:425,ternero:185,ternera:170,toro:760,capon:440};
+  function openFicha(cv){
+    const a=animales.find(x=>x.cv===cv); if(!a)return;
+    const c=CAT[a.cat];
+    const retiro=a.sig.includes('trat');
+    const claves=[
+      ['Último peso',`${PESOS[a.cat]||400} kg · 04/06`],
+      a.cat==='vaca'?['Partos','4 · último sep 2025']:null,
+      a.sig.includes('pre')?['Próximo parto','~sep 2026']:null,
+      a.sig.includes('vender')?['Señal','Para vender']:null,
+      a.sig.includes('destete')?['Señal','Para destetar']:null,
+    ].filter(Boolean);
+    const ident=[['Categoría',c.l],['Sexo',a.sexo],['Edad',a.edad],['Potrero',a.pot],['RENSPA','01.234.5.67890'],['Caravana visual','V-'+a.cv.replace(/\D/g,'').slice(-3)]];
+    const evs=[];
+    if(retiro)evs.push(['06/06','Tratamiento: cojera — <b>retiro hasta 12/06</b>','var(--rojo)']);
+    evs.push(['06/06',`Recorrida: contada en ${a.pot}`,'var(--verde)']);
+    if(a.sig.includes('pre'))evs.push(['12/04','Tacto: <b>preñada</b> — 6 meses','var(--cielo)']);
+    evs.push(['02/04','Vacuna aftosa — sesión de manga','var(--verde)']);
+    evs.push(['12/03',`Movimiento: ${a.pot==='Don Gilberto'?'El Monte':'Don Gilberto'} → ${a.pot}`,'var(--sol)']);
+    evs.push(['2023',`Alta por ${a.cv.startsWith('DEMO')?'nacimiento en el campo':'compra (remate Cañuelas)'}`,'var(--faint)']);
+    document.getElementById('drawer').innerHTML=`
+      <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3 class="tnum" style="font-size:19px">${a.cv}</h3><div class="ds">${c.l} · ${a.sexo} · ${a.edad} · en ${a.pot}</div></div>
+      <div class="db">
+        ${retiro?'<div class="ai-note" style="background:var(--rojo-soft);color:var(--rojo)">⚠ Retiro sanitario vigente — no vender hasta 12/06</div>':''}
+        <div class="dsec"><h4>Identidad</h4><div class="dstate">${ident.map(([l,v])=>`<div class="it"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')}</div></div>
+        ${claves.length?`<div class="dsec"><h4>Datos clave</h4><div class="dstate">${claves.map(([l,v])=>`<div class="it"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')}</div></div>`:''}
+        <div class="dsec"><h4>Historial — no se borra nunca</h4><div class="tl">${evs.map(([d,t,col])=>`<div class="ev"><span class="ed">${d}</span><span class="dot" style="background:${col}"></span><span class="et">${t}</span></div>`).join('')}</div></div>
+        <div class="dact"><button class="primary">+ Registrar evento</button><button class="ghost">Cambiar caravana</button></div>
+      </div>`;
+    openDrawerUI();
+  }
   function render(){const list=filtered();const el=document.getElementById('content');
     if(view==='tabla'){el.innerHTML=list.length?`<table class="tbl"><thead><tr><th>Caravana</th><th>Categoría</th><th>Sexo</th><th>Potrero</th><th>Edad</th><th>Señales</th><th></th></tr></thead><tbody>${list.map(rowHtml).join('')}</tbody></table>`:`<div class="empty">Sin animales con ese filtro.</div>`;}
     else{const pots=[...new Set(list.map(a=>a.pot))];el.innerHTML=pots.length?pots.map(p=>{const inp=list.filter(a=>a.pot===p);return `<div class="potblock"><div class="pothead"><span class="nm">${p}</span><span class="cnt">${inp.length} animales</span><span class="pstate ps-gan">● ${POT_STATE[p]||''}</span></div><table class="tbl"><tbody>${inp.map(rowHtml).join('')}</tbody></table></div>`;}).join(''):`<div class="empty">Sin animales con ese filtro.</div>`;}
