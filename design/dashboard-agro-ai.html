@@ -217,6 +217,22 @@
   .insight .act{align-self:center;font-size:13px;color:var(--verde-deep);font-weight:600;white-space:nowrap;cursor:pointer;padding:8px 16px;background:var(--verde-soft);border-radius:10px;transition:background 0.2s}
   .insight .act:hover{background:#d0e3c8}
   
+  /* plata en camino: calendario de cobros y pagos */
+  .flujo .fr{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--inset)}
+  .flujo .fr:last-child{border-bottom:none}
+  .flujo .fd{font-size:12px;font-weight:700;color:var(--muted);min-width:42px;font-variant-numeric:tabular-nums}
+  .flujo .fic{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 30px}
+  .flujo .fic svg{width:15px;height:15px}
+  .flujo .fic.in{background:var(--verde-soft);color:var(--verde-deep)}
+  .flujo .fic.out{background:var(--sol-soft);color:var(--sol-deep)}
+  .flujo .ft{min-width:0;flex:1}
+  .flujo .ft b{font-size:13.5px;display:block}
+  .flujo .ft small{font-size:11.5px;color:var(--faint)}
+  .flujo .fm{font-weight:700;font-size:14px;white-space:nowrap}
+  .flujo .fm.in{color:var(--verde-deep)}
+  .flujo .fst{font-size:11px;font-weight:700;border-radius:12px;padding:3px 9px;background:var(--inset);color:var(--muted);white-space:nowrap;font-family:'Archivo',sans-serif}
+  .flujo .fst.f-ok{background:var(--verde-soft);color:var(--verde-deep)}
+  .flujo .fst.f-warn{background:var(--sol-soft);color:var(--sol-deep)}
   .donut-wrap{display:flex;align-items:center;gap:24px;justify-content:center}
   .valor-hac{margin-top:18px;border-top:1px dashed var(--border);padding-top:14px}
   .valor-hac .vh-lab{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:700}
@@ -262,7 +278,11 @@
   /* HACIENDA */
   .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:8px}
   .pagehead h1{font-size:32px;font-weight:700;letter-spacing:-0.03em}.pagehead .sub{color:var(--muted);font-size:14.5px;margin-top:4px;font-weight:500}
-  .btn{background:var(--verde);color:#fff;border:none;border-radius:12px;padding:12px 20px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 4px 12px var(--verde-glow);font-family:'Inter',sans-serif;transition:all 0.2s}
+  .btn{background:linear-gradient(180deg,var(--verde) 0%,#2f6a42 100%);color:#fff;border:none;border-radius:12px;padding:12px 20px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 4px 12px var(--verde-glow),inset 0 1px 0 rgba(255,255,255,.18);font-family:'Inter',sans-serif;transition:all 0.2s}
+  .btn:active{transform:translateY(0) scale(.98)}
+  button:focus-visible,a:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+  /* ícono inline chico — reemplaza emojis de estado (profesional, mismo trazo que el resto) */
+  .gi{width:13px;height:13px;vertical-align:-2px;display:inline-block;flex:0 0 13px}
   .btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,185,129,0.4);background:var(--verde-deep)}
   
   .resumen{display:grid;grid-template-columns:1.5fr 1fr;gap:20px}
@@ -587,6 +607,7 @@
   .m-status svg{width:14px;height:14px}
   .m-head .mh-sub{font-size:12.5px;opacity:.9;margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .m-off{font-size:10px;font-weight:700;background:rgba(224,162,53,.28);color:#ecc25c;padding:2px 8px;border-radius:10px;letter-spacing:.05em}
+  .m-off::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#ecc25c;margin-right:5px;vertical-align:1px}
   .m-prog{height:5px;background:rgba(255,255,255,.18);border-radius:3px;margin-top:12px;overflow:hidden}
   .m-prog i{display:block;height:100%;background:var(--sol);border-radius:3px;transition:width .3s}
   .m-body{padding:16px 14px 24px;display:flex;flex-direction:column;gap:12px}
@@ -783,8 +804,8 @@
         <section><div class="panel">
           <div class="ph"><h3>Estado de los campos</h3><span class="sub">tocá un potrero para entrar</span></div>
           <div class="campos">
-            <div class="pcard" onclick="nav('hacienda');setPotF('La Loma')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot">⚠ pasto escaso</span> · 💧 baja</div></div>
-            <div class="pcard" onclick="nav('hacienda');setPotF('Don Gilberto')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · 💧 ok</div></div>
+            <div class="pcard" onclick="nav('hacienda');setPotF('La Loma')"><div class="top"><div><div class="nm">La Loma</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">128</div><div class="meta"><span class="warn-dot"><i data-lucide="triangle-alert" class="gi"></i> pasto escaso</span> · <i data-lucide="droplet" class="gi"></i> baja</div></div>
+            <div class="pcard" onclick="nav('hacienda');setPotF('Don Gilberto')"><div class="top"><div><div class="nm">Don Gilberto</div><div class="cmp">La Esperanza · RENSPA</div></div><span class="pstate ps-gan">● Ganadero</span></div><div class="big tnum">353</div><div class="meta">pasto normal · <i data-lucide="droplet" class="gi"></i> ok</div></div>
             <div class="pcard"><div class="top"><div><div class="nm">El Bajo</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-cul">● Maíz</span></div><div class="big tnum" style="font-size:18px;color:var(--cielo)">Creciendo</div><div class="meta">cosecha ~jul</div></div>
             <div class="pcard"><div class="top"><div><div class="nm">La Cañada</div><div class="cmp">La Esperanza</div></div><span class="pstate ps-des">● Descanso</span></div><div class="big tnum" style="font-size:18px;color:var(--verde-deep)">Lista ✓</div><div class="meta">pasto abundante</div></div>
           </div>
@@ -794,7 +815,7 @@
           <div class="panel"><div class="ph"><h3>Últimas recorridas</h3><span class="sub">qué tan fresco está el dato</span></div>
             <table class="tbl"><tbody>
               <tr onclick="nav('campos')"><td style="font-weight:600">Don Gilberto</td><td style="color:var(--muted)">hoy</td><td style="color:var(--verde-deep);font-weight:600;text-align:right">✓ sin novedades</td></tr>
-              <tr onclick="nav('campos')"><td style="font-weight:600">La Loma</td><td style="color:var(--muted)">hace 2 días</td><td style="color:var(--sol-deep);font-weight:600;text-align:right">⚠ pasto escaso</td></tr>
+              <tr onclick="nav('campos')"><td style="font-weight:600">La Loma</td><td style="color:var(--muted)">hace 2 días</td><td style="color:var(--sol-deep);font-weight:600;text-align:right"><i data-lucide="triangle-alert" class="gi"></i> pasto escaso</td></tr>
               <tr onclick="nav('campos')"><td style="font-weight:600">El Monte</td><td style="color:var(--muted)">hace 3 días</td><td style="color:var(--rojo);font-weight:600;text-align:right">1 en tratamiento</td></tr>
               <tr onclick="nav('recorrida')"><td style="font-weight:600">El Fondo</td><td style="color:var(--rojo);font-weight:600">hace 12 días</td><td style="color:var(--verde-deep);font-weight:600;text-align:right">recorrer →</td></tr>
             </tbody></table>
@@ -860,7 +881,7 @@
         <div class="campos-head">
           <div><h1>Campos</h1><div class="sub" id="campos-sub"></div></div>
           <div class="head-actions">
-            <div class="segment"><button id="cm-mapa" class="on" onclick="setCamposMode('mapa')">Mapa de potreros</button><button id="cm-plan" onclick="setCamposMode('planificar')">⇄ Planificar</button></div>
+            <div class="segment"><button id="cm-mapa" class="on" onclick="setCamposMode('mapa')">Mapa de potreros</button><button id="cm-plan" onclick="setCamposMode('planificar')"><i data-lucide="arrow-right-left" class="gi"></i> Planificar</button></div>
             <button class="btn">+ Nuevo campo</button>
           </div>
         </div>
@@ -924,6 +945,25 @@
         </div>
 
         <section class="row a">
+          <div class="panel"><div class="ph"><h3>Plata en camino</h3><span class="sub">cheques y plazos de cobro/pago · próximos 45 días</span><button class="rad" style="margin-left:auto" onclick="openPlazo()"><i data-lucide="plus" style="width:15px;height:15px"></i> Cheque / plazo</button></div>
+            <div class="flujo">
+              <div class="fr"><span class="fd tnum">11/06</span><span class="fic in"><i data-lucide="arrow-down-left"></i></span><div class="ft"><b>Liquidación venta 18 novillos</b><small>Bartomeu y Cía. · plazo 30 días · echeq</small></div><span class="fm tnum in">+$8,9M</span><span class="fst f-ok">mañana</span></div>
+              <div class="fr"><span class="fd tnum">12/06</span><span class="fic out"><i data-lucide="arrow-up-right"></i></span><div class="ft"><b>Cheque #4412 — Banco Nación</b><small>emitido 12/05 · A. Bartomeu</small></div><span class="fm tnum">−$900k</span><span class="fst f-warn">en 2 días</span></div>
+              <div class="fr"><span class="fd tnum">20/06</span><span class="fic out"><i data-lucide="arrow-up-right"></i></span><div class="ft"><b>Veterinaria San Jorge</b><small>cuenta corriente · 30 días</small></div><span class="fm tnum">−$1,4M</span><span class="fst">en 10 días</span></div>
+              <div class="fr"><span class="fd tnum">01/07</span><span class="fic out"><i data-lucide="arrow-up-right"></i></span><div class="ft"><b>Alquiler El Arrendado</b><small>trimestre jul–sep</small></div><span class="fm tnum">−$2,1M</span><span class="fst">en 21 días</span></div>
+              <div class="fr"><span class="fd tnum">15/07</span><span class="fic in"><i data-lucide="arrow-down-left"></i></span><div class="ft"><b>echeq diferido — venta 12 vaquillonas</b><small>Rosgan · 60 días</small></div><span class="fm tnum in">+$2,9M</span><span class="fst">en 35 días</span></div>
+            </div>
+            <div class="ai-note">✦ Si todo se cumple, al 15/07 quedás <b>+$7,4M</b>. Ojo: el cheque del 12/06 sale <b>antes</b> de que acredite la liquidación — confirmá saldo en cuenta.</div>
+          </div>
+          <div class="panel"><div class="ph"><h3>Conexiones</h3><span class="sub">de dónde pueden entrar los datos solos</span></div>
+            <div class="insight"><div class="ic ic-verde"><i data-lucide="file-text"></i></div><div class="tx"><b>Consignataria — liquidaciones</b><p>Reenviá el PDF de la "cuenta de venta y líquido producto": la IA carga venta, comisión y plazo de cobro sola.</p></div><div class="act" style="cursor:default">✦ MVP</div></div>
+            <div class="insight"><div class="ic ic-sol"><i data-lucide="stethoscope"></i></div><div class="tx"><b>Veterinario</b><p>Lo invitás con su usuario: lo que carga va directo a las fichas. O le sacás foto a la receta y la IA la lee.</p></div><div class="act" style="cursor:default">✦ MVP</div></div>
+            <div class="insight"><div class="ic ic-cielo"><i data-lucide="landmark"></i></div><div class="tx"><b>Banco — echeqs</b><p>Emisión y conciliación automática vía API bancaria (BIND ya la ofrece). Mientras tanto: carga manual.</p></div><div class="act" style="cursor:default;background:var(--inset);color:var(--muted)">Fase 2</div></div>
+            <div class="insight"><div class="ic ic-rojo"><i data-lucide="shield-check"></i></div><div class="tx"><b>SENASA / SIGSA</b><p>DTe y actas de vacunación oficiales. Sin API pública — se entra por autogestión o leyendo el acta con IA.</p></div><div class="act" style="cursor:default;background:var(--inset);color:var(--muted)">Fase 2</div></div>
+          </div>
+        </section>
+
+        <section class="row a">
           <div class="panel"><div class="ph"><h3>Rentabilidad por potrero</h3><div class="vtoggle"><button class="on">Potrero</button><button>Campo</button></div></div>
             <div class="rentbar">
               <div class="rb"><span class="rn">Don Gilberto</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="rv">+9,1M</span></div>
@@ -977,7 +1017,7 @@
       </div>
       <!-- ============ RECORRIDA (MODO CAMPO) ============ -->
       <div class="page" id="page-recorrida">
-        <div class="pagehead"><div><h1>Modo Campo</h1><div class="sub">Recorrida, Clima y Manga — así se trabaja desde el celular. Probalo: es interactivo.</div></div><button class="btn" onclick="recReset()">↺ Reiniciar demo</button></div>
+        <div class="pagehead"><div><h1>Modo Campo</h1><div class="sub">Recorrida, Clima y Manga — así se trabaja desde el celular. Probalo: es interactivo.</div></div><button class="btn" onclick="recReset()"><i data-lucide="rotate-ccw" class="gi" style="vertical-align:-2px;margin-right:4px"></i>Reiniciar demo</button></div>
         <div class="campo-layout">
           <div class="phone"><div class="pscreen" id="pscreen"></div></div>
           <div class="campo-notes">
@@ -1091,7 +1131,7 @@
 
   /* ---- Hacienda ---- */
   const CAT={vaca:{l:'Vaca',c:'var(--verde)'},vaquillona:{l:'Vaquillona',c:'var(--cielo)'},novillo:{l:'Novillo',c:'var(--tierra)'},ternero:{l:'Ternero',c:'var(--sol)'},ternera:{l:'Ternera',c:'var(--sol)'},toro:{l:'Toro',c:'#9aa48c'},capon:{l:'Capón',c:'#9aa48c'}};
-  const SIG={trat:{l:'retiro vigente',cls:'sig-trat',ic:'⚠'},pre:{l:'preñada',cls:'sig-pre',ic:'🐮'},vender:{l:'para vender',cls:'sig-vender',ic:'🏷️'},destete:{l:'destete',cls:'sig-destete',ic:'✂️'}};
+  const SIG={trat:{l:'retiro vigente',cls:'sig-trat',ic:'<i data-lucide="triangle-alert" class="gi"></i>'},pre:{l:'preñada',cls:'sig-pre',ic:'<i data-lucide="heart" class="gi"></i>'},vender:{l:'para vender',cls:'sig-vender',ic:'<i data-lucide="tag" class="gi"></i>'},destete:{l:'destete',cls:'sig-destete',ic:'<i data-lucide="scissors" class="gi"></i>'}};
   const animales=[
     {cv:'AR 138 001234567',cat:'vaca',sexo:'Hembra',pot:'La Loma',edad:'5 a',sig:['trat','pre']},
     {cv:'AR 138 001230088',cat:'vaca',sexo:'Hembra',pot:'La Loma',edad:'6 a',sig:['pre']},
@@ -1142,17 +1182,19 @@
     document.getElementById('drawer').innerHTML=`
       <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3 class="tnum" style="font-size:19px">${a.cv}</h3><div class="ds">${c.l} · ${a.sexo} · ${a.edad} · en ${a.pot}</div></div>
       <div class="db">
-        ${retiro?'<div class="ai-note" style="background:var(--rojo-soft);color:var(--rojo)">⚠ Retiro sanitario vigente — no vender hasta 12/06</div>':''}
+        ${retiro?'<div class="ai-note" style="background:var(--rojo-soft);color:var(--rojo)"><i data-lucide="triangle-alert" class="gi"></i> Retiro sanitario vigente — no vender hasta 12/06</div>':''}
         <div class="dsec"><h4>Identidad</h4><div class="dstate">${ident.map(([l,v])=>`<div class="it"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')}</div></div>
         ${claves.length?`<div class="dsec"><h4>Datos clave</h4><div class="dstate">${claves.map(([l,v])=>`<div class="it"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')}</div></div>`:''}
         <div class="dsec"><h4>Historial — no se borra nunca</h4><div class="tl">${evs.map(([d,t,col])=>`<div class="ev"><span class="ed">${d}</span><span class="dot" style="background:${col}"></span><span class="et">${t}</span></div>`).join('')}</div></div>
         <div class="dact"><button class="primary">+ Registrar evento</button><button class="ghost">Cambiar caravana</button></div>
       </div>`;
     openDrawerUI();
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
   function render(){const list=filtered();const el=document.getElementById('content');
     if(view==='tabla'){el.innerHTML=list.length?`<table class="tbl"><thead><tr><th>Caravana</th><th>Categoría</th><th>Sexo</th><th>Potrero</th><th>Edad</th><th>Señales</th><th></th></tr></thead><tbody>${list.map(rowHtml).join('')}</tbody></table>`:`<div class="empty">Sin animales con ese filtro.</div>`;}
     else{const pots=[...new Set(list.map(a=>a.pot))];el.innerHTML=pots.length?pots.map(p=>{const inp=list.filter(a=>a.pot===p);return `<div class="potblock"><div class="pothead"><span class="nm">${p}</span><span class="cnt">${inp.length} animales</span><span class="pstate ps-gan">● ${POT_STATE[p]||''}</span></div><table class="tbl"><tbody>${inp.map(rowHtml).join('')}</tbody></table></div>`;}).join(''):`<div class="empty">Sin animales con ese filtro.</div>`;}
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
   function setView(v){view=v;document.getElementById('t-tabla').classList.toggle('on',v==='tabla');document.getElementById('t-pot').classList.toggle('on',v==='potrero');render();}
   function setQ(nq){q=nq;document.querySelectorAll('.sigstat').forEach(c=>c.classList.toggle('on',c.dataset.q===nq));const sc=document.getElementById('sig-clear');if(sc)sc.textContent=nq==='todos'?'tocá para filtrar':'✕ quitar filtro';render();}
@@ -1171,7 +1213,7 @@
     if(p.e==='cosecha')return 'Cosechando';
     return 'Rastrojo';
   }
-  const PSIG={pasto:'⚠ pasto escaso',agua:'💧 agua baja',trat:'🩹 en tratam.'};
+  const PSIG={pasto:'<i data-lucide="triangle-alert" class="gi"></i> pasto escaso',agua:'<i data-lucide="droplet" class="gi"></i> agua baja',trat:'<i data-lucide="cross" class="gi"></i> en tratam.'};
   const CAMPOS={
     esperanza:{nombre:'La Esperanza',tenencia:'Propio',potreros:[
       {id:'la-loma',nm:'La Loma',e:'ganadero',ha:80,cab:128,agua:'Baja',pasto:'Escaso',elec:'OK',renspa:'01.234.5.67890',sig:['pasto','agua'],hist:[140,135,132,130,128]},
@@ -1249,7 +1291,7 @@
       const Lp=(p.rect.x/W*100).toFixed(2),Tp=(p.rect.y/H*100).toFixed(2),Wp=(p.rect.w/W*100).toFixed(2),Hp=(p.rect.h/H*100).toFixed(2);
       const big=p.rect.w>150 && p.rect.h>86;
       const med=p.rect.w>110 && p.rect.h>60;
-      const sigs=p.sig&&p.sig.length?` <span style="opacity:.85">${p.sig.map(s=>s==='pasto'?'⚠':s==='agua'?'💧':'🩹').join('')}</span>`:'';
+      const sigs=p.sig&&p.sig.length?` <span style="opacity:.9;display:inline-flex;gap:3px;vertical-align:-2px">${p.sig.map(s=>`<i data-lucide="${s==='pasto'?'triangle-alert':s==='agua'?'droplet':'cross'}" class="gi"></i>`).join('')}</span>`:'';
       const c=(p.cultivo||'');
       const tex=p.e==='cultivo'?(/ma[íi]z/i.test(c)?'tex-maiz':/soja/i.test(c)?'tex-soja':/trigo/i.test(c)?'tex-trigo':/girasol/i.test(c)?'tex-girasol':''):'';
       const everb=everbOf(p);
@@ -1294,6 +1336,7 @@
         <div class="dact">${p.cab?`<button class="primary" onclick="closeDrawer();nav('hacienda');setPotF('${p.nm}')">Ver los ${p.cab} animales</button><button class="ghost" onclick="moverDesde('${p.id}')">Mover hacienda</button>`:`<button class="primary" onclick="closeDrawer();nav('recorrida')">Registrar recorrida</button><button class="ghost" onclick="moverDesde('${p.id}')">Planificar</button>`}</div>
       </div>`;
     openDrawerUI();
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
     if(camposView==='satelital'&&_map) setTimeout(()=>{_map.invalidateSize();drawCampoPolys();},260);
   }
   function openDrawerUI(){document.getElementById('drawer').classList.add('open');document.querySelector('.scroll').classList.add('with-drawer');document.querySelector('.topbar').classList.add('with-drawer');}
@@ -1320,7 +1363,7 @@
     const all=[];
     pts.forEach(p=>{
       const col=MAPCOLOR[p.e]||'#6db84e';
-      const sig=p.sig&&p.sig.length?' '+p.sig.map(s=>s==='pasto'?'⚠':s==='agua'?'💧':'🩹').join(''):'';
+      const sig=p.sig&&p.sig.length?' '+p.sig.map(s=>`<i data-lucide="${s==='pasto'?'triangle-alert':s==='agua'?'droplet':'cross'}" class="gi" style="width:11px;height:11px"></i>`).join(' '):'';
       const poly=L.polygon(GEO[p.id],{color:'#ffffff',weight:2,fillColor:col,fillOpacity:.5}).addTo(_polys);
       poly.bindTooltip(`<b>${p.nm}</b><span>${everbOf(p)} · ${contStr(p)}${sig}</span>`,{permanent:true,direction:'center',className:'pottip',opacity:1});
       poly.on('click',()=>openPotrero(p.id));
@@ -1329,6 +1372,7 @@
       all.push(...GEO[p.id]);
     });
     _map.fitBounds(L.latLngBounds(all),{padding:[50,50],maxZoom:14});
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
   }
   function setCamposView(v){
     camposView=v;
@@ -1437,8 +1481,8 @@
 
   /* ===== EL INGENIERO — asistente IA (D3 Motor 2 + D13 "certero o nada") ===== */
   const INGQA={
-    'la-loma':{q:'¿Cómo viene La Loma?',a:`<b>La Loma viene cargada y con poco pasto.</b>128 cabezas en 80 ha (1,6 cab/ha). Pasto escaso y agua baja en las últimas 3 recorridas; el conteo bajó de 140 a 128 en 5 recorridas.<div class="why">Datos: recorridas del 02/05 al 06/06 · stock por caravana.</div><div class="acts"><span onclick="ingPlan()">⇄ Planificar movimiento</span><span onclick="closeDrawer();nav('campos')">Ver potrero</span></div>`},
-    'aliviar':{q:'¿Qué potrero conviene aliviar?',a:`<b>La Loma — y tenés a La Cañada lista.</b>Es el único potrero ganadero con pasto escaso y agua baja a la vez. La Cañada está vacía con pasto abundante y comparte RENSPA: movés sin guía.<div class="why">Porqué: 3 recorridas seguidas con pasto escaso + receptor disponible en el mismo RENSPA.</div><div class="acts"><span onclick="ingPlan()">⇄ Planificar movimiento</span></div>`},
+    'la-loma':{q:'¿Cómo viene La Loma?',a:`<b>La Loma viene cargada y con poco pasto.</b>128 cabezas en 80 ha (1,6 cab/ha). Pasto escaso y agua baja en las últimas 3 recorridas; el conteo bajó de 140 a 128 en 5 recorridas.<div class="why">Datos: recorridas del 02/05 al 06/06 · stock por caravana.</div><div class="acts"><span onclick="ingPlan()"><i data-lucide="arrow-right-left" class="gi"></i> Planificar movimiento</span><span onclick="closeDrawer();nav('campos')">Ver potrero</span></div>`},
+    'aliviar':{q:'¿Qué potrero conviene aliviar?',a:`<b>La Loma — y tenés a La Cañada lista.</b>Es el único potrero ganadero con pasto escaso y agua baja a la vez. La Cañada está vacía con pasto abundante y comparte RENSPA: movés sin guía.<div class="why">Porqué: 3 recorridas seguidas con pasto escaso + receptor disponible en el mismo RENSPA.</div><div class="acts"><span onclick="ingPlan()"><i data-lucide="arrow-right-left" class="gi"></i> Planificar movimiento</span></div>`},
     'arrendado':{q:'¿Cuánta plata hizo El Arrendado?',a:`<b>El Arrendado va −$1,2M este ciclo (devengado).</b>Es el segundo ciclo en pérdida: el alquiler ($2,1M) se come el resultado ganadero. En caja la pérdida es mayor por los pagos adelantados.<div class="why">Datos: movimientos cargados del ciclo · vista devengado vs caja.</div><div class="acts"><span onclick="closeDrawer();nav('analitica')">Ver Analítica</span></div>`},
     'lluvia':{q:'¿Cómo venimos de lluvia?',a:`<b>Mayo cerró seco: 38 mm, un 38% abajo del promedio.</b>Tercer mes consecutivo por debajo. Todavía no alcanza para una opinión de venta — falta cruzarlo con precio y temporada.<div class="why">Datos: pluviómetro cargado + Open-Meteo. Sin las otras patas (D13), no opino de vender.</div>`},
   };
@@ -1522,20 +1566,20 @@
     <div class="m-body">
       <div class="m-card"><h5>¿Qué hacés hoy?</h5><div class="mg-grid">${PRESETS.map(([k,ic,l])=>`<button class="${MG.preset===k?'on':''}" onclick="MG.preset='${k}';renderPhone()"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div></div>
       <div class="m-card"><h5>Lote</h5><div class="m-chips"><button class="on" onclick="mSel(this)">La Loma</button><button onclick="mSel(this)">Don Gilberto</button><button onclick="mSel(this)">El Monte</button></div></div>
-      <div class="m-cta"><button class="big" ${MG.preset?'':'disabled style="opacity:.45;cursor:not-allowed"'} onclick="mgStart()">▶ Iniciar sesión</button></div>
+      <div class="m-cta"><button class="big" ${MG.preset?'':'disabled style="opacity:.45;cursor:not-allowed"'} onclick="mgStart()"><i data-lucide="play" class="gi" style="margin-right:5px"></i>Iniciar sesión</button></div>
     </div>`;
   }
   function phoneManga(){
     const pl=PRESETS.find(x=>x[0]===MG.preset)||PRESETS[0];
     const last=MG.scans[0];
     return `
-    <div class="m-head" style="background:#7a5510">${mStatus()}<h2>${pl[2]}</h2><div class="mh-sub">La Loma · sesión activa <span class="m-off">⬤ OFFLINE</span></div></div>
+    <div class="m-head" style="background:#7a5510">${mStatus()}<h2>${pl[2]}</h2><div class="mh-sub">La Loma · sesión activa <span class="m-off">OFFLINE</span></div></div>
     <div class="m-body">
       <div class="m-card" style="text-align:center"><h5>Escaneados</h5><div class="tnum" style="font-family:'Archivo';font-size:56px;font-weight:700;line-height:1">${MG.scans.length}</div><div class="m-exp">cada escaneo del bastón aplica "${pl[2]}" solo</div></div>
       ${last?`<div class="m-card" style="background:var(--verde-soft);border-color:var(--verde)"><h5 style="color:var(--verde-deep)">Último escaneo</h5><div class="tnum" style="font-family:'Archivo';font-weight:700;font-size:17px">${last}</div><div style="font-size:12.5px;color:var(--verde-deep);font-weight:600;margin-top:3px">✓ ${pl[2]} registrada en su ficha</div></div>`:`<div class="m-card" style="text-align:center;color:var(--faint);font-size:13.5px;border-style:dashed">Esperando el primer escaneo del bastón…</div>`}
       ${MG.scans.length>1?`<div class="m-card"><h5>Anteriores</h5>${MG.scans.slice(1,5).map(s=>`<div class="tnum" style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--inset)">✓ ${s}</div>`).join('')}${MG.scans.length>5?`<div style="font-size:12px;color:var(--faint);padding-top:6px">+ ${MG.scans.length-5} más</div>`:''}</div>`:''}
       <button class="m-voice"><i data-lucide="mic"></i> Nota de este animal (voz)</button>
-      <div class="m-cta"><button class="alt" onclick="mgScan()">⚡ Simular escaneo del bastón</button><button class="big" style="background:var(--rojo);box-shadow:0 8px 20px rgba(191,59,43,.3)" onclick="mgEnd()">■ Terminar — ${MG.scans.length} animales</button></div>
+      <div class="m-cta"><button class="alt" onclick="mgScan()"><i data-lucide="zap" class="gi" style="margin-right:5px"></i>Simular escaneo del bastón</button><button class="big" style="background:var(--rojo);box-shadow:0 8px 20px rgba(191,59,43,.3)" onclick="mgEnd()"><i data-lucide="square" class="gi" style="margin-right:5px"></i>Terminar — ${MG.scans.length} animales</button></div>
     </div>`;
   }
   function mgStart(){if(!MG.preset)return;MG.active=true;MG.scans=[];renderPhone();}
@@ -1546,7 +1590,7 @@
   function phoneClima(){
     const days=[['HOY','sun',24,9,''],['JUE','cloud-sun',26,11,''],['VIE','cloud',22,10,''],['SÁB','cloud-rain',18,8,'12'],['DOM','cloud-drizzle',17,7,'4'],['LUN','sun',19,6,''],['MAR','sun',21,7,'']];
     return `
-    <div class="m-head" style="background:#2f6587">${mStatus()}<h2>Clima</h2><div class="mh-sub">Cnel. Suárez · Open-Meteo · actualizado 07:30 <span class="m-off">⬤ OFFLINE</span></div></div>
+    <div class="m-head" style="background:#2f6587">${mStatus()}<h2>Clima</h2><div class="mh-sub">Cnel. Suárez · Open-Meteo · actualizado 07:30 <span class="m-off">OFFLINE</span></div></div>
     <div class="m-body">
       <div class="m-card" style="display:flex;align-items:center;gap:16px"><i data-lucide="sun" style="width:46px;height:46px;color:var(--sol);flex:0 0 46px"></i><div><div class="tnum" style="font-family:'Archivo',sans-serif;font-size:42px;font-weight:700;line-height:1">24°</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">despejado · viento 12 km/h NO · humedad 48%</div></div></div>
       <div class="m-card" style="background:var(--verde-soft);border-color:var(--verde)"><h5 style="color:var(--verde-deep)">Pulverización</h5><div style="font-weight:700;font-size:15px;color:var(--verde-deep)">✓ Ventana OK hasta las 18:00</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">viento 12 km/h (límite 15) · sin lluvia en 24 h · humedad 48%</div></div>
@@ -1570,7 +1614,7 @@
       </div>`;
     };
     return `
-    <div class="m-head">${mStatus()}<h2>Recorrida</h2><div class="mh-sub">miércoles 10/06 · ¿en qué campo estás? <span class="m-off">⬤ OFFLINE</span></div></div>
+    <div class="m-head">${mStatus()}<h2>Recorrida</h2><div class="mh-sub">miércoles 10/06 · ¿en qué campo estás? <span class="m-off">OFFLINE</span></div></div>
     <div class="m-body">
       ${Object.keys(CAMPOS).map(card).join('')}
       <div class="m-exp" style="text-align:left;margin-top:2px">La recorrida va campo por campo: entrás, confirmás sus potreros y pasás al siguiente. La lluvia se pregunta en cada campo — puede llover en uno y no en otro.</div>
@@ -1582,7 +1626,7 @@
     const done=pots.filter(p=>REC.done[p.id]).length, total=pots.length;
     const llu=REC.lluvia[REC.campo], mm=REC.mm[REC.campo];
     return `
-    <div class="m-head">${mStatus()}<div class="m-back" style="color:#cfe3c2" onclick="REC.campo=null;REC.mmOtro=false;renderPhone()">← Campos</div><h2>${c.nombre}</h2><div class="mh-sub">miércoles 10/06 · ${c.tenencia.toLowerCase()} <span class="m-off">⬤ OFFLINE</span></div><div class="m-prog"><i style="width:${Math.round(done/total*100)}%"></i></div></div>
+    <div class="m-head">${mStatus()}<div class="m-back" style="color:#cfe3c2" onclick="REC.campo=null;REC.mmOtro=false;renderPhone()">← Campos</div><h2>${c.nombre}</h2><div class="mh-sub">miércoles 10/06 · ${c.tenencia.toLowerCase()} <span class="m-off">OFFLINE</span></div><div class="m-prog"><i style="width:${Math.round(done/total*100)}%"></i></div></div>
     <div class="m-body">
       <div class="m-card"><h5>¿Llovió desde la última vez?</h5><div class="m-llu">
         <button class="${llu==='no'?'on':''}" onclick="mLluvia('no')">No</button>
@@ -1637,6 +1681,24 @@
   function mOpen(id){REC.cur=id;renderPhone();}
   function mDone(){const p=ALLPOT.find(x=>x.id===REC.cur);REC.done[REC.cur]=true;REC.cur=null;REC.toast=`✓ ${p?p.nm:'Potrero'} confirmado`;renderPhone();}
 
+  /* ===== ANALÍTICA: cheques y plazos (calendario de plata) ===== */
+  function openPlazo(){
+    document.getElementById('drawer').innerHTML=`
+      <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3>Cargar cheque / plazo</h3><div class="ds">Para que el calendario de plata sea real</div></div>
+      <div class="db">
+        <div class="mf"><label>Tipo</label><select><option>Cobro — liquidación de consignataria</option><option>Cobro — echeq recibido</option><option>Pago — cheque emitido</option><option>Pago — cuenta corriente (proveedor)</option></select></div>
+        <div class="mf"><label>Contraparte</label><select><option>Bartomeu y Cía.</option><option>Veterinaria San Jorge</option><option>Banco Nación</option><option>Otro…</option></select></div>
+        <div class="mf"><label>Monto</label><input type="number" placeholder="$"></div>
+        <div class="mf"><label>Fecha de cobro / pago</label><input type="date" value="2026-07-10"></div>
+        <div class="ai-note">✦ Si reenviás el mail o PDF de la liquidación a tu casilla de Risso Agro, esto se carga solo — monto, comisión y plazo incluidos.</div>
+        <button class="btn" onclick="plazoOk()">Guardar</button>
+        <div id="plazo-msg"></div>
+      </div>`;
+    openDrawerUI();
+    if(window.lucide&&window.lucide.createIcons)window.lucide.createIcons();
+  }
+  function plazoOk(){const m=document.getElementById('plazo-msg');if(m)m.innerHTML='<div class="move-ok">✓ Guardado (demo). Entra en "Plata en camino" y en los avisos de vencimiento del Inicio.</div>';setTimeout(closeDrawer,1600);}
+
   /* ===== TICKER: precio del Gordo — carga manual con alerta de frescura (D14) =====
      Cañuelas (MAG) publica el precio pero sin API limpia: MVP = carga manual.
      El sistema guarda la fecha y avisa si el dato tiene más de 7 días (D13: nada viejo como actual). */
@@ -1666,7 +1728,7 @@
     document.getElementById('drawer').innerHTML=`
       <div class="dh"><button class="x" onclick="closeDrawer()">✕</button><h3>Precio del Gordo</h3><div class="ds">$ por kg de novillo — Cañuelas (MAG)</div></div>
       <div class="db">
-        ${d>7?`<div class="ai-note" style="border-color:rgba(224,162,53,.4)">⚠ El precio cargado tiene <b>${d} días</b>. Las varas en kg de novillo y las comparaciones lo usan — conviene refrescarlo.</div>`:''}
+        ${d>7?`<div class="ai-note" style="border-color:rgba(224,162,53,.4)"><i data-lucide="triangle-alert" class="gi"></i> El precio cargado tiene <b>${d} días</b>. Las varas en kg de novillo y las comparaciones lo usan — conviene refrescarlo.</div>`:''}
         <div class="dsec"><h4>Último cargado</h4><div style="font-size:15px"><b class="tnum">$${GORDO.precio.toLocaleString('es-AR')}</b> /kg · ${f} (hace ${d} días)</div></div>
         <a href="https://www.mercadoagroganadero.com.ar/" target="_blank" rel="noopener" class="rad" style="display:flex;justify-content:center;align-items:center;gap:8px;width:100%;text-decoration:none;margin-bottom:14px"><i data-lucide="external-link" style="width:15px;height:15px"></i> Ver el precio publicado — Cañuelas (MAG)</a>
         <div class="mf"><label>Precio de hoy ($/kg novillo)</label><input id="gordo-in" type="number" value="${GORDO.precio}" onkeydown="if(event.key==='Enter')gordoOk()"></div>

@@ -102,6 +102,12 @@ await page.waitForTimeout(700);
 await page.screenshot(shot('ficha-animal'));
 await page.evaluate(() => closeDrawer());
 
+// Analítica: drawer de cheque/plazo (calendario de plata)
+await page.evaluate(() => { setQ('todos'); nav('analitica'); openPlazo(); });
+await page.waitForTimeout(700);
+await page.screenshot(shot('analitica-plazo'));
+await page.evaluate(() => closeDrawer());
+
 // Analítica: drawer de carga de movimiento
 await page.evaluate(() => { setQ('todos'); nav('analitica'); openCarga(); });
 await page.waitForTimeout(800);
