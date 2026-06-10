@@ -233,6 +233,8 @@
   .sigstat .ic svg{width:18px;height:18px}
   .stat .v{font-family:'Archivo';font-size:30px;font-weight:700;margin-top:6px;line-height:1;letter-spacing:-0.02em}
   .stat .d{font-size:12px;margin-top:6px}
+  .minitrack{height:7px;border-radius:4px;background:var(--inset);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);margin-top:9px;overflow:hidden;max-width:160px}
+  .minitrack i{display:block;height:100%;background:linear-gradient(90deg,#6aa7c9,var(--cielo));border-radius:4px}
   @media(max-width:900px){.statbar{flex-wrap:wrap}.stat{flex:1 1 calc(50% - 5px)}}
   /* dashboard: paneles más calmos */
   #page-inicio .panel{box-shadow:0 4px 16px rgba(10,30,20,.05)}
@@ -265,15 +267,18 @@
   .sigstat.on{background:var(--verde-soft);border-color:var(--verde);box-shadow:0 4px 12px var(--verde-glow)}
   .sigstat .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 36px;box-shadow:0 2px 6px rgba(0,0,0,0.05)}
   .sigstat .v{font-family:'Archivo';font-size:22px;font-weight:700;line-height:1}.sigstat .l{font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
+  .sigstat .s2{font-size:11px;color:var(--faint);font-weight:500;margin-top:3px;line-height:1.3}
   .ic-trat{background:var(--rojo-soft);color:var(--rojo)}.ic-pre{background:var(--verde-soft);color:var(--verde-deep)}
   .ic-vender{background:var(--sol-soft);color:#a06f15}.ic-destete{background:var(--cielo-soft);color:var(--cielo)}
   
   .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .search{flex:1;min-width:260px;display:flex;align-items:center;gap:10px;background:var(--card);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);transition:border-color 0.2s}
+  .search{flex:1;min-width:190px;display:flex;align-items:center;gap:10px;background:var(--card);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);transition:border-color 0.2s}
   .search:focus-within{border-color:var(--verde);box-shadow:0 0 0 3px var(--verde-soft)}
   .search input{flex:1;border:none;background:none;outline:none;font-size:14.5px;font-family:inherit;color:var(--ink)}.search input::placeholder{color:var(--faint)}
   .select{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;box-shadow:var(--shadow);font-family:inherit;transition:all 0.2s}
   .select:hover{border-color:var(--faint)}
+  select.select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%234d574a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+  select.select:focus{outline:none;border-color:var(--verde);box-shadow:0 0 0 3px var(--verde-soft)}
   .pot-chip{display:inline-flex;align-items:center;gap:5px;background:var(--verde-soft);border:1px solid var(--verde);color:var(--verde-deep);border-radius:14px;padding:11px 16px;font-size:13.5px;font-weight:600;white-space:nowrap}
   .toggle{display:flex;background:var(--inset);border:1px solid var(--border);border-radius:14px;padding:4px;margin-left:auto}
   .toggle button{border:none;background:none;padding:8px 16px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;transition:all 0.2s}
@@ -489,6 +494,22 @@
   .rb .rv{flex:0 0 80px;text-align:right;font-family:'Archivo';font-weight:700;font-variant-numeric:tabular-nums;color:var(--verde-deep);font-size:15px}
   .rb.loss .rv{color:var(--rojo)}
   
+  /* compras vs ventas: comparativa que se lee en 2 segundos */
+  .cvv{display:flex;flex-direction:column;gap:18px;padding:8px 0 18px}
+  .cvv-row{display:flex;align-items:center;gap:14px}
+  .cvv-l{flex:0 0 64px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .cvv-n{font-size:26px;font-weight:700;flex:0 0 52px;text-align:right;letter-spacing:-0.02em}
+  .cvv-bar{flex:1;height:18px;border-radius:9px;background:var(--inset);overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.05)}
+  .cvv-bar i{display:block;height:100%;border-radius:9px}
+  /* resultado por mes: barras con valor arriba y mes abajo — el actual resaltado */
+  .mbar{display:flex;align-items:flex-end;gap:12px;height:150px;padding:6px 4px 14px}
+  .mb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;height:100%}
+  .mb i{width:70%;background:#b7d0bd;border-radius:5px 5px 0 0;display:block}
+  .mb b{font-family:'Archivo',sans-serif;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .mb small{font-size:11px;color:var(--faint);font-weight:700}
+  .mb.now i{background:linear-gradient(0deg,var(--verde-deep),var(--verde));box-shadow:0 -2px 8px var(--verde-glow)}
+  .mb.now b{color:var(--verde-deep);font-size:13.5px}
+  .mb.now small{color:var(--ink)}
   .expbtns{display:flex;gap:12px;margin-top:20px}
   .expbtns button{flex:1;background:var(--inset);border:1px solid rgba(0,0,0,0.05);border-radius:12px;padding:12px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit;transition:all 0.2s}
   .expbtns button:hover{background:var(--card);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.05)}
@@ -600,7 +621,7 @@
         <div class="statbar">
           <div class="stat"><div class="lab"><i data-lucide="beef" style="color:var(--verde)"></i>Stock total</div><div class="v tnum">545</div><div class="d up">▲ 18 partos este mes</div></div>
           <div class="stat"><div class="lab"><i data-lucide="wallet" style="color:var(--sol-deep)"></i>Rentabilidad</div><div class="v tnum up">+$18,4M</div><div class="d"><span style="color:var(--muted)">Esperanza <b style="color:var(--verde-deep)">+$19,6M</b> · Arrendado <b style="color:var(--rojo)">−$1,2M</b></span></div></div>
-          <div class="stat"><div class="lab"><i data-lucide="cloud-rain" style="color:var(--cielo)"></i>Lluvia (mayo)</div><div class="v tnum">38<span style="font-size:16px;color:var(--muted)">mm</span></div><div class="d down">▼ 38% vs promedio</div></div>
+          <div class="stat"><div class="lab"><i data-lucide="cloud-rain" style="color:var(--cielo)"></i>Lluvia (mayo)</div><div class="v tnum">38<span style="font-size:16px;color:var(--muted)">mm</span></div><div class="minitrack"><i style="width:62%"></i></div><div class="d down">▼ 38% — promedio: 61 mm</div></div>
           <div class="stat"><div class="lab"><i data-lucide="landmark" style="color:var(--tierra)"></i>Por pagar</div><div class="v tnum">$1,2M</div><div class="d" style="color:var(--sol-deep)">● 1 cheque en 2 días</div></div>
         </div>
 
@@ -692,10 +713,10 @@
           <div class="panel">
             <div class="ph"><h3>Señales</h3><span class="sub" id="sig-clear" style="cursor:pointer" onclick="setQ('todos')">tocá para filtrar</span></div>
             <div class="signals">
-              <div class="sigstat" data-q="trat" onclick="setQ(q==='trat'?'todos':'trat')"><div class="ic ic-trat"><i data-lucide="stethoscope"></i></div><div><div class="v tnum">5</div><div class="l">En tratamiento</div></div></div>
-              <div class="sigstat" data-q="pre" onclick="setQ(q==='pre'?'todos':'pre')"><div class="ic ic-pre"><i data-lucide="heart-pulse"></i></div><div><div class="v tnum">187</div><div class="l">Preñadas</div></div></div>
-              <div class="sigstat" data-q="vender" onclick="setQ(q==='vender'?'todos':'vender')"><div class="ic ic-vender"><i data-lucide="tag"></i></div><div><div class="v tnum">24</div><div class="l">Para vender</div></div></div>
-              <div class="sigstat" data-q="destete" onclick="setQ(q==='destete'?'todos':'destete')"><div class="ic ic-destete"><i data-lucide="scissors"></i></div><div><div class="v tnum">31</div><div class="l">Para destetar</div></div></div>
+              <div class="sigstat" data-q="trat" onclick="setQ(q==='trat'?'todos':'trat')"><div class="ic ic-trat"><i data-lucide="stethoscope"></i></div><div><div class="v tnum">5</div><div class="l">En tratamiento</div><div class="s2" style="color:var(--rojo)">1 retiro vence 12/06</div></div></div>
+              <div class="sigstat" data-q="pre" onclick="setQ(q==='pre'?'todos':'pre')"><div class="ic ic-pre"><i data-lucide="heart-pulse"></i></div><div><div class="v tnum">187</div><div class="l">Preñadas</div><div class="s2">~31 paren en 90 días</div></div></div>
+              <div class="sigstat" data-q="vender" onclick="setQ(q==='vender'?'todos':'vender')"><div class="ic ic-vender"><i data-lucide="tag"></i></div><div><div class="v tnum">24</div><div class="l">Para vender</div><div class="s2">novillos · ~425 kg prom.</div></div></div>
+              <div class="sigstat" data-q="destete" onclick="setQ(q==='destete'?'todos':'destete')"><div class="ic ic-destete"><i data-lucide="scissors"></i></div><div><div class="v tnum">31</div><div class="l">Para destetar</div><div class="s2">terneros de 6-7 meses</div></div></div>
             </div>
           </div>
         </section>
@@ -703,8 +724,8 @@
         <div class="toolbar">
           <div class="search"><i data-lucide="search" style="width:16px;height:16px;color:var(--faint)"></i><input id="q" placeholder="Buscar por caravana…" oninput="render()"></div>
           <div class="pot-chip" id="pot-chip" style="display:none"></div>
-          <select class="select" id="catF" onchange="render()" style="appearance:auto"><option value="todas">Categoría: todas</option><option value="vaca">Vacas</option><option value="vaquillona">Vaquillonas</option><option value="novillo">Novillos</option><option value="ternero">Terneros/as</option><option value="toro">Toros</option><option value="capon">Capones</option></select>
-          <div class="select">Estado: Activos ▾</div>
+          <select class="select" id="catF" onchange="render()"><option value="todas">Categoría: todas</option><option value="vaca">Vacas</option><option value="vaquillona">Vaquillonas</option><option value="novillo">Novillos</option><option value="ternero">Terneros/as</option><option value="toro">Toros</option><option value="capon">Capones</option></select>
+          <select class="select" id="estF" onchange="render()"><option value="act">Estado: activos</option><option value="arch">Archivados</option></select>
           <div class="toggle"><button id="t-tabla" class="on" onclick="setView('tabla')">Tabla</button><button id="t-pot" onclick="setView('potrero')">Por potrero</button></div>
         </div>
         <div class="panel" id="content"></div>
@@ -801,15 +822,23 @@
         </section>
 
         <section class="row b">
-          <div class="panel"><div class="ph"><h3>Compras vs ventas</h3><span class="sub">cabezas · año</span></div>
-            <div style="display:flex;flex-direction:column;gap:14px;padding-top:8px">
-              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Compras · 40</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:30%;height:100%;background:var(--sol)"></div></div></div>
-              <div><div style="font-size:12px;color:var(--muted);margin-bottom:5px">Ventas · 120</div><div style="height:14px;border-radius:7px;background:var(--inset);overflow:hidden"><div style="width:78%;height:100%;background:var(--verde)"></div></div></div>
-              <div style="font-size:12px;color:var(--faint);font-style:italic">Vendiste 3× lo que compraste — rodeo en reducción.</div>
+          <div class="panel" style="display:flex;flex-direction:column"><div class="ph"><h3>Compras vs ventas</h3><span class="sub">cabezas · 2026</span></div>
+            <div class="cvv">
+              <div class="cvv-row"><span class="cvv-l">Compré</span><b class="tnum cvv-n">40</b><div class="cvv-bar"><i style="width:33%;background:var(--sol)"></i></div></div>
+              <div class="cvv-row"><span class="cvv-l">Vendí</span><b class="tnum cvv-n">120</b><div class="cvv-bar"><i style="width:100%;background:var(--verde)"></i></div></div>
             </div>
+            <div class="ai-note" style="margin-top:auto">✦ Vendiste 3× lo que compraste — el rodeo se achicó <b>80 cabezas</b> este año.</div>
           </div>
-          <div class="panel"><div class="ph"><h3>Rentabilidad x mes</h3><span class="sub">pesos de hoy</span></div>
-            <svg width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--verde)" stop-opacity=".28"/><stop offset="1" stop-color="var(--verde)" stop-opacity="0"/></linearGradient></defs><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30 L300,120 L0,120 Z" fill="url(#g2)"/><path d="M0,90 L50,80 L100,95 L150,60 L200,68 L250,40 L300,30" fill="none" stroke="var(--verde)" stroke-width="2.5"/></svg>
+          <div class="panel" style="display:flex;flex-direction:column"><div class="ph"><h3>Resultado por mes</h3><span class="sub">millones · devengado</span></div>
+            <div class="mbar">
+              <div class="mb"><b>1,1</b><i style="height:26%"></i><small>E</small></div>
+              <div class="mb"><b>1,6</b><i style="height:42%"></i><small>F</small></div>
+              <div class="mb"><b>0,9</b><i style="height:22%"></i><small>M</small></div>
+              <div class="mb"><b>2,4</b><i style="height:62%"></i><small>A</small></div>
+              <div class="mb"><b>2,0</b><i style="height:52%"></i><small>M</small></div>
+              <div class="mb now"><b>3,1</b><i style="height:80%"></i><small>J</small></div>
+            </div>
+            <div class="ai-note" style="margin-top:auto">✦ Junio va <b>+$3,1M</b>, tu mejor mes del año — la venta de 18 novillos.</div>
           </div>
           <div class="panel"><div class="ph"><h3>Movimientos recientes</h3></div>
             <table class="tbl"><tbody>
@@ -881,7 +910,7 @@
   ];
   const POT_STATE={'La Loma':'Ganadero','Don Gilberto':'Ganadero','El Monte':'Ganadero'};
   let view='tabla', q='todos', potF=null;
-  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();const cf=(document.getElementById('catF')||{}).value||'todas';return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(potF&&a.pot!==potF)return false;if(cf!=='todas'&&!a.cat.startsWith(cf))return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
+  function filtered(){const txt=(document.getElementById('q').value||'').toLowerCase();const cf=(document.getElementById('catF')||{}).value||'todas';const ef=(document.getElementById('estF')||{}).value||'act';if(ef==='arch')return [];return animales.filter(a=>{if(q!=='todos'&&!a.sig.includes(q))return false;if(potF&&a.pot!==potF)return false;if(cf!=='todas'&&!a.cat.startsWith(cf))return false;if(txt&&!a.cv.toLowerCase().includes(txt))return false;return true;});}
   /* filtro por potrero: el puente mapa → animales ("qué animales tengo acá") */
   function setPotF(n){potF=n;const c=document.getElementById('pot-chip');if(c){if(n){c.style.display='inline-flex';c.innerHTML=`Potrero: <b>${n}</b> <span onclick="setPotF(null)" style="cursor:pointer;margin-left:4px">✕</span>`;}else{c.style.display='none';c.innerHTML='';}}render();}
   function sigsHtml(a){return `<div class="sigs">${a.sig.map(s=>`<span class="sig ${SIG[s].cls}">${SIG[s].ic} ${SIG[s].l}</span>`).join('')}</div>`;}
