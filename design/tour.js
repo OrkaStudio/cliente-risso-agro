@@ -58,6 +58,12 @@ await page.waitForTimeout(500);
 await page.screenshot(shot('manga-sesion'));
 await page.evaluate(() => { MG.active = false; MG.preset = null; PH.tab = 'rec'; renderPhone(); });
 
+// Teléfono: tab Clima (clima de bolsillo)
+await page.evaluate(() => { nav('recorrida'); PH.tab = 'clima'; renderPhone(); });
+await page.waitForTimeout(500);
+await page.screenshot(shot('phone-clima'));
+await page.evaluate(() => { PH.tab = 'rec'; renderPhone(); });
+
 // Clima: drawer de carga de lluvia
 await page.evaluate(() => { nav('clima'); openLluvia(); });
 await page.waitForTimeout(700);

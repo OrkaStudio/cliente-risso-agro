@@ -639,6 +639,16 @@
   .m-mmrow input::placeholder{color:var(--faint);font-weight:600;font-size:14px}
   .m-mmrow button{padding:13px 20px;border-radius:13px;border:none;background:var(--verde);color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:'Archivo',sans-serif}
   .m-mmrow button:active{transform:scale(.95)}
+  /* clima de bolsillo: tira de pronóstico scrolleable */
+  .mfc{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .mfc::-webkit-scrollbar{display:none}
+  .mfc .d{flex:0 0 62px;background:var(--inset);border:1px solid var(--border);border-radius:12px;padding:9px 4px;text-align:center}
+  .mfc .d.today{background:rgba(63,134,179,.12);border-color:var(--cielo)}
+  .mfc .d b{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block}
+  .mfc .d svg{width:19px;height:19px;margin:6px auto 4px;display:block}
+  .mfc .d .t{font-family:'Archivo',sans-serif;font-weight:700;font-size:14.5px}
+  .mfc .d small{color:var(--faint);font-size:10.5px;margin-left:2px}
+  .mfc .d .mm{display:block;font-size:10.5px;color:var(--cielo);font-weight:700;min-height:13px;margin-top:2px}
   /* toast de confirmación */
   .m-toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:var(--verde-deep);color:#fff;padding:11px 20px;border-radius:14px;font-weight:700;font-size:13.5px;box-shadow:0 8px 22px rgba(31,74,46,.4);z-index:5;white-space:nowrap;animation:fadeInUp .3s ease}
 
@@ -1485,6 +1495,7 @@
   function phoneTabs(){
     return `<div class="m-tabs">
       <button class="${PH.tab==='rec'?'on':''}" onclick="PH.tab='rec';renderPhone()"><i data-lucide="map-pin"></i>Recorrida</button>
+      <button class="${PH.tab==='clima'?'on':''}" onclick="PH.tab='clima';renderPhone()"><i data-lucide="cloud-sun"></i>Clima</button>
       <button class="${PH.tab==='manga'?'on':''}" onclick="PH.tab='manga';renderPhone()"><i data-lucide="scan-line"></i>Manga</button>
     </div>`;
   }
@@ -1492,6 +1503,7 @@
     const el=document.getElementById('pscreen'); if(!el)return;
     let html, fullscreen=false;
     if(PH.tab==='manga'){ html=MG.active?phoneManga():phoneMangaSetup(); fullscreen=MG.active; }
+    else if(PH.tab==='clima'){ html=phoneClima(); }
     else{ html=REC.cur?phoneParte():(REC.campo?phoneList():phoneCampos()); fullscreen=!!REC.cur; }
     el.innerHTML=html+(fullscreen?'':phoneTabs());
     if(REC.toast){
@@ -1528,6 +1540,23 @@
   function mgStart(){if(!MG.preset)return;MG.active=true;MG.scans=[];renderPhone();}
   function mgScan(){const pool=animales.map(a=>a.cv);MG.scans.unshift(pool[MG.scans.length%pool.length]);renderPhone();}
   function mgEnd(){const n=MG.scans.length;MG.active=false;MG.preset=null;REC.toast=`✓ Sesión guardada — ${n} animales`;renderPhone();}
+  /* --- Clima de bolsillo: lo que mirás antes de salir (D13: todo con su porqué) --- */
+  const CL={carga:false};
+  function phoneClima(){
+    const days=[['HOY','sun',24,9,''],['JUE','cloud-sun',26,11,''],['VIE','cloud',22,10,''],['SÁB','cloud-rain',18,8,'12'],['DOM','cloud-drizzle',17,7,'4'],['LUN','sun',19,6,''],['MAR','sun',21,7,'']];
+    return `
+    <div class="m-head" style="background:#2f6587">${mStatus()}<h2>Clima</h2><div class="mh-sub">Cnel. Suárez · Open-Meteo · actualizado 07:30 <span class="m-off">⬤ OFFLINE</span></div></div>
+    <div class="m-body">
+      <div class="m-card" style="display:flex;align-items:center;gap:16px"><i data-lucide="sun" style="width:46px;height:46px;color:var(--sol);flex:0 0 46px"></i><div><div class="tnum" style="font-family:'Archivo',sans-serif;font-size:42px;font-weight:700;line-height:1">24°</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">despejado · viento 12 km/h NO · humedad 48%</div></div></div>
+      <div class="m-card" style="background:var(--verde-soft);border-color:var(--verde)"><h5 style="color:var(--verde-deep)">Pulverización</h5><div style="font-weight:700;font-size:15px;color:var(--verde-deep)">✓ Ventana OK hasta las 18:00</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px">viento 12 km/h (límite 15) · sin lluvia en 24 h · humedad 48%</div></div>
+      <div class="m-card" style="background:var(--sol-soft);border-color:var(--sol)"><h5 style="color:var(--sol-deep)">Jueves: calor para la hacienda</h5><div style="font-size:13px;color:var(--muted)">ITH 78 previsto — revisá agua y sombra en los potreros cargados.</div></div>
+      <div class="m-card"><h5>Próximos 7 días</h5><div class="mfc">${days.map(([d,ic,t,mn,mm],i)=>`<div class="d ${i===0?'today':''}"><b>${d}</b><i data-lucide="${ic}"></i><span class="t tnum">${t}°</span><small>${mn}°</small><span class="mm">${mm?mm+'mm':''}</span></div>`).join('')}</div><div class="m-exp" style="text-align:left;margin-top:9px">Llueve el sábado — si vas a mover hacienda, hacelo antes del viernes.</div></div>
+      <div class="m-card"><h5>Lluvia de junio</h5><div style="display:flex;align-items:baseline;gap:8px"><span class="tnum" style="font-family:'Archivo',sans-serif;font-size:32px;font-weight:700">38<small style="font-size:15px;color:var(--muted)">mm</small></span><span style="font-size:12.5px;color:var(--rojo);font-weight:700">▼ 38% vs promedio (61 mm)</span></div>
+      ${CL.carga?`<div class="m-chips" style="margin-top:12px">${[5,10,20].map(v=>`<button onclick="clMM(${v})">${v} mm</button>`).join('')}<button onclick="clMM(0)">cancelar</button></div>`:`<button class="m-voice" style="margin-top:12px;border-color:var(--cielo);background:rgba(63,134,179,.1);color:#2f6587" onclick="CL.carga=true;renderPhone()"><i data-lucide="cloud-rain"></i> Cargar lluvia del pluviómetro</button>`}</div>
+    </div>`;
+  }
+  function clMM(v){CL.carga=false;if(v)REC.toast=`✓ ${v} mm cargados a junio`;renderPhone();}
+
   /* paso 1: ¿en qué campo estás? — la recorrida va campo por campo */
   function phoneCampos(){
     const card=(k)=>{
