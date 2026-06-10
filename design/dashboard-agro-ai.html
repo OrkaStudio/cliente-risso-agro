@@ -207,6 +207,13 @@
   @media(max-width:1100px){.kpis,.campos{grid-template-columns:repeat(2,1fr)}}
 
   .insight{display:flex;gap:16px;padding:16px;border-radius:16px;background:var(--inset);border:1px solid var(--border);margin-bottom:12px;transition:all 0.2s}
+  .insight:hover{transform:translateX(3px);border-color:#d9d0b8;box-shadow:0 3px 10px rgba(10,30,20,.05)}
+  /* línea diaria del Ingeniero — la empresa de un vistazo, arriba de todo */
+  .ai-strip{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:18px;background:linear-gradient(115deg,rgba(224,162,53,.12),rgba(58,122,78,.07) 60%);border:1px solid rgba(224,162,53,.3);margin-bottom:18px;font-size:13.5px;line-height:1.5}
+  .ai-strip .star{font-size:17px;color:var(--sol-deep);flex:0 0 auto}
+  .ai-strip b{color:var(--ink)}
+  .ai-strip .go{margin-left:auto;white-space:nowrap;font-weight:700;font-size:13px;color:var(--verde-deep);cursor:pointer;padding:8px 14px;border-radius:10px;background:var(--verde-soft);transition:background .2s}
+  .ai-strip .go:hover{background:#d0e3c8}
   .insight:hover{background:rgba(255,255,255,0.85);box-shadow:0 4px 12px rgba(0,0,0,0.03)}
   .insight:last-child{margin-bottom:0}
   .insight .ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 40px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
@@ -451,7 +458,7 @@
   .dhist .b.last i{background:linear-gradient(0deg, var(--verde-deep), var(--verde));box-shadow:0 -2px 8px var(--verde-glow)}
   .dhist .b small{font-size:11px;color:var(--muted);font-weight:600}
   .dhist .b.last small{color:var(--ink);font-weight:700;font-size:12px}
-  .ai-note{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--sol-deep);background:var(--sol-soft);border-radius:12px;padding:10px 14px;margin-top:10px;font-weight:500;line-height:1.5}
+  .ai-note{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--sol-deep);background:var(--sol-soft);border-left:3px solid var(--sol);border-radius:12px;padding:10px 14px;margin-top:10px;font-weight:500;line-height:1.5}
   /* ficha de animal: historial append-only (D15) */
   .tl{display:flex;flex-direction:column}
   .tl .ev{display:flex;gap:12px;position:relative;padding-bottom:16px}
@@ -469,9 +476,9 @@
   .dact .ghost:hover{background:var(--surface-hi);transform:translateY(-2px)}
   
   #campos-map{border-radius:24px;box-shadow:inset 0 2px 10px rgba(0,0,0,0.1)}
-  .pottip{background:rgba(24,44,30,.88)!important;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1)!important;color:#fff!important;font-family:'Archivo',sans-serif!important;padding:8px 14px!important;text-align:center!important;line-height:1.3!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important;border-radius:12px!important}
-  .pottip b{display:block;font-size:14px;font-weight:700;letter-spacing:0.02em}
-  .pottip span{display:block;font-size:11.5px;font-weight:500;opacity:.9;margin-top:2px}
+  .pottip{background:rgba(24,44,30,.88)!important;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1)!important;color:#fff!important;font-family:'Archivo',sans-serif!important;padding:5px 10px!important;text-align:center!important;line-height:1.25!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important;border-radius:10px!important}
+  .pottip b{display:block;font-size:12.5px;font-weight:700;letter-spacing:0.02em;white-space:nowrap}
+  .pottip span{display:block;font-size:10.5px;font-weight:500;opacity:.9;margin-top:1px;white-space:nowrap}
   .pottip::before{display:none!important}
   
   /* PLANIFICAR MOVIMIENTOS */
@@ -762,6 +769,7 @@
 
       <!-- ============ INICIO ============ -->
       <div class="page active" id="page-inicio">
+        <div class="ai-strip"><span class="star">✦</span><span><b>Hoy:</b> podés pulverizar hasta las 18:00 · La Loma sigue al límite — conviene mover esta semana · el cheque de $900k vence el viernes.</span><span class="go" onclick="openIngeniero()">Preguntale al Ingeniero →</span></div>
         <div class="statbar">
           <div class="stat"><div class="lab"><i data-lucide="beef" style="color:var(--verde)"></i>Stock total</div><div class="v tnum">545</div><div class="d up">▲ 18 partos este mes</div></div>
           <div class="stat"><div class="lab"><i data-lucide="wallet" style="color:var(--sol-deep)"></i>Rentabilidad</div><div class="v tnum up">+$18,4M</div><div class="d"><span style="color:var(--muted)">Esperanza <b style="color:var(--verde-deep)">+$19,6M</b> · Arrendado <b style="color:var(--rojo)">−$1,2M</b></span></div></div>
@@ -1365,7 +1373,7 @@
       const col=MAPCOLOR[p.e]||'#6db84e';
       const sig=p.sig&&p.sig.length?' '+p.sig.map(s=>`<i data-lucide="${s==='pasto'?'triangle-alert':s==='agua'?'droplet':'cross'}" class="gi" style="width:11px;height:11px"></i>`).join(' '):'';
       const poly=L.polygon(GEO[p.id],{color:'#ffffff',weight:2,fillColor:col,fillOpacity:.5}).addTo(_polys);
-      poly.bindTooltip(`<b>${p.nm}</b><span>${everbOf(p)} · ${contStr(p)}${sig}</span>`,{permanent:true,direction:'center',className:'pottip',opacity:1});
+      poly.bindTooltip(`<b>${p.nm}</b><span>${contStr(p)}${sig}</span>`,{permanent:true,direction:'center',className:'pottip',opacity:1});
       poly.on('click',()=>openPotrero(p.id));
       poly.on('mouseover',()=>poly.setStyle({fillOpacity:.72,weight:3}));
       poly.on('mouseout',()=>poly.setStyle({fillOpacity:.5,weight:2}));
