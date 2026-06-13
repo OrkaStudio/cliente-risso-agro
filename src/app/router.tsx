@@ -9,8 +9,10 @@ import { AppShell } from '@/app/app-shell'
 
 // Code-splitting por ruta: el código de cada sección se carga al entrar, no en
 // el bundle inicial (login). El AppShell envuelve el <Outlet> en <Suspense>.
-const HomePage = lazy(() =>
-  import('@/app/home-page').then((m) => ({ default: m.HomePage })),
+const InicioPage = lazy(() =>
+  import('@/features/inicio/inicio-page').then((m) => ({
+    default: m.InicioPage,
+  })),
 )
 const AnimalesPage = lazy(() =>
   import('@/features/hacienda/animales-page').then((m) => ({
@@ -52,7 +54,7 @@ export const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { index: true, element: <HomePage /> },
+          { index: true, element: <InicioPage /> },
           { path: 'hacienda', element: <AnimalesPage /> },
           { path: 'hacienda/nuevo', element: <AltaAnimalPage /> },
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },

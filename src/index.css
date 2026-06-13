@@ -3,10 +3,14 @@
 @import "shadcn/tailwind.css";
 
 /* ============================================================
-   Identidad Risso Agro — "Agro-Analytical Modernism" (Stitch)
-   Campo moderno, sobrio y robusto: verde campo + hueso + ámbar
-   (destaque/atención) + celeste (clima/info). Tipografía de
-   campo: Inter (cuerpo) + Archivo condensado (títulos/números).
+   Identidad Risso Agro — "Precisión agro-tech"
+   Porcelana fría + verde campo profundo + semánticos de campo
+   (sol/cielo/tierra) + lima como realce. Números en JetBrains
+   Mono (instrumento de precisión). Paleta de gráficos g1–g5
+   armonizada, separada de los colores de alerta.
+   Tipografía: Inter (cuerpo) + Archivo (títulos) + JetBrains
+   Mono (cifras), todas self-hosted (offline-first del vertical).
+   Guía visual: design/dashboard-agro-ai.html
    ============================================================ */
 
 /* Archivo SIN tabla DSIG (la original la trae y Chrome la rechaza). */
@@ -25,21 +29,45 @@
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./assets/fonts/JetBrainsMono-Variable.ttf") format("truetype-variations");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-    --font-heading: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+    --font-heading: 'Archivo', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-    /* Acentos de marca como utilidades (bg-amber, text-sky, …) */
+    /* Acentos de marca expuestos como utilidades (bg-field, text-sol, …) */
     --color-field: var(--field);
+    --color-field-deep: var(--field-deep);
     --color-field-soft: var(--field-soft);
-    --color-amber: var(--amber);
-    --color-amber-soft: var(--amber-soft);
+    --color-sol: var(--sol);
+    --color-sol-soft: var(--sol-soft);
+    --color-sol-deep: var(--sol-deep);
     --color-sky: var(--sky);
     --color-sky-soft: var(--sky-soft);
-    --color-terracotta: var(--terracotta);
+    --color-tierra: var(--tierra);
+    --color-tierra-soft: var(--tierra-soft);
+    --color-lima: var(--lima);
+    --color-lima-soft: var(--lima-soft);
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+    --color-faint: var(--faint);
+
+    /* Serie de datos para gráficos (tonos campo armonizados) */
+    --color-g1: var(--g1);
+    --color-g2: var(--g2);
+    --color-g3: var(--g3);
+    --color-g4: var(--g4);
+    --color-g5: var(--g5);
+    --color-g-mute: var(--g-mute);
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -72,58 +100,74 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.55);
-    --radius-md: calc(var(--radius) * 0.7);
+    --radius-sm: calc(var(--radius) * 0.5);
+    --radius-md: calc(var(--radius) * 0.72);
     --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.35);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-xl: calc(var(--radius) * 1.3);
+    --radius-2xl: calc(var(--radius) * 1.7);
+    --radius-3xl: calc(var(--radius) * 2.1);
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
     /* Acentos de marca */
-    --field: #2f5d3a;        /* verde campo (primary) */
-    --field-soft: #a1d4a8;   /* verde claro (tints) */
-    --amber: #fdba46;        /* destaque / atención */
-    --amber-soft: #ffdeae;
-    --sky: #025a7b;          /* clima / info */
-    --sky-soft: #90d0f6;
-    --terracotta: #b4541f;   /* alerta suave */
+    --field: #178a55;        /* verde campo (primary) */
+    --field-deep: #0b5837;   /* verde profundo (sidebar, énfasis) */
+    --field-soft: #e2f2e9;   /* tint */
+    --sol: #d98a18;          /* sol / atención cálida */
+    --sol-soft: #fbf1de;
+    --sol-deep: #9c620c;
+    --sky: #2779c4;          /* cielo / info / clima */
+    --sky-soft: #e7f1f9;
+    --tierra: #b85c2e;       /* tierra / terracota */
+    --tierra-soft: #f7e9e0;
+    --lima: #79ad28;         /* realce (brote) */
+    --lima-soft: #eff6de;
+    --ink: #131b16;          /* texto carbón verdoso */
+    --ink-soft: #4b5750;
+    --faint: #828e85;
 
-    /* Semánticos (shadcn) — Material 3 "Agro-Analytical Modernism" */
-    --background: #fbf9f1;          /* hueso */
-    --foreground: #1b1c17;          /* carbón cálido */
+    /* Serie de datos — paleta de gráficos armonizada (tonos campo) */
+    --g1: #3d8b66;           /* verde pradera */
+    --g2: #cda44b;           /* miel */
+    --g3: #5189a8;           /* agua / acero */
+    --g4: #b97950;           /* arcilla */
+    --g5: #8fa08f;           /* salvia */
+    --g-mute: #c6cfc3;       /* base apagada (contexto) */
+
+    /* Semánticos (shadcn) */
+    --background: #eef0eb;          /* porcelana fría */
+    --foreground: #131b16;
     --card: #ffffff;
-    --card-foreground: #1b1c17;
+    --card-foreground: #131b16;
     --popover: #ffffff;
-    --popover-foreground: #1b1c17;
-    --primary: #2f5d3a;             /* verde campo */
+    --popover-foreground: #131b16;
+    --primary: #178a55;             /* verde campo */
     --primary-foreground: #ffffff;
-    --secondary: #f0eee6;           /* surface-container */
-    --secondary-foreground: #1b1c17;
-    --muted: #f6f4ec;
-    --muted-foreground: #414941;    /* on-surface-variant */
-    --accent: #fdba46;              /* ámbar */
-    --accent-foreground: #704b00;
-    --destructive: #ba1a1a;
-    --border: #c1c9be;              /* outline-variant */
-    --input: #c1c9be;
-    --ring: #2f5d3a;
-    --chart-1: #2f5d3a;
-    --chart-2: #fdba46;
-    --chart-3: #025a7b;
-    --chart-4: #414941;
-    --chart-5: #ba1a1a;
-    --radius: 1rem;                 /* cards 16px; botones ≈ 11px */
-    --sidebar: #f6f4ec;
-    --sidebar-foreground: #1b1c17;
-    --sidebar-primary: #2f5d3a;
+    --secondary: #f2f4ef;           /* superficie hundida */
+    --secondary-foreground: #131b16;
+    --muted: #f2f4ef;
+    --muted-foreground: #4b5750;
+    --accent: #d98a18;              /* sol / atención */
+    --accent-foreground: #2a1c06;
+    --destructive: #cd3a2c;
+    --border: #e4e7e1;              /* hairline */
+    --input: #dadeD6;
+    --ring: #178a55;
+    --chart-1: #3d8b66;
+    --chart-2: #cda44b;
+    --chart-3: #5189a8;
+    --chart-4: #b97950;
+    --chart-5: #8fa08f;
+    --radius: 0.875rem;             /* cards ≈ 14px; botones/inputs ≈ 9–10px */
+    --sidebar: #182c1e;             /* verde profundo */
+    --sidebar-foreground: #f7f5ec;
+    --sidebar-primary: #178a55;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #f0eee6;
-    --sidebar-accent-foreground: #1b1c17;
-    --sidebar-border: #c1c9be;
-    --sidebar-ring: #2f5d3a;
+    --sidebar-accent: rgba(247, 245, 236, 0.07);
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: rgba(247, 245, 236, 0.10);
+    --sidebar-ring: #2fd58b;
 }
 
 @layer base {
@@ -132,16 +176,31 @@
   }
   html {
     @apply font-sans;
-    font-size: 17px; /* base de campo, legible */
+    font-size: 16px;
   }
   body {
     @apply bg-background text-foreground;
+    /* Grilla cartográfica fina sobre porcelana — atmósfera técnica, no ruido */
+    background-image:
+      linear-gradient(rgba(16, 24, 19, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16, 24, 19, 0.022) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
-  /* Títulos en Archivo condensado ("Narrow"), tracking ajustado */
+  /* Títulos en Archivo, levemente condensado */
   h1, h2, h3, h4, h5,
   [data-slot="card-title"] {
     font-family: var(--font-heading);
-    font-stretch: 78%;
-    letter-spacing: -0.01em;
+    font-stretch: 87%;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  /* Cifras: JetBrains Mono tabular, el sello "instrumento de precisión".
+     Usar en métricas, montos, caravanas, fechas. */
+  .tnum {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
   }
 }
