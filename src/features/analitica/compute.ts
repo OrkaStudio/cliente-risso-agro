@@ -43,6 +43,28 @@ export function porCampo(
     .sort((a, b) => b.monto - a.monto)
 }
 
+export type LineaMes = { mes: string; resultado: number }
+
+/** Resultado neto por mes (para el gráfico de barras). Usa la fecha que
+ *  corresponde al modo: devengo en 'devengado', cobro/pago en 'caja'. */
+export function resultadoPorMes(
+  movs: MovimientoConDetalle[],
+  modo: Modo,
+): LineaMes[] {
+  const map = new Map<string, number>()
+  for (const m of movs) {
+    if (!entra(m, modo)) continue
+    const fecha = modo === 'caja' ? m.fecha_cobro_pago : m.fecha_devengo
+    if (!fecha) continue
+    const mes = fecha.slice(0, 7) // YYYY-MM
+    const delta = m.tipo === 'ingreso' ? Number(m.monto) : -Number(m.monto)
+    map.set(mes, (map.get(mes) ?? 0) + delta)
+  }
+  return [...map.entries()]
+    .map(([mes, resultado]) => ({ mes, resultado }))
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+}
+
 /** Gastos agrupados por categoría (mayor a menor). */
 export function gastosPorCategoria(
   movs: MovimientoConDetalle[],

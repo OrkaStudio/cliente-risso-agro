@@ -7,6 +7,9 @@ export const useMovimientos = () =>
 export const useCategorias = () =>
   useQuery({ queryKey: ['categorias-mov'], queryFn: api.listCategorias })
 
+export const usePendientes = () =>
+  useQuery({ queryKey: ['pendientes'], queryFn: api.listPendientes })
+
 export function useCrearMovimiento() {
   const qc = useQueryClient()
   return useMutation({

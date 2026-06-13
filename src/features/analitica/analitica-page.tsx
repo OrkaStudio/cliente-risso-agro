@@ -1,219 +1,385 @@
 import { useMemo, useState } from 'react'
+import { Banknote, Receipt, TrendingUp } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { useMovimientos } from '@/features/analitica/hooks'
+import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
   formatARS,
   gastosPorCategoria,
   porCampo,
+  resultadoPorMes,
   resumen,
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 
-function Barra({ valor, max }: { valor: number; max: number }) {
-  const pct = max > 0 ? Math.round((Math.abs(valor) / max) * 100) : 0
-  return (
-    <div className="h-2 w-full rounded bg-muted">
-      <div
-        className={cn('h-2 rounded', valor < 0 ? 'bg-destructive' : 'bg-primary')}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
+const GSERIE = ['var(--g1)', 'var(--g2)', 'var(--g3)', 'var(--g4)', 'var(--g5)']
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function mesCorto(yyyymm: string): string {
+  const m = Number(yyyymm.slice(5, 7))
+  return MESES[m - 1] ?? yyyymm
+}
+
+function fmtCompact(n: number): string {
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '−' : ''
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
+  return `${sign}$${abs}`
 }
 
 export function AnaliticaPage() {
   const empresa = useEmpresa()
   const empresaId = empresa.data?.empresa_id ?? ''
   const movs = useMovimientos()
+  const pendientes = usePendientes()
   const [modo, setModo] = useState<Modo>('devengado')
 
   const data = useMemo(() => movs.data ?? [], [movs.data])
   const res = useMemo(() => resumen(data, modo), [data, modo])
   const campos = useMemo(() => porCampo(data, modo), [data, modo])
   const categorias = useMemo(() => gastosPorCategoria(data, modo), [data, modo])
+  const porMes = useMemo(() => resultadoPorMes(data, modo), [data, modo])
+
   const maxCampo = Math.max(1, ...campos.map((c) => Math.abs(c.monto)))
-  const maxCat = Math.max(1, ...categorias.map((c) => c.monto))
+  const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
+  const totalGastos = categorias.reduce((s, c) => s + c.monto, 0)
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Analítica</h1>
-        <div className="flex items-center gap-3">
-          <div className="flex rounded-md border p-0.5 text-sm">
-            {(['devengado', 'caja'] as Modo[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setModo(m)}
-                className={cn(
-                  'rounded px-3 py-1 capitalize',
-                  modo === m
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground',
-                )}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <CargarMovimientoDialog empresaId={empresaId} />
+    <div className="flex flex-col gap-6">
+      {/* Encabezado */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
+            Analítica
+          </h1>
+          <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
+            Cargá la plata, decidí con la data · Toda la empresa
+          </p>
         </div>
+        <CargarMovimientoDialog empresaId={empresaId} />
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {modo === 'devengado'
-          ? 'Devengado: la economía real, sin importar cuándo entró/salió la plata.'
-          : 'Caja: solo lo que ya se cobró o pagó de verdad.'}
-      </p>
+      {/* Toggle devengado/caja */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex rounded-[10px] border border-border bg-secondary p-0.5">
+          {(['devengado', 'caja'] as Modo[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setModo(m)}
+              className={cn(
+                'rounded-[7px] px-4 py-2 text-[13.5px] font-semibold capitalize transition-colors',
+                modo === m
+                  ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.08)]'
+                  : 'text-muted-foreground hover:text-ink',
+              )}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-faint">
+          {modo === 'devengado'
+            ? 'Devengado: la economía real, sin importar cuándo entró/salió la plata.'
+            : 'Caja: solo lo que ya se cobró o pagó de verdad.'}
+        </span>
+      </div>
 
       {movs.isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : movs.error ? (
+        <p className="text-sm text-destructive">
+          Error al cargar: {(movs.error as Error).message}
+        </p>
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Card>
-              <CardContent className="py-4">
-                <div className="text-xs text-muted-foreground">Ingresos</div>
-                <div className="text-2xl font-semibold">
-                  {formatARS(res.ingresos)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="py-4">
-                <div className="text-xs text-muted-foreground">Gastos</div>
-                <div className="text-2xl font-semibold">
-                  {formatARS(res.gastos)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="py-4">
-                <div className="text-xs text-muted-foreground">Resultado</div>
-                <div
-                  className={cn(
-                    'text-2xl font-semibold',
-                    res.resultado < 0 && 'text-destructive',
-                  )}
-                >
-                  {formatARS(res.resultado)}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">
+            <KpiCell label="Ingresos" icon={Banknote} color="var(--field)" value={formatARS(res.ingresos)} />
+            <KpiCell label="Gastos" icon={Receipt} color="var(--tierra)" value={formatARS(res.gastos)} />
+            <KpiCell
+              label="Resultado"
+              icon={TrendingUp}
+              color="var(--sol-deep)"
+              value={formatARS(res.resultado)}
+              valueColor={res.resultado < 0 ? 'var(--destructive)' : 'var(--field-deep)'}
+            />
           </div>
 
-          {/* Resultado por campo */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Resultado por campo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {campos.length > 0 ? (
-                <div className="space-y-3">
-                  {campos.map((c) => (
-                    <div key={c.nombre} className="grid gap-1">
-                      <div className="flex justify-between text-sm">
-                        <span>{c.nombre}</span>
+          {/* Resultado por mes + Plata en camino */}
+          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <Panel title="Resultado por mes" sub={modo === 'caja' ? 'caja' : 'devengado'}>
+              {porMes.length === 0 ? (
+                <Vacio>Sin movimientos para graficar.</Vacio>
+              ) : (
+                <div
+                  className="flex h-40 items-end gap-2 px-1 pb-3 pt-1"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(rgba(16,24,19,0.05) 1px, transparent 1px)',
+                    backgroundSize: '100% 25%',
+                  }}
+                >
+                  {porMes.map((m, i) => {
+                    const last = i === porMes.length - 1
+                    return (
+                      <div
+                        key={m.mes}
+                        className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
+                      >
                         <span
                           className={cn(
-                            'font-medium tabular-nums',
-                            c.monto < 0 && 'text-destructive',
+                            'tnum text-[11px]',
+                            last ? 'font-bold text-field-deep' : 'text-muted-foreground',
                           )}
                         >
-                          {formatARS(c.monto)}
+                          {fmtCompact(m.resultado)}
+                        </span>
+                        <div
+                          className="w-[55%] rounded-t-sm"
+                          style={{
+                            height: `${(Math.abs(m.resultado) / maxMes) * 100}%`,
+                            background:
+                              m.resultado < 0
+                                ? 'var(--destructive)'
+                                : last
+                                  ? 'var(--field-deep)'
+                                  : 'var(--g1)',
+                          }}
+                        />
+                        <span className="text-[11px] font-semibold text-faint">
+                          {mesCorto(m.mes)}
                         </span>
                       </div>
-                      <Barra valor={c.monto} max={maxCampo} />
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Sin datos.</p>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
 
-          {/* Gastos por categoría */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Gastos por categoría</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {categorias.length > 0 ? (
-                <div className="space-y-3">
-                  {categorias.map((c) => (
-                    <div key={c.nombre} className="grid gap-1">
-                      <div className="flex justify-between text-sm">
-                        <span>{c.nombre}</span>
-                        <span className="font-medium tabular-nums">
-                          {formatARS(c.monto)}
-                        </span>
-                      </div>
-                      <Barra valor={c.monto} max={maxCat} />
-                    </div>
-                  ))}
-                </div>
+            <Panel title="Plata en camino" sub="cobros y pagos">
+              {pendientes.isLoading ? (
+                <Vacio>Cargando…</Vacio>
+              ) : !pendientes.data || pendientes.data.length === 0 ? (
+                <Vacio>Sin cobros ni pagos pendientes.</Vacio>
               ) : (
-                <p className="text-sm text-muted-foreground">Sin gastos.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Movimientos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Movimientos{data.length ? ` (${data.length})` : ''}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="py-2 pr-4 font-medium">Fecha</th>
-                        <th className="py-2 pr-4 font-medium">Categoría</th>
-                        <th className="py-2 pr-4 font-medium">Campo</th>
-                        <th className="py-2 pr-4 font-medium">Estado</th>
-                        <th className="py-2 text-right font-medium">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((m) => (
-                        <tr key={m.id} className="border-b last:border-0">
-                          <td className="py-2 pr-4">{m.fecha_devengo}</td>
-                          <td className="py-2 pr-4">
-                            {m.categoria?.nombre ?? '—'}
-                          </td>
-                          <td className="py-2 pr-4">{m.campo?.nombre ?? '—'}</td>
-                          <td className="py-2 pr-4">{m.estado}</td>
-                          <td
+                <table className="w-full">
+                  <tbody>
+                    {pendientes.data.slice(0, 6).map((v) => (
+                      <tr key={v.id} className="border-b border-border/60 last:border-0">
+                        <td className="py-3 pr-3">
+                          <div className="text-sm font-semibold text-ink">
+                            {v.descripcion}
+                          </div>
+                          <div className="text-xs text-faint">
+                            {v.tipo === 'ingreso' ? 'Cobro' : 'Pago'}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-3 text-right">
+                          <span
                             className={cn(
-                              'py-2 text-right tabular-nums',
-                              m.tipo === 'gasto' && 'text-destructive',
+                              'tnum text-xs font-bold',
+                              v.diasParaVencer != null && v.diasParaVencer <= 3
+                                ? 'text-destructive'
+                                : 'text-muted-foreground',
                             )}
                           >
-                            {m.tipo === 'gasto' ? '−' : '+'}
-                            {formatARS(Number(m.monto))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Todavía no cargaste movimientos.
-                </p>
+                            {v.diasParaVencer != null
+                              ? v.diasParaVencer <= 0
+                                ? 'hoy'
+                                : `en ${v.diasParaVencer} d`
+                              : '—'}
+                          </span>
+                        </td>
+                        <td
+                          className={cn(
+                            'tnum py-3 text-right text-sm font-bold',
+                            v.tipo === 'ingreso' ? 'text-field-deep' : 'text-ink',
+                          )}
+                        >
+                          {v.tipo === 'ingreso' ? '+' : '−'}
+                          {v.monto != null ? fmtCompact(v.monto) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </div>
+
+          {/* Rentabilidad por campo + Gastos por categoría */}
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Panel title="Rentabilidad por campo">
+              {campos.length === 0 ? (
+                <Vacio>Sin datos.</Vacio>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  {campos.map((c) => (
+                    <div key={c.nombre} className="flex items-center gap-3.5 text-sm">
+                      <span className="w-28 shrink-0 truncate font-semibold text-ink">
+                        {c.nombre}
+                      </span>
+                      <div className="h-3.5 flex-1 overflow-hidden rounded bg-secondary">
+                        <div
+                          className="h-full rounded"
+                          style={{
+                            width: `${(Math.abs(c.monto) / maxCampo) * 100}%`,
+                            background: c.monto < 0 ? 'var(--destructive)' : 'var(--g1)',
+                          }}
+                        />
+                      </div>
+                      <span
+                        className={cn(
+                          'tnum w-20 shrink-0 text-right text-[13px] font-bold',
+                          c.monto < 0 ? 'text-destructive' : 'text-field-deep',
+                        )}
+                      >
+                        {fmtCompact(c.monto)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="Gastos por categoría">
+              {categorias.length === 0 ? (
+                <Vacio>Sin gastos.</Vacio>
+              ) : (
+                <>
+                  <div className="flex h-3 gap-0.5 overflow-hidden rounded-md">
+                    {categorias.map((c, i) => (
+                      <span
+                        key={c.nombre}
+                        className="h-full rounded-sm"
+                        style={{
+                          width: `${(c.monto / totalGastos) * 100}%`,
+                          background: GSERIE[i % GSERIE.length],
+                        }}
+                        title={`${c.nombre}: ${formatARS(c.monto)}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 gap-2.5 text-[13.5px] sm:grid-cols-2">
+                    {categorias.map((c, i) => (
+                      <div key={c.nombre} className="flex items-center gap-2.5">
+                        <span
+                          className="size-[11px] shrink-0 rounded-[3px]"
+                          style={{ background: GSERIE[i % GSERIE.length] }}
+                        />
+                        <span className="truncate text-ink">{c.nombre}</span>
+                        <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
+                          {fmtCompact(c.monto)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Panel>
+          </div>
+
+          {/* Movimientos recientes */}
+          <Panel
+            title="Movimientos"
+            sub={data.length ? `${data.length} en total` : undefined}
+          >
+            {data.length === 0 ? (
+              <Vacio>Todavía no cargaste movimientos.</Vacio>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      {['Fecha', 'Categoría', 'Campo', 'Estado', 'Monto'].map((h, i) => (
+                        <th
+                          key={h}
+                          className={cn(
+                            'px-4 py-3.5 text-xs font-semibold uppercase tracking-[0.05em] text-faint',
+                            i === 4 && 'text-right',
+                          )}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.slice(0, 12).map((m) => (
+                      <tr
+                        key={m.id}
+                        className="border-b border-border/60 last:border-0 hover:bg-secondary/50"
+                      >
+                        <td className="tnum px-4 py-3 text-sm text-muted-foreground">
+                          {m.fecha_devengo}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-ink">
+                          {m.categoria?.nombre ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                          {m.campo?.nombre ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
+                            {m.estado}
+                          </span>
+                        </td>
+                        <td
+                          className={cn(
+                            'tnum px-4 py-3 text-right text-sm font-bold',
+                            m.tipo === 'gasto' ? 'text-destructive' : 'text-field-deep',
+                          )}
+                        >
+                          {m.tipo === 'gasto' ? '−' : '+'}
+                          {formatARS(Number(m.monto))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
         </>
       )}
     </div>
+  )
+}
+
+function KpiCell({
+  label,
+  icon: Icon,
+  color,
+  value,
+  valueColor,
+}: {
+  label: string
+  icon: typeof Banknote
+  color: string
+  value: string
+  valueColor?: string
+}) {
+  return (
+    <div className="min-w-40 flex-1 px-[22px] py-[18px]">
+      <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+        <Icon className="size-4" style={{ color }} />
+        {label}
+      </div>
+      <div
+        className="tnum mt-2 text-[24px] font-bold leading-none"
+        style={{ color: valueColor ?? 'var(--ink)' }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function Vacio({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="py-8 text-center text-sm text-muted-foreground">{children}</p>
   )
 }
