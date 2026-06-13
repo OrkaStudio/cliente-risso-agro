@@ -1,22 +1,24 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
+import { ArrowDownLeft, ArrowUpRight, TriangleAlert } from 'lucide-react'
 import { Constants, type Database } from '@/lib/supabase/types'
 import { useCampos, usePotreros } from '@/features/campos/hooks'
 import { useCategorias, useCrearMovimiento } from '@/features/analitica/hooks'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+const fieldClass =
+  'w-full rounded-[10px] border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft placeholder:text-faint'
+const labelClass =
+  'mb-1.5 block text-[11px] font-bold uppercase tracking-[0.06em] text-faint'
 
 const medioPagoLabel: Record<
   Database['public']['Enums']['medio_pago'],
@@ -58,6 +60,11 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
     [categorias.data, tipo],
   )
 
+  function elegirTipo(t: TipoMov) {
+    setTipo(t)
+    setCategoriaId('')
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -77,8 +84,8 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
         monto: montoNum,
         fechaDevengo,
         fechaCobroPago: fechaCobroPago || null,
-        medioPago:
-          (medioPago || null) as Database['public']['Enums']['medio_pago'] | null,
+        medioPago: (medioPago ||
+          null) as Database['public']['Enums']['medio_pago'] | null,
         descripcion,
       })
       toast.success('Movimiento cargado')
@@ -92,52 +99,80 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
     }
   }
 
+  const esGasto = tipo === 'gasto'
+
   return (
     <>
-      <span onClick={() => setOpen(true)}>
-        <Button size="sm" disabled={!empresaId}>
-          + Cargar gasto/ingreso
-        </Button>
-      </span>
+      <Button onClick={() => setOpen(true)} disabled={!empresaId}>
+        + Cargar gasto/ingreso
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[540px]">
           <DialogHeader>
-            <DialogTitle>Cargar gasto / ingreso</DialogTitle>
+            <DialogTitle className="font-heading text-xl">
+              Cargar movimiento
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={onSubmit} className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="mv-tipo">Tipo</Label>
-                <select
-                  id="mv-tipo"
-                  className={selectClass}
-                  value={tipo}
-                  onChange={(e) => {
-                    setTipo(e.target.value as TipoMov)
-                    setCategoriaId('')
-                  }}
-                >
-                  <option value="gasto">Gasto</option>
-                  <option value="ingreso">Ingreso</option>
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="mv-monto">Monto (ARS)</Label>
-                <Input
+          <form onSubmit={onSubmit} className="grid gap-5">
+            {/* Tipo: toggle con color */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => elegirTipo('gasto')}
+                className={cn(
+                  'flex items-center justify-center gap-2 rounded-[11px] border-[1.5px] px-4 py-3 text-sm font-bold transition-colors',
+                  esGasto
+                    ? 'border-tierra bg-tierra-soft text-tierra'
+                    : 'border-border bg-card text-muted-foreground hover:border-faint',
+                )}
+              >
+                <ArrowUpRight className="size-[18px]" />
+                Gasto
+              </button>
+              <button
+                type="button"
+                onClick={() => elegirTipo('ingreso')}
+                className={cn(
+                  'flex items-center justify-center gap-2 rounded-[11px] border-[1.5px] px-4 py-3 text-sm font-bold transition-colors',
+                  !esGasto
+                    ? 'border-primary bg-field-soft text-field-deep'
+                    : 'border-border bg-card text-muted-foreground hover:border-faint',
+                )}
+              >
+                <ArrowDownLeft className="size-[18px]" />
+                Ingreso
+              </button>
+            </div>
+
+            {/* Monto destacado */}
+            <div>
+              <label htmlFor="mv-monto" className={labelClass}>
+                Monto
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-heading text-lg font-bold text-faint">
+                  $
+                </span>
+                <input
                   id="mv-monto"
                   type="number"
                   inputMode="decimal"
+                  placeholder="0"
                   value={monto}
                   onChange={(e) => setMonto(e.target.value)}
+                  className={cn(fieldClass, 'tnum py-3 pl-8 text-lg font-bold')}
                 />
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="mv-categoria">Categoría</Label>
+            {/* Categoría */}
+            <div>
+              <label htmlFor="mv-categoria" className={labelClass}>
+                Categoría
+              </label>
               <select
                 id="mv-categoria"
-                className={selectClass}
+                className={fieldClass}
                 value={categoriaId}
                 onChange={(e) => setCategoriaId(e.target.value)}
               >
@@ -150,12 +185,15 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
               </select>
             </div>
 
+            {/* Campo + Potrero */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="mv-campo">Campo</Label>
+              <div>
+                <label htmlFor="mv-campo" className={labelClass}>
+                  Campo
+                </label>
                 <select
                   id="mv-campo"
-                  className={selectClass}
+                  className={fieldClass}
                   value={campoId}
                   onChange={(e) => {
                     setCampoId(e.target.value)
@@ -170,11 +208,13 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                   ))}
                 </select>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="mv-potrero">Potrero (opcional)</Label>
+              <div>
+                <label htmlFor="mv-potrero" className={labelClass}>
+                  Potrero <span className="font-medium normal-case">(opcional)</span>
+                </label>
                 <select
                   id="mv-potrero"
-                  className={selectClass}
+                  className={cn(fieldClass, 'disabled:opacity-50')}
                   value={potreroId}
                   onChange={(e) => setPotreroId(e.target.value)}
                   disabled={!campoId}
@@ -189,33 +229,45 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
               </div>
             </div>
 
+            {/* Fechas */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="mv-devengo">Fecha (cuándo ocurrió)</Label>
-                <Input
+              <div>
+                <label htmlFor="mv-devengo" className={labelClass}>
+                  Cuándo ocurrió
+                </label>
+                <input
                   id="mv-devengo"
                   type="date"
                   value={fechaDevengo}
                   onChange={(e) => setFechaDevengo(e.target.value)}
+                  className={cn(fieldClass, '[color-scheme:light]')}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="mv-cobro">Cobrado/pagado (opcional)</Label>
-                <Input
+              <div>
+                <label htmlFor="mv-cobro" className={labelClass}>
+                  {esGasto ? 'Pagado' : 'Cobrado'}{' '}
+                  <span className="font-medium normal-case">(opcional)</span>
+                </label>
+                <input
                   id="mv-cobro"
                   type="date"
                   value={fechaCobroPago}
                   onChange={(e) => setFechaCobroPago(e.target.value)}
+                  className={cn(fieldClass, '[color-scheme:light]')}
                 />
               </div>
             </div>
 
+            {/* Medio + descripción */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="mv-medio">Medio de pago (opcional)</Label>
+              <div>
+                <label htmlFor="mv-medio" className={labelClass}>
+                  Medio de pago{' '}
+                  <span className="font-medium normal-case">(opcional)</span>
+                </label>
                 <select
                   id="mv-medio"
-                  className={selectClass}
+                  className={fieldClass}
                   value={medioPago}
                   onChange={(e) => setMedioPago(e.target.value)}
                 >
@@ -227,22 +279,33 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                   ))}
                 </select>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="mv-desc">Descripción (opcional)</Label>
-                <Input
+              <div>
+                <label htmlFor="mv-desc" className={labelClass}>
+                  Descripción{' '}
+                  <span className="font-medium normal-case">(opcional)</span>
+                </label>
+                <input
                   id="mv-desc"
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Ej: antiparasitario"
+                  className={fieldClass}
                 />
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Si no cargás la fecha de cobro/pago, queda como pendiente.
+            <p className="flex items-start gap-2 rounded-[10px] bg-secondary px-3.5 py-2.5 text-xs text-muted-foreground">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-sol-deep" />
+              Si no cargás la fecha de {esGasto ? 'pago' : 'cobro'}, el
+              movimiento queda <b className="font-semibold">pendiente</b> (entra
+              en lo devengado, todavía no en caja).
             </p>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            {error && (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            )}
             <Button type="submit" disabled={crear.isPending || !empresaId}>
-              {crear.isPending ? 'Guardando…' : 'Cargar'}
+              {crear.isPending ? 'Guardando…' : 'Cargar movimiento'}
             </Button>
           </form>
         </DialogContent>
