@@ -121,6 +121,16 @@ export type Gordo = {
 }
 
 /**
+ * Fuente de referencia para el precio del gordo (carga manual). El
+ * Mercado Agroganadero de Cañuelas es el mercado de referencia del país.
+ * Cambiá esto si usás otra fuente (tu consignatario, ROSGAN, etc.).
+ */
+export const GORDO_FUENTE = {
+  nombre: 'Mercado de Cañuelas',
+  url: 'https://www.mercadoagroganadero.com.ar/',
+} as const
+
+/**
  * Último precio del gordo de la empresa. null si nunca se cargó.
  * El scope por empresa lo garantiza la RLS de cotizacion_gordo.
  */

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Beef } from 'lucide-react'
+import { Beef, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
+import { GORDO_FUENTE } from '@/features/cotizaciones/api'
 import { useCargarGordo, useGordoActual } from '@/features/cotizaciones/hooks'
 import { Button } from '@/components/ui/button'
 import {
@@ -116,6 +117,15 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
                   className="tnum w-full rounded-[10px] border border-border bg-card py-3 pl-8 pr-3.5 text-lg font-bold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft"
                 />
               </div>
+              <a
+                href={GORDO_FUENTE.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-field-deep hover:underline"
+              >
+                <ExternalLink className="size-3.5" />
+                Buscá el precio en {GORDO_FUENTE.nombre}
+              </a>
             </div>
             <div>
               <label htmlFor="g-fecha" className={labelClass}>
