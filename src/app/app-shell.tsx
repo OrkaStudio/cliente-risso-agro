@@ -4,13 +4,40 @@ import {
   BarChart3,
   Beef,
   ChevronLeft,
+  CircleDollarSign,
   LayoutDashboard,
   Leaf,
   LogOut,
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
+import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { cn } from '@/lib/utils'
+
+/** Ticker de cotizaciones reales. Si la fuente falla, no muestra nada
+ *  (nunca un valor de muestra). El gordo (carga manual) y el clima se
+ *  suman acá cuando estén conectados. */
+function Ticker() {
+  const blue = useDolarBlue()
+  return (
+    <div className="ml-auto flex min-w-0 items-center gap-4 overflow-hidden text-sidebar-foreground">
+      {blue.data && (
+        <div
+          className="flex shrink-0 items-center gap-2"
+          title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
+        >
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
+            <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
+            Blue
+          </span>
+          <b className="tnum text-sm font-semibold text-white">
+            ${blue.data.venta.toLocaleString('es-AR')}
+          </b>
+        </div>
+      )}
+    </div>
+  )
+}
 
 /**
  * Layout del área autenticada (Modo Oficina, escritorio).
@@ -168,9 +195,7 @@ export function AppShell() {
             <span className="text-[10px] text-sidebar-foreground/55">▾</span>
           </button>
 
-          {/* Acá va el ticker (gordo / dólar / clima) cuando conectemos
-              las fuentes reales — Open-Meteo (clima), dolarapi (USD) y la
-              fuente del gordo a definir. Sin datos de muestra. */}
+          <Ticker />
         </header>
 
         {/* Sólo el contenido scrollea */}
