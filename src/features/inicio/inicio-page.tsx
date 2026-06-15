@@ -63,6 +63,7 @@ function Kpi({
   detail?: string
   detailColor?: string
 }) {
+  const vacio = value === '—'
   return (
     <div className="flex min-h-[96px] flex-1 flex-col justify-center px-[22px] py-[18px]">
       <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
@@ -70,7 +71,12 @@ function Kpi({
         {label}
       </div>
       <div className="mt-2 flex items-baseline gap-1">
-        <span className="tnum text-[26px] font-bold leading-none text-ink">
+        <span
+          className={cn(
+            'tnum text-[26px] font-bold leading-none',
+            vacio ? 'text-faint' : 'text-ink',
+          )}
+        >
           {value}
         </span>
         {unit && <span className="text-base text-muted-foreground">{unit}</span>}
@@ -97,9 +103,12 @@ function DonutStock({
 }) {
   if (total === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        Todavía no hay animales activos cargados.
-      </p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
+        <Beef className="size-7 text-faint" />
+        <p className="text-sm text-muted-foreground">
+          Todavía no hay animales activos cargados.
+        </p>
+      </div>
     )
   }
   // Segmentos con gap de 1 unidad (circunferencia ≈ 100). El offset de cada
@@ -116,8 +125,8 @@ function DonutStock({
     }
   })
   return (
-    <div className="flex items-center justify-center gap-6">
-      <svg width="150" height="150" viewBox="0 0 42 42" className="shrink-0">
+    <div className="flex flex-1 flex-wrap items-center justify-center gap-x-9 gap-y-5">
+      <svg width="158" height="158" viewBox="0 0 42 42" className="shrink-0">
         <circle
           cx="21"
           cy="21"
@@ -164,7 +173,7 @@ function DonutStock({
           CABEZAS
         </text>
       </svg>
-      <div className="flex flex-col gap-2.5 text-[13.5px]">
+      <div className="flex min-w-[168px] flex-col gap-2.5 text-[13.5px]">
         {data.map((c) => (
           <div key={c.categoria} className="flex items-center gap-2.5">
             <span
@@ -215,10 +224,17 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
         </span>
       </div>
       <div className="mt-4 flex items-baseline gap-1">
-        <span className="tnum text-[28px] font-bold leading-none text-ink">
+        <span
+          className={cn(
+            'tnum text-[28px] font-bold leading-none',
+            p.cabezas === 0 ? 'text-faint' : 'text-ink',
+          )}
+        >
           {p.cabezas}
         </span>
-        <span className="text-xs text-muted-foreground">cab</span>
+        <span className="text-xs text-muted-foreground">
+          {p.cabezas === 0 ? 'sin hacienda' : 'cab'}
+        </span>
       </div>
       <div className="mt-2 flex min-h-4 gap-3 text-xs font-medium text-muted-foreground">
         <span className="tnum">
@@ -313,16 +329,30 @@ export function InicioPage() {
       </div>
 
       {/* Stock por categoría + vencimientos */}
-      <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Panel title="Stock por categoría" sub={`${data.totalCabezas} cabezas`}>
+      <div className="grid items-stretch gap-5 lg:grid-cols-[1.4fr_1fr]">
+        <Panel
+          title="Stock por categoría"
+          sub={`${data.totalCabezas} cabezas`}
+          className="flex flex-col"
+        >
           <DonutStock data={data.porCategoria} total={data.totalCabezas} />
         </Panel>
 
-        <Panel title="Próximos vencimientos" sub="cobros y pagos">
+        <Panel
+          title="Próximos vencimientos"
+          sub="cobros y pagos"
+          className="flex flex-col"
+        >
           {proximos.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Sin vencimientos cargados.
-            </p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
+              <CalendarClock className="size-7 text-faint" />
+              <p className="text-sm text-muted-foreground">
+                Sin vencimientos próximos.
+              </p>
+              <p className="text-xs text-faint">
+                Los cobros y pagos pendientes aparecen acá.
+              </p>
+            </div>
           ) : (
             <table className="w-full">
               <tbody>
@@ -363,7 +393,7 @@ export function InicioPage() {
               </tbody>
             </table>
           )}
-          <div className="mt-3 text-[13px]">
+          <div className="mt-4 border-t border-border/60 pt-3 text-[13px]">
             <Link
               to="/analitica"
               className="font-semibold text-field-deep hover:underline"
