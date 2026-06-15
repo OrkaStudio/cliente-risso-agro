@@ -3,12 +3,13 @@ import {
   Beef,
   CalendarClock,
   LandPlot,
+  MapPin,
   TrendingUp,
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
-import { estadoCicloLabel } from '@/features/campos/labels'
+import { estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
 import { Panel } from '@/components/panel'
@@ -201,13 +202,8 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
   return (
     <div className="rounded-[11px] border border-border bg-secondary/60 p-4 transition-shadow hover:shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-heading text-base font-semibold text-ink">
-            {p.nombre}
-          </div>
-          <div className="mt-0.5 truncate text-xs text-faint">
-            {p.campoNombre}
-          </div>
+        <div className="min-w-0 font-heading text-base font-semibold text-ink">
+          {p.nombre}
         </div>
         <span
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[11px] font-bold"
@@ -250,6 +246,72 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
   )
 }
 
+/* ===== Grupo de un campo con sus potreros ===== */
+type CampoGrupo = {
+  id: string
+  nombre: string
+  tipo: Database['public']['Enums']['tipo_campo']
+  potreros: PotreroPanorama[]
+  cabezas: number
+  hectareas: number
+}
+
+function CampoGroup({ campo }: { campo: CampoGrupo }) {
+  return (
+    <div>
+      <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-border pb-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <MapPin className="size-[18px] shrink-0 text-field" />
+          <h4 className="truncate font-heading text-[17px] font-semibold text-ink">
+            {campo.nombre}
+          </h4>
+          <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+            {tipoCampoLabel[campo.tipo]}
+          </span>
+        </div>
+        <div className="tnum shrink-0 text-[13px] font-medium text-faint">
+          {campo.potreros.length}{' '}
+          {campo.potreros.length === 1 ? 'potrero' : 'potreros'} · {campo.cabezas}{' '}
+          cab{campo.hectareas > 0 ? ` · ${campo.hectareas} ha` : ''}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        {campo.potreros.map((p) => (
+          <PotreroCard key={p.id} p={p} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Agrupa los potreros por campo (jerarquía real: un campo tiene varios
+ *  potreros), ordena campos y potreros por hacienda descendente. */
+function agruparPorCampo(potreros: PotreroPanorama[]): CampoGrupo[] {
+  const porCampo = potreros.reduce((acc, p) => {
+    const g = acc.get(p.campoId) ?? {
+      id: p.campoId,
+      nombre: p.campoNombre,
+      tipo: p.campoTipo,
+      potreros: [] as PotreroPanorama[],
+      cabezas: 0,
+      hectareas: 0,
+    }
+    return acc.set(p.campoId, {
+      ...g,
+      potreros: [...g.potreros, p],
+      cabezas: g.cabezas + p.cabezas,
+      hectareas: g.hectareas + (p.hectareas ?? 0),
+    })
+  }, new Map<string, CampoGrupo>())
+
+  return [...porCampo.values()]
+    .map((c) => ({
+      ...c,
+      potreros: [...c.potreros].sort((a, b) => b.cabezas - a.cabezas),
+    }))
+    .sort((a, b) => b.cabezas - a.cabezas)
+}
+
 export function InicioPage() {
   const { data, isLoading, error } = usePanoramaInicio()
 
@@ -268,8 +330,7 @@ export function InicioPage() {
   const campos = new Set(data.potreros.map((p) => p.campoNombre)).size
   const superficie = data.potreros.reduce((s, p) => s + (p.hectareas ?? 0), 0)
   const proximos = data.vencimientos.slice(0, 5)
-  // Lo relevante primero: potreros con más hacienda arriba, vacíos al final.
-  const potrerosOrden = [...data.potreros].sort((a, b) => b.cabezas - a.cabezas)
+  const camposAgrupados = agruparPorCampo(data.potreros)
 
   return (
     <div className="flex flex-col gap-6">
@@ -404,9 +465,9 @@ export function InicioPage() {
         </Panel>
       </div>
 
-      {/* Estado de los campos */}
+      {/* Estado de los campos — agrupado por campo */}
       <Panel title="Estado de los campos" sub="tocá un potrero para entrar">
-        {data.potreros.length === 0 ? (
+        {camposAgrupados.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Todavía no hay potreros cargados.{' '}
             <Link to="/campos" className="font-semibold text-field-deep hover:underline">
@@ -414,9 +475,9 @@ export function InicioPage() {
             </Link>
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-            {potrerosOrden.map((p) => (
-              <PotreroCard key={p.id} p={p} />
+          <div className="flex flex-col gap-7">
+            {camposAgrupados.map((campo) => (
+              <CampoGroup key={campo.id} campo={campo} />
             ))}
           </div>
         )}

@@ -3,13 +3,16 @@ import type { Database } from '@/lib/supabase/types'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
+type TipoCampo = Database['public']['Enums']['tipo_campo']
 
 export type CategoriaConteo = { categoria: Categoria; cabezas: number }
 
 export type PotreroPanorama = {
   id: string
   nombre: string
+  campoId: string
   campoNombre: string
+  campoTipo: TipoCampo
   estadoCiclo: EstadoCiclo
   hectareas: number | null
   cabezas: number
@@ -54,7 +57,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       .eq('estado', 'activo'),
     supabase
       .from('potrero')
-      .select('id, nombre, estado_ciclo, hectareas, campo:campo(nombre)')
+      .select('id, nombre, estado_ciclo, hectareas, campo:campo(id, nombre, tipo)')
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
     supabase.from('v_flujo_caja').select('neto'),
@@ -84,14 +87,23 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
   const cab = new Map(
     (stock ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
   )
-  const potrerosPanorama: PotreroPanorama[] = (potreros ?? []).map((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    campoNombre: (p.campo as { nombre: string } | null)?.nombre ?? '—',
-    estadoCiclo: p.estado_ciclo,
-    hectareas: p.hectareas,
-    cabezas: cab.get(p.id) ?? 0,
-  }))
+  const potrerosPanorama: PotreroPanorama[] = (potreros ?? []).map((p) => {
+    const campo = p.campo as {
+      id: string
+      nombre: string
+      tipo: TipoCampo
+    } | null
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      campoId: campo?.id ?? '—',
+      campoNombre: campo?.nombre ?? '—',
+      campoTipo: campo?.tipo ?? 'propio',
+      estadoCiclo: p.estado_ciclo,
+      hectareas: p.hectareas,
+      cabezas: cab.get(p.id) ?? 0,
+    }
+  })
 
   // Plata
   const netoAnual = (flujo ?? []).reduce((s, f) => s + (f.neto ?? 0), 0)
