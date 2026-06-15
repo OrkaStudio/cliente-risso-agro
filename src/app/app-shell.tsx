@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react'
+import { Suspense, type ReactNode, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart3,
@@ -13,38 +13,58 @@ import {
 import { useAuth } from '@/features/auth/auth-context'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
-import { useDolarBlue } from '@/features/cotizaciones/hooks'
+import { useClima, useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { cn } from '@/lib/utils'
 
-/** Ticker de cotizaciones reales. Si una fuente falla, no muestra ese
- *  dato (nunca un valor de muestra). Gordo = carga manual; Blue = dolarapi.
- *  El clima se suma acá cuando esté conectado (Open-Meteo). */
+function fechaHoy(): string {
+  const s = new Date().toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+const TickerDivider = () => <span className="h-6 w-px bg-sidebar-border" />
+
+/** Strip de mercado: gordo (manual), dólar blue (dolarapi) y clima
+ *  (open-meteo). Si una fuente falla, no muestra ese dato (nunca un valor
+ *  de muestra). Los slots presentes se separan con un divisor. */
 function Ticker() {
   const blue = useDolarBlue()
+  const clima = useClima()
   const empresa = useEmpresa()
   const empresaId = empresa.data?.empresa_id ?? ''
+
+  const slots: ReactNode[] = [
+    empresaId ? <GordoSlot key="gordo" empresaId={empresaId} /> : null,
+    blue.data ? (
+      <div
+        key="blue"
+        className="flex shrink-0 items-center gap-2"
+        title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
+      >
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
+          <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
+          Blue
+        </span>
+        <b className="tnum text-sm font-semibold text-white">
+          ${blue.data.venta.toLocaleString('es-AR')}
+        </b>
+      </div>
+    ) : null,
+    clima.data ? <ClimaSlot key="clima" /> : null,
+  ].filter(Boolean)
+
   return (
-    <div className="ml-auto flex min-w-0 items-center gap-4 overflow-hidden text-sidebar-foreground">
-      {empresaId && <GordoSlot empresaId={empresaId} />}
-      {empresaId && blue.data && (
-        <span className="h-6 w-px bg-sidebar-border" />
-      )}
-      {blue.data && (
-        <div
-          className="flex shrink-0 items-center gap-2"
-          title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
-        >
-          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-            <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
-            Blue
-          </span>
-          <b className="tnum text-sm font-semibold text-white">
-            ${blue.data.venta.toLocaleString('es-AR')}
-          </b>
+    <div className="ml-auto flex min-w-0 items-center gap-3 overflow-hidden text-sidebar-foreground">
+      {slots.map((slot, i) => (
+        <div key={i} className="flex items-center gap-3">
+          {i > 0 && <TickerDivider />}
+          {slot}
         </div>
-      )}
-      <ClimaSlot />
+      ))}
     </div>
   )
 }
@@ -197,6 +217,9 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
         <header className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
+          <div className="hidden shrink-0 font-heading text-sm font-semibold text-white sm:block">
+            {fechaHoy()}
+          </div>
           <Ticker />
         </header>
 

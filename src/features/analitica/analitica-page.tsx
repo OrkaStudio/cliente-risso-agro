@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Banknote, Receipt, TrendingUp } from 'lucide-react'
+import { Banknote, ChevronDown, Receipt, TrendingUp } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCampos } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
@@ -81,13 +81,13 @@ export function AnaliticaPage() {
 
       {/* Toggle devengado/caja */}
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex rounded-[10px] border border-border bg-secondary p-0.5">
+        <div className="flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
           {(['devengado', 'caja'] as Modo[]).map((m) => (
             <button
               key={m}
               onClick={() => setModo(m)}
               className={cn(
-                'rounded-[7px] px-4 py-2 text-[13.5px] font-semibold capitalize transition-colors',
+                'rounded-[7px] px-4 text-[13.5px] font-semibold capitalize transition-colors',
                 modo === m
                   ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.08)]'
                   : 'text-muted-foreground hover:text-ink',
@@ -97,20 +97,23 @@ export function AnaliticaPage() {
             </button>
           ))}
         </div>
-        <select
-          className="rounded-[10px] border border-border bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none focus:border-primary focus:ring-2 focus:ring-field-soft"
-          value={campoF ?? 'empresa'}
-          onChange={(e) =>
-            setCampoF(e.target.value === 'empresa' ? null : e.target.value)
-          }
-        >
-          <option value="empresa">Toda la empresa</option>
-          {(camposLista.data ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+        <div className="relative shrink-0">
+          <select
+            className="h-10 cursor-pointer appearance-none rounded-[10px] border border-border bg-card pl-3.5 pr-9 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors hover:border-faint focus:border-primary focus:ring-2 focus:ring-field-soft"
+            value={campoF ?? 'empresa'}
+            onChange={(e) =>
+              setCampoF(e.target.value === 'empresa' ? null : e.target.value)
+            }
+          >
+            <option value="empresa">Toda la empresa</option>
+            {(camposLista.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
+        </div>
         <span className="text-xs text-faint">
           {modo === 'devengado'
             ? 'Devengado: la economía real, sin importar cuándo entró/salió la plata.'

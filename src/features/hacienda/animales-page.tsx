@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Search, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, Search, X } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useAnimales, usePotreros } from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
@@ -32,8 +32,29 @@ function edad(fechaNac: string | null): string {
   return `${Math.floor(meses / 12)} a`
 }
 
-const selectClass =
-  'rounded-[10px] border border-border bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none focus:border-primary focus:ring-2 focus:ring-field-soft'
+/* Select de filtro con estilo del sistema (sin la flecha nativa). */
+function FilterSelect({
+  value,
+  onChange,
+  children,
+}: {
+  value: string
+  onChange: (v: string) => void
+  children: ReactNode
+}) {
+  return (
+    <div className="relative shrink-0">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 cursor-pointer appearance-none rounded-[10px] border border-border bg-card pl-3.5 pr-9 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors hover:border-faint focus:border-primary focus:ring-2 focus:ring-field-soft"
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
+    </div>
+  )
+}
 
 export function AnimalesPage() {
   const animales = useAnimales()
@@ -163,19 +184,24 @@ export function AnimalesPage() {
       </Panel>
 
       {/* Toolbar de filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex min-w-48 flex-1 items-center gap-2.5 rounded-[10px] border border-border bg-card px-4 py-2.5 shadow-[0_1px_2px_rgba(16,24,19,0.05)] focus-within:border-primary focus-within:ring-2 focus-within:ring-field-soft">
-          <Search className="size-4 text-faint" />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex h-10 min-w-52 flex-1 items-center gap-2.5 rounded-[10px] border border-border bg-card px-3.5 shadow-[0_1px_2px_rgba(16,24,19,0.05)] focus-within:border-primary focus-within:ring-2 focus-within:ring-field-soft">
+          <Search className="size-4 shrink-0 text-faint" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por caravana…"
-            className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-faint"
+            className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-faint"
           />
+          {q && (
+            <button onClick={() => setQ('')} aria-label="Limpiar búsqueda">
+              <X className="size-4 text-faint transition-colors hover:text-ink" />
+            </button>
+          )}
         </div>
 
         {potF && (
-          <span className="inline-flex items-center gap-1.5 rounded-[10px] border border-primary bg-field-soft px-3.5 py-2.5 text-[13.5px] font-semibold text-field-deep">
+          <span className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-primary bg-field-soft px-3.5 text-[13.5px] font-semibold text-field-deep">
             Potrero: {potreroNombre.get(potF) ?? '—'}
             <button onClick={() => setPotF(null)} aria-label="Quitar filtro">
               <X className="size-3.5" />
@@ -183,11 +209,10 @@ export function AnimalesPage() {
           </span>
         )}
 
-        <select
-          className={selectClass}
+        <FilterSelect
           value={campoF ?? 'todos'}
-          onChange={(e) => {
-            setCampoF(e.target.value === 'todos' ? null : e.target.value)
+          onChange={(v) => {
+            setCampoF(v === 'todos' ? null : v)
             setPotF(null)
           }}
         >
@@ -197,12 +222,11 @@ export function AnimalesPage() {
               {c.nombre}
             </option>
           ))}
-        </select>
+        </FilterSelect>
 
-        <select
-          className={selectClass}
+        <FilterSelect
           value={catF}
-          onChange={(e) => setCatF(e.target.value as 'todas' | Categoria)}
+          onChange={(v) => setCatF(v as 'todas' | Categoria)}
         >
           <option value="todas">Categoría: todas</option>
           {CATEGORIAS.map((c) => (
@@ -210,25 +234,21 @@ export function AnimalesPage() {
               {categoriaLabel[c]}
             </option>
           ))}
-        </select>
+        </FilterSelect>
 
-        <select
-          className={selectClass}
-          value={estF}
-          onChange={(e) => setEstF(e.target.value as Estado)}
-        >
+        <FilterSelect value={estF} onChange={(v) => setEstF(v as Estado)}>
           <option value="activo">Estado: activos</option>
           <option value="vendido">Vendidos</option>
           <option value="muerto">Bajas</option>
-        </select>
+        </FilterSelect>
 
-        <div className="ml-auto flex rounded-[10px] border border-border bg-secondary p-0.5">
+        <div className="ml-auto flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
           {(['tabla', 'potrero'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
               className={cn(
-                'rounded-[7px] px-4 py-2 text-[13.5px] font-semibold transition-colors',
+                'rounded-[7px] px-4 text-[13.5px] font-semibold transition-colors',
                 view === v
                   ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.08)]'
                   : 'text-muted-foreground hover:text-ink',
