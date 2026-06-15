@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   cargarGordo,
+  getClima,
   getDolarBlue,
   getGordoActual,
 } from '@/features/cotizaciones/api'
@@ -16,6 +17,16 @@ export const useDolarBlue = () =>
     queryFn: getDolarBlue,
     staleTime: 30 * 60 * 1000,
     refetchInterval: 30 * 60 * 1000,
+    retry: 1,
+  })
+
+/** Clima del campo principal (Open-Meteo). Cambia lento → cache 15 min. */
+export const useClima = () =>
+  useQuery({
+    queryKey: ['clima'],
+    queryFn: getClima,
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
     retry: 1,
   })
 

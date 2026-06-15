@@ -39,6 +39,80 @@ export async function getDolarBlue(): Promise<Dolar> {
   }
 }
 
+/**
+ * Ubicación del campo principal para el clima. Provisional: la tabla
+ * `campo` todavía no guarda coordenadas; cuando las tenga, esto sale de la
+ * empresa/campo elegido. Por ahora, Las Flores (Buenos Aires).
+ */
+export const CAMPO_PRINCIPAL = {
+  nombre: 'Las Flores',
+  lat: -35.935128,
+  lon: -59.335386,
+} as const
+
+/** Descripción corta por código WMO (open-meteo). */
+const WMO: Record<number, string> = {
+  0: 'Despejado',
+  1: 'Mayormente despejado',
+  2: 'Parcialmente nublado',
+  3: 'Nublado',
+  45: 'Niebla',
+  48: 'Niebla con escarcha',
+  51: 'Llovizna leve',
+  53: 'Llovizna',
+  55: 'Llovizna intensa',
+  56: 'Llovizna helada',
+  57: 'Llovizna helada',
+  61: 'Lluvia leve',
+  63: 'Lluvia',
+  65: 'Lluvia intensa',
+  66: 'Lluvia helada',
+  67: 'Lluvia helada',
+  71: 'Nieve leve',
+  73: 'Nieve',
+  75: 'Nieve intensa',
+  77: 'Aguanieve',
+  80: 'Chaparrones',
+  81: 'Chaparrones',
+  82: 'Chaparrones fuertes',
+  85: 'Chaparrones de nieve',
+  86: 'Chaparrones de nieve',
+  95: 'Tormenta',
+  96: 'Tormenta con granizo',
+  99: 'Tormenta con granizo',
+}
+
+export type Clima = {
+  /** Temperatura actual en °C, redondeada. */
+  temp: number
+  /** Código WMO (define el ícono). */
+  code: number
+  descripcion: string
+  lugar: string
+}
+
+/**
+ * Clima actual del campo principal vía Open-Meteo (gratis, sin key).
+ */
+export async function getClima(): Promise<Clima> {
+  const { lat, lon, nombre } = CAMPO_PRINCIPAL
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,weather_code&timezone=America/Argentina/Buenos_Aires`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`open-meteo ${res.status}`)
+  const j = (await res.json()) as {
+    current: { temperature_2m: number; weather_code: number }
+  }
+  const code = j.current.weather_code
+  return {
+    temp: Math.round(j.current.temperature_2m),
+    code,
+    descripcion: WMO[code] ?? '—',
+    lugar: nombre,
+  }
+}
+
 export type Gordo = {
   /** $ por kg vivo. */
   valor: number

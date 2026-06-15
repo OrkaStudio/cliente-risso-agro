@@ -11,6 +11,7 @@ import {
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
+import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
@@ -43,6 +44,7 @@ function Ticker() {
           </b>
         </div>
       )}
+      <ClimaSlot />
     </div>
   )
 }
