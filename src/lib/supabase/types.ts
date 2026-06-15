@@ -206,6 +206,44 @@ export type Database = {
           },
         ]
       }
+      cotizacion_gordo: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          fecha: string
+          id: string
+          nota: string | null
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          fecha?: string
+          id?: string
+          nota?: string | null
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          fecha?: string
+          id?: string
+          nota?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_gordo_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa: {
         Row: {
           created_at: string

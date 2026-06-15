@@ -11,16 +11,24 @@ import {
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
+import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 import { cn } from '@/lib/utils'
 
-/** Ticker de cotizaciones reales. Si la fuente falla, no muestra nada
- *  (nunca un valor de muestra). El gordo (carga manual) y el clima se
- *  suman acá cuando estén conectados. */
+/** Ticker de cotizaciones reales. Si una fuente falla, no muestra ese
+ *  dato (nunca un valor de muestra). Gordo = carga manual; Blue = dolarapi.
+ *  El clima se suma acá cuando esté conectado (Open-Meteo). */
 function Ticker() {
   const blue = useDolarBlue()
+  const empresa = useEmpresa()
+  const empresaId = empresa.data?.empresa_id ?? ''
   return (
     <div className="ml-auto flex min-w-0 items-center gap-4 overflow-hidden text-sidebar-foreground">
+      {empresaId && <GordoSlot empresaId={empresaId} />}
+      {empresaId && blue.data && (
+        <span className="h-6 w-px bg-sidebar-border" />
+      )}
       {blue.data && (
         <div
           className="flex shrink-0 items-center gap-2"

@@ -1,5 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import { getDolarBlue } from '@/features/cotizaciones/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  cargarGordo,
+  getDolarBlue,
+  getGordoActual,
+} from '@/features/cotizaciones/api'
 
 /**
  * Dólar Blue. Cambia pocas veces al día → cacheo generoso y refetch
@@ -14,3 +18,20 @@ export const useDolarBlue = () =>
     refetchInterval: 30 * 60 * 1000,
     retry: 1,
   })
+
+/** Último precio del gordo (carga manual). enabled hasta tener empresa. */
+export const useGordoActual = (empresaId: string) =>
+  useQuery({
+    queryKey: ['gordo-actual', empresaId],
+    queryFn: getGordoActual,
+    enabled: Boolean(empresaId),
+    staleTime: 5 * 60 * 1000,
+  })
+
+export function useCargarGordo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: cargarGordo,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['gordo-actual'] }),
+  })
+}
