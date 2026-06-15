@@ -121,13 +121,15 @@ export type Gordo = {
 }
 
 /**
- * Fuente de referencia para el precio del gordo (carga manual). El
- * Mercado Agroganadero de Cañuelas es el mercado de referencia del país.
- * Cambiá esto si usás otra fuente (tu consignatario, ROSGAN, etc.).
+ * Fuente de referencia para el precio del gordo (carga manual). URL directa
+ * a la tabla diaria "Precios por Categoría" del Mercado Agroganadero de
+ * Cañuelas (el mercado de referencia del país): cae directo en el precio
+ * por categoría en $/kg. Cambiá esto si usás otra fuente (tu consignatario,
+ * ROSGAN, etc.).
  */
 export const GORDO_FUENTE = {
   nombre: 'Mercado de Cañuelas',
-  url: 'https://www.mercadoagroganadero.com.ar/',
+  url: 'https://www.mercadoagroganadero.com.ar/dll/hacienda1.dll/haciinfo000502',
 } as const
 
 /**
