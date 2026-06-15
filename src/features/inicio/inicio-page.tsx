@@ -9,24 +9,15 @@ import {
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
-import { estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
+import {
+  estadoCicloColor,
+  estadoCicloLabel,
+  tipoCampoLabel,
+} from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
-
-type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
-
-/* Estado del ciclo del potrero → color del badge (cartográfico apagado). */
-const CICLO_COLOR: Record<EstadoCiclo, string> = {
-  ganadero: 'var(--g1)',
-  descanso: 'var(--g2)',
-  preparacion: 'var(--tierra)',
-  siembra: 'var(--lima)',
-  cultivo: 'var(--g3)',
-  cosecha: 'var(--sol)',
-  rastrojo: 'var(--g5)',
-}
 
 function fmtCompact(n: number): string {
   const abs = Math.abs(n)
@@ -200,7 +191,10 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
   const densidad =
     p.hectareas && p.hectareas > 0 ? p.cabezas / p.hectareas : null
   return (
-    <div className="rounded-[11px] border border-border bg-secondary/60 p-4 transition-shadow hover:shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
+    <Link
+      to={`/potrero/${p.id}`}
+      className="block rounded-[11px] border border-border bg-secondary/60 p-4 transition-shadow hover:shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 font-heading text-base font-semibold text-ink">
           {p.nombre}
@@ -208,13 +202,13 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
         <span
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[11px] font-bold"
           style={{
-            color: CICLO_COLOR[p.estadoCiclo],
-            background: 'color-mix(in srgb, ' + CICLO_COLOR[p.estadoCiclo] + ' 14%, transparent)',
+            color: estadoCicloColor[p.estadoCiclo],
+            background: 'color-mix(in srgb, ' + estadoCicloColor[p.estadoCiclo] + ' 14%, transparent)',
           }}
         >
           <span
             className="size-1.5 rounded-full"
-            style={{ background: CICLO_COLOR[p.estadoCiclo] }}
+            style={{ background: estadoCicloColor[p.estadoCiclo] }}
           />
           {estadoCicloLabel[p.estadoCiclo]}
         </span>
@@ -242,7 +236,7 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
 

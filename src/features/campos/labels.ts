@@ -17,3 +17,14 @@ export const estadoCicloLabel: Record<EstadoCiclo, string> = {
   cosecha: 'Cosecha',
   rastrojo: 'Rastrojo',
 }
+
+/** Color del badge según el estado del ciclo (cartográfico apagado). */
+export const estadoCicloColor: Record<EstadoCiclo, string> = {
+  ganadero: 'var(--g1)',
+  descanso: 'var(--g2)',
+  preparacion: 'var(--tierra)',
+  siembra: 'var(--lima)',
+  cultivo: 'var(--g3)',
+  cosecha: 'var(--sol)',
+  rastrojo: 'var(--g5)',
+}
