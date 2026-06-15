@@ -4,14 +4,10 @@ import {
   BarChart3,
   Beef,
   ChevronLeft,
-  CircleDollarSign,
   LayoutDashboard,
   Leaf,
   LogOut,
   Map as MapIcon,
-  Sprout,
-  Sun,
-  TriangleAlert,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { cn } from '@/lib/utils'
@@ -126,28 +122,6 @@ export function AppShell() {
           ))}
         </nav>
 
-        {/* Widget "Hoy" — chrome del layout. Datos de muestra hasta
-            conectar clima (Open-Meteo) y alertas reales. */}
-        {!collapsed && (
-          <div className="mx-3 mb-2 flex flex-col gap-2.5 rounded-2xl border border-sidebar-border bg-white/[0.05] p-3.5">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-sidebar-foreground/45">
-              Hoy en el campo
-            </div>
-            <div className="flex items-center gap-2 text-[13px] font-medium text-sidebar-foreground">
-              <Sun className="size-[15px] shrink-0 text-[#e8b75c]" />
-              <b className="font-bold">24°</b> · sin lluvia prevista
-            </div>
-            <div className="flex items-center gap-2 text-[13px] font-medium text-sidebar-foreground">
-              <Sprout className="size-[15px] shrink-0 text-lima" />
-              Pulverización: <b className="font-bold">ventana OK</b>
-            </div>
-            <div className="flex items-center gap-2 text-[13px] font-medium text-[#e8b75c]">
-              <TriangleAlert className="size-[15px] shrink-0" />
-              <b className="font-bold">4</b> requieren atención
-            </div>
-          </div>
-        )}
-
         {/* Usuario */}
         <div
           className={cn(
@@ -194,35 +168,9 @@ export function AppShell() {
             <span className="text-[10px] text-sidebar-foreground/55">▾</span>
           </button>
 
-          {/* Ticker — se reduce en pantallas medianas. Datos de muestra
-              hasta conectar dólar/precio/clima. */}
-          <div className="ml-auto flex min-w-0 items-center gap-4 overflow-hidden text-sidebar-foreground">
-            <div className="hidden shrink-0 items-center gap-2 lg:flex">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-                <Beef className="size-[15px] text-[#d4b896]" />
-                Gordo
-              </span>
-              <b className="tnum text-sm font-semibold text-white">$4.373</b>
-              <span className="text-xs text-[#2fd58b]">▲ 1,2%</span>
-            </div>
-            <span className="hidden h-6 w-px bg-sidebar-border lg:block" />
-            <div className="hidden shrink-0 items-center gap-2 xl:flex">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-                <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
-                Blue
-              </span>
-              <b className="tnum text-sm font-semibold text-white">$1.180</b>
-              <span className="text-xs text-[#ef8d7b]">▼ 0,4%</span>
-            </div>
-            <span className="hidden h-6 w-px bg-sidebar-border xl:block" />
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-                <Sun className="size-[15px] text-[#e8b75c]" />
-                Clima
-              </span>
-              <b className="text-sm font-semibold text-white">24°</b>
-            </div>
-          </div>
+          {/* Acá va el ticker (gordo / dólar / clima) cuando conectemos
+              las fuentes reales — Open-Meteo (clima), dolarapi (USD) y la
+              fuente del gordo a definir. Sin datos de muestra. */}
         </header>
 
         {/* Sólo el contenido scrollea */}
