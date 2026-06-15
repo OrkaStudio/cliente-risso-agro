@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Banknote, Receipt, TrendingUp } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { useCampos } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
   formatARS,
@@ -35,9 +36,24 @@ export function AnaliticaPage() {
   const empresaId = empresa.data?.empresa_id ?? ''
   const movs = useMovimientos()
   const pendientes = usePendientes()
+  const camposLista = useCampos()
   const [modo, setModo] = useState<Modo>('devengado')
+  const [campoF, setCampoF] = useState<string | null>(null)
 
-  const data = useMemo(() => movs.data ?? [], [movs.data])
+  const nombreCampo =
+    (camposLista.data ?? []).find((c) => c.id === campoF)?.nombre ?? null
+
+  // Alcance del apartado: si hay un campo elegido, todo se acota a sus
+  // movimientos (y la "plata en camino" a sus pendientes).
+  const data = useMemo(() => {
+    const todos = movs.data ?? []
+    return campoF ? todos.filter((m) => m.campo_id === campoF) : todos
+  }, [movs.data, campoF])
+  const pendientesScope = useMemo(() => {
+    const todos = pendientes.data ?? []
+    return campoF ? todos.filter((v) => v.campoId === campoF) : todos
+  }, [pendientes.data, campoF])
+
   const res = useMemo(() => resumen(data, modo), [data, modo])
   const campos = useMemo(() => porCampo(data, modo), [data, modo])
   const categorias = useMemo(() => gastosPorCategoria(data, modo), [data, modo])
@@ -56,7 +72,8 @@ export function AnaliticaPage() {
             Analítica
           </h1>
           <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-            Cargá la plata, decidí con la data · Toda la empresa
+            Cargá la plata, decidí con la data ·{' '}
+            {nombreCampo ?? 'Toda la empresa'}
           </p>
         </div>
         <CargarMovimientoDialog empresaId={empresaId} />
@@ -80,6 +97,20 @@ export function AnaliticaPage() {
             </button>
           ))}
         </div>
+        <select
+          className="rounded-[10px] border border-border bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none focus:border-primary focus:ring-2 focus:ring-field-soft"
+          value={campoF ?? 'empresa'}
+          onChange={(e) =>
+            setCampoF(e.target.value === 'empresa' ? null : e.target.value)
+          }
+        >
+          <option value="empresa">Toda la empresa</option>
+          {(camposLista.data ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
         <span className="text-xs text-faint">
           {modo === 'devengado'
             ? 'Devengado: la economía real, sin importar cuándo entró/salió la plata.'
@@ -162,12 +193,12 @@ export function AnaliticaPage() {
             <Panel title="Plata en camino" sub="cobros y pagos">
               {pendientes.isLoading ? (
                 <Vacio>Cargando…</Vacio>
-              ) : !pendientes.data || pendientes.data.length === 0 ? (
+              ) : pendientesScope.length === 0 ? (
                 <Vacio>Sin cobros ni pagos pendientes.</Vacio>
               ) : (
                 <table className="w-full">
                   <tbody>
-                    {pendientes.data.slice(0, 6).map((v) => (
+                    {pendientesScope.slice(0, 6).map((v) => (
                       <tr key={v.id} className="border-b border-border/60 last:border-0">
                         <td className="py-3 pr-3">
                           <div className="text-sm font-semibold text-ink">

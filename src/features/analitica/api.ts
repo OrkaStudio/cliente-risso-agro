@@ -36,6 +36,7 @@ export async function listMovimientos(): Promise<MovimientoConDetalle[]> {
 
 export type Pendiente = {
   id: string
+  campoId: string | null
   descripcion: string
   tipo: TipoMov | null
   monto: number | null
@@ -47,11 +48,12 @@ export type Pendiente = {
 export async function listPendientes(): Promise<Pendiente[]> {
   const { data, error } = await supabase
     .from('v_pendientes')
-    .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
+    .select('id, campo_id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
     .order('dias_para_vencer', { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []).map((v) => ({
     id: v.id ?? crypto.randomUUID(),
+    campoId: v.campo_id,
     descripcion: v.descripcion ?? '—',
     tipo: v.tipo,
     monto: v.monto,
