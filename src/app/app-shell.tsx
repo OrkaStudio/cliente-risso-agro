@@ -197,14 +197,6 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
         <header className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
-          <button
-            type="button"
-            className="flex shrink-0 items-center gap-2 rounded-[14px] border border-white/[0.06] bg-white/[0.08] px-4 py-2 font-heading text-sm font-semibold text-white transition-colors hover:bg-white/[0.12]"
-          >
-            Toda la empresa
-            <span className="text-[10px] text-sidebar-foreground/55">▾</span>
-          </button>
-
           <Ticker />
         </header>
 

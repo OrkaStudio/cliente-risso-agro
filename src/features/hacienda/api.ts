@@ -40,7 +40,7 @@ export async function getEventos(animalId: string): Promise<Evento[]> {
 export async function listPotreros() {
   const { data, error } = await supabase
     .from('potrero')
-    .select('id, nombre')
+    .select('id, nombre, campo_id')
     .order('nombre')
   if (error) throw error
   return data

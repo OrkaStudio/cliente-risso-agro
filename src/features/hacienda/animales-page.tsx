@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Search, X } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useAnimales, usePotreros } from '@/features/hacienda/hooks'
+import { useCampos } from '@/features/campos/hooks'
 import {
   categoriaColor,
   categoriaLabel,
@@ -37,21 +38,38 @@ const selectClass =
 export function AnimalesPage() {
   const animales = useAnimales()
   const potreros = usePotreros()
+  const campos = useCampos()
 
   const [q, setQ] = useState('')
   const [catF, setCatF] = useState<'todas' | Categoria>('todas')
   const [estF, setEstF] = useState<Estado>('activo')
   const [potF, setPotF] = useState<string | null>(null)
+  const [campoF, setCampoF] = useState<string | null>(null)
   const [view, setView] = useState<'tabla' | 'potrero'>('tabla')
 
   const potreroNombre = useMemo(
     () => new Map((potreros.data ?? []).map((p) => [p.id, p.nombre])),
     [potreros.data],
   )
+  // potrero_id → campo_id, para acotar el apartado por campo.
+  const potreroCampo = useMemo(
+    () => new Map((potreros.data ?? []).map((p) => [p.id, p.campo_id])),
+    [potreros.data],
+  )
 
-  const lista = useMemo(() => animales.data ?? [], [animales.data])
+  const todos = useMemo(() => animales.data ?? [], [animales.data])
 
-  // Stock por categoría = activos (no depende de los filtros de la tabla).
+  // Alcance del apartado: si hay un campo elegido, todo (stock, conteos y
+  // tabla) se acota a los animales de ese campo.
+  const lista = useMemo(
+    () =>
+      campoF
+        ? todos.filter((a) => potreroCampo.get(a.potrero_id ?? '') === campoF)
+        : todos,
+    [todos, campoF, potreroCampo],
+  )
+
+  // Stock por categoría = activos del alcance (no depende de los filtros de la tabla).
   const { porCategoria, totalActivos } = useMemo(() => {
     const activos = lista.filter((a) => a.estado === 'activo')
     const conteo = new Map<Categoria, number>()
@@ -164,6 +182,22 @@ export function AnimalesPage() {
             </button>
           </span>
         )}
+
+        <select
+          className={selectClass}
+          value={campoF ?? 'todos'}
+          onChange={(e) => {
+            setCampoF(e.target.value === 'todos' ? null : e.target.value)
+            setPotF(null)
+          }}
+        >
+          <option value="todos">Campo: todos</option>
+          {(campos.data ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
 
         <select
           className={selectClass}
