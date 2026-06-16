@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import type { Cheque } from '@/features/cheques/api'
 import { LiquidarChequeDialog } from '@/features/cheques/cheques-dialogs'
 import { Panel } from '@/components/panel'
@@ -25,36 +30,60 @@ function estaVencido(fecha: string | null): boolean {
 function ChequeChip({ c }: { c: Cheque }) {
   const cobro = c.tipo === 'ingreso'
   const vencido = estaVencido(c.fechaVencimiento)
+  const Icono = cobro ? ArrowDownLeft : ArrowUpRight
+  const titulo = c.contraparte ?? c.descripcion ?? (cobro ? 'Cobro' : 'Pago')
   return (
     <LiquidarChequeDialog
       cheque={c}
       trigger={
         <button
           type="button"
-          title={`${c.contraparte ?? c.descripcion ?? 'Cheque'} · ${cobro ? 'a cobrar' : 'a pagar'}${c.banco ? ` · ${c.banco}` : ''}`}
+          title={`${titulo}${c.numero ? ` · N° ${c.numero}` : ''}${c.banco ? ` · ${c.banco}` : ''} · ${cobro ? 'a cobrar' : 'a pagar'}${vencido ? ' · VENCIDO' : ''}`}
           className={cn(
-            'flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-[11px] font-bold transition-colors',
+            'flex w-full flex-col gap-0.5 rounded-md border-l-[3px] px-1.5 py-1 text-left transition-[filter]',
             cobro
-              ? 'bg-field-soft text-field-deep hover:brightness-95'
-              : 'bg-tierra-soft text-tierra hover:brightness-95',
+              ? 'border-field-deep bg-field-soft hover:brightness-[0.97]'
+              : 'border-tierra bg-tierra-soft hover:brightness-[0.97]',
             vencido && 'ring-1 ring-destructive/50',
           )}
         >
-          <span
-            className={cn(
-              'size-1.5 shrink-0 rounded-full',
-              cobro ? 'bg-field-deep' : 'bg-tierra',
-            )}
-          />
-          <span className="tnum truncate">
-            {cobro ? '+' : '−'}
-            {fmtCompact(c.monto)}
-          </span>
-          {c.esEcheq && (
-            <span className="ml-auto text-[8.5px] font-bold uppercase opacity-70">
-              e
+          <span className="flex items-center gap-1">
+            <Icono
+              className={cn(
+                'size-3 shrink-0',
+                cobro ? 'text-field-deep' : 'text-tierra',
+              )}
+            />
+            <span
+              className={cn(
+                'truncate text-[10.5px] font-bold leading-tight',
+                cobro ? 'text-field-deep' : 'text-tierra',
+              )}
+            >
+              {titulo}
             </span>
-          )}
+            {c.esEcheq && (
+              <span className="ml-auto shrink-0 rounded bg-sky/15 px-1 text-[8px] font-bold uppercase leading-tight text-sky">
+                e
+              </span>
+            )}
+          </span>
+          <span className="flex items-baseline justify-between gap-1">
+            <span
+              className={cn(
+                'tnum text-[12px] font-bold leading-tight',
+                cobro ? 'text-field-deep' : 'text-tierra',
+              )}
+            >
+              {cobro ? '+' : '−'}
+              {fmtCompact(c.monto)}
+            </span>
+            {c.banco && (
+              <span className="truncate text-[9px] font-medium leading-tight text-ink/50">
+                {c.banco}
+              </span>
+            )}
+          </span>
         </button>
       }
     />
@@ -167,7 +196,7 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
               <div
                 key={j}
                 className={cn(
-                  'min-h-[94px] border-r border-border/60 p-1.5 last:border-r-0',
+                  'min-h-[150px] border-r border-border/60 p-1.5 last:border-r-0',
                   !cel && 'bg-secondary/30',
                 )}
               >
@@ -210,7 +239,9 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
             Sin fecha de vencimiento:
           </span>
           {sinFecha.map((c) => (
-            <ChequeChip key={c.id} c={c} />
+            <div key={c.id} className="w-44">
+              <ChequeChip c={c} />
+            </div>
           ))}
         </div>
       )}
