@@ -1,11 +1,20 @@
 import { useMemo, useState } from 'react'
-import { Banknote, ChevronDown, Receipt, TrendingUp } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Banknote,
+  ChevronDown,
+  Receipt,
+  TrendingUp,
+} from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCampos } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
+  cuentasPendientes,
   formatARS,
   gastosPorCategoria,
+  ingresosPorCategoria,
   porCampo,
   resultadoPorMes,
   resumen,
@@ -57,11 +66,15 @@ export function AnaliticaPage() {
   const res = useMemo(() => resumen(data, modo), [data, modo])
   const campos = useMemo(() => porCampo(data, modo), [data, modo])
   const categorias = useMemo(() => gastosPorCategoria(data, modo), [data, modo])
+  const ingCategorias = useMemo(
+    () => ingresosPorCategoria(data, modo),
+    [data, modo],
+  )
   const porMes = useMemo(() => resultadoPorMes(data, modo), [data, modo])
+  const cuentas = useMemo(() => cuentasPendientes(data), [data])
 
   const maxCampo = Math.max(1, ...campos.map((c) => Math.abs(c.monto)))
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
-  const totalGastos = categorias.reduce((s, c) => s + c.monto, 0)
 
   return (
     <div className="flex flex-col gap-6">
@@ -139,6 +152,20 @@ export function AnaliticaPage() {
               color="var(--sol-deep)"
               value={formatARS(res.resultado)}
               valueColor={res.resultado < 0 ? 'var(--destructive)' : 'var(--field-deep)'}
+            />
+            <KpiCell
+              label="Por cobrar"
+              icon={ArrowDownLeft}
+              color="var(--field)"
+              value={cuentas.porCobrar === 0 ? '—' : formatARS(cuentas.porCobrar)}
+              sub="pendiente"
+            />
+            <KpiCell
+              label="Por pagar"
+              icon={ArrowUpRight}
+              color="var(--tierra)"
+              value={cuentas.porPagar === 0 ? '—' : formatARS(cuentas.porPagar)}
+              sub="pendiente"
             />
           </div>
 
@@ -244,77 +271,57 @@ export function AnaliticaPage() {
             </Panel>
           </div>
 
-          {/* Rentabilidad por campo + Gastos por categoría */}
+          {/* Ingresos + Gastos por categoría */}
           <div className="grid gap-5 lg:grid-cols-2">
-            <Panel title="Rentabilidad por campo">
-              {campos.length === 0 ? (
-                <Vacio>Sin datos.</Vacio>
+            <Panel title="Ingresos por categoría">
+              {ingCategorias.length === 0 ? (
+                <Vacio>Sin ingresos.</Vacio>
               ) : (
-                <div className="flex flex-col gap-3.5">
-                  {campos.map((c) => (
-                    <div key={c.nombre} className="flex items-center gap-3.5 text-sm">
-                      <span className="w-28 shrink-0 truncate font-semibold text-ink">
-                        {c.nombre}
-                      </span>
-                      <div className="h-3.5 flex-1 overflow-hidden rounded bg-secondary">
-                        <div
-                          className="h-full rounded"
-                          style={{
-                            width: `${(Math.abs(c.monto) / maxCampo) * 100}%`,
-                            background: c.monto < 0 ? 'var(--destructive)' : 'var(--g1)',
-                          }}
-                        />
-                      </div>
-                      <span
-                        className={cn(
-                          'tnum w-20 shrink-0 text-right text-[13px] font-bold',
-                          c.monto < 0 ? 'text-destructive' : 'text-field-deep',
-                        )}
-                      >
-                        {fmtCompact(c.monto)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <CategoriaBreakdown items={ingCategorias} />
               )}
             </Panel>
-
             <Panel title="Gastos por categoría">
               {categorias.length === 0 ? (
                 <Vacio>Sin gastos.</Vacio>
               ) : (
-                <>
-                  <div className="flex h-3 gap-0.5 overflow-hidden rounded-md">
-                    {categorias.map((c, i) => (
-                      <span
-                        key={c.nombre}
-                        className="h-full rounded-sm"
-                        style={{
-                          width: `${(c.monto / totalGastos) * 100}%`,
-                          background: GSERIE[i % GSERIE.length],
-                        }}
-                        title={`${c.nombre}: ${formatARS(c.monto)}`}
-                      />
-                    ))}
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-2.5 text-[13.5px] sm:grid-cols-2">
-                    {categorias.map((c, i) => (
-                      <div key={c.nombre} className="flex items-center gap-2.5">
-                        <span
-                          className="size-[11px] shrink-0 rounded-[3px]"
-                          style={{ background: GSERIE[i % GSERIE.length] }}
-                        />
-                        <span className="truncate text-ink">{c.nombre}</span>
-                        <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
-                          {fmtCompact(c.monto)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <CategoriaBreakdown items={categorias} />
               )}
             </Panel>
           </div>
+
+          {/* Rentabilidad por campo */}
+          <Panel title="Rentabilidad por campo" sub="ingresos − gastos">
+            {campos.length === 0 ? (
+              <Vacio>Sin datos.</Vacio>
+            ) : (
+              <div className="flex flex-col gap-3.5">
+                {campos.map((c) => (
+                  <div key={c.nombre} className="flex items-center gap-3.5 text-sm">
+                    <span className="w-28 shrink-0 truncate font-semibold text-ink">
+                      {c.nombre}
+                    </span>
+                    <div className="h-3.5 flex-1 overflow-hidden rounded bg-secondary">
+                      <div
+                        className="h-full rounded"
+                        style={{
+                          width: `${(Math.abs(c.monto) / maxCampo) * 100}%`,
+                          background: c.monto < 0 ? 'var(--destructive)' : 'var(--g1)',
+                        }}
+                      />
+                    </div>
+                    <span
+                      className={cn(
+                        'tnum w-24 shrink-0 text-right text-[13px] font-bold',
+                        c.monto < 0 ? 'text-destructive' : 'text-field-deep',
+                      )}
+                    >
+                      {fmtCompact(c.monto)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
 
           {/* Movimientos recientes */}
           <Panel
@@ -383,18 +390,56 @@ export function AnaliticaPage() {
   )
 }
 
+/** Barra apilada + leyenda de montos por categoría (ingresos o gastos). */
+function CategoriaBreakdown({ items }: { items: { nombre: string; monto: number }[] }) {
+  const total = items.reduce((s, c) => s + c.monto, 0) || 1
+  return (
+    <>
+      <div className="flex h-3 gap-0.5 overflow-hidden rounded-md">
+        {items.map((c, i) => (
+          <span
+            key={c.nombre}
+            className="h-full rounded-sm"
+            style={{
+              width: `${(c.monto / total) * 100}%`,
+              background: GSERIE[i % GSERIE.length],
+            }}
+            title={`${c.nombre}: ${formatARS(c.monto)}`}
+          />
+        ))}
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-2.5 text-[13.5px] sm:grid-cols-2">
+        {items.map((c, i) => (
+          <div key={c.nombre} className="flex items-center gap-2.5">
+            <span
+              className="size-[11px] shrink-0 rounded-[3px]"
+              style={{ background: GSERIE[i % GSERIE.length] }}
+            />
+            <span className="truncate text-ink">{c.nombre}</span>
+            <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
+              {fmtCompact(c.monto)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function KpiCell({
   label,
   icon: Icon,
   color,
   value,
   valueColor,
+  sub,
 }: {
   label: string
   icon: typeof Banknote
   color: string
   value: string
   valueColor?: string
+  sub?: string
 }) {
   return (
     <div className="min-w-40 flex-1 px-[22px] py-[18px]">
@@ -408,6 +453,7 @@ function KpiCell({
       >
         {value}
       </div>
+      {sub && <div className="mt-1.5 text-xs font-medium text-faint">{sub}</div>}
     </div>
   )
 }

@@ -65,20 +65,44 @@ export function resultadoPorMes(
     .sort((a, b) => a.mes.localeCompare(b.mes))
 }
 
-/** Gastos agrupados por categoría (mayor a menor). */
-export function gastosPorCategoria(
+/** Monto agrupado por categoría para un tipo (ingreso/gasto), mayor a menor. */
+export function montoPorCategoria(
   movs: MovimientoConDetalle[],
   modo: Modo,
+  tipo: 'ingreso' | 'gasto',
 ): LineaMonto[] {
   const map = new Map<string, number>()
   for (const m of movs) {
-    if (!entra(m, modo) || m.tipo !== 'gasto') continue
+    if (!entra(m, modo) || m.tipo !== tipo) continue
     const nombre = m.categoria?.nombre ?? 'Sin categoría'
     map.set(nombre, (map.get(nombre) ?? 0) + Number(m.monto))
   }
   return [...map.entries()]
     .map(([nombre, monto]) => ({ nombre, monto }))
     .sort((a, b) => b.monto - a.monto)
+}
+
+export const gastosPorCategoria = (m: MovimientoConDetalle[], modo: Modo) =>
+  montoPorCategoria(m, modo, 'gasto')
+export const ingresosPorCategoria = (m: MovimientoConDetalle[], modo: Modo) =>
+  montoPorCategoria(m, modo, 'ingreso')
+
+/**
+ * Cuentas pendientes (independiente del modo): lo que falta cobrar y pagar.
+ * Explica la brecha devengado↔caja.
+ */
+export function cuentasPendientes(movs: MovimientoConDetalle[]): {
+  porCobrar: number
+  porPagar: number
+} {
+  let porCobrar = 0
+  let porPagar = 0
+  for (const m of movs) {
+    if (m.estado !== 'pendiente') continue
+    if (m.tipo === 'ingreso') porCobrar += Number(m.monto)
+    else porPagar += Number(m.monto)
+  }
+  return { porCobrar, porPagar }
 }
 
 const fmt = new Intl.NumberFormat('es-AR', {
