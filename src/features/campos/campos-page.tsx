@@ -63,7 +63,7 @@ function CampoSection({
           Este campo no tiene potreros todavía.
         </p>
       ) : (
-        <SuperficieMapa potreros={campo.potreros} />
+        <SuperficieMapa potreros={campo.potreros} ratio={3.8} />
       )}
     </section>
   )

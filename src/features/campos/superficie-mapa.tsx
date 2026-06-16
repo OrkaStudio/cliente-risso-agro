@@ -3,18 +3,24 @@ import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
 import { CicloIcon, type PotreroCardData } from '@/features/potrero/potrero-card'
 import { squarify } from '@/features/campos/treemap'
 
-/* Espacio de referencia para el treemap (relación 2:1). El contenedor usa
- * el mismo aspect-ratio, así los % mapean exacto a cualquier ancho. */
-const REF_W = 1000
-const REF_H = 500
-
 /**
  * Mapa de superficie: cada potrero es un bloque con área proporcional a sus
  * hectáreas, coloreado por estado de ciclo. Reemplaza la grilla de cards por
  * algo que se lee como la superficie real del campo. Toca un bloque para
  * entrar al potrero.
+ *
+ * `ratio` = ancho/alto del contenedor (más alto = más bajo/compacto). Más
+ * compacto en la lista (campos apilados) que en el detalle.
  */
-export function SuperficieMapa({ potreros }: { potreros: PotreroCardData[] }) {
+export function SuperficieMapa({
+  potreros,
+  ratio = 3,
+}: {
+  potreros: PotreroCardData[]
+  ratio?: number
+}) {
+  const REF_W = 1000
+  const REF_H = REF_W / ratio
   const tiles = squarify(
     potreros.map((p) => ({
       datum: p,
@@ -32,7 +38,10 @@ export function SuperficieMapa({ potreros }: { potreros: PotreroCardData[] }) {
   }
 
   return (
-    <div className="relative aspect-[2/1] w-full">
+    <div
+      className="relative w-full"
+      style={{ aspectRatio: String(ratio) }}
+    >
       {tiles.map((t) => {
         const p = t.datum
         const color = estadoCicloColor[p.estadoCiclo]
