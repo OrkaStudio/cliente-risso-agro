@@ -1,6 +1,11 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
-import { ArrowDownLeft, ArrowUpRight, TriangleAlert } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CircleCheck,
+  TriangleAlert,
+} from 'lucide-react'
 import { Constants, type Database } from '@/lib/supabase/types'
 import { useCampos, usePotreros } from '@/features/campos/hooks'
 import { useCategorias, useCrearMovimiento } from '@/features/analitica/hooks'
@@ -170,11 +175,13 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                 </span>
                 <input
                   id="mv-monto"
-                  type="number"
-                  inputMode="decimal"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="0"
-                  value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
+                  value={monto ? Number(monto).toLocaleString('es-AR') : ''}
+                  onChange={(e) =>
+                    setMonto(e.target.value.replace(/\D/g, ''))
+                  }
                   className={cn(fieldClass, 'tnum py-3 pl-8 text-lg font-bold')}
                 />
               </div>
@@ -383,12 +390,24 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
               </div>
             )}
 
-            <p className="flex items-start gap-2 rounded-[10px] bg-secondary px-3.5 py-2.5 text-xs text-muted-foreground">
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-sol-deep" />
-              Si no cargás la fecha de {esGasto ? 'pago' : 'cobro'}, el
-              movimiento queda <b className="font-semibold">pendiente</b> (entra
-              en lo devengado, todavía no en caja).
-            </p>
+            {/* Estado en vivo según la fecha de cobro/pago */}
+            {fechaCobroPago ? (
+              <p className="flex items-start gap-2 rounded-[10px] bg-field-soft px-3.5 py-2.5 text-xs text-field-deep">
+                <CircleCheck className="mt-0.5 size-3.5 shrink-0" />
+                Queda <b className="font-semibold">liquidado</b> — ya{' '}
+                {esGasto ? 'pagado' : 'cobrado'} el{' '}
+                {fechaCobroPago.split('-').reverse().join('/')}.
+              </p>
+            ) : (
+              <p className="flex items-start gap-2 rounded-[10px] bg-secondary px-3.5 py-2.5 text-xs text-muted-foreground">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-sol-deep" />
+                Queda <b className="font-semibold">pendiente</b> (entra en lo
+                devengado, todavía no en caja)
+                {fechaVencimiento
+                  ? ` · vence el ${fechaVencimiento.split('-').reverse().join('/')}.`
+                  : '. Cargá "Vence el" para seguir el vencimiento.'}
+              </p>
+            )}
 
             {error && (
               <p className="text-sm font-medium text-destructive">{error}</p>
