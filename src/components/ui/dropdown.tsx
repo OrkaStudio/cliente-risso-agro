@@ -58,6 +58,7 @@ export function Dropdown({
   className,
   menuClassName,
   ariaLabel,
+  block = false,
 }: {
   value: string
   onChange: (value: string) => void
@@ -65,6 +66,8 @@ export function Dropdown({
   className?: string
   menuClassName?: string
   ariaLabel?: string
+  /** Ancho completo (para formularios) en vez de ancho de contenido. */
+  block?: boolean
 }) {
   const [open, setOpen] = React.useState(false)
   const [hovered, setHovered] = React.useState<string | null>(null)
@@ -76,7 +79,7 @@ export function Dropdown({
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative shrink-0" ref={ref}>
+      <div className={cn('relative', block ? 'w-full' : 'shrink-0')} ref={ref}>
         <button
           type="button"
           aria-haspopup="listbox"
@@ -86,6 +89,7 @@ export function Dropdown({
           onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
           className={cn(
             'flex h-10 items-center justify-between gap-2 rounded-[10px] border border-border bg-card pl-3.5 pr-2.5 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors hover:border-faint focus-visible:ring-2 focus-visible:ring-field-soft',
+            block && 'w-full',
             open && 'border-primary ring-2 ring-field-soft',
             className,
           )}

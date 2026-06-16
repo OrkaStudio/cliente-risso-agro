@@ -9,6 +9,7 @@ import { categoriaLabel } from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Dropdown } from '@/components/ui/dropdown'
 import {
   Card,
   CardContent,
@@ -25,8 +26,6 @@ const schema = z.object({
   fechaNacimiento: z.string().optional(),
 })
 
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 export function AltaAnimalPage() {
   const navigate = useNavigate()
@@ -116,40 +115,40 @@ export function AltaAnimalPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="categoria">Categoría *</Label>
-              <select
-                id="categoria"
-                className={selectClass}
+              <Label>Categoría *</Label>
+              <Dropdown
+                block
+                ariaLabel="Categoría"
                 value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-              >
-                <option value="">Elegí…</option>
-                {Constants.public.Enums.categoria_animal.map((c) => (
-                  <option key={c} value={c}>
-                    {categoriaLabel[c]}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategoria}
+                options={[
+                  { value: '', label: 'Elegí…' },
+                  ...Constants.public.Enums.categoria_animal.map((c) => ({
+                    value: c,
+                    label: categoriaLabel[c],
+                  })),
+                ]}
+              />
               <p className="text-xs text-muted-foreground">
                 El sexo se completa solo según la categoría.
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="potrero">Potrero (opcional)</Label>
-              <select
-                id="potrero"
-                className={selectClass}
+              <Label>Potrero (opcional)</Label>
+              <Dropdown
+                block
+                ariaLabel="Potrero"
                 value={potreroId}
-                onChange={(e) => setPotreroId(e.target.value)}
-              >
-                <option value="">Sin asignar</option>
-                {(potreros.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+                onChange={setPotreroId}
+                options={[
+                  { value: '', label: 'Sin asignar' },
+                  ...(potreros.data ?? []).map((p) => ({
+                    value: p.id,
+                    label: p.nombre,
+                  })),
+                ]}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

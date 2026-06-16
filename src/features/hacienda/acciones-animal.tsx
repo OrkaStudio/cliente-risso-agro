@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Dropdown } from '@/components/ui/dropdown'
 import {
   Dialog,
   DialogContent,
@@ -22,8 +23,6 @@ import {
 } from '@/components/ui/dialog'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 /** Shell de diálogo controlado: un botón que abre + el contenido del form. */
 function AccionDialog({
@@ -97,20 +96,20 @@ export function RegistrarEventoDialog({
     >
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="ev-tipo">Tipo</Label>
-          <select
-            id="ev-tipo"
-            className={selectClass}
+          <Label>Tipo</Label>
+          <Dropdown
+            block
+            ariaLabel="Tipo de evento"
             value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoEventoManual)}
-          >
-            <option value="">Elegí…</option>
-            {TIPOS_EVENTO_MANUAL.map((t) => (
-              <option key={t} value={t}>
-                {tipoEventoLabel[t]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setTipo(v as TipoEventoManual)}
+            options={[
+              { value: '', label: 'Elegí…' },
+              ...TIPOS_EVENTO_MANUAL.map((t) => ({
+                value: t,
+                label: tipoEventoLabel[t],
+              })),
+            ]}
+          />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="ev-fecha">Fecha</Label>
@@ -247,17 +246,18 @@ export function DarBajaDialog({ animalId }: { animalId: string }) {
     >
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="db-estado">Motivo</Label>
-          <select
-            id="db-estado"
-            className={selectClass}
+          <Label>Motivo</Label>
+          <Dropdown
+            block
+            ariaLabel="Motivo de baja"
             value={estado}
-            onChange={(e) => setEstado(e.target.value as 'vendido' | 'muerto')}
-          >
-            <option value="">Elegí…</option>
-            <option value="vendido">Vendido</option>
-            <option value="muerto">Muerto</option>
-          </select>
+            onChange={(v) => setEstado(v as 'vendido' | 'muerto')}
+            options={[
+              { value: '', label: 'Elegí…' },
+              { value: 'vendido', label: 'Vendido' },
+              { value: 'muerto', label: 'Muerto' },
+            ]}
+          />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="db-fecha">Fecha</Label>

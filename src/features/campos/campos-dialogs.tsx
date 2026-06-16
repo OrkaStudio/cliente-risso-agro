@@ -18,9 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
+import { Dropdown } from '@/components/ui/dropdown'
 
 function parseHa(v: string): number | null {
   const n = Number(v)
@@ -133,21 +131,17 @@ export function CampoFormDialog({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="campo-tipo">Tipo</Label>
-            <select
-              id="campo-tipo"
-              className={selectClass}
+            <Label>Tipo</Label>
+            <Dropdown
+              block
+              ariaLabel="Tipo de campo"
               value={tipo}
-              onChange={(e) =>
-                setTipo(e.target.value as Campo['tipo'])
-              }
-            >
-              {Constants.public.Enums.tipo_campo.map((t) => (
-                <option key={t} value={t}>
-                  {tipoCampoLabel[t]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setTipo(v as Campo['tipo'])}
+              options={Constants.public.Enums.tipo_campo.map((t) => ({
+                value: t,
+                label: tipoCampoLabel[t],
+              }))}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="campo-ha">Hectáreas (opcional)</Label>
@@ -252,21 +246,17 @@ export function PotreroFormDialog({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="potrero-estado">Estado del ciclo</Label>
-            <select
-              id="potrero-estado"
-              className={selectClass}
+            <Label>Estado del ciclo</Label>
+            <Dropdown
+              block
+              ariaLabel="Estado del ciclo"
               value={estadoCiclo}
-              onChange={(e) =>
-                setEstadoCiclo(e.target.value as Potrero['estado_ciclo'])
-              }
-            >
-              {Constants.public.Enums.estado_ciclo_potrero.map((s) => (
-                <option key={s} value={s}>
-                  {estadoCicloLabel[s]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setEstadoCiclo(v as Potrero['estado_ciclo'])}
+              options={Constants.public.Enums.estado_ciclo_potrero.map((s) => ({
+                value: s,
+                label: estadoCicloLabel[s],
+              }))}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="potrero-ha">Hectáreas (opcional)</Label>

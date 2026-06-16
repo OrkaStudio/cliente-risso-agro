@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
@@ -189,65 +190,60 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
 
             {/* Categoría */}
             <div>
-              <label htmlFor="mv-categoria" className={labelClass}>
-                Categoría
-              </label>
-              <select
-                id="mv-categoria"
-                className={fieldClass}
+              <label className={labelClass}>Categoría</label>
+              <Dropdown
+                block
+                ariaLabel="Categoría"
                 value={categoriaId}
-                onChange={(e) => setCategoriaId(e.target.value)}
-              >
-                <option value="">Elegí…</option>
-                {categoriasFiltradas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategoriaId}
+                options={[
+                  { value: '', label: 'Elegí…' },
+                  ...categoriasFiltradas.map((c) => ({
+                    value: c.id,
+                    label: c.nombre,
+                  })),
+                ]}
+              />
             </div>
 
             {/* Campo + Potrero */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="mv-campo" className={labelClass}>
-                  Campo
-                </label>
-                <select
-                  id="mv-campo"
-                  className={fieldClass}
+                <label className={labelClass}>Campo</label>
+                <Dropdown
+                  block
+                  ariaLabel="Campo"
                   value={campoId}
-                  onChange={(e) => {
-                    setCampoId(e.target.value)
+                  onChange={(v) => {
+                    setCampoId(v)
                     setPotreroId('')
                   }}
-                >
-                  <option value="">Elegí…</option>
-                  {(campos.data ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Elegí…' },
+                    ...(campos.data ?? []).map((c) => ({
+                      value: c.id,
+                      label: c.nombre,
+                    })),
+                  ]}
+                />
               </div>
               <div>
-                <label htmlFor="mv-potrero" className={labelClass}>
+                <label className={labelClass}>
                   Potrero <span className="font-medium normal-case">(opcional)</span>
                 </label>
-                <select
-                  id="mv-potrero"
-                  className={cn(fieldClass, 'disabled:opacity-50')}
+                <Dropdown
+                  block
+                  ariaLabel="Potrero"
                   value={potreroId}
-                  onChange={(e) => setPotreroId(e.target.value)}
-                  disabled={!campoId}
-                >
-                  <option value="">Todo el campo</option>
-                  {(potreros.data ?? []).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setPotreroId}
+                  options={[
+                    { value: '', label: 'Todo el campo' },
+                    ...(potreros.data ?? []).map((p) => ({
+                      value: p.id,
+                      label: p.nombre,
+                    })),
+                  ]}
+                />
               </div>
             </div>
 
@@ -296,23 +292,23 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
             {/* Medio + descripción */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="mv-medio" className={labelClass}>
+                <label className={labelClass}>
                   Medio de pago{' '}
                   <span className="font-medium normal-case">(opcional)</span>
                 </label>
-                <select
-                  id="mv-medio"
-                  className={fieldClass}
+                <Dropdown
+                  block
+                  ariaLabel="Medio de pago"
                   value={medioPago}
-                  onChange={(e) => setMedioPago(e.target.value)}
-                >
-                  <option value="">—</option>
-                  {Constants.public.Enums.medio_pago.map((m) => (
-                    <option key={m} value={m}>
-                      {medioPagoLabel[m]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setMedioPago}
+                  options={[
+                    { value: '', label: '—' },
+                    ...Constants.public.Enums.medio_pago.map((m) => ({
+                      value: m,
+                      label: medioPagoLabel[m],
+                    })),
+                  ]}
+                />
               </div>
               <div>
                 <label htmlFor="mv-desc" className={labelClass}>
