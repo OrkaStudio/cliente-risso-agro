@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronDown, Search, X } from 'lucide-react'
+import { ArrowRight, Search, X } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useAnimales, usePotreros } from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
@@ -11,6 +11,7 @@ import {
 } from '@/features/hacienda/labels'
 import { Panel } from '@/components/panel'
 import { buttonVariants } from '@/components/ui/button'
+import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
@@ -32,29 +33,6 @@ function edad(fechaNac: string | null): string {
   return `${Math.floor(meses / 12)} a`
 }
 
-/* Select de filtro con estilo del sistema (sin la flecha nativa). */
-function FilterSelect({
-  value,
-  onChange,
-  children,
-}: {
-  value: string
-  onChange: (v: string) => void
-  children: ReactNode
-}) {
-  return (
-    <div className="relative shrink-0">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 cursor-pointer appearance-none rounded-[10px] border border-border bg-card pl-3.5 pr-9 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors hover:border-faint focus:border-primary focus:ring-2 focus:ring-field-soft"
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
-    </div>
-  )
-}
 
 export function AnimalesPage() {
   const animales = useAnimales()
@@ -209,38 +187,39 @@ export function AnimalesPage() {
           </span>
         )}
 
-        <FilterSelect
+        <Dropdown
+          ariaLabel="Filtrar por campo"
           value={campoF ?? 'todos'}
           onChange={(v) => {
             setCampoF(v === 'todos' ? null : v)
             setPotF(null)
           }}
-        >
-          <option value="todos">Campo: todos</option>
-          {(campos.data ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: 'todos', label: 'Campo: todos' },
+            ...(campos.data ?? []).map((c) => ({ value: c.id, label: c.nombre })),
+          ]}
+        />
 
-        <FilterSelect
+        <Dropdown
+          ariaLabel="Filtrar por categoría"
           value={catF}
           onChange={(v) => setCatF(v as 'todas' | Categoria)}
-        >
-          <option value="todas">Categoría: todas</option>
-          {CATEGORIAS.map((c) => (
-            <option key={c} value={c}>
-              {categoriaLabel[c]}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: 'todas', label: 'Categoría: todas' },
+            ...CATEGORIAS.map((c) => ({ value: c, label: categoriaLabel[c] })),
+          ]}
+        />
 
-        <FilterSelect value={estF} onChange={(v) => setEstF(v as Estado)}>
-          <option value="activo">Estado: activos</option>
-          <option value="vendido">Vendidos</option>
-          <option value="muerto">Bajas</option>
-        </FilterSelect>
+        <Dropdown
+          ariaLabel="Filtrar por estado"
+          value={estF}
+          onChange={(v) => setEstF(v as Estado)}
+          options={[
+            { value: 'activo', label: 'Estado: activos' },
+            { value: 'vendido', label: 'Vendidos' },
+            { value: 'muerto', label: 'Bajas' },
+          ]}
+        />
 
         <div className="ml-auto flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
           {(['tabla', 'potrero'] as const).map((v) => (

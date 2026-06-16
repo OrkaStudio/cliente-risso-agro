@@ -3,7 +3,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
-  ChevronDown,
   Receipt,
   TrendingUp,
 } from 'lucide-react'
@@ -22,6 +21,7 @@ import {
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
 import { Panel } from '@/components/panel'
+import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 
 const GSERIE = ['var(--g1)', 'var(--g2)', 'var(--g3)', 'var(--g4)', 'var(--g5)']
@@ -110,23 +110,18 @@ export function AnaliticaPage() {
             </button>
           ))}
         </div>
-        <div className="relative shrink-0">
-          <select
-            className="h-10 cursor-pointer appearance-none rounded-[10px] border border-border bg-card pl-3.5 pr-9 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors hover:border-faint focus:border-primary focus:ring-2 focus:ring-field-soft"
-            value={campoF ?? 'empresa'}
-            onChange={(e) =>
-              setCampoF(e.target.value === 'empresa' ? null : e.target.value)
-            }
-          >
-            <option value="empresa">Toda la empresa</option>
-            {(camposLista.data ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
-        </div>
+        <Dropdown
+          ariaLabel="Filtrar por campo"
+          value={campoF ?? 'empresa'}
+          onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
+          options={[
+            { value: 'empresa', label: 'Toda la empresa' },
+            ...(camposLista.data ?? []).map((c) => ({
+              value: c.id,
+              label: c.nombre,
+            })),
+          ]}
+        />
         <span className="text-xs text-faint">
           {modo === 'devengado'
             ? 'Devengado: la economía real, sin importar cuándo entró/salió la plata.'
