@@ -384,6 +384,9 @@ export function InicioPage() {
         />
       </div>
 
+      {/* Pronóstico 7 días del campo */}
+      <PronosticoPanel />
+
       {/* Stock por categoría + vencimientos */}
       <div className="grid items-stretch gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Panel
@@ -477,9 +480,6 @@ export function InicioPage() {
           </div>
         )}
       </Panel>
-
-      {/* Pronóstico 7 días del campo */}
-      <PronosticoPanel />
     </div>
   )
 }
