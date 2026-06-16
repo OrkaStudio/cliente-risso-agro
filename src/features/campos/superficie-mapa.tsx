@@ -5,16 +5,20 @@ import { squarify } from '@/features/campos/treemap'
 
 /**
  * Mapa de superficie: cada potrero es un bloque con área proporcional a sus
- * hectáreas, coloreado por estado de ciclo. Reemplaza la grilla de cards por
- * algo que se lee como la superficie real del campo. Toca un bloque para
- * entrar al potrero.
+ * hectáreas, coloreado por estado de ciclo. Toca un bloque para entrar.
  *
- * `ratio` = ancho/alto del contenedor (más alto = más bajo/compacto). Más
- * compacto en la lista (campos apilados) que en el detalle.
+ * Para que los potreros chicos no queden ilegibles cuando las superficies
+ * son muy dispares (ej. 200 ha vs 10 ha), comprimimos la escala (área ∝
+ * ha^0.6): se preserva el orden y "más grande = más grande", pero los chicos
+ * ganan superficie usable. El número exacto de ha va en cada bloque.
+ *
+ * `ratio` = ancho/alto del contenedor (más alto = más bajo/compacto).
  */
+const EXP = 0.6
+
 export function SuperficieMapa({
   potreros,
-  ratio = 3,
+  ratio = 2.6,
 }: {
   potreros: PotreroCardData[]
   ratio?: number
@@ -24,7 +28,7 @@ export function SuperficieMapa({
   const tiles = squarify(
     potreros.map((p) => ({
       datum: p,
-      value: p.hectareas && p.hectareas > 0 ? p.hectareas : 0.5,
+      value: Math.pow(p.hectareas && p.hectareas > 0 ? p.hectareas : 0.3, EXP),
     })),
     { x: 0, y: 0, w: REF_W, h: REF_H },
   )
@@ -38,17 +42,13 @@ export function SuperficieMapa({
   }
 
   return (
-    <div
-      className="relative w-full"
-      style={{ aspectRatio: String(ratio) }}
-    >
+    <div className="relative w-full" style={{ aspectRatio: String(ratio) }}>
       {tiles.map((t) => {
         const p = t.datum
         const color = estadoCicloColor[p.estadoCiclo]
         const wPct = (t.w / REF_W) * 100
         const hPct = (t.h / REF_H) * 100
-        const grande = wPct > 15 && hPct > 24
-        const medio = wPct > 10 && hPct > 14
+        const grande = wPct > 18 && hPct > 32
         const conHacienda = p.cabezas > 0
         const sec = conHacienda
           ? `${p.cabezas} cab`
@@ -67,45 +67,44 @@ export function SuperficieMapa({
             <Link
               to={`/potrero/${p.id}`}
               title={`${p.nombre} · ${estadoCicloLabel[p.estadoCiclo]} · ${p.hectareas ?? '—'} ha · ${sec}`}
-              className="absolute inset-[3px] flex flex-col justify-between overflow-hidden rounded-[10px] p-2.5 transition-[filter] hover:brightness-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
+              className="group absolute inset-[4px] flex flex-col justify-between gap-1 overflow-hidden rounded-xl p-3 transition-all hover:z-10 hover:brightness-[0.98] hover:shadow-[0_4px_16px_rgba(16,24,19,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
               style={{
-                background: `color-mix(in srgb, ${color} 16%, var(--card))`,
-                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 32%, transparent)`,
+                background: `color-mix(in srgb, ${color} 15%, var(--card))`,
+                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 34%, transparent)`,
               }}
             >
-              <div className="flex items-center gap-1.5">
+              {/* Nombre + estado (siempre) */}
+              <div className="flex min-w-0 items-start gap-1.5">
                 <span
-                  className="size-1.5 shrink-0 rounded-full"
+                  className="mt-[5px] size-1.5 shrink-0 rounded-full"
                   style={{ background: color }}
                 />
-                <span className="truncate font-heading text-[13px] font-bold text-ink">
+                <span className="line-clamp-2 font-heading text-[13px] font-bold leading-tight text-ink">
                   {p.nombre}
                 </span>
               </div>
-              {grande ? (
-                <div className="flex items-end justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1 text-[12px] font-semibold text-ink">
-                      <CicloIcon
-                        estado={p.estadoCiclo}
-                        className="size-3.5 shrink-0"
-                        style={{ color }}
-                      />
-                      <span className="truncate">{sec}</span>
-                    </div>
-                  </div>
-                  <span className="tnum shrink-0 text-[12px] font-bold text-ink">
-                    {p.hectareas ?? '—'}
-                    <span className="ml-0.5 text-[10px] font-medium text-muted-foreground">
-                      ha
-                    </span>
+
+              {/* Pie: actividad (si entra) + hectáreas (siempre) */}
+              <div className="flex items-end justify-between gap-2">
+                {grande ? (
+                  <span className="flex min-w-0 items-center gap-1 text-[12px] font-semibold text-ink/80">
+                    <CicloIcon
+                      estado={p.estadoCiclo}
+                      className="size-3.5 shrink-0"
+                      style={{ color }}
+                    />
+                    <span className="truncate">{sec}</span>
                   </span>
-                </div>
-              ) : medio ? (
-                <span className="tnum text-[11px] font-bold text-ink">
-                  {p.hectareas ?? '—'} ha
+                ) : (
+                  <span />
+                )}
+                <span className="tnum shrink-0 whitespace-nowrap text-[12px] font-bold text-ink">
+                  {p.hectareas ?? '—'}
+                  <span className="ml-0.5 text-[10px] font-medium text-muted-foreground">
+                    ha
+                  </span>
                 </span>
-              ) : null}
+              </div>
             </Link>
           </div>
         )

@@ -150,7 +150,7 @@ export function CampoDetailPage() {
           title="Mapa de superficie"
           sub="cada bloque ∝ hectáreas · tocá uno para entrar"
         >
-          <SuperficieMapa potreros={campo.potreros} ratio={2.8} />
+          <SuperficieMapa potreros={campo.potreros} ratio={2.3} />
         </Panel>
       )}
     </div>
