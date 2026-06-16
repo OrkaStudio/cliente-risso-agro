@@ -221,11 +221,11 @@ export function PotreroDetailPage() {
       {/* Encabezado */}
       <div>
         <Link
-          to="/"
+          to={`/campos/${data.campoId}`}
           className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
-          Inicio
+          {data.campoNombre}
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -268,13 +268,7 @@ export function PotreroDetailPage() {
           />
         </div>
         <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-          <Link
-            to={`/campos/${data.campoId}`}
-            className="font-semibold text-field-deep hover:underline"
-          >
-            {data.campoNombre}
-          </Link>{' '}
-          · {tipoCampoLabel[data.campoTipo]}
+          Campo {data.campoNombre} · {tipoCampoLabel[data.campoTipo]}
         </p>
       </div>
 
