@@ -5,12 +5,14 @@ import {
   LandPlot,
   MapPin,
   TrendingUp,
+  TriangleAlert,
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
+import { useCheques } from '@/features/cheques/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { PotreroCard } from '@/features/potrero/potrero-card'
@@ -33,6 +35,50 @@ function fechaLarga(): string {
     month: 'long',
   })
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/* ===== Alerta de cheques que vencen pronto ===== */
+function ChequesAlerta() {
+  const { data } = useCheques()
+  const hoy0 = new Date().setHours(0, 0, 0, 0)
+  const urgentes = (data ?? []).filter((c) => {
+    if (c.estado !== 'pendiente' || !c.fechaVencimiento) return false
+    const [y, m, d] = c.fechaVencimiento.split('-').map(Number)
+    const dias = Math.round((new Date(y, m - 1, d).getTime() - hoy0) / 86400000)
+    return dias <= 7
+  })
+  if (urgentes.length === 0) return null
+
+  const aPagar = urgentes
+    .filter((c) => c.tipo === 'gasto')
+    .reduce((s, c) => s + c.monto, 0)
+  const aCobrar = urgentes
+    .filter((c) => c.tipo === 'ingreso')
+    .reduce((s, c) => s + c.monto, 0)
+  const n = urgentes.length
+
+  return (
+    <Link
+      to="/cheques"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] border border-sol-deep/30 bg-sol-soft px-[22px] py-4 transition-colors hover:border-sol-deep/60"
+    >
+      <TriangleAlert className="size-5 shrink-0 text-sol-deep" />
+      <span className="text-sm font-bold text-ink">
+        {n} {n === 1 ? 'cheque vence' : 'cheques vencen'} en los próximos 7 días
+      </span>
+      <span className="flex items-center gap-3 text-[13px] font-semibold">
+        {aPagar > 0 && (
+          <span className="text-tierra">a pagar {fmtCompact(aPagar)}</span>
+        )}
+        {aCobrar > 0 && (
+          <span className="text-field-deep">a cobrar {fmtCompact(aCobrar)}</span>
+        )}
+      </span>
+      <span className="ml-auto text-[13px] font-semibold text-field-deep">
+        Ver cheques →
+      </span>
+    </Link>
+  )
 }
 
 /* ===== KPI ===== */
@@ -282,6 +328,9 @@ export function InicioPage() {
           {data.potreros.length} potreros
         </p>
       </div>
+
+      {/* Alerta de cheques que vencen pronto */}
+      <ChequesAlerta />
 
       {/* KPIs — barra instrumental con celdas divididas por hairline */}
       <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">

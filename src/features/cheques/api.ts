@@ -46,3 +46,21 @@ export async function listCheques(): Promise<Cheque[]> {
     estado: m.estado,
   }))
 }
+
+/** Marca un cheque como cobrado/pagado: setea la fecha y pasa a liquidado. */
+export async function liquidarCheque(id: string, fecha: string): Promise<void> {
+  const { error } = await supabase
+    .from('movimiento_financiero')
+    .update({ fecha_cobro_pago: fecha, estado: 'liquidado' })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Deshace la liquidación: vuelve el cheque a pendiente (sin fecha de cobro/pago). */
+export async function revertirCheque(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('movimiento_financiero')
+    .update({ fecha_cobro_pago: null, estado: 'pendiente' })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
