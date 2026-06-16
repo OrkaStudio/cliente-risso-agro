@@ -4,6 +4,7 @@ import {
   getClima,
   getDolarBlue,
   getGordoActual,
+  getPronostico,
 } from '@/features/cotizaciones/api'
 
 /**
@@ -27,6 +28,15 @@ export const useClima = () =>
     queryFn: getClima,
     staleTime: 15 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000,
+    retry: 1,
+  })
+
+/** Pronóstico 7 días (Open-Meteo). Cambia poco → cache 1 h. */
+export const usePronostico = () =>
+  useQuery({
+    queryKey: ['pronostico'],
+    queryFn: getPronostico,
+    staleTime: 60 * 60 * 1000,
     retry: 1,
   })
 

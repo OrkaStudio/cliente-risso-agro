@@ -1,29 +1,6 @@
-import {
-  Cloud,
-  CloudDrizzle,
-  CloudFog,
-  CloudLightning,
-  CloudRain,
-  CloudSnow,
-  CloudSun,
-  Snowflake,
-  Sun,
-} from 'lucide-react'
+import { Snowflake } from 'lucide-react'
 import { useClima } from '@/features/cotizaciones/hooks'
-
-/** Ícono del ticker según el código WMO de open-meteo. */
-function WmoIcon({ code, className }: { code: number; className?: string }) {
-  if (code <= 1) return <Sun className={className} />
-  if (code === 2) return <CloudSun className={className} />
-  if (code === 45 || code === 48) return <CloudFog className={className} />
-  if (code >= 51 && code <= 57) return <CloudDrizzle className={className} />
-  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82))
-    return <CloudRain className={className} />
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86)
-    return <CloudSnow className={className} />
-  if (code >= 95) return <CloudLightning className={className} />
-  return <Cloud className={className} />
-}
+import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 
 /**
  * Slot del clima en el ticker (Open-Meteo): temperatura actual, máx/mín del

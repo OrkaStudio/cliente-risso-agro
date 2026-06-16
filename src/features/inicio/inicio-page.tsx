@@ -16,6 +16,7 @@ import {
 } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
+import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 
@@ -476,6 +477,9 @@ export function InicioPage() {
           </div>
         )}
       </Panel>
+
+      {/* Pronóstico 7 días del campo */}
+      <PronosticoPanel />
     </div>
   )
 }

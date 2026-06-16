@@ -136,6 +136,56 @@ export async function getClima(): Promise<Clima> {
   }
 }
 
+export type DiaPronostico = {
+  /** YYYY-MM-DD. */
+  fecha: string
+  code: number
+  descripcion: string
+  max: number
+  min: number
+  lluviaProb: number
+  lluviaMm: number
+  helada: boolean
+}
+
+/**
+ * Pronóstico de 7 días del campo principal (Open-Meteo, gratis, sin key).
+ */
+export async function getPronostico(): Promise<DiaPronostico[]> {
+  const { lat, lon } = CAMPO_PRINCIPAL
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum` +
+    `&timezone=America/Argentina/Buenos_Aires&forecast_days=7`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`open-meteo ${res.status}`)
+  const j = (await res.json()) as {
+    daily: {
+      time: string[]
+      weather_code: number[]
+      temperature_2m_max: number[]
+      temperature_2m_min: number[]
+      precipitation_probability_max: number[]
+      precipitation_sum: number[]
+    }
+  }
+  const d = j.daily
+  return d.time.map((fecha, i) => {
+    const code = d.weather_code[i] ?? 0
+    const min = d.temperature_2m_min[i] ?? 0
+    return {
+      fecha,
+      code,
+      descripcion: WMO[code] ?? '—',
+      max: Math.round(d.temperature_2m_max[i] ?? 0),
+      min: Math.round(min),
+      lluviaProb: Math.round(d.precipitation_probability_max[i] ?? 0),
+      lluviaMm: d.precipitation_sum[i] ?? 0,
+      helada: min <= 3,
+    }
+  })
+}
+
 export type Gordo = {
   /** $ por kg vivo. */
   valor: number
