@@ -238,11 +238,11 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
           >
             {/* Escanear comprobante (OCR con IA) */}
             <motion.div variants={fade}>
+              {/* Sin `capture`: el SO ofrece sacar foto O elegir un archivo. */}
               <input
                 ref={fileRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={onElegirFoto}
                 className="hidden"
               />
@@ -262,13 +262,13 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                 ) : (
                   <>
                     <Camera className="size-[18px]" />
-                    Escanear comprobante con una foto
+                    Escanear comprobante
                   </>
                 )}
               </button>
               <p className="mt-1.5 px-1 text-[11px] text-faint">
-                Sacale una foto al ticket o factura y completo los campos. Revisás
-                vos antes de guardar.
+                Sacale una foto al ticket o factura, o subí el archivo, y completo
+                los campos. Revisás vos antes de guardar.
               </p>
             </motion.div>
 
