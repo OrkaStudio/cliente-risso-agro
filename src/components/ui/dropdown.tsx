@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import {
   AnimatePresence,
   MotionConfig,
@@ -12,51 +13,41 @@ export type DropdownOption = {
   value: string
   label: string
   icon?: LucideIcon
-  /** Color del ícono (opcional). */
   color?: string
-}
-
-function useClickAway(
-  ref: React.RefObject<HTMLElement | null>,
-  handler: () => void,
-) {
-  React.useEffect(() => {
-    const listener = (e: MouseEvent | TouchEvent) => {
-      if (!ref.current || ref.current.contains(e.target as Node)) return
-      handler()
-    }
-    document.addEventListener('mousedown', listener)
-    document.addEventListener('touchstart', listener)
-    return () => {
-      document.removeEventListener('mousedown', listener)
-      document.removeEventListener('touchstart', listener)
-    }
-  }, [ref, handler])
 }
 
 const container: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { when: 'beforeChildren', staggerChildren: 0.04 },
+    transition: { when: 'beforeChildren', staggerChildren: 0.035 },
   },
 }
 const item: Variants = {
   hidden: { opacity: 0, y: -6 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.18 } },
+}
+
+type Pos = {
+  left: number
+  width: number
+  up: boolean
+  anchorTop: number
+  anchorBottom: number
+  maxH: number
 }
 
 /**
- * Dropdown animado (framer-motion) en el tema del sistema: porcelana/verde.
- * Reemplaza a los <select> nativos. Click-away + Escape para cerrar,
- * highlight que se desliza entre opciones.
+ * Dropdown animado (framer-motion) en el tema del sistema. Reemplaza a los
+ * <select> nativos. El menú se renderiza en un portal posicionado contra la
+ * ventana: nunca lo recorta un contenedor con scroll y **sube si no hay
+ * espacio abajo** (flip). Si hay muchas opciones, el menú scrollea.
  */
 export function Dropdown({
   value,
   onChange,
   options,
   className,
-  menuClassName,
   ariaLabel,
   block = false,
 }: {
@@ -64,29 +55,80 @@ export function Dropdown({
   onChange: (value: string) => void
   options: DropdownOption[]
   className?: string
-  menuClassName?: string
   ariaLabel?: string
-  /** Ancho completo (para formularios) en vez de ancho de contenido. */
   block?: boolean
 }) {
   const [open, setOpen] = React.useState(false)
   const [hovered, setHovered] = React.useState<string | null>(null)
-  const ref = React.useRef<HTMLDivElement>(null)
-  useClickAway(ref, () => setOpen(false))
+  const [pos, setPos] = React.useState<Pos | null>(null)
+  const btnRef = React.useRef<HTMLButtonElement>(null)
+  const menuRef = React.useRef<HTMLDivElement>(null)
 
   const selected = options.find((o) => o.value === value) ?? options[0]
   const activo = hovered ?? value
 
+  const place = React.useCallback(() => {
+    const el = btnRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const M = 8
+    const below = window.innerHeight - r.bottom
+    const above = r.top
+    const estimate = Math.min(options.length * 40 + 12, 320)
+    const up = below < Math.min(estimate, 260) && above > below
+    const maxH = Math.max(140, (up ? above : below) - M - 8)
+    setPos({
+      left: r.left,
+      width: r.width,
+      up,
+      anchorTop: r.top,
+      anchorBottom: r.bottom,
+      maxH,
+    })
+  }, [options.length])
+
+  // Posicionar al abrir + seguir al trigger en scroll/resize.
+  React.useLayoutEffect(() => {
+    if (!open) return
+    place()
+    const onMove = () => place()
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [open, place])
+
+  // Cerrar con click afuera (trigger + menú están en árboles distintos) o Escape.
+  React.useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      const t = e.target as Node
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
   return (
     <MotionConfig reducedMotion="user">
-      <div className={cn('relative', block ? 'w-full' : 'shrink-0')} ref={ref}>
+      <div className={cn('relative', block ? 'w-full' : 'inline-block')}>
         <button
+          ref={btnRef}
           type="button"
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label={ariaLabel}
           onClick={() => setOpen((o) => !o)}
-          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
           className={cn(
             'flex h-10 items-center justify-between gap-2 rounded-[10px] border border-border bg-card pl-3.5 pr-2.5 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors hover:border-faint focus-visible:ring-2 focus-visible:ring-field-soft',
             block && 'w-full',
@@ -111,31 +153,35 @@ export function Dropdown({
             <ChevronDown className="size-4" />
           </motion.span>
         </button>
+      </div>
 
+      {createPortal(
         <AnimatePresence>
-          {open && (
+          {open && pos && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{
-                opacity: 1,
-                height: 'auto',
-                transition: { type: 'spring', stiffness: 500, damping: 32 },
+              ref={menuRef}
+              role="listbox"
+              initial={{ opacity: 0, y: pos.up ? 6 : -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: pos.up ? 6 : -6 }}
+              transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+              style={{
+                position: 'fixed',
+                left: pos.left,
+                minWidth: pos.width,
+                maxWidth: window.innerWidth - pos.left - 8,
+                zIndex: 60,
+                ...(pos.up
+                  ? { bottom: window.innerHeight - pos.anchorTop + 8 }
+                  : { top: pos.anchorBottom + 8 }),
               }}
-              exit={{
-                opacity: 0,
-                height: 0,
-                transition: { type: 'spring', stiffness: 500, damping: 32 },
-              }}
-              className={cn(
-                'absolute left-0 top-full z-50 mt-2 min-w-full overflow-hidden',
-                menuClassName,
-              )}
             >
               <motion.div
                 variants={container}
                 initial="hidden"
                 animate="visible"
-                className="relative rounded-xl border border-border bg-card p-1 shadow-[0_12px_40px_rgba(16,30,20,0.16)]"
+                className="overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-[0_12px_40px_rgba(16,30,20,0.18)]"
+                style={{ maxHeight: pos.maxH }}
               >
                 {options.map((o) => {
                   const esActivo = o.value === activo
@@ -181,8 +227,9 @@ export function Dropdown({
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>
-      </div>
+        </AnimatePresence>,
+        document.body,
+      )}
     </MotionConfig>
   )
 }
