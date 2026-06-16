@@ -47,6 +47,11 @@ const AnaliticaPage = lazy(() =>
     default: m.AnaliticaPage,
   })),
 )
+const ChequesPage = lazy(() =>
+  import('@/features/cheques/cheques-page').then((m) => ({
+    default: m.ChequesPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -67,6 +72,7 @@ export const router = createBrowserRouter([
           { path: 'campos/:id', element: <CampoDetailPage /> },
           { path: 'potrero/:id', element: <PotreroDetailPage /> },
           { path: 'analitica', element: <AnaliticaPage /> },
+          { path: 'cheques', element: <ChequesPage /> },
         ],
       },
     ],

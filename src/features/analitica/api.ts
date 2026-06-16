@@ -70,14 +70,21 @@ export type NuevoMovimiento = {
   potreroId?: string | null
   monto: number
   fechaDevengo: string
+  fechaVencimiento?: string | null
   fechaCobroPago?: string | null
   medioPago?: MedioPago | null
   descripcion?: string
+  // Cheque / echeq (solo cuando medioPago === 'cheque')
+  esEcheq?: boolean
+  chequeNumero?: string | null
+  chequeBanco?: string | null
+  contraparte?: string | null
 }
 
 export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
   // estado derivado: si tiene fecha de cobro/pago, ya pasó por caja → liquidado.
   const liquidado = !!input.fechaCobroPago
+  const esCheque = input.medioPago === 'cheque'
   const { error } = await supabase.from('movimiento_financiero').insert({
     empresa_id: input.empresaId,
     tipo: input.tipo,
@@ -86,10 +93,15 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
     potrero_id: input.potreroId || null,
     monto: input.monto,
     fecha_devengo: input.fechaDevengo,
+    fecha_vencimiento: input.fechaVencimiento || null,
     fecha_cobro_pago: input.fechaCobroPago || null,
     medio_pago: input.medioPago || null,
     descripcion: input.descripcion?.trim() || null,
     estado: liquidado ? 'liquidado' : 'pendiente',
+    es_echeq: esCheque ? !!input.esEcheq : false,
+    cheque_numero: esCheque ? input.chequeNumero?.trim() || null : null,
+    cheque_banco: esCheque ? input.chequeBanco?.trim() || null : null,
+    contraparte: input.contraparte?.trim() || null,
   })
   if (error) throw new Error(error.message)
 }

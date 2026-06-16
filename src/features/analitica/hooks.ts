@@ -14,6 +14,11 @@ export function useCrearMovimiento() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: api.crearMovimiento,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['movimientos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['movimientos'] })
+      qc.invalidateQueries({ queryKey: ['pendientes'] })
+      qc.invalidateQueries({ queryKey: ['cheques'] })
+      qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
+    },
   })
 }

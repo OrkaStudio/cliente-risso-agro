@@ -41,9 +41,14 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
   const [potreroId, setPotreroId] = useState('')
   const [monto, setMonto] = useState('')
   const [fechaDevengo, setFechaDevengo] = useState(hoy())
+  const [fechaVencimiento, setFechaVencimiento] = useState('')
   const [fechaCobroPago, setFechaCobroPago] = useState('')
   const [medioPago, setMedioPago] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [esEcheq, setEsEcheq] = useState(false)
+  const [chequeNumero, setChequeNumero] = useState('')
+  const [chequeBanco, setChequeBanco] = useState('')
+  const [contraparte, setContraparte] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const categorias = useCategorias()
@@ -83,17 +88,27 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
         potreroId: potreroId || null,
         monto: montoNum,
         fechaDevengo,
+        fechaVencimiento: fechaVencimiento || null,
         fechaCobroPago: fechaCobroPago || null,
         medioPago: (medioPago ||
           null) as Database['public']['Enums']['medio_pago'] | null,
         descripcion,
+        esEcheq,
+        chequeNumero,
+        chequeBanco,
+        contraparte,
       })
       toast.success('Movimiento cargado')
       setOpen(false)
       setCategoriaId('')
       setMonto('')
       setDescripcion('')
+      setFechaVencimiento('')
       setFechaCobroPago('')
+      setEsEcheq(false)
+      setChequeNumero('')
+      setChequeBanco('')
+      setContraparte('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error')
     }
@@ -244,6 +259,19 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                 />
               </div>
               <div>
+                <label htmlFor="mv-vence" className={labelClass}>
+                  Vence el{' '}
+                  <span className="font-medium normal-case">(opcional)</span>
+                </label>
+                <input
+                  id="mv-vence"
+                  type="date"
+                  value={fechaVencimiento}
+                  onChange={(e) => setFechaVencimiento(e.target.value)}
+                  className={cn(fieldClass, '[color-scheme:light]')}
+                />
+              </div>
+              <div>
                 <label htmlFor="mv-cobro" className={labelClass}>
                   {esGasto ? 'Pagado' : 'Cobrado'}{' '}
                   <span className="font-medium normal-case">(opcional)</span>
@@ -293,6 +321,67 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                 />
               </div>
             </div>
+
+            {/* Datos del cheque (solo si el medio es cheque) */}
+            {medioPago === 'cheque' && (
+              <div className="grid gap-4 rounded-[11px] border border-border bg-secondary/50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+                    Datos del cheque
+                  </span>
+                  <label className="flex cursor-pointer items-center gap-2 text-[13px] font-semibold text-ink">
+                    <input
+                      type="checkbox"
+                      checked={esEcheq}
+                      onChange={(e) => setEsEcheq(e.target.checked)}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    Es echeq (electrónico)
+                  </label>
+                </div>
+                <div>
+                  <label htmlFor="mv-contraparte" className={labelClass}>
+                    {esGasto ? 'Beneficiario' : 'Emisor'}{' '}
+                    <span className="font-medium normal-case">(opcional)</span>
+                  </label>
+                  <input
+                    id="mv-contraparte"
+                    value={contraparte}
+                    onChange={(e) => setContraparte(e.target.value)}
+                    placeholder={esGasto ? 'A quién se lo das' : 'Quién lo libró'}
+                    className={fieldClass}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="mv-cheque-banco" className={labelClass}>
+                      Banco{' '}
+                      <span className="font-medium normal-case">(opcional)</span>
+                    </label>
+                    <input
+                      id="mv-cheque-banco"
+                      value={chequeBanco}
+                      onChange={(e) => setChequeBanco(e.target.value)}
+                      placeholder="Ej: Nación"
+                      className={fieldClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="mv-cheque-num" className={labelClass}>
+                      N° de cheque{' '}
+                      <span className="font-medium normal-case">(opcional)</span>
+                    </label>
+                    <input
+                      id="mv-cheque-num"
+                      value={chequeNumero}
+                      onChange={(e) => setChequeNumero(e.target.value)}
+                      placeholder="Ej: 4412"
+                      className={cn(fieldClass, 'tnum')}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <p className="flex items-start gap-2 rounded-[10px] bg-secondary px-3.5 py-2.5 text-xs text-muted-foreground">
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-sol-deep" />

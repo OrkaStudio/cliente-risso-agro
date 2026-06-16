@@ -5,6 +5,7 @@ import {
   Beef,
   ChevronLeft,
   CircleDollarSign,
+  Landmark,
   LayoutDashboard,
   Leaf,
   LogOut,
@@ -81,6 +82,7 @@ const NAV = [
   { to: '/hacienda', label: 'Hacienda', icon: Beef, end: false },
   { to: '/campos', label: 'Campos', icon: MapIcon, end: false },
   { to: '/analitica', label: 'Analítica', icon: BarChart3, end: false },
+  { to: '/cheques', label: 'Cheques', icon: Landmark, end: false },
 ]
 
 function initials(email?: string) {

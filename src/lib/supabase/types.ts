@@ -441,6 +441,10 @@ export type Database = {
           animal_id: string | null
           campo_id: string
           categoria_id: string
+          cheque_banco: string | null
+          cheque_numero: string | null
+          contraparte: string | null
+          es_echeq: boolean
           comprobante_url: string | null
           created_at: string
           created_by: string | null
@@ -463,6 +467,10 @@ export type Database = {
           animal_id?: string | null
           campo_id: string
           categoria_id: string
+          cheque_banco?: string | null
+          cheque_numero?: string | null
+          contraparte?: string | null
+          es_echeq?: boolean
           comprobante_url?: string | null
           created_at?: string
           created_by?: string | null
@@ -485,6 +493,10 @@ export type Database = {
           animal_id?: string | null
           campo_id?: string
           categoria_id?: string
+          cheque_banco?: string | null
+          cheque_numero?: string | null
+          contraparte?: string | null
+          es_echeq?: boolean
           comprobante_url?: string | null
           created_at?: string
           created_by?: string | null
