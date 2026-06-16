@@ -370,10 +370,12 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                           />
                         </div>
                         <div>
-                          <label className={label}>Medio de pago</label>
+                          <label className={label}>
+                            {esGasto ? 'Medio de pago' : 'Medio de cobro'}
+                          </label>
                           <Dropdown
                             block
-                            ariaLabel="Medio de pago"
+                            ariaLabel={esGasto ? 'Medio de pago' : 'Medio de cobro'}
                             value={medioPago}
                             onChange={setMedioPago}
                             options={[
