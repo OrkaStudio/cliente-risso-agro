@@ -14,6 +14,8 @@ import {
   estadoCicloLabel,
   tipoCampoLabel,
 } from '@/features/campos/labels'
+import { useEmpresa } from '@/features/empresa/use-empresa'
+import { PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { usePotreroDetalle } from '@/features/potrero/hooks'
 import type { PotreroDetalle } from '@/features/potrero/api'
 import { CultivoDialog } from '@/features/potrero/cultivo-dialog'
@@ -184,6 +186,8 @@ function CampanaAgricola({ d }: { d: PotreroDetalle }) {
 
 export function PotreroDetailPage() {
   const { id = '' } = useParams()
+  const empresa = useEmpresa()
+  const empresaId = empresa.data?.empresa_id ?? ''
   const { data, isLoading, error } = usePotreroDetalle(id)
 
   if (isLoading) {
@@ -223,26 +227,54 @@ export function PotreroDetailPage() {
           <ChevronLeft className="size-4" />
           Inicio
         </Link>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-            {data.nombre}
-          </h1>
-          <span
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[12px] font-bold"
-            style={{
-              color: estadoCicloColor[data.estadoCiclo],
-              background: `color-mix(in srgb, ${estadoCicloColor[data.estadoCiclo]} 14%, transparent)`,
-            }}
-          >
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
+              {data.nombre}
+            </h1>
             <span
-              className="size-1.5 rounded-full"
-              style={{ background: estadoCicloColor[data.estadoCiclo] }}
-            />
-            {estadoCicloLabel[data.estadoCiclo]}
-          </span>
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[12px] font-bold"
+              style={{
+                color: estadoCicloColor[data.estadoCiclo],
+                background: `color-mix(in srgb, ${estadoCicloColor[data.estadoCiclo]} 14%, transparent)`,
+              }}
+            >
+              <span
+                className="size-1.5 rounded-full"
+                style={{ background: estadoCicloColor[data.estadoCiclo] }}
+              />
+              {estadoCicloLabel[data.estadoCiclo]}
+            </span>
+          </div>
+          <PotreroFormDialog
+            empresaId={empresaId}
+            campoId={data.campoId}
+            potrero={{
+              id: data.id,
+              nombre: data.nombre,
+              estado_ciclo: data.estadoCiclo,
+              hectareas: data.hectareas,
+              campo_id: data.campoId,
+              empresa_id: empresaId,
+              establecimiento_id: null,
+              created_at: '',
+              cultivo: data.cultivo,
+              variedad: data.variedad,
+              fecha_siembra: data.fechaSiembra,
+              fecha_cosecha_estimada: data.fechaCosechaEstimada,
+            }}
+            triggerLabel="Editar potrero"
+            triggerVariant="outline"
+          />
         </div>
         <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-          {data.campoNombre} · {tipoCampoLabel[data.campoTipo]}
+          <Link
+            to={`/campos/${data.campoId}`}
+            className="font-semibold text-field-deep hover:underline"
+          >
+            {data.campoNombre}
+          </Link>{' '}
+          · {tipoCampoLabel[data.campoTipo]}
         </p>
       </div>
 

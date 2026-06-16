@@ -1,27 +1,19 @@
-import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Beef,
   CalendarClock,
   LandPlot,
-  Leaf,
   MapPin,
-  Sprout,
-  Tractor,
   TrendingUp,
   Wallet,
-  Wheat,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
-import {
-  estadoCicloColor,
-  estadoCicloLabel,
-  tipoCampoLabel,
-} from '@/features/campos/labels'
+import { tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
+import { PotreroCard } from '@/features/potrero/potrero-card'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 
@@ -32,20 +24,6 @@ function fmtCompact(n: number): string {
     return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
   if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
   return `${sign}$${abs}`
-}
-
-const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-
-/** "12/10" a partir de YYYY-MM-DD. */
-function ddmm(fecha: string): string {
-  const [, m, d] = fecha.split('-')
-  return `${d}/${m}`
-}
-
-/** "mar" (mes abreviado) a partir de YYYY-MM-DD. */
-function mesAbrev(fecha: string): string {
-  const m = Number(fecha.slice(5, 7))
-  return MESES_ABREV[m - 1] ?? ''
 }
 
 function fechaLarga(): string {
@@ -203,147 +181,6 @@ function DonutStock({
         ))}
       </div>
     </div>
-  )
-}
-
-/* Ícono según el estado del ciclo del potrero. */
-function CicloIcon({
-  estado,
-  className,
-  style,
-}: {
-  estado: Database['public']['Enums']['estado_ciclo_potrero']
-  className?: string
-  style?: CSSProperties
-}) {
-  const props = { className, style }
-  switch (estado) {
-    case 'ganadero':
-      return <Beef {...props} />
-    case 'descanso':
-      return <Leaf {...props} />
-    case 'preparacion':
-      return <Tractor {...props} />
-    case 'siembra':
-      return <Sprout {...props} />
-    case 'cultivo':
-      return <Sprout {...props} />
-    case 'cosecha':
-    case 'rastrojo':
-      return <Wheat {...props} />
-    default:
-      return <Leaf {...props} />
-  }
-}
-
-/* ===== Card de potrero (estado de los campos) ===== */
-function PotreroCard({ p }: { p: PotreroPanorama }) {
-  const densidad =
-    p.hectareas && p.hectareas > 0 ? p.cabezas / p.hectareas : null
-  const color = estadoCicloColor[p.estadoCiclo]
-  const totalComp = p.porCategoria.reduce((s, c) => s + c.cabezas, 0)
-  const conHacienda = p.cabezas > 0 && totalComp > 0
-
-  return (
-    <Link
-      to={`/potrero/${p.id}`}
-      style={{ borderLeftColor: color, borderLeftWidth: '3px' }}
-      className="block rounded-[11px] border border-border bg-secondary/60 p-4 transition-shadow hover:shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
-    >
-      {/* Encabezado: nombre + estado del ciclo */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 font-heading text-base font-semibold text-ink">
-          {p.nombre}
-        </div>
-        <span
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[11px] font-bold"
-          style={{
-            color,
-            background: `color-mix(in srgb, ${color} 14%, transparent)`,
-          }}
-        >
-          <span className="size-1.5 rounded-full" style={{ background: color }} />
-          {estadoCicloLabel[p.estadoCiclo]}
-        </span>
-      </div>
-
-      {conHacienda ? (
-        <>
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="tnum text-[26px] font-bold leading-none text-ink">
-              {p.cabezas}
-            </span>
-            <span className="text-xs text-muted-foreground">cab</span>
-          </div>
-          {/* Barra de composición por categoría */}
-          <div className="mt-2.5 flex h-2.5 gap-0.5 overflow-hidden rounded-full">
-            {p.porCategoria.map((c) => (
-              <span
-                key={c.categoria}
-                style={{
-                  width: `${(c.cabezas / totalComp) * 100}%`,
-                  background: categoriaColor[c.categoria],
-                }}
-                title={`${categoriaLabel[c.categoria]}: ${c.cabezas}`}
-              />
-            ))}
-          </div>
-          {/* Leyenda: principales categorías */}
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]">
-            {p.porCategoria.slice(0, 2).map((c) => (
-              <span key={c.categoria} className="flex items-center gap-1.5">
-                <span
-                  className="size-2 shrink-0 rounded-full"
-                  style={{ background: categoriaColor[c.categoria] }}
-                />
-                <span className="text-muted-foreground">
-                  {categoriaLabel[c.categoria]}
-                </span>
-                <b className="tnum font-bold text-ink">{c.cabezas}</b>
-              </span>
-            ))}
-            {p.porCategoria.length > 2 && (
-              <span className="font-semibold text-faint">
-                +{p.porCategoria.length - 2}
-              </span>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="mt-3">
-          <div className="flex items-center gap-2">
-            <CicloIcon
-              estado={p.estadoCiclo}
-              className="size-[18px] shrink-0"
-              style={{ color }}
-            />
-            <span className="truncate text-sm font-semibold text-ink">
-              {p.cultivo ?? estadoCicloLabel[p.estadoCiclo]}
-            </span>
-            <span className="shrink-0 text-xs text-faint">· sin hacienda</span>
-          </div>
-          {(p.fechaSiembra || p.fechaCosechaEstimada) && (
-            <div className="tnum mt-1.5 text-xs text-muted-foreground">
-              {p.fechaSiembra && `sembrado ${ddmm(p.fechaSiembra)}`}
-              {p.fechaSiembra && p.fechaCosechaEstimada && ' · '}
-              {p.fechaCosechaEstimada &&
-                `cosecha ~${mesAbrev(p.fechaCosechaEstimada)}`}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="mt-3 flex min-h-4 gap-3 text-xs font-medium text-muted-foreground">
-        <span className="tnum">
-          {p.hectareas != null ? `${p.hectareas} ha` : 's/ sup.'}
-        </span>
-        {densidad != null && conHacienda && (
-          <span className="tnum">
-            {densidad.toFixed(1).replace('.', ',')} cab/ha
-          </span>
-        )}
-      </div>
-    </Link>
   )
 }
 
