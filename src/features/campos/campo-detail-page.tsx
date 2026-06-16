@@ -4,7 +4,8 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCamposConPotreros } from '@/features/campos/hooks'
 import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { tipoCampoLabel } from '@/features/campos/labels'
-import { PotreroCard } from '@/features/potrero/potrero-card'
+import { SuperficieMapa } from '@/features/campos/superficie-mapa'
+import { Panel } from '@/components/panel'
 
 function StatCell({
   label,
@@ -136,7 +137,7 @@ export function CampoDetailPage() {
         />
       </div>
 
-      {/* Mosaico de potreros */}
+      {/* Mapa de superficie */}
       {campo.potreros.length === 0 ? (
         <section className="rounded-[14px] border border-border bg-card p-10 text-center shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
           <p className="text-sm text-muted-foreground">
@@ -145,11 +146,12 @@ export function CampoDetailPage() {
           </p>
         </section>
       ) : (
-        <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-          {campo.potreros.map((p) => (
-            <PotreroCard key={p.id} p={p} />
-          ))}
-        </div>
+        <Panel
+          title="Mapa de superficie"
+          sub="cada bloque ∝ hectáreas · tocá uno para entrar"
+        >
+          <SuperficieMapa potreros={campo.potreros} />
+        </Panel>
       )}
     </div>
   )

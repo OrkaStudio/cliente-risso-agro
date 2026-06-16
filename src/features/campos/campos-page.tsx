@@ -5,7 +5,7 @@ import { useCamposConPotreros } from '@/features/campos/hooks'
 import type { CampoConPotreros } from '@/features/campos/api'
 import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { tipoCampoLabel } from '@/features/campos/labels'
-import { PotreroCard } from '@/features/potrero/potrero-card'
+import { SuperficieMapa } from '@/features/campos/superficie-mapa'
 
 function CampoSection({
   campo,
@@ -63,11 +63,7 @@ function CampoSection({
           Este campo no tiene potreros todavía.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-          {campo.potreros.map((p) => (
-            <PotreroCard key={p.id} p={p} />
-          ))}
-        </div>
+        <SuperficieMapa potreros={campo.potreros} />
       )}
     </section>
   )
