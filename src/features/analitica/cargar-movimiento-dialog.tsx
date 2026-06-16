@@ -1,13 +1,16 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  Camera,
   ChevronDown,
   CircleCheck,
   Clock,
+  Loader2,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 import { Constants, type Database } from '@/lib/supabase/types'
 import { useCampos, usePotreros } from '@/features/campos/hooks'
 import { useCategorias, useCrearMovimiento } from '@/features/analitica/hooks'
@@ -38,6 +41,35 @@ const medioPagoLabel: Record<MedioPago, string> = {
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
+type ComprobanteOCR = {
+  tipo: TipoMov | null
+  monto: number | null
+  fecha: string | null
+  descripcion: string | null
+  contraparte: string | null
+  categoria_id: string | null
+  confianza: 'alta' | 'media' | 'baja'
+}
+
+/** Achica la foto antes de mandarla (menos tokens = menos costo) y la pasa a base64 JPEG. */
+async function fotoAJpegBase64(
+  file: File,
+): Promise<{ base64: string; mediaType: string }> {
+  const bitmap = await createImageBitmap(file)
+  const max = 1500
+  const escala = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const w = Math.round(bitmap.width * escala)
+  const h = Math.round(bitmap.height * escala)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No se pudo procesar la imagen')
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+  return { base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' }
+}
+
 const stagger: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.05 } },
@@ -65,6 +97,8 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
   const [contraparte, setContraparte] = useState('')
   const [masOpciones, setMasOpciones] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [escaneando, setEscaneando] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const categorias = useCategorias()
   const campos = useCampos()
@@ -100,6 +134,51 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
     setChequeBanco('')
     setContraparte('')
     setMasOpciones(false)
+  }
+
+  async function onElegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite re-elegir la misma foto
+    if (!file) return
+    setError(null)
+    setEscaneando(true)
+    try {
+      const { base64, mediaType } = await fotoAJpegBase64(file)
+      const cats = (categorias.data ?? []).map((c) => ({
+        id: c.id,
+        nombre: c.nombre,
+        grupo: c.grupo,
+        aplica_a: c.aplica_a,
+      }))
+      const { data, error: fnError } = await supabase.functions.invoke<ComprobanteOCR>(
+        'extraer-comprobante',
+        { body: { imageBase64: base64, mediaType, categorias: cats } },
+      )
+      if (fnError) throw new Error(fnError.message)
+      if (!data || 'error' in data)
+        throw new Error((data as { error?: string })?.error ?? 'No se pudo leer')
+
+      // Pre-llenar — sugiere, no impone. El usuario revisa y confirma.
+      if (data.tipo === 'gasto' || data.tipo === 'ingreso') setTipo(data.tipo)
+      if (data.monto && data.monto > 0) setMonto(String(Math.round(data.monto)))
+      if (data.fecha) setFecha(data.fecha)
+      if (data.categoria_id) setCategoriaId(data.categoria_id)
+      if (data.descripcion) setDescripcion(data.descripcion)
+      if (data.contraparte) setContraparte(data.contraparte)
+      if (data.descripcion || data.contraparte) setMasOpciones(true)
+
+      if (data.confianza === 'baja')
+        toast.warning('Leí el comprobante pero la imagen es difícil. Revisá bien los datos.')
+      else toast.success('Listo, revisá los datos antes de guardar.')
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `No pude leer el comprobante: ${err.message}`
+          : 'No pude leer el comprobante',
+      )
+    } finally {
+      setEscaneando(false)
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -157,6 +236,42 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
             animate="show"
             className="grid gap-4"
           >
+            {/* Escanear comprobante (OCR con IA) */}
+            <motion.div variants={fade}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={onElegirFoto}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={escaneando}
+                className={cn(
+                  'flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-field-soft/40 px-4 py-3 text-sm font-bold text-field-deep transition-colors hover:bg-field-soft disabled:opacity-60',
+                )}
+              >
+                {escaneando ? (
+                  <>
+                    <Loader2 className="size-[18px] animate-spin" />
+                    Leyendo comprobante…
+                  </>
+                ) : (
+                  <>
+                    <Camera className="size-[18px]" />
+                    Escanear comprobante con una foto
+                  </>
+                )}
+              </button>
+              <p className="mt-1.5 px-1 text-[11px] text-faint">
+                Sacale una foto al ticket o factura y completo los campos. Revisás
+                vos antes de guardar.
+              </p>
+            </motion.div>
+
             {/* Tipo */}
             <motion.div variants={fade} className="grid grid-cols-2 gap-2.5">
               <button
