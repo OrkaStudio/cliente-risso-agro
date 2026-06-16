@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { motion, type Variants } from 'framer-motion'
 import { ArrowDownLeft, ArrowUpRight, CircleCheck, Landmark } from 'lucide-react'
@@ -310,7 +310,14 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
 }
 
 // --- Liquidar (marcar cobrado/pagado) --------------------------------
-export function LiquidarChequeDialog({ cheque }: { cheque: Cheque }) {
+export function LiquidarChequeDialog({
+  cheque,
+  trigger,
+}: {
+  cheque: Cheque
+  /** Si se pasa, se usa como disparador en vez del botón por defecto. */
+  trigger?: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const [fecha, setFecha] = useState(hoy())
   const [error, setError] = useState<string | null>(null)
@@ -331,14 +338,20 @@ export function LiquidarChequeDialog({ cheque }: { cheque: Cheque }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] font-semibold text-field-deep transition-colors hover:border-primary hover:bg-field-soft"
-      >
-        <CircleCheck className="size-3.5" />
-        {cobro ? 'Marcar cobrado' : 'Marcar pagado'}
-      </button>
+      {trigger ? (
+        <span className="contents" onClick={() => setOpen(true)}>
+          {trigger}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12.5px] font-semibold text-field-deep transition-colors hover:border-primary hover:bg-field-soft"
+        >
+          <CircleCheck className="size-3.5" />
+          {cobro ? 'Marcar cobrado' : 'Marcar pagado'}
+        </button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="rounded-2xl sm:max-w-[380px]">
           <DialogHeader>

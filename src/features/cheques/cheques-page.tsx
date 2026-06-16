@@ -8,6 +8,7 @@ import {
   CargarChequeDialog,
   LiquidarChequeDialog,
 } from '@/features/cheques/cheques-dialogs'
+import { ChequesCalendario } from '@/features/cheques/cheques-calendario'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 
@@ -30,18 +31,8 @@ function diasInfo(c: Cheque): { texto: string; urgente: boolean } {
   return { texto: `en ${dias} d`, urgente: dias <= 3 }
 }
 
-function mesLabel(ym: string): string {
-  if (ym === 'sin') return 'Sin fecha de vencimiento'
-  const [y, m] = ym.split('-').map(Number)
-  const s = new Date(y, m - 1, 1).toLocaleDateString('es-AR', {
-    month: 'long',
-    year: 'numeric',
-  })
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
 type Filtro = 'todos' | 'cobrar' | 'pagar'
-type Vista = 'tabla' | 'agenda'
+type Vista = 'tabla' | 'calendario'
 
 export function ChequesPage() {
   const empresa = useEmpresa()
@@ -88,32 +79,11 @@ export function ChequesPage() {
     [data, porFiltro, verLiquidados],
   )
 
-  // Agenda: pendientes agrupados por mes de vencimiento (orden cronológico).
-  const meses = useMemo(() => {
-    const pend = data.filter((c) => c.estado === 'pendiente' && porFiltro(c))
-    const orden: string[] = []
-    const grupos = new Map<string, Cheque[]>()
-    for (const c of pend) {
-      const k = c.fechaVencimiento ? c.fechaVencimiento.slice(0, 7) : 'sin'
-      if (!grupos.has(k)) {
-        grupos.set(k, [])
-        orden.push(k)
-      }
-      grupos.get(k)!.push(c)
-    }
-    // 'sin' siempre al final
-    orden.sort((a, b) => (a === 'sin' ? 1 : b === 'sin' ? -1 : a < b ? -1 : 1))
-    return orden.map((k) => {
-      const items = grupos.get(k)!
-      const aCobrar = items
-        .filter((c) => c.tipo === 'ingreso')
-        .reduce((s, c) => s + c.monto, 0)
-      const aPagar = items
-        .filter((c) => c.tipo === 'gasto')
-        .reduce((s, c) => s + c.monto, 0)
-      return { key: k, items, aCobrar, aPagar, neto: aCobrar - aPagar }
-    })
-  }, [data, porFiltro])
+  // Calendario: pendientes filtrados (se ubican por fecha de vencimiento).
+  const pendientesFiltrados = useMemo(
+    () => data.filter((c) => c.estado === 'pendiente' && porFiltro(c)),
+    [data, porFiltro],
+  )
 
   async function onRevertir(c: Cheque) {
     try {
@@ -169,7 +139,7 @@ export function ChequesPage() {
           {(
             [
               ['tabla', 'Tabla'],
-              ['agenda', 'Agenda'],
+              ['calendario', 'Calendario'],
             ] as [Vista, string][]
           ).map(([v, lbl]) => (
             <button
@@ -353,102 +323,7 @@ export function ChequesPage() {
           )}
         </Panel>
       ) : (
-        // Vista agenda
-        <div className="flex flex-col gap-4">
-          {meses.length === 0 ? (
-            <Panel>
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                No hay cheques pendientes con ese filtro.
-              </p>
-            </Panel>
-          ) : (
-            meses.map((g) => (
-              <Panel key={g.key} className="p-0">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-                  <span className="font-heading text-[15px] font-bold text-ink">
-                    {mesLabel(g.key)}
-                  </span>
-                  <div className="flex items-center gap-4 text-[12.5px] font-semibold">
-                    {g.aCobrar > 0 && (
-                      <span className="text-field-deep">
-                        +{fmt(g.aCobrar)}
-                      </span>
-                    )}
-                    {g.aPagar > 0 && (
-                      <span className="text-tierra">−{fmt(g.aPagar)}</span>
-                    )}
-                    <span
-                      className={cn(
-                        'tnum',
-                        g.neto >= 0 ? 'text-ink' : 'text-destructive',
-                      )}
-                    >
-                      neto {g.neto >= 0 ? '+' : '−'}
-                      {fmt(Math.abs(g.neto))}
-                    </span>
-                  </div>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {g.items.map((c) => {
-                    const di = diasInfo(c)
-                    const cobro = c.tipo === 'ingreso'
-                    return (
-                      <div
-                        key={c.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3"
-                      >
-                        <span
-                          className={cn(
-                            'tnum w-24 shrink-0 text-[12.5px] font-bold',
-                            di.urgente ? 'text-destructive' : 'text-muted-foreground',
-                          )}
-                        >
-                          {c.fechaVencimiento
-                            ? c.fechaVencimiento.split('-').reverse().join('/')
-                            : '—'}
-                        </span>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-bold uppercase',
-                            cobro
-                              ? 'bg-field-soft text-field-deep'
-                              : 'bg-tierra-soft text-tierra',
-                          )}
-                        >
-                          {cobro ? 'Cobro' : 'Pago'}
-                        </span>
-                        {c.esEcheq && (
-                          <span className="rounded-md bg-sky/15 px-1.5 py-0.5 text-[10.5px] font-bold uppercase text-sky">
-                            echeq
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-                          {c.contraparte ?? c.descripcion ?? '—'}
-                          {c.banco && (
-                            <span className="font-normal text-faint">
-                              {' '}
-                              · {c.banco}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className={cn(
-                            'tnum text-sm font-bold',
-                            cobro ? 'text-field-deep' : 'text-ink',
-                          )}
-                        >
-                          {cobro ? '+' : '−'}
-                          {fmt(c.monto)}
-                        </span>
-                        <LiquidarChequeDialog cheque={c} />
-                      </div>
-                    )
-                  })}
-                </div>
-              </Panel>
-            ))
-          )}
-        </div>
+        <ChequesCalendario cheques={pendientesFiltrados} />
       )}
     </div>
   )
