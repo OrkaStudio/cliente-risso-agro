@@ -3,9 +3,13 @@ import {
   Beef,
   CalendarClock,
   LandPlot,
+  Leaf,
   MapPin,
+  Sprout,
+  Tractor,
   TrendingUp,
   Wallet,
+  Wheat,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
@@ -187,15 +191,48 @@ function DonutStock({
   )
 }
 
+/* Ícono según el estado del ciclo del potrero. */
+function CicloIcon({
+  estado,
+  className,
+}: {
+  estado: Database['public']['Enums']['estado_ciclo_potrero']
+  className?: string
+}) {
+  switch (estado) {
+    case 'ganadero':
+      return <Beef className={className} />
+    case 'descanso':
+      return <Leaf className={className} />
+    case 'preparacion':
+      return <Tractor className={className} />
+    case 'siembra':
+      return <Sprout className={className} />
+    case 'cultivo':
+      return <Sprout className={className} />
+    case 'cosecha':
+    case 'rastrojo':
+      return <Wheat className={className} />
+    default:
+      return <Leaf className={className} />
+  }
+}
+
 /* ===== Card de potrero (estado de los campos) ===== */
 function PotreroCard({ p }: { p: PotreroPanorama }) {
   const densidad =
     p.hectareas && p.hectareas > 0 ? p.cabezas / p.hectareas : null
+  const color = estadoCicloColor[p.estadoCiclo]
+  const totalComp = p.porCategoria.reduce((s, c) => s + c.cabezas, 0)
+  const conHacienda = p.cabezas > 0 && totalComp > 0
+
   return (
     <Link
       to={`/potrero/${p.id}`}
+      style={{ borderLeftColor: color, borderLeftWidth: '3px' }}
       className="block rounded-[11px] border border-border bg-secondary/60 p-4 transition-shadow hover:shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
     >
+      {/* Encabezado: nombre + estado del ciclo */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 font-heading text-base font-semibold text-ink">
           {p.nombre}
@@ -203,35 +240,72 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
         <span
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[11px] font-bold"
           style={{
-            color: estadoCicloColor[p.estadoCiclo],
-            background: 'color-mix(in srgb, ' + estadoCicloColor[p.estadoCiclo] + ' 14%, transparent)',
+            color,
+            background: `color-mix(in srgb, ${color} 14%, transparent)`,
           }}
         >
-          <span
-            className="size-1.5 rounded-full"
-            style={{ background: estadoCicloColor[p.estadoCiclo] }}
-          />
+          <span className="size-1.5 rounded-full" style={{ background: color }} />
           {estadoCicloLabel[p.estadoCiclo]}
         </span>
       </div>
-      <div className="mt-4 flex items-baseline gap-1">
-        <span
-          className={cn(
-            'tnum text-[28px] font-bold leading-none',
-            p.cabezas === 0 ? 'text-faint' : 'text-ink',
-          )}
-        >
-          {p.cabezas}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {p.cabezas === 0 ? 'sin hacienda' : 'cab'}
-        </span>
-      </div>
-      <div className="mt-2 flex min-h-4 gap-3 text-xs font-medium text-muted-foreground">
+
+      {conHacienda ? (
+        <>
+          <div className="mt-3 flex items-baseline gap-1">
+            <span className="tnum text-[26px] font-bold leading-none text-ink">
+              {p.cabezas}
+            </span>
+            <span className="text-xs text-muted-foreground">cab</span>
+          </div>
+          {/* Barra de composición por categoría */}
+          <div className="mt-2.5 flex h-2.5 gap-0.5 overflow-hidden rounded-full">
+            {p.porCategoria.map((c) => (
+              <span
+                key={c.categoria}
+                style={{
+                  width: `${(c.cabezas / totalComp) * 100}%`,
+                  background: categoriaColor[c.categoria],
+                }}
+                title={`${categoriaLabel[c.categoria]}: ${c.cabezas}`}
+              />
+            ))}
+          </div>
+          {/* Leyenda: principales categorías */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]">
+            {p.porCategoria.slice(0, 2).map((c) => (
+              <span key={c.categoria} className="flex items-center gap-1.5">
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ background: categoriaColor[c.categoria] }}
+                />
+                <span className="text-muted-foreground">
+                  {categoriaLabel[c.categoria]}
+                </span>
+                <b className="tnum font-bold text-ink">{c.cabezas}</b>
+              </span>
+            ))}
+            {p.porCategoria.length > 2 && (
+              <span className="font-semibold text-faint">
+                +{p.porCategoria.length - 2}
+              </span>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="mt-3 flex items-center gap-2">
+          <CicloIcon estado={p.estadoCiclo} className="size-[18px]" />
+          <span className="text-sm font-semibold text-ink">
+            {estadoCicloLabel[p.estadoCiclo]}
+          </span>
+          <span className="text-xs text-faint">· sin hacienda</span>
+        </div>
+      )}
+
+      <div className="mt-3 flex min-h-4 gap-3 text-xs font-medium text-muted-foreground">
         <span className="tnum">
           {p.hectareas != null ? `${p.hectareas} ha` : 's/ sup.'}
         </span>
-        {densidad != null && (
+        {densidad != null && conHacienda && (
           <span className="tnum">
             {densidad.toFixed(1).replace('.', ',')} cab/ha
           </span>

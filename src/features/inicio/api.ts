@@ -16,6 +16,8 @@ export type PotreroPanorama = {
   estadoCiclo: EstadoCiclo
   hectareas: number | null
   cabezas: number
+  /** Composición de la hacienda del potrero, por categoría (desc). */
+  porCategoria: CategoriaConteo[]
 }
 
 export type Vencimiento = {
@@ -53,7 +55,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
   ] = await Promise.all([
     supabase
       .from('v_animal_con_caravana')
-      .select('categoria, estado')
+      .select('categoria, estado, potrero_id')
       .eq('estado', 'activo'),
     supabase
       .from('potrero')
@@ -83,6 +85,15 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     .sort((a, b) => b.cabezas - a.cabezas)
   const totalCabezas = porCategoria.reduce((s, c) => s + c.cabezas, 0)
 
+  // Composición por potrero: categoría → cabezas
+  const catPorPotrero = new Map<string, Map<Categoria, number>>()
+  for (const a of animales ?? []) {
+    if (!a.categoria || !a.potrero_id) continue
+    const m = catPorPotrero.get(a.potrero_id) ?? new Map<Categoria, number>()
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    catPorPotrero.set(a.potrero_id, m)
+  }
+
   // Cabezas por potrero
   const cab = new Map(
     (stock ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
@@ -93,6 +104,11 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       nombre: string
       tipo: TipoCampo
     } | null
+    const composicion: CategoriaConteo[] = [
+      ...(catPorPotrero.get(p.id)?.entries() ?? []),
+    ]
+      .map(([categoria, cabezas]) => ({ categoria, cabezas }))
+      .sort((a, b) => b.cabezas - a.cabezas)
     return {
       id: p.id,
       nombre: p.nombre,
@@ -102,6 +118,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       estadoCiclo: p.estado_ciclo,
       hectareas: p.hectareas,
       cabezas: cab.get(p.id) ?? 0,
+      porCategoria: composicion,
     }
   })
 
