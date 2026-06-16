@@ -18,6 +18,10 @@ export type PotreroPanorama = {
   cabezas: number
   /** Composición de la hacienda del potrero, por categoría (desc). */
   porCategoria: CategoriaConteo[]
+  /** Campaña agrícola actual (carga manual). null si no aplica. */
+  cultivo: string | null
+  fechaSiembra: string | null
+  fechaCosechaEstimada: string | null
 }
 
 export type Vencimiento = {
@@ -59,7 +63,9 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       .eq('estado', 'activo'),
     supabase
       .from('potrero')
-      .select('id, nombre, estado_ciclo, hectareas, campo:campo(id, nombre, tipo)')
+      .select(
+        'id, nombre, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada, campo:campo(id, nombre, tipo)',
+      )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
     supabase.from('v_flujo_caja').select('neto'),
@@ -119,6 +125,9 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       hectareas: p.hectareas,
       cabezas: cab.get(p.id) ?? 0,
       porCategoria: composicion,
+      cultivo: p.cultivo,
+      fechaSiembra: p.fecha_siembra,
+      fechaCosechaEstimada: p.fecha_cosecha_estimada,
     }
   })
 

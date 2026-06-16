@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { getPotreroDetalle } from '@/features/potrero/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { actualizarCultivo, getPotreroDetalle } from '@/features/potrero/api'
 
 export const usePotreroDetalle = (id: string) =>
   useQuery({
@@ -7,3 +7,14 @@ export const usePotreroDetalle = (id: string) =>
     queryFn: () => getPotreroDetalle(id),
     enabled: Boolean(id),
   })
+
+export function useActualizarCultivo(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: actualizarCultivo,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['potrero-detalle', id] })
+      qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
+    },
+  })
+}

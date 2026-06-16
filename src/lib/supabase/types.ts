@@ -616,32 +616,44 @@ export type Database = {
         Row: {
           campo_id: string
           created_at: string
+          cultivo: string | null
           empresa_id: string
           establecimiento_id: string | null
           estado_ciclo: Database["public"]["Enums"]["estado_ciclo_potrero"]
+          fecha_cosecha_estimada: string | null
+          fecha_siembra: string | null
           hectareas: number | null
           id: string
           nombre: string
+          variedad: string | null
         }
         Insert: {
           campo_id: string
           created_at?: string
+          cultivo?: string | null
           empresa_id: string
           establecimiento_id?: string | null
           estado_ciclo?: Database["public"]["Enums"]["estado_ciclo_potrero"]
+          fecha_cosecha_estimada?: string | null
+          fecha_siembra?: string | null
           hectareas?: number | null
           id?: string
           nombre: string
+          variedad?: string | null
         }
         Update: {
           campo_id?: string
           created_at?: string
+          cultivo?: string | null
           empresa_id?: string
           establecimiento_id?: string | null
           estado_ciclo?: Database["public"]["Enums"]["estado_ciclo_potrero"]
+          fecha_cosecha_estimada?: string | null
+          fecha_siembra?: string | null
           hectareas?: number | null
           id?: string
           nombre?: string
+          variedad?: string | null
         }
         Relationships: [
           {

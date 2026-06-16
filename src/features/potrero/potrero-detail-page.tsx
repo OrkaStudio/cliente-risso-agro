@@ -1,5 +1,13 @@
+import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Beef, ChevronLeft, LandPlot, Scale, TrendingUp } from 'lucide-react'
+import {
+  Beef,
+  ChevronLeft,
+  LandPlot,
+  Scale,
+  Sprout,
+  TrendingUp,
+} from 'lucide-react'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
 import {
   estadoCicloColor,
@@ -8,8 +16,16 @@ import {
 } from '@/features/campos/labels'
 import { usePotreroDetalle } from '@/features/potrero/hooks'
 import type { PotreroDetalle } from '@/features/potrero/api'
+import { CultivoDialog } from '@/features/potrero/cultivo-dialog'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
+
+/** "12/10/26" a partir de YYYY-MM-DD. */
+function fmtFecha(f: string | null): string | null {
+  if (!f) return null
+  const [y, m, d] = f.split('-')
+  return `${d}/${m}/${y.slice(2)}`
+}
 
 function fmtCompact(n: number): string {
   const abs = Math.abs(n)
@@ -117,6 +133,55 @@ function StockCategoria({ d }: { d: PotreroDetalle }) {
   )
 }
 
+/* ===== Campaña agrícola (cultivo + fechas, carga manual) ===== */
+function CampoStat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold text-ink">{children}</div>
+    </div>
+  )
+}
+
+function CampanaAgricola({ d }: { d: PotreroDetalle }) {
+  const tiene = Boolean(
+    d.cultivo || d.fechaSiembra || d.fechaCosechaEstimada || d.variedad,
+  )
+  return (
+    <Panel
+      title="Campaña agrícola"
+      action={
+        <CultivoDialog potrero={d} triggerLabel={tiene ? 'Editar' : '+ Cargar'} />
+      }
+    >
+      {tiene ? (
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
+          <CampoStat label="Cultivo">
+            <span className="inline-flex items-center gap-2">
+              <Sprout className="size-[18px] text-field" />
+              {d.cultivo ?? '—'}
+            </span>
+          </CampoStat>
+          {d.variedad && <CampoStat label="Variedad">{d.variedad}</CampoStat>}
+          <CampoStat label="Siembra">
+            <span className="tnum">{fmtFecha(d.fechaSiembra) ?? '—'}</span>
+          </CampoStat>
+          <CampoStat label="Cosecha estimada">
+            <span className="tnum">{fmtFecha(d.fechaCosechaEstimada) ?? '—'}</span>
+          </CampoStat>
+        </div>
+      ) : (
+        <p className="py-1 text-sm text-muted-foreground">
+          Sin campaña cargada. Cargá el cultivo, la variedad y las fechas de
+          siembra y cosecha.
+        </p>
+      )}
+    </Panel>
+  )
+}
+
 export function PotreroDetailPage() {
   const { id = '' } = useParams()
   const { data, isLoading, error } = usePotreroDetalle(id)
@@ -216,6 +281,9 @@ export function PotreroDetailPage() {
           }
         />
       </div>
+
+      {/* Campaña agrícola */}
+      <CampanaAgricola d={data} />
 
       {/* Stock + animales */}
       <Panel title="Stock por categoría" sub={`${data.totalCabezas} cabezas`}>

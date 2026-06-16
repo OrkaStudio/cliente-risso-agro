@@ -23,6 +23,11 @@ export type PotreroDetalle = {
   totalCabezas: number
   porCategoria: { categoria: Categoria; cabezas: number }[]
   animales: AnimalEnPotrero[]
+  /** Campaña agrícola actual (carga manual). */
+  cultivo: string | null
+  variedad: string | null
+  fechaSiembra: string | null
+  fechaCosechaEstimada: string | null
   /** Plata devengada del potrero (suma de todos los meses). */
   ingresos: number
   gastos: number
@@ -40,7 +45,9 @@ export async function getPotreroDetalle(
     await Promise.all([
       supabase
         .from('potrero')
-        .select('id, nombre, estado_ciclo, hectareas, campo:campo(id, nombre, tipo)')
+        .select(
+          'id, nombre, estado_ciclo, hectareas, cultivo, variedad, fecha_siembra, fecha_cosecha_estimada, campo:campo(id, nombre, tipo)',
+        )
         .eq('id', id)
         .maybeSingle(),
       supabase
@@ -96,8 +103,32 @@ export async function getPotreroDetalle(
     totalCabezas: lista.length,
     porCategoria,
     animales: lista,
+    cultivo: potrero.cultivo,
+    variedad: potrero.variedad,
+    fechaSiembra: potrero.fecha_siembra,
+    fechaCosechaEstimada: potrero.fecha_cosecha_estimada,
     ingresos,
     gastos,
     resultado,
   }
+}
+
+/** Actualiza la campaña agrícola del potrero (carga manual). */
+export async function actualizarCultivo(input: {
+  id: string
+  cultivo: string | null
+  variedad: string | null
+  fechaSiembra: string | null
+  fechaCosechaEstimada: string | null
+}): Promise<void> {
+  const { error } = await supabase
+    .from('potrero')
+    .update({
+      cultivo: input.cultivo,
+      variedad: input.variedad,
+      fecha_siembra: input.fechaSiembra,
+      fecha_cosecha_estimada: input.fechaCosechaEstimada,
+    })
+    .eq('id', input.id)
+  if (error) throw new Error(error.message)
 }

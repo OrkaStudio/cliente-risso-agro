@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Beef,
@@ -31,6 +32,20 @@ function fmtCompact(n: number): string {
     return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
   if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
   return `${sign}$${abs}`
+}
+
+const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** "12/10" a partir de YYYY-MM-DD. */
+function ddmm(fecha: string): string {
+  const [, m, d] = fecha.split('-')
+  return `${d}/${m}`
+}
+
+/** "mar" (mes abreviado) a partir de YYYY-MM-DD. */
+function mesAbrev(fecha: string): string {
+  const m = Number(fecha.slice(5, 7))
+  return MESES_ABREV[m - 1] ?? ''
 }
 
 function fechaLarga(): string {
@@ -195,26 +210,29 @@ function DonutStock({
 function CicloIcon({
   estado,
   className,
+  style,
 }: {
   estado: Database['public']['Enums']['estado_ciclo_potrero']
   className?: string
+  style?: CSSProperties
 }) {
+  const props = { className, style }
   switch (estado) {
     case 'ganadero':
-      return <Beef className={className} />
+      return <Beef {...props} />
     case 'descanso':
-      return <Leaf className={className} />
+      return <Leaf {...props} />
     case 'preparacion':
-      return <Tractor className={className} />
+      return <Tractor {...props} />
     case 'siembra':
-      return <Sprout className={className} />
+      return <Sprout {...props} />
     case 'cultivo':
-      return <Sprout className={className} />
+      return <Sprout {...props} />
     case 'cosecha':
     case 'rastrojo':
-      return <Wheat className={className} />
+      return <Wheat {...props} />
     default:
-      return <Leaf className={className} />
+      return <Leaf {...props} />
   }
 }
 
@@ -292,12 +310,26 @@ function PotreroCard({ p }: { p: PotreroPanorama }) {
           </div>
         </>
       ) : (
-        <div className="mt-3 flex items-center gap-2">
-          <CicloIcon estado={p.estadoCiclo} className="size-[18px]" />
-          <span className="text-sm font-semibold text-ink">
-            {estadoCicloLabel[p.estadoCiclo]}
-          </span>
-          <span className="text-xs text-faint">· sin hacienda</span>
+        <div className="mt-3">
+          <div className="flex items-center gap-2">
+            <CicloIcon
+              estado={p.estadoCiclo}
+              className="size-[18px] shrink-0"
+              style={{ color }}
+            />
+            <span className="truncate text-sm font-semibold text-ink">
+              {p.cultivo ?? estadoCicloLabel[p.estadoCiclo]}
+            </span>
+            <span className="shrink-0 text-xs text-faint">· sin hacienda</span>
+          </div>
+          {(p.fechaSiembra || p.fechaCosechaEstimada) && (
+            <div className="tnum mt-1.5 text-xs text-muted-foreground">
+              {p.fechaSiembra && `sembrado ${ddmm(p.fechaSiembra)}`}
+              {p.fechaSiembra && p.fechaCosechaEstimada && ' · '}
+              {p.fechaCosechaEstimada &&
+                `cosecha ~${mesAbrev(p.fechaCosechaEstimada)}`}
+            </div>
+          )}
         </div>
       )}
 
