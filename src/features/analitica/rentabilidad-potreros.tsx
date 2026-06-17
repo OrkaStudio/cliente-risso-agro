@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom'
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Beef,
   LandPlot,
   Leaf,
+  PawPrint,
   Sprout,
   Wheat,
   type LucideIcon,
@@ -67,9 +67,9 @@ const TIPO: Record<
   { color: string; tint: string; Icon: LucideIcon; label: string }
 > = {
   ganadero: {
-    color: 'var(--field-deep)',
-    tint: 'var(--field-soft)',
-    Icon: Beef,
+    color: 'var(--ganado)',
+    tint: 'var(--ganado-soft)',
+    Icon: PawPrint,
     label: 'Ganadero',
   },
   agricola: {
@@ -79,8 +79,8 @@ const TIPO: Record<
     label: 'Agrícola',
   },
   forrajero: {
-    color: 'var(--tierra)',
-    tint: 'var(--tierra-soft)',
+    color: 'var(--lila)',
+    tint: 'var(--lila-soft)',
     Icon: Leaf,
     label: 'Forrajero',
   },
@@ -131,7 +131,7 @@ function PotreroCard({
     sin = gastos === 0
     etiqueta = sin ? 'Sin movimientos' : 'Costo de forraje'
     valor = gastos
-    numColor = 'var(--tierra)'
+    numColor = 'var(--lila)'
     flecha = null
   } else {
     const estado = estadoDe(fin)

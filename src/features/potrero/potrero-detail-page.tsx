@@ -438,7 +438,7 @@ export function PotreroDetailPage() {
                 value={formatARS(valorPlata)}
                 color={
                   esForraje
-                    ? 'var(--tierra)'
+                    ? 'var(--lila)'
                     : enCurso
                       ? 'var(--sol-deep)'
                       : fin.resultado < 0
@@ -456,7 +456,7 @@ export function PotreroDetailPage() {
             </div>
 
             {esForraje ? (
-              <p className="rounded-lg border border-tierra/25 bg-tierra-soft/50 px-3.5 py-2.5 text-[13px] text-ink">
+              <p className="rounded-lg border border-lila/25 bg-lila-soft/50 px-3.5 py-2.5 text-[13px] text-ink">
                 Potrero <strong>forrajero</strong>: produce alimento para la
                 hacienda. Es un <strong>centro de costo</strong> — su valor se ve
                 en los animales (engorde/venta), no en una venta del potrero.

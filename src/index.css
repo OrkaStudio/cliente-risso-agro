@@ -57,6 +57,10 @@
     --color-tierra-soft: var(--tierra-soft);
     --color-lima: var(--lima);
     --color-lima-soft: var(--lima-soft);
+    --color-ganado: var(--ganado);
+    --color-ganado-soft: var(--ganado-soft);
+    --color-lila: var(--lila);
+    --color-lila-soft: var(--lila-soft);
     --color-ink: var(--ink);
     --color-ink-soft: var(--ink-soft);
     --color-faint: var(--faint);
@@ -123,6 +127,10 @@
     --tierra-soft: #f7e9e0;
     --lima: #79ad28;         /* realce (brote) */
     --lima-soft: #eff6de;
+    --ganado: #b5392f;       /* rojo ganado (hacienda) */
+    --ganado-soft: #f7e2de;
+    --lila: #7c5cc4;         /* violeta forraje */
+    --lila-soft: #ece7f8;
     --ink: #131b16;          /* texto carbón verdoso */
     --ink-soft: #4b5750;
     --faint: #828e85;
