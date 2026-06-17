@@ -162,9 +162,10 @@ function DonutStock({
       offset: 25 - prev,
     }
   })
+  const max = Math.max(...data.map((c) => c.cabezas), 1)
   return (
-    <div className="flex flex-1 flex-wrap items-center justify-center gap-x-9 gap-y-5">
-      <svg width="158" height="158" viewBox="0 0 42 42" className="shrink-0">
+    <div className="flex flex-1 flex-col items-center gap-7 py-1 sm:flex-row sm:items-center sm:gap-9">
+      <svg width="168" height="168" viewBox="0 0 42 42" className="shrink-0">
         <circle
           cx="21"
           cy="21"
@@ -211,22 +212,38 @@ function DonutStock({
           CABEZAS
         </text>
       </svg>
-      <div className="flex min-w-[168px] flex-col gap-2.5 text-[13.5px]">
-        {data.map((c) => (
-          <div key={c.categoria} className="flex items-center gap-2.5">
-            <span
-              className="size-[11px] shrink-0 rounded-[3px]"
-              style={{ background: categoriaColor[c.categoria] }}
-            />
-            <span className="text-ink">{categoriaLabel[c.categoria]}</span>
-            <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
-              {c.cabezas}
-              <span className="ml-1.5 text-[10.5px] font-semibold text-faint">
-                {Math.round((c.cabezas / total) * 100)}%
-              </span>
-            </span>
-          </div>
-        ))}
+      <div className="flex w-full flex-1 flex-col gap-3">
+        {data.map((c) => {
+          const pct = Math.round((c.cabezas / total) * 100)
+          const color = categoriaColor[c.categoria]
+          return (
+            <div key={c.categoria}>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <span className="flex items-center gap-2 text-[13.5px]">
+                  <span
+                    className="size-2.5 shrink-0 rounded-[3px]"
+                    style={{ background: color }}
+                  />
+                  <span className="text-ink">{categoriaLabel[c.categoria]}</span>
+                </span>
+                <span className="flex items-baseline gap-2">
+                  <span className="tnum text-[13px] font-bold text-ink">
+                    {c.cabezas}
+                  </span>
+                  <span className="tnum w-7 text-right text-[11px] text-faint">
+                    {pct}%
+                  </span>
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${(c.cabezas / max) * 100}%`, background: color }}
+                />
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
