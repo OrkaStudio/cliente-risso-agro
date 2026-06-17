@@ -4,6 +4,7 @@ import type { CampoConPotreros } from '@/features/campos/api'
 import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
 import type { LineaCampo, LineaPotrero } from '@/features/analitica/compute'
 import { Panel } from '@/components/panel'
+import { cn } from '@/lib/utils'
 
 function fmtCompact(n: number): string {
   const abs = Math.abs(n)
@@ -38,7 +39,8 @@ const ETIQUETA: Record<Estado, string> = {
   pierde: 'Pérdida',
 }
 
-/** Card compacta: el número manda. Solo lo que se ve a simple vista. */
+/** Card compacta: el número manda. Las sin datos quedan apagadas (mismo tamaño,
+ *  segundo plano) — visibles pero sin robar la atención. */
 function PotreroCard({
   potreroId,
   nombre,
@@ -54,34 +56,61 @@ function PotreroCard({
   cabezas: number
   estadoCiclo: CampoConPotreros['potreros'][number]['estadoCiclo']
   cultivo: string | null
-  fin: Fin
+  fin: Fin | undefined
 }) {
   const estado = estadoDe(fin)
   const color = COLOR[estado]
-  const valor = estado === 'curso' ? fin.gastos : fin.resultado
-  const valorHa = ha && ha > 0 ? Math.round(valor / ha) : null
+  const sin = estado === 'sin'
+  const valor = estado === 'curso' ? (fin?.gastos ?? 0) : (fin?.resultado ?? 0)
+  const valorHa = ha && ha > 0 && !sin ? Math.round(valor / ha) : null
   const Flecha = estado === 'pierde' ? ArrowDownRight : ArrowUpRight
+
+  const meta = (
+    <span className="tnum truncate text-[12px] text-faint">
+      {ha ? `${ha} ha` : 's/ha'}
+      {cabezas > 0 && ` · ${cabezas} cab`}
+      {cultivo && !sin && (
+        <span className="ml-1 inline-flex items-center gap-0.5 text-field">
+          <Sprout className="size-3" />
+          {cultivo}
+        </span>
+      )}
+    </span>
+  )
 
   return (
     <Link
       to={`/potrero/${potreroId}`}
-      className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)]"
+      className={cn(
+        'group relative flex h-full flex-col overflow-hidden rounded-2xl border p-4 transition-all',
+        sin
+          ? 'border-dashed border-border bg-card/40 hover:border-faint hover:bg-card'
+          : 'border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.04)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)]',
+      )}
     >
-      {/* Gancho visual: glow de color del estado en la esquina + barra de acento */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full opacity-[0.13] blur-2xl transition-opacity group-hover:opacity-25"
-        style={{ background: color }}
-      />
-      <div
-        aria-hidden
-        className="absolute left-0 top-0 h-full w-1"
-        style={{ background: color }}
-      />
+      {!sin && (
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full opacity-[0.13] blur-2xl transition-opacity group-hover:opacity-25"
+            style={{ background: color }}
+          />
+          <div
+            aria-hidden
+            className="absolute left-0 top-0 h-full w-1"
+            style={{ background: color }}
+          />
+        </>
+      )}
 
-      <div className="relative">
+      <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between gap-2">
-          <h4 className="truncate font-heading text-[17px] font-bold text-ink">
+          <h4
+            className={cn(
+              'truncate font-heading text-[17px] font-bold',
+              sin ? 'text-muted-foreground' : 'text-ink',
+            )}
+          >
             {nombre}
           </h4>
           <span
@@ -96,42 +125,40 @@ function PotreroCard({
           </span>
         </div>
 
-        {/* Héroe: el número */}
-        <div className="mt-2.5 flex items-end justify-between gap-2">
-          <div>
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
-              {ETIQUETA[estado]}
+        {sin ? (
+          <div className="mt-2.5 text-[13px] text-faint">Sin movimientos</div>
+        ) : (
+          <div className="mt-2.5 flex items-end justify-between gap-2">
+            <div>
+              <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
+                {ETIQUETA[estado]}
+              </div>
+              <div
+                className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
+                style={{ color }}
+              >
+                <Flecha className="size-5" strokeWidth={2.5} />
+                {fmtCompact(valor)}
+              </div>
             </div>
-            <div
-              className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
-              style={{ color }}
-            >
-              <Flecha className="size-5" strokeWidth={2.5} />
-              {fmtCompact(valor)}
-            </div>
-          </div>
-          {valorHa != null && (
-            <div className="tnum pb-0.5 text-right text-[15px] font-bold text-muted-foreground">
-              {fmtCompact(valorHa)}
-              <span className="text-[11px] font-semibold text-faint">/ha</span>
-            </div>
-          )}
-        </div>
-
-        {/* Pie: meta mínima + cta */}
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
-          <span className="tnum truncate text-[12px] text-faint">
-            {ha ? `${ha} ha` : 's/ha'}
-            {cabezas > 0 && ` · ${cabezas} cab`}
-            {cultivo && (
-              <span className="ml-1 inline-flex items-center gap-0.5 text-field">
-                <Sprout className="size-3" />
-                {cultivo}
-              </span>
+            {valorHa != null && (
+              <div className="tnum pb-0.5 text-right text-[15px] font-bold text-muted-foreground">
+                {fmtCompact(valorHa)}
+                <span className="text-[11px] font-semibold text-faint">/ha</span>
+              </div>
             )}
-          </span>
-          <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-field-deep">
-            Ver
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+          {meta}
+          <span
+            className={cn(
+              'inline-flex items-center gap-0.5 text-[12px] font-semibold',
+              sin ? 'text-muted-foreground' : 'text-field-deep',
+            )}
+          >
+            {sin ? 'Cargar' : 'Ver'}
             <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </span>
         </div>
@@ -179,12 +206,15 @@ export function RentabilidadPotreros({
       ) : (
         <div className="flex flex-col gap-7">
           {lista.map((campo) => {
-            const conDatos = campo.potreros.filter(
-              (p) => estadoDe(finPorPotrero.get(p.id)) !== 'sin',
-            )
-            const vacios = campo.potreros.filter(
-              (p) => estadoDe(finPorPotrero.get(p.id)) === 'sin',
-            )
+            // Con datos primero, vacíos después; dentro, por resultado.
+            const orden = [...campo.potreros].sort((a, b) => {
+              const fa = finPorPotrero.get(a.id)
+              const fb = finPorPotrero.get(b.id)
+              const sa = estadoDe(fa) === 'sin' ? 1 : 0
+              const sb = estadoDe(fb) === 'sin' ? 1 : 0
+              if (sa !== sb) return sa - sb
+              return (fb?.resultado ?? 0) - (fa?.resultado ?? 0)
+            })
             const cf = finPorCampo.get(campo.id)
             const estado = estadoDe(cf)
             const ha = campo.hectareas ?? campo.totalHa
@@ -222,9 +252,13 @@ export function RentabilidadPotreros({
                   )}
                 </div>
 
-                {conDatos.length > 0 && (
+                {campo.potreros.length === 0 ? (
+                  <p className="py-2 text-[13px] text-faint">
+                    Este campo no tiene potreros cargados.
+                  </p>
+                ) : (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {conDatos.map((p) => (
+                    {orden.map((p) => (
                       <PotreroCard
                         key={p.id}
                         potreroId={p.id}
@@ -233,29 +267,8 @@ export function RentabilidadPotreros({
                         cabezas={p.cabezas}
                         estadoCiclo={p.estadoCiclo}
                         cultivo={p.cultivo}
-                        fin={finPorPotrero.get(p.id)!}
+                        fin={finPorPotrero.get(p.id)}
                       />
-                    ))}
-                  </div>
-                )}
-
-                {vacios.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11.5px] font-medium text-faint">
-                      Sin movimientos:
-                    </span>
-                    {vacios.map((p) => (
-                      <Link
-                        key={p.id}
-                        to={`/potrero/${p.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-faint hover:text-ink"
-                      >
-                        <span
-                          className="size-1.5 rounded-full"
-                          style={{ background: estadoCicloColor[p.estadoCiclo] }}
-                        />
-                        {p.nombre}
-                      </Link>
                     ))}
                   </div>
                 )}

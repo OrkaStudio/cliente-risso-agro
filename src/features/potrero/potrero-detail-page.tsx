@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Beef,
   ChevronLeft,
@@ -249,6 +249,7 @@ function CampanaAgricola({ d }: { d: PotreroDetalle }) {
 
 export function PotreroDetailPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const empresa = useEmpresa()
   const empresaId = empresa.data?.empresa_id ?? ''
   const { data, isLoading, error } = usePotreroDetalle(id)
@@ -298,13 +299,14 @@ export function PotreroDetailPage() {
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
       <div>
-        <Link
-          to={`/campos/${data.campoId}`}
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
           className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
-          {data.campoNombre}
-        </Link>
+          Volver
+        </button>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
