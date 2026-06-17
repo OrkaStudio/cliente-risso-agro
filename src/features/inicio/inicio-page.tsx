@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   Beef,
   CalendarClock,
   LandPlot,
@@ -405,44 +407,65 @@ export function InicioPage() {
               </p>
             </div>
           ) : (
-            <table className="w-full">
-              <tbody>
-                {proximos.map((v) => (
-                  <tr
+            <div className="flex flex-1 flex-col">
+              {proximos.map((v) => {
+                const cobro = v.tipo === 'ingreso'
+                const urgente =
+                  v.diasParaVencer != null && v.diasParaVencer <= 3
+                const dias =
+                  v.diasParaVencer == null
+                    ? '—'
+                    : v.diasParaVencer <= 0
+                      ? 'hoy'
+                      : `en ${v.diasParaVencer} d`
+                return (
+                  <div
                     key={v.id}
-                    className="border-b border-border/60 last:border-0"
+                    className="flex items-center gap-3 border-b border-border/60 py-2.5 last:border-0"
                   >
-                    <td className="py-3 pr-3">
-                      <div className="text-sm font-semibold text-ink">
+                    <span
+                      className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+                      style={{
+                        color: cobro ? 'var(--field-deep)' : 'var(--tierra)',
+                        background: cobro
+                          ? 'var(--field-soft)'
+                          : 'var(--tierra-soft)',
+                      }}
+                    >
+                      {cobro ? (
+                        <ArrowDownLeft className="size-4" />
+                      ) : (
+                        <ArrowUpRight className="size-4" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-ink">
                         {v.descripcion}
                       </div>
-                      <div className="text-xs text-faint">
-                        {v.tipo === 'ingreso' ? 'Cobro' : 'Pago'}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-3 text-right">
                       <span
                         className={cn(
-                          'tnum text-xs font-bold',
-                          v.diasParaVencer != null && v.diasParaVencer <= 3
-                            ? 'text-destructive'
-                            : 'text-muted-foreground',
+                          'inline-block rounded-full px-1.5 text-[10.5px] font-bold',
+                          urgente
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-secondary text-faint',
                         )}
                       >
-                        {v.diasParaVencer != null
-                          ? v.diasParaVencer <= 0
-                            ? 'hoy'
-                            : `en ${v.diasParaVencer} d`
-                          : '—'}
+                        {dias}
                       </span>
-                    </td>
-                    <td className="tnum py-3 text-right text-sm font-bold text-ink">
+                    </div>
+                    <span
+                      className={cn(
+                        'tnum shrink-0 text-sm font-bold',
+                        cobro ? 'text-field-deep' : 'text-ink',
+                      )}
+                    >
+                      {cobro ? '+' : '−'}
                       {v.monto != null ? fmtCompact(v.monto) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           )}
           <div className="mt-4 border-t border-border/60 pt-3 text-[13px]">
             <Link

@@ -78,7 +78,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
     <Link
       to={`/potrero/${p.id}`}
       style={{ borderLeftColor: color, borderLeftWidth: '3px' }}
-      className="block rounded-[11px] border border-border bg-secondary/60 p-4 transition-shadow hover:shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
+      className="block rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 font-heading text-base font-semibold text-ink">
