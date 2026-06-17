@@ -81,36 +81,22 @@ function PotreroCard({
   return (
     <Link
       to={`/potrero/${potreroId}`}
-      className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-2xl border p-4 transition-all',
-        sin
-          ? 'border-dashed border-border bg-card/40 hover:border-faint hover:bg-card'
-          : 'border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.04)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)]',
-      )}
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)]"
     >
-      {!sin && (
-        <>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full opacity-[0.13] blur-2xl transition-opacity group-hover:opacity-25"
-            style={{ background: color }}
-          />
-          <div
-            aria-hidden
-            className="absolute left-0 top-0 h-full w-1"
-            style={{ background: color }}
-          />
-        </>
-      )}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full opacity-[0.13] blur-2xl transition-opacity group-hover:opacity-25"
+        style={{ background: color }}
+      />
+      <div
+        aria-hidden
+        className="absolute left-0 top-0 h-full w-1"
+        style={{ background: color }}
+      />
 
       <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between gap-2">
-          <h4
-            className={cn(
-              'truncate font-heading text-[17px] font-bold',
-              sin ? 'text-muted-foreground' : 'text-ink',
-            )}
-          >
+          <h4 className="truncate font-heading text-[17px] font-bold text-ink">
             {nombre}
           </h4>
           <span
@@ -125,30 +111,26 @@ function PotreroCard({
           </span>
         </div>
 
-        {sin ? (
-          <div className="mt-2.5 text-[13px] text-faint">Sin movimientos</div>
-        ) : (
-          <div className="mt-2.5 flex items-end justify-between gap-2">
-            <div>
-              <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
-                {ETIQUETA[estado]}
-              </div>
-              <div
-                className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
-                style={{ color }}
-              >
-                <Flecha className="size-5" strokeWidth={2.5} />
-                {fmtCompact(valor)}
-              </div>
+        <div className="mt-2.5 flex items-end justify-between gap-2">
+          <div>
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
+              {sin ? 'Sin movimientos' : ETIQUETA[estado]}
             </div>
-            {valorHa != null && (
-              <div className="tnum pb-0.5 text-right text-[15px] font-bold text-muted-foreground">
-                {fmtCompact(valorHa)}
-                <span className="text-[11px] font-semibold text-faint">/ha</span>
-              </div>
-            )}
+            <div
+              className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
+              style={{ color }}
+            >
+              {!sin && <Flecha className="size-5" strokeWidth={2.5} />}
+              {sin ? '—' : fmtCompact(valor)}
+            </div>
           </div>
-        )}
+          {valorHa != null && (
+            <div className="tnum pb-0.5 text-right text-[15px] font-bold text-muted-foreground">
+              {fmtCompact(valorHa)}
+              <span className="text-[11px] font-semibold text-faint">/ha</span>
+            </div>
+          )}
+        </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
           {meta}
