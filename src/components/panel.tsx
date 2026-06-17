@@ -1,25 +1,43 @@
 import type { ReactNode } from 'react'
+import { Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+/** Ícono de ayuda con tooltip al hover: explica qué muestra el panel. */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex shrink-0">
+      <Info className="size-[18px] cursor-help text-faint transition-colors hover:text-ink" />
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute right-0 top-7 z-30 w-60 rounded-xl border border-border bg-card p-3 text-[12.5px] font-medium leading-snug text-muted-foreground opacity-0 shadow-[0_12px_40px_rgba(16,30,20,0.18)] transition-opacity duration-150 group-hover:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
+  )
+}
 
 /**
  * Panel base del Modo Oficina: blanco, hairline, sombra crisp.
- * Cabecera con título + (sub | acción a la derecha). Guía: el mockup
+ * Cabecera con título + (acción | info | sub a la derecha). Guía: el mockup
  * design/dashboard-agro-ai.html.
  */
 export function Panel({
   title,
   sub,
+  info,
   action,
   children,
   className,
 }: {
   title?: string
   sub?: string
+  info?: string
   action?: ReactNode
   children: ReactNode
   className?: string
 }) {
-  const hasHeader = Boolean(title || sub || action)
+  const hasHeader = Boolean(title || sub || info || action)
   return (
     <section
       className={cn(
@@ -33,7 +51,11 @@ export function Panel({
             {title}
           </h3>
           {action ??
-            (sub && <span className="text-[13.5px] text-faint">{sub}</span>)}
+            (info ? (
+              <InfoTip text={info} />
+            ) : (
+              sub && <span className="text-[13.5px] text-faint">{sub}</span>
+            ))}
         </div>
       )}
       {children}

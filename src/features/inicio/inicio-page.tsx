@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownLeft,
@@ -11,7 +12,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
+import { categoriaColor } from '@/features/hacienda/labels'
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import { useCheques } from '@/features/cheques/hooks'
@@ -131,119 +132,99 @@ function Kpi({
   )
 }
 
-/* ===== Donut de stock por categoría ===== */
-function DonutStock({
-  data,
-  total,
+/* ===== Stock por categoría — pictograma del rodeo ===== */
+const categoriaPlural: Record<
+  Database['public']['Enums']['categoria_animal'],
+  string
+> = {
+  vaca: 'Vacas',
+  vaquillona: 'Vaquillonas',
+  novillo: 'Novillos',
+  ternero: 'Terneros',
+  ternera: 'Terneras',
+  toro: 'Toros',
+  capon: 'Capones',
+}
+
+/** Vaca (mdi:cow) — glifo relleno reutilizable. */
+function CowGlyph({
+  className,
+  style,
 }: {
-  data: CategoriaConteo[]
-  total: number
+  className?: string
+  style?: CSSProperties
 }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} style={style} aria-hidden>
+      <path
+        fill="currentColor"
+        d="M10.5 18a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5m3 0a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5M10 11a1 1 0 0 1 1 1a1 1 0 0 1-1 1a1 1 0 0 1-1-1a1 1 0 0 1 1-1m4 0a1 1 0 0 1 1 1a1 1 0 0 1-1 1a1 1 0 0 1-1-1a1 1 0 0 1 1-1m4 7c0 2.21-2.69 4-6 4s-6-1.79-6-4c0-.9.45-1.73 1.2-2.4c-.75-1-1.2-2.25-1.2-3.6l.12-1.22c-.54.15-1.19.15-1.72 0c-1.02-.28-2.56-1.43-2.33-2.23s2.14-.95 3.16-.65c.59.17 1.22.6 1.59 1.06l.57-.81C6.79 7.05 7 4 10 3l-.09.14c-.28.44-1 1.83-.24 3.33a6.02 6.02 0 0 1 4.66 0c.76-1.5.04-2.89-.24-3.33L14 3c3 1 3.21 4.05 2.61 5.15l.57.81c.37-.46 1-.89 1.59-1.06c1.02-.3 2.93-.15 3.16.65s-1.31 1.95-2.33 2.23c-.53.15-1.18.15-1.72 0L18 12c0 1.35-.45 2.6-1.2 3.6c.75.67 1.2 1.5 1.2 2.4m-6-2c-2.21 0-4 .9-4 2s1.79 2 4 2s4-.9 4-2s-1.79-2-4-2m0-2c1.12 0 2.17.21 3.07.56c.58-.69.93-1.56.93-2.56a4 4 0 0 0-4-4a4 4 0 0 0-4 4c0 1 .35 1.87.93 2.56c.9-.35 1.95-.56 3.07-.56m2.09-10.86"
+      />
+    </svg>
+  )
+}
+
+function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number }) {
   if (total === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-        <Beef className="size-7 text-faint" />
+      <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+        <CowGlyph className="size-8 text-faint" />
         <p className="text-sm text-muted-foreground">
           Todavía no hay animales activos cargados.
         </p>
       </div>
     )
   }
-  // Segmentos con gap de 1 unidad (circunferencia ≈ 100). El offset de cada
-  // segmento es el acumulado de los anteriores (sin mutar variables externas).
-  const segs = data.map((c, i) => {
-    const prev = data
-      .slice(0, i)
-      .reduce((s, x) => s + (x.cabezas / total) * 100, 0)
-    const visible = Math.max((c.cabezas / total) * 100 - 1, 0.5)
-    return {
-      color: categoriaColor[c.categoria],
-      dash: `${visible} ${100 - visible}`,
-      offset: 25 - prev,
-    }
-  })
-  const max = Math.max(...data.map((c) => c.cabezas), 1)
+
+  // Pictograma: ~60 vaquitas repartidas por categoría según su proporción.
+  const SLOTS = 60
+  const herd = data.flatMap((c) =>
+    Array.from(
+      { length: Math.max(1, Math.round((c.cabezas / total) * SLOTS)) },
+      () => categoriaColor[c.categoria],
+    ),
+  )
+
   return (
-    <div className="flex flex-1 flex-col items-center gap-7 py-1 sm:flex-row sm:items-center sm:gap-9">
-      <svg width="168" height="168" viewBox="0 0 42 42" className="shrink-0">
-        <circle
-          cx="21"
-          cy="21"
-          r="15.9"
-          fill="none"
-          stroke="var(--secondary)"
-          strokeWidth="5.5"
-        />
-        {segs.map((s, i) => (
-          <circle
-            key={i}
-            cx="21"
-            cy="21"
-            r="15.9"
-            fill="none"
-            stroke={s.color}
-            strokeWidth="5.5"
-            strokeDasharray={s.dash}
-            strokeDashoffset={s.offset}
-          />
-        ))}
-        <text
-          x="21"
-          y="20.2"
-          textAnchor="middle"
-          fontSize="8"
-          fontWeight="700"
-          fill="var(--ink)"
-          fontFamily="JetBrains Mono"
-          letterSpacing="-0.5"
-        >
+    <div className="flex flex-col gap-5">
+      {/* Hero */}
+      <div className="flex items-end gap-3">
+        <span className="tnum text-[42px] font-bold leading-none text-ink">
           {total}
-        </text>
-        <text
-          x="21"
-          y="26.5"
-          textAnchor="middle"
-          fontSize="2.6"
-          fill="var(--faint)"
-          fontFamily="Inter"
-          fontWeight="600"
-          letterSpacing="0.4"
-        >
-          CABEZAS
-        </text>
-      </svg>
-      <div className="flex w-full flex-1 flex-col gap-3">
-        {data.map((c) => {
-          const pct = Math.round((c.cabezas / total) * 100)
-          const color = categoriaColor[c.categoria]
-          return (
-            <div key={c.categoria}>
-              <div className="mb-1 flex items-baseline justify-between gap-2">
-                <span className="flex items-center gap-2 text-[13.5px]">
-                  <span
-                    className="size-2.5 shrink-0 rounded-[3px]"
-                    style={{ background: color }}
-                  />
-                  <span className="text-ink">{categoriaLabel[c.categoria]}</span>
-                </span>
-                <span className="flex items-baseline gap-2">
-                  <span className="tnum text-[13px] font-bold text-ink">
-                    {c.cabezas}
-                  </span>
-                  <span className="tnum w-7 text-right text-[11px] text-faint">
-                    {pct}%
-                  </span>
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${(c.cabezas / max) * 100}%`, background: color }}
-                />
-              </div>
-            </div>
-          )
-        })}
+        </span>
+        <span className="pb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
+          cabezas
+          <br />
+          {data.length} categorías
+        </span>
+      </div>
+
+      {/* Pictograma del rodeo */}
+      <div className="flex flex-wrap gap-x-1.5 gap-y-1">
+        {herd.map((color, i) => (
+          <CowGlyph key={i} className="size-5" style={{ color }} />
+        ))}
+      </div>
+
+      {/* Leyenda */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 border-t border-border/60 pt-4 sm:grid-cols-3">
+        {data.map((c) => (
+          <div key={c.categoria} className="flex items-center gap-2">
+            <CowGlyph
+              className="size-4 shrink-0"
+              style={{ color: categoriaColor[c.categoria] }}
+            />
+            <span className="truncate text-[13px] text-ink">
+              {categoriaPlural[c.categoria]}
+            </span>
+            <span className="tnum ml-auto shrink-0 text-[12.5px] font-bold text-ink">
+              {c.cabezas}
+              <span className="ml-1 text-[10.5px] font-semibold text-faint">
+                {Math.round((c.cabezas / total) * 100)}%
+              </span>
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -402,15 +383,15 @@ export function InicioPage() {
       <div className="grid items-stretch gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Panel
           title="Stock por categoría"
-          sub={`${data.totalCabezas} cabezas`}
+          info="Cómo se reparte tu rodeo por categoría de hacienda. Cada vaquita del pictograma representa una porción del total de cabezas."
           className="flex flex-col"
         >
-          <DonutStock data={data.porCategoria} total={data.totalCabezas} />
+          <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
         </Panel>
 
         <Panel
           title="Próximos vencimientos"
-          sub="cobros y pagos"
+          info="Cobros y pagos pendientes, ordenados por urgencia. En rojo, los que vencen en 3 días o menos."
           className="flex flex-col"
         >
           {proximos.length === 0 ? (
@@ -496,7 +477,10 @@ export function InicioPage() {
       </div>
 
       {/* Estado de los campos — agrupado por campo */}
-      <Panel title="Estado de los campos" sub="tocá un potrero para entrar">
+      <Panel
+        title="Estado de los campos"
+        info="Tus potreros agrupados por campo, con su hacienda y estado de ciclo. Tocá uno para ver todo su detalle."
+      >
         {camposAgrupados.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Todavía no hay potreros cargados.{' '}
