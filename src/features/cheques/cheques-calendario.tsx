@@ -212,7 +212,7 @@ function ChequeChip({ c }: { c: Cheque }) {
             onMouseEnter={abrir}
             onMouseLeave={cerrarDif}
             className={cn(
-              'flex w-full flex-col gap-0.5 rounded-md border-l-[3px] px-1.5 py-1 text-left transition-[filter]',
+              'flex w-full flex-col gap-px rounded-md border-l-[3px] px-1.5 py-[3px] text-left transition-[filter]',
               cobro
                 ? 'border-field-deep bg-field-soft hover:brightness-[0.97]'
                 : 'border-tierra bg-tierra-soft hover:brightness-[0.97]',
@@ -323,7 +323,7 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
   return (
     <Panel className="p-0">
       {/* Navegación */}
-      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-2.5">
         <span className="font-heading text-[16px] font-bold text-ink">
           {mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}
         </span>
@@ -359,7 +359,7 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
         {DIAS.map((d) => (
           <div
             key={d}
-            className="px-2 py-2 text-center text-[11px] font-bold uppercase tracking-[0.04em] text-faint"
+            className="px-2 py-1.5 text-center text-[10.5px] font-bold uppercase tracking-[0.04em] text-faint"
           >
             {d}
           </div>
@@ -377,16 +377,16 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
               <div
                 key={j}
                 className={cn(
-                  'min-h-[150px] border-r border-border/60 p-1.5 last:border-r-0',
+                  'min-h-[84px] border-r border-border/60 p-1 last:border-r-0',
                   !cel && 'bg-secondary/30',
                 )}
               >
                 {cel && (
                   <>
-                    <div className="mb-1 flex justify-end">
+                    <div className="mb-0.5 flex justify-end">
                       <span
                         className={cn(
-                          'flex size-6 items-center justify-center rounded-full text-[12px] font-semibold',
+                          'flex size-5 items-center justify-center rounded-full text-[11px] font-semibold',
                           esMesActual && cel.dia === diaHoy
                             ? 'bg-field-deep text-white'
                             : 'text-muted-foreground',
@@ -395,13 +395,13 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
                         {cel.dia}
                       </span>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      {cel.items.slice(0, 3).map((c) => (
+                    <div className="flex flex-col gap-0.5">
+                      {cel.items.slice(0, 2).map((c) => (
                         <ChequeChip key={c.id} c={c} />
                       ))}
-                      {cel.items.length > 3 && (
-                        <span className="px-1 text-[10.5px] font-semibold text-faint">
-                          +{cel.items.length - 3} más
+                      {cel.items.length > 2 && (
+                        <span className="px-1 text-[10px] font-semibold text-faint">
+                          +{cel.items.length - 2} más
                         </span>
                       )}
                     </div>
