@@ -322,7 +322,7 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
     'flex size-8 items-center justify-center rounded-lg border border-white/60 bg-white/50 text-muted-foreground backdrop-blur transition-colors hover:bg-white/80 hover:text-ink'
 
   return (
-    <Panel className="relative overflow-hidden p-0 bg-gradient-to-br from-field-soft/70 via-card to-sky/15">
+    <Panel className="relative overflow-hidden p-0 bg-gradient-to-br from-field-soft/70 via-card to-field-soft/15">
       {/* Blobs difuminados que dan profundidad al vidrio */}
       <div
         aria-hidden
@@ -330,11 +330,7 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-16 right-0 size-64 rounded-full bg-sky/20 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-1/3 top-1/3 size-44 rounded-full bg-sol-deep/10 blur-3xl"
+        className="pointer-events-none absolute -bottom-16 right-0 size-64 rounded-full bg-field/15 blur-3xl"
       />
 
       <div className="relative z-10">
@@ -413,17 +409,12 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
                   >
                     {cel && (
                       <>
-                        <div className="mb-1 flex items-center gap-1">
-                          {hoyCell && (
-                            <span className="rounded-full bg-field-deep px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-white">
-                              Hoy
-                            </span>
-                          )}
+                        <div className="mb-1 flex justify-center">
                           <span
                             className={cn(
-                              'tnum ml-auto text-[14px] font-bold leading-none',
+                              'tnum flex items-center justify-center text-[14px] font-bold leading-none',
                               hoyCell
-                                ? 'text-field-deep'
+                                ? 'size-6 rounded-full bg-field-deep text-[12.5px] text-white'
                                 : pasado
                                   ? 'text-faint'
                                   : 'text-ink',
