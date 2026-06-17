@@ -121,7 +121,21 @@ export function AnaliticaPage() {
             {nombreCampo ?? 'Toda la empresa'}
           </p>
         </div>
-        <CargarMovimientoDialog empresaId={empresaId} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Dropdown
+            ariaLabel="Filtrar por campo"
+            value={campoF ?? 'empresa'}
+            onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
+            options={[
+              { value: 'empresa', label: 'Toda la empresa' },
+              ...(camposLista.data ?? []).map((c) => ({
+                value: c.id,
+                label: c.nombre,
+              })),
+            ]}
+          />
+          <CargarMovimientoDialog empresaId={empresaId} />
+        </div>
       </div>
 
       {movs.isLoading ? (
@@ -132,22 +146,6 @@ export function AnaliticaPage() {
         </p>
       ) : (
         <>
-          {/* Filtro por campo */}
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <Dropdown
-              ariaLabel="Filtrar por campo"
-              value={campoF ?? 'empresa'}
-              onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
-              options={[
-                { value: 'empresa', label: 'Toda la empresa' },
-                ...(camposLista.data ?? []).map((c) => ({
-                  value: c.id,
-                  label: c.nombre,
-                })),
-              ]}
-            />
-          </div>
-
           {/* KPIs */}
           <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">
             <KpiCell label="Ingresos" icon={Banknote} color="var(--field)" value={formatARS(res.ingresos)} />
@@ -238,7 +236,7 @@ export function AnaliticaPage() {
           )}
 
           {/* Resultado por mes + Plata en camino */}
-          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+          <div className="grid items-start gap-5 lg:grid-cols-[1.4fr_1fr]">
             <Panel title="Resultado por mes" sub="ingresos − gastos">
               {porMes.length === 0 ? (
                 <Vacio>Sin movimientos para graficar.</Vacio>
@@ -364,7 +362,7 @@ export function AnaliticaPage() {
           </div>
 
           {/* Ingresos + Gastos por categoría */}
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid items-start gap-5 lg:grid-cols-2">
             <Panel title="Ingresos por categoría">
               {ingCategorias.length === 0 ? (
                 <Vacio>Sin ingresos.</Vacio>
