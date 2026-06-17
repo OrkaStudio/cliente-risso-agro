@@ -1,10 +1,16 @@
 import { Link } from 'react-router-dom'
-import { ArrowDownRight, ArrowUpRight, Sprout } from 'lucide-react'
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Beef,
+  LandPlot,
+  Sprout,
+  Wheat,
+  type LucideIcon,
+} from 'lucide-react'
 import type { CampoConPotreros } from '@/features/campos/api'
-import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
 import type { LineaCampo, LineaPotrero } from '@/features/analitica/compute'
 import { Panel } from '@/components/panel'
-import { cn } from '@/lib/utils'
 
 function fmtCompact(n: number): string {
   const abs = Math.abs(n)
@@ -39,6 +45,40 @@ const ETIQUETA: Record<Estado, string> = {
   pierde: 'Pérdida',
 }
 
+// Identidad visual por TIPO de potrero (lo que se ve a simple vista).
+type Tipo = 'ganadero' | 'agricola' | 'vacio'
+const AGRICOLA = ['preparacion', 'siembra', 'cultivo', 'cosecha', 'rastrojo']
+
+function tipoDe(estadoCiclo: string, cabezas: number, cultivo: string | null): Tipo {
+  if (estadoCiclo === 'ganadero' || cabezas > 0) return 'ganadero'
+  if (AGRICOLA.includes(estadoCiclo) || cultivo) return 'agricola'
+  return 'vacio'
+}
+
+const TIPO: Record<
+  Tipo,
+  { color: string; tint: string; Icon: LucideIcon; label: string }
+> = {
+  ganadero: {
+    color: 'var(--field-deep)',
+    tint: 'var(--field-soft)',
+    Icon: Beef,
+    label: 'Ganadero',
+  },
+  agricola: {
+    color: 'var(--sol-deep)',
+    tint: 'var(--sol-soft)',
+    Icon: Wheat,
+    label: 'Agrícola',
+  },
+  vacio: {
+    color: 'var(--faint)',
+    tint: 'var(--secondary)',
+    Icon: LandPlot,
+    label: 'En descanso',
+  },
+}
+
 /** Card compacta: el número manda. Las sin datos quedan apagadas (mismo tamaño,
  *  segundo plano) — visibles pero sin robar la atención. */
 function PotreroCard({
@@ -59,39 +99,40 @@ function PotreroCard({
   fin: Fin | undefined
 }) {
   const estado = estadoDe(fin)
-  const color = COLOR[estado]
   const sin = estado === 'sin'
+  const numColor = COLOR[estado]
   const valor = estado === 'curso' ? (fin?.gastos ?? 0) : (fin?.resultado ?? 0)
   const valorHa = ha && ha > 0 && !sin ? Math.round(valor / ha) : null
   const Flecha = estado === 'pierde' ? ArrowDownRight : ArrowUpRight
 
-  const meta = (
-    <span className="tnum truncate text-[12px] text-faint">
-      {ha ? `${ha} ha` : 's/ha'}
-      {cabezas > 0 && ` · ${cabezas} cab`}
-      {cultivo && !sin && (
-        <span className="ml-1 inline-flex items-center gap-0.5 text-field">
-          <Sprout className="size-3" />
-          {cultivo}
-        </span>
-      )}
-    </span>
-  )
+  // Identidad por tipo de potrero
+  const tipo = tipoDe(estadoCiclo, cabezas, cultivo)
+  const t = TIPO[tipo]
+  const Marca = t.Icon
 
   return (
     <Link
       to={`/potrero/${potreroId}`}
       className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)]"
     >
+      {/* Tinte y marca de agua del TIPO de potrero */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full opacity-[0.13] blur-2xl transition-opacity group-hover:opacity-25"
-        style={{ background: color }}
+        className="pointer-events-none absolute inset-0 opacity-50"
+        style={{
+          background: `linear-gradient(135deg, color-mix(in srgb, ${t.tint} 55%, transparent), transparent 60%)`,
+        }}
+      />
+      <Marca
+        aria-hidden
+        className="pointer-events-none absolute -bottom-4 -right-3 size-28 opacity-[0.07] transition-all group-hover:scale-110 group-hover:opacity-[0.12]"
+        style={{ color: t.color }}
+        strokeWidth={1.5}
       />
       <div
         aria-hidden
-        className="absolute left-0 top-0 h-full w-1"
-        style={{ background: color }}
+        className="absolute left-0 top-0 h-full w-1.5"
+        style={{ background: t.color }}
       />
 
       <div className="relative flex h-full flex-col">
@@ -100,14 +141,14 @@ function PotreroCard({
             {nombre}
           </h4>
           <span
-            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold"
-            style={{ color: estadoCicloColor[estadoCiclo] }}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold"
+            style={{
+              color: t.color,
+              background: `color-mix(in srgb, ${t.color} 12%, transparent)`,
+            }}
           >
-            <span
-              className="size-1.5 rounded-full"
-              style={{ background: estadoCicloColor[estadoCiclo] }}
-            />
-            {estadoCicloLabel[estadoCiclo]}
+            <Marca className="size-3" />
+            {t.label}
           </span>
         </div>
 
@@ -118,7 +159,7 @@ function PotreroCard({
             </div>
             <div
               className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
-              style={{ color }}
+              style={{ color: numColor }}
             >
               {!sin && <Flecha className="size-5" strokeWidth={2.5} />}
               {sin ? '—' : fmtCompact(valor)}
@@ -133,12 +174,19 @@ function PotreroCard({
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
-          {meta}
-          <span
-            className={cn(
-              'inline-flex items-center gap-0.5 text-[12px] font-semibold',
-              sin ? 'text-muted-foreground' : 'text-field-deep',
+          <span className="tnum truncate text-[12px] text-faint">
+            {ha ? `${ha} ha` : 's/ha'}
+            {cabezas > 0 && ` · ${cabezas} cab`}
+            {cultivo && (
+              <span className="ml-1 inline-flex items-center gap-0.5 text-field">
+                <Sprout className="size-3" />
+                {cultivo}
+              </span>
             )}
+          </span>
+          <span
+            className="inline-flex items-center gap-0.5 text-[12px] font-semibold"
+            style={{ color: t.color }}
           >
             {sin ? 'Cargar' : 'Ver'}
             <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
