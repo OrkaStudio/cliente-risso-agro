@@ -438,6 +438,7 @@ export type Database = {
       }
       movimiento_financiero: {
         Row: {
+          actividad: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id: string | null
           campo_id: string
           categoria_id: string
@@ -464,6 +465,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
           campo_id: string
           categoria_id: string
@@ -490,6 +492,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
           campo_id?: string
           categoria_id?: string
@@ -945,6 +948,7 @@ export type Database = {
       }
     }
     Enums: {
+      actividad_movimiento: "cria" | "invernada" | "agricultura" | "estructura"
       agua_estado: "llena" | "normal" | "baja" | "seca"
       categoria_animal:
         | "vaca"
@@ -1116,6 +1120,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      actividad_movimiento: ["cria", "invernada", "agricultura", "estructura"],
       agua_estado: ["llena", "normal", "baja", "seca"],
       categoria_animal: [
         "vaca",

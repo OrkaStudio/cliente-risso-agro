@@ -16,6 +16,7 @@ import {
 } from '@/features/campos/labels'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { PotreroFormDialog } from '@/features/campos/campos-dialogs'
+import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
 import { usePotreroDetalle } from '@/features/potrero/hooks'
 import type { PotreroDetalle } from '@/features/potrero/api'
 import { CultivoDialog } from '@/features/potrero/cultivo-dialog'
@@ -246,26 +247,34 @@ export function PotreroDetailPage() {
               {estadoCicloLabel[data.estadoCiclo]}
             </span>
           </div>
-          <PotreroFormDialog
-            empresaId={empresaId}
-            campoId={data.campoId}
-            potrero={{
-              id: data.id,
-              nombre: data.nombre,
-              estado_ciclo: data.estadoCiclo,
-              hectareas: data.hectareas,
-              campo_id: data.campoId,
-              empresa_id: empresaId,
-              establecimiento_id: null,
-              created_at: '',
-              cultivo: data.cultivo,
-              variedad: data.variedad,
-              fecha_siembra: data.fechaSiembra,
-              fecha_cosecha_estimada: data.fechaCosechaEstimada,
-            }}
-            triggerLabel="Editar potrero"
-            triggerVariant="outline"
-          />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <CargarMovimientoDialog
+              empresaId={empresaId}
+              campoInicial={data.campoId}
+              potreroInicial={data.id}
+              triggerLabel="+ Cargar a este potrero"
+            />
+            <PotreroFormDialog
+              empresaId={empresaId}
+              campoId={data.campoId}
+              potrero={{
+                id: data.id,
+                nombre: data.nombre,
+                estado_ciclo: data.estadoCiclo,
+                hectareas: data.hectareas,
+                campo_id: data.campoId,
+                empresa_id: empresaId,
+                establecimiento_id: null,
+                created_at: '',
+                cultivo: data.cultivo,
+                variedad: data.variedad,
+                fecha_siembra: data.fechaSiembra,
+                fecha_cosecha_estimada: data.fechaCosechaEstimada,
+              }}
+              triggerLabel="Editar potrero"
+              triggerVariant="outline"
+            />
+          </div>
         </div>
         <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
           Campo {data.campoNombre} · {tipoCampoLabel[data.campoTipo]}

@@ -10,10 +10,12 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCampos, useCamposConPotreros } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
+  actividadLabel,
   cuentasPendientes,
   formatARS,
   gastosPorCategoria,
   ingresosPorCategoria,
+  porActividad,
   porCampo,
   porPotrero,
   resultadoPorMes,
@@ -77,6 +79,7 @@ export function AnaliticaPage() {
   const porMes = useMemo(() => resultadoPorMes(data, modo), [data, modo])
   const cuentas = useMemo(() => cuentasPendientes(data), [data])
   const potreros = useMemo(() => porPotrero(data, modo), [data, modo])
+  const actividades = useMemo(() => porActividad(data, modo), [data, modo])
 
   // Hectáreas por campo (nombre) y por potrero (id) para el margen por ha.
   const haCampo = useMemo(() => {
@@ -98,6 +101,7 @@ export function AnaliticaPage() {
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
   const maxPotrero = Math.max(1, ...potreros.map((p) => Math.abs(p.monto)))
   const maxAbs = Math.max(maxCampo, maxPotrero)
+  const maxAct = Math.max(1, ...actividades.map((a) => Math.abs(a.resultado)))
 
   const potrerosPorCampo = useMemo(() => {
     const m = new Map<string, typeof potreros>()
@@ -222,6 +226,29 @@ export function AnaliticaPage() {
               </p>
             )}
           </Panel>
+
+          {/* Rentabilidad por actividad — qué actividad rinde */}
+          {actividades.length > 0 && (
+            <Panel
+              title="Rentabilidad por actividad"
+              sub="cría · invernada · agricultura · estructura"
+            >
+              <div className="flex flex-col gap-3.5">
+                {actividades.map((a) => (
+                  <RentaRow
+                    key={a.actividad}
+                    nombre={
+                      a.actividad === 'sin'
+                        ? 'Sin asignar'
+                        : actividadLabel[a.actividad]
+                    }
+                    monto={a.resultado}
+                    max={maxAct}
+                  />
+                ))}
+              </div>
+            </Panel>
+          )}
 
           {/* Resultado por mes + Plata en camino */}
           <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">

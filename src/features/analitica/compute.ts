@@ -1,4 +1,14 @@
 import type { MovimientoConDetalle } from '@/features/analitica/api'
+import type { Database } from '@/lib/supabase/types'
+
+type Actividad = Database['public']['Enums']['actividad_movimiento']
+
+export const actividadLabel: Record<Actividad, string> = {
+  cria: 'Cría',
+  invernada: 'Invernada',
+  agricultura: 'Agricultura',
+  estructura: 'Estructura',
+}
 
 export type Modo = 'devengado' | 'caja'
 export type Resumen = { ingresos: number; gastos: number; resultado: number }
@@ -140,4 +150,47 @@ export function porPotrero(
     map.set(m.potrero_id, { ...prev, monto: prev.monto + delta })
   }
   return [...map.values()].sort((a, b) => b.monto - a.monto)
+}
+
+// ===== Rentabilidad por actividad =====
+// La pregunta clave en ganadería (donde la hacienda se mueve entre potreros):
+// ¿qué actividad rinde? cría / invernada / agricultura, y estructura como costo.
+
+export type LineaActividad = {
+  actividad: Actividad | 'sin'
+  ingresos: number
+  gastos: number
+  resultado: number
+}
+
+const ORDEN_ACT: (Actividad | 'sin')[] = [
+  'cria',
+  'invernada',
+  'agricultura',
+  'estructura',
+  'sin',
+]
+
+export function porActividad(
+  movs: MovimientoConDetalle[],
+  modo: Modo,
+): LineaActividad[] {
+  const map = new Map<Actividad | 'sin', LineaActividad>()
+  for (const m of movs) {
+    if (!entra(m, modo)) continue
+    const key = (m.actividad ?? 'sin') as Actividad | 'sin'
+    const prev = map.get(key) ?? {
+      actividad: key,
+      ingresos: 0,
+      gastos: 0,
+      resultado: 0,
+    }
+    if (m.tipo === 'ingreso') prev.ingresos += Number(m.monto)
+    else prev.gastos += Number(m.monto)
+    prev.resultado = prev.ingresos - prev.gastos
+    map.set(key, prev)
+  }
+  return [...map.values()].sort(
+    (a, b) => ORDEN_ACT.indexOf(a.actividad) - ORDEN_ACT.indexOf(b.actividad),
+  )
 }

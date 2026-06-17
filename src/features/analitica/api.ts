@@ -3,6 +3,7 @@ import type { Database } from '@/lib/supabase/types'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
+type ActividadMov = Database['public']['Enums']['actividad_movimiento']
 export type CategoriaMov = Database['public']['Tables']['categoria_movimiento']['Row']
 
 export type MovimientoConDetalle =
@@ -73,6 +74,7 @@ export type NuevoMovimiento = {
   fechaVencimiento?: string | null
   fechaCobroPago?: string | null
   medioPago?: MedioPago | null
+  actividad?: ActividadMov | null
   descripcion?: string
   // Cheque / echeq (solo cuando medioPago === 'cheque')
   esEcheq?: boolean
@@ -96,6 +98,7 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
     fecha_vencimiento: input.fechaVencimiento || null,
     fecha_cobro_pago: input.fechaCobroPago || null,
     medio_pago: input.medioPago || null,
+    actividad: input.actividad || null,
     descripcion: input.descripcion?.trim() || null,
     estado: liquidado ? 'liquidado' : 'pendiente',
     es_echeq: esCheque ? !!input.esEcheq : false,

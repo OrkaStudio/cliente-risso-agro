@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Constants, type Database } from '@/lib/supabase/types'
 import { useCampos, usePotreros } from '@/features/campos/hooks'
 import { useCategorias, useCrearMovimiento } from '@/features/analitica/hooks'
+import { actividadLabel } from '@/features/analitica/compute'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -26,6 +27,7 @@ import { cn } from '@/lib/utils'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
+type ActividadMov = Database['public']['Enums']['actividad_movimiento']
 
 const label = 'mb-1.5 block text-[12px] font-semibold text-ink'
 const field =
@@ -79,12 +81,25 @@ const fade: Variants = {
   show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 26 } },
 }
 
-export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
+export function CargarMovimientoDialog({
+  empresaId,
+  campoInicial,
+  potreroInicial,
+  triggerLabel = '+ Cargar gasto/ingreso',
+  triggerVariant,
+}: {
+  empresaId: string
+  campoInicial?: string
+  potreroInicial?: string
+  triggerLabel?: string
+  triggerVariant?: 'outline'
+}) {
   const [open, setOpen] = useState(false)
   const [tipo, setTipo] = useState<TipoMov>('gasto')
   const [categoriaId, setCategoriaId] = useState('')
-  const [campoId, setCampoId] = useState('')
-  const [potreroId, setPotreroId] = useState('')
+  const [campoId, setCampoId] = useState(campoInicial ?? '')
+  const [potreroId, setPotreroId] = useState(potreroInicial ?? '')
+  const [actividad, setActividad] = useState('')
   const [monto, setMonto] = useState('')
   const [liquidado, setLiquidado] = useState(true) // ya se pagó/cobró
   const [fecha, setFecha] = useState(hoy())
@@ -123,6 +138,7 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
 
   function reset() {
     setCategoriaId('')
+    setActividad('')
     setMonto('')
     setLiquidado(true)
     setFecha(hoy())
@@ -204,6 +220,7 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
         fechaVencimiento: liquidado ? null : vence || null,
         fechaCobroPago: liquidado ? fecha : null,
         medioPago: (medioPago || null) as MedioPago | null,
+        actividad: (actividad || null) as ActividadMov | null,
         descripcion,
         esEcheq,
         chequeNumero,
@@ -220,8 +237,12 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} disabled={!empresaId}>
-        + Cargar gasto/ingreso
+      <Button
+        onClick={() => setOpen(true)}
+        disabled={!empresaId}
+        variant={triggerVariant}
+      >
+        {triggerLabel}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="rounded-2xl sm:max-w-[480px]">
@@ -386,6 +407,29 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                   ...(potreros.data ?? []).map((p) => ({
                     value: p.id,
                     label: p.nombre,
+                  })),
+                ]}
+              />
+            </motion.div>
+
+            {/* Actividad — para ver qué actividad rinde */}
+            <motion.div variants={fade}>
+              <label className={label}>
+                Actividad{' '}
+                <span className="font-normal text-faint">
+                  · cría, invernada, agricultura…
+                </span>
+              </label>
+              <Dropdown
+                block
+                ariaLabel="Actividad"
+                value={actividad}
+                onChange={setActividad}
+                options={[
+                  { value: '', label: 'Sin asignar' },
+                  ...Constants.public.Enums.actividad_movimiento.map((a) => ({
+                    value: a,
+                    label: actividadLabel[a],
                   })),
                 ]}
               />
