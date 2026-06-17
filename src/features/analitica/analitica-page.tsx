@@ -1,11 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
+  Beef,
+  Building2,
+  CircleDashed,
   Receipt,
   TrendingUp,
+  Wheat,
 } from 'lucide-react'
+import type { Database } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCampos, useCamposConPotreros } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
@@ -42,6 +47,24 @@ function fmtCompact(n: number): string {
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
   if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
   return `${sign}$${abs}`
+}
+
+type Actividad = Database['public']['Enums']['actividad_movimiento']
+const actividadMeta: Record<
+  Actividad | 'sin',
+  { color: string; Icon: ComponentType<{ className?: string }> }
+> = {
+  cria: { color: 'var(--ganado)', Icon: Beef },
+  invernada: { color: 'var(--g1)', Icon: TrendingUp },
+  agricultura: { color: 'var(--sol-deep)', Icon: Wheat },
+  estructura: { color: 'var(--tierra)', Icon: Building2 },
+  sin: { color: 'var(--faint)', Icon: CircleDashed },
+}
+
+const estadoMov: Record<string, { label: string; cls: string }> = {
+  liquidado: { label: 'Liquidado', cls: 'bg-field-soft text-field-deep' },
+  pendiente: { label: 'Pendiente', cls: 'bg-sol-soft text-sol-deep' },
+  anulado: { label: 'Anulado', cls: 'bg-secondary text-faint' },
 }
 
 export function AnaliticaPage() {
@@ -163,21 +186,53 @@ export function AnaliticaPage() {
           {actividades.length > 0 && (
             <Panel
               title="Rentabilidad por actividad"
-              sub="cría · invernada · agricultura · estructura"
+              sub="qué actividad rinde y cuál no"
             >
-              <div className="flex flex-col gap-3.5">
-                {actividades.map((a) => (
-                  <RentaRow
-                    key={a.actividad}
-                    nombre={
-                      a.actividad === 'sin'
-                        ? 'Sin asignar'
-                        : actividadLabel[a.actividad]
-                    }
-                    monto={a.resultado}
-                    max={maxAct}
-                  />
-                ))}
+              <div className="flex flex-col gap-4">
+                {actividades.map((a) => {
+                  const meta = actividadMeta[a.actividad]
+                  const neg = a.resultado < 0
+                  const numColor = neg
+                    ? 'var(--destructive)'
+                    : 'var(--field-deep)'
+                  return (
+                    <div key={a.actividad} className="flex items-center gap-3.5">
+                      <span
+                        className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                        style={{
+                          color: meta.color,
+                          background: `color-mix(in srgb, ${meta.color} 12%, transparent)`,
+                        }}
+                      >
+                        <meta.Icon className="size-[19px]" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate font-semibold text-ink">
+                            {a.actividad === 'sin'
+                              ? 'Sin asignar'
+                              : actividadLabel[a.actividad]}
+                          </span>
+                          <span
+                            className="tnum shrink-0 text-[15px] font-bold"
+                            style={{ color: numColor }}
+                          >
+                            {fmtCompact(a.resultado)}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${(Math.abs(a.resultado) / maxAct) * 100}%`,
+                              background: neg ? 'var(--destructive)' : meta.color,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </Panel>
           )}
@@ -188,42 +243,49 @@ export function AnaliticaPage() {
               {porMes.length === 0 ? (
                 <Vacio>Sin movimientos para graficar.</Vacio>
               ) : (
-                <div
-                  className="flex h-40 items-end gap-2 px-1 pb-3 pt-1"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(rgba(16,24,19,0.05) 1px, transparent 1px)',
-                    backgroundSize: '100% 25%',
-                  }}
-                >
+                <div className="flex h-48 items-end gap-2.5 border-b border-border/60 pb-0">
                   {porMes.map((m, i) => {
                     const last = i === porMes.length - 1
+                    const neg = m.resultado < 0
+                    const fill = neg
+                      ? 'linear-gradient(180deg, #e0584b, var(--destructive))'
+                      : last
+                        ? 'linear-gradient(180deg, var(--field), var(--field-deep))'
+                        : 'linear-gradient(180deg, var(--g1), color-mix(in srgb, var(--g1) 75%, #000))'
                     return (
                       <div
                         key={m.mes}
-                        className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
+                        className="group flex h-full flex-1 flex-col items-center justify-end gap-2"
+                        title={`${mesCorto(m.mes)}: ${fmtCompact(m.resultado)}`}
                       >
                         <span
                           className={cn(
-                            'tnum text-[11px]',
-                            last ? 'font-bold text-field-deep' : 'text-muted-foreground',
+                            'tnum text-[10.5px] transition-opacity',
+                            neg
+                              ? 'text-destructive'
+                              : last
+                                ? 'font-bold text-field-deep'
+                                : 'text-muted-foreground',
                           )}
                         >
                           {fmtCompact(m.resultado)}
                         </span>
                         <div
-                          className="w-[55%] rounded-t-sm"
+                          className="w-[62%] rounded-t-lg transition-all duration-200 group-hover:brightness-105"
                           style={{
-                            height: `${(Math.abs(m.resultado) / maxMes) * 100}%`,
-                            background:
-                              m.resultado < 0
-                                ? 'var(--destructive)'
-                                : last
-                                  ? 'var(--field-deep)'
-                                  : 'var(--g1)',
+                            height: `${(Math.abs(m.resultado) / maxMes) * 92 + 2}%`,
+                            background: fill,
+                            boxShadow: last
+                              ? '0 0 0 2px color-mix(in srgb, var(--field-deep) 22%, transparent)'
+                              : undefined,
                           }}
                         />
-                        <span className="text-[11px] font-semibold text-faint">
+                        <span
+                          className={cn(
+                            'text-[10.5px] font-semibold',
+                            last ? 'text-field-deep' : 'text-faint',
+                          )}
+                        >
                           {mesCorto(m.mes)}
                         </span>
                       </div>
@@ -239,47 +301,64 @@ export function AnaliticaPage() {
               ) : pendientesScope.length === 0 ? (
                 <Vacio>Sin cobros ni pagos pendientes.</Vacio>
               ) : (
-                <table className="w-full">
-                  <tbody>
-                    {pendientesScope.slice(0, 6).map((v) => (
-                      <tr key={v.id} className="border-b border-border/60 last:border-0">
-                        <td className="py-3 pr-3">
-                          <div className="text-sm font-semibold text-ink">
+                <div className="flex flex-col">
+                  {pendientesScope.slice(0, 6).map((v) => {
+                    const cobro = v.tipo === 'ingreso'
+                    const urgente = v.diasParaVencer != null && v.diasParaVencer <= 3
+                    const dias =
+                      v.diasParaVencer == null
+                        ? '—'
+                        : v.diasParaVencer <= 0
+                          ? 'hoy'
+                          : `en ${v.diasParaVencer} d`
+                    return (
+                      <div
+                        key={v.id}
+                        className="flex items-center gap-3 border-b border-border/60 py-2.5 last:border-0"
+                      >
+                        <span
+                          className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+                          style={{
+                            color: cobro ? 'var(--field-deep)' : 'var(--tierra)',
+                            background: cobro
+                              ? 'var(--field-soft)'
+                              : 'var(--tierra-soft)',
+                          }}
+                        >
+                          {cobro ? (
+                            <ArrowDownLeft className="size-4" />
+                          ) : (
+                            <ArrowUpRight className="size-4" />
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-ink">
                             {v.descripcion}
                           </div>
-                          <div className="text-xs text-faint">
-                            {v.tipo === 'ingreso' ? 'Cobro' : 'Pago'}
-                          </div>
-                        </td>
-                        <td className="py-3 pr-3 text-right">
                           <span
                             className={cn(
-                              'tnum text-xs font-bold',
-                              v.diasParaVencer != null && v.diasParaVencer <= 3
-                                ? 'text-destructive'
-                                : 'text-muted-foreground',
+                              'inline-block rounded-full px-1.5 text-[10.5px] font-bold',
+                              urgente
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-secondary text-faint',
                             )}
                           >
-                            {v.diasParaVencer != null
-                              ? v.diasParaVencer <= 0
-                                ? 'hoy'
-                                : `en ${v.diasParaVencer} d`
-                              : '—'}
+                            {dias}
                           </span>
-                        </td>
-                        <td
+                        </div>
+                        <span
                           className={cn(
-                            'tnum py-3 text-right text-sm font-bold',
-                            v.tipo === 'ingreso' ? 'text-field-deep' : 'text-ink',
+                            'tnum shrink-0 text-sm font-bold',
+                            cobro ? 'text-field-deep' : 'text-ink',
                           )}
                         >
-                          {v.tipo === 'ingreso' ? '+' : '−'}
+                          {cobro ? '+' : '−'}
                           {v.monto != null ? fmtCompact(v.monto) : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </Panel>
           </div>
@@ -328,36 +407,58 @@ export function AnaliticaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.slice(0, 12).map((m) => (
-                      <tr
-                        key={m.id}
-                        className="border-b border-border/60 last:border-0 hover:bg-secondary/50"
-                      >
-                        <td className="tnum px-4 py-3 text-sm text-muted-foreground">
-                          {m.fecha_devengo}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-ink">
-                          {m.categoria?.nombre ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {m.campo?.nombre ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-                            {m.estado}
-                          </span>
-                        </td>
-                        <td
-                          className={cn(
-                            'tnum px-4 py-3 text-right text-sm font-bold',
-                            m.tipo === 'gasto' ? 'text-destructive' : 'text-field-deep',
-                          )}
+                    {data.slice(0, 12).map((m) => {
+                      const est = estadoMov[m.estado] ?? {
+                        label: m.estado,
+                        cls: 'bg-secondary text-faint',
+                      }
+                      const gasto = m.tipo === 'gasto'
+                      return (
+                        <tr
+                          key={m.id}
+                          className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40"
                         >
-                          {m.tipo === 'gasto' ? '−' : '+'}
-                          {formatARS(Number(m.monto))}
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="tnum px-4 py-3 text-[13px] text-muted-foreground">
+                            {m.fecha_devengo.split('-').reverse().join('/')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                              <span
+                                className="size-1.5 shrink-0 rounded-full"
+                                style={{
+                                  background: gasto
+                                    ? 'var(--tierra)'
+                                    : 'var(--field-deep)',
+                                }}
+                              />
+                              {m.categoria?.nombre ?? '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {m.campo?.nombre ?? '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[11px] font-bold',
+                                est.cls,
+                              )}
+                            >
+                              {est.label}
+                            </span>
+                          </td>
+                          <td
+                            className={cn(
+                              'tnum px-4 py-3 text-right text-sm font-bold',
+                              gasto ? 'text-tierra' : 'text-field-deep',
+                            )}
+                          >
+                            {gasto ? '−' : '+'}
+                            {formatARS(Number(m.monto))}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -369,111 +470,43 @@ export function AnaliticaPage() {
   )
 }
 
-/** Barra apilada + leyenda de montos por categoría (ingresos o gastos). */
+/** Ranking de categorías: cada fila con su barra de participación + monto + %. */
 function CategoriaBreakdown({ items }: { items: { nombre: string; monto: number }[] }) {
   const total = items.reduce((s, c) => s + c.monto, 0) || 1
+  const max = Math.max(...items.map((c) => c.monto), 1)
   return (
-    <>
-      <div className="flex h-3 gap-0.5 overflow-hidden rounded-md">
-        {items.map((c, i) => (
-          <span
-            key={c.nombre}
-            className="h-full rounded-sm"
-            style={{
-              width: `${(c.monto / total) * 100}%`,
-              background: GSERIE[i % GSERIE.length],
-            }}
-            title={`${c.nombre}: ${formatARS(c.monto)}`}
-          />
-        ))}
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-2.5 text-[13.5px] sm:grid-cols-2">
-        {items.map((c, i) => (
-          <div key={c.nombre} className="flex items-center gap-2.5">
-            <span
-              className="size-[11px] shrink-0 rounded-[3px]"
-              style={{ background: GSERIE[i % GSERIE.length] }}
-            />
-            <span className="truncate text-ink">{c.nombre}</span>
-            <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
-              {fmtCompact(c.monto)}
-            </span>
+    <div className="flex flex-col gap-3.5">
+      {items.map((c, i) => {
+        const color = GSERIE[i % GSERIE.length]
+        const pct = Math.round((c.monto / total) * 100)
+        return (
+          <div key={c.nombre}>
+            <div className="mb-1 flex items-baseline justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2 text-[13.5px]">
+                <span
+                  className="size-2.5 shrink-0 rounded-[3px]"
+                  style={{ background: color }}
+                />
+                <span className="truncate text-ink">{c.nombre}</span>
+              </span>
+              <span className="flex shrink-0 items-baseline gap-2">
+                <span className="tnum text-[13px] font-bold text-ink">
+                  {fmtCompact(c.monto)}
+                </span>
+                <span className="tnum w-8 text-right text-[11px] text-faint">
+                  {pct}%
+                </span>
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${(c.monto / max) * 100}%`, background: color }}
+              />
+            </div>
           </div>
-        ))}
-      </div>
-    </>
-  )
-}
-
-/** Fila de rentabilidad: nombre (+ sub), barra, monto y margen por hectárea.
- *  `bold` para el campo, `nested` para el potrero (indentado y más chico). */
-function RentaRow({
-  nombre,
-  sub,
-  monto,
-  max,
-  ha,
-  bold,
-  nested,
-}: {
-  nombre: string
-  sub?: string
-  monto: number
-  max: number
-  ha?: number
-  bold?: boolean
-  nested?: boolean
-}) {
-  const neg = monto < 0
-  const barH = nested ? 'h-2.5' : 'h-3.5'
-  const color = neg
-    ? 'var(--destructive)'
-    : nested
-      ? 'var(--g3)'
-      : 'var(--g1)'
-  return (
-    <div className="flex items-center gap-3.5 text-sm">
-      <div className="flex w-36 shrink-0 items-center gap-1.5">
-        {nested && (
-          <span className="size-1.5 shrink-0 rounded-full bg-faint" />
-        )}
-        <div className="min-w-0">
-          <div
-            className={cn(
-              'truncate text-ink',
-              bold ? 'font-bold' : nested ? 'font-medium text-[13px]' : 'font-semibold',
-            )}
-          >
-            {nombre}
-          </div>
-          {sub && <div className="truncate text-[11px] text-faint">{sub}</div>}
-        </div>
-      </div>
-      <div className={cn('flex-1 overflow-hidden rounded bg-secondary', barH)}>
-        <div
-          className="h-full rounded"
-          style={{
-            width: `${(Math.abs(monto) / max) * 100}%`,
-            background: color,
-          }}
-        />
-      </div>
-      <div className="w-24 shrink-0 text-right">
-        <div
-          className={cn(
-            'tnum font-bold',
-            nested ? 'text-[12px]' : 'text-[13px]',
-            neg ? 'text-destructive' : 'text-field-deep',
-          )}
-        >
-          {fmtCompact(monto)}
-        </div>
-        {ha ? (
-          <div className="tnum text-[10.5px] font-medium text-faint">
-            {fmtCompact(Math.round(monto / ha))}/ha
-          </div>
-        ) : null}
-      </div>
+        )
+      })}
     </div>
   )
 }
