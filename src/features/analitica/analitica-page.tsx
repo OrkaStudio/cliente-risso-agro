@@ -236,12 +236,16 @@ export function AnaliticaPage() {
           )}
 
           {/* Resultado por mes + Plata en camino */}
-          <div className="grid items-start gap-5 lg:grid-cols-[1.4fr_1fr]">
-            <Panel title="Resultado por mes" sub="ingresos − gastos">
+          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <Panel
+              title="Resultado por mes"
+              sub="ingresos − gastos"
+              className="flex flex-col"
+            >
               {porMes.length === 0 ? (
                 <Vacio>Sin movimientos para graficar.</Vacio>
               ) : (
-                <div className="flex h-48 items-end gap-2.5 border-b border-border/60 pb-0">
+                <div className="flex min-h-[11rem] flex-1 items-end gap-2.5 border-b border-border/60 pb-0">
                   {porMes.map((m, i) => {
                     const last = i === porMes.length - 1
                     const neg = m.resultado < 0
@@ -361,23 +365,33 @@ export function AnaliticaPage() {
             </Panel>
           </div>
 
-          {/* Ingresos + Gastos por categoría */}
-          <div className="grid items-start gap-5 lg:grid-cols-2">
-            <Panel title="Ingresos por categoría">
-              {ingCategorias.length === 0 ? (
-                <Vacio>Sin ingresos.</Vacio>
-              ) : (
-                <CategoriaBreakdown items={ingCategorias} />
-              )}
-            </Panel>
-            <Panel title="Gastos por categoría">
-              {categorias.length === 0 ? (
-                <Vacio>Sin gastos.</Vacio>
-              ) : (
-                <CategoriaBreakdown items={categorias} />
-              )}
-            </Panel>
-          </div>
+          {/* Ingresos + Gastos por categoría — una sola card, dos columnas */}
+          <Panel title="Movimientos por categoría" sub="ingresos vs gastos">
+            <div className="grid gap-x-10 gap-y-6 md:grid-cols-2 md:divide-x md:divide-border/60">
+              <div className="md:pr-10">
+                <div className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-field-deep">
+                  <ArrowDownLeft className="size-4" />
+                  Ingresos
+                </div>
+                {ingCategorias.length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">Sin ingresos.</p>
+                ) : (
+                  <CategoriaBreakdown items={ingCategorias} />
+                )}
+              </div>
+              <div>
+                <div className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-tierra">
+                  <ArrowUpRight className="size-4" />
+                  Gastos
+                </div>
+                {categorias.length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">Sin gastos.</p>
+                ) : (
+                  <CategoriaBreakdown items={categorias} />
+                )}
+              </div>
+            </div>
+          </Panel>
 
           {/* Movimientos recientes */}
           <Panel
