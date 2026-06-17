@@ -198,7 +198,9 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
         campoId,
         potreroId: potreroId || null,
         monto: montoNum,
-        fechaDevengo: fecha,
+        // Liquidado: devenga el día que se pagó/cobró. Pendiente: devenga el
+        // día en que vence (lo que el productor entiende como "cuándo lo pagás").
+        fechaDevengo: liquidado ? fecha : vence || fecha,
         fechaVencimiento: liquidado ? null : vence || null,
         fechaCobroPago: liquidado ? fecha : null,
         medioPago: (medioPago || null) as MedioPago | null,
@@ -412,31 +414,17 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                   />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="mv-fecha" className={label}>
-                      Cuándo ocurrió
-                    </label>
-                    <input
-                      id="mv-fecha"
-                      type="date"
-                      value={fecha}
-                      onChange={(e) => setFecha(e.target.value)}
-                      className={cn(field, '[color-scheme:light]')}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="mv-vence" className={label}>
-                      Vence el
-                    </label>
-                    <input
-                      id="mv-vence"
-                      type="date"
-                      value={vence}
-                      onChange={(e) => setVence(e.target.value)}
-                      className={cn(field, '[color-scheme:light]')}
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="mv-vence" className={label}>
+                    ¿Cuándo lo tenés que {esGasto ? 'pagar' : 'cobrar'}?
+                  </label>
+                  <input
+                    id="mv-vence"
+                    type="date"
+                    value={vence}
+                    onChange={(e) => setVence(e.target.value)}
+                    className={cn(field, '[color-scheme:light]')}
+                  />
                 </div>
               )}
             </motion.div>

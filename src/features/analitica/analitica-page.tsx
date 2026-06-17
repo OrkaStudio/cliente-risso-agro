@@ -7,7 +7,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { useCampos } from '@/features/campos/hooks'
+import { useCampos, useCamposConPotreros } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
   cuentasPendientes,
@@ -15,12 +15,12 @@ import {
   gastosPorCategoria,
   ingresosPorCategoria,
   porCampo,
+  porPotrero,
   resultadoPorMes,
   resumen,
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
-import { ProyeccionFlujo } from '@/features/analitica/proyeccion-flujo'
 import { Panel } from '@/components/panel'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
@@ -47,6 +47,7 @@ export function AnaliticaPage() {
   const movs = useMovimientos()
   const pendientes = usePendientes()
   const camposLista = useCampos()
+  const camposConPotreros = useCamposConPotreros()
   // El motor mantiene las dos bases; al productor le mostramos el resultado
   // del negocio (devengado) + el flujo de fondos proyectado. Sin toggle académico.
   const modo: Modo = 'devengado'
@@ -75,15 +76,27 @@ export function AnaliticaPage() {
   )
   const porMes = useMemo(() => resultadoPorMes(data, modo), [data, modo])
   const cuentas = useMemo(() => cuentasPendientes(data), [data])
+  const potreros = useMemo(() => porPotrero(data, modo), [data, modo])
 
-  // Saldo de caja estimado de toda la empresa (sugerencia para la proyección).
-  const saldoCaja = useMemo(
-    () => resumen(movs.data ?? [], 'caja').resultado,
-    [movs.data],
-  )
+  // Hectáreas por campo (nombre) y por potrero (id) para el margen por ha.
+  const haCampo = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of camposConPotreros.data ?? []) {
+      const ha = c.hectareas ?? c.totalHa
+      if (ha) m.set(c.nombre, ha)
+    }
+    return m
+  }, [camposConPotreros.data])
+  const haPotrero = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of camposConPotreros.data ?? [])
+      for (const p of c.potreros) if (p.hectareas) m.set(p.id, p.hectareas)
+    return m
+  }, [camposConPotreros.data])
 
   const maxCampo = Math.max(1, ...campos.map((c) => Math.abs(c.monto)))
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
+  const maxPotrero = Math.max(1, ...potreros.map((p) => Math.abs(p.monto)))
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,22 +122,8 @@ export function AnaliticaPage() {
         </p>
       ) : (
         <>
-          {/* Flujo de fondos proyectado — ¿me va a alcanzar la plata? */}
-          <ProyeccionFlujo
-            saldoSugerido={saldoCaja}
-            pendientes={pendientes.data ?? []}
-          />
-
-          {/* Resultado del negocio — ¿qué me deja guita? */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <div>
-              <h2 className="font-heading text-[20px] font-bold text-ink">
-                Resultado del negocio
-              </h2>
-              <p className="text-[13px] text-muted-foreground">
-                Lo que ganás y gastás de verdad · {nombreCampo ?? 'toda la empresa'}
-              </p>
-            </div>
+          {/* Filtro por campo */}
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <Dropdown
               ariaLabel="Filtrar por campo"
               value={campoF ?? 'empresa'}
@@ -164,6 +163,54 @@ export function AnaliticaPage() {
               value={cuentas.porPagar === 0 ? '—' : formatARS(cuentas.porPagar)}
               sub="pendiente"
             />
+          </div>
+
+          {/* Rentabilidad por campo y por potrero — el corazón de la decisión */}
+          <div className="grid items-start gap-5 lg:grid-cols-2">
+            <Panel
+              title="Rentabilidad por campo"
+              sub="resultado y margen por hectárea"
+            >
+              {campos.length === 0 ? (
+                <Vacio>Sin datos.</Vacio>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  {campos.map((c) => (
+                    <RentaRow
+                      key={c.nombre}
+                      nombre={c.nombre}
+                      monto={c.monto}
+                      max={maxCampo}
+                      ha={haCampo.get(c.nombre)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Panel>
+            <Panel
+              title="Rentabilidad por potrero"
+              sub="qué potrero rindió y cuál no"
+            >
+              {potreros.length === 0 ? (
+                <Vacio>
+                  Imputá gastos o ingresos a un potrero (en “Más opciones” al
+                  cargar) para compararlos acá.
+                </Vacio>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  {potreros.map((p) => (
+                    <RentaRow
+                      key={p.potreroId}
+                      nombre={p.nombre}
+                      sub={p.campoNombre}
+                      monto={p.monto}
+                      max={maxPotrero}
+                      ha={haPotrero.get(p.potreroId)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Panel>
           </div>
 
           {/* Resultado por mes + Plata en camino */}
@@ -286,40 +333,6 @@ export function AnaliticaPage() {
             </Panel>
           </div>
 
-          {/* Rentabilidad por campo */}
-          <Panel title="Rentabilidad por campo" sub="ingresos − gastos">
-            {campos.length === 0 ? (
-              <Vacio>Sin datos.</Vacio>
-            ) : (
-              <div className="flex flex-col gap-3.5">
-                {campos.map((c) => (
-                  <div key={c.nombre} className="flex items-center gap-3.5 text-sm">
-                    <span className="w-28 shrink-0 truncate font-semibold text-ink">
-                      {c.nombre}
-                    </span>
-                    <div className="h-3.5 flex-1 overflow-hidden rounded bg-secondary">
-                      <div
-                        className="h-full rounded"
-                        style={{
-                          width: `${(Math.abs(c.monto) / maxCampo) * 100}%`,
-                          background: c.monto < 0 ? 'var(--destructive)' : 'var(--g1)',
-                        }}
-                      />
-                    </div>
-                    <span
-                      className={cn(
-                        'tnum w-24 shrink-0 text-right text-[13px] font-bold',
-                        c.monto < 0 ? 'text-destructive' : 'text-field-deep',
-                      )}
-                    >
-                      {fmtCompact(c.monto)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-
           {/* Movimientos recientes */}
           <Panel
             title="Movimientos"
@@ -420,6 +433,55 @@ function CategoriaBreakdown({ items }: { items: { nombre: string; monto: number 
         ))}
       </div>
     </>
+  )
+}
+
+/** Fila de rentabilidad: nombre (+ sub), barra, monto y margen por hectárea. */
+function RentaRow({
+  nombre,
+  sub,
+  monto,
+  max,
+  ha,
+}: {
+  nombre: string
+  sub?: string
+  monto: number
+  max: number
+  ha?: number
+}) {
+  const neg = monto < 0
+  return (
+    <div className="flex items-center gap-3.5 text-sm">
+      <div className="w-32 shrink-0">
+        <div className="truncate font-semibold text-ink">{nombre}</div>
+        {sub && <div className="truncate text-[11px] text-faint">{sub}</div>}
+      </div>
+      <div className="h-3.5 flex-1 overflow-hidden rounded bg-secondary">
+        <div
+          className="h-full rounded"
+          style={{
+            width: `${(Math.abs(monto) / max) * 100}%`,
+            background: neg ? 'var(--destructive)' : 'var(--g1)',
+          }}
+        />
+      </div>
+      <div className="w-24 shrink-0 text-right">
+        <div
+          className={cn(
+            'tnum text-[13px] font-bold',
+            neg ? 'text-destructive' : 'text-field-deep',
+          )}
+        >
+          {fmtCompact(monto)}
+        </div>
+        {ha ? (
+          <div className="tnum text-[10.5px] font-medium text-faint">
+            {fmtCompact(Math.round(monto / ha))}/ha
+          </div>
+        ) : null}
+      </div>
+    </div>
   )
 }
 
