@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Sprout } from 'lucide-react'
 import type { CampoConPotreros } from '@/features/campos/api'
 import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
 import type { LineaCampo, LineaPotrero } from '@/features/analitica/compute'
 import { Panel } from '@/components/panel'
-import { cn } from '@/lib/utils'
 
 function fmtCompact(n: number): string {
   const abs = Math.abs(n)
@@ -16,31 +15,30 @@ function fmtCompact(n: number): string {
 }
 
 type Fin = { ingresos: number; gastos: number; resultado: number }
-
 type Estado = 'sin' | 'curso' | 'gana' | 'pierde'
 
-/** Una campaña/ciclo en el campo es largo: si se invirtió y todavía no se
- *  vendió, NO es pérdida — es inversión en curso. Solo hay ganancia/pérdida
- *  cuando hubo ingresos. */
+/** Ciclo largo: invertir y todavía no vender NO es pérdida, es inversión.
+ *  Solo hay ganancia/pérdida cuando hubo ingresos. */
 function estadoDe(f: Fin | undefined): Estado {
   if (!f || (f.ingresos === 0 && f.gastos === 0)) return 'sin'
   if (f.ingresos === 0 && f.gastos > 0) return 'curso'
   return f.resultado >= 0 ? 'gana' : 'pierde'
 }
 
-const ACENTO: Record<Estado, string> = {
-  sin: 'border-l-border',
-  curso: 'border-l-sol-deep',
-  gana: 'border-l-field-deep',
-  pierde: 'border-l-destructive',
-}
 const COLOR: Record<Estado, string> = {
-  sin: 'text-faint',
-  curso: 'text-sol-deep',
-  gana: 'text-field-deep',
-  pierde: 'text-destructive',
+  sin: 'var(--faint)',
+  curso: 'var(--sol-deep)',
+  gana: 'var(--field-deep)',
+  pierde: 'var(--destructive)',
+}
+const ETIQUETA: Record<Estado, string> = {
+  sin: '',
+  curso: 'Invertido',
+  gana: 'Ganancia',
+  pierde: 'Pérdida',
 }
 
+/** Card compacta: el número manda. Solo lo que se ve a simple vista. */
 function PotreroCard({
   potreroId,
   nombre,
@@ -56,121 +54,94 @@ function PotreroCard({
   cabezas: number
   estadoCiclo: CampoConPotreros['potreros'][number]['estadoCiclo']
   cultivo: string | null
-  fin: Fin | undefined
+  fin: Fin
 }) {
   const estado = estadoDe(fin)
-  const ingresos = fin?.ingresos ?? 0
-  const gastos = fin?.gastos ?? 0
-  const resultado = fin?.resultado ?? 0
-  const maxBar = Math.max(ingresos, gastos, 1)
-
-  // Número principal: invertido (en curso) o resultado (cerrado).
-  const valor = estado === 'curso' ? gastos : resultado
+  const color = COLOR[estado]
+  const valor = estado === 'curso' ? fin.gastos : fin.resultado
   const valorHa = ha && ha > 0 ? Math.round(valor / ha) : null
-  const etiqueta =
-    estado === 'curso'
-      ? 'Invertido'
-      : estado === 'sin'
-        ? ''
-        : 'Resultado'
+  const Flecha = estado === 'pierde' ? ArrowDownRight : ArrowUpRight
 
   return (
     <Link
       to={`/potrero/${potreroId}`}
-      className={cn(
-        'group flex flex-col rounded-xl border border-l-4 border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(16,30,20,0.1)]',
-        ACENTO[estado],
-      )}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(16,30,20,0.12)]"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate font-heading text-[15px] font-bold text-ink">
-            {nombre}
-          </div>
-          <div className="tnum text-[11px] text-faint">
-            {ha ? `${ha} ha` : 's/ ha'}
-            {cabezas > 0 && ` · ${cabezas} cab`}
-          </div>
-        </div>
-        <span
-          className="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-          style={{
-            color: estadoCicloColor[estadoCiclo],
-            background: `color-mix(in srgb, ${estadoCicloColor[estadoCiclo]} 13%, transparent)`,
-          }}
-        >
-          {estadoCicloLabel[estadoCiclo]}
-        </span>
-      </div>
+      {/* Gancho visual: glow de color del estado en la esquina + barra de acento */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full opacity-[0.13] blur-2xl transition-opacity group-hover:opacity-25"
+        style={{ background: color }}
+      />
+      <div
+        aria-hidden
+        className="absolute left-0 top-0 h-full w-1"
+        style={{ background: color }}
+      />
 
-      {estado === 'sin' ? (
-        <div className="mt-3 flex-1 py-2 text-[13px] text-faint">
-          Sin movimientos cargados
+      <div className="relative">
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="truncate font-heading text-[17px] font-bold text-ink">
+            {nombre}
+          </h4>
+          <span
+            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold"
+            style={{ color: estadoCicloColor[estadoCiclo] }}
+          >
+            <span
+              className="size-1.5 rounded-full"
+              style={{ background: estadoCicloColor[estadoCiclo] }}
+            />
+            {estadoCicloLabel[estadoCiclo]}
+          </span>
         </div>
-      ) : (
-        <>
-          <div className="mt-3">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-faint">
-              {etiqueta}
+
+        {/* Héroe: el número */}
+        <div className="mt-2.5 flex items-end justify-between gap-2">
+          <div>
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
+              {ETIQUETA[estado]}
             </div>
-            <div className={cn('tnum text-[22px] font-bold leading-none', COLOR[estado])}>
+            <div
+              className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
+              style={{ color }}
+            >
+              <Flecha className="size-5" strokeWidth={2.5} />
               {fmtCompact(valor)}
             </div>
-            <div className="mt-1 text-[11px] font-medium text-faint">
-              {valorHa != null && `${fmtCompact(valorHa)}/ha`}
-              {estado === 'curso' && ' · campaña en curso, sin vender'}
-            </div>
           </div>
-
-          {/* Composición: entró vs gastó */}
-          <div className="mt-3 flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="w-12 shrink-0 text-[10px] font-semibold text-field-deep">
-                Entró
-              </span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-field-deep"
-                  style={{ width: `${(ingresos / maxBar) * 100}%` }}
-                />
-              </div>
-              <span className="tnum w-12 shrink-0 text-right text-[10.5px] font-bold text-ink">
-                {fmtCompact(ingresos)}
-              </span>
+          {valorHa != null && (
+            <div className="tnum pb-0.5 text-right text-[15px] font-bold text-muted-foreground">
+              {fmtCompact(valorHa)}
+              <span className="text-[11px] font-semibold text-faint">/ha</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-12 shrink-0 text-[10px] font-semibold text-tierra">
-                Gastó
-              </span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-tierra"
-                  style={{ width: `${(gastos / maxBar) * 100}%` }}
-                />
-              </div>
-              <span className="tnum w-12 shrink-0 text-right text-[10.5px] font-bold text-ink">
-                {fmtCompact(gastos)}
-              </span>
-            </div>
-          </div>
-        </>
-      )}
+          )}
+        </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5">
-        <span className="truncate text-[11px] text-muted-foreground">
-          {cultivo ?? ' '}
-        </span>
-        <span className="inline-flex items-center gap-0.5 text-[11.5px] font-semibold text-field-deep">
-          Ver
-          <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-        </span>
+        {/* Pie: meta mínima + cta */}
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+          <span className="tnum truncate text-[12px] text-faint">
+            {ha ? `${ha} ha` : 's/ha'}
+            {cabezas > 0 && ` · ${cabezas} cab`}
+            {cultivo && (
+              <span className="ml-1 inline-flex items-center gap-0.5 text-field">
+                <Sprout className="size-3" />
+                {cultivo}
+              </span>
+            )}
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-field-deep">
+            Ver
+            <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </span>
+        </div>
       </div>
     </Link>
   )
 }
 
-/** Rentabilidad por potrero como cards limpias agrupadas por campo. Cada card
- *  lleva a la página del potrero (toda la info), sin saturar la grilla. */
+/** Rentabilidad por potrero: cards compactas para los que tienen datos, y un
+ *  strip de chips para los que todavía no — foco en lo que importa. */
 export function RentabilidadPotreros({
   campos,
   potreros,
@@ -190,12 +161,11 @@ export function RentabilidadPotreros({
     campos.map((c) => [c.campoId, c]),
   )
 
-  // Campos con movimientos o con potreros; ordenados por resultado.
-  const lista = [...camposConPotreros].sort((a, b) => {
-    const ra = finPorCampo.get(a.id)?.resultado ?? 0
-    const rb = finPorCampo.get(b.id)?.resultado ?? 0
-    return rb - ra
-  })
+  const lista = [...camposConPotreros].sort(
+    (a, b) =>
+      (finPorCampo.get(b.id)?.resultado ?? 0) -
+      (finPorCampo.get(a.id)?.resultado ?? 0),
+  )
 
   return (
     <Panel
@@ -209,14 +179,21 @@ export function RentabilidadPotreros({
       ) : (
         <div className="flex flex-col gap-7">
           {lista.map((campo) => {
+            const conDatos = campo.potreros.filter(
+              (p) => estadoDe(finPorPotrero.get(p.id)) !== 'sin',
+            )
+            const vacios = campo.potreros.filter(
+              (p) => estadoDe(finPorPotrero.get(p.id)) === 'sin',
+            )
             const cf = finPorCampo.get(campo.id)
             const estado = estadoDe(cf)
             const ha = campo.hectareas ?? campo.totalHa
             const valor = estado === 'curso' ? (cf?.gastos ?? 0) : (cf?.resultado ?? 0)
             const valorHa = ha > 0 && valor ? Math.round(valor / ha) : null
+
             return (
               <div key={campo.id}>
-                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
+                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <div className="flex items-baseline gap-2">
                     <h4 className="font-heading text-[16px] font-bold text-ink">
                       {campo.nombre}
@@ -229,10 +206,11 @@ export function RentabilidadPotreros({
                   </div>
                   {estado !== 'sin' && (
                     <span className="flex items-baseline gap-1.5 text-[13px]">
-                      <span className="text-faint">
-                        {estado === 'curso' ? 'invertido' : 'resultado'}
-                      </span>
-                      <span className={cn('tnum font-bold', COLOR[estado])}>
+                      <span className="text-faint">{ETIQUETA[estado].toLowerCase()}</span>
+                      <span
+                        className="tnum font-bold"
+                        style={{ color: COLOR[estado] }}
+                      >
                         {fmtCompact(valor)}
                       </span>
                       {valorHa != null && (
@@ -243,13 +221,10 @@ export function RentabilidadPotreros({
                     </span>
                   )}
                 </div>
-                {campo.potreros.length === 0 ? (
-                  <p className="py-2 text-[13px] text-faint">
-                    Este campo no tiene potreros cargados.
-                  </p>
-                ) : (
+
+                {conDatos.length > 0 && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {campo.potreros.map((p) => (
+                    {conDatos.map((p) => (
                       <PotreroCard
                         key={p.id}
                         potreroId={p.id}
@@ -258,8 +233,29 @@ export function RentabilidadPotreros({
                         cabezas={p.cabezas}
                         estadoCiclo={p.estadoCiclo}
                         cultivo={p.cultivo}
-                        fin={finPorPotrero.get(p.id)}
+                        fin={finPorPotrero.get(p.id)!}
                       />
+                    ))}
+                  </div>
+                )}
+
+                {vacios.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11.5px] font-medium text-faint">
+                      Sin movimientos:
+                    </span>
+                    {vacios.map((p) => (
+                      <Link
+                        key={p.id}
+                        to={`/potrero/${p.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-faint hover:text-ink"
+                      >
+                        <span
+                          className="size-1.5 rounded-full"
+                          style={{ background: estadoCicloColor[p.estadoCiclo] }}
+                        />
+                        {p.nombre}
+                      </Link>
                     ))}
                   </div>
                 )}
