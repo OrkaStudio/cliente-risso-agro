@@ -317,115 +317,154 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
     year: 'numeric',
   })
 
+  const hoy0 = new Date().setHours(0, 0, 0, 0)
   const botonNav =
-    'flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-faint hover:text-ink'
+    'flex size-8 items-center justify-center rounded-lg border border-white/60 bg-white/50 text-muted-foreground backdrop-blur transition-colors hover:bg-white/80 hover:text-ink'
 
   return (
-    <Panel className="p-0">
-      {/* Navegación */}
-      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-2.5">
-        <span className="font-heading text-[16px] font-bold text-ink">
-          {mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            aria-label="Mes anterior"
-            onClick={() => setCursor(new Date(year, month - 1, 1))}
-            className={botonNav}
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setCursor(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}
-            className="h-8 rounded-lg border border-border bg-card px-3 text-[13px] font-semibold text-ink transition-colors hover:border-faint"
-          >
-            Hoy
-          </button>
-          <button
-            type="button"
-            aria-label="Mes siguiente"
-            onClick={() => setCursor(new Date(year, month + 1, 1))}
-            className={botonNav}
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
-      </div>
+    <Panel className="relative overflow-hidden p-0 bg-gradient-to-br from-field-soft/70 via-card to-sky/15">
+      {/* Blobs difuminados que dan profundidad al vidrio */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-16 -top-12 size-56 rounded-full bg-field/20 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-16 right-0 size-64 rounded-full bg-sky/20 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-1/3 top-1/3 size-44 rounded-full bg-sol-deep/10 blur-3xl"
+      />
 
-      {/* Encabezado de días */}
-      <div className="grid grid-cols-7 border-b border-border">
-        {DIAS.map((d) => (
-          <div
-            key={d}
-            className="px-2 py-1.5 text-center text-[10.5px] font-bold uppercase tracking-[0.04em] text-faint"
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Grilla */}
-      <div>
-        {semanas.map((sem, i) => (
-          <div
-            key={i}
-            className="grid grid-cols-7 border-b border-border/60 last:border-0"
-          >
-            {sem.map((cel, j) => (
-              <div
-                key={j}
-                className={cn(
-                  'min-h-[84px] border-r border-border/60 p-1 last:border-r-0',
-                  !cel && 'bg-secondary/30',
-                )}
-              >
-                {cel && (
-                  <>
-                    <div className="mb-0.5 flex justify-end">
-                      <span
-                        className={cn(
-                          'flex size-5 items-center justify-center rounded-full text-[11px] font-semibold',
-                          esMesActual && cel.dia === diaHoy
-                            ? 'bg-field-deep text-white'
-                            : 'text-muted-foreground',
-                        )}
-                      >
-                        {cel.dia}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      {cel.items.slice(0, 2).map((c) => (
-                        <ChequeChip key={c.id} c={c} />
-                      ))}
-                      {cel.items.length > 2 && (
-                        <span className="px-1 text-[10px] font-semibold text-faint">
-                          +{cel.items.length - 2} más
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* Sin fecha de vencimiento */}
-      {sinFecha.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
-          <span className="text-[12px] font-semibold text-faint">
-            Sin fecha de vencimiento:
+      <div className="relative z-10">
+        {/* Navegación */}
+        <div className="flex items-center justify-between gap-3 border-b border-white/50 px-5 py-3">
+          <span className="font-heading text-[18px] font-bold text-ink">
+            {mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}
           </span>
-          {sinFecha.map((c) => (
-            <div key={c.id} className="w-44">
-              <ChequeChip c={c} />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Mes anterior"
+              onClick={() => setCursor(new Date(year, month - 1, 1))}
+              className={botonNav}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setCursor(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+              }
+              className="h-8 rounded-lg border border-white/60 bg-white/50 px-3 text-[13px] font-semibold text-ink backdrop-blur transition-colors hover:bg-white/80"
+            >
+              Hoy
+            </button>
+            <button
+              type="button"
+              aria-label="Mes siguiente"
+              onClick={() => setCursor(new Date(year, month + 1, 1))}
+              className={botonNav}
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Encabezado de días */}
+        <div className="grid grid-cols-7 border-b border-white/50">
+          {DIAS.map((d, i) => (
+            <div
+              key={d}
+              className={cn(
+                'px-2 py-2 text-center text-[11px] font-bold uppercase tracking-[0.05em]',
+                i >= 5 ? 'text-faint/70' : 'text-muted-foreground',
+              )}
+            >
+              {d}
             </div>
           ))}
         </div>
-      )}
+
+        {/* Grilla */}
+        <div>
+          {semanas.map((sem, i) => (
+            <div key={i} className="grid grid-cols-7">
+              {sem.map((cel, j) => {
+                const hoyCell = !!cel && esMesActual && cel.dia === diaHoy
+                const finde = j >= 5
+                const pasado =
+                  !!cel && new Date(year, month, cel.dia).getTime() < hoy0
+                return (
+                  <div
+                    key={j}
+                    className={cn(
+                      'min-h-[92px] border-b border-r border-white/45 p-1.5 backdrop-blur-md transition-colors last:border-r-0',
+                      !cel && 'bg-white/10',
+                      cel &&
+                        !hoyCell &&
+                        (finde
+                          ? 'bg-white/25 hover:bg-white/45'
+                          : 'bg-white/45 hover:bg-white/65'),
+                      hoyCell &&
+                        'bg-field-soft/70 ring-1 ring-inset ring-field-deep/40',
+                    )}
+                  >
+                    {cel && (
+                      <>
+                        <div className="mb-1 flex items-center gap-1">
+                          {hoyCell && (
+                            <span className="rounded-full bg-field-deep px-1.5 py-px text-[8.5px] font-bold uppercase tracking-wide text-white">
+                              Hoy
+                            </span>
+                          )}
+                          <span
+                            className={cn(
+                              'tnum ml-auto text-[14px] font-bold leading-none',
+                              hoyCell
+                                ? 'text-field-deep'
+                                : pasado
+                                  ? 'text-faint'
+                                  : 'text-ink',
+                            )}
+                          >
+                            {cel.dia}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          {cel.items.slice(0, 2).map((c) => (
+                            <ChequeChip key={c.id} c={c} />
+                          ))}
+                          {cel.items.length > 2 && (
+                            <span className="px-1 text-[10px] font-semibold text-faint">
+                              +{cel.items.length - 2} más
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Sin fecha de vencimiento */}
+        {sinFecha.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/50 px-5 py-3">
+            <span className="text-[12px] font-semibold text-faint">
+              Sin fecha de vencimiento:
+            </span>
+            {sinFecha.map((c) => (
+              <div key={c.id} className="w-44">
+                <ChequeChip c={c} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Panel>
   )
 }
