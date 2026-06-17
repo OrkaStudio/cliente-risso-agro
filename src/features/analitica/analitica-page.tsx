@@ -20,6 +20,7 @@ import {
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
+import { ProyeccionFlujo } from '@/features/analitica/proyeccion-flujo'
 import { Panel } from '@/components/panel'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
@@ -46,7 +47,9 @@ export function AnaliticaPage() {
   const movs = useMovimientos()
   const pendientes = usePendientes()
   const camposLista = useCampos()
-  const [modo, setModo] = useState<Modo>('devengado')
+  // El motor mantiene las dos bases; al productor le mostramos el resultado
+  // del negocio (devengado) + el flujo de fondos proyectado. Sin toggle académico.
+  const modo: Modo = 'devengado'
   const [campoF, setCampoF] = useState<string | null>(null)
 
   const nombreCampo =
@@ -73,6 +76,12 @@ export function AnaliticaPage() {
   const porMes = useMemo(() => resultadoPorMes(data, modo), [data, modo])
   const cuentas = useMemo(() => cuentasPendientes(data), [data])
 
+  // Saldo de caja estimado de toda la empresa (sugerencia para la proyección).
+  const saldoCaja = useMemo(
+    () => resumen(movs.data ?? [], 'caja').resultado,
+    [movs.data],
+  )
+
   const maxCampo = Math.max(1, ...campos.map((c) => Math.abs(c.monto)))
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
 
@@ -92,43 +101,6 @@ export function AnaliticaPage() {
         <CargarMovimientoDialog empresaId={empresaId} />
       </div>
 
-      {/* Toggle devengado/caja */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
-          {(['devengado', 'caja'] as Modo[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setModo(m)}
-              className={cn(
-                'rounded-[7px] px-4 text-[13.5px] font-semibold capitalize transition-colors',
-                modo === m
-                  ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.08)]'
-                  : 'text-muted-foreground hover:text-ink',
-              )}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-        <Dropdown
-          ariaLabel="Filtrar por campo"
-          value={campoF ?? 'empresa'}
-          onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
-          options={[
-            { value: 'empresa', label: 'Toda la empresa' },
-            ...(camposLista.data ?? []).map((c) => ({
-              value: c.id,
-              label: c.nombre,
-            })),
-          ]}
-        />
-        <span className="text-xs text-faint">
-          {modo === 'devengado'
-            ? 'Devengado: la economía real, sin importar cuándo entró/salió la plata.'
-            : 'Caja: solo lo que ya se cobró o pagó de verdad.'}
-        </span>
-      </div>
-
       {movs.isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
       ) : movs.error ? (
@@ -137,6 +109,36 @@ export function AnaliticaPage() {
         </p>
       ) : (
         <>
+          {/* Flujo de fondos proyectado — ¿me va a alcanzar la plata? */}
+          <ProyeccionFlujo
+            saldoSugerido={saldoCaja}
+            pendientes={pendientes.data ?? []}
+          />
+
+          {/* Resultado del negocio — ¿qué me deja guita? */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div>
+              <h2 className="font-heading text-[20px] font-bold text-ink">
+                Resultado del negocio
+              </h2>
+              <p className="text-[13px] text-muted-foreground">
+                Lo que ganás y gastás de verdad · {nombreCampo ?? 'toda la empresa'}
+              </p>
+            </div>
+            <Dropdown
+              ariaLabel="Filtrar por campo"
+              value={campoF ?? 'empresa'}
+              onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
+              options={[
+                { value: 'empresa', label: 'Toda la empresa' },
+                ...(camposLista.data ?? []).map((c) => ({
+                  value: c.id,
+                  label: c.nombre,
+                })),
+              ]}
+            />
+          </div>
+
           {/* KPIs */}
           <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">
             <KpiCell label="Ingresos" icon={Banknote} color="var(--field)" value={formatARS(res.ingresos)} />
@@ -166,7 +168,7 @@ export function AnaliticaPage() {
 
           {/* Resultado por mes + Plata en camino */}
           <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-            <Panel title="Resultado por mes" sub={modo === 'caja' ? 'caja' : 'devengado'}>
+            <Panel title="Resultado por mes" sub="ingresos − gastos">
               {porMes.length === 0 ? (
                 <Vacio>Sin movimientos para graficar.</Vacio>
               ) : (

@@ -1,4 +1,4 @@
-import type { MovimientoConDetalle } from '@/features/analitica/api'
+import type { MovimientoConDetalle, Pendiente } from '@/features/analitica/api'
 
 export type Modo = 'devengado' | 'caja'
 export type Resumen = { ingresos: number; gastos: number; resultado: number }
@@ -111,3 +111,113 @@ const fmt = new Intl.NumberFormat('es-AR', {
   maximumFractionDigits: 0,
 })
 export const formatARS = (n: number) => fmt.format(n)
+
+// ===== Proyección de flujo de fondos =====
+// La pregunta del productor: "¿me va a alcanzar la plata?". Desde el saldo de
+// hoy, aplicamos los cobros (+) y pagos (−) pendientes por su vencimiento y
+// vemos cómo evoluciona la caja — y si en algún momento queda en rojo.
+
+export type PuntoFlujo = {
+  fecha: string
+  balance: number
+  descripcion?: string
+  tipo?: 'ingreso' | 'gasto'
+  monto?: number
+}
+export type EventoFlujo = {
+  id: string
+  fecha: string
+  descripcion: string
+  tipo: 'ingreso' | 'gasto'
+  monto: number
+  balance: number
+}
+export type Proyeccion = {
+  puntos: PuntoFlujo[]
+  eventos: EventoFlujo[]
+  saldoInicial: number
+  saldoFinal: number
+  minBalance: number
+  fechaMin: string
+  primerNegativo: { fecha: string; balance: number } | null
+  totalCobrar: number
+  totalPagar: number
+  sinFecha: Pendiente[]
+}
+
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+export function proyectarFlujo(
+  saldoInicial: number,
+  pend: Pendiente[],
+  horizonteDias = 90,
+): Proyeccion {
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const limite = new Date(hoy)
+  limite.setDate(limite.getDate() + horizonteDias)
+
+  const sinFecha = pend.filter((p) => !p.fechaVencimiento || p.monto == null)
+  const conFecha = pend
+    .filter((p) => p.fechaVencimiento && p.monto != null)
+    .sort((a, b) => (a.fechaVencimiento! < b.fechaVencimiento! ? -1 : 1))
+
+  let balance = saldoInicial
+  let minBalance = balance
+  let fechaMin = isoLocal(hoy)
+  let primerNegativo: { fecha: string; balance: number } | null = null
+  let totalCobrar = 0
+  let totalPagar = 0
+
+  const puntos: PuntoFlujo[] = [{ fecha: isoLocal(hoy), balance }]
+  const eventos: EventoFlujo[] = []
+
+  for (const p of conFecha) {
+    const [y, m, d] = p.fechaVencimiento!.split('-').map(Number)
+    if (new Date(y, m - 1, d) > limite) continue
+    const monto = Number(p.monto)
+    const tipo = p.tipo ?? 'gasto'
+    if (tipo === 'ingreso') {
+      balance += monto
+      totalCobrar += monto
+    } else {
+      balance -= monto
+      totalPagar += monto
+    }
+    eventos.push({
+      id: p.id,
+      fecha: p.fechaVencimiento!,
+      descripcion: p.descripcion,
+      tipo,
+      monto,
+      balance,
+    })
+    puntos.push({
+      fecha: p.fechaVencimiento!,
+      balance,
+      descripcion: p.descripcion,
+      tipo,
+      monto,
+    })
+    if (balance < minBalance) {
+      minBalance = balance
+      fechaMin = p.fechaVencimiento!
+    }
+    if (!primerNegativo && balance < 0)
+      primerNegativo = { fecha: p.fechaVencimiento!, balance }
+  }
+
+  return {
+    puntos,
+    eventos,
+    saldoInicial,
+    saldoFinal: balance,
+    minBalance,
+    fechaMin,
+    primerNegativo,
+    totalCobrar,
+    totalPagar,
+    sinFecha,
+  }
+}
