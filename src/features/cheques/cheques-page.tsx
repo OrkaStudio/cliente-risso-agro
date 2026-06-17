@@ -1,6 +1,14 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ComponentType } from 'react'
 import { toast } from 'sonner'
-import { ArrowDownLeft, ArrowUpRight, Landmark, Undo2 } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarDays,
+  Eye,
+  Landmark,
+  Table2,
+  Undo2,
+} from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCheques, useRevertirCheque } from '@/features/cheques/hooks'
 import type { Cheque } from '@/features/cheques/api'
@@ -33,6 +41,53 @@ function diasInfo(c: Cheque): { texto: string; urgente: boolean } {
 
 type Filtro = 'todos' | 'cobrar' | 'pagar'
 type Vista = 'tabla' | 'calendario'
+type Tono = 'neutro' | 'cobro' | 'pago'
+
+/** Pill de filtro con ícono y contador, coloreado según el tono cuando está activo. */
+function FilterPill({
+  active,
+  onClick,
+  label,
+  count,
+  tono,
+  icon: Icon,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+  count: number
+  tono: Tono
+  icon?: ComponentType<{ className?: string }>
+}) {
+  const activo: Record<Tono, string> = {
+    neutro: 'border-ink/25 bg-ink/[0.06] text-ink',
+    cobro: 'border-field-deep bg-field-soft text-field-deep',
+    pago: 'border-tierra bg-tierra-soft text-tierra',
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex h-10 items-center gap-2 rounded-[11px] border px-3.5 text-[13.5px] font-semibold transition-colors',
+        active
+          ? activo[tono]
+          : 'border-border bg-card text-muted-foreground hover:border-faint hover:text-ink',
+      )}
+    >
+      {Icon && <Icon className="size-4" />}
+      {label}
+      <span
+        className={cn(
+          'tnum flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
+          active ? 'bg-white/70 text-current' : 'bg-secondary text-faint',
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  )
+}
 
 export function ChequesPage() {
   const empresa = useEmpresa()
@@ -59,6 +114,13 @@ export function ChequesPage() {
         .reduce((s, c) => s + c.monto, 0),
     [data],
   )
+
+  const conteo = useMemo(() => {
+    const p = data.filter((c) => c.estado === 'pendiente')
+    const cobrar = p.filter((c) => c.tipo === 'ingreso').length
+    const pagar = p.filter((c) => c.tipo === 'gasto').length
+    return { todos: cobrar + pagar, cobrar, pagar }
+  }, [data])
 
   const porFiltro = useCallback(
     (c: Cheque) => {
@@ -135,61 +197,70 @@ export function ChequesPage() {
 
       {/* Controles: vista + filtros */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
+        {/* Toggle de vista con íconos */}
+        <div className="flex h-10 rounded-[11px] border border-border bg-secondary p-1">
           {(
             [
-              ['tabla', 'Tabla'],
-              ['calendario', 'Calendario'],
-            ] as [Vista, string][]
-          ).map(([v, lbl]) => (
+              ['tabla', 'Tabla', Table2],
+              ['calendario', 'Calendario', CalendarDays],
+            ] as [Vista, string, ComponentType<{ className?: string }>][]
+          ).map(([v, lbl, Icon]) => (
             <button
               key={v}
+              type="button"
               onClick={() => setVista(v)}
               className={cn(
-                'rounded-[7px] px-4 text-[13.5px] font-semibold transition-colors',
+                'flex items-center gap-1.5 rounded-[8px] px-3.5 text-[13.5px] font-semibold transition-colors',
                 vista === v
-                  ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.08)]'
+                  ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.1)]'
                   : 'text-muted-foreground hover:text-ink',
               )}
             >
+              <Icon className="size-4" />
               {lbl}
             </button>
           ))}
         </div>
 
-        <div className="flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
-          {(
-            [
-              ['todos', 'Todos'],
-              ['cobrar', 'A cobrar'],
-              ['pagar', 'A pagar'],
-            ] as [Filtro, string][]
-          ).map(([v, lbl]) => (
-            <button
-              key={v}
-              onClick={() => setFiltro(v)}
-              className={cn(
-                'rounded-[7px] px-4 text-[13.5px] font-semibold transition-colors',
-                filtro === v
-                  ? 'bg-card text-ink shadow-[0_1px_3px_rgba(16,24,19,0.08)]'
-                  : 'text-muted-foreground hover:text-ink',
-              )}
-            >
-              {lbl}
-            </button>
-          ))}
-        </div>
+        {/* Filtros con contador */}
+        <FilterPill
+          active={filtro === 'todos'}
+          onClick={() => setFiltro('todos')}
+          label="Todos"
+          count={conteo.todos}
+          tono="neutro"
+        />
+        <FilterPill
+          active={filtro === 'cobrar'}
+          onClick={() => setFiltro('cobrar')}
+          label="A cobrar"
+          count={conteo.cobrar}
+          tono="cobro"
+          icon={ArrowDownLeft}
+        />
+        <FilterPill
+          active={filtro === 'pagar'}
+          onClick={() => setFiltro('pagar')}
+          label="A pagar"
+          count={conteo.pagar}
+          tono="pago"
+          icon={ArrowUpRight}
+        />
 
         {vista === 'tabla' && (
-          <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-medium text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={verLiquidados}
-              onChange={(e) => setVerLiquidados(e.target.checked)}
-              className="size-4 accent-[var(--primary)]"
-            />
+          <button
+            type="button"
+            onClick={() => setVerLiquidados((v) => !v)}
+            className={cn(
+              'ml-auto flex h-10 items-center gap-2 rounded-[11px] border px-3.5 text-[13px] font-semibold transition-colors',
+              verLiquidados
+                ? 'border-field-deep bg-field-soft text-field-deep'
+                : 'border-border bg-card text-muted-foreground hover:border-faint hover:text-ink',
+            )}
+          >
+            <Eye className="size-4" />
             Ver cobrados/pagados
-          </label>
+          </button>
         )}
       </div>
 
