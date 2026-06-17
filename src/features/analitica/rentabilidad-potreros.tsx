@@ -9,29 +9,20 @@ type IconProps = {
 }
 type IconComp = ComponentType<IconProps>
 
-/** Toro en estilo de línea (lucide no tiene bovinos). Cabeza + cuernos. */
-function ToroIcon({ className, style, strokeWidth = 1.5 }: IconProps) {
+/** Vaca (mdi:cow). Ícono relleno — va con fill, no stroke. */
+function CowIcon({ className, style }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
       className={className}
       style={style}
       aria-hidden
     >
-      <path d="M7 7C4 6 2.8 4 3.8 2.4" />
-      <path d="M17 7C20 6 21.2 4 20.2 2.4" />
-      <path d="M7 7c0-1.7 2.2-2.2 5-2.2s5 .5 5 2.2c0 4.1-2.2 8.2-5 8.2S7 11.1 7 7Z" />
-      <path d="M10 9h.01" />
-      <path d="M14 9h.01" />
-      <path d="M9.6 12.3c1.1 1 3.7 1 4.8 0" />
-      <path d="M11 11.7h.01" />
-      <path d="M13 11.7h.01" />
+      <path
+        fill="currentColor"
+        d="M10.5 18a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5m3 0a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5M10 11a1 1 0 0 1 1 1a1 1 0 0 1-1 1a1 1 0 0 1-1-1a1 1 0 0 1 1-1m4 0a1 1 0 0 1 1 1a1 1 0 0 1-1 1a1 1 0 0 1-1-1a1 1 0 0 1 1-1m4 7c0 2.21-2.69 4-6 4s-6-1.79-6-4c0-.9.45-1.73 1.2-2.4c-.75-1-1.2-2.25-1.2-3.6l.12-1.22c-.54.15-1.19.15-1.72 0c-1.02-.28-2.56-1.43-2.33-2.23s2.14-.95 3.16-.65c.59.17 1.22.6 1.59 1.06l.57-.81C6.79 7.05 7 4 10 3l-.09.14c-.28.44-1 1.83-.24 3.33a6.02 6.02 0 0 1 4.66 0c.76-1.5.04-2.89-.24-3.33L14 3c3 1 3.21 4.05 2.61 5.15l.57.81c.37-.46 1-.89 1.59-1.06c1.02-.3 2.93-.15 3.16.65s-1.31 1.95-2.33 2.23c-.53.15-1.18.15-1.72 0L18 12c0 1.35-.45 2.6-1.2 3.6c.75.67 1.2 1.5 1.2 2.4m-6-2c-2.21 0-4 .9-4 2s1.79 2 4 2s4-.9 4-2s-1.79-2-4-2m0-2c1.12 0 2.17.21 3.07.56c.58-.69.93-1.56.93-2.56a4 4 0 0 0-4-4a4 4 0 0 0-4 4c0 1 .35 1.87.93 2.56c.9-.35 1.95-.56 3.07-.56m2.09-10.86"
+      />
     </svg>
   )
 }
@@ -95,7 +86,7 @@ const TIPO: Record<
   ganadero: {
     color: 'var(--ganado)',
     tint: 'var(--ganado-soft)',
-    Icon: ToroIcon,
+    Icon: CowIcon,
     label: 'Ganadero',
   },
   agricola: {
