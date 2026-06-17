@@ -97,6 +97,17 @@ export function AnaliticaPage() {
   const maxCampo = Math.max(1, ...campos.map((c) => Math.abs(c.monto)))
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
   const maxPotrero = Math.max(1, ...potreros.map((p) => Math.abs(p.monto)))
+  const maxAbs = Math.max(maxCampo, maxPotrero)
+
+  const potrerosPorCampo = useMemo(() => {
+    const m = new Map<string, typeof potreros>()
+    for (const p of potreros) {
+      const arr = m.get(p.campoNombre) ?? []
+      arr.push(p)
+      m.set(p.campoNombre, arr)
+    }
+    return m
+  }, [potreros])
 
   return (
     <div className="flex flex-col gap-6">
@@ -165,53 +176,52 @@ export function AnaliticaPage() {
             />
           </div>
 
-          {/* Rentabilidad por campo y por potrero — el corazón de la decisión */}
-          <div className="grid items-start gap-5 lg:grid-cols-2">
-            <Panel
-              title="Rentabilidad por campo"
-              sub="resultado y margen por hectárea"
-            >
-              {campos.length === 0 ? (
-                <Vacio>Sin datos.</Vacio>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {campos.map((c) => (
-                    <RentaRow
-                      key={c.nombre}
-                      nombre={c.nombre}
-                      monto={c.monto}
-                      max={maxCampo}
-                      ha={haCampo.get(c.nombre)}
-                    />
-                  ))}
-                </div>
-              )}
-            </Panel>
-            <Panel
-              title="Rentabilidad por potrero"
-              sub="qué potrero rindió y cuál no"
-            >
-              {potreros.length === 0 ? (
-                <Vacio>
-                  Imputá gastos o ingresos a un potrero (en “Más opciones” al
-                  cargar) para compararlos acá.
-                </Vacio>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {potreros.map((p) => (
-                    <RentaRow
-                      key={p.potreroId}
-                      nombre={p.nombre}
-                      sub={p.campoNombre}
-                      monto={p.monto}
-                      max={maxPotrero}
-                      ha={haPotrero.get(p.potreroId)}
-                    />
-                  ))}
-                </div>
-              )}
-            </Panel>
-          </div>
+          {/* Rentabilidad por campo y potrero — el corazón de la decisión */}
+          <Panel
+            title="Rentabilidad por campo y potrero"
+            sub="resultado y margen por hectárea"
+          >
+            {campos.length === 0 ? (
+              <Vacio>Sin movimientos para analizar todavía.</Vacio>
+            ) : (
+              <div className="flex flex-col divide-y divide-border/60">
+                {campos.map((c) => {
+                  const ps = potrerosPorCampo.get(c.nombre) ?? []
+                  return (
+                    <div key={c.nombre} className="py-3 first:pt-0 last:pb-0">
+                      <RentaRow
+                        nombre={c.nombre}
+                        monto={c.monto}
+                        max={maxAbs}
+                        ha={haCampo.get(c.nombre)}
+                        bold
+                      />
+                      {ps.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2 pl-4">
+                          {ps.map((p) => (
+                            <RentaRow
+                              key={p.potreroId}
+                              nombre={p.nombre}
+                              monto={p.monto}
+                              max={maxAbs}
+                              ha={haPotrero.get(p.potreroId)}
+                              nested
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {potreros.length === 0 && campos.length > 0 && (
+              <p className="mt-4 rounded-lg bg-secondary/60 px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
+                💡 Elegí el <strong>potrero</strong> al cargar un gasto o ingreso
+                para ver cuál de tus potreros rinde y cuál no.
+              </p>
+            )}
+          </Panel>
 
           {/* Resultado por mes + Plata en camino */}
           <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -436,40 +446,64 @@ function CategoriaBreakdown({ items }: { items: { nombre: string; monto: number 
   )
 }
 
-/** Fila de rentabilidad: nombre (+ sub), barra, monto y margen por hectárea. */
+/** Fila de rentabilidad: nombre (+ sub), barra, monto y margen por hectárea.
+ *  `bold` para el campo, `nested` para el potrero (indentado y más chico). */
 function RentaRow({
   nombre,
   sub,
   monto,
   max,
   ha,
+  bold,
+  nested,
 }: {
   nombre: string
   sub?: string
   monto: number
   max: number
   ha?: number
+  bold?: boolean
+  nested?: boolean
 }) {
   const neg = monto < 0
+  const barH = nested ? 'h-2.5' : 'h-3.5'
+  const color = neg
+    ? 'var(--destructive)'
+    : nested
+      ? 'var(--g3)'
+      : 'var(--g1)'
   return (
     <div className="flex items-center gap-3.5 text-sm">
-      <div className="w-32 shrink-0">
-        <div className="truncate font-semibold text-ink">{nombre}</div>
-        {sub && <div className="truncate text-[11px] text-faint">{sub}</div>}
+      <div className="flex w-36 shrink-0 items-center gap-1.5">
+        {nested && (
+          <span className="size-1.5 shrink-0 rounded-full bg-faint" />
+        )}
+        <div className="min-w-0">
+          <div
+            className={cn(
+              'truncate text-ink',
+              bold ? 'font-bold' : nested ? 'font-medium text-[13px]' : 'font-semibold',
+            )}
+          >
+            {nombre}
+          </div>
+          {sub && <div className="truncate text-[11px] text-faint">{sub}</div>}
+        </div>
       </div>
-      <div className="h-3.5 flex-1 overflow-hidden rounded bg-secondary">
+      <div className={cn('flex-1 overflow-hidden rounded bg-secondary', barH)}>
         <div
           className="h-full rounded"
           style={{
             width: `${(Math.abs(monto) / max) * 100}%`,
-            background: neg ? 'var(--destructive)' : 'var(--g1)',
+            background: color,
           }}
         />
       </div>
       <div className="w-24 shrink-0 text-right">
         <div
           className={cn(
-            'tnum text-[13px] font-bold',
+            'tnum font-bold',
+            nested ? 'text-[12px]' : 'text-[13px]',
             neg ? 'text-destructive' : 'text-field-deep',
           )}
         >

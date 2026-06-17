@@ -365,6 +365,32 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
               </div>
             </motion.div>
 
+            {/* Potrero — clave para la rentabilidad por potrero */}
+            <motion.div variants={fade}>
+              <label className={label}>
+                Potrero{' '}
+                <span className="font-normal text-faint">
+                  · así sabés qué potrero rinde
+                </span>
+              </label>
+              <Dropdown
+                block
+                ariaLabel="Potrero"
+                value={potreroId}
+                onChange={setPotreroId}
+                options={[
+                  {
+                    value: '',
+                    label: campoId ? 'Todo el campo' : 'Elegí un campo primero',
+                  },
+                  ...(potreros.data ?? []).map((p) => ({
+                    value: p.id,
+                    label: p.nombre,
+                  })),
+                ]}
+              />
+            </motion.div>
+
             {/* Estado: ya se pagó/cobró vs pendiente */}
             <motion.div variants={fade}>
               <label className={label}>Estado</label>
@@ -436,7 +462,7 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                 onClick={() => setMasOpciones((m) => !m)}
                 className="flex w-full items-center justify-between rounded-xl px-1 py-1.5 text-[13px] font-semibold text-field-deep"
               >
-                Más opciones (potrero, medio de pago, cheque, nota)
+                Más opciones (medio de pago, cheque, nota)
                 <ChevronDown
                   className={cn(
                     'size-4 transition-transform',
@@ -455,41 +481,23 @@ export function CargarMovimientoDialog({ empresaId }: { empresaId: string }) {
                     className="overflow-hidden"
                   >
                     <div className="grid gap-4 pt-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className={label}>Potrero</label>
-                          <Dropdown
-                            block
-                            ariaLabel="Potrero"
-                            value={potreroId}
-                            onChange={setPotreroId}
-                            options={[
-                              { value: '', label: 'Todo el campo' },
-                              ...(potreros.data ?? []).map((p) => ({
-                                value: p.id,
-                                label: p.nombre,
-                              })),
-                            ]}
-                          />
-                        </div>
-                        <div>
-                          <label className={label}>
-                            {esGasto ? 'Medio de pago' : 'Medio de cobro'}
-                          </label>
-                          <Dropdown
-                            block
-                            ariaLabel={esGasto ? 'Medio de pago' : 'Medio de cobro'}
-                            value={medioPago}
-                            onChange={setMedioPago}
-                            options={[
-                              { value: '', label: '—' },
-                              ...Constants.public.Enums.medio_pago.map((m) => ({
-                                value: m,
-                                label: medioPagoLabel[m],
-                              })),
-                            ]}
-                          />
-                        </div>
+                      <div>
+                        <label className={label}>
+                          {esGasto ? 'Medio de pago' : 'Medio de cobro'}
+                        </label>
+                        <Dropdown
+                          block
+                          ariaLabel={esGasto ? 'Medio de pago' : 'Medio de cobro'}
+                          value={medioPago}
+                          onChange={setMedioPago}
+                          options={[
+                            { value: '', label: '—' },
+                            ...Constants.public.Enums.medio_pago.map((m) => ({
+                              value: m,
+                              label: medioPagoLabel[m],
+                            })),
+                          ]}
+                        />
                       </div>
 
                       {esCheque && (
