@@ -34,7 +34,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
     supabase
       .from('potrero')
       .select(
-        'id, nombre, campo_id, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada',
+        'id, nombre, campo_id, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada, destino',
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
@@ -72,6 +72,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
       cultivo: p.cultivo,
       fechaSiembra: p.fecha_siembra,
       fechaCosechaEstimada: p.fecha_cosecha_estimada,
+      destino: p.destino,
     }
     const arr = potrerosPorCampo.get(p.campo_id) ?? []
     arr.push(vista)

@@ -18,6 +18,7 @@ export type PotreroCardData = {
   cultivo: string | null
   fechaSiembra: string | null
   fechaCosechaEstimada: string | null
+  destino: Database['public']['Enums']['destino_campania'] | null
 }
 
 const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']

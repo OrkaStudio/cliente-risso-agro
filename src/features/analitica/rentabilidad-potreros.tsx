@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   Beef,
   LandPlot,
+  Leaf,
   Sprout,
   Wheat,
   type LucideIcon,
@@ -46,10 +47,16 @@ const ETIQUETA: Record<Estado, string> = {
 }
 
 // Identidad visual por TIPO de potrero (lo que se ve a simple vista).
-type Tipo = 'ganadero' | 'agricola' | 'vacio'
+type Tipo = 'ganadero' | 'agricola' | 'forrajero' | 'vacio'
 const AGRICOLA = ['preparacion', 'siembra', 'cultivo', 'cosecha', 'rastrojo']
 
-function tipoDe(estadoCiclo: string, cabezas: number, cultivo: string | null): Tipo {
+function tipoDe(
+  estadoCiclo: string,
+  cabezas: number,
+  cultivo: string | null,
+  destino: string | null,
+): Tipo {
+  if (destino === 'consumo') return 'forrajero'
   if (estadoCiclo === 'ganadero' || cabezas > 0) return 'ganadero'
   if (AGRICOLA.includes(estadoCiclo) || cultivo) return 'agricola'
   return 'vacio'
@@ -71,6 +78,12 @@ const TIPO: Record<
     Icon: Wheat,
     label: 'Agrícola',
   },
+  forrajero: {
+    color: 'var(--tierra)',
+    tint: 'var(--tierra-soft)',
+    Icon: Leaf,
+    label: 'Forrajero',
+  },
   vacio: {
     color: 'var(--faint)',
     tint: 'var(--secondary)',
@@ -88,6 +101,7 @@ function PotreroCard({
   cabezas,
   estadoCiclo,
   cultivo,
+  destino,
   fin,
 }: {
   potreroId: string
@@ -96,19 +110,39 @@ function PotreroCard({
   cabezas: number
   estadoCiclo: CampoConPotreros['potreros'][number]['estadoCiclo']
   cultivo: string | null
+  destino: CampoConPotreros['potreros'][number]['destino']
   fin: Fin | undefined
 }) {
-  const estado = estadoDe(fin)
-  const sin = estado === 'sin'
-  const numColor = COLOR[estado]
-  const valor = estado === 'curso' ? (fin?.gastos ?? 0) : (fin?.resultado ?? 0)
-  const valorHa = ha && ha > 0 && !sin ? Math.round(valor / ha) : null
-  const Flecha = estado === 'pierde' ? ArrowDownRight : ArrowUpRight
-
   // Identidad por tipo de potrero
-  const tipo = tipoDe(estadoCiclo, cabezas, cultivo)
+  const tipo = tipoDe(estadoCiclo, cabezas, cultivo, destino)
   const t = TIPO[tipo]
   const Marca = t.Icon
+
+  // Forraje (consumo) = centro de costo: se muestra el costo, no ganancia/pérdida.
+  const esForraje = destino === 'consumo'
+  const gastos = fin?.gastos ?? 0
+  let etiqueta: string
+  let valor: number
+  let numColor: string
+  let flecha: typeof ArrowUpRight | null
+  let sin: boolean
+
+  if (esForraje) {
+    sin = gastos === 0
+    etiqueta = sin ? 'Sin movimientos' : 'Costo de forraje'
+    valor = gastos
+    numColor = 'var(--tierra)'
+    flecha = null
+  } else {
+    const estado = estadoDe(fin)
+    sin = estado === 'sin'
+    etiqueta = sin ? 'Sin movimientos' : ETIQUETA[estado]
+    valor = estado === 'curso' ? gastos : (fin?.resultado ?? 0)
+    numColor = COLOR[estado]
+    flecha = estado === 'pierde' ? ArrowDownRight : ArrowUpRight
+  }
+  const valorHa = ha && ha > 0 && !sin ? Math.round(valor / ha) : null
+  const Flecha = flecha
 
   return (
     <Link
@@ -155,13 +189,13 @@ function PotreroCard({
         <div className="mt-2.5 flex items-end justify-between gap-2">
           <div>
             <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
-              {sin ? 'Sin movimientos' : ETIQUETA[estado]}
+              {etiqueta}
             </div>
             <div
               className="tnum flex items-center gap-1 text-[30px] font-bold leading-none"
               style={{ color: numColor }}
             >
-              {!sin && <Flecha className="size-5" strokeWidth={2.5} />}
+              {!sin && Flecha && <Flecha className="size-5" strokeWidth={2.5} />}
               {sin ? '—' : fmtCompact(valor)}
             </div>
           </div>
@@ -297,6 +331,7 @@ export function RentabilidadPotreros({
                         cabezas={p.cabezas}
                         estadoCiclo={p.estadoCiclo}
                         cultivo={p.cultivo}
+                        destino={p.destino}
                         fin={finPorPotrero.get(p.id)}
                       />
                     ))}

@@ -286,8 +286,14 @@ export function PotreroDetailPage() {
   const delPotrero = (movs.data ?? []).filter((m) => m.potrero_id === id)
   const fin = resumen(delPotrero, 'devengado')
   const sinPlata = fin.ingresos === 0 && fin.gastos === 0
-  const enCurso = fin.ingresos === 0 && fin.gastos > 0
-  const valorPlata = enCurso ? fin.gastos : fin.resultado
+  const esForraje = data.destino === 'consumo'
+  const enCurso = !esForraje && fin.ingresos === 0 && fin.gastos > 0
+  const valorPlata = esForraje || enCurso ? fin.gastos : fin.resultado
+  const labelPlata = esForraje
+    ? 'Costo de forraje'
+    : enCurso
+      ? 'Invertido'
+      : 'Resultado'
   const margenHa =
     data.hectareas && data.hectareas > 0 && !sinPlata
       ? Math.round(valorPlata / data.hectareas)
@@ -349,6 +355,8 @@ export function PotreroDetailPage() {
                 variedad: data.variedad,
                 fecha_siembra: data.fechaSiembra,
                 fecha_cosecha_estimada: data.fechaCosechaEstimada,
+                destino: data.destino,
+                aprovechamiento: data.aprovechamiento,
               }}
               triggerLabel="Editar potrero"
               triggerVariant="outline"
@@ -386,16 +394,18 @@ export function PotreroDetailPage() {
           detail={densidad ? undefined : 'necesita superficie'}
         />
         <Kpi
-          label={enCurso ? 'Invertido' : 'Resultado'}
+          label={labelPlata}
           icon={TrendingUp}
           iconColor="var(--sol-deep)"
           value={sinPlata ? '—' : fmtCompact(valorPlata)}
           detail={
             sinPlata
               ? 'sin movimientos'
-              : enCurso
-                ? 'campaña en curso, sin vender'
-                : 'devengado · acumulado'
+              : esForraje
+                ? 'consumo animal · forraje'
+                : enCurso
+                  ? 'campaña en curso, sin vender'
+                  : 'devengado · acumulado'
           }
         />
       </div>
@@ -424,14 +434,16 @@ export function PotreroDetailPage() {
                 color="var(--tierra)"
               />
               <PlataStat
-                label={enCurso ? 'Invertido' : 'Resultado'}
+                label={labelPlata}
                 value={formatARS(valorPlata)}
                 color={
-                  enCurso
-                    ? 'var(--sol-deep)'
-                    : fin.resultado < 0
-                      ? 'var(--destructive)'
-                      : 'var(--field-deep)'
+                  esForraje
+                    ? 'var(--tierra)'
+                    : enCurso
+                      ? 'var(--sol-deep)'
+                      : fin.resultado < 0
+                        ? 'var(--destructive)'
+                        : 'var(--field-deep)'
                 }
               />
               {margenHa != null && (
@@ -443,13 +455,19 @@ export function PotreroDetailPage() {
               )}
             </div>
 
-            {enCurso && (
+            {esForraje ? (
+              <p className="rounded-lg border border-tierra/25 bg-tierra-soft/50 px-3.5 py-2.5 text-[13px] text-ink">
+                Potrero <strong>forrajero</strong>: produce alimento para la
+                hacienda. Es un <strong>centro de costo</strong> — su valor se ve
+                en los animales (engorde/venta), no en una venta del potrero.
+              </p>
+            ) : enCurso ? (
               <p className="rounded-lg border border-sol-deep/25 bg-sol-soft/50 px-3.5 py-2.5 text-[13px] text-ink">
                 Este potrero está en plena campaña: acumula costos y todavía no
                 vendió. <strong>No es pérdida, es inversión</strong> — el
                 resultado se sabrá al cosechar/vender.
               </p>
-            )}
+            ) : null}
 
             <div className="grid gap-6 sm:grid-cols-2">
               <CatLista titulo="Ingresos por categoría" items={ingresosCat} />

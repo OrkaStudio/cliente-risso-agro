@@ -22,6 +22,7 @@ export type PotreroPanorama = {
   cultivo: string | null
   fechaSiembra: string | null
   fechaCosechaEstimada: string | null
+  destino: Database['public']['Enums']['destino_campania'] | null
 }
 
 export type Vencimiento = {
@@ -64,7 +65,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     supabase
       .from('potrero')
       .select(
-        'id, nombre, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada, campo:campo(id, nombre, tipo)',
+        'id, nombre, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada, destino, campo:campo(id, nombre, tipo)',
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
@@ -128,6 +129,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       cultivo: p.cultivo,
       fechaSiembra: p.fecha_siembra,
       fechaCosechaEstimada: p.fecha_cosecha_estimada,
+      destino: p.destino,
     }
   })
 

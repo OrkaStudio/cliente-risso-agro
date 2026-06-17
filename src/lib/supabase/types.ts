@@ -629,9 +629,11 @@ export type Database = {
       }
       potrero: {
         Row: {
+          aprovechamiento: Database["public"]["Enums"]["aprovechamiento_forraje"] | null
           campo_id: string
           created_at: string
           cultivo: string | null
+          destino: Database["public"]["Enums"]["destino_campania"] | null
           empresa_id: string
           establecimiento_id: string | null
           estado_ciclo: Database["public"]["Enums"]["estado_ciclo_potrero"]
@@ -643,9 +645,11 @@ export type Database = {
           variedad: string | null
         }
         Insert: {
+          aprovechamiento?: Database["public"]["Enums"]["aprovechamiento_forraje"] | null
           campo_id: string
           created_at?: string
           cultivo?: string | null
+          destino?: Database["public"]["Enums"]["destino_campania"] | null
           empresa_id: string
           establecimiento_id?: string | null
           estado_ciclo?: Database["public"]["Enums"]["estado_ciclo_potrero"]
@@ -657,9 +661,11 @@ export type Database = {
           variedad?: string | null
         }
         Update: {
+          aprovechamiento?: Database["public"]["Enums"]["aprovechamiento_forraje"] | null
           campo_id?: string
           created_at?: string
           cultivo?: string | null
+          destino?: Database["public"]["Enums"]["destino_campania"] | null
           empresa_id?: string
           establecimiento_id?: string | null
           estado_ciclo?: Database["public"]["Enums"]["estado_ciclo_potrero"]
@@ -950,6 +956,13 @@ export type Database = {
     Enums: {
       actividad_movimiento: "cria" | "invernada" | "agricultura" | "estructura"
       agua_estado: "llena" | "normal" | "baja" | "seca"
+      aprovechamiento_forraje:
+        | "pastoreo"
+        | "rollo"
+        | "silo"
+        | "fardo"
+        | "diferido"
+      destino_campania: "venta" | "consumo"
       categoria_animal:
         | "vaca"
         | "vaquillona"
@@ -1122,6 +1135,8 @@ export const Constants = {
     Enums: {
       actividad_movimiento: ["cria", "invernada", "agricultura", "estructura"],
       agua_estado: ["llena", "normal", "baja", "seca"],
+      aprovechamiento_forraje: ["pastoreo", "rollo", "silo", "fardo", "diferido"],
+      destino_campania: ["venta", "consumo"],
       categoria_animal: [
         "vaca",
         "vaquillona",

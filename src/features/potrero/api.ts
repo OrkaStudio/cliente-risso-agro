@@ -4,6 +4,8 @@ import type { Database } from '@/lib/supabase/types'
 type Categoria = Database['public']['Enums']['categoria_animal']
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 type TipoCampo = Database['public']['Enums']['tipo_campo']
+type Destino = Database['public']['Enums']['destino_campania']
+type Aprovechamiento = Database['public']['Enums']['aprovechamiento_forraje']
 
 export type AnimalEnPotrero = {
   id: string
@@ -28,6 +30,8 @@ export type PotreroDetalle = {
   variedad: string | null
   fechaSiembra: string | null
   fechaCosechaEstimada: string | null
+  destino: Destino | null
+  aprovechamiento: Aprovechamiento | null
   /** Plata devengada del potrero (suma de todos los meses). */
   ingresos: number
   gastos: number
@@ -46,7 +50,7 @@ export async function getPotreroDetalle(
       supabase
         .from('potrero')
         .select(
-          'id, nombre, estado_ciclo, hectareas, cultivo, variedad, fecha_siembra, fecha_cosecha_estimada, campo:campo(id, nombre, tipo)',
+          'id, nombre, estado_ciclo, hectareas, cultivo, variedad, fecha_siembra, fecha_cosecha_estimada, destino, aprovechamiento, campo:campo(id, nombre, tipo)',
         )
         .eq('id', id)
         .maybeSingle(),
@@ -107,6 +111,8 @@ export async function getPotreroDetalle(
     variedad: potrero.variedad,
     fechaSiembra: potrero.fecha_siembra,
     fechaCosechaEstimada: potrero.fecha_cosecha_estimada,
+    destino: potrero.destino,
+    aprovechamiento: potrero.aprovechamiento,
     ingresos,
     gastos,
     resultado,
@@ -120,6 +126,8 @@ export async function actualizarCultivo(input: {
   variedad: string | null
   fechaSiembra: string | null
   fechaCosechaEstimada: string | null
+  destino: Destino | null
+  aprovechamiento: Aprovechamiento | null
 }): Promise<void> {
   const { error } = await supabase
     .from('potrero')
@@ -128,6 +136,9 @@ export async function actualizarCultivo(input: {
       variedad: input.variedad,
       fecha_siembra: input.fechaSiembra,
       fecha_cosecha_estimada: input.fechaCosechaEstimada,
+      destino: input.destino,
+      // El aprovechamiento solo aplica a forraje (consumo).
+      aprovechamiento: input.destino === 'consumo' ? input.aprovechamiento : null,
     })
     .eq('id', input.id)
   if (error) throw new Error(error.message)
