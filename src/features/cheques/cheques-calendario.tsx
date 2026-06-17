@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -308,7 +308,25 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
     return { semanas: sem, sinFecha: sin }
   }, [cheques, year, month])
 
-  const hoy = new Date()
+  // "Hoy" en estado: se actualiza solo al cambiar de día (timer a medianoche).
+  const [hoy, setHoy] = useState(() => new Date())
+  useEffect(() => {
+    const ahora = new Date()
+    const proximaMedianoche = new Date(
+      ahora.getFullYear(),
+      ahora.getMonth(),
+      ahora.getDate() + 1,
+      0,
+      0,
+      1,
+    )
+    const t = window.setTimeout(
+      () => setHoy(new Date()),
+      proximaMedianoche.getTime() - ahora.getTime(),
+    )
+    return () => window.clearTimeout(t)
+  }, [hoy])
+
   const esMesActual = hoy.getFullYear() === year && hoy.getMonth() === month
   const diaHoy = hoy.getDate()
 
@@ -317,7 +335,11 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
     year: 'numeric',
   })
 
-  const hoy0 = new Date().setHours(0, 0, 0, 0)
+  const hoy0 = new Date(
+    hoy.getFullYear(),
+    hoy.getMonth(),
+    hoy.getDate(),
+  ).getTime()
   const botonNav =
     'flex size-8 items-center justify-center rounded-lg border border-white/60 bg-white/50 text-muted-foreground backdrop-blur transition-colors hover:bg-white/80 hover:text-ink'
 
