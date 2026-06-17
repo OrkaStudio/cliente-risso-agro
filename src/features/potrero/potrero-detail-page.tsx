@@ -17,6 +17,13 @@ import {
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
+import { useMovimientos } from '@/features/analitica/hooks'
+import {
+  formatARS,
+  gastosPorCategoria,
+  ingresosPorCategoria,
+  resumen,
+} from '@/features/analitica/compute'
 import { usePotreroDetalle } from '@/features/potrero/hooks'
 import type { PotreroDetalle } from '@/features/potrero/api'
 import { CultivoDialog } from '@/features/potrero/cultivo-dialog'
@@ -87,6 +94,61 @@ function Kpi({
       {detail && (
         <div className="mt-[7px] text-xs font-medium text-muted-foreground">
           {detail}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ===== Detalle financiero del potrero ===== */
+function PlataStat({
+  label,
+  value,
+  color,
+}: {
+  label: string
+  value: string
+  color: string
+}) {
+  return (
+    <div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+        {label}
+      </div>
+      <div className="tnum mt-1 text-[18px] font-bold leading-none" style={{ color }}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function CatLista({
+  titulo,
+  items,
+}: {
+  titulo: string
+  items: { nombre: string; monto: number }[]
+}) {
+  return (
+    <div>
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+        {titulo}
+      </div>
+      {items.length === 0 ? (
+        <p className="text-[13px] text-faint">—</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {items.map((c) => (
+            <div
+              key={c.nombre}
+              className="flex items-center justify-between gap-3 text-[13px]"
+            >
+              <span className="truncate text-ink">{c.nombre}</span>
+              <span className="tnum shrink-0 font-semibold text-ink">
+                {formatARS(c.monto)}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -190,6 +252,7 @@ export function PotreroDetailPage() {
   const empresa = useEmpresa()
   const empresaId = empresa.data?.empresa_id ?? ''
   const { data, isLoading, error } = usePotreroDetalle(id)
+  const movs = useMovimientos()
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -216,6 +279,20 @@ export function PotreroDetailPage() {
     data.hectareas && data.hectareas > 0
       ? (data.totalCabezas / data.hectareas).toFixed(1).replace('.', ',')
       : null
+
+  // Finanzas del potrero (cycle-aware): si invirtió y aún no vendió, es
+  // "invertido / campaña en curso", no pérdida.
+  const delPotrero = (movs.data ?? []).filter((m) => m.potrero_id === id)
+  const fin = resumen(delPotrero, 'devengado')
+  const sinPlata = fin.ingresos === 0 && fin.gastos === 0
+  const enCurso = fin.ingresos === 0 && fin.gastos > 0
+  const valorPlata = enCurso ? fin.gastos : fin.resultado
+  const margenHa =
+    data.hectareas && data.hectareas > 0 && !sinPlata
+      ? Math.round(valorPlata / data.hectareas)
+      : null
+  const gastosCat = gastosPorCategoria(delPotrero, 'devengado')
+  const ingresosCat = ingresosPorCategoria(delPotrero, 'devengado')
 
   return (
     <div className="flex flex-col gap-6">
@@ -307,15 +384,115 @@ export function PotreroDetailPage() {
           detail={densidad ? undefined : 'necesita superficie'}
         />
         <Kpi
-          label="Resultado"
+          label={enCurso ? 'Invertido' : 'Resultado'}
           icon={TrendingUp}
           iconColor="var(--sol-deep)"
-          value={data.resultado === 0 ? '—' : fmtCompact(data.resultado)}
+          value={sinPlata ? '—' : fmtCompact(valorPlata)}
           detail={
-            data.resultado === 0 ? 'sin movimientos' : 'devengado · acumulado'
+            sinPlata
+              ? 'sin movimientos'
+              : enCurso
+                ? 'campaña en curso, sin vender'
+                : 'devengado · acumulado'
           }
         />
       </div>
+
+      {/* Plata del potrero — detalle financiero */}
+      <Panel
+        title="Plata del potrero"
+        sub={enCurso ? 'campaña en curso' : 'devengado · acumulado'}
+      >
+        {sinPlata ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Todavía no imputaste gastos ni ingresos a este potrero. Cargalos con
+            “+ Cargar a este potrero” para ver acá cómo rinde.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap gap-x-10 gap-y-3">
+              <PlataStat
+                label="Ingresos"
+                value={formatARS(fin.ingresos)}
+                color="var(--field-deep)"
+              />
+              <PlataStat
+                label="Gastos"
+                value={formatARS(fin.gastos)}
+                color="var(--tierra)"
+              />
+              <PlataStat
+                label={enCurso ? 'Invertido' : 'Resultado'}
+                value={formatARS(valorPlata)}
+                color={
+                  enCurso
+                    ? 'var(--sol-deep)'
+                    : fin.resultado < 0
+                      ? 'var(--destructive)'
+                      : 'var(--field-deep)'
+                }
+              />
+              {margenHa != null && (
+                <PlataStat
+                  label="Margen / ha"
+                  value={`${fmtCompact(margenHa)}/ha`}
+                  color="var(--ink)"
+                />
+              )}
+            </div>
+
+            {enCurso && (
+              <p className="rounded-lg border border-sol-deep/25 bg-sol-soft/50 px-3.5 py-2.5 text-[13px] text-ink">
+                Este potrero está en plena campaña: acumula costos y todavía no
+                vendió. <strong>No es pérdida, es inversión</strong> — el
+                resultado se sabrá al cosechar/vender.
+              </p>
+            )}
+
+            <div className="grid gap-6 sm:grid-cols-2">
+              <CatLista titulo="Ingresos por categoría" items={ingresosCat} />
+              <CatLista titulo="Gastos por categoría" items={gastosCat} />
+            </div>
+
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+                Movimientos del potrero
+              </div>
+              <table className="w-full">
+                <tbody>
+                  {[...delPotrero]
+                    .sort((a, b) => (a.fecha_devengo < b.fecha_devengo ? 1 : -1))
+                    .slice(0, 10)
+                    .map((m) => (
+                      <tr
+                        key={m.id}
+                        className="border-b border-border/60 last:border-0"
+                      >
+                        <td className="tnum py-2.5 pr-3 text-[12.5px] text-muted-foreground">
+                          {fmtFecha(m.fecha_devengo)}
+                        </td>
+                        <td className="py-2.5 pr-3 text-[13px] text-ink">
+                          {m.categoria?.nombre ?? '—'}
+                        </td>
+                        <td
+                          className={cn(
+                            'tnum py-2.5 text-right text-[13px] font-bold',
+                            m.tipo === 'gasto'
+                              ? 'text-tierra'
+                              : 'text-field-deep',
+                          )}
+                        >
+                          {m.tipo === 'gasto' ? '−' : '+'}
+                          {formatARS(Number(m.monto))}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Panel>
 
       {/* Campaña agrícola */}
       <CampanaAgricola d={data} />

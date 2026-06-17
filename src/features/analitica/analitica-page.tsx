@@ -23,6 +23,7 @@ import {
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
+import { RentabilidadPotreros } from '@/features/analitica/rentabilidad-potreros'
 import { Panel } from '@/components/panel'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
@@ -81,37 +82,8 @@ export function AnaliticaPage() {
   const potreros = useMemo(() => porPotrero(data, modo), [data, modo])
   const actividades = useMemo(() => porActividad(data, modo), [data, modo])
 
-  // Hectáreas por campo (nombre) y por potrero (id) para el margen por ha.
-  const haCampo = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const c of camposConPotreros.data ?? []) {
-      const ha = c.hectareas ?? c.totalHa
-      if (ha) m.set(c.nombre, ha)
-    }
-    return m
-  }, [camposConPotreros.data])
-  const haPotrero = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const c of camposConPotreros.data ?? [])
-      for (const p of c.potreros) if (p.hectareas) m.set(p.id, p.hectareas)
-    return m
-  }, [camposConPotreros.data])
-
-  const maxCampo = Math.max(1, ...campos.map((c) => Math.abs(c.monto)))
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
-  const maxPotrero = Math.max(1, ...potreros.map((p) => Math.abs(p.monto)))
-  const maxAbs = Math.max(maxCampo, maxPotrero)
   const maxAct = Math.max(1, ...actividades.map((a) => Math.abs(a.resultado)))
-
-  const potrerosPorCampo = useMemo(() => {
-    const m = new Map<string, typeof potreros>()
-    for (const p of potreros) {
-      const arr = m.get(p.campoNombre) ?? []
-      arr.push(p)
-      m.set(p.campoNombre, arr)
-    }
-    return m
-  }, [potreros])
 
   return (
     <div className="flex flex-col gap-6">
@@ -180,52 +152,12 @@ export function AnaliticaPage() {
             />
           </div>
 
-          {/* Rentabilidad por campo y potrero — el corazón de la decisión */}
-          <Panel
-            title="Rentabilidad por campo y potrero"
-            sub="resultado y margen por hectárea"
-          >
-            {campos.length === 0 ? (
-              <Vacio>Sin movimientos para analizar todavía.</Vacio>
-            ) : (
-              <div className="flex flex-col divide-y divide-border/60">
-                {campos.map((c) => {
-                  const ps = potrerosPorCampo.get(c.nombre) ?? []
-                  return (
-                    <div key={c.nombre} className="py-3 first:pt-0 last:pb-0">
-                      <RentaRow
-                        nombre={c.nombre}
-                        monto={c.monto}
-                        max={maxAbs}
-                        ha={haCampo.get(c.nombre)}
-                        bold
-                      />
-                      {ps.length > 0 && (
-                        <div className="mt-2 flex flex-col gap-2 pl-4">
-                          {ps.map((p) => (
-                            <RentaRow
-                              key={p.potreroId}
-                              nombre={p.nombre}
-                              monto={p.monto}
-                              max={maxAbs}
-                              ha={haPotrero.get(p.potreroId)}
-                              nested
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            {potreros.length === 0 && campos.length > 0 && (
-              <p className="mt-4 rounded-lg bg-secondary/60 px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
-                💡 Elegí el <strong>potrero</strong> al cargar un gasto o ingreso
-                para ver cuál de tus potreros rinde y cuál no.
-              </p>
-            )}
-          </Panel>
+          {/* Rentabilidad por potrero — cards, una por potrero */}
+          <RentabilidadPotreros
+            campos={campos}
+            potreros={potreros}
+            camposConPotreros={camposConPotreros.data ?? []}
+          />
 
           {/* Rentabilidad por actividad — qué actividad rinde */}
           {actividades.length > 0 && (

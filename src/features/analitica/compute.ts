@@ -36,21 +36,36 @@ export function resumen(movs: MovimientoConDetalle[], modo: Modo): Resumen {
   return { ingresos, gastos, resultado: ingresos - gastos }
 }
 
-/** Resultado (ingresos − gastos) por campo. */
+export type LineaCampo = {
+  campoId: string
+  nombre: string
+  ingresos: number
+  gastos: number
+  resultado: number
+}
+
+/** Ingresos, gastos y resultado por campo. */
 export function porCampo(
   movs: MovimientoConDetalle[],
   modo: Modo,
-): LineaMonto[] {
-  const map = new Map<string, number>()
+): LineaCampo[] {
+  const map = new Map<string, LineaCampo>()
   for (const m of movs) {
     if (!entra(m, modo)) continue
-    const nombre = m.campo?.nombre ?? 'Sin campo'
-    const delta = m.tipo === 'ingreso' ? Number(m.monto) : -Number(m.monto)
-    map.set(nombre, (map.get(nombre) ?? 0) + delta)
+    const id = m.campo_id
+    const prev = map.get(id) ?? {
+      campoId: id,
+      nombre: m.campo?.nombre ?? 'Sin campo',
+      ingresos: 0,
+      gastos: 0,
+      resultado: 0,
+    }
+    if (m.tipo === 'ingreso') prev.ingresos += Number(m.monto)
+    else prev.gastos += Number(m.monto)
+    prev.resultado = prev.ingresos - prev.gastos
+    map.set(id, prev)
   }
-  return [...map.entries()]
-    .map(([nombre, monto]) => ({ nombre, monto }))
-    .sort((a, b) => b.monto - a.monto)
+  return [...map.values()].sort((a, b) => b.resultado - a.resultado)
 }
 
 export type LineaMes = { mes: string; resultado: number }
@@ -129,8 +144,11 @@ export const formatARS = (n: number) => fmt.format(n)
 export type LineaPotrero = {
   potreroId: string
   nombre: string
+  campoId: string
   campoNombre: string
-  monto: number
+  ingresos: number
+  gastos: number
+  resultado: number
 }
 
 export function porPotrero(
@@ -143,13 +161,18 @@ export function porPotrero(
     const prev = map.get(m.potrero_id) ?? {
       potreroId: m.potrero_id,
       nombre: m.potrero?.nombre ?? 'Potrero',
+      campoId: m.campo_id,
       campoNombre: m.campo?.nombre ?? '',
-      monto: 0,
+      ingresos: 0,
+      gastos: 0,
+      resultado: 0,
     }
-    const delta = m.tipo === 'ingreso' ? Number(m.monto) : -Number(m.monto)
-    map.set(m.potrero_id, { ...prev, monto: prev.monto + delta })
+    if (m.tipo === 'ingreso') prev.ingresos += Number(m.monto)
+    else prev.gastos += Number(m.monto)
+    prev.resultado = prev.ingresos - prev.gastos
+    map.set(m.potrero_id, prev)
   }
-  return [...map.values()].sort((a, b) => b.monto - a.monto)
+  return [...map.values()].sort((a, b) => b.resultado - a.resultado)
 }
 
 // ===== Rentabilidad por actividad =====
