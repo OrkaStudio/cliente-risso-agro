@@ -1,14 +1,40 @@
+import type { ComponentType, CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  LandPlot,
-  Leaf,
-  PawPrint,
-  Sprout,
-  Wheat,
-  type LucideIcon,
-} from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, LandPlot, Leaf, Sprout, Wheat } from 'lucide-react'
+
+type IconProps = {
+  className?: string
+  style?: CSSProperties
+  strokeWidth?: number
+}
+type IconComp = ComponentType<IconProps>
+
+/** Toro en estilo de línea (lucide no tiene bovinos). Cabeza + cuernos. */
+function ToroIcon({ className, style, strokeWidth = 1.5 }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={style}
+      aria-hidden
+    >
+      <path d="M7 7C4 6 2.8 4 3.8 2.4" />
+      <path d="M17 7C20 6 21.2 4 20.2 2.4" />
+      <path d="M7 7c0-1.7 2.2-2.2 5-2.2s5 .5 5 2.2c0 4.1-2.2 8.2-5 8.2S7 11.1 7 7Z" />
+      <path d="M10 9h.01" />
+      <path d="M14 9h.01" />
+      <path d="M9.6 12.3c1.1 1 3.7 1 4.8 0" />
+      <path d="M11 11.7h.01" />
+      <path d="M13 11.7h.01" />
+    </svg>
+  )
+}
 import type { CampoConPotreros } from '@/features/campos/api'
 import type { LineaCampo, LineaPotrero } from '@/features/analitica/compute'
 import { Panel } from '@/components/panel'
@@ -64,12 +90,12 @@ function tipoDe(
 
 const TIPO: Record<
   Tipo,
-  { color: string; tint: string; Icon: LucideIcon; label: string }
+  { color: string; tint: string; Icon: IconComp; label: string }
 > = {
   ganadero: {
     color: 'var(--ganado)',
     tint: 'var(--ganado-soft)',
-    Icon: PawPrint,
+    Icon: ToroIcon,
     label: 'Ganadero',
   },
   agricola: {
