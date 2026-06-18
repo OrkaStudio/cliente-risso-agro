@@ -83,6 +83,88 @@ export type NuevoMovimiento = {
   contraparte?: string | null
 }
 
+// ===== Series: gastos recurrentes / en cuotas =====
+export type Frecuencia =
+  | 'mensual'
+  | 'bimestral'
+  | 'trimestral'
+  | 'semestral'
+  | 'anual'
+
+const MESES_FREQ: Record<Frecuencia, number> = {
+  mensual: 1,
+  bimestral: 2,
+  trimestral: 3,
+  semestral: 6,
+  anual: 12,
+}
+
+export const frecuenciaLabel: Record<Frecuencia, string> = {
+  mensual: 'Mensual',
+  bimestral: 'Bimestral',
+  trimestral: 'Trimestral',
+  semestral: 'Semestral',
+  anual: 'Anual',
+}
+
+function addMeses(fecha: string, meses: number): string {
+  const [y, m, d] = fecha.split('-').map(Number)
+  const dt = new Date(y, m - 1 + meses, d)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+export type NuevaSerie = {
+  empresaId: string
+  tipo: TipoMov
+  categoriaId: string
+  campoId: string
+  potreroId?: string | null
+  actividad?: ActividadMov | null
+  montoCuota: number
+  frecuencia: Frecuencia
+  primeraFecha: string
+  cantidad: number
+  descripcion: string
+  medioPago?: MedioPago | null
+}
+
+/** Genera la serie completa de cuotas pendientes, unidas por serie_id. */
+export async function crearSerie(input: NuevaSerie): Promise<void> {
+  const serieId = crypto.randomUUID()
+  const off = MESES_FREQ[input.frecuencia]
+  const filas = Array.from({ length: input.cantidad }, (_, i) => {
+    const fecha = addMeses(input.primeraFecha, i * off)
+    return {
+      empresa_id: input.empresaId,
+      tipo: input.tipo,
+      categoria_id: input.categoriaId,
+      campo_id: input.campoId,
+      potrero_id: input.potreroId || null,
+      actividad: input.actividad || null,
+      monto: input.montoCuota,
+      fecha_devengo: fecha,
+      fecha_vencimiento: fecha,
+      fecha_cobro_pago: null,
+      estado: 'pendiente' as const,
+      medio_pago: input.medioPago || null,
+      descripcion: `${input.descripcion.trim()} (cuota ${i + 1}/${input.cantidad})`,
+      serie_id: serieId,
+    }
+  })
+  const { error } = await supabase.from('movimiento_financiero').insert(filas)
+  if (error) throw new Error(error.message)
+}
+
+/** Cancela (anula) las cuotas pendientes de una serie. Las pagadas quedan. */
+export async function cancelarSerie(serieId: string): Promise<void> {
+  const { error } = await supabase
+    .from('movimiento_financiero')
+    .update({ estado: 'anulado' })
+    .eq('serie_id', serieId)
+    .eq('estado', 'pendiente')
+  if (error) throw new Error(error.message)
+}
+
 export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
   // estado derivado: si tiene fecha de cobro/pago, ya pasó por caja → liquidado.
   const liquidado = !!input.fechaCobroPago

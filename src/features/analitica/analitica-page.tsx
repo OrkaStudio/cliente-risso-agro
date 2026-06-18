@@ -28,7 +28,9 @@ import {
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
+import { CargarRecurrenteDialog } from '@/features/analitica/cargar-recurrente-dialog'
 import { RentabilidadPotreros } from '@/features/analitica/rentabilidad-potreros'
+import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
 import { Panel } from '@/components/panel'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
@@ -134,6 +136,7 @@ export function AnaliticaPage() {
               })),
             ]}
           />
+          <CargarRecurrenteDialog empresaId={empresaId} />
           <CargarMovimientoDialog empresaId={empresaId} />
         </div>
       </div>
@@ -392,6 +395,9 @@ export function AnaliticaPage() {
               </div>
             </div>
           </Panel>
+
+          {/* Recurrentes y cuotas (series activas) */}
+          <SeriesRecurrentes movimientos={data} />
 
           {/* Movimientos recientes */}
           <Panel

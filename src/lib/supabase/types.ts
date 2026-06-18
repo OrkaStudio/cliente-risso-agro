@@ -460,6 +460,7 @@ export type Database = {
           moneda: string
           monto: number
           potrero_id: string | null
+          serie_id: string | null
           tipo: Database["public"]["Enums"]["tipo_movimiento"]
           tipo_cambio: number | null
           updated_at: string
@@ -487,6 +488,7 @@ export type Database = {
           moneda?: string
           monto: number
           potrero_id?: string | null
+          serie_id?: string | null
           tipo: Database["public"]["Enums"]["tipo_movimiento"]
           tipo_cambio?: number | null
           updated_at?: string
@@ -514,6 +516,7 @@ export type Database = {
           moneda?: string
           monto?: number
           potrero_id?: string | null
+          serie_id?: string | null
           tipo?: Database["public"]["Enums"]["tipo_movimiento"]
           tipo_cambio?: number | null
           updated_at?: string
