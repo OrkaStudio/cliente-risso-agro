@@ -12,7 +12,6 @@ import {
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-import { categoriaColor } from '@/features/hacienda/labels'
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import { useCheques } from '@/features/cheques/hooks'
@@ -132,20 +131,7 @@ function Kpi({
   )
 }
 
-/* ===== Stock por categoría — pictograma del rodeo ===== */
-const categoriaPlural: Record<
-  Database['public']['Enums']['categoria_animal'],
-  string
-> = {
-  vaca: 'Vacas',
-  vaquillona: 'Vaquillonas',
-  novillo: 'Novillos',
-  ternero: 'Terneros',
-  ternera: 'Terneras',
-  toro: 'Toros',
-  capon: 'Capones',
-}
-
+/* ===== Estructura del rodeo ===== */
 /** Vaca (mdi:cow) — glifo relleno reutilizable. */
 function CowGlyph({
   className,
@@ -164,6 +150,89 @@ function CowGlyph({
   )
 }
 
+const HEMBRA = 'var(--field-deep)'
+const MACHO = 'var(--sky)'
+
+/** Indicador de manejo con referencia (verde/ámbar). */
+function Indicador({
+  label,
+  value,
+  nota,
+  tono = 'ok',
+}: {
+  label: string
+  value: string
+  nota: string
+  tono?: 'ok' | 'alerta'
+}) {
+  return (
+    <div>
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-faint">
+        {label}
+      </div>
+      <div className="tnum mt-1 text-[20px] font-bold leading-none text-ink">
+        {value}
+      </div>
+      <div
+        className={cn(
+          'mt-1 text-[11px] font-medium',
+          tono === 'alerta' ? 'text-sol-deep' : 'text-muted-foreground',
+        )}
+      >
+        {nota}
+      </div>
+    </div>
+  )
+}
+
+/** Una fila de la pirámide: hembra (izq, crece hacia el centro) ↔ macho (der). */
+function FilaPiramide({
+  etapa,
+  h,
+  hLabel,
+  m,
+  mLabel,
+  max,
+}: {
+  etapa: string
+  h: number
+  hLabel: string
+  m: number
+  mLabel: string
+  max: number
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_4.5rem_1fr] items-center gap-2">
+      <div className="flex items-center justify-end gap-2">
+        <span className="truncate text-[11.5px] text-muted-foreground">
+          {hLabel} <b className="tnum text-ink">{h}</b>
+        </span>
+        <div className="flex h-7 w-[60%] justify-end">
+          <div
+            className="h-full rounded-l-md transition-all"
+            style={{ width: `${(h / max) * 100}%`, background: HEMBRA }}
+          />
+        </div>
+      </div>
+      <div className="text-center text-[10.5px] font-bold uppercase tracking-[0.04em] text-faint">
+        {etapa}
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-[60%] justify-start">
+          <div
+            className="h-full rounded-r-md transition-all"
+            style={{ width: `${(m / max) * 100}%`, background: MACHO }}
+          />
+        </div>
+        <span className="truncate text-[11.5px] text-muted-foreground">
+          <b className="tnum text-ink">{m}</b> {mLabel}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Estructura del rodeo: pirámide por sexo/etapa + indicadores de manejo. */
 function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number }) {
   if (total === 0) {
     return (
@@ -176,55 +245,78 @@ function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number })
     )
   }
 
-  // Pictograma: ~60 vaquitas repartidas por categoría según su proporción.
-  const SLOTS = 60
-  const herd = data.flatMap((c) =>
-    Array.from(
-      { length: Math.max(1, Math.round((c.cabezas / total) * SLOTS)) },
-      () => categoriaColor[c.categoria],
-    ),
-  )
+  const get = (cat: Database['public']['Enums']['categoria_animal']) =>
+    data.find((c) => c.categoria === cat)?.cabezas ?? 0
+  const vacas = get('vaca')
+  const vaquillonas = get('vaquillona')
+  const terneras = get('ternera')
+  const toros = get('toro')
+  const novillos = get('novillo') + get('capon')
+  const terneros = get('ternero')
+
+  const hembras = vacas + vaquillonas + terneras
+  const machos = toros + novillos + terneros
+  const max = Math.max(vacas, vaquillonas, terneras, toros, novillos, terneros, 1)
+
+  // Indicadores de manejo
+  const vientres = vacas + vaquillonas
+  const pctVientres = Math.round((vientres / total) * 100)
+  const ratioToro = toros > 0 ? Math.round(vacas / toros) : null
+  const ratioOk = ratioToro != null && ratioToro >= 22
+  const destete =
+    vacas > 0 ? Math.round(((terneros + terneras) / vacas) * 100) : null
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Hero */}
-      <div className="flex items-end gap-3">
-        <span className="tnum text-[42px] font-bold leading-none text-ink">
-          {total}
-        </span>
-        <span className="pb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
-          cabezas
-          <br />
-          {data.length} categorías
-        </span>
-      </div>
-
-      {/* Pictograma del rodeo */}
-      <div className="flex flex-wrap gap-x-1.5 gap-y-1">
-        {herd.map((color, i) => (
-          <CowGlyph key={i} className="size-5" style={{ color }} />
-        ))}
-      </div>
-
-      {/* Leyenda */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 border-t border-border/60 pt-4 sm:grid-cols-3">
-        {data.map((c) => (
-          <div key={c.categoria} className="flex items-center gap-2">
-            <CowGlyph
-              className="size-4 shrink-0"
-              style={{ color: categoriaColor[c.categoria] }}
-            />
-            <span className="truncate text-[13px] text-ink">
-              {categoriaPlural[c.categoria]}
-            </span>
-            <span className="tnum ml-auto shrink-0 text-[12.5px] font-bold text-ink">
-              {c.cabezas}
-              <span className="ml-1 text-[10.5px] font-semibold text-faint">
-                {Math.round((c.cabezas / total) * 100)}%
-              </span>
-            </span>
+      {/* Encabezado hembras/machos */}
+      <div className="grid grid-cols-[1fr_4.5rem_1fr] items-baseline gap-2">
+        <div className="text-right text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: HEMBRA }}>
+          Hembras <span className="tnum">{hembras}</span>
+        </div>
+        <div className="text-center">
+          <div className="tnum text-[22px] font-bold leading-none text-ink">
+            {total}
           </div>
-        ))}
+          <div className="text-[9px] font-bold uppercase tracking-wide text-faint">
+            cabezas
+          </div>
+        </div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: MACHO }}>
+          <span className="tnum">{machos}</span> Machos
+        </div>
+      </div>
+
+      {/* Pirámide por etapa */}
+      <div className="flex flex-col gap-2">
+        <FilaPiramide etapa="Adultos" h={vacas} hLabel="Vacas" m={toros} mLabel="Toros" max={max} />
+        <FilaPiramide etapa="Recría" h={vaquillonas} hLabel="Vaquillonas" m={novillos} mLabel="Novillos" max={max} />
+        <FilaPiramide etapa="Cría" h={terneras} hLabel="Terneras" m={terneros} mLabel="Terneros" max={max} />
+      </div>
+
+      {/* Indicadores de manejo con referencia */}
+      <div className="grid grid-cols-3 gap-4 border-t border-border/60 pt-4">
+        <Indicador
+          label="Vientres"
+          value={String(vientres)}
+          nota={`${pctVientres}% del rodeo`}
+        />
+        <Indicador
+          label="Toro : vaca"
+          value={ratioToro != null ? `1 : ${ratioToro}` : '—'}
+          nota={
+            ratioToro == null
+              ? 'sin toros'
+              : ratioOk
+                ? 'en rango (ideal 1:25)'
+                : 'muchos toros (ideal 1:25)'
+          }
+          tono={ratioToro != null && !ratioOk ? 'alerta' : 'ok'}
+        />
+        <Indicador
+          label="Destete"
+          value={destete != null ? `${destete}%` : '—'}
+          nota="terneros por vaca"
+        />
       </div>
     </div>
   )
@@ -382,8 +474,8 @@ export function InicioPage() {
       {/* Stock por categoría + vencimientos */}
       <div className="grid items-stretch gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Panel
-          title="Stock por categoría"
-          info="Cómo se reparte tu rodeo por categoría de hacienda. Cada vaquita del pictograma representa una porción del total de cabezas."
+          title="Estructura del rodeo"
+          info="La forma de tu rodeo por sexo y etapa, con indicadores de manejo: cuántos vientres tenés, la relación toro:vaca (ideal 1 toro cada 25 vacas) y el índice de destete (terneros por vaca)."
           className="flex flex-col"
         >
           <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
