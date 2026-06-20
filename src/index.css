@@ -212,3 +212,21 @@
     letter-spacing: -0.03em;
   }
 }
+
+/* Etiqueta de potrero sobre el mapa satelital (Leaflet tooltip permanente):
+   sin caja, texto blanco legible sobre la imagen. */
+.potrero-label.leaflet-tooltip {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  color: #fff;
+  font-family: var(--font-heading, inherit);
+  font-weight: 800;
+  font-size: 13px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+.potrero-label.leaflet-tooltip::before {
+  display: none;
+}

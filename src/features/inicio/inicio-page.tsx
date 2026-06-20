@@ -103,12 +103,12 @@ function Kpi({
 }) {
   const vacio = value === '—'
   return (
-    <div className="flex min-h-[96px] flex-1 flex-col justify-center px-[22px] py-[18px]">
-      <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+    <div className="flex min-h-[96px] flex-1 flex-col items-center justify-center px-[22px] py-[18px] text-center">
+      <div className="flex items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
         <Icon className="size-4" style={{ color: iconColor }} />
         {label}
       </div>
-      <div className="mt-2 flex items-baseline gap-1">
+      <div className="mt-2 flex items-baseline justify-center gap-1">
         <span
           className={cn(
             'tnum text-[26px] font-bold leading-none',
@@ -166,21 +166,23 @@ function Indicador({
   tono?: 'ok' | 'alerta'
 }) {
   return (
-    <div>
-      <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-faint">
+    <div className="flex flex-col items-center gap-2 text-center">
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-faint">
         {label}
       </div>
-      <div className="tnum mt-1 text-[20px] font-bold leading-none text-ink">
+      <div className="tnum text-[24px] font-bold leading-none text-ink">
         {value}
       </div>
-      <div
+      <span
         className={cn(
-          'mt-1 text-[11px] font-medium',
-          tono === 'alerta' ? 'text-sol-deep' : 'text-muted-foreground',
+          'inline-flex items-center rounded-full px-2.5 py-[3px] text-[10.5px] font-semibold',
+          tono === 'alerta'
+            ? 'bg-sol-soft text-sol-deep'
+            : 'bg-secondary text-muted-foreground',
         )}
       >
         {nota}
-      </div>
+      </span>
     </div>
   )
 }
@@ -202,12 +204,12 @@ function FilaPiramide({
   max: number
 }) {
   return (
-    <div className="grid grid-cols-[1fr_4.5rem_1fr] items-center gap-2">
-      <div className="flex items-center justify-end gap-2">
-        <span className="truncate text-[11.5px] text-muted-foreground">
+    <div className="grid grid-cols-[1fr_5rem_1fr] items-center gap-2">
+      <div className="flex items-center justify-between gap-2.5">
+        <span className="whitespace-nowrap text-[12px] text-muted-foreground">
           {hLabel} <b className="tnum text-ink">{h}</b>
         </span>
-        <div className="flex h-7 w-[60%] justify-end">
+        <div className="flex h-9 w-[58%] justify-end">
           <div
             className="h-full rounded-l-md transition-all"
             style={{ width: `${(h / max) * 100}%`, background: HEMBRA }}
@@ -217,15 +219,15 @@ function FilaPiramide({
       <div className="text-center text-[10.5px] font-bold uppercase tracking-[0.04em] text-faint">
         {etapa}
       </div>
-      <div className="flex items-center gap-2">
-        <div className="flex h-7 w-[60%] justify-start">
+      <div className="flex items-center justify-between gap-2.5">
+        <div className="flex h-9 w-[58%] justify-start">
           <div
             className="h-full rounded-r-md transition-all"
             style={{ width: `${(m / max) * 100}%`, background: MACHO }}
           />
         </div>
-        <span className="truncate text-[11.5px] text-muted-foreground">
-          <b className="tnum text-ink">{m}</b> {mLabel}
+        <span className="whitespace-nowrap text-[12px] text-muted-foreground">
+          {mLabel} <b className="tnum text-ink">{m}</b>
         </span>
       </div>
     </div>
@@ -267,34 +269,34 @@ function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number })
     vacas > 0 ? Math.round(((terneros + terneras) / vacas) * 100) : null
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex w-full flex-1 flex-col justify-center gap-7 py-2">
       {/* Encabezado hembras/machos */}
-      <div className="grid grid-cols-[1fr_4.5rem_1fr] items-baseline gap-2">
-        <div className="text-right text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: HEMBRA }}>
+      <div className="grid grid-cols-[1fr_5rem_1fr] items-baseline gap-2">
+        <div className="text-right text-[11.5px] font-bold uppercase tracking-[0.05em]" style={{ color: HEMBRA }}>
           Hembras <span className="tnum">{hembras}</span>
         </div>
         <div className="text-center">
-          <div className="tnum text-[22px] font-bold leading-none text-ink">
+          <div className="tnum text-[26px] font-bold leading-none text-ink">
             {total}
           </div>
-          <div className="text-[9px] font-bold uppercase tracking-wide text-faint">
+          <div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-faint">
             cabezas
           </div>
         </div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: MACHO }}>
-          <span className="tnum">{machos}</span> Machos
+        <div className="text-left text-[11.5px] font-bold uppercase tracking-[0.05em]" style={{ color: MACHO }}>
+          Machos <span className="tnum">{machos}</span>
         </div>
       </div>
 
       {/* Pirámide por etapa */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <FilaPiramide etapa="Adultos" h={vacas} hLabel="Vacas" m={toros} mLabel="Toros" max={max} />
         <FilaPiramide etapa="Recría" h={vaquillonas} hLabel="Vaquillonas" m={novillos} mLabel="Novillos" max={max} />
         <FilaPiramide etapa="Cría" h={terneras} hLabel="Terneras" m={terneros} mLabel="Terneros" max={max} />
       </div>
 
       {/* Indicadores de manejo con referencia */}
-      <div className="grid grid-cols-3 gap-4 border-t border-border/60 pt-4">
+      <div className="grid grid-cols-3 divide-x divide-border/60 border-t border-border/60 pt-4">
         <Indicador
           label="Vientres"
           value={String(vientres)}

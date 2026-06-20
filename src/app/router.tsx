@@ -29,6 +29,14 @@ const FichaAnimalPage = lazy(() =>
     default: m.FichaAnimalPage,
   })),
 )
+const LotesPage = lazy(() =>
+  import('@/features/lotes/lotes-page').then((m) => ({ default: m.LotesPage })),
+)
+const LoteFichaPage = lazy(() =>
+  import('@/features/lotes/lote-ficha-page').then((m) => ({
+    default: m.LoteFichaPage,
+  })),
+)
 const CamposPage = lazy(() =>
   import('@/features/campos/campos-page').then((m) => ({ default: m.CamposPage })),
 )
@@ -68,6 +76,8 @@ export const router = createBrowserRouter([
           { path: 'hacienda', element: <AnimalesPage /> },
           { path: 'hacienda/nuevo', element: <AltaAnimalPage /> },
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },
+          { path: 'lotes', element: <LotesPage /> },
+          { path: 'lotes/:id', element: <LoteFichaPage /> },
           { path: 'campos', element: <CamposPage /> },
           { path: 'campos/:id', element: <CampoDetailPage /> },
           { path: 'potrero/:id', element: <PotreroDetailPage /> },

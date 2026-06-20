@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   CircleDollarSign,
   Landmark,
+  Layers,
   LayoutDashboard,
   Leaf,
   LogOut,
@@ -80,6 +81,7 @@ function Ticker() {
 const NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/hacienda', label: 'Hacienda', icon: Beef, end: false },
+  { to: '/lotes', label: 'Lotes', icon: Layers, end: false },
   { to: '/campos', label: 'Campos', icon: MapIcon, end: false },
   { to: '/analitica', label: 'Analítica', icon: BarChart3, end: false },
   { to: '/cheques', label: 'Cheques', icon: Landmark, end: false },
@@ -227,7 +229,7 @@ export function AppShell() {
 
         {/* Sólo el contenido scrollea */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1340px] px-6 py-7">
+          <div className="w-full px-4 py-7 sm:px-6">
             <Suspense
               fallback={
                 <div className="text-sm text-muted-foreground">Cargando…</div>
