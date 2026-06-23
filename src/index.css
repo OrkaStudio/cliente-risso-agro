@@ -213,20 +213,188 @@
   }
 }
 
-/* Etiqueta de potrero sobre el mapa satelital (Leaflet tooltip permanente):
-   sin caja, texto blanco legible sobre la imagen. */
+/* ===== Mapa de potreros (Leaflet) ===== */
+
+/* Etiqueta de potrero: "pill" oscura translúcida, legible sobre satélite. */
 .potrero-label.leaflet-tooltip {
-  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 9px;
   border: none;
-  box-shadow: none;
-  padding: 0;
+  border-radius: 9px;
+  background: rgba(8, 20, 15, 0.62);
+  backdrop-filter: blur(3px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   color: #fff;
-  font-family: var(--font-heading, inherit);
-  font-weight: 800;
-  font-size: 13px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
   white-space: nowrap;
 }
 .potrero-label.leaflet-tooltip::before {
   display: none;
+}
+.potrero-label .pl-num {
+  font-family: var(--font-heading, inherit);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+}
+.potrero-label .pl-sub {
+  font-family: var(--font-mono, inherit);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* Superficies de control: estética "glass" coherente. */
+.map-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.map-tools .mt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 24, 18, 0.66);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-family: var(--font-heading, inherit);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  transition:
+    background 0.12s,
+    transform 0.12s;
+}
+.map-tools .mt-btn:hover {
+  background: rgba(20, 40, 30, 0.82);
+}
+.map-tools .mt-btn.on {
+  background: var(--field, #3f9d52);
+  border-color: transparent;
+}
+
+.map-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(12, 24, 18, 0.62);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.map-legend .lg-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.map-legend .lg-fill {
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1.5px solid;
+}
+.map-legend .lg-line {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.map-infocard {
+  padding: 10px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(12, 24, 18, 0.72);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  min-width: 150px;
+}
+.map-infocard .ic-num {
+  font-family: var(--font-heading, inherit);
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.1;
+}
+.map-infocard .ic-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+.map-infocard .ic-link {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8fe3a6;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.map-infocard .ic-link:hover {
+  text-decoration: underline;
+}
+
+/* Popup con input para nombrar el potrero recién dibujado. */
+.potrero-popup .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  padding: 4px;
+}
+.potrero-popup .leaflet-popup-content {
+  margin: 10px 12px;
+}
+.potrero-input label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground, #667);
+  margin-bottom: 6px;
+}
+.potrero-input .pi-row {
+  display: flex;
+  gap: 6px;
+}
+.potrero-input .pi-field {
+  width: 90px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border, #d8dcd9);
+  font-size: 14px;
+  font-weight: 700;
+}
+.potrero-input .pi-field:focus {
+  outline: 2px solid var(--field, #3f9d52);
+  outline-offset: 0;
+}
+.potrero-input .pi-ok {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: none;
+  background: var(--field, #3f9d52);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Controles nativos de Leaflet/Geoman: bordes redondeados para acompañar. */
+.leaflet-control-zoom,
+.leaflet-pm-toolbar .button-container {
+  border-radius: 10px !important;
+  overflow: hidden;
 }

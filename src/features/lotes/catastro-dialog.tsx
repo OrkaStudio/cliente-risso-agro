@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { MapPin } from 'lucide-react'
 import { buscarParcelaRural, type ParcelaCatastro } from '@/features/lotes/catastro'
-import { setCampoBoundary } from '@/features/lotes/geo'
+import { deleteCampoView, setCampoBoundary } from '@/features/lotes/geo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -69,6 +69,7 @@ export function CatastroDialog({
 
   function aplicar(p: ParcelaCatastro) {
     setCampoBoundary(campoId, p.anillo)
+    deleteCampoView(campoId) // que el mapa re-encuadre a la parcela traída
     toast.success(`Contorno traído (${p.areaHa} ha)`)
     setOpen(false)
     reset()

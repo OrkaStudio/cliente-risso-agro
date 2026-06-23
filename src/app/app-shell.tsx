@@ -81,7 +81,7 @@ function Ticker() {
 const NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/hacienda', label: 'Hacienda', icon: Beef, end: false },
-  { to: '/lotes', label: 'Lotes', icon: Layers, end: false },
+  { to: '/potreros', label: 'Potreros', icon: Layers, end: false },
   { to: '/campos', label: 'Campos', icon: MapIcon, end: false },
   { to: '/analitica', label: 'Analítica', icon: BarChart3, end: false },
   { to: '/cheques', label: 'Cheques', icon: Landmark, end: false },

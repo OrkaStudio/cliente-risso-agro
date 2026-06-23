@@ -585,7 +585,7 @@ export function TrasladarPartirDialog({
     if (nuevo) {
       toast.success('Lote partido')
       setOpen(false)
-      navigate(`/lotes/${nuevo}`)
+      navigate(`/potreros/${nuevo}`)
     } else {
       setError('No se movió ningún animal')
     }

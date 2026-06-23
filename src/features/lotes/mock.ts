@@ -244,6 +244,8 @@ export type Potrero = {
   campoId: string
   numero: string
   hectareas: number
+  /** Si el potrero está sembrado (uso agrícola). Sin lote ni cultivo = vacío. */
+  cultivo?: string
 }
 
 export const potreros: Potrero[] = [
@@ -255,7 +257,7 @@ export const potreros: Potrero[] = [
   { id: 'lp-p1b', campoId: 'la-portena', numero: '1B', hectareas: 40 },
   { id: 'lp-p2', campoId: 'la-portena', numero: '2', hectareas: 8 },
   { id: 'lp-p3', campoId: 'la-portena', numero: '3', hectareas: 35 },
-  { id: 'lp-p4', campoId: 'la-portena', numero: '4', hectareas: 55 },
+  { id: 'lp-p4', campoId: 'la-portena', numero: '4', hectareas: 55, cultivo: 'Trigo' },
   { id: 'lp-p5', campoId: 'la-portena', numero: '5', hectareas: 27 },
   { id: 'lp-p6', campoId: 'la-portena', numero: '6', hectareas: 22 },
   { id: 'lp-p7', campoId: 'la-portena', numero: '7', hectareas: 18 },
@@ -267,6 +269,6 @@ export const potreros: Potrero[] = [
   { id: 'dg-p2', campoId: 'don-gilberto', numero: '2', hectareas: 12 },
   // ===== Los Pampas (165 ha · 3 potreros) =====
   { id: 'pa-p2', campoId: 'los-pampas', numero: '2', hectareas: 80 },
-  { id: 'pa-p1', campoId: 'los-pampas', numero: '1', hectareas: 50 },
+  { id: 'pa-p1', campoId: 'los-pampas', numero: '1', hectareas: 50, cultivo: 'Soja' },
   { id: 'pa-p3', campoId: 'los-pampas', numero: '3', hectareas: 35 },
 ]

@@ -71,7 +71,7 @@ function LoteCard({ lote }: { lote: Lote }) {
   const codigo = codigoLote(lote)
   return (
     <Link
-      to={`/lotes/${lote.id}`}
+      to={`/potreros/${lote.id}`}
       className="flex flex-col gap-3.5 rounded-[14px] border border-l-[5px] p-[18px] shadow-[0_1px_2px_rgba(16,24,19,0.05)] transition-shadow hover:shadow-[0_4px_18px_rgba(16,24,19,0.08)]"
       style={{
         borderColor: 'var(--border)',
@@ -322,7 +322,7 @@ export function LotesPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-            Lotes de hacienda
+            Potreros
           </h1>
           <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
             {lotes.length} lotes · {campos.length} campos · cada lote es una

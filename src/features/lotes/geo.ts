@@ -78,3 +78,40 @@ export function deleteCampoBoundary(campoId: string) {
   delete boundaries[campoId]
   persistB()
 }
+
+// ===== Vista del mapa por campo (centro + zoom) =====
+export type CampoView = { center: LatLng; zoom: number }
+
+const LSV = 'risso-campo-view'
+
+function loadV(): Record<string, CampoView> {
+  try {
+    return JSON.parse(localStorage.getItem(LSV) ?? '{}')
+  } catch {
+    return {}
+  }
+}
+
+const views: Record<string, CampoView> = loadV()
+
+function persistV() {
+  try {
+    localStorage.setItem(LSV, JSON.stringify(views))
+  } catch {
+    /* sin persistencia */
+  }
+}
+
+export function setCampoView(campoId: string, v: CampoView) {
+  views[campoId] = v
+  persistV()
+}
+
+export function getCampoView(campoId: string): CampoView | undefined {
+  return views[campoId]
+}
+
+export function deleteCampoView(campoId: string) {
+  delete views[campoId]
+  persistV()
+}

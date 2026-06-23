@@ -38,10 +38,10 @@ export function LoteFichaPage() {
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">Lote no encontrado.</p>
         <Link
-          to="/lotes"
+          to="/potreros"
           className="text-sm font-semibold text-field-deep hover:underline"
         >
-          ← Volver a Lotes
+          ← Volver a Potreros
         </Link>
       </div>
     )
@@ -56,7 +56,7 @@ export function LoteFichaPage() {
   function onBorrar() {
     borrarLote(lote!.id)
     toast.success('Lote borrado')
-    navigate('/lotes')
+    navigate('/potreros')
   }
 
   return (
@@ -64,11 +64,11 @@ export function LoteFichaPage() {
       {/* Encabezado */}
       <div>
         <Link
-          to="/lotes"
+          to="/potreros"
           className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
-          Lotes
+          Potreros
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
