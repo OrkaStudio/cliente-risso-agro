@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Beef, LayoutGrid, Layers, Map as MapIcon } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Beef, Check, LayoutGrid, Layers, Map as MapIcon, Pencil } from 'lucide-react'
 import {
   colorCategoria,
   categoriaLabel,
@@ -21,7 +21,10 @@ import {
 import { potreros as potrerosSeed, type Campo } from '@/features/lotes/mock'
 import { CrearLoteDialog } from '@/features/lotes/lotes-dialogs'
 import { CampoMapaReal } from '@/features/lotes/campo-mapa-real'
+import { CampoVista } from '@/features/lotes/campo-vista'
 import { CatastroDialog } from '@/features/lotes/catastro-dialog'
+import { tieneGeometria } from '@/features/lotes/geo'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 type Vista = 'mapa' | 'lista'
@@ -209,10 +212,17 @@ function CampoBloque({ campo, lotes }: { campo: Campo; lotes: Lote[] }) {
   )
 }
 
-/* ===== Vista MAPA: selector de campo + mapa satelital real ===== */
+/* ===== Vista MAPA: selector de campo + vista contenida / edición satelital ===== */
 function MapaVista({ lotes }: { lotes: Lote[] }) {
+  const navigate = useNavigate()
   const [campoId, setCampoId] = useState(campos[0]?.id ?? '')
   const [ver, setVer] = useState(0)
+  // Modo satelital (editar) explícito: arranca activo solo si el campo todavía
+  // no está delimitado. No se deriva de la geometría para no saltar al traer
+  // el catastro a mitad de la edición.
+  const [editar, setEditar] = useState(
+    () => !tieneGeometria(campos[0]?.id ?? ''),
+  )
   const campo = campos.find((c) => c.id === campoId) ?? campos[0]
   const potreros = potrerosSeed.filter((p) => p.campoId === campo.id)
   const delCampo = lotes.filter((l) => l.campoId === campo.id)
@@ -227,7 +237,10 @@ function MapaVista({ lotes }: { lotes: Lote[] }) {
             <button
               key={c.id}
               type="button"
-              onClick={() => setCampoId(c.id)}
+              onClick={() => {
+                setCampoId(c.id)
+                setEditar(!tieneGeometria(c.id))
+              }}
               className={cn(
                 'inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors',
                 activo
@@ -250,27 +263,54 @@ function MapaVista({ lotes }: { lotes: Lote[] }) {
 
       <section className="rounded-[14px] border border-border bg-card p-6 shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
         <CampoHeader campo={campo} lotes={lotes} />
-        <div className="mb-3 flex flex-wrap items-center gap-2.5">
-          <CatastroDialog
-            campoId={campo.id}
-            onAplicado={() => setVer((v) => v + 1)}
-          />
-          <span className="text-[12.5px] text-muted-foreground">
-            Trae el contorno real del campo por nomenclatura catastral.
-          </span>
-        </div>
-        <CampoMapaReal
-          key={`${campo.id}-${ver}`}
-          campo={campo}
-          potreros={potreros}
-          lotes={delCampo}
-        />
-        <p className="mt-3 text-[12.5px] text-muted-foreground">
-          Traé el contorno del catastro, después usá la herramienta de polígono
-          (arriba a la izquierda) para <b>dibujar cada potrero</b> adentro y
-          ponele su número. Todo se guarda solo. Tocá un potrero con lote para
-          abrirlo.
-        </p>
+
+        {editar ? (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2.5">
+              <CatastroDialog
+                campoId={campo.id}
+                onAplicado={() => setVer((v) => v + 1)}
+              />
+              <Button size="sm" onClick={() => setEditar(false)}>
+                <Check className="size-4" />
+                Listo
+              </Button>
+              <span className="text-[12.5px] text-muted-foreground">
+                Traé el contorno del catastro y dibujá los potreros adentro.
+              </span>
+            </div>
+            <CampoMapaReal
+              key={`${campo.id}-${ver}`}
+              campo={campo}
+              potreros={potreros}
+              lotes={delCampo}
+            />
+            <p className="mt-3 text-[12.5px] text-muted-foreground">
+              Usá la herramienta de polígono (arriba a la izquierda) para{' '}
+              <b>dibujar cada potrero</b> y ponele su número. Cuando termines,
+              tocá <b>Listo</b> para ver el campo limpio.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-2.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditar(true)}
+              >
+                <Pencil className="size-4" />
+                Editar potreros
+              </Button>
+            </div>
+            <CampoVista
+              key={campo.id}
+              campo={campo}
+              lotes={delCampo}
+              onVerLote={(id) => navigate(`/potreros/${id}`)}
+            />
+          </>
+        )}
       </section>
     </div>
   )

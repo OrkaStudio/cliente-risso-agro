@@ -3,6 +3,40 @@
 // una columna geográfica (geojson / PostGIS) en Supabase.
 export type LatLng = [number, number] // [lat, lng]
 
+// ===== Marcadores de infraestructura (molino / laguna / tranquera) =====
+export type Marker = {
+  id: string
+  type: string
+  lat: number
+  lng: number
+  radiusM?: number // solo laguna (área)
+  angleDeg?: number // solo tranquera (orientada al alambrado)
+}
+
+const LSM = 'risso-markers'
+function loadM(): Record<string, Marker[]> {
+  try {
+    return JSON.parse(localStorage.getItem(LSM) ?? '{}')
+  } catch {
+    return {}
+  }
+}
+const markersByCampo: Record<string, Marker[]> = loadM()
+function persistM() {
+  try {
+    localStorage.setItem(LSM, JSON.stringify(markersByCampo))
+  } catch {
+    /* sin persistencia */
+  }
+}
+export function getMarkers(campoId: string): Marker[] {
+  return markersByCampo[campoId] ?? []
+}
+export function setMarkers(campoId: string, ms: Marker[]) {
+  markersByCampo[campoId] = ms
+  persistM()
+}
+
 const LS = 'risso-potrero-geo'
 const keyOf = (campoId: string, numero: string) => `${campoId}::${numero}`
 
@@ -32,6 +66,13 @@ export function setGeo(campoId: string, numero: string, coords: LatLng[]) {
 export function deleteGeo(campoId: string, numero: string) {
   delete geo[keyOf(campoId, numero)]
   persist()
+}
+
+/** ¿El campo ya tiene contorno y/o potreros dibujados? */
+export function tieneGeometria(campoId: string): boolean {
+  return (
+    !!getCampoBoundary(campoId) || Object.keys(allGeo(campoId)).length > 0
+  )
 }
 
 /** Geometrías trazadas de un campo: { numero: coords }. */

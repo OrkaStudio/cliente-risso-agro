@@ -230,6 +230,26 @@ export function agregarAnimalesPorCantidad(
   emit()
 }
 
+/** Define qué lote ocupa un potrero (membresía): el lote destino suma el
+ *  número de potrero y cualquier otro lote del mismo campo lo pierde.
+ *  loteId null = el potrero queda sin lote (vacío/agrícola). */
+export function setPotreroLote(
+  campoId: string,
+  numero: string,
+  loteId: string | null,
+) {
+  for (const l of state) {
+    if (l.campoId !== campoId) continue
+    const tiene = l.potreros.includes(numero)
+    if (loteId && l.id === loteId) {
+      if (!tiene) l.potreros = [...l.potreros, numero]
+    } else if (tiene) {
+      l.potreros = l.potreros.filter((p) => p !== numero)
+    }
+  }
+  emit()
+}
+
 export function quitarAnimal(loteId: string, animalId: string) {
   const lote = state.find((l) => l.id === loteId)
   if (!lote) return

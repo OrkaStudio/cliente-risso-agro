@@ -1,11 +1,24 @@
-import { ArrowRight, Beef, LandPlot, Layers, MousePointer2, Sprout } from 'lucide-react'
+import { useState } from 'react'
+import {
+  ArrowRight,
+  Beef,
+  LandPlot,
+  Layers,
+  MousePointer2,
+  Pencil,
+  Sprout,
+} from 'lucide-react'
 import { especieColor, especieLabel, type Especie } from '@/features/lotes/domain'
+import { FEATURE_MAP, type FeatureId } from '@/features/lotes/potrero-features'
 import type { Campo } from '@/features/lotes/mock'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dropdown } from '@/components/ui/dropdown'
+import { cn } from '@/lib/utils'
 
 export type Uso = 'ganadero' | 'agricola' | 'vacio'
 
-/** Color y etiqueta por uso del potrero (doble codificación: borde = campo,
- *  relleno = uso). */
 export const USO: Record<Uso, { label: string; color: string }> = {
   ganadero: { label: 'Ganadero', color: '#3f9d52' },
   agricola: { label: 'Agrícola', color: '#d6a032' },
@@ -22,6 +35,20 @@ export type PotreroInfo = {
   cabezas?: number
   loteId?: string
   cultivo?: string
+  features?: FeatureId[]
+}
+
+export type EditarPotrero = {
+  lotes: { id: string; codigo: string }[]
+  onGuardar: (
+    numero: string,
+    v: {
+      hectareas?: number
+      cultivo?: string
+      loteId: string | null
+      features?: FeatureId[]
+    },
+  ) => void
 }
 
 function UsoBadge({ uso }: { uso: Uso }) {
@@ -59,18 +86,134 @@ function Dato({
   )
 }
 
+/* ===== Formulario de edición del potrero ===== */
+function FormEditar({
+  info,
+  edit,
+  onClose,
+}: {
+  info: PotreroInfo
+  edit: EditarPotrero
+  onClose: () => void
+}) {
+  const [estado, setEstado] = useState<Uso>(info.uso)
+  const [hectareas, setHectareas] = useState(info.ha != null ? String(info.ha) : '')
+  const [cultivo, setCultivo] = useState(info.cultivo ?? '')
+  const [loteId, setLoteId] = useState(info.loteId ?? edit.lotes[0]?.id ?? '')
+
+  function guardar() {
+    const ha = parseFloat(hectareas.replace(',', '.'))
+    edit.onGuardar(info.numero, {
+      hectareas: Number.isFinite(ha) ? ha : undefined,
+      cultivo: estado === 'agricola' ? cultivo.trim() || undefined : undefined,
+      loteId: estado === 'ganadero' ? loteId || null : null,
+    })
+    onClose()
+  }
+
+  const estados: Uso[] = ['ganadero', 'agricola', 'vacio']
+
+  return (
+    <div className="flex flex-1 flex-col gap-3.5 p-4">
+      <span className="font-heading text-[22px] font-bold tracking-[-0.02em] text-ink">
+        Potrero {info.numero}
+      </span>
+
+      <div className="grid gap-2">
+        <Label htmlFor="pot-ha">Hectáreas</Label>
+        <Input
+          id="pot-ha"
+          value={hectareas}
+          onChange={(e) => setHectareas(e.target.value)}
+          inputMode="decimal"
+          placeholder="55"
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Estado</Label>
+        <div className="flex gap-1.5">
+          {estados.map((u) => (
+            <button
+              key={u}
+              type="button"
+              onClick={() => setEstado(u)}
+              className={cn(
+                'flex-1 rounded-lg border px-2 py-1.5 text-[12px] font-semibold transition-colors',
+                estado === u
+                  ? 'border-transparent text-white'
+                  : 'border-border text-muted-foreground hover:bg-secondary',
+              )}
+              style={estado === u ? { background: USO[u].color } : undefined}
+            >
+              {USO[u].label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {estado === 'ganadero' && (
+        <div className="grid gap-2">
+          <Label>Lote en el potrero</Label>
+          {edit.lotes.length > 0 ? (
+            <Dropdown
+              block
+              ariaLabel="Lote"
+              value={loteId}
+              onChange={setLoteId}
+              options={edit.lotes.map((l) => ({
+                value: l.id,
+                label: `Lote ${l.codigo}`,
+              }))}
+            />
+          ) : (
+            <p className="text-[12.5px] text-muted-foreground">
+              No hay lotes en este campo. Creá uno en la lista.
+            </p>
+          )}
+        </div>
+      )}
+
+      {estado === 'agricola' && (
+        <div className="grid gap-2">
+          <Label htmlFor="pot-cultivo">Cultivo</Label>
+          <Input
+            id="pot-cultivo"
+            value={cultivo}
+            onChange={(e) => setCultivo(e.target.value)}
+            placeholder="Trigo, Soja…"
+          />
+        </div>
+      )}
+
+      <div className="mt-auto flex gap-2">
+        <Button variant="outline" size="sm" onClick={onClose} className="flex-1">
+          Cancelar
+        </Button>
+        <Button size="sm" onClick={guardar} className="flex-1">
+          Guardar
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function PotreroSidePanel({
   info,
   campo,
   onVerLote,
+  edit,
 }: {
   info: PotreroInfo | null
   campo: Campo
   onVerLote: (loteId: string) => void
+  edit?: EditarPotrero
 }) {
+  // Snapshot del potrero al abrir la edición → el hover no lo cambia mientras editás.
+  const [editInfo, setEditInfo] = useState<PotreroInfo | null>(null)
+
   return (
-    <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-[560px] lg:w-[300px]">
-      {/* Cabecera: campo */}
+    <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-auto lg:w-[300px]">
       <div className="flex items-center gap-2.5 border-b border-border px-4 py-3.5">
         <span
           className="inline-flex size-7 items-center justify-center rounded-lg font-heading text-[13px] font-bold text-white"
@@ -83,7 +226,13 @@ export function PotreroSidePanel({
         </span>
       </div>
 
-      {info ? (
+      {editInfo && edit ? (
+        <FormEditar
+          info={editInfo}
+          edit={edit}
+          onClose={() => setEditInfo(null)}
+        />
+      ) : info ? (
         <div className="flex flex-1 flex-col gap-3.5 p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="font-heading text-[26px] font-bold tracking-[-0.02em] text-ink">
@@ -134,10 +283,26 @@ export function PotreroSidePanel({
                 {info.cultivo}
               </Dato>
             )}
+            {info.features && info.features.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {info.features.map((fid) => {
+                  const F = FEATURE_MAP[fid]
+                  return (
+                    <span
+                      key={fid}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 text-[11.5px] font-semibold text-ink"
+                    >
+                      <F.Icon className="size-3.5 text-field-deep" />
+                      {F.label}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="mt-auto">
-            {info.uso === 'ganadero' && info.loteId ? (
+          <div className="mt-auto grid gap-2">
+            {info.uso === 'ganadero' && info.loteId && (
               <button
                 type="button"
                 onClick={() => onVerLote(info.loteId!)}
@@ -145,11 +310,17 @@ export function PotreroSidePanel({
               >
                 Ver lote <ArrowRight className="size-4" />
               </button>
-            ) : info.uso === 'vacio' ? (
-              <p className="rounded-xl bg-secondary py-2.5 text-center text-[12.5px] font-medium text-faint">
-                Sin hacienda ni cultivo
-              </p>
-            ) : null}
+            )}
+            {edit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditInfo(info)}
+              >
+                <Pencil className="size-4" />
+                Editar potrero
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -157,33 +328,46 @@ export function PotreroSidePanel({
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
             <MousePointer2 className="size-7 text-faint" />
             <p className="text-[13px] text-muted-foreground">
-              Pasá el mouse sobre un potrero para ver su detalle.
+              Pasá el mouse o tocá un potrero para ver y editar su detalle.
             </p>
           </div>
           <div className="grid gap-2 border-t border-border/60 pt-3">
             <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
-              Referencias
+              Referencias · color = campo
             </span>
-            {(Object.keys(USO) as Uso[]).map((u) => (
-              <div key={u} className="flex items-center gap-2.5 text-[12.5px]">
-                <span
-                  className="size-3.5 rounded-[4px] border"
-                  style={{
-                    background: `${USO[u].color}33`,
-                    borderColor: USO[u].color,
-                  }}
-                />
-                <span className="text-ink">{USO[u].label}</span>
-              </div>
-            ))}
-            <div className="mt-0.5 flex items-center gap-2.5 text-[12.5px]">
+            <div className="flex items-center gap-2.5 text-[12.5px]">
               <span
-                className="h-[3px] w-3.5 rounded"
-                style={{ background: campo.color.hex }}
+                className="size-3.5 rounded-[4px] border"
+                style={{
+                  background: `${campo.color.hex}88`,
+                  borderColor: campo.color.hex,
+                }}
               />
-              <span className="text-muted-foreground">
-                Borde = color del campo
-              </span>
+              <span className="text-ink">Ganadero</span>
+              <span className="ml-auto text-faint">sólido</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-[12.5px]">
+              <span
+                className="size-3.5 rounded-[4px] border"
+                style={{
+                  background: `${campo.color.hex}22`,
+                  backgroundImage: `repeating-linear-gradient(45deg, ${campo.color.hex} 0 2px, transparent 2px 5px)`,
+                  borderColor: campo.color.hex,
+                }}
+              />
+              <span className="text-ink">Agrícola</span>
+              <span className="ml-auto text-faint">surcos</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-[12.5px]">
+              <span
+                className="size-3.5 rounded-[4px]"
+                style={{
+                  background: `${campo.color.hex}14`,
+                  border: `1.5px dashed ${campo.color.hex}99`,
+                }}
+              />
+              <span className="text-ink">Vacío</span>
+              <span className="ml-auto text-faint">tenue</span>
             </div>
           </div>
         </div>

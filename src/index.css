@@ -213,6 +213,16 @@
   }
 }
 
+/* Entrada escalonada de los potreros en la vista contenida. */
+@keyframes potreroFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ===== Mapa de potreros (Leaflet) ===== */
 
 /* Etiqueta de potrero: "pill" oscura translúcida, legible sobre satélite. */
