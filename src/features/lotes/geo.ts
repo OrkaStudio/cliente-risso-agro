@@ -11,6 +11,7 @@ export type Marker = {
   lng: number
   radiusM?: number // solo laguna (área)
   angleDeg?: number // solo tranquera (orientada al alambrado)
+  scale?: number // molino/tranquera: factor de tamaño del ícono (1 = base)
 }
 
 const LSM = 'risso-markers'

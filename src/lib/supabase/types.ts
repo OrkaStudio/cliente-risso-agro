@@ -26,6 +26,7 @@ export type Database = {
           estado: Database["public"]["Enums"]["estado_animal"]
           fecha_nacimiento: string | null
           id: string
+          lote_id: string | null
           notas: string | null
           origen: string | null
           potrero_id: string | null
@@ -39,6 +40,7 @@ export type Database = {
           estado?: Database["public"]["Enums"]["estado_animal"]
           fecha_nacimiento?: string | null
           id?: string
+          lote_id?: string | null
           notas?: string | null
           origen?: string | null
           potrero_id?: string | null
@@ -52,6 +54,7 @@ export type Database = {
           estado?: Database["public"]["Enums"]["estado_animal"]
           fecha_nacimiento?: string | null
           id?: string
+          lote_id?: string | null
           notas?: string | null
           origen?: string | null
           potrero_id?: string | null
@@ -67,6 +70,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "animal_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lote"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "animal_potrero_id_fkey"
             columns: ["potrero_id"]
             isOneToOne: false
@@ -77,6 +87,7 @@ export type Database = {
       }
       campo: {
         Row: {
+          contorno: Json | null
           created_at: string
           empresa_id: string
           hectareas: number | null
@@ -85,6 +96,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_campo"]
         }
         Insert: {
+          contorno?: Json | null
           created_at?: string
           empresa_id: string
           hectareas?: number | null
@@ -93,6 +105,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["tipo_campo"]
         }
         Update: {
+          contorno?: Json | null
           created_at?: string
           empresa_id?: string
           hectareas?: number | null
@@ -362,6 +375,60 @@ export type Database = {
           },
         ]
       }
+      infraestructura: {
+        Row: {
+          angulo_deg: number | null
+          campo_id: string
+          created_at: string
+          empresa_id: string
+          escala: number | null
+          id: string
+          lat: number
+          lng: number
+          radio_m: number | null
+          tipo: Database["public"]["Enums"]["tipo_infraestructura"]
+        }
+        Insert: {
+          angulo_deg?: number | null
+          campo_id: string
+          created_at?: string
+          empresa_id: string
+          escala?: number | null
+          id?: string
+          lat: number
+          lng: number
+          radio_m?: number | null
+          tipo: Database["public"]["Enums"]["tipo_infraestructura"]
+        }
+        Update: {
+          angulo_deg?: number | null
+          campo_id?: string
+          created_at?: string
+          empresa_id?: string
+          escala?: number | null
+          id?: string
+          lat?: number
+          lng?: number
+          radio_m?: number | null
+          tipo?: Database["public"]["Enums"]["tipo_infraestructura"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "infraestructura_campo_id_fkey"
+            columns: ["campo_id"]
+            isOneToOne: false
+            referencedRelation: "campo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "infraestructura_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lluvia: {
         Row: {
           campo_id: string
@@ -407,6 +474,51 @@ export type Database = {
           },
         ]
       }
+      lote: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          especie: string | null
+          id: string
+          nombre: string
+          potrero_id: string | null
+          proposito: string | null
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          especie?: string | null
+          id?: string
+          nombre: string
+          potrero_id?: string | null
+          proposito?: string | null
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          especie?: string | null
+          id?: string
+          nombre?: string
+          potrero_id?: string | null
+          proposito?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lote_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lote_potrero_id_fkey"
+            columns: ["potrero_id"]
+            isOneToOne: false
+            referencedRelation: "potrero"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       miembro_empresa: {
         Row: {
           created_at: string
@@ -444,13 +556,13 @@ export type Database = {
           categoria_id: string
           cheque_banco: string | null
           cheque_numero: string | null
-          contraparte: string | null
-          es_echeq: boolean
           comprobante_url: string | null
+          contraparte: string | null
           created_at: string
           created_by: string | null
           descripcion: string | null
           empresa_id: string
+          es_echeq: boolean
           estado: Database["public"]["Enums"]["estado_movimiento"]
           fecha_cobro_pago: string | null
           fecha_devengo: string
@@ -472,13 +584,13 @@ export type Database = {
           categoria_id: string
           cheque_banco?: string | null
           cheque_numero?: string | null
-          contraparte?: string | null
-          es_echeq?: boolean
           comprobante_url?: string | null
+          contraparte?: string | null
           created_at?: string
           created_by?: string | null
           descripcion?: string | null
           empresa_id: string
+          es_echeq?: boolean
           estado?: Database["public"]["Enums"]["estado_movimiento"]
           fecha_cobro_pago?: string | null
           fecha_devengo: string
@@ -500,13 +612,13 @@ export type Database = {
           categoria_id?: string
           cheque_banco?: string | null
           cheque_numero?: string | null
-          contraparte?: string | null
-          es_echeq?: boolean
           comprobante_url?: string | null
+          contraparte?: string | null
           created_at?: string
           created_by?: string | null
           descripcion?: string | null
           empresa_id?: string
+          es_echeq?: boolean
           estado?: Database["public"]["Enums"]["estado_movimiento"]
           fecha_cobro_pago?: string | null
           fecha_devengo?: string
@@ -632,7 +744,9 @@ export type Database = {
       }
       potrero: {
         Row: {
-          aprovechamiento: Database["public"]["Enums"]["aprovechamiento_forraje"] | null
+          aprovechamiento:
+            | Database["public"]["Enums"]["aprovechamiento_forraje"]
+            | null
           campo_id: string
           created_at: string
           cultivo: string | null
@@ -645,10 +759,13 @@ export type Database = {
           hectareas: number | null
           id: string
           nombre: string
+          poligono: Json | null
           variedad: string | null
         }
         Insert: {
-          aprovechamiento?: Database["public"]["Enums"]["aprovechamiento_forraje"] | null
+          aprovechamiento?:
+            | Database["public"]["Enums"]["aprovechamiento_forraje"]
+            | null
           campo_id: string
           created_at?: string
           cultivo?: string | null
@@ -661,10 +778,13 @@ export type Database = {
           hectareas?: number | null
           id?: string
           nombre: string
+          poligono?: Json | null
           variedad?: string | null
         }
         Update: {
-          aprovechamiento?: Database["public"]["Enums"]["aprovechamiento_forraje"] | null
+          aprovechamiento?:
+            | Database["public"]["Enums"]["aprovechamiento_forraje"]
+            | null
           campo_id?: string
           created_at?: string
           cultivo?: string | null
@@ -677,6 +797,7 @@ export type Database = {
           hectareas?: number | null
           id?: string
           nombre?: string
+          poligono?: Json | null
           variedad?: string | null
         }
         Relationships: [
@@ -965,7 +1086,6 @@ export type Database = {
         | "silo"
         | "fardo"
         | "diferido"
-      destino_campania: "venta" | "consumo"
       categoria_animal:
         | "vaca"
         | "vaquillona"
@@ -974,6 +1094,7 @@ export type Database = {
         | "ternera"
         | "toro"
         | "capon"
+      destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
       estado_animal: "activo" | "vendido" | "muerto"
       estado_ciclo_potrero:
@@ -1008,6 +1129,7 @@ export type Database = {
         | "cambio_caravana"
         | "baja"
         | "nota"
+      tipo_infraestructura: "molino" | "laguna" | "tranquera" | "manga"
       tipo_movimiento: "ingreso" | "gasto"
     }
     CompositeTypes: {
@@ -1138,8 +1260,13 @@ export const Constants = {
     Enums: {
       actividad_movimiento: ["cria", "invernada", "agricultura", "estructura"],
       agua_estado: ["llena", "normal", "baja", "seca"],
-      aprovechamiento_forraje: ["pastoreo", "rollo", "silo", "fardo", "diferido"],
-      destino_campania: ["venta", "consumo"],
+      aprovechamiento_forraje: [
+        "pastoreo",
+        "rollo",
+        "silo",
+        "fardo",
+        "diferido",
+      ],
       categoria_animal: [
         "vaca",
         "vaquillona",
@@ -1149,6 +1276,7 @@ export const Constants = {
         "toro",
         "capon",
       ],
+      destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
       estado_animal: ["activo", "vendido", "muerto"],
       estado_ciclo_potrero: [
@@ -1186,6 +1314,7 @@ export const Constants = {
         "baja",
         "nota",
       ],
+      tipo_infraestructura: ["molino", "laguna", "tranquera", "manga"],
       tipo_movimiento: ["ingreso", "gasto"],
     },
   },

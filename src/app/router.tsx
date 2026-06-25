@@ -14,6 +14,11 @@ const InicioPage = lazy(() =>
     default: m.InicioPage,
   })),
 )
+const InicioPageRedesign = lazy(() =>
+  import('@/features/inicio/inicio-page-redesign').then((m) => ({
+    default: m.InicioPageRedesign,
+  })),
+)
 const AnimalesPage = lazy(() =>
   import('@/features/hacienda/animales-page').then((m) => ({
     default: m.AnimalesPage,
@@ -73,6 +78,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <InicioPage /> },
+          { path: 'redesign', element: <InicioPageRedesign /> },
           { path: 'hacienda', element: <AnimalesPage /> },
           { path: 'hacienda/nuevo', element: <AltaAnimalPage /> },
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },

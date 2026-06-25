@@ -31,12 +31,28 @@ const IMAGERY =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const LABELS =
   'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+const ROADS =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
 const DEFAULT_CENTER: [number, number] = [-36.03, -59.1]
 const HALO = '#08140f'
 const LABEL_ZOOM = 15
 const OVERLAP_MIN_M2 = 50
 
 type Estado = 'normal' | 'hover' | 'selected'
+
+// ----- Orientación: referencias prácticas por lado del campo -----
+type Cardinal = 'N' | 'S' | 'E' | 'O'
+const CARDINALES: { dir: Cardinal; pos: string; arrow: string }[] = [
+  { dir: 'N', pos: 'left-1/2 top-2 -translate-x-1/2', arrow: '↑' },
+  { dir: 'S', pos: 'bottom-2 left-1/2 -translate-x-1/2', arrow: '↓' },
+  { dir: 'E', pos: 'right-2 top-1/2 -translate-y-1/2', arrow: '→' },
+  { dir: 'O', pos: 'left-2 top-1/2 -translate-y-1/2', arrow: '←' },
+]
+// Referencias de ubicación por campo (ciudades, rutas). Lo que sabemos hoy;
+// se completa con datos reales que dé el productor.
+const REFERENCIAS: Record<string, { dir: Cardinal; label: string }[]> = {
+  'la-portena': [{ dir: 'E', label: 'Las Flores' }],
+}
 
 const SVG_RECENTER =
   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>'
@@ -72,10 +88,13 @@ export function CampoMapaReal({
       zoomSnap: 0.5,
       zoomDelta: 0.5,
       wheelPxPerZoomLevel: 120,
+      maxBoundsViscosity: 0.9, // efecto imán: resiste y trae de vuelta al campo
     })
     mapRef.current = map
 
     L.tileLayer(IMAGERY, { maxZoom: 19, attribution: '© Esri' }).addTo(map)
+    // Caminos/rutas (overlay transparente) → referencia y orientación.
+    L.tileLayer(ROADS, { maxZoom: 19, opacity: 0.95 }).addTo(map)
     let labels: L.TileLayer | null = L.tileLayer(LABELS, {
       maxZoom: 19,
       opacity: 0.9,
@@ -97,12 +116,16 @@ export function CampoMapaReal({
     map.pm.setLang('es')
     map.pm.setGlobalOptions({
       snappable: true,
-      snapDistance: 20,
+      snapDistance: 30, // más tolerancia: el vértice se pega al potrero vecino
+      snapSegment: true, // engancha al borde, no solo a los vértices
       allowSelfIntersection: false,
       pathOptions: { color: hex, weight: 2.5, fillColor: hex, fillOpacity: 0.15 },
     })
 
-    const fixSize = () => map.invalidateSize()
+    const fixSize = () => {
+      map.invalidateSize()
+      lockToField()
+    }
     const t = setTimeout(fixSize, 60)
     const ro = new ResizeObserver(fixSize)
     ro.observe(host)
@@ -269,6 +292,7 @@ export function CampoMapaReal({
     // ---------- contorno del campo ----------
     let boundaryLayer: L.Polygon | null = null
     const boundary = getCampoBoundary(campo.id)
+
     if (boundary) {
       L.polygon(boundary, {
         color: HALO,
@@ -300,6 +324,22 @@ export function CampoMapaReal({
       return b
     }
 
+    // Mantiene el campo como referencia: imán al centro al desplazarse y se
+    // puede alejar el zoom para ver contexto (pero no irse a los vecinos).
+    function lockToField() {
+      const b = allBounds()
+      if (!b || !b.isValid()) return
+      map.setMaxBounds(b.pad(0.15))
+      const fitZoom = map.getBoundsZoom(b.pad(0.15), false)
+      // Permitir alejar unos niveles para contexto, sin caer a vista de país.
+      if (Number.isFinite(fitZoom)) map.setMinZoom(Math.max(9, fitZoom - 4))
+    }
+    // Imán: tras arrastrar (o alejar el zoom) vuelve a centrar el campo.
+    function magnetToCenter() {
+      const b = allBounds()
+      if (b && b.isValid()) map.panTo(b.getCenter(), { animate: true, duration: 0.4 })
+    }
+
     // ---------- vista ----------
     const vista = getCampoView(campo.id)
     if (vista) map.setView(vista.center, vista.zoom)
@@ -307,15 +347,22 @@ export function CampoMapaReal({
       const b = allBounds()
       if (b && b.isValid()) map.fitBounds(b, { padding: [30, 30] })
     }
+    lockToField()
+    let prevZoom = map.getZoom()
     map.on('moveend', () => {
       const c = map.getCenter()
       setCampoView(campo.id, { center: [c.lat, c.lng], zoom: map.getZoom() })
     })
+    // Imán al centro al soltar un arrastre.
+    map.on('dragend', magnetToCenter)
     map.on('zoomend', () => {
       const z = map.getZoom()
       layers.forEach(({ main }, numero) =>
         main.setTooltipContent(labelHtml(numero, z)),
       )
+      // Al alejar, recentrar el campo; al acercar, dejar inspeccionar libre.
+      if (z < prevZoom) magnetToCenter()
+      prevZoom = z
     })
 
     // ---------- controles ----------
@@ -415,12 +462,27 @@ export function CampoMapaReal({
     }
   }, [campo.id, campo.color.hex])
 
+  const refs = REFERENCIAS[campo.id] ?? []
+  const refDe = (d: Cardinal) => refs.find((r) => r.dir === d)?.label
+
   return (
     <div className="flex flex-col gap-3 lg:flex-row">
-      <div
-        ref={ref}
-        className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1"
-      />
+      <div className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1">
+        <div ref={ref} className="absolute inset-0" />
+        {/* Orientación: N/S/E/O (mapa norte-arriba) + referencia por lado */}
+        <div className="pointer-events-none absolute inset-0 z-[450]">
+          {CARDINALES.map(({ dir, pos, arrow }) => (
+            <div
+              key={dir}
+              className={`absolute ${pos} flex items-center gap-1 rounded-full border border-border bg-white/85 px-2 py-0.5 text-[10.5px] shadow-sm backdrop-blur`}
+            >
+              <span className="font-bold text-field-deep">{dir}</span>
+              {refDe(dir) && <span className="text-ink">{refDe(dir)}</span>}
+              <span className="text-muted-foreground">{arrow}</span>
+            </div>
+          ))}
+        </div>
+      </div>
       <PotreroSidePanel
         info={hover}
         campo={campo}

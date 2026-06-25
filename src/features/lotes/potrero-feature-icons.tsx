@@ -48,22 +48,45 @@ export function LagunaIcon({ className }: { className?: string }) {
   )
 }
 
-export function TranqueraIcon({ className }: { className?: string }) {
+const PLAN_INK = '#33433a'
+
+export function MangaIcon({ className }: { className?: string }) {
+  // Símbolo de planta (cenital), centrado para que se lea a cualquier rotación:
+  // corral de encierro → embudo → brete (rieles paralelos con travesaños).
   return (
-    <svg viewBox="0 0 40 40" className={className}>
-      <defs>
-        <linearGradient id="tq-wood" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#c89863" />
-          <stop offset="100%" stopColor="#875631" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="20" cy="35" rx="14" ry="2.4" fill="#0b1f17" opacity="0.16" />
-      <rect x="6" y="9" width="3.6" height="26" rx="1.6" fill="url(#tq-wood)" stroke="#6e451f" strokeWidth="0.4" />
-      <rect x="30.4" y="9" width="3.6" height="26" rx="1.6" fill="url(#tq-wood)" stroke="#6e451f" strokeWidth="0.4" />
-      <rect x="8" y="12.5" width="24" height="2.9" rx="1.4" fill="url(#tq-wood)" stroke="#6e451f" strokeWidth="0.3" />
-      <rect x="8" y="19.5" width="24" height="2.9" rx="1.4" fill="url(#tq-wood)" stroke="#6e451f" strokeWidth="0.3" />
-      <rect x="8" y="26.5" width="24" height="2.9" rx="1.4" fill="url(#tq-wood)" stroke="#6e451f" strokeWidth="0.3" />
-      <rect x="18.6" y="10" width="2.8" height="22" rx="1.4" fill="url(#tq-wood)" stroke="#6e451f" strokeWidth="0.3" transform="rotate(38 20 21)" />
+    <svg viewBox="0 0 40 40" className={className} fill="none" stroke={PLAN_INK}>
+      {/* corral de encierro */}
+      <rect x="5" y="13" width="11" height="14" rx="1.5" strokeWidth="1.3" />
+      {/* embudo: del corral al brete, angostándose */}
+      <path d="M16 14.6 L26 17.5" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M16 25.4 L26 22.5" strokeWidth="1.3" strokeLinecap="round" />
+      {/* brete: rieles paralelos */}
+      <line x1="26" y1="17.5" x2="35" y2="17.5" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="26" y1="22.5" x2="35" y2="22.5" strokeWidth="1.3" strokeLinecap="round" />
+      {/* travesaños */}
+      <line x1="29" y1="17.5" x2="29" y2="22.5" strokeWidth="0.85" />
+      <line x1="32" y1="17.5" x2="32" y2="22.5" strokeWidth="0.85" />
+    </svg>
+  )
+}
+
+export function TranqueraIcon({ className }: { className?: string }) {
+  // Tranquera real en estilo plano fino: dos postes + hoja con travesaños y
+  // riostra diagonal (portón de campo).
+  return (
+    <svg viewBox="0 0 40 40" className={className} fill="none" stroke={PLAN_INK} strokeLinecap="round">
+      {/* postes */}
+      <line x1="7" y1="11" x2="7" y2="29" strokeWidth="1.7" />
+      <line x1="33" y1="11" x2="33" y2="29" strokeWidth="1.7" />
+      {/* montantes de la hoja */}
+      <line x1="9.5" y1="14.5" x2="9.5" y2="25.5" strokeWidth="1.2" />
+      <line x1="30.5" y1="14.5" x2="30.5" y2="25.5" strokeWidth="1.2" />
+      {/* travesaños horizontales */}
+      <line x1="9.5" y1="14.5" x2="30.5" y2="14.5" strokeWidth="1.2" />
+      <line x1="9.5" y1="20" x2="30.5" y2="20" strokeWidth="1.2" />
+      <line x1="9.5" y1="25.5" x2="30.5" y2="25.5" strokeWidth="1.2" />
+      {/* riostra diagonal */}
+      <line x1="9.5" y1="25.5" x2="30.5" y2="14.5" strokeWidth="1" opacity="0.75" />
     </svg>
   )
 }

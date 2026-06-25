@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { Minus, Plus, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
 import {
   FEATURE_MAP,
   FEATURES,
@@ -35,12 +35,12 @@ import { cn } from '@/lib/utils'
 const W = 1000
 const H = 560
 const PAD = 26
-const INK = '#3a4a40'
 const M_PER_DEG = 111320
 
 type XY = [number, number]
 type Edge = [XY, XY]
 type Shape = { numero: string; points: string; cx: number; cy: number; small: boolean }
+type Sat = { href: string; matrix: string; w: number; h: number }
 
 function ptsStr(xy: XY[]) {
   return xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
@@ -69,10 +69,17 @@ function centroide(xy: XY[]) {
   }
   return { cx: cx / (6 * a), cy: cy / (6 * a), w, h }
 }
+// Color semántico del uso (canal distinto a la identidad del campo).
+const USO_COLOR: Record<Uso, string> = {
+  ganadero: '#2f7d3a',
+  agricola: '#bb7a12',
+  vacio: '#5d6770',
+}
 function fillOpFor(uso: Uso, sel: boolean, hov: boolean): number {
-  if (uso === 'vacio') return sel ? 0.28 : hov ? 0.2 : 0.1
-  if (uso === 'agricola') return sel ? 0.34 : hov ? 0.26 : 0.18
-  return sel ? 0.5 : hov ? 0.4 : 0.3
+  // Tintes livianos: dejan ver la foto satelital de fondo.
+  if (uso === 'vacio') return sel ? 0.18 : hov ? 0.12 : 0.04
+  if (uso === 'agricola') return sel ? 0.24 : hov ? 0.18 : 0.1
+  return sel ? 0.32 : hov ? 0.24 : 0.15
 }
 function pointInRing(lat: number, lng: number, ring: LatLng[]): boolean {
   let inside = false
@@ -112,7 +119,7 @@ export function CampoVista({
   const attrs = usePotrerosAttrs()
   const attrOf = (numero: string) => attrs[`${campo.id}::${numero}`] ?? {}
 
-  const { shapes, boundary, edges, placePoint, toLatLng, mToVB, vbToM } =
+  const { shapes, boundary, edges, placePoint, toLatLng, mToVB, vbToM, sat } =
     useMemo(() => {
       const geos = allGeo(campo.id)
       const bnd = getCampoBoundary(campo.id)
@@ -127,6 +134,7 @@ export function CampoVista({
           toLatLng: undefined as ((vx: number, vy: number) => LatLng) | undefined,
           mToVB: undefined as ((m: number) => number) | undefined,
           vbToM: undefined as ((d: number) => number) | undefined,
+          sat: null as Sat | null,
         }
 
       const lats = all.map((p) => p[0])
@@ -165,7 +173,9 @@ export function CampoVista({
       const maxY = Math.max(...ys)
       const w = Math.max(maxX - minX, 1e-9)
       const h = Math.max(maxY - minY, 1e-9)
-      const scale = Math.min((W - 2 * PAD) / w, (H - 2 * PAD) / h)
+      // FILL < 1 deja margen alrededor para ver los campos vecinos.
+      const FILL = 0.86
+      const scale = Math.min((W - 2 * PAD) / w, (H - 2 * PAD) / h) * FILL
       const offX = PAD + (W - 2 * PAD - w * scale) / 2
       const offY = PAD + (H - 2 * PAD - h * scale) / 2
       const fit = ([x, y]: XY): XY => [
@@ -195,6 +205,45 @@ export function CampoVista({
       const mToVB = (m: number) => (m / M_PER_DEG) * scale
       const vbToM = (d: number) => (d / scale) * M_PER_DEG
 
+      // ----- Imagen satelital encajada en la misma proyección (raw → SVG) -----
+      // El bbox se calcula desde las 4 ESQUINAS del lienzo (no desde el campo):
+      // así la foto cubre todo el cuadro aunque esté rotada → sin triángulos
+      // blancos. Incluye el entorno (campos vecinos) alrededor del campo.
+      const cornersLL = (
+        [
+          [0, 0],
+          [W, 0],
+          [W, H],
+          [0, H],
+        ] as XY[]
+      ).map(([x, y]) => toLatLng(x, y))
+      let minLat = Math.min(...cornersLL.map((p) => p[0]))
+      let maxLat = Math.max(...cornersLL.map((p) => p[0]))
+      let minLng = Math.min(...cornersLL.map((p) => p[1]))
+      let maxLng = Math.max(...cornersLL.map((p) => p[1]))
+      const mLat = (maxLat - minLat) * 0.14
+      const mLng = (maxLng - minLng) * 0.14
+      minLat -= mLat
+      maxLat += mLat
+      minLng -= mLng
+      maxLng += mLng
+      // El size DEBE tener el aspecto del bbox en GRADOS; si no, Esri ensancha
+      // el bbox para igualarlo y la foto queda corrida/a otra escala.
+      const LONG = 2048
+      const ar = (maxLng - minLng) / (maxLat - minLat)
+      const pxW = ar >= 1 ? LONG : Math.round(LONG * ar)
+      const pxH = ar >= 1 ? Math.round(LONG / ar) : LONG
+      const href =
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export' +
+        `?bbox=${minLng},${minLat},${maxLng},${maxLat}&bboxSR=4326&imageSR=4326` +
+        `&size=${pxW},${pxH}&format=jpg&f=image`
+      // Coloco la imagen (de pxW×pxH) mapeando sus esquinas a las 3 esquinas
+      // geográficas en coordenadas SVG normales (robusto, sin números diminutos).
+      const [p0x, p0y] = placePoint(maxLat, minLng) // NO (arriba-izq)
+      const [p1x, p1y] = placePoint(maxLat, maxLng) // NE (arriba-der)
+      const [p3x, p3y] = placePoint(minLat, minLng) // SO (abajo-izq)
+      const matrix = `matrix(${(p1x - p0x) / pxW} ${(p1y - p0y) / pxW} ${(p3x - p0x) / pxH} ${(p3y - p0y) / pxH} ${p0x} ${p0y})`
+      const sat: Sat = { href, matrix, w: pxW, h: pxH }
       return {
         shapes,
         boundary: bnd ? ptsStr(place(bnd)) : null,
@@ -203,6 +252,7 @@ export function CampoVista({
         toLatLng,
         mToVB,
         vbToM,
+        sat,
       }
     }, [campo.id])
 
@@ -213,14 +263,46 @@ export function CampoVista({
   markersRef.current = markers
   const [placing, setPlacing] = useState<FeatureId | null>(null)
   const [hoverMk, setHoverMk] = useState<string | null>(null)
-  const drag = useRef<{ id: string; mode: 'move' | 'resize' } | null>(null)
+  const [selMk, setSelMk] = useState<string | null>(null)
+  const drag = useRef<{
+    id: string
+    mode: 'move' | 'resize'
+    sx: number
+    sy: number
+    moved: boolean
+  } | null>(null)
+  // La captura de puntero hace que el "click" tras soltar caiga en el <svg>;
+  // este flag evita que ese click deseleccione el marcador recién tocado.
+  const suppressClick = useRef(false)
 
   const saveMarkers = (next: Marker[]) => {
     setMarkersState(next)
     setMarkers(campo.id, next)
   }
-  const removeMarker = (id: string) =>
+  const removeMarker = (id: string) => {
+    setSelMk((s) => (s === id ? null : s))
     saveMarkers(markersRef.current.filter((m) => m.id !== id))
+  }
+  // Agranda/achica el marcador seleccionado: laguna por área (m), resto por escala.
+  const bumpSize = (id: string, dir: 1 | -1) =>
+    saveMarkers(
+      markersRef.current.map((m) => {
+        if (m.id !== id) return m
+        if (m.type === 'laguna') {
+          const r = Math.min(600, Math.max(25, Math.round((m.radiusM ?? 160) + dir * 25)))
+          return { ...m, radiusM: r }
+        }
+        const s = Math.min(2.2, Math.max(0.5, +((m.scale ?? 1) + dir * 0.15).toFixed(2)))
+        return { ...m, scale: s }
+      }),
+    )
+  // Rota el marcador (manga/tranquera) en pasos de 15°.
+  const rotateMarker = (id: string, deltaDeg: number) =>
+    saveMarkers(
+      markersRef.current.map((m) =>
+        m.id === id ? { ...m, angleDeg: ((m.angleDeg ?? 0) + deltaDeg + 360) % 360 } : m,
+      ),
+    )
 
   function clientToVB(e: { clientX: number; clientY: number }): XY | null {
     const svg = svgRef.current
@@ -267,15 +349,42 @@ export function CampoVista({
       const [lat, lng] = toLatLng(vb[0], vb[1])
       saveMarkers([...markersRef.current, { id, type: placing, lat, lng }])
     }
+    // Coloca uno y sale del modo "Marcar" (evita seguir agregando con cada click).
+    setPlacing(null)
+    setSelMk(id)
+    setSelected(null)
+  }
+  function startDrag(e: React.PointerEvent, id: string, mode: 'move' | 'resize') {
+    e.stopPropagation()
+    // Seleccionar al instante (la barra de acción aparece apenas tocás el ícono).
+    setSelMk(id)
+    setSelected(null)
+    suppressClick.current = true
+    drag.current = { id, mode, sx: e.clientX, sy: e.clientY, moved: false }
+    svgRef.current?.setPointerCapture(e.pointerId)
   }
   function onPointerMove(e: React.PointerEvent) {
     const ds = drag.current
     if (!ds || !toLatLng) return
     const vb = clientToVB(e)
     if (!vb) return
+    // Umbral en píxeles de pantalla → distingue click de arrastre real.
+    if (!ds.moved && Math.hypot(e.clientX - ds.sx, e.clientY - ds.sy) < 6) return
+    ds.moved = true
     if (ds.mode === 'move') {
-      const [lat, lng] = toLatLng(vb[0], vb[1])
-      setMarkersState((prev) => prev.map((m) => (m.id === ds.id ? { ...m, lat, lng } : m)))
+      const mk = markersRef.current.find((x) => x.id === ds.id)
+      if (mk?.type === 'tranquera') {
+        const snap = snapToEdge(vb[0], vb[1])
+        const [lat, lng] = toLatLng(snap ? snap.x : vb[0], snap ? snap.y : vb[1])
+        setMarkersState((prev) =>
+          prev.map((m) =>
+            m.id === ds.id ? { ...m, lat, lng, angleDeg: snap ? snap.angle : 0 } : m,
+          ),
+        )
+      } else {
+        const [lat, lng] = toLatLng(vb[0], vb[1])
+        setMarkersState((prev) => prev.map((m) => (m.id === ds.id ? { ...m, lat, lng } : m)))
+      }
     } else if (placePoint && vbToM) {
       const m = markersRef.current.find((x) => x.id === ds.id)
       if (!m) return
@@ -285,10 +394,10 @@ export function CampoVista({
     }
   }
   function onPointerUp() {
-    if (drag.current) {
-      setMarkers(campo.id, markersRef.current)
-      drag.current = null
-    }
+    const ds = drag.current
+    if (!ds) return
+    if (ds.moved) setMarkers(campo.id, markersRef.current)
+    drag.current = null
   }
 
   const featsByPot = useMemo(() => {
@@ -342,33 +451,8 @@ export function CampoVista({
   const activeNum = selected ?? hoverNum
   const panelInfo = activeNum ? infoDe(activeNum) : null
   const vacio = shapes.length === 0 && !boundary
-  const RemoveBtn = ({ id }: { id: string }) => (
-    <button
-      type="button"
-      title="Quitar"
-      onClick={(e) => {
-        e.stopPropagation()
-        removeMarker(id)
-      }}
-      style={{
-        position: 'absolute',
-        top: '-2px',
-        right: '-2px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '16px',
-        height: '16px',
-        borderRadius: '50%',
-        background: INK,
-        color: '#fff',
-        border: 'none',
-        cursor: 'pointer',
-      }}
-    >
-      <X size={10} strokeWidth={3} />
-    </button>
-  )
+  const selMarker = markers.find((m) => m.id === selMk) ?? null
+  const selFeat = selMarker ? FEATURE_MAP[selMarker.type as FeatureId] : null
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row">
@@ -386,28 +470,41 @@ export function CampoVista({
             className="h-full w-full"
             style={{ cursor: placing ? 'crosshair' : undefined }}
             onClick={(e) => {
+              if (suppressClick.current) {
+                suppressClick.current = false
+                return
+              }
               if (placing) placeAt(e)
-              else setSelected(null)
+              else {
+                setSelected(null)
+                setSelMk(null)
+              }
             }}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
           >
-            <defs>
-              <pattern id="pat-agricola" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                <line x1="0" y1="0" x2="0" y2="9" stroke={campo.color.hex} strokeWidth="1" />
-              </pattern>
-              <radialGradient id="lg-water" cx="42%" cy="34%" r="72%">
-                <stop offset="0%" stopColor="#c4e9f6" />
-                <stop offset="55%" stopColor="#56a8cc" />
-                <stop offset="100%" stopColor="#1f6386" />
-              </radialGradient>
-              <filter id="lg-sh" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0b1f17" floodOpacity="0.2" />
-              </filter>
-            </defs>
+            {/* Fondo: si por algo la foto no llega a un borde, no se ve blanco */}
+            <rect x="0" y="0" width={W} height={H} fill="#3a4a3f" />
+
+            {/* Foto satelital plena: cubre todo el recuadro, sin atenuar */}
+            {sat && (
+              <image
+                href={sat.href}
+                x={0}
+                y={0}
+                width={sat.w}
+                height={sat.h}
+                transform={sat.matrix}
+                preserveAspectRatio="none"
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
 
             {boundary && (
-              <polygon points={boundary} fill="none" stroke={campo.color.hex} strokeWidth={2.5} strokeLinejoin="round" />
+              <>
+                <polygon points={boundary} fill="none" stroke="#0c1c14" strokeOpacity={0.55} strokeWidth={5} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
+                <polygon points={boundary} fill="none" stroke={campo.color.hex} strokeWidth={2.5} strokeLinejoin="round" />
+              </>
             )}
 
             {shapes.map((s) => {
@@ -415,13 +512,13 @@ export function CampoVista({
               const uso = info.uso
               const sel = selected === s.numero
               const hov = hoverNum === s.numero
-              const sub =
+              const usoText =
                 uso === 'ganadero'
-                  ? `${info.cabezas} cab`
+                  ? `Ganadero · ${info.cabezas ?? 0}`
                   : uso === 'agricola'
-                    ? (info.cultivo ?? null)
-                    : null
-              const conSub = !!sub && !s.small
+                    ? `Agrícola${info.cultivo ? ` · ${info.cultivo}` : ''}`
+                    : 'Vacío'
+              const showPill = !s.small
               return (
                 <g
                   key={s.numero}
@@ -436,6 +533,17 @@ export function CampoVista({
                     setSelected(s.numero)
                   }}
                 >
+                  {/* casing oscuro: hace legible el contorno sobre la foto */}
+                  <polygon
+                    points={s.points}
+                    fill="none"
+                    stroke="#0c1c14"
+                    strokeOpacity={0.55}
+                    strokeWidth={(sel || hov ? 2.5 : 1.5) + 2.4}
+                    strokeLinejoin="round"
+                    strokeDasharray={uso === 'vacio' ? '4 5' : undefined}
+                    style={{ pointerEvents: 'none' }}
+                  />
                   <polygon
                     points={s.points}
                     fill={campo.color.hex}
@@ -446,19 +554,54 @@ export function CampoVista({
                     strokeDasharray={uso === 'vacio' ? '4 5' : undefined}
                     style={{ transition: 'fill-opacity 0.12s' }}
                   />
-                  {uso === 'agricola' && (
-                    <polygon points={s.points} fill="url(#pat-agricola)" fillOpacity={0.5} style={{ pointerEvents: 'none' }} />
-                  )}
-                  <text x={s.cx} y={s.cy} textAnchor="middle" dominantBaseline="central" fontFamily="var(--font-heading, sans-serif)" fill={INK} style={{ pointerEvents: 'none' }}>
-                    <tspan x={s.cx} dy={conSub ? '-0.32em' : '0'} fontWeight={700} fontSize={s.small ? 15 : 22}>
+                  <text
+                    x={s.cx}
+                    y={s.cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontFamily="var(--font-heading, sans-serif)"
+                    fill="#fff"
+                    stroke="#0c1c14"
+                    strokeWidth={3.6}
+                    strokeLinejoin="round"
+                    paintOrder="stroke"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <tspan x={s.cx} dy={showPill ? '-0.6em' : '0'} fontWeight={700} fontSize={s.small ? 15 : 22}>
                       {s.numero}
                     </tspan>
-                    {conSub && (
-                      <tspan x={s.cx} dy="1.35em" fontWeight={600} fontSize={12} fill="#6b776f">
-                        {sub}
-                      </tspan>
-                    )}
                   </text>
+                  {showPill && (
+                    <foreignObject
+                      x={s.cx - 70}
+                      y={s.cy + 4}
+                      width={140}
+                      height={22}
+                      style={{ overflow: 'visible', pointerEvents: 'none' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '1.5px 8px',
+                            borderRadius: '999px',
+                            background: USO_COLOR[uso],
+                            color: '#fff',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            letterSpacing: '0.01em',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                            border: '1px solid rgba(255,255,255,0.25)',
+                            fontFamily: 'var(--font-body, sans-serif)',
+                          }}
+                        >
+                          {usoText}
+                        </span>
+                      </div>
+                    </foreignObject>
+                  )}
                 </g>
               )
             })}
@@ -472,69 +615,53 @@ export function CampoVista({
                   const [vx, vy] = placePoint(m.lat, m.lng)
                   const r = Math.max(10, mToVB(m.radiusM ?? 120))
                   const ry = r * 0.62
-                  const over = hoverMk === m.id
+                  const active = hoverMk === m.id || selMk === m.id
                   return (
                     <g
                       key={m.id}
                       onMouseEnter={() => setHoverMk(m.id)}
                       onMouseLeave={() => setHoverMk((h) => (h === m.id ? null : h))}
                     >
+                      {/* casing oscuro para legibilidad sobre cualquier fondo */}
                       <ellipse
                         cx={vx}
                         cy={vy}
                         rx={r}
                         ry={ry}
-                        fill="url(#lg-water)"
-                        fillOpacity={0.82}
-                        stroke="#1d5d7a"
-                        strokeWidth={1}
-                        filter="url(#lg-sh)"
+                        fill="#bfe3f2"
+                        fillOpacity={0.12}
+                        stroke="#0c2630"
+                        strokeOpacity={0.5}
+                        strokeWidth={(active ? 2.4 : 1.8) + 2}
                         style={{ cursor: 'move' }}
-                        onPointerDown={(e) => {
-                          e.stopPropagation()
-                          drag.current = { id: m.id, mode: 'move' }
-                          svgRef.current?.setPointerCapture(e.pointerId)
-                        }}
+                        onPointerDown={(e) => startDrag(e, m.id, 'move')}
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <path
-                        d={`M ${vx - r * 0.55} ${vy - ry * 0.35} q ${r * 0.55} ${-ry * 0.45} ${r * 1.1} 0`}
+                      {/* anillo que marca la laguna */}
+                      <ellipse
+                        cx={vx}
+                        cy={vy}
+                        rx={r}
+                        ry={ry}
                         fill="none"
-                        stroke="#e6f5fb"
-                        strokeWidth={1.2}
-                        strokeLinecap="round"
-                        opacity={0.7}
+                        stroke="#e2f4fc"
+                        strokeWidth={active ? 2.4 : 1.8}
+                        strokeDasharray="6 4"
                         style={{ pointerEvents: 'none' }}
                       />
-                      <circle
-                        cx={vx + r}
-                        cy={vy}
-                        r={6}
-                        fill="#fff"
-                        stroke="#1d5d7a"
-                        strokeWidth={1.5}
-                        style={{ cursor: 'ew-resize' }}
-                        onPointerDown={(e) => {
-                          e.stopPropagation()
-                          drag.current = { id: m.id, mode: 'resize' }
-                          svgRef.current?.setPointerCapture(e.pointerId)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      {over && (
+                      {active && (
                         <g
-                          style={{ cursor: 'pointer' }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeMarker(m.id)
-                          }}
+                          style={{ cursor: 'ew-resize' }}
+                          onPointerDown={(e) => startDrag(e, m.id, 'resize')}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <circle cx={vx} cy={vy - ry - 11} r={8} fill={INK} />
+                          <circle cx={vx + r} cy={vy} r={8} fill="#fff" stroke="#0f4763" strokeWidth={1.8} />
                           <path
-                            d={`M ${vx - 3} ${vy - ry - 14} l 6 6 M ${vx + 3} ${vy - ry - 14} l -6 6`}
-                            stroke="#fff"
-                            strokeWidth={1.6}
+                            d={`M ${vx + r - 3.4} ${vy} l 2 -2 M ${vx + r - 3.4} ${vy} l 2 2 M ${vx + r + 3.4} ${vy} l -2 -2 M ${vx + r + 3.4} ${vy} l -2 2`}
+                            stroke="#0f4763"
+                            strokeWidth={1.4}
                             strokeLinecap="round"
+                            fill="none"
                           />
                         </g>
                       )}
@@ -551,50 +678,76 @@ export function CampoVista({
                   if (!F) return null
                   const [vx, vy] = placePoint(m.lat, m.lng)
                   const Icon = F.Icon
-                  const isTr = m.type === 'tranquera'
+                  // Planos cenitales: centrados y rotables (tranquera, manga).
+                  // Molino: ícono parado, anclado al piso.
+                  const isFlat = m.type === 'tranquera' || m.type === 'manga'
+                  const active = hoverMk === m.id || selMk === m.id
+                  const scale = m.scale ?? 1
+                  const FO = 110
                   return (
-                    <foreignObject
-                      key={m.id}
-                      x={vx - 24}
-                      y={isTr ? vy - 24 : vy - 40}
-                      width={48}
-                      height={isTr ? 48 : 48}
-                      style={{ overflow: 'visible' }}
-                    >
-                      <div
-                        style={{ position: 'relative', width: '48px', height: '48px' }}
-                        onMouseEnter={() => setHoverMk(m.id)}
-                        onMouseLeave={() => setHoverMk((h) => (h === m.id ? null : h))}
+                    <g key={m.id}>
+                      <foreignObject
+                        x={vx - FO / 2}
+                        y={isFlat ? vy - FO / 2 : vy - FO + 8}
+                        width={FO}
+                        height={FO}
+                        style={{ overflow: 'visible' }}
                       >
                         <div
-                          title={F.label}
-                          onClick={(e) => e.stopPropagation()}
-                          style={
-                            isTr
-                              ? {
-                                  position: 'absolute',
-                                  inset: 0,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transform: `rotate(${m.angleDeg ?? 0}deg)`,
-                                  filter: 'drop-shadow(0 2px 2px rgba(11,31,23,0.22))',
-                                }
-                              : {
-                                  position: 'absolute',
-                                  bottom: '0',
-                                  left: '3px',
-                                  width: '42px',
-                                  height: '44px',
-                                  filter: 'drop-shadow(0 2px 2px rgba(11,31,23,0.22))',
-                                }
-                          }
+                          style={{
+                            position: 'relative',
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: isFlat ? 'center' : 'flex-end',
+                            justifyContent: 'center',
+                          }}
+                          onMouseEnter={() => setHoverMk(m.id)}
+                          onMouseLeave={() => setHoverMk((h) => (h === m.id ? null : h))}
                         >
-                          <Icon className={isTr ? 'size-[40px]' : 'size-[42px]'} />
+                          {/* chip claro detrás del ícono plano → contraste */}
+                          {isFlat && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                width: `${46 * scale}px`,
+                                height: `${46 * scale}px`,
+                                transform: 'translate(-50%,-50%)',
+                                borderRadius: '50%',
+                                background: 'rgba(248,250,246,0.9)',
+                                border: active
+                                  ? '1.5px solid #0f4763'
+                                  : '1px solid rgba(20,40,30,0.22)',
+                                boxShadow: '0 1px 3px rgba(11,31,23,0.4)',
+                              }}
+                            />
+                          )}
+                          <div
+                            title={F.label}
+                            onPointerDown={(e) => startDrag(e, m.id, 'move')}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: 'relative',
+                              lineHeight: 0,
+                              cursor: 'move',
+                              transform: isFlat
+                                ? `rotate(${m.angleDeg ?? 0}deg) scale(${scale})`
+                                : `scale(${scale})`,
+                              transformOrigin: isFlat ? 'center' : 'bottom center',
+                              filter: isFlat
+                                ? 'drop-shadow(0 1px 1px rgba(0,0,0,0.18))'
+                                : active
+                                  ? 'drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff) drop-shadow(0 2px 2px rgba(0,0,0,0.5))'
+                                  : 'drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff) drop-shadow(0 1px 2px rgba(0,0,0,0.42))',
+                            }}
+                          >
+                            <Icon className={isFlat ? 'size-[40px]' : 'size-[42px]'} />
+                          </div>
                         </div>
-                        {hoverMk === m.id && <RemoveBtn id={m.id} />}
-                      </div>
-                    </foreignObject>
+                      </foreignObject>
+                    </g>
                   )
                 })}
           </svg>
@@ -623,6 +776,73 @@ export function CampoVista({
                 {label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Barra de acción del marcador seleccionado (HTML → click 100% confiable) */}
+        {selMarker && selFeat && (
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-white/95 py-1.5 pl-3 pr-1.5 shadow-md backdrop-blur">
+            <selFeat.Icon className="size-4" />
+            <span className="text-[12px] font-medium text-ink">{selFeat.label}</span>
+            <span className="mx-0.5 h-4 w-px bg-border" />
+            <div className="flex items-center gap-1" title="Tamaño">
+              <button
+                type="button"
+                aria-label="Achicar"
+                onClick={() => bumpSize(selMarker.id, -1)}
+                className="flex size-6 items-center justify-center rounded-full border border-border text-ink transition-colors hover:bg-muted"
+              >
+                <Minus className="size-[13px]" strokeWidth={2.4} />
+              </button>
+              <button
+                type="button"
+                aria-label="Agrandar"
+                onClick={() => bumpSize(selMarker.id, 1)}
+                className="flex size-6 items-center justify-center rounded-full border border-border text-ink transition-colors hover:bg-muted"
+              >
+                <Plus className="size-[13px]" strokeWidth={2.4} />
+              </button>
+            </div>
+            {(selMarker.type === 'manga' || selMarker.type === 'tranquera') && (
+              <>
+                <span className="mx-0.5 h-4 w-px bg-border" />
+                <div className="flex items-center gap-1" title="Rotar">
+                  <button
+                    type="button"
+                    aria-label="Rotar a la izquierda"
+                    onClick={() => rotateMarker(selMarker.id, -15)}
+                    className="flex size-6 items-center justify-center rounded-full border border-border text-ink transition-colors hover:bg-muted"
+                  >
+                    <RotateCcw className="size-[13px]" strokeWidth={2.2} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Rotar a la derecha"
+                    onClick={() => rotateMarker(selMarker.id, 15)}
+                    className="flex size-6 items-center justify-center rounded-full border border-border text-ink transition-colors hover:bg-muted"
+                  >
+                    <RotateCw className="size-[13px]" strokeWidth={2.2} />
+                  </button>
+                </div>
+              </>
+            )}
+            <span className="mx-0.5 h-4 w-px bg-border" />
+            <button
+              type="button"
+              onClick={() => removeMarker(selMarker.id)}
+              className="flex items-center gap-1 rounded-full bg-[#b4232a] px-2.5 py-1 text-[12px] font-semibold text-white transition-colors hover:bg-[#9a1d23]"
+            >
+              <Trash2 className="size-[13px]" strokeWidth={2.4} />
+              Eliminar
+            </button>
+            <button
+              type="button"
+              title="Deseleccionar"
+              onClick={() => setSelMk(null)}
+              className="flex size-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink"
+            >
+              ✕
+            </button>
           </div>
         )}
       </div>

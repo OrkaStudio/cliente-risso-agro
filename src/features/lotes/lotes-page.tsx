@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Beef, Check, LayoutGrid, Layers, Map as MapIcon, Pencil } from 'lucide-react'
+import { Beef, LayoutGrid, Layers, Map as MapIcon } from 'lucide-react'
 import {
   colorCategoria,
   categoriaLabel,
@@ -20,11 +20,11 @@ import {
 } from '@/features/lotes/store'
 import { potreros as potrerosSeed, type Campo } from '@/features/lotes/mock'
 import { CrearLoteDialog } from '@/features/lotes/lotes-dialogs'
+import { ImportarDibujosButton } from '@/features/campos/importar-dibujos-button'
 import { CampoMapaReal } from '@/features/lotes/campo-mapa-real'
 import { CampoVista } from '@/features/lotes/campo-vista'
 import { CatastroDialog } from '@/features/lotes/catastro-dialog'
 import { tieneGeometria } from '@/features/lotes/geo'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 type Vista = 'mapa' | 'lista'
@@ -226,6 +226,7 @@ function MapaVista({ lotes }: { lotes: Lote[] }) {
   const campo = campos.find((c) => c.id === campoId) ?? campos[0]
   const potreros = potrerosSeed.filter((p) => p.campoId === campo.id)
   const delCampo = lotes.filter((l) => l.campoId === campo.id)
+  const cabezasCampo = delCampo.reduce((s, l) => s + totalLote(l), 0)
 
   return (
     <div className="flex flex-col gap-4">
@@ -262,23 +263,43 @@ function MapaVista({ lotes }: { lotes: Lote[] }) {
       </div>
 
       <section className="rounded-[14px] border border-border bg-card p-6 shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
-        <CampoHeader campo={campo} lotes={lotes} />
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <span
+                className="inline-flex size-9 items-center justify-center rounded-xl font-heading text-[16px] font-bold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
+                style={{ background: campo.color.hex }}
+                title={`Color ${campo.color.nombre}`}
+              >
+                {campo.color.letra}
+              </span>
+              <h3 className="font-heading text-[26px] font-bold tracking-[-0.02em] text-ink">
+                {campo.nombre}
+              </h3>
+            </div>
+            <VistaCampoToggle editar={editar} setEditar={setEditar} />
+          </div>
+          <span className="tnum text-[13px] text-faint">
+            {potreros.length} potreros · {delCampo.length}{' '}
+            {delCampo.length === 1 ? 'lote' : 'lotes'} · {cabezasCampo} cab ·{' '}
+            {campo.hectareas} ha
+          </span>
+        </div>
+
+        {editar && (
+          <div className="mb-3 flex flex-wrap items-center gap-2.5">
+            <CatastroDialog
+              campoId={campo.id}
+              onAplicado={() => setVer((v) => v + 1)}
+            />
+            <span className="text-[12.5px] text-muted-foreground">
+              Traé el contorno del catastro y dibujá los potreros adentro.
+            </span>
+          </div>
+        )}
 
         {editar ? (
           <>
-            <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <CatastroDialog
-                campoId={campo.id}
-                onAplicado={() => setVer((v) => v + 1)}
-              />
-              <Button size="sm" onClick={() => setEditar(false)}>
-                <Check className="size-4" />
-                Listo
-              </Button>
-              <span className="text-[12.5px] text-muted-foreground">
-                Traé el contorno del catastro y dibujá los potreros adentro.
-              </span>
-            </div>
             <CampoMapaReal
               key={`${campo.id}-${ver}`}
               campo={campo}
@@ -288,30 +309,52 @@ function MapaVista({ lotes }: { lotes: Lote[] }) {
             <p className="mt-3 text-[12.5px] text-muted-foreground">
               Usá la herramienta de polígono (arriba a la izquierda) para{' '}
               <b>dibujar cada potrero</b> y ponele su número. Cuando termines,
-              tocá <b>Listo</b> para ver el campo limpio.
+              volvé a <b>Vista por potrero</b>.
             </p>
           </>
         ) : (
-          <>
-            <div className="mb-3 flex flex-wrap items-center justify-end gap-2.5">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEditar(true)}
-              >
-                <Pencil className="size-4" />
-                Editar potreros
-              </Button>
-            </div>
-            <CampoVista
-              key={campo.id}
-              campo={campo}
-              lotes={delCampo}
-              onVerLote={(id) => navigate(`/potreros/${id}`)}
-            />
-          </>
+          <CampoVista
+            key={campo.id}
+            campo={campo}
+            lotes={delCampo}
+            onVerLote={(id) => navigate(`/potreros/${id}`)}
+          />
         )}
       </section>
+    </div>
+  )
+}
+
+/* Toggle de vista del campo: plano por potrero ↔ satelital (editar) */
+function VistaCampoToggle({
+  editar,
+  setEditar,
+}: {
+  editar: boolean
+  setEditar: (v: boolean) => void
+}) {
+  const items: [boolean, string, typeof MapIcon][] = [
+    [false, 'Vista por potrero', LayoutGrid],
+    [true, 'Vista satelital', MapIcon],
+  ]
+  return (
+    <div className="inline-flex rounded-xl border border-border bg-card p-1">
+      {items.map(([val, label, Icon]) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => setEditar(val)}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
+            editar === val
+              ? 'bg-field-soft text-field-deep'
+              : 'text-muted-foreground hover:text-ink',
+          )}
+        >
+          <Icon className="size-4" />
+          {label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -370,6 +413,7 @@ export function LotesPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <ImportarDibujosButton />
           <VistaToggle vista={vista} setVista={setVista} />
           <CrearLoteDialog />
         </div>
