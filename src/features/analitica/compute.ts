@@ -1,4 +1,4 @@
-import type { MovimientoConDetalle } from '@/features/analitica/api'
+import type { MovimientoConDetalle, Pendiente } from '@/features/analitica/api'
 import type { Database } from '@/lib/supabase/types'
 
 type Actividad = Database['public']['Enums']['actividad_movimiento']
@@ -193,6 +193,39 @@ const ORDEN_ACT: (Actividad | 'sin')[] = [
   'estructura',
   'sin',
 ]
+
+// ===== Proyección de flujo de fondos =====
+// "Lo que va a entrar y salir" (no lo que ya pasó): cobros y pagos PENDIENTES
+// agrupados por mes de vencimiento, con saldo acumulado. Las cuotas de las
+// series recurrentes ya están materializadas como pendientes → entran solas.
+
+export type LineaFlujo = {
+  mes: string // YYYY-MM
+  entra: number // cobros pendientes del mes
+  sale: number // pagos pendientes del mes
+  neto: number // entra − sale
+  acumulado: number // saldo proyectado acumulado
+}
+
+export function proyeccionFlujo(pendientes: Pendiente[]): LineaFlujo[] {
+  const map = new Map<string, { entra: number; sale: number }>()
+  for (const p of pendientes) {
+    if (!p.fechaVencimiento || p.monto == null) continue
+    const mes = p.fechaVencimiento.slice(0, 7)
+    const cur = map.get(mes) ?? { entra: 0, sale: 0 }
+    if (p.tipo === 'ingreso') cur.entra += p.monto
+    else cur.sale += p.monto
+    map.set(mes, cur)
+  }
+  let acumulado = 0
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([mes, v]) => {
+      const neto = v.entra - v.sale
+      acumulado += neto
+      return { mes, entra: v.entra, sale: v.sale, neto, acumulado }
+    })
+}
 
 export function porActividad(
   movs: MovimientoConDetalle[],

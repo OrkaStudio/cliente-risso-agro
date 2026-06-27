@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { MapPin } from 'lucide-react'
 import { buscarParcelaRural, type ParcelaCatastro } from '@/features/lotes/catastro'
-import { deleteCampoView, setCampoBoundary } from '@/features/lotes/geo'
+import type { LatLng } from '@/features/campos/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,12 +19,13 @@ import {
  * campo. `onAplicado` avisa para refrescar el mapa.
  */
 export function CatastroDialog({
-  campoId,
+  onAplicar,
   onAplicado,
   triggerLabel = 'Traer del catastro',
   triggerVariant = 'outline',
 }: {
-  campoId: string
+  /** Persiste el contorno traído (a la base real). */
+  onAplicar: (anillo: LatLng[]) => void
   onAplicado: () => void
   triggerLabel?: string
   triggerVariant?: 'default' | 'outline'
@@ -68,8 +69,7 @@ export function CatastroDialog({
   }
 
   function aplicar(p: ParcelaCatastro) {
-    setCampoBoundary(campoId, p.anillo)
-    deleteCampoView(campoId) // que el mapa re-encuadre a la parcela traída
+    onAplicar(p.anillo as LatLng[])
     toast.success(`Contorno traído (${p.areaHa} ha)`)
     setOpen(false)
     reset()

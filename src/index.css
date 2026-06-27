@@ -223,6 +223,19 @@
   }
 }
 
+/* Barra de carga indeterminada (placeholder mientras carga el satélite). */
+@keyframes loadbar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+.animate-loadbar {
+  animation: loadbar 1.1s ease-in-out infinite;
+}
+
 /* ===== Mapa de potreros (Leaflet) ===== */
 
 /* Etiqueta de potrero: "pill" oscura translúcida, legible sobre satélite. */

@@ -49,10 +49,25 @@ export function useCrearPotrero(campoId: string) {
     mutationFn: api.crearPotrero,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['potreros-campo', campoId] })
+      qc.invalidateQueries({ queryKey: ['campo-mapa', campoId] })
       qc.invalidateQueries({ queryKey: ['campos'] })
       qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
       qc.invalidateQueries({ queryKey: ['potreros'] }) // dropdown del alta de animal
       qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
+    },
+  })
+}
+
+export function useActualizarPotreroMapa(campoId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.actualizarPotreroMapa,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['campo-mapa', campoId] })
+      qc.invalidateQueries({ queryKey: ['potreros-campo', campoId] })
+      qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
+      qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
+      qc.invalidateQueries({ queryKey: ['potrero-detalle'] })
     },
   })
 }
@@ -63,6 +78,7 @@ export function useActualizarPotrero(campoId: string) {
     mutationFn: api.actualizarPotrero,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['potreros-campo', campoId] })
+      qc.invalidateQueries({ queryKey: ['campo-mapa', campoId] })
       qc.invalidateQueries({ queryKey: ['potreros'] })
       qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
       qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
@@ -81,6 +97,7 @@ export function useSetCampoContorno(campoId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
       qc.invalidateQueries({ queryKey: ['campo', campoId] })
+      qc.invalidateQueries({ queryKey: ['campo-mapa', campoId] })
     },
   })
 }
@@ -92,6 +109,7 @@ export function useSetPotreroPoligono(campoId: string) {
       api.setPotreroPoligono(vars.potreroId, vars.poligono),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['potreros-campo', campoId] })
+      qc.invalidateQueries({ queryKey: ['campo-mapa', campoId] })
       qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
     },
   })

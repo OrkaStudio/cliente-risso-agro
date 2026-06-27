@@ -2,7 +2,7 @@
 // No es un módulo de componentes para Fast Refresh → desactivamos la regla acá.
 /* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { LoginPage } from '@/features/auth/login-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { AppShell } from '@/app/app-shell'
@@ -12,11 +12,6 @@ import { AppShell } from '@/app/app-shell'
 const InicioPage = lazy(() =>
   import('@/features/inicio/inicio-page').then((m) => ({
     default: m.InicioPage,
-  })),
-)
-const InicioPageRedesign = lazy(() =>
-  import('@/features/inicio/inicio-page-redesign').then((m) => ({
-    default: m.InicioPageRedesign,
   })),
 )
 const AnimalesPage = lazy(() =>
@@ -41,9 +36,6 @@ const LoteFichaPage = lazy(() =>
   import('@/features/lotes/lote-ficha-page').then((m) => ({
     default: m.LoteFichaPage,
   })),
-)
-const CamposPage = lazy(() =>
-  import('@/features/campos/campos-page').then((m) => ({ default: m.CamposPage })),
 )
 const CampoDetailPage = lazy(() =>
   import('@/features/campos/campo-detail-page').then((m) => ({
@@ -78,14 +70,14 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <InicioPage /> },
-          { path: 'redesign', element: <InicioPageRedesign /> },
           { path: 'hacienda', element: <AnimalesPage /> },
           { path: 'hacienda/nuevo', element: <AltaAnimalPage /> },
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },
-          { path: 'potreros', element: <LotesPage /> },
-          { path: 'potreros/:id', element: <LoteFichaPage /> },
-          { path: 'campos', element: <CamposPage /> },
+          { path: 'campos', element: <LotesPage /> },
           { path: 'campos/:id', element: <CampoDetailPage /> },
+          { path: 'potreros/:id', element: <LoteFichaPage /> },
+          // Compat: la sección Potreros se unificó dentro de Campos.
+          { path: 'potreros', element: <Navigate to="/campos" replace /> },
           { path: 'potrero/:id', element: <PotreroDetailPage /> },
           { path: 'analitica', element: <AnaliticaPage /> },
           { path: 'cheques', element: <ChequesPage /> },

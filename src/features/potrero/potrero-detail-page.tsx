@@ -357,6 +357,7 @@ export function PotreroDetailPage() {
                 fecha_cosecha_estimada: data.fechaCosechaEstimada,
                 destino: data.destino,
                 aprovechamiento: data.aprovechamiento,
+                poligono: null,
               }}
               triggerLabel="Editar potrero"
               triggerVariant="outline"

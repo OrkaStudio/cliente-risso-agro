@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import '@geoman-io/leaflet-geoman-free'
 import 'leaflet/dist/leaflet.css'
@@ -8,23 +7,13 @@ import { toast } from 'sonner'
 import intersect from '@turf/intersect'
 import area from '@turf/area'
 import { featureCollection, polygon as turfPolygon } from '@turf/helpers'
-import { codigoLote, totalLote, type Lote } from '@/features/lotes/store'
-import { propositoLabel } from '@/features/lotes/domain'
-import {
-  allGeo,
-  deleteGeo,
-  getCampoBoundary,
-  getCampoView,
-  setCampoView,
-  setGeo,
-  type LatLng,
-} from '@/features/lotes/geo'
-import type { Campo, Potrero } from '@/features/lotes/mock'
+import { usoDeEstado, type CampoVM } from '@/features/campos/use-campo-mapa'
+import type { LatLng, PotreroMapa } from '@/features/campos/api'
+import { getCampoView, setCampoView } from '@/features/lotes/geo'
 import {
   PotreroSidePanel,
   USO,
   type PotreroInfo,
-  type Uso,
 } from '@/features/lotes/potrero-side-panel'
 
 const IMAGERY =
@@ -49,9 +38,9 @@ const CARDINALES: { dir: Cardinal; pos: string; arrow: string }[] = [
   { dir: 'O', pos: 'left-2 top-1/2 -translate-y-1/2', arrow: '←' },
 ]
 // Referencias de ubicación por campo (ciudades, rutas). Lo que sabemos hoy;
-// se completa con datos reales que dé el productor.
+// se completa con datos reales que dé el productor. Se busca por nombre.
 const REFERENCIAS: Record<string, { dir: Cardinal; label: string }[]> = {
-  'la-portena': [{ dir: 'E', label: 'Las Flores' }],
+  'La Porteña': [{ dir: 'E', label: 'Las Flores' }],
 }
 
 const SVG_RECENTER =
@@ -61,21 +50,37 @@ const SVG_FULL =
 
 export function CampoMapaReal({
   campo,
+  contorno,
   potreros,
-  lotes,
+  onDibujarPotrero,
+  onSetPoligono,
+  onVerPotrero,
 }: {
-  campo: Campo
-  potreros: Potrero[]
-  lotes: Lote[]
+  campo: CampoVM
+  contorno: LatLng[] | null
+  potreros: PotreroMapa[]
+  /** Crea (o reusa por nombre) el potrero y le guarda el polígono. Devuelve su id. */
+  onDibujarPotrero: (nombre: string, poligono: LatLng[]) => Promise<string>
+  /** Reemplaza/limpia el polígono de un potrero existente. */
+  onSetPoligono: (potreroId: string, poligono: LatLng[] | null) => void
+  onVerPotrero: (potreroId: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
-  const navigate = useNavigate()
-  const lotesRef = useRef(lotes)
-  lotesRef.current = lotes
+  const [hover, setHover] = useState<PotreroInfo | null>(null)
+
+  // Refs a los datos/callbacks para que el efecto (que corre una vez por campo)
+  // siempre lea lo último sin re-montar el mapa.
   const potrerosRef = useRef(potreros)
   potrerosRef.current = potreros
-  const [hover, setHover] = useState<PotreroInfo | null>(null)
+  const contornoRef = useRef(contorno)
+  contornoRef.current = contorno
+  const dibujarRef = useRef(onDibujarPotrero)
+  dibujarRef.current = onDibujarPotrero
+  const setPoligonoRef = useRef(onSetPoligono)
+  setPoligonoRef.current = onSetPoligono
+  const verRef = useRef(onVerPotrero)
+  verRef.current = onVerPotrero
 
   useEffect(() => {
     if (!ref.current || mapRef.current) return
@@ -148,13 +153,13 @@ export function CampoMapaReal({
     function overlapsExisting(pts: LatLng[], except?: string): string | null {
       const a = toTurf(pts)
       if (!a) return null
-      for (const [numero, entry] of layers) {
-        if (numero === except) continue
+      for (const [id, entry] of layers) {
+        if (id === except) continue
         const b = toTurf(entry.pts)
         if (!b) continue
         try {
           const inter = intersect(featureCollection([a, b]))
-          if (inter && area(inter) > OVERLAP_MIN_M2) return numero
+          if (inter && area(inter) > OVERLAP_MIN_M2) return entry.nombre
         } catch {
           /* geometría inválida */
         }
@@ -163,17 +168,13 @@ export function CampoMapaReal({
     }
 
     // ---------- uso + estilo ----------
-    function ocupanDe(numero: string): Lote[] {
-      return lotesRef.current.filter((lo) => lo.potreros.includes(numero))
+    const datoDe = (id: string) => potrerosRef.current.find((p) => p.id === id)
+    function usoDe(id: string) {
+      const p = datoDe(id)
+      return p ? usoDeEstado(p.estadoCiclo) : 'vacio'
     }
-    function usoDe(numero: string): Uso {
-      if (ocupanDe(numero).length) return 'ganadero'
-      if (potrerosRef.current.find((p) => p.numero === numero)?.cultivo)
-        return 'agricola'
-      return 'vacio'
-    }
-    function styleMain(numero: string, estado: Estado): L.PathOptions {
-      const uso = usoDe(numero)
+    function styleMain(id: string, estado: Estado): L.PathOptions {
+      const uso = usoDe(id)
       const base = uso === 'vacio' ? 0.05 : 0.2
       const fillOpacity =
         estado === 'selected'
@@ -191,49 +192,45 @@ export function CampoMapaReal({
         dashArray: uso === 'vacio' ? '3 6' : undefined,
       }
     }
-    function labelHtml(numero: string, zoom: number): string {
-      const lote = ocupanDe(numero)[0]
-      if (zoom >= LABEL_ZOOM && lote) {
-        return `<span class="pl-num">${numero}</span><span class="pl-sub">${codigoLote(
-          lote,
-        )} · ${totalLote(lote)}</span>`
+    function labelHtml(id: string, zoom: number): string {
+      const p = datoDe(id)
+      const nombre = p?.nombre ?? '—'
+      if (zoom >= LABEL_ZOOM && p && p.cabezas > 0) {
+        return `<span class="pl-num">${nombre}</span><span class="pl-sub">${p.cabezas} cab</span>`
       }
-      return `<span class="pl-num">${numero}</span>`
+      return `<span class="pl-num">${nombre}</span>`
     }
 
     // ---------- hover → panel lateral ----------
-    function openHover(numero: string) {
-      const lote = ocupanDe(numero)[0]
-      const p = potrerosRef.current.find((pp) => pp.numero === numero)
+    function openHover(id: string) {
+      const p = datoDe(id)
       setHover({
-        numero,
-        uso: usoDe(numero),
-        ha: p?.hectareas,
-        especie: lote?.especie,
-        proposito: lote ? propositoLabel[lote.proposito] : undefined,
-        loteCodigo: lote ? codigoLote(lote) : undefined,
-        cabezas: lote ? totalLote(lote) : undefined,
-        loteId: lote?.id,
-        cultivo: p?.cultivo,
+        potreroId: id,
+        numero: p?.nombre ?? '—',
+        uso: p ? usoDeEstado(p.estadoCiclo) : 'vacio',
+        estadoCiclo: p?.estadoCiclo ?? 'descanso',
+        ha: p?.hectareas ?? null,
+        cabezas: p?.cabezas ?? 0,
+        cultivo: p?.cultivo ?? null,
       })
     }
 
     // ---------- potreros ----------
     const layers = new Map<
       string,
-      { halo: L.Polygon; main: L.Polygon; pts: LatLng[] }
+      { halo: L.Polygon; main: L.Polygon; pts: LatLng[]; nombre: string }
     >()
     let selected: string | null = null
 
-    function selectPotrero(numero: string) {
+    function selectPotrero(id: string) {
       if (selected && layers.has(selected)) {
         layers.get(selected)!.main.setStyle(styleMain(selected, 'normal'))
       }
-      selected = numero
-      layers.get(numero)?.main.setStyle(styleMain(numero, 'selected'))
+      selected = id
+      layers.get(id)?.main.setStyle(styleMain(id, 'selected'))
     }
 
-    function addPotrero(numero: string, pts: LatLng[]) {
+    function addPotrero(id: string, nombre: string, pts: LatLng[]) {
       const halo = L.polygon(pts, {
         color: HALO,
         weight: 5.5,
@@ -242,24 +239,24 @@ export function CampoMapaReal({
         interactive: false,
         lineJoin: 'round',
       }).addTo(map)
-      const main = L.polygon(pts, styleMain(numero, 'normal')).addTo(map)
-      main.bindTooltip(labelHtml(numero, map.getZoom()), {
+      const main = L.polygon(pts, styleMain(id, 'normal')).addTo(map)
+      main.bindTooltip(labelHtml(id, map.getZoom()), {
         permanent: true,
         direction: 'center',
         className: 'potrero-label',
         interactive: false,
       })
-      const entry = { halo, main, pts }
+      const entry = { halo, main, pts, nombre }
       main.on('mouseover', () => {
-        if (selected !== numero) main.setStyle(styleMain(numero, 'hover'))
-        openHover(numero)
+        if (selected !== id) main.setStyle(styleMain(id, 'hover'))
+        openHover(id)
       })
       main.on('mouseout', () => {
-        if (selected !== numero) main.setStyle(styleMain(numero, 'normal'))
+        if (selected !== id) main.setStyle(styleMain(id, 'normal'))
       })
       main.on('click', () => {
-        selectPotrero(numero)
-        openHover(numero)
+        selectPotrero(id)
+        openHover(id)
         map.flyToBounds(main.getBounds(), {
           padding: [48, 48],
           maxZoom: 16,
@@ -268,7 +265,7 @@ export function CampoMapaReal({
       })
       main.on('pm:edit', () => {
         const np = ringOf(main)
-        const clash = overlapsExisting(np, numero)
+        const clash = overlapsExisting(np, id)
         if (clash) {
           main.setLatLngs(entry.pts as L.LatLngExpression[])
           halo.setLatLngs(main.getLatLngs())
@@ -276,22 +273,25 @@ export function CampoMapaReal({
           return
         }
         entry.pts = np
-        setGeo(campo.id, numero, np)
+        setPoligonoRef.current(id, np)
         halo.setLatLngs(main.getLatLngs())
       })
       main.on('pm:remove', () => {
-        deleteGeo(campo.id, numero)
+        // Borrar el dibujo NO borra el potrero (eso está diferido): solo limpia
+        // su geometría para poder volver a trazarlo.
+        setPoligonoRef.current(id, null)
         map.removeLayer(halo)
-        layers.delete(numero)
-        if (selected === numero) selected = null
+        layers.delete(id)
+        if (selected === id) selected = null
+        toast.info('Se quitó el dibujo del potrero (el potrero sigue existiendo)')
       })
-      layers.set(numero, entry)
+      layers.set(id, entry)
       return main
     }
 
     // ---------- contorno del campo ----------
     let boundaryLayer: L.Polygon | null = null
-    const boundary = getCampoBoundary(campo.id)
+    const boundary = contornoRef.current
 
     if (boundary) {
       L.polygon(boundary, {
@@ -310,8 +310,9 @@ export function CampoMapaReal({
       }).addTo(map)
     }
 
-    for (const [numero, pts] of Object.entries(allGeo(campo.id))) {
-      addPotrero(numero, pts as LatLng[])
+    for (const p of potrerosRef.current) {
+      if (p.poligono && p.poligono.length > 0)
+        addPotrero(p.id, p.nombre, p.poligono)
     }
 
     function allBounds(): L.LatLngBounds | null {
@@ -357,8 +358,8 @@ export function CampoMapaReal({
     map.on('dragend', magnetToCenter)
     map.on('zoomend', () => {
       const z = map.getZoom()
-      layers.forEach(({ main }, numero) =>
-        main.setTooltipContent(labelHtml(numero, z)),
+      layers.forEach(({ main }, id) =>
+        main.setTooltipContent(labelHtml(id, z)),
       )
       // Al alejar, recentrar el campo; al acercar, dejar inspeccionar libre.
       if (z < prevZoom) magnetToCenter()
@@ -418,26 +419,36 @@ export function CampoMapaReal({
         `<div class="pi-row"><input class="pi-field" placeholder="9 · 1A" /><button class="pi-ok" type="button">Guardar</button></div>`
       L.DomEvent.disableClickPropagation(box)
       const field = box.querySelector('.pi-field') as HTMLInputElement
+      const okBtn = box.querySelector('.pi-ok') as HTMLButtonElement
       const popup = L.popup({ className: 'potrero-popup', closeButton: true })
         .setLatLng(raw.getBounds().getCenter())
         .setContent(box)
         .openOn(map)
       setTimeout(() => field.focus(), 60)
       let saved = false
-      const commit = () => {
+      const commit = async () => {
         const numero = field.value.trim()
-        if (!numero) return
+        if (!numero || saved) return
         saved = true
-        setGeo(campo.id, numero, pts)
-        map.removeLayer(raw)
-        map.closePopup(popup)
-        addPotrero(numero, pts)
-        selectPotrero(numero)
-        openHover(numero)
+        okBtn.disabled = true
+        okBtn.textContent = 'Guardando…'
+        try {
+          const id = await dibujarRef.current(numero, pts)
+          map.removeLayer(raw)
+          map.closePopup(popup)
+          addPotrero(id, numero, pts)
+          selectPotrero(id)
+          openHover(id)
+        } catch (err) {
+          saved = false
+          okBtn.disabled = false
+          okBtn.textContent = 'Guardar'
+          toast.error(`No se pudo guardar: ${(err as Error).message}`)
+        }
       }
-      box.querySelector('.pi-ok')!.addEventListener('click', commit)
+      okBtn.addEventListener('click', () => void commit())
       field.addEventListener('keydown', (ev) => {
-        if ((ev as KeyboardEvent).key === 'Enter') commit()
+        if ((ev as KeyboardEvent).key === 'Enter') void commit()
       })
       map.on('popupclose', function onClose(ev: L.PopupEvent) {
         if (ev.popup !== popup) return
@@ -462,7 +473,7 @@ export function CampoMapaReal({
     }
   }, [campo.id, campo.color.hex])
 
-  const refs = REFERENCIAS[campo.id] ?? []
+  const refs = REFERENCIAS[campo.nombre] ?? []
   const refDe = (d: Cardinal) => refs.find((r) => r.dir === d)?.label
 
   return (
@@ -486,7 +497,7 @@ export function CampoMapaReal({
       <PotreroSidePanel
         info={hover}
         campo={campo}
-        onVerLote={(id) => navigate(`/potreros/${id}`)}
+        onVerPotrero={(id) => verRef.current(id)}
       />
     </div>
   )

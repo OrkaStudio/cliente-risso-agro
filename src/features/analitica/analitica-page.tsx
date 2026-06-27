@@ -1,4 +1,5 @@
 import { useMemo, useState, type ComponentType } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { useCampos, useCamposConPotreros } from '@/features/campos/hooks'
+import { useCampos } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
   actividadLabel,
@@ -22,14 +23,13 @@ import {
   ingresosPorCategoria,
   porActividad,
   porCampo,
-  porPotrero,
+  proyeccionFlujo,
   resultadoPorMes,
   resumen,
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
 import { CargarRecurrenteDialog } from '@/features/analitica/cargar-recurrente-dialog'
-import { RentabilidadPotreros } from '@/features/analitica/rentabilidad-potreros'
 import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
 import { Panel } from '@/components/panel'
 import { Dropdown } from '@/components/ui/dropdown'
@@ -41,6 +41,12 @@ const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'O
 function mesCorto(yyyymm: string): string {
   const m = Number(yyyymm.slice(5, 7))
   return MESES[m - 1] ?? yyyymm
+}
+
+/** "Mar 2026" — para la proyección, que puede cruzar años. */
+function mesLargo(yyyymm: string): string {
+  const m = Number(yyyymm.slice(5, 7))
+  return `${MESES[m - 1] ?? yyyymm} ${yyyymm.slice(0, 4)}`
 }
 
 function fmtCompact(n: number): string {
@@ -75,11 +81,14 @@ export function AnaliticaPage() {
   const movs = useMovimientos()
   const pendientes = usePendientes()
   const camposLista = useCampos()
-  const camposConPotreros = useCamposConPotreros()
   // El motor mantiene las dos bases; al productor le mostramos el resultado
   // del negocio (devengado) + el flujo de fondos proyectado. Sin toggle académico.
   const modo: Modo = 'devengado'
-  const [campoF, setCampoF] = useState<string | null>(null)
+  // Permite llegar filtrado desde el "Resumen del campo" (/analitica?campo=:id).
+  const [searchParams] = useSearchParams()
+  const [campoF, setCampoF] = useState<string | null>(
+    () => searchParams.get('campo'),
+  )
 
   const nombreCampo =
     (camposLista.data ?? []).find((c) => c.id === campoF)?.nombre ?? null
@@ -104,8 +113,11 @@ export function AnaliticaPage() {
   )
   const porMes = useMemo(() => resultadoPorMes(data, modo), [data, modo])
   const cuentas = useMemo(() => cuentasPendientes(data), [data])
-  const potreros = useMemo(() => porPotrero(data, modo), [data, modo])
   const actividades = useMemo(() => porActividad(data, modo), [data, modo])
+  const flujo = useMemo(
+    () => proyeccionFlujo(pendientesScope),
+    [pendientesScope],
+  )
 
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
   const maxAct = Math.max(1, ...actividades.map((a) => Math.abs(a.resultado)))
@@ -176,12 +188,64 @@ export function AnaliticaPage() {
             />
           </div>
 
-          {/* Rentabilidad por potrero — cards, una por potrero */}
-          <RentabilidadPotreros
-            campos={campos}
-            potreros={potreros}
-            camposConPotreros={camposConPotreros.data ?? []}
-          />
+          {/* Rentabilidad por campo — comparación (tabla) */}
+          <Panel
+            title="Rentabilidad por campo"
+            sub={campoF ? 'campo filtrado' : 'comparación entre campos'}
+          >
+            {campos.length === 0 ? (
+              <Vacio>Sin movimientos cargados todavía.</Vacio>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      {['Campo', 'Ingresos', 'Gastos', 'Resultado'].map((h, i) => (
+                        <th
+                          key={h}
+                          className={cn(
+                            'px-4 py-3 text-xs font-semibold uppercase tracking-[0.05em] text-faint',
+                            i > 0 && 'text-right',
+                          )}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campos.map((c) => (
+                      <tr
+                        key={c.campoId}
+                        className="border-b border-border/60 last:border-0"
+                      >
+                        <td className="px-4 py-3 text-sm font-medium text-ink">
+                          {c.nombre}
+                        </td>
+                        <td className="tnum px-4 py-3 text-right text-sm text-field-deep">
+                          {formatARS(c.ingresos)}
+                        </td>
+                        <td className="tnum px-4 py-3 text-right text-sm text-tierra">
+                          {formatARS(c.gastos)}
+                        </td>
+                        <td
+                          className="tnum px-4 py-3 text-right text-sm font-bold"
+                          style={{
+                            color:
+                              c.resultado < 0
+                                ? 'var(--destructive)'
+                                : 'var(--field-deep)',
+                          }}
+                        >
+                          {formatARS(c.resultado)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
 
           {/* Rentabilidad por actividad — qué actividad rinde */}
           {actividades.length > 0 && (
@@ -237,6 +301,80 @@ export function AnaliticaPage() {
               </div>
             </Panel>
           )}
+
+          {/* Proyección de flujo de fondos — lo que va a entrar/salir por mes */}
+          <Panel
+            title="Proyección de flujo de fondos"
+            info="Cobros y pagos pendientes agrupados por mes de vencimiento, con el saldo proyectado acumulado. Las cuotas de las series recurrentes ya están incluidas."
+          >
+            {flujo.length === 0 ? (
+              <Vacio>
+                Sin cobros ni pagos pendientes con fecha de vencimiento.
+              </Vacio>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      {['Mes', 'Por cobrar', 'Por pagar', 'Neto', 'Saldo acum.'].map(
+                        (h, i) => (
+                          <th
+                            key={h}
+                            className={cn(
+                              'px-4 py-3 text-xs font-semibold uppercase tracking-[0.05em] text-faint',
+                              i > 0 && 'text-right',
+                            )}
+                          >
+                            {h}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {flujo.map((f) => (
+                      <tr
+                        key={f.mes}
+                        className="border-b border-border/60 last:border-0"
+                      >
+                        <td className="px-4 py-3 text-sm font-medium text-ink">
+                          {mesLargo(f.mes)}
+                        </td>
+                        <td className="tnum px-4 py-3 text-right text-sm text-field-deep">
+                          {f.entra ? formatARS(f.entra) : '—'}
+                        </td>
+                        <td className="tnum px-4 py-3 text-right text-sm text-tierra">
+                          {f.sale ? formatARS(f.sale) : '—'}
+                        </td>
+                        <td
+                          className="tnum px-4 py-3 text-right text-sm font-semibold"
+                          style={{
+                            color:
+                              f.neto < 0
+                                ? 'var(--destructive)'
+                                : 'var(--field-deep)',
+                          }}
+                        >
+                          {formatARS(f.neto)}
+                        </td>
+                        <td
+                          className="tnum px-4 py-3 text-right text-sm font-bold"
+                          style={{
+                            color:
+                              f.acumulado < 0
+                                ? 'var(--destructive)'
+                                : 'var(--ink)',
+                          }}
+                        >
+                          {formatARS(f.acumulado)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
 
           {/* Resultado por mes + Plata en camino */}
           <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">

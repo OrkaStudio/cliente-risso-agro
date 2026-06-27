@@ -163,6 +163,28 @@ export async function actualizarCampo(input: {
   if (error) throw new Error(error.message)
 }
 
+/**
+ * Edición del potrero desde el mapa (vista satelital/plano): estado de ciclo,
+ * hectáreas y cultivo en una sola escritura. `actualizarPotrero` no toca
+ * `cultivo`; este sí, porque el panel del mapa lo edita.
+ */
+export async function actualizarPotreroMapa(input: {
+  id: string
+  estadoCiclo: EstadoCiclo
+  hectareas?: number | null
+  cultivo?: string | null
+}): Promise<void> {
+  const { error } = await supabase
+    .from('potrero')
+    .update({
+      estado_ciclo: input.estadoCiclo,
+      hectareas: input.hectareas ?? null,
+      cultivo: input.cultivo ?? null,
+    })
+    .eq('id', input.id)
+  if (error) throw new Error(error.message)
+}
+
 export async function listPotreros(campoId: string): Promise<Potrero[]> {
   const { data, error } = await supabase
     .from('potrero')
@@ -179,15 +201,20 @@ export async function crearPotrero(input: {
   nombre: string
   estadoCiclo: EstadoCiclo
   hectareas?: number | null
-}): Promise<void> {
-  const { error } = await supabase.from('potrero').insert({
-    empresa_id: input.empresaId,
-    campo_id: input.campoId,
-    nombre: input.nombre.trim(),
-    estado_ciclo: input.estadoCiclo,
-    hectareas: input.hectareas ?? null,
-  })
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('potrero')
+    .insert({
+      empresa_id: input.empresaId,
+      campo_id: input.campoId,
+      nombre: input.nombre.trim(),
+      estado_ciclo: input.estadoCiclo,
+      hectareas: input.hectareas ?? null,
+    })
+    .select('id')
+    .single()
   if (error) throw new Error(error.message)
+  return data.id
 }
 
 export async function actualizarPotrero(input: {

@@ -45,6 +45,7 @@ function CampoSection({
               hectareas: campo.hectareas,
               empresa_id: empresaId,
               created_at: '',
+              contorno: null,
             }}
             triggerLabel="Editar"
             triggerVariant="outline"

@@ -1,34 +1,21 @@
-import { useMemo, useRef, useState } from 'react'
-import { Minus, Plus, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Minus, Plus, RotateCcw, RotateCw, Satellite, Trash2 } from 'lucide-react'
 import {
   FEATURE_MAP,
   FEATURES,
   type FeatureId,
 } from '@/features/lotes/potrero-features'
 import {
-  allGeo,
-  getCampoBoundary,
-  getMarkers,
-  setMarkers,
-  type LatLng,
-  type Marker,
-} from '@/features/lotes/geo'
-import {
-  codigoLote,
-  setPotreroLote,
-  totalLote,
-  type Lote,
-} from '@/features/lotes/store'
-import {
-  setPotreroAttrs,
-  usePotrerosAttrs,
-} from '@/features/lotes/potreros-store'
-import { propositoLabel } from '@/features/lotes/domain'
-import type { Campo } from '@/features/lotes/mock'
+  usoDeEstado,
+  type CampoVM,
+  type Uso,
+} from '@/features/campos/use-campo-mapa'
+import type { Infraestructura, LatLng, PotreroMapa } from '@/features/campos/api'
+import { cargarSat, satCacheado } from '@/features/lotes/satelite-cache'
 import {
   PotreroSidePanel,
+  type EditarPotrero,
   type PotreroInfo,
-  type Uso,
 } from '@/features/lotes/potrero-side-panel'
 import { cn } from '@/lib/utils'
 
@@ -39,8 +26,50 @@ const M_PER_DEG = 111320
 
 type XY = [number, number]
 type Edge = [XY, XY]
-type Shape = { numero: string; points: string; cx: number; cy: number; small: boolean }
-type Sat = { href: string; matrix: string; w: number; h: number }
+type Shape = { id: string; numero: string; points: string; cx: number; cy: number; small: boolean }
+type SatLayer = { href: string; matrix: string; w: number; h: number }
+// Carga progresiva: `base` (chica, ~2s) aparece ya; `hi` (nítida, ~3s) entra
+// encima. El `/export` de Esri renderiza on-demand y 2048px tarda ~13s → se
+// veía el fondo verde todo ese rato. 1536 da buena definición en ~3s.
+type Sat = { base: SatLayer; hi: SatLayer }
+
+/** Marcador de infraestructura en estado de trabajo (mapeado de la fila real). */
+type Mk = {
+  id: string
+  type: FeatureId
+  lat: number
+  lng: number
+  radiusM?: number | null
+  angleDeg?: number | null
+  scale?: number | null
+}
+
+function infraToMk(i: Infraestructura): Mk {
+  return {
+    id: i.id,
+    type: i.tipo as FeatureId,
+    lat: i.lat,
+    lng: i.lng,
+    radiusM: i.radio_m,
+    angleDeg: i.angulo_deg,
+    scale: i.escala,
+  }
+}
+
+export type CrearInfraInput = {
+  tipo: FeatureId
+  lat: number
+  lng: number
+  radio_m?: number | null
+  angulo_deg?: number | null
+}
+export type PatchInfraInput = {
+  lat?: number
+  lng?: number
+  radio_m?: number | null
+  angulo_deg?: number | null
+  escala?: number | null
+}
 
 function ptsStr(xy: XY[]) {
   return xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
@@ -107,24 +136,42 @@ function closestOnSeg(px: number, py: number, a: XY, b: XY) {
 
 export function CampoVista({
   campo,
-  lotes,
-  onVerLote,
+  contorno,
+  potreros,
+  infra,
+  onGuardarPotrero,
+  onCrearInfra,
+  onActualizarInfra,
+  onBorrarInfra,
+  onVerPotrero,
 }: {
-  campo: Campo
-  lotes: Lote[]
-  onVerLote: (loteId: string) => void
+  campo: CampoVM
+  contorno: LatLng[] | null
+  potreros: PotreroMapa[]
+  infra: Infraestructura[]
+  onGuardarPotrero: EditarPotrero['onGuardar']
+  onCrearInfra: (input: CrearInfraInput) => Promise<{ id: string }>
+  onActualizarInfra: (id: string, patch: PatchInfraInput) => void
+  onBorrarInfra: (id: string) => void
+  onVerPotrero: (potreroId: string) => void
 }) {
-  const [hoverNum, setHoverNum] = useState<string | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  const attrs = usePotrerosAttrs()
-  const attrOf = (numero: string) => attrs[`${campo.id}::${numero}`] ?? {}
+
+  // Mapa potreroId → datos del potrero (uso, ha, cabezas, cultivo, estado).
+  const byId = useMemo(
+    () => new Map(potreros.map((p) => [p.id, p])),
+    [potreros],
+  )
 
   const { shapes, boundary, edges, placePoint, toLatLng, mToVB, vbToM, sat } =
     useMemo(() => {
-      const geos = allGeo(campo.id)
-      const bnd = getCampoBoundary(campo.id)
-      const entries = Object.entries(geos)
-      const all: LatLng[] = [...(bnd ?? []), ...entries.flatMap(([, p]) => p)]
+      // Solo potreros con polígono dibujado entran al render.
+      const entries = potreros
+        .filter((p) => p.poligono && p.poligono.length > 0)
+        .map((p) => ({ id: p.id, numero: p.nombre, pts: p.poligono as LatLng[] }))
+      const bnd = contorno
+      const all: LatLng[] = [...(bnd ?? []), ...entries.flatMap((e) => e.pts)]
       if (all.length === 0)
         return {
           shapes: [] as Shape[],
@@ -185,11 +232,11 @@ export function CampoVista({
       const place = (pts: LatLng[]): XY[] => project(pts).map(fit)
 
       const edges: Edge[] = []
-      const shapes: Shape[] = entries.map(([numero, pts]) => {
+      const shapes: Shape[] = entries.map(({ id, numero, pts }) => {
         const xy = place(pts)
         for (let i = 0; i < xy.length; i++) edges.push([xy[i], xy[(i + 1) % xy.length]])
         const { cx, cy, w: pw, h: ph } = centroide(xy)
-        return { numero, points: ptsStr(xy), cx, cy, small: Math.min(pw, ph) < 92 }
+        return { id, numero, points: ptsStr(xy), cx, cy, small: Math.min(pw, ph) < 92 }
       })
 
       const placePoint = (lat: number, lng: number): XY => fit(rot(raw([lat, lng])))
@@ -227,23 +274,25 @@ export function CampoVista({
       maxLat += mLat
       minLng -= mLng
       maxLng += mLng
-      // El size DEBE tener el aspecto del bbox en GRADOS; si no, Esri ensancha
-      // el bbox para igualarlo y la foto queda corrida/a otra escala.
-      const LONG = 2048
-      const ar = (maxLng - minLng) / (maxLat - minLat)
-      const pxW = ar >= 1 ? LONG : Math.round(LONG * ar)
-      const pxH = ar >= 1 ? Math.round(LONG / ar) : LONG
-      const href =
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export' +
-        `?bbox=${minLng},${minLat},${maxLng},${maxLat}&bboxSR=4326&imageSR=4326` +
-        `&size=${pxW},${pxH}&format=jpg&f=image`
-      // Coloco la imagen (de pxW×pxH) mapeando sus esquinas a las 3 esquinas
-      // geográficas en coordenadas SVG normales (robusto, sin números diminutos).
+      // Coloco la imagen mapeando sus esquinas a las 3 esquinas geográficas en
+      // coordenadas SVG normales (robusto, sin números diminutos).
       const [p0x, p0y] = placePoint(maxLat, minLng) // NO (arriba-izq)
       const [p1x, p1y] = placePoint(maxLat, maxLng) // NE (arriba-der)
       const [p3x, p3y] = placePoint(minLat, minLng) // SO (abajo-izq)
-      const matrix = `matrix(${(p1x - p0x) / pxW} ${(p1y - p0y) / pxW} ${(p3x - p0x) / pxH} ${(p3y - p0y) / pxH} ${p0x} ${p0y})`
-      const sat: Sat = { href, matrix, w: pxW, h: pxH }
+      // El size DEBE tener el aspecto del bbox en GRADOS; si no, Esri ensancha
+      // el bbox para igualarlo y la foto queda corrida/a otra escala.
+      const ar = (maxLng - minLng) / (maxLat - minLat)
+      const satLayer = (LONG: number): SatLayer => {
+        const pxW = ar >= 1 ? LONG : Math.round(LONG * ar)
+        const pxH = ar >= 1 ? Math.round(LONG / ar) : LONG
+        const href =
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export' +
+          `?bbox=${minLng},${minLat},${maxLng},${maxLat}&bboxSR=4326&imageSR=4326` +
+          `&size=${pxW},${pxH}&format=jpg&f=image`
+        const matrix = `matrix(${(p1x - p0x) / pxW} ${(p1y - p0y) / pxW} ${(p3x - p0x) / pxH} ${(p3y - p0y) / pxH} ${p0x} ${p0y})`
+        return { href, matrix, w: pxW, h: pxH }
+      }
+      const sat: Sat = { base: satLayer(768), hi: satLayer(1536) }
       return {
         shapes,
         boundary: bnd ? ptsStr(place(bnd)) : null,
@@ -254,13 +303,15 @@ export function CampoVista({
         vbToM,
         sat,
       }
-    }, [campo.id])
+    }, [potreros, contorno])
 
-  // ---------- marcadores ----------
+  // ---------- marcadores (infraestructura real) ----------
   const svgRef = useRef<SVGSVGElement | null>(null)
-  const [markers, setMarkersState] = useState<Marker[]>(() => getMarkers(campo.id))
+  const [markers, setMarkersState] = useState<Mk[]>(() => infra.map(infraToMk))
   const markersRef = useRef(markers)
-  markersRef.current = markers
+  useEffect(() => {
+    markersRef.current = markers
+  }, [markers])
   const [placing, setPlacing] = useState<FeatureId | null>(null)
   const [hoverMk, setHoverMk] = useState<string | null>(null)
   const [selMk, setSelMk] = useState<string | null>(null)
@@ -275,34 +326,46 @@ export function CampoVista({
   // este flag evita que ese click deseleccione el marcador recién tocado.
   const suppressClick = useRef(false)
 
-  const saveMarkers = (next: Marker[]) => {
-    setMarkersState(next)
-    setMarkers(campo.id, next)
-  }
+  // Resincroniza desde la base cuando cambia la infraestructura y no se está
+  // arrastrando (evita que un refetch pise un drag en curso).
+  useEffect(() => {
+    if (drag.current) return
+    setMarkersState(infra.map(infraToMk))
+  }, [infra])
+
   const removeMarker = (id: string) => {
     setSelMk((s) => (s === id ? null : s))
-    saveMarkers(markersRef.current.filter((m) => m.id !== id))
+    setMarkersState((prev) => prev.filter((m) => m.id !== id))
+    onBorrarInfra(id)
   }
   // Agranda/achica el marcador seleccionado: laguna por área (m), resto por escala.
-  const bumpSize = (id: string, dir: 1 | -1) =>
-    saveMarkers(
-      markersRef.current.map((m) => {
-        if (m.id !== id) return m
-        if (m.type === 'laguna') {
-          const r = Math.min(600, Math.max(25, Math.round((m.radiusM ?? 160) + dir * 25)))
-          return { ...m, radiusM: r }
-        }
-        const s = Math.min(2.2, Math.max(0.5, +((m.scale ?? 1) + dir * 0.15).toFixed(2)))
-        return { ...m, scale: s }
-      }),
-    )
+  const bumpSize = (id: string, dir: 1 | -1) => {
+    const m = markersRef.current.find((x) => x.id === id)
+    if (!m) return
+    if (m.type === 'laguna') {
+      const r = Math.min(600, Math.max(25, Math.round((m.radiusM ?? 160) + dir * 25)))
+      setMarkersState((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, radiusM: r } : x)),
+      )
+      onActualizarInfra(id, { radio_m: r })
+    } else {
+      const s = Math.min(2.2, Math.max(0.5, +((m.scale ?? 1) + dir * 0.15).toFixed(2)))
+      setMarkersState((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, scale: s } : x)),
+      )
+      onActualizarInfra(id, { escala: s })
+    }
+  }
   // Rota el marcador (manga/tranquera) en pasos de 15°.
-  const rotateMarker = (id: string, deltaDeg: number) =>
-    saveMarkers(
-      markersRef.current.map((m) =>
-        m.id === id ? { ...m, angleDeg: ((m.angleDeg ?? 0) + deltaDeg + 360) % 360 } : m,
-      ),
+  const rotateMarker = (id: string, deltaDeg: number) => {
+    const m = markersRef.current.find((x) => x.id === id)
+    if (!m) return
+    const ang = ((m.angleDeg ?? 0) + deltaDeg + 360) % 360
+    setMarkersState((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, angleDeg: ang } : x)),
     )
+    onActualizarInfra(id, { angulo_deg: ang })
+  }
 
   function clientToVB(e: { clientX: number; clientY: number }): XY | null {
     const svg = svgRef.current
@@ -330,29 +393,31 @@ export function CampoVista({
     }
     return best
   }
-  function placeAt(e: { clientX: number; clientY: number }) {
+  async function placeAt(e: { clientX: number; clientY: number }) {
     if (!placing || !toLatLng) return
     const vb = clientToVB(e)
     if (!vb) return
-    const id = `m${Date.now()}`
+    let input: CrearInfraInput
     if (placing === 'tranquera') {
       const snap = snapToEdge(vb[0], vb[1])
       const [lat, lng] = toLatLng(snap ? snap.x : vb[0], snap ? snap.y : vb[1])
-      saveMarkers([
-        ...markersRef.current,
-        { id, type: 'tranquera', lat, lng, angleDeg: snap ? snap.angle : 0 },
-      ])
+      input = { tipo: 'tranquera', lat, lng, angulo_deg: snap ? snap.angle : 0 }
     } else if (placing === 'laguna') {
       const [lat, lng] = toLatLng(vb[0], vb[1])
-      saveMarkers([...markersRef.current, { id, type: 'laguna', lat, lng, radiusM: 160 }])
+      input = { tipo: 'laguna', lat, lng, radio_m: 160 }
     } else {
       const [lat, lng] = toLatLng(vb[0], vb[1])
-      saveMarkers([...markersRef.current, { id, type: placing, lat, lng }])
+      input = { tipo: placing, lat, lng }
     }
     // Coloca uno y sale del modo "Marcar" (evita seguir agregando con cada click).
     setPlacing(null)
-    setSelMk(id)
     setSelected(null)
+    try {
+      const created = await onCrearInfra(input)
+      setSelMk(created.id)
+    } catch {
+      /* el toast de error lo dispara la mutación del padre */
+    }
   }
   function startDrag(e: React.PointerEvent, id: string, mode: 'move' | 'resize') {
     e.stopPropagation()
@@ -396,63 +461,98 @@ export function CampoVista({
   function onPointerUp() {
     const ds = drag.current
     if (!ds) return
-    if (ds.moved) setMarkers(campo.id, markersRef.current)
+    if (ds.moved) {
+      const m = markersRef.current.find((x) => x.id === ds.id)
+      if (m) {
+        if (ds.mode === 'move') {
+          onActualizarInfra(m.id, {
+            lat: m.lat,
+            lng: m.lng,
+            ...(m.type === 'tranquera' ? { angulo_deg: m.angleDeg } : {}),
+          })
+        } else {
+          onActualizarInfra(m.id, { radio_m: m.radiusM })
+        }
+      }
+    }
     drag.current = null
   }
 
   const featsByPot = useMemo(() => {
-    const geos = allGeo(campo.id)
     const map: Record<string, FeatureId[]> = {}
     for (const m of markers) {
-      for (const [numero, ring] of Object.entries(geos)) {
-        if (pointInRing(m.lat, m.lng, ring)) {
-          ;(map[numero] ??= []).push(m.type as FeatureId)
+      for (const p of potreros) {
+        if (p.poligono && pointInRing(m.lat, m.lng, p.poligono)) {
+          ;(map[p.id] ??= []).push(m.type)
           break
         }
       }
     }
     for (const k of Object.keys(map)) map[k] = [...new Set(map[k])]
     return map
-  }, [campo.id, markers])
+  }, [potreros, markers])
 
-  function usoDe(numero: string): Uso {
-    if (lotes.some((l) => l.potreros.includes(numero))) return 'ganadero'
-    if (attrOf(numero).cultivo) return 'agricola'
-    return 'vacio'
-  }
-  function infoDe(numero: string): PotreroInfo {
-    const lote = lotes.find((l) => l.potreros.includes(numero))
-    const a = attrOf(numero)
+  function infoDe(id: string): PotreroInfo {
+    const p = byId.get(id)
     return {
-      numero,
-      uso: usoDe(numero),
-      ha: a.hectareas,
-      especie: lote?.especie,
-      proposito: lote ? propositoLabel[lote.proposito] : undefined,
-      loteCodigo: lote ? codigoLote(lote) : undefined,
-      cabezas: lote ? totalLote(lote) : undefined,
-      loteId: lote?.id,
-      cultivo: a.cultivo,
-      features: featsByPot[numero],
+      potreroId: id,
+      numero: p?.nombre ?? '—',
+      uso: p ? usoDeEstado(p.estadoCiclo) : 'vacio',
+      estadoCiclo: p?.estadoCiclo ?? 'descanso',
+      ha: p?.hectareas ?? null,
+      cabezas: p?.cabezas ?? 0,
+      cultivo: p?.cultivo ?? null,
+      features: featsByPot[id],
     }
   }
 
-  const editProp = {
-    lotes: lotes.map((l) => ({ id: l.id, codigo: codigoLote(l) })),
-    onGuardar: (
-      numero: string,
-      v: { hectareas?: number; cultivo?: string; loteId: string | null },
-    ) => {
-      setPotreroAttrs(campo.id, numero, { hectareas: v.hectareas, cultivo: v.cultivo })
-      setPotreroLote(campo.id, numero, v.loteId)
-    },
-  }
+  const editProp: EditarPotrero = { onGuardar: onGuardarPotrero }
 
-  const activeNum = selected ?? hoverNum
-  const panelInfo = activeNum ? infoDe(activeNum) : null
+  // Resolución del satélite a blob cacheado (Esri manda `max-age=0` → no cachea;
+  // lo hacemos nosotros para que revisitas/toggles sean instantáneos). El cache
+  // hit se lee en render (lookup puro) → sin spinner al volver a un campo. El
+  // miss se baja en un efecto. El `href` viaja con el blob para no mostrar la
+  // foto de otro campo mientras se resuelve.
+  const baseHref = sat?.base.href
+  const hiHref = sat?.hi.href
+  const baseHit = baseHref ? satCacheado(baseHref) ?? null : null
+  const hiHit = hiHref ? satCacheado(hiHref) ?? null : null
+  const [baseFetched, setBaseFetched] = useState<{ href: string; blob: string } | null>(null)
+  const [hiFetched, setHiFetched] = useState<{ href: string; blob: string } | null>(null)
+  const baseSrc =
+    baseHit ?? (baseFetched?.href === baseHref ? baseFetched?.blob : null)
+  const hiSrc = hiHit ?? (hiFetched?.href === hiHref ? hiFetched?.blob : null)
+  const [paintedHref, setPaintedHref] = useState<string | null>(null)
+  const satLoaded = !!baseSrc
+  const hiLoaded = !!hiSrc && paintedHref === hiHref
+
+  useEffect(() => {
+    if (!baseHref || baseHit) return
+    let alive = true
+    cargarSat(baseHref)
+      .then((blob) => alive && setBaseFetched({ href: baseHref, blob }))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [baseHref, baseHit])
+
+  useEffect(() => {
+    if (!hiHref || hiHit) return
+    let alive = true
+    cargarSat(hiHref)
+      .then((blob) => alive && setHiFetched({ href: hiHref, blob }))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [hiHref, hiHit])
+
+  const activeId = selected ?? hoverId
+  const panelInfo = activeId ? infoDe(activeId) : null
   const vacio = shapes.length === 0 && !boundary
   const selMarker = markers.find((m) => m.id === selMk) ?? null
-  const selFeat = selMarker ? FEATURE_MAP[selMarker.type as FeatureId] : null
+  const selFeat = selMarker ? FEATURE_MAP[selMarker.type] : null
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row">
@@ -474,7 +574,7 @@ export function CampoVista({
                 suppressClick.current = false
                 return
               }
-              if (placing) placeAt(e)
+              if (placing) void placeAt(e)
               else {
                 setSelected(null)
                 setSelMk(null)
@@ -486,17 +586,36 @@ export function CampoVista({
             {/* Fondo: si por algo la foto no llega a un borde, no se ve blanco */}
             <rect x="0" y="0" width={W} height={H} fill="#3a4a3f" />
 
-            {/* Foto satelital plena: cubre todo el recuadro, sin atenuar */}
-            {sat && (
+            {/* Foto satelital: capa base (carga rápida) + nítida encima que
+                entra con un fundido cuando termina de renderizar Esri. Ambas
+                desde blob cacheado (instantáneo al revisitar el campo). */}
+            {sat && baseSrc && (
               <image
-                href={sat.href}
+                href={baseSrc}
                 x={0}
                 y={0}
-                width={sat.w}
-                height={sat.h}
-                transform={sat.matrix}
+                width={sat.base.w}
+                height={sat.base.h}
+                transform={sat.base.matrix}
                 preserveAspectRatio="none"
                 style={{ pointerEvents: 'none' }}
+              />
+            )}
+            {sat && hiSrc && (
+              <image
+                href={hiSrc}
+                x={0}
+                y={0}
+                width={sat.hi.w}
+                height={sat.hi.h}
+                transform={sat.hi.matrix}
+                preserveAspectRatio="none"
+                onLoad={() => setPaintedHref(hiHref ?? null)}
+                style={{
+                  pointerEvents: 'none',
+                  opacity: hiLoaded ? 1 : 0,
+                  transition: 'opacity 0.4s ease',
+                }}
               />
             )}
 
@@ -508,10 +627,10 @@ export function CampoVista({
             )}
 
             {shapes.map((s) => {
-              const info = infoDe(s.numero)
+              const info = infoDe(s.id)
               const uso = info.uso
-              const sel = selected === s.numero
-              const hov = hoverNum === s.numero
+              const sel = selected === s.id
+              const hov = hoverId === s.id
               const usoText =
                 uso === 'ganadero'
                   ? `Ganadero · ${info.cabezas ?? 0}`
@@ -521,16 +640,16 @@ export function CampoVista({
               const showPill = !s.small
               return (
                 <g
-                  key={s.numero}
+                  key={s.id}
                   className="cursor-pointer"
-                  onMouseEnter={() => setHoverNum(s.numero)}
+                  onMouseEnter={() => setHoverId(s.id)}
                   onClick={(e) => {
                     e.stopPropagation()
                     if (placing) {
-                      placeAt(e)
+                      void placeAt(e)
                       return
                     }
-                    setSelected(s.numero)
+                    setSelected(s.id)
                   }}
                 >
                   {/* casing oscuro: hace legible el contorno sobre la foto */}
@@ -674,7 +793,7 @@ export function CampoVista({
               markers
                 .filter((m) => m.type !== 'laguna')
                 .map((m) => {
-                  const F = FEATURE_MAP[m.type as FeatureId]
+                  const F = FEATURE_MAP[m.type]
                   if (!F) return null
                   const [vx, vy] = placePoint(m.lat, m.lng)
                   const Icon = F.Icon
@@ -751,6 +870,25 @@ export function CampoVista({
                   )
                 })}
           </svg>
+        )}
+
+        {/* Placeholder gris uniforme mientras Esri renderiza la foto. Tapa todo
+            (potreros, toolbar) → carga limpia, sin el fondo verde a medias. */}
+        {!vacio && sat && !satLoaded && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-secondary">
+            <div className="flex flex-col items-center gap-2.5">
+              <Satellite
+                className="size-10 text-muted-foreground"
+                strokeWidth={1.5}
+              />
+              <span className="text-[13.5px] font-semibold text-muted-foreground">
+                Cargando satélite…
+              </span>
+            </div>
+            <div className="h-1.5 w-48 overflow-hidden rounded-full bg-black/[0.06]">
+              <div className="animate-loadbar h-full w-1/3 rounded-full bg-field" />
+            </div>
+          </div>
         )}
 
         {/* Toolbar */}
@@ -849,7 +987,7 @@ export function CampoVista({
       <PotreroSidePanel
         info={panelInfo}
         campo={campo}
-        onVerLote={onVerLote}
+        onVerPotrero={onVerPotrero}
         edit={editProp}
       />
     </div>

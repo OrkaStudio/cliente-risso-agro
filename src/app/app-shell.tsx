@@ -1,17 +1,15 @@
 import { Suspense, type ReactNode, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart3,
   Beef,
   ChevronLeft,
   CircleDollarSign,
   Landmark,
-  Layers,
   LayoutDashboard,
   Leaf,
   LogOut,
   Map as MapIcon,
-  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
@@ -82,7 +80,6 @@ function Ticker() {
 const NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/hacienda', label: 'Hacienda', icon: Beef, end: false },
-  { to: '/potreros', label: 'Potreros', icon: Layers, end: false },
   { to: '/campos', label: 'Campos', icon: MapIcon, end: false },
   { to: '/analitica', label: 'Analítica', icon: BarChart3, end: false },
   { to: '/cheques', label: 'Cheques', icon: Landmark, end: false },
@@ -94,9 +91,6 @@ function initials(email?: string) {
 
 export function AppShell() {
   const { user, signOut } = useAuth()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const isRedesign = location.pathname.startsWith('/redesign')
 
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('side-collapsed') === '1',
@@ -106,21 +100,6 @@ export function AppShell() {
       localStorage.setItem('side-collapsed', c ? '0' : '1')
       return !c
     })
-
-  const toggleRedesign = () => {
-    if (isRedesign) {
-      navigate('/')
-    } else {
-      navigate('/redesign')
-    }
-  }
-
-  const mappedNav = NAV.map((item) => {
-    if (item.to === '/' && isRedesign) {
-      return { ...item, to: '/redesign' }
-    }
-    return item
-  })
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">
@@ -168,7 +147,7 @@ export function AppShell() {
               Oficina
             </div>
           )}
-          {mappedNav.map(({ to, label, icon: Icon, end }) => (
+          {NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -244,19 +223,6 @@ export function AppShell() {
           <div className="hidden shrink-0 font-heading text-sm font-semibold text-white sm:block">
             {fechaHoy()}
           </div>
-          
-          <button
-            onClick={toggleRedesign}
-            className={cn(
-              "flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-xs font-semibold transition-all border shrink-0 cursor-pointer",
-              isRedesign
-                ? "bg-lima/10 border-lima/35 text-lima hover:bg-lima/20 shadow-[0_0_12px_rgba(121,173,40,0.15)]"
-                : "bg-white/[0.05] border-white/10 text-sidebar-foreground/75 hover:bg-white/[0.08] hover:text-white"
-            )}
-          >
-            <Sparkles className="size-3.5" />
-            {isRedesign ? "Nueva UI Activa" : "Probar Nueva UI"}
-          </button>
 
           <Ticker />
         </header>

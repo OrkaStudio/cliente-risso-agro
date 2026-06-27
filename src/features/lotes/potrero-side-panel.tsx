@@ -3,21 +3,25 @@ import {
   ArrowRight,
   Beef,
   LandPlot,
-  Layers,
   MousePointer2,
   Pencil,
   Sprout,
 } from 'lucide-react'
-import { especieColor, especieLabel, type Especie } from '@/features/lotes/domain'
 import { FEATURE_MAP, type FeatureId } from '@/features/lotes/potrero-features'
-import type { Campo } from '@/features/lotes/mock'
+import {
+  usoToEstadoCiclo,
+  type CampoVM,
+  type Uso,
+} from '@/features/campos/use-campo-mapa'
+import type { Database } from '@/lib/supabase/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 
-export type Uso = 'ganadero' | 'agricola' | 'vacio'
+type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
+
+export type { Uso }
 
 export const USO: Record<Uso, { label: string; color: string }> = {
   ganadero: { label: 'Ganadero', color: '#3f9d52' },
@@ -26,27 +30,26 @@ export const USO: Record<Uso, { label: string; color: string }> = {
 }
 
 export type PotreroInfo = {
+  /** Identidad real del potrero (UUID). */
+  potreroId: string
+  /** Etiqueta visible = potrero.nombre (ej. "9", "1A"). */
   numero: string
   uso: Uso
-  ha?: number
-  especie?: Especie
-  proposito?: string
-  loteCodigo?: string
+  /** Estado de ciclo real, para preservar el estado fino al editar. */
+  estadoCiclo: EstadoCiclo
+  ha?: number | null
   cabezas?: number
-  loteId?: string
-  cultivo?: string
+  cultivo?: string | null
   features?: FeatureId[]
 }
 
 export type EditarPotrero = {
-  lotes: { id: string; codigo: string }[]
   onGuardar: (
-    numero: string,
+    potreroId: string,
     v: {
-      hectareas?: number
-      cultivo?: string
-      loteId: string | null
-      features?: FeatureId[]
+      hectareas?: number | null
+      cultivo?: string | null
+      estadoCiclo: EstadoCiclo
     },
   ) => void
 }
@@ -99,14 +102,13 @@ function FormEditar({
   const [estado, setEstado] = useState<Uso>(info.uso)
   const [hectareas, setHectareas] = useState(info.ha != null ? String(info.ha) : '')
   const [cultivo, setCultivo] = useState(info.cultivo ?? '')
-  const [loteId, setLoteId] = useState(info.loteId ?? edit.lotes[0]?.id ?? '')
 
   function guardar() {
     const ha = parseFloat(hectareas.replace(',', '.'))
-    edit.onGuardar(info.numero, {
-      hectareas: Number.isFinite(ha) ? ha : undefined,
-      cultivo: estado === 'agricola' ? cultivo.trim() || undefined : undefined,
-      loteId: estado === 'ganadero' ? loteId || null : null,
+    edit.onGuardar(info.potreroId, {
+      hectareas: Number.isFinite(ha) ? ha : null,
+      cultivo: estado === 'agricola' ? cultivo.trim() || null : null,
+      estadoCiclo: usoToEstadoCiclo(estado, info.estadoCiclo),
     })
     onClose()
   }
@@ -152,28 +154,6 @@ function FormEditar({
         </div>
       </div>
 
-      {estado === 'ganadero' && (
-        <div className="grid gap-2">
-          <Label>Lote en el potrero</Label>
-          {edit.lotes.length > 0 ? (
-            <Dropdown
-              block
-              ariaLabel="Lote"
-              value={loteId}
-              onChange={setLoteId}
-              options={edit.lotes.map((l) => ({
-                value: l.id,
-                label: `Lote ${l.codigo}`,
-              }))}
-            />
-          ) : (
-            <p className="text-[12.5px] text-muted-foreground">
-              No hay lotes en este campo. Creá uno en la lista.
-            </p>
-          )}
-        </div>
-      )}
-
       {estado === 'agricola' && (
         <div className="grid gap-2">
           <Label htmlFor="pot-cultivo">Cultivo</Label>
@@ -201,12 +181,12 @@ function FormEditar({
 export function PotreroSidePanel({
   info,
   campo,
-  onVerLote,
+  onVerPotrero,
   edit,
 }: {
   info: PotreroInfo | null
-  campo: Campo
-  onVerLote: (loteId: string) => void
+  campo: CampoVM
+  onVerPotrero?: (potreroId: string) => void
   edit?: EditarPotrero
 }) {
   // Snapshot del potrero al abrir la edición → el hover no lo cambia mientras editás.
@@ -243,7 +223,7 @@ export function PotreroSidePanel({
 
           {info.uso === 'ganadero' && (
             <div className="tnum text-[30px] font-bold leading-none text-ink">
-              {info.cabezas}{' '}
+              {info.cabezas ?? 0}{' '}
               <span className="text-[14px] font-semibold text-muted-foreground">
                 cabezas
               </span>
@@ -254,28 +234,6 @@ export function PotreroSidePanel({
             {info.ha != null && (
               <Dato icon={LandPlot} label="Superficie">
                 {info.ha} ha
-              </Dato>
-            )}
-            {info.uso === 'ganadero' && info.especie && (
-              <Dato icon={Beef} label="Especie">
-                <span className="inline-flex items-center gap-1.5">
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ background: especieColor[info.especie] }}
-                  />
-                  {especieLabel[info.especie]}
-                </span>
-              </Dato>
-            )}
-            {info.loteCodigo && (
-              <Dato icon={Layers} label="Lote">
-                {info.loteCodigo}
-                {info.proposito && (
-                  <span className="font-normal text-muted-foreground">
-                    {' '}
-                    · {info.proposito}
-                  </span>
-                )}
               </Dato>
             )}
             {info.uso === 'agricola' && info.cultivo && (
@@ -302,13 +260,13 @@ export function PotreroSidePanel({
           </div>
 
           <div className="mt-auto grid gap-2">
-            {info.uso === 'ganadero' && info.loteId && (
+            {onVerPotrero && (
               <button
                 type="button"
-                onClick={() => onVerLote(info.loteId!)}
+                onClick={() => onVerPotrero(info.potreroId)}
                 className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-field-soft py-2.5 text-[13px] font-semibold text-field-deep transition-colors hover:bg-field-soft/70"
               >
-                Ver lote <ArrowRight className="size-4" />
+                Ver potrero <ArrowRight className="size-4" />
               </button>
             )}
             {edit && (
