@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { motion, type Variants } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ArrowDownLeft, ArrowUpRight, CircleCheck, Landmark } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useCampos } from '@/features/campos/hooks'
@@ -15,28 +15,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Dropdown } from '@/components/ui/dropdown'
+import {
+  CheckCard,
+  FormDialog,
+  formField,
+  formItem,
+  formLabel,
+} from '@/components/form-dialog'
 import { cn } from '@/lib/utils'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 
-const label = 'mb-1.5 block text-[12px] font-semibold text-ink'
-const field =
-  'h-10 w-full rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft placeholder:text-faint'
-
 const hoy = () => new Date().toISOString().slice(0, 10)
-
-const stagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
-}
-const fade: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 320, damping: 26 },
-  },
-}
 
 // --- Carga dedicada de cheque ----------------------------------------
 export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
@@ -50,6 +40,8 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
   const [numero, setNumero] = useState('')
   const [esEcheq, setEsEcheq] = useState(false)
   const [vence, setVence] = useState('')
+  const [yaSaldado, setYaSaldado] = useState(false)
+  const [fechaSaldado, setFechaSaldado] = useState(hoy())
   const [error, setError] = useState<string | null>(null)
 
   const categorias = useCategorias()
@@ -76,6 +68,8 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
     setNumero('')
     setEsEcheq(false)
     setVence('')
+    setYaSaldado(false)
+    setFechaSaldado(hoy())
   }
 
   async function onSubmit(e: FormEvent) {
@@ -86,7 +80,11 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
       return setError('Ingresá un monto válido')
     if (!categoriaId) return setError('Elegí la categoría')
     if (!campoId) return setError('Elegí el campo')
-    if (!vence) return setError('Ingresá la fecha de vencimiento')
+    // Si ya se cobró/pagó, el vencimiento es opcional; si no, es obligatorio.
+    if (!yaSaldado && !vence)
+      return setError('Ingresá la fecha de vencimiento')
+    if (yaSaldado && !fechaSaldado)
+      return setError(`Ingresá la fecha en que se ${esPago ? 'pagó' : 'cobró'}`)
 
     try {
       await crear.mutateAsync({
@@ -96,8 +94,9 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
         campoId,
         monto: montoNum,
         fechaDevengo: hoy(),
-        fechaVencimiento: vence,
-        fechaCobroPago: null, // pendiente hasta que se cobre/pague
+        fechaVencimiento: vence || null,
+        // Si ya está saldado → liquidado (lo deriva crearMovimiento).
+        fechaCobroPago: yaSaldado ? fechaSaldado : null,
         medioPago: 'cheque',
         descripcion: '',
         esEcheq,
@@ -105,7 +104,15 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
         chequeBanco: banco,
         contraparte,
       })
-      toast.success(esEcheq ? 'Echeq cargado' : 'Cheque cargado')
+      toast.success(
+        yaSaldado
+          ? esPago
+            ? 'Cheque pagado cargado'
+            : 'Cheque cobrado cargado'
+          : esEcheq
+            ? 'Echeq cargado'
+            : 'Cheque cargado',
+      )
       setOpen(false)
       reset()
     } catch (err) {
@@ -118,193 +125,193 @@ export function CargarChequeDialog({ empresaId }: { empresaId: string }) {
       <Button onClick={() => setOpen(true)} disabled={!empresaId}>
         + Cargar cheque
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="rounded-2xl sm:max-w-[460px]">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl">
-              Cargar cheque
-            </DialogTitle>
-          </DialogHeader>
-
-          <motion.form
-            onSubmit={onSubmit}
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            className="grid gap-4"
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        icon={Landmark}
+        title="Cargar cheque"
+        subtitle="Registrá un cobro o pago con cheque o echeq"
+        onSubmit={onSubmit}
+        footer={
+          <Button
+            type="submit"
+            disabled={crear.isPending || !empresaId}
+            className="h-12 w-full rounded-xl text-[15px] font-semibold shadow-[0_4px_14px_rgba(16,30,20,0.18)]"
           >
-            {/* Tipo */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setTipo('ingreso')
-                  setCategoriaId('')
-                }}
-                className={cn(
-                  'flex items-center justify-center gap-2 rounded-xl border-[1.5px] px-4 py-3 text-sm font-bold transition-colors',
-                  !esPago
-                    ? 'border-primary bg-field-soft text-field-deep'
-                    : 'border-border bg-card text-muted-foreground hover:border-faint',
-                )}
-              >
-                <ArrowDownLeft className="size-[18px]" />
-                A cobrar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTipo('gasto')
-                  setCategoriaId('')
-                }}
-                className={cn(
-                  'flex items-center justify-center gap-2 rounded-xl border-[1.5px] px-4 py-3 text-sm font-bold transition-colors',
-                  esPago
-                    ? 'border-tierra bg-tierra-soft text-tierra'
-                    : 'border-border bg-card text-muted-foreground hover:border-faint',
-                )}
-              >
-                <ArrowUpRight className="size-[18px]" />
-                A pagar
-              </button>
-            </motion.div>
+            {crear.isPending
+              ? 'Guardando…'
+              : yaSaldado
+                ? `Cargar cheque ${esPago ? 'pagado' : 'cobrado'}`
+                : 'Cargar cheque'}
+          </Button>
+        }
+      >
+        {/* Tipo */}
+        <motion.div variants={formItem} className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setTipo('ingreso')}
+            className={cn(
+              'flex items-center justify-center gap-2 rounded-xl border-[1.5px] px-4 py-3 text-sm font-bold transition-colors',
+              !esPago
+                ? 'border-primary bg-field-soft text-field-deep'
+                : 'border-border bg-card text-muted-foreground hover:border-faint',
+            )}
+          >
+            <ArrowDownLeft className="size-[18px]" />
+            A cobrar
+          </button>
+          <button
+            type="button"
+            onClick={() => setTipo('gasto')}
+            className={cn(
+              'flex items-center justify-center gap-2 rounded-xl border-[1.5px] px-4 py-3 text-sm font-bold transition-colors',
+              esPago
+                ? 'border-tierra bg-tierra-soft text-tierra'
+                : 'border-border bg-card text-muted-foreground hover:border-faint',
+            )}
+          >
+            <ArrowUpRight className="size-[18px]" />
+            A pagar
+          </button>
+        </motion.div>
 
-            {/* Monto */}
-            <motion.div variants={fade}>
-              <label htmlFor="ch-monto" className={label}>
-                Monto
-              </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-heading text-lg font-bold text-faint">
-                  $
-                </span>
-                <input
-                  id="ch-monto"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="0"
-                  autoFocus
-                  value={monto ? Number(monto).toLocaleString('es-AR') : ''}
-                  onChange={(e) => setMonto(e.target.value.replace(/\D/g, ''))}
-                  className={cn(field, 'tnum h-12 pl-8 text-xl font-bold')}
-                />
-              </div>
-            </motion.div>
+        {/* Monto */}
+        <motion.div variants={formItem}>
+          <label htmlFor="ch-monto" className={formLabel}>
+            Monto
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-heading text-lg font-bold text-faint">
+              $
+            </span>
+            <input
+              id="ch-monto"
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              autoFocus
+              value={monto ? Number(monto).toLocaleString('es-AR') : ''}
+              onChange={(e) => setMonto(e.target.value.replace(/\D/g, ''))}
+              className={cn(formField, 'tnum h-12 pl-8 text-xl font-bold')}
+            />
+          </div>
+        </motion.div>
 
-            {/* Es echeq */}
-            <motion.div variants={fade}>
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-secondary/50 px-3.5 py-2.5 text-sm font-semibold text-ink">
-                <input
-                  type="checkbox"
-                  checked={esEcheq}
-                  onChange={(e) => setEsEcheq(e.target.checked)}
-                  className="size-4 accent-[var(--primary)]"
-                />
-                Es echeq (cheque electrónico)
-              </label>
-            </motion.div>
+        {/* Es echeq */}
+        <motion.div variants={formItem}>
+          <CheckCard checked={esEcheq} onChange={setEsEcheq}>
+            Es echeq (cheque electrónico)
+          </CheckCard>
+        </motion.div>
 
-            {/* Contraparte + banco + número */}
-            <motion.div variants={fade} className="grid gap-3">
-              <div>
-                <label className={label}>
-                  {esPago ? 'Beneficiario' : 'Emisor'}
-                </label>
-                <input
-                  value={contraparte}
-                  onChange={(e) => setContraparte(e.target.value)}
-                  placeholder={esPago ? 'A quién se le paga' : 'Quién lo emitió'}
-                  className={field}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={label}>Banco</label>
-                  <input
-                    value={banco}
-                    onChange={(e) => setBanco(e.target.value)}
-                    placeholder="Banco"
-                    className={field}
-                  />
-                </div>
-                <div>
-                  <label className={label}>N° de cheque</label>
-                  <input
-                    value={numero}
-                    onChange={(e) => setNumero(e.target.value)}
-                    placeholder="N°"
-                    className={cn(field, 'tnum')}
-                  />
-                </div>
-              </div>
-            </motion.div>
+        {/* Contraparte + banco + número */}
+        <motion.div variants={formItem} className="grid gap-3">
+          <div>
+            <label className={formLabel}>{esPago ? 'Beneficiario' : 'Emisor'}</label>
+            <input
+              value={contraparte}
+              onChange={(e) => setContraparte(e.target.value)}
+              placeholder={esPago ? 'A quién se le paga' : 'Quién lo emitió'}
+              className={formField}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={formLabel}>Banco</label>
+              <input
+                value={banco}
+                onChange={(e) => setBanco(e.target.value)}
+                placeholder="Banco"
+                className={formField}
+              />
+            </div>
+            <div>
+              <label className={formLabel}>N° de cheque</label>
+              <input
+                value={numero}
+                onChange={(e) => setNumero(e.target.value)}
+                placeholder="N°"
+                className={cn(formField, 'tnum')}
+              />
+            </div>
+          </div>
+        </motion.div>
 
-            {/* Vencimiento */}
-            <motion.div variants={fade}>
-              <label htmlFor="ch-vence" className={label}>
-                Vence el
+        {/* Vencimiento */}
+        <motion.div variants={formItem}>
+          <label htmlFor="ch-vence" className={formLabel}>
+            Vence el{' '}
+            {yaSaldado && <span className="font-normal text-faint">(opcional)</span>}
+          </label>
+          <input
+            id="ch-vence"
+            type="date"
+            value={vence}
+            onChange={(e) => setVence(e.target.value)}
+            className={cn(formField, '[color-scheme:light]')}
+          />
+        </motion.div>
+
+        {/* Ya cobrado / pagado */}
+        <motion.div variants={formItem} className="grid gap-3">
+          <CheckCard checked={yaSaldado} onChange={setYaSaldado}>
+            {esPago ? 'Ya está pagado' : 'Ya está cobrado'}
+          </CheckCard>
+          {yaSaldado && (
+            <div>
+              <label htmlFor="ch-fecha-saldado" className={formLabel}>
+                Fecha en que se {esPago ? 'pagó' : 'cobró'}
               </label>
               <input
-                id="ch-vence"
+                id="ch-fecha-saldado"
                 type="date"
-                value={vence}
-                onChange={(e) => setVence(e.target.value)}
-                className={cn(field, '[color-scheme:light]')}
+                value={fechaSaldado}
+                onChange={(e) => setFechaSaldado(e.target.value)}
+                className={cn(formField, '[color-scheme:light]')}
               />
-            </motion.div>
+            </div>
+          )}
+        </motion.div>
 
-            {/* Categoría + campo */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={label}>Categoría</label>
-                <Dropdown
-                  block
-                  ariaLabel="Categoría"
-                  value={categoriaId}
-                  onChange={setCategoriaId}
-                  options={[
-                    { value: '', label: 'Elegí…' },
-                    ...categoriasFiltradas.map((c) => ({
-                      value: c.id,
-                      label: c.nombre,
-                    })),
-                  ]}
-                />
-              </div>
-              <div>
-                <label className={label}>Campo</label>
-                <Dropdown
-                  block
-                  ariaLabel="Campo"
-                  value={campoId}
-                  onChange={setCampoId}
-                  options={[
-                    { value: '', label: 'Elegí…' },
-                    ...(campos.data ?? []).map((c) => ({
-                      value: c.id,
-                      label: c.nombre,
-                    })),
-                  ]}
-                />
-              </div>
-            </motion.div>
+        {/* Categoría + Campo */}
+        <motion.div variants={formItem} className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={formLabel}>Categoría</label>
+            <Dropdown
+              block
+              ariaLabel="Categoría"
+              value={categoriaId}
+              onChange={setCategoriaId}
+              options={[
+                { value: '', label: 'Elegí…' },
+                ...categoriasFiltradas.map((c) => ({
+                  value: c.id,
+                  label: c.nombre,
+                })),
+              ]}
+            />
+          </div>
+          <div>
+            <label className={formLabel}>Campo</label>
+            <Dropdown
+              block
+              ariaLabel="Campo"
+              value={campoId}
+              onChange={setCampoId}
+              options={[
+                { value: '', label: 'Elegí…' },
+                ...(campos.data ?? []).map((c) => ({
+                  value: c.id,
+                  label: c.nombre,
+                })),
+              ]}
+            />
+          </div>
+        </motion.div>
 
-            {error && (
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            )}
-
-            <motion.div variants={fade}>
-              <Button
-                type="submit"
-                disabled={crear.isPending || !empresaId}
-                className="h-11 w-full rounded-xl"
-              >
-                {crear.isPending ? 'Guardando…' : 'Cargar cheque'}
-              </Button>
-            </motion.div>
-          </motion.form>
-        </DialogContent>
-      </Dialog>
+        {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+      </FormDialog>
     </>
   )
 }
@@ -373,7 +380,7 @@ export function LiquidarChequeDialog({
               </div>
             </div>
             <div>
-              <label htmlFor="liq-fecha" className={label}>
+              <label htmlFor="liq-fecha" className={formLabel}>
                 Fecha en que se {cobro ? 'cobró' : 'pagó'}
               </label>
               <input
@@ -381,7 +388,7 @@ export function LiquidarChequeDialog({
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
-                className={cn(field, '[color-scheme:light]')}
+                className={cn(formField, '[color-scheme:light]')}
               />
             </div>
             {error && (

@@ -141,9 +141,11 @@ export function ChequesPage() {
     [data, porFiltro, verLiquidados],
   )
 
-  // Calendario: pendientes filtrados (se ubican por fecha de vencimiento).
-  const pendientesFiltrados = useMemo(
-    () => data.filter((c) => c.estado === 'pendiente' && porFiltro(c)),
+  // Calendario: pendientes + liquidados (los pendientes se ubican por
+  // vencimiento; los ya cobrados/pagados por su fecha de cobro/pago, marcados
+  // como hechos). Solo se excluyen los anulados (ya filtrados en listCheques).
+  const calendarioItems = useMemo(
+    () => data.filter((c) => porFiltro(c)),
     [data, porFiltro],
   )
 
@@ -394,7 +396,7 @@ export function ChequesPage() {
           )}
         </Panel>
       ) : (
-        <ChequesCalendario cheques={pendientesFiltrados} />
+        <ChequesCalendario cheques={calendarioItems} />
       )}
     </div>
   )

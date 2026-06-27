@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
-import { AnimatePresence, motion, type Variants } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -9,6 +9,7 @@ import {
   CircleCheck,
   Clock,
   Loader2,
+  Receipt,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Constants, type Database } from '@/lib/supabase/types'
@@ -16,22 +17,19 @@ import { useCampos, usePotreros } from '@/features/campos/hooks'
 import { useCategorias, useCrearMovimiento } from '@/features/analitica/hooks'
 import { actividadLabel } from '@/features/analitica/compute'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Dropdown } from '@/components/ui/dropdown'
+import {
+  CheckCard,
+  FormDialog,
+  formField,
+  formItem,
+  formLabel,
+} from '@/components/form-dialog'
 import { cn } from '@/lib/utils'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
 type ActividadMov = Database['public']['Enums']['actividad_movimiento']
-
-const label = 'mb-1.5 block text-[12px] font-semibold text-ink'
-const field =
-  'h-10 w-full rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft placeholder:text-faint'
 
 const medioPagoLabel: Record<MedioPago, string> = {
   efectivo: 'Efectivo',
@@ -70,15 +68,6 @@ async function fotoAJpegBase64(
   ctx.drawImage(bitmap, 0, 0, w, h)
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
   return { base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' }
-}
-
-const stagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
-}
-const fade: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 26 } },
 }
 
 export function CargarMovimientoDialog({
@@ -244,23 +233,26 @@ export function CargarMovimientoDialog({
       >
         {triggerLabel}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="rounded-2xl sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl">
-              Cargar movimiento
-            </DialogTitle>
-          </DialogHeader>
-
-          <motion.form
-            onSubmit={onSubmit}
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            className="grid gap-4"
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        icon={Receipt}
+        title="Cargar movimiento"
+        subtitle="Registrá un gasto o ingreso del campo"
+        onSubmit={onSubmit}
+        className="sm:max-w-[480px]"
+        footer={
+          <Button
+            type="submit"
+            disabled={crear.isPending || !empresaId}
+            className="h-12 w-full rounded-xl text-[15px] font-semibold shadow-[0_4px_14px_rgba(16,30,20,0.18)]"
           >
-            {/* Escanear comprobante (OCR con IA) */}
-            <motion.div variants={fade}>
+            {crear.isPending ? 'Guardando…' : 'Cargar movimiento'}
+          </Button>
+        }
+      >
+        {/* Escanear comprobante (OCR con IA) */}
+            <motion.div variants={formItem}>
               {/* Sin `capture`: el SO ofrece sacar foto O elegir un archivo. */}
               <input
                 ref={fileRef}
@@ -296,7 +288,7 @@ export function CargarMovimientoDialog({
             </motion.div>
 
             {/* Tipo */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-2.5">
+            <motion.div variants={formItem} className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => elegirTipo('gasto')}
@@ -326,8 +318,8 @@ export function CargarMovimientoDialog({
             </motion.div>
 
             {/* Monto */}
-            <motion.div variants={fade}>
-              <label htmlFor="mv-monto" className={label}>
+            <motion.div variants={formItem}>
+              <label htmlFor="mv-monto" className={formLabel}>
                 Monto
               </label>
               <div className="relative">
@@ -342,15 +334,15 @@ export function CargarMovimientoDialog({
                   autoFocus
                   value={monto ? Number(monto).toLocaleString('es-AR') : ''}
                   onChange={(e) => setMonto(e.target.value.replace(/\D/g, ''))}
-                  className={cn(field, 'tnum h-12 pl-8 text-xl font-bold')}
+                  className={cn(formField, 'tnum h-12 pl-8 text-xl font-bold')}
                 />
               </div>
             </motion.div>
 
             {/* Categoría + Campo */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-3">
+            <motion.div variants={formItem} className="grid grid-cols-2 gap-3">
               <div>
-                <label className={label}>Categoría</label>
+                <label className={formLabel}>Categoría</label>
                 <Dropdown
                   block
                   ariaLabel="Categoría"
@@ -366,7 +358,7 @@ export function CargarMovimientoDialog({
                 />
               </div>
               <div>
-                <label className={label}>Campo</label>
+                <label className={formLabel}>Campo</label>
                 <Dropdown
                   block
                   ariaLabel="Campo"
@@ -387,8 +379,8 @@ export function CargarMovimientoDialog({
             </motion.div>
 
             {/* Potrero — clave para la rentabilidad por potrero */}
-            <motion.div variants={fade}>
-              <label className={label}>
+            <motion.div variants={formItem}>
+              <label className={formLabel}>
                 Potrero{' '}
                 <span className="font-normal text-faint">
                   · así sabés qué potrero rinde
@@ -413,8 +405,8 @@ export function CargarMovimientoDialog({
             </motion.div>
 
             {/* Actividad — para ver qué actividad rinde */}
-            <motion.div variants={fade}>
-              <label className={label}>
+            <motion.div variants={formItem}>
+              <label className={formLabel}>
                 Actividad{' '}
                 <span className="font-normal text-faint">
                   · cría, invernada, agricultura…
@@ -436,8 +428,8 @@ export function CargarMovimientoDialog({
             </motion.div>
 
             {/* Estado: ya se pagó/cobró vs pendiente */}
-            <motion.div variants={fade}>
-              <label className={label}>Estado</label>
+            <motion.div variants={formItem}>
+              <label className={formLabel}>Estado</label>
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
@@ -469,10 +461,10 @@ export function CargarMovimientoDialog({
             </motion.div>
 
             {/* Fechas según estado */}
-            <motion.div variants={fade}>
+            <motion.div variants={formItem}>
               {liquidado ? (
                 <div>
-                  <label htmlFor="mv-fecha" className={label}>
+                  <label htmlFor="mv-fecha" className={formLabel}>
                     Fecha del {esGasto ? 'pago' : 'cobro'}
                   </label>
                   <input
@@ -480,12 +472,12 @@ export function CargarMovimientoDialog({
                     type="date"
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
-                    className={cn(field, '[color-scheme:light]')}
+                    className={cn(formField, '[color-scheme:light]')}
                   />
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="mv-vence" className={label}>
+                  <label htmlFor="mv-vence" className={formLabel}>
                     ¿Cuándo lo tenés que {esGasto ? 'pagar' : 'cobrar'}?
                   </label>
                   <input
@@ -493,14 +485,14 @@ export function CargarMovimientoDialog({
                     type="date"
                     value={vence}
                     onChange={(e) => setVence(e.target.value)}
-                    className={cn(field, '[color-scheme:light]')}
+                    className={cn(formField, '[color-scheme:light]')}
                   />
                 </div>
               )}
             </motion.div>
 
             {/* Más opciones */}
-            <motion.div variants={fade}>
+            <motion.div variants={formItem}>
               <button
                 type="button"
                 onClick={() => setMasOpciones((m) => !m)}
@@ -526,7 +518,7 @@ export function CargarMovimientoDialog({
                   >
                     <div className="grid gap-4 pt-3">
                       <div>
-                        <label className={label}>
+                        <label className={formLabel}>
                           {esGasto ? 'Medio de pago' : 'Medio de cobro'}
                         </label>
                         <Dropdown
@@ -546,47 +538,39 @@ export function CargarMovimientoDialog({
 
                       {esCheque && (
                         <div className="grid gap-3 rounded-xl border border-border bg-secondary/50 p-3.5">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
-                              Datos del cheque
-                            </span>
-                            <label className="flex cursor-pointer items-center gap-2 text-[13px] font-semibold text-ink">
-                              <input
-                                type="checkbox"
-                                checked={esEcheq}
-                                onChange={(e) => setEsEcheq(e.target.checked)}
-                                className="size-4 accent-[var(--primary)]"
-                              />
-                              Es echeq
-                            </label>
-                          </div>
+                          <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+                            Datos del cheque
+                          </span>
+                          <CheckCard checked={esEcheq} onChange={setEsEcheq}>
+                            Es echeq
+                          </CheckCard>
                           <input
                             value={contraparte}
                             onChange={(e) => setContraparte(e.target.value)}
                             placeholder={
                               esGasto ? 'Beneficiario' : 'Emisor'
                             }
-                            className={field}
+                            className={formField}
                           />
                           <div className="grid grid-cols-2 gap-3">
                             <input
                               value={chequeBanco}
                               onChange={(e) => setChequeBanco(e.target.value)}
                               placeholder="Banco"
-                              className={field}
+                              className={formField}
                             />
                             <input
                               value={chequeNumero}
                               onChange={(e) => setChequeNumero(e.target.value)}
                               placeholder="N° de cheque"
-                              className={cn(field, 'tnum')}
+                              className={cn(formField, 'tnum')}
                             />
                           </div>
                         </div>
                       )}
 
                       <div>
-                        <label htmlFor="mv-desc" className={label}>
+                        <label htmlFor="mv-desc" className={formLabel}>
                           Descripción
                         </label>
                         <input
@@ -594,7 +578,7 @@ export function CargarMovimientoDialog({
                           value={descripcion}
                           onChange={(e) => setDescripcion(e.target.value)}
                           placeholder="Ej: antiparasitario"
-                          className={field}
+                          className={formField}
                         />
                       </div>
                     </div>
@@ -606,19 +590,7 @@ export function CargarMovimientoDialog({
             {error && (
               <p className="text-sm font-medium text-destructive">{error}</p>
             )}
-
-            <motion.div variants={fade}>
-              <Button
-                type="submit"
-                disabled={crear.isPending || !empresaId}
-                className="h-11 w-full rounded-xl"
-              >
-                {crear.isPending ? 'Guardando…' : 'Cargar movimiento'}
-              </Button>
-            </motion.div>
-          </motion.form>
-        </DialogContent>
-      </Dialog>
+      </FormDialog>
     </>
   )
 }

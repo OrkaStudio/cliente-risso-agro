@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
-import { AnimatePresence, motion, type Variants } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, Repeat } from 'lucide-react'
 import { Constants, type Database } from '@/lib/supabase/types'
 import { useCampos, usePotreros } from '@/features/campos/hooks'
@@ -8,22 +8,18 @@ import { useCategorias, useCrearSerie } from '@/features/analitica/hooks'
 import { actividadLabel } from '@/features/analitica/compute'
 import { frecuenciaLabel, type Frecuencia } from '@/features/analitica/api'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Dropdown } from '@/components/ui/dropdown'
+import {
+  FormDialog,
+  formField,
+  formItem,
+  formLabel,
+} from '@/components/form-dialog'
 import { cn } from '@/lib/utils'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
 type ActividadMov = Database['public']['Enums']['actividad_movimiento']
-
-const label = 'mb-1.5 block text-[12px] font-semibold text-ink'
-const field =
-  'h-10 w-full rounded-xl border border-border bg-card px-3.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft placeholder:text-faint'
 
 const medioPagoLabel: Record<MedioPago, string> = {
   efectivo: 'Efectivo',
@@ -57,12 +53,6 @@ const fmtMonto = (n: number) =>
     : n >= 1_000
       ? `$${Math.round(n / 1_000)}k`
       : `$${n}`
-
-const stagger: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
-const fade: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 26 } },
-}
 
 /** Alta de un gasto/ingreso recurrente o en cuotas: genera toda la serie. */
 export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
@@ -153,23 +143,26 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
         <Repeat className="size-4" />
         Recurrente / cuotas
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="rounded-2xl sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl">
-              Gasto recurrente o en cuotas
-            </DialogTitle>
-          </DialogHeader>
-
-          <motion.form
-            onSubmit={onSubmit}
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            className="grid gap-4"
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        icon={Repeat}
+        title="Gasto recurrente o en cuotas"
+        subtitle="Cargá una vez y se generan las cuotas solas"
+        onSubmit={onSubmit}
+        className="sm:max-w-[480px]"
+        footer={
+          <Button
+            type="submit"
+            disabled={crear.isPending || !empresaId}
+            className="h-12 w-full rounded-xl text-[15px] font-semibold shadow-[0_4px_14px_rgba(16,30,20,0.18)]"
           >
+            {crear.isPending ? 'Generando…' : `Crear ${cant || ''} cuotas`}
+          </Button>
+        }
+      >
             {/* Tipo */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-2.5">
+            <motion.div variants={formItem} className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => {
@@ -205,8 +198,8 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
             </motion.div>
 
             {/* Descripción */}
-            <motion.div variants={fade}>
-              <label htmlFor="r-desc" className={label}>
+            <motion.div variants={formItem}>
+              <label htmlFor="r-desc" className={formLabel}>
                 ¿Qué es?
               </label>
               <input
@@ -215,13 +208,13 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                 onChange={(e) => setDescripcion(e.target.value)}
                 placeholder="Ej: Cuota camioneta · Alquiler La Lucía"
                 autoFocus
-                className={field}
+                className={formField}
               />
             </motion.div>
 
             {/* Monto por cuota */}
-            <motion.div variants={fade}>
-              <label htmlFor="r-monto" className={label}>
+            <motion.div variants={formItem}>
+              <label htmlFor="r-monto" className={formLabel}>
                 Monto de cada cuota
               </label>
               <div className="relative">
@@ -235,15 +228,15 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                   placeholder="0"
                   value={monto ? Number(monto).toLocaleString('es-AR') : ''}
                   onChange={(e) => setMonto(e.target.value.replace(/\D/g, ''))}
-                  className={cn(field, 'tnum h-12 pl-8 text-xl font-bold')}
+                  className={cn(formField, 'tnum h-12 pl-8 text-xl font-bold')}
                 />
               </div>
             </motion.div>
 
             {/* Frecuencia + Cantidad */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-3">
+            <motion.div variants={formItem} className="grid grid-cols-2 gap-3">
               <div>
-                <label className={label}>Cada</label>
+                <label className={formLabel}>Cada</label>
                 <Dropdown
                   block
                   ariaLabel="Frecuencia"
@@ -256,7 +249,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                 />
               </div>
               <div>
-                <label htmlFor="r-cant" className={label}>
+                <label htmlFor="r-cant" className={formLabel}>
                   Cuotas
                 </label>
                 <input
@@ -266,14 +259,14 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                   max={120}
                   value={cantidad}
                   onChange={(e) => setCantidad(e.target.value)}
-                  className={cn(field, 'tnum')}
+                  className={cn(formField, 'tnum')}
                 />
               </div>
             </motion.div>
 
             {/* Primera fecha */}
-            <motion.div variants={fade}>
-              <label htmlFor="r-primera" className={label}>
+            <motion.div variants={formItem}>
+              <label htmlFor="r-primera" className={formLabel}>
                 Primer vencimiento
               </label>
               <input
@@ -281,14 +274,14 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                 type="date"
                 value={primera}
                 onChange={(e) => setPrimera(e.target.value)}
-                className={cn(field, '[color-scheme:light]')}
+                className={cn(formField, '[color-scheme:light]')}
               />
             </motion.div>
 
             {/* Preview */}
             {montoNum > 0 && cant > 0 && (
               <motion.div
-                variants={fade}
+                variants={formItem}
                 className="rounded-xl border border-border bg-secondary/60 px-3.5 py-2.5 text-[13px]"
               >
                 <span className="font-bold text-ink">
@@ -302,9 +295,9 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
             )}
 
             {/* Categoría + Campo */}
-            <motion.div variants={fade} className="grid grid-cols-2 gap-3">
+            <motion.div variants={formItem} className="grid grid-cols-2 gap-3">
               <div>
-                <label className={label}>Categoría</label>
+                <label className={formLabel}>Categoría</label>
                 <Dropdown
                   block
                   ariaLabel="Categoría"
@@ -317,7 +310,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                 />
               </div>
               <div>
-                <label className={label}>Campo</label>
+                <label className={formLabel}>Campo</label>
                 <Dropdown
                   block
                   ariaLabel="Campo"
@@ -335,8 +328,8 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
             </motion.div>
 
             {/* Actividad */}
-            <motion.div variants={fade}>
-              <label className={label}>Actividad</label>
+            <motion.div variants={formItem}>
+              <label className={formLabel}>Actividad</label>
               <Dropdown
                 block
                 ariaLabel="Actividad"
@@ -353,7 +346,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
             </motion.div>
 
             {/* Más opciones */}
-            <motion.div variants={fade}>
+            <motion.div variants={formItem}>
               <button
                 type="button"
                 onClick={() => setMasOpciones((m) => !m)}
@@ -375,7 +368,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                   >
                     <div className="grid grid-cols-2 gap-3 pt-3">
                       <div>
-                        <label className={label}>Potrero</label>
+                        <label className={formLabel}>Potrero</label>
                         <Dropdown
                           block
                           ariaLabel="Potrero"
@@ -388,7 +381,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
                         />
                       </div>
                       <div>
-                        <label className={label}>
+                        <label className={formLabel}>
                           {esGasto ? 'Medio de pago' : 'Medio de cobro'}
                         </label>
                         <Dropdown
@@ -412,19 +405,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
             </motion.div>
 
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-
-            <motion.div variants={fade}>
-              <Button
-                type="submit"
-                disabled={crear.isPending || !empresaId}
-                className="h-11 w-full rounded-xl"
-              >
-                {crear.isPending ? 'Generando…' : `Crear ${cant || ''} cuotas`}
-              </Button>
-            </motion.div>
-          </motion.form>
-        </DialogContent>
-      </Dialog>
+      </FormDialog>
     </>
   )
 }

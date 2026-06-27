@@ -236,6 +236,27 @@
   animation: loadbar 1.1s ease-in-out infinite;
 }
 
+/* Scrollbar fino con track transparente: cuando un contenedor redondeado es a
+ * la vez el que scrollea (diálogos), evita que la barra "cuadre" la esquina de
+ * ese lado → el redondeo se ve parejo en los 4 ángulos. */
+.scroll-rounded {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+}
+.scroll-rounded::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-rounded::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-rounded::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 /* ===== Mapa de potreros (Leaflet) ===== */
 
 /* Etiqueta de potrero: "pill" oscura translúcida, legible sobre satélite. */
