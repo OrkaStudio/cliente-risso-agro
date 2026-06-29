@@ -7,6 +7,7 @@ import {
   type Variants,
 } from 'framer-motion'
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react'
+import { rootZoom } from '@/lib/zoom'
 import { cn } from '@/lib/utils'
 
 export type DropdownOption = {
@@ -32,9 +33,10 @@ type Pos = {
   left: number
   width: number
   up: boolean
-  anchorTop: number
-  anchorBottom: number
+  top: number
+  bottom: number
   maxH: number
+  maxW: number
 }
 
 /**
@@ -70,20 +72,29 @@ export function Dropdown({
   const place = React.useCallback(() => {
     const el = btnRef.current
     if (!el) return
+    // Coordenadas en el espacio zoomeado (ver lib/zoom): todo dividido por z.
+    const z = rootZoom()
     const r = el.getBoundingClientRect()
+    const left = r.left / z
+    const width = r.width / z
+    const aTop = r.top / z
+    const aBottom = r.bottom / z
+    const vh = window.innerHeight / z
+    const vw = window.innerWidth / z
     const M = 8
-    const below = window.innerHeight - r.bottom
-    const above = r.top
+    const below = vh - aBottom
+    const above = aTop
     const estimate = Math.min(options.length * 40 + 12, 320)
     const up = below < Math.min(estimate, 260) && above > below
     const maxH = Math.max(140, (up ? above : below) - M - 8)
     setPos({
-      left: r.left,
-      width: r.width,
+      left,
+      width,
       up,
-      anchorTop: r.top,
-      anchorBottom: r.bottom,
+      top: aBottom + 8,
+      bottom: vh - aTop + 8,
       maxH,
+      maxW: vw - left - 8,
     })
   }, [options.length])
 
@@ -169,11 +180,9 @@ export function Dropdown({
                 position: 'fixed',
                 left: pos.left,
                 minWidth: pos.width,
-                maxWidth: window.innerWidth - pos.left - 8,
+                maxWidth: pos.maxW,
                 zIndex: 60,
-                ...(pos.up
-                  ? { bottom: window.innerHeight - pos.anchorTop + 8 }
-                  : { top: pos.anchorBottom + 8 }),
+                ...(pos.up ? { bottom: pos.bottom } : { top: pos.top }),
               }}
             >
               <motion.div

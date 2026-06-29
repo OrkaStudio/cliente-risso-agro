@@ -27,6 +27,7 @@ import {
 import type { CampoConPotreros, LatLng } from '@/features/campos/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { CampoFormDialog } from '@/features/campos/campos-dialogs'
+import { PageHeader, Stat } from '@/components/page-header'
 import { PotreroCard } from '@/features/potrero/potrero-card'
 import {
   CampoMapaReal,
@@ -396,21 +397,21 @@ export function LotesPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-            Campos
-          </h1>
-          <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-            {campos.length} campos · {totalPotreros} potreros · superficie y uso
-            de cada potrero
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <VistaToggle vista={vista} setVista={setVista} />
-          <CampoFormDialog empresaId={empresaId} triggerLabel="+ Nuevo campo" />
-        </div>
-      </div>
+      <PageHeader
+        title="Campos"
+        meta={
+          <>
+            <Stat>{campos.length}</Stat> campos · <Stat>{totalPotreros}</Stat>{' '}
+            potreros · superficie y uso de cada potrero
+          </>
+        }
+        action={
+          <>
+            <VistaToggle vista={vista} setVista={setVista} />
+            <CampoFormDialog empresaId={empresaId} triggerLabel="+ Nuevo campo" />
+          </>
+        }
+      />
 
       {/* KPIs */}
       <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">

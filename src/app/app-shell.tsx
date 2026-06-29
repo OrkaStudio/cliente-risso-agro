@@ -102,11 +102,11 @@ export function AppShell() {
     })
 
   return (
-    <div className="flex h-svh overflow-hidden bg-background">
+    <div className="flex h-full overflow-hidden bg-background">
       {/* ===== Sidebar ===== */}
       <aside
         className={cn(
-          'm-4 flex h-[calc(100svh-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out',
+          'm-4 flex h-[calc(100%-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out',
           collapsed ? 'w-[76px]' : 'w-[248px]',
         )}
       >

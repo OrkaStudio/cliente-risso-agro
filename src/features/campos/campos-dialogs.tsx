@@ -1,5 +1,7 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
+import { motion } from 'framer-motion'
+import { LandPlot, MapPin } from 'lucide-react'
 import { Constants } from '@/lib/supabase/types'
 import type { Campo, Potrero } from '@/features/campos/api'
 import {
@@ -12,46 +14,16 @@ import { estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Dropdown } from '@/components/ui/dropdown'
+import { FormDialog, formItem } from '@/components/form-dialog'
 
 function parseHa(v: string): number | null {
   const n = Number(v)
   return v.trim() === '' || Number.isNaN(n) ? null : n
 }
 
-function Shell({
-  trigger,
-  titulo,
-  open,
-  setOpen,
-  children,
-}: {
-  trigger: ReactNode
-  titulo: string
-  open: boolean
-  setOpen: (v: boolean) => void
-  children: ReactNode
-}) {
-  return (
-    <>
-      <span onClick={() => setOpen(true)}>{trigger}</span>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{titulo}</DialogTitle>
-          </DialogHeader>
-          {children}
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
+const footerBtn =
+  'h-12 w-full rounded-xl text-[15px] font-semibold shadow-[0_4px_14px_rgba(16,30,20,0.18)]'
 
 // --- Campo ------------------------------------------------------------
 export function CampoFormDialog({
@@ -109,18 +81,28 @@ export function CampoFormDialog({
   }
 
   return (
-    <Shell
-      open={open}
-      setOpen={setOpen}
-      titulo={editing ? 'Editar campo' : 'Nuevo campo'}
-      trigger={
-        <Button variant={triggerVariant} size="sm">
-          {triggerLabel}
-        </Button>
-      }
-    >
-      <form onSubmit={onSubmit} className="grid gap-4">
-        <div className="grid gap-2">
+    <>
+      <Button variant={triggerVariant} size="sm" onClick={() => setOpen(true)}>
+        {triggerLabel}
+      </Button>
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        icon={MapPin}
+        title={editing ? 'Editar campo' : 'Nuevo campo'}
+        subtitle={
+          editing
+            ? 'Actualizá los datos del campo'
+            : 'Un establecimiento propio o alquilado'
+        }
+        onSubmit={onSubmit}
+        footer={
+          <Button type="submit" disabled={pending || !empresaId} className={footerBtn}>
+            {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear campo'}
+          </Button>
+        }
+      >
+        <motion.div variants={formItem} className="grid gap-2">
           <Label htmlFor="campo-nombre">Nombre</Label>
           <Input
             id="campo-nombre"
@@ -128,8 +110,8 @@ export function CampoFormDialog({
             onChange={(e) => setNombre(e.target.value)}
             autoFocus
           />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+        </motion.div>
+        <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label>Tipo</Label>
             <Dropdown
@@ -153,13 +135,10 @@ export function CampoFormDialog({
               onChange={(e) => setHectareas(e.target.value)}
             />
           </div>
-        </div>
+        </motion.div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" disabled={pending || !empresaId}>
-          {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear campo'}
-        </Button>
-      </form>
-    </Shell>
+      </FormDialog>
+    </>
   )
 }
 
@@ -224,18 +203,28 @@ export function PotreroFormDialog({
   }
 
   return (
-    <Shell
-      open={open}
-      setOpen={setOpen}
-      titulo={editing ? 'Editar potrero' : 'Nuevo potrero'}
-      trigger={
-        <Button variant={triggerVariant} size="sm">
-          {triggerLabel}
-        </Button>
-      }
-    >
-      <form onSubmit={onSubmit} className="grid gap-4">
-        <div className="grid gap-2">
+    <>
+      <Button variant={triggerVariant} size="sm" onClick={() => setOpen(true)}>
+        {triggerLabel}
+      </Button>
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        icon={LandPlot}
+        title={editing ? 'Editar potrero' : 'Nuevo potrero'}
+        subtitle={
+          editing
+            ? 'Actualizá los datos del potrero'
+            : 'Una división dentro del campo'
+        }
+        onSubmit={onSubmit}
+        footer={
+          <Button type="submit" disabled={pending || !empresaId} className={footerBtn}>
+            {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear potrero'}
+          </Button>
+        }
+      >
+        <motion.div variants={formItem} className="grid gap-2">
           <Label htmlFor="potrero-nombre">Nombre</Label>
           <Input
             id="potrero-nombre"
@@ -243,8 +232,8 @@ export function PotreroFormDialog({
             onChange={(e) => setNombre(e.target.value)}
             autoFocus
           />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+        </motion.div>
+        <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label>Estado del ciclo</Label>
             <Dropdown
@@ -268,12 +257,9 @@ export function PotreroFormDialog({
               onChange={(e) => setHectareas(e.target.value)}
             />
           </div>
-        </div>
+        </motion.div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" disabled={pending || !empresaId}>
-          {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear potrero'}
-        </Button>
-      </form>
-    </Shell>
+      </FormDialog>
+    </>
   )
 }

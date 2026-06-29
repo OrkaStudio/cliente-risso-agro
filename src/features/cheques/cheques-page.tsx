@@ -18,6 +18,7 @@ import {
 } from '@/features/cheques/cheques-dialogs'
 import { ChequesCalendario } from '@/features/cheques/cheques-calendario'
 import { Panel } from '@/components/panel'
+import { PageHeader } from '@/components/page-header'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number): string {
@@ -163,17 +164,11 @@ export function ChequesPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-            Cheques y echeqs
-          </h1>
-          <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-            Cobros y pagos con cheque, por vencimiento
-          </p>
-        </div>
-        <CargarChequeDialog empresaId={empresaId} />
-      </div>
+      <PageHeader
+        title="Cheques y echeqs"
+        meta="Cobros y pagos con cheque, por vencimiento"
+        action={<CargarChequeDialog empresaId={empresaId} />}
+      />
 
       {/* KPIs */}
       <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">

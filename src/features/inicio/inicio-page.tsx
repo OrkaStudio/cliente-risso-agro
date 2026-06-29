@@ -19,6 +19,7 @@ import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { PotreroCard } from '@/features/potrero/potrero-card'
 import { Panel } from '@/components/panel'
+import { PageHeader, Stat } from '@/components/page-header'
 import { cn } from '@/lib/utils'
 
 function fmtCompact(n: number): string {
@@ -413,15 +414,16 @@ export function InicioPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
-      <div>
-        <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-          La empresa hoy
-        </h1>
-        <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-          {fechaLarga()} · {campos} {campos === 1 ? 'campo' : 'campos'} ·{' '}
-          {data.potreros.length} potreros
-        </p>
-      </div>
+      <PageHeader
+        title="La empresa hoy"
+        meta={
+          <>
+            {fechaLarga()} · <Stat>{campos}</Stat>{' '}
+            {campos === 1 ? 'campo' : 'campos'} ·{' '}
+            <Stat>{data.potreros.length}</Stat> potreros
+          </>
+        }
+      />
 
       {/* Alerta de cheques que vencen pronto */}
       <ChequesAlerta />

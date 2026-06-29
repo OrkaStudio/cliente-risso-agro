@@ -46,8 +46,13 @@ export function Panel({
       )}
     >
       {hasHeader && (
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <h3 className="font-heading text-[17px] font-semibold text-ink">
+        <div className="mb-5 flex items-center justify-between gap-3 border-b border-border/70 pb-4">
+          <h3 className="flex items-center gap-2.5 font-heading text-[17px] font-semibold text-ink">
+            {/* Acento que ancla el título (no más título aislado) */}
+            <span
+              aria-hidden
+              className="h-[18px] w-[3px] shrink-0 rounded-full bg-field"
+            />
             {title}
           </h3>
           {action ??

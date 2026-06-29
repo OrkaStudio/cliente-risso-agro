@@ -32,6 +32,7 @@ import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-d
 import { CargarRecurrenteDialog } from '@/features/analitica/cargar-recurrente-dialog'
 import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
 import { Panel } from '@/components/panel'
+import { PageHeader } from '@/components/page-header'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 
@@ -125,33 +126,33 @@ export function AnaliticaPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-            Analítica
-          </h1>
-          <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
+      <PageHeader
+        title="Analítica"
+        meta={
+          <>
             Cargá la plata, decidí con la data ·{' '}
             {nombreCampo ?? 'Toda la empresa'}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Dropdown
-            ariaLabel="Filtrar por campo"
-            value={campoF ?? 'empresa'}
-            onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
-            options={[
-              { value: 'empresa', label: 'Toda la empresa' },
-              ...(camposLista.data ?? []).map((c) => ({
-                value: c.id,
-                label: c.nombre,
-              })),
-            ]}
-          />
-          <CargarRecurrenteDialog empresaId={empresaId} />
-          <CargarMovimientoDialog empresaId={empresaId} />
-        </div>
-      </div>
+          </>
+        }
+        action={
+          <>
+            <Dropdown
+              ariaLabel="Filtrar por campo"
+              value={campoF ?? 'empresa'}
+              onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
+              options={[
+                { value: 'empresa', label: 'Toda la empresa' },
+                ...(camposLista.data ?? []).map((c) => ({
+                  value: c.id,
+                  label: c.nombre,
+                })),
+              ]}
+            />
+            <CargarRecurrenteDialog empresaId={empresaId} />
+            <CargarMovimientoDialog empresaId={empresaId} />
+          </>
+        }
+      />
 
       {movs.isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>

@@ -17,6 +17,7 @@ import {
 import type { Cheque } from '@/features/cheques/api'
 import { LiquidarChequeDialog } from '@/features/cheques/cheques-dialogs'
 import { Panel } from '@/components/panel'
+import { rootZoom } from '@/lib/zoom'
 import { cn } from '@/lib/utils'
 
 const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do']
@@ -58,7 +59,30 @@ function diasTexto(fecha: string | null): { texto: string; urgente: boolean } | 
 
 const ddmmaaaa = (f: string) => f.split('-').reverse().join('/')
 
-type CardPos = { left: number; up: boolean; anchorTop: number; anchorBottom: number }
+// Coordenadas en espacio zoomeado (ver lib/zoom): `top`/`bottom` ya resueltos.
+type CardPos = { left: number; up: boolean; top: number; bottom: number }
+
+/** Calcula la posición de un popover anclado a `el`, corrigiendo el zoom de
+ *  <html> (getBoundingClientRect/window.* vienen en px visuales → dividir por z).
+ *  `ancho`/`alto` son estimaciones para decidir el flip y el clamp horizontal. */
+function anclarPopover(el: HTMLElement, ancho: number, alto: number): CardPos {
+  const z = rootZoom()
+  const r = el.getBoundingClientRect()
+  const left = r.left / z
+  const top = r.top / z
+  const bottom = r.bottom / z
+  const vw = window.innerWidth / z
+  const vh = window.innerHeight / z
+  const clampedLeft = Math.min(Math.max(8, left), vw - ancho - 8)
+  const espacioAbajo = vh - bottom
+  const up = espacioAbajo < alto && top > espacioAbajo
+  return {
+    left: clampedLeft,
+    up,
+    top: bottom + 8,
+    bottom: vh - top + 8,
+  }
+}
 
 /** Tarjeta de detalle que aparece al pasar el mouse sobre un chip. Se posiciona
  *  contra la ventana (portal) para que no la recorte la grilla. */
@@ -91,9 +115,7 @@ function DetalleCard({
           left: pos.left,
           width: 268,
           zIndex: 70,
-          ...(pos.up
-            ? { bottom: window.innerHeight - pos.anchorTop + 8 }
-            : { top: pos.anchorBottom + 8 }),
+          ...(pos.up ? { bottom: pos.bottom } : { top: pos.top }),
         }}
         className="rounded-xl border border-border bg-card p-3.5 shadow-[0_14px_44px_rgba(16,30,20,0.2)]"
       >
@@ -219,15 +241,8 @@ function ChequeChip({ c }: { c: Cheque }) {
 
   const abrir = () => {
     window.clearTimeout(timer.current)
-    const el = btnRef.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const ANCHO = 268
-    const ALTO = 230
-    const left = Math.min(Math.max(8, r.left), window.innerWidth - ANCHO - 8)
-    const espacioAbajo = window.innerHeight - r.bottom
-    const up = espacioAbajo < ALTO && r.top > espacioAbajo
-    setPos({ left, up, anchorTop: r.top, anchorBottom: r.bottom })
+    if (!btnRef.current) return
+    setPos(anclarPopover(btnRef.current, 268, 230))
   }
   const cerrarDif = () => {
     timer.current = window.setTimeout(() => setPos(null), 110)
@@ -342,9 +357,7 @@ function DiaPopover({
           left: pos.left,
           width: 300,
           zIndex: 41,
-          ...(pos.up
-            ? { bottom: window.innerHeight - pos.anchorTop + 8 }
-            : { top: pos.anchorBottom + 8 }),
+          ...(pos.up ? { bottom: pos.bottom } : { top: pos.top }),
         }}
         className="flex max-h-[330px] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_14px_44px_rgba(16,30,20,0.22)]"
       >
@@ -386,13 +399,7 @@ function DiaContenido({
 
   const abrir = (el: HTMLElement | null) => {
     if (!el) return
-    const r = el.getBoundingClientRect()
-    const ANCHO = 300
-    const ALTO = 330
-    const left = Math.min(Math.max(8, r.left), window.innerWidth - ANCHO - 8)
-    const espacioAbajo = window.innerHeight - r.bottom
-    const up = espacioAbajo < ALTO && r.top > espacioAbajo
-    setPos({ left, up, anchorTop: r.top, anchorBottom: r.bottom })
+    setPos(anclarPopover(el, 300, 330))
   }
 
   const tieneItems = items.length > 0

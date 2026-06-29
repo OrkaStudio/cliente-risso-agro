@@ -185,6 +185,21 @@
   html {
     @apply font-sans;
     font-size: 16px;
+    /* Bump global sutil de toda la UI (texto + números) para mejor legibilidad
+       del público 40+. Escala proporcional → no aprieta el layout. */
+    zoom: 1.06;
+  }
+  /* La cadena de altura va por porcentaje (no `svh`): los % se adaptan al zoom,
+     las unidades de viewport NO → con zoom desbordaban y aparecía una segunda
+     scrollbar. `overflow: hidden` en html/body blinda contra rounding. */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html,
+  body {
+    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground;

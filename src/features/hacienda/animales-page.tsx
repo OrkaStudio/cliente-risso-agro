@@ -9,8 +9,9 @@ import {
   categoriaLabel,
   sexoLabel,
 } from '@/features/hacienda/labels'
+import { CrearAnimalDialog } from '@/features/hacienda/crear-animal-dialog'
 import { Panel } from '@/components/panel'
-import { buttonVariants } from '@/components/ui/button'
+import { PageHeader, Stat } from '@/components/page-header'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 
@@ -107,20 +108,16 @@ export function AnimalesPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-[32px] font-bold tracking-[-0.03em] text-ink">
-            Hacienda
-          </h1>
-          <p className="mt-1 text-[14.5px] font-medium text-muted-foreground">
-            <span className="tnum">{totalActivos}</span> cabezas activas ·{' '}
-            {potrerosConAnimales} potreros con animales
-          </p>
-        </div>
-        <Link to="/hacienda/nuevo" className={buttonVariants()}>
-          + Nuevo animal
-        </Link>
-      </div>
+      <PageHeader
+        title="Hacienda"
+        meta={
+          <>
+            <Stat>{totalActivos}</Stat> cabezas activas ·{' '}
+            <Stat>{potrerosConAnimales}</Stat> potreros con animales
+          </>
+        }
+        action={<CrearAnimalDialog />}
+      />
 
       {/* Stock por categoría */}
       <Panel title="Stock por categoría" sub={`${totalActivos} cabezas activas`}>

@@ -19,11 +19,6 @@ const AnimalesPage = lazy(() =>
     default: m.AnimalesPage,
   })),
 )
-const AltaAnimalPage = lazy(() =>
-  import('@/features/hacienda/alta-animal-page').then((m) => ({
-    default: m.AltaAnimalPage,
-  })),
-)
 const FichaAnimalPage = lazy(() =>
   import('@/features/hacienda/ficha-animal-page').then((m) => ({
     default: m.FichaAnimalPage,
@@ -71,7 +66,6 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <InicioPage /> },
           { path: 'hacienda', element: <AnimalesPage /> },
-          { path: 'hacienda/nuevo', element: <AltaAnimalPage /> },
           { path: 'hacienda/:id', element: <FichaAnimalPage /> },
           { path: 'campos', element: <LotesPage /> },
           { path: 'campos/:id', element: <CampoDetailPage /> },
