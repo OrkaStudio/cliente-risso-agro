@@ -27,6 +27,20 @@ export function useCrearAnimal() {
   })
 }
 
+export function useCrearAnimalesMasivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.crearAnimalesMasivo,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['animales'] })
+      qc.invalidateQueries({ queryKey: ['stock-potrero'] })
+      qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
+      qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
+      qc.invalidateQueries({ queryKey: ['lotes-campo'] })
+    },
+  })
+}
+
 export function useRegistrarEvento(animalId: string) {
   const qc = useQueryClient()
   return useMutation({

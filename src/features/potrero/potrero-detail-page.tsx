@@ -1,14 +1,17 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Beef,
   ChevronLeft,
   LandPlot,
+  Layers,
   Scale,
   Sprout,
   TrendingUp,
 } from 'lucide-react'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
+import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
+import { Button } from '@/components/ui/button'
 import {
   estadoCicloColor,
   estadoCicloLabel,
@@ -254,6 +257,7 @@ export function PotreroDetailPage() {
   const empresaId = empresa.data?.empresa_id ?? ''
   const { data, isLoading, error } = usePotreroDetalle(id)
   const movs = useMovimientos()
+  const [cargaOpen, setCargaOpen] = useState(false)
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -333,6 +337,20 @@ export function PotreroDetailPage() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
+            <Button onClick={() => setCargaOpen(true)} className="gap-1.5">
+              <Layers className="size-4" />
+              Cargar animales
+            </Button>
+            <CargaMasivaDialog
+              open={cargaOpen}
+              onOpenChange={setCargaOpen}
+              prefill={{
+                campoId: data.campoId,
+                potreroId: data.id,
+                campoNombre: data.campoNombre,
+                potreroNombre: data.nombre,
+              }}
+            />
             <CargarMovimientoDialog
               empresaId={empresaId}
               campoInicial={data.campoId}

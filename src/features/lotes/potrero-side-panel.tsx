@@ -1,3 +1,5 @@
+// Exporta el componente + helpers (USO/tipos) del mismo módulo (patrón del repo).
+/* eslint-disable react-refresh/only-export-components */
 import { useState } from 'react'
 import {
   ArrowRight,

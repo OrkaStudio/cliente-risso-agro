@@ -1,23 +1,18 @@
-import { useMemo, useState, type ComponentType } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
-  Beef,
-  Building2,
-  CircleDashed,
   Receipt,
   TrendingUp,
-  Wheat,
 } from 'lucide-react'
-import type { Database } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCampos } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
-  actividadLabel,
   cuentasPendientes,
+  fmtCompact,
   formatARS,
   gastosPorCategoria,
   ingresosPorCategoria,
@@ -30,6 +25,7 @@ import {
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
 import { CargarRecurrenteDialog } from '@/features/analitica/cargar-recurrente-dialog'
+import { RentabilidadActividad } from '@/features/analitica/rentabilidad-actividad'
 import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
 import { Panel } from '@/components/panel'
 import { PageHeader } from '@/components/page-header'
@@ -48,26 +44,6 @@ function mesCorto(yyyymm: string): string {
 function mesLargo(yyyymm: string): string {
   const m = Number(yyyymm.slice(5, 7))
   return `${MESES[m - 1] ?? yyyymm} ${yyyymm.slice(0, 4)}`
-}
-
-function fmtCompact(n: number): string {
-  const abs = Math.abs(n)
-  const sign = n < 0 ? '−' : ''
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
-  return `${sign}$${abs}`
-}
-
-type Actividad = Database['public']['Enums']['actividad_movimiento']
-const actividadMeta: Record<
-  Actividad | 'sin',
-  { color: string; Icon: ComponentType<{ className?: string }> }
-> = {
-  cria: { color: 'var(--ganado)', Icon: Beef },
-  invernada: { color: 'var(--g1)', Icon: TrendingUp },
-  agricultura: { color: 'var(--sol-deep)', Icon: Wheat },
-  estructura: { color: 'var(--tierra)', Icon: Building2 },
-  sin: { color: 'var(--faint)', Icon: CircleDashed },
 }
 
 const estadoMov: Record<string, { label: string; cls: string }> = {
@@ -121,7 +97,6 @@ export function AnaliticaPage() {
   )
 
   const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.resultado)))
-  const maxAct = Math.max(1, ...actividades.map((a) => Math.abs(a.resultado)))
 
   return (
     <div className="flex flex-col gap-6">
@@ -249,59 +224,7 @@ export function AnaliticaPage() {
           </Panel>
 
           {/* Rentabilidad por actividad — qué actividad rinde */}
-          {actividades.length > 0 && (
-            <Panel
-              title="Rentabilidad por actividad"
-              sub="qué actividad rinde y cuál no"
-            >
-              <div className="flex flex-col gap-4">
-                {actividades.map((a) => {
-                  const meta = actividadMeta[a.actividad]
-                  const neg = a.resultado < 0
-                  const numColor = neg
-                    ? 'var(--destructive)'
-                    : 'var(--field-deep)'
-                  return (
-                    <div key={a.actividad} className="flex items-center gap-3.5">
-                      <span
-                        className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-                        style={{
-                          color: meta.color,
-                          background: `color-mix(in srgb, ${meta.color} 12%, transparent)`,
-                        }}
-                      >
-                        <meta.Icon className="size-[19px]" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate font-semibold text-ink">
-                            {a.actividad === 'sin'
-                              ? 'Sin asignar'
-                              : actividadLabel[a.actividad]}
-                          </span>
-                          <span
-                            className="tnum shrink-0 text-[15px] font-bold"
-                            style={{ color: numColor }}
-                          >
-                            {fmtCompact(a.resultado)}
-                          </span>
-                        </div>
-                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${(Math.abs(a.resultado) / maxAct) * 100}%`,
-                              background: neg ? 'var(--destructive)' : meta.color,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </Panel>
-          )}
+          <RentabilidadActividad actividades={actividades} />
 
           {/* Proyección de flujo de fondos — lo que va a entrar/salir por mes */}
           <Panel

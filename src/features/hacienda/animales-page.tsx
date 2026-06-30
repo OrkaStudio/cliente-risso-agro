@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Search, X } from 'lucide-react'
+import { ArrowRight, Layers, Search, X } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useAnimales, usePotreros } from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
@@ -45,6 +45,7 @@ export function AnimalesPage() {
   const [estF, setEstF] = useState<Estado>('activo')
   const [potF, setPotF] = useState<string | null>(null)
   const [campoF, setCampoF] = useState<string | null>(null)
+  const [soloSinCaravana, setSoloSinCaravana] = useState(false)
   const [view, setView] = useState<'tabla' | 'potrero'>('tabla')
 
   const potreroNombre = useMemo(
@@ -70,7 +71,7 @@ export function AnimalesPage() {
   )
 
   // Stock por categoría = activos del alcance (no depende de los filtros de la tabla).
-  const { porCategoria, totalActivos } = useMemo(() => {
+  const { porCategoria, totalActivos, sinCaravana } = useMemo(() => {
     const activos = lista.filter((a) => a.estado === 'activo')
     const conteo = new Map<Categoria, number>()
     for (const a of activos) {
@@ -80,13 +81,18 @@ export function AnimalesPage() {
     const porCategoria = [...conteo.entries()]
       .map(([categoria, n]) => ({ categoria, n }))
       .sort((a, b) => b.n - a.n)
-    return { porCategoria, totalActivos: activos.length }
+    return {
+      porCategoria,
+      totalActivos: activos.length,
+      sinCaravana: activos.filter((a) => !a.caravana_rfid).length,
+    }
   }, [lista])
 
   const filtered = useMemo(() => {
     const txt = q.trim().toLowerCase()
     return lista.filter((a) => {
       if (a.estado !== estF) return false
+      if (soloSinCaravana && a.caravana_rfid) return false
       if (catF !== 'todas' && a.categoria !== catF) return false
       if (potF && a.potrero_id !== potF) return false
       if (
@@ -98,7 +104,7 @@ export function AnimalesPage() {
         return false
       return true
     })
-  }, [lista, q, catF, estF, potF])
+  }, [lista, q, catF, estF, potF, soloSinCaravana])
 
   const potrerosConAnimales = useMemo(
     () => new Set(lista.filter((a) => a.estado === 'activo').map((a) => a.potrero_id)).size,
@@ -114,6 +120,12 @@ export function AnimalesPage() {
           <>
             <Stat>{totalActivos}</Stat> cabezas activas ·{' '}
             <Stat>{potrerosConAnimales}</Stat> potreros con animales
+            {sinCaravana > 0 && (
+              <>
+                {' '}
+                · <Stat>{sinCaravana}</Stat> sin caravana
+              </>
+            )}
           </>
         }
         action={<CrearAnimalDialog />}
@@ -217,6 +229,25 @@ export function AnimalesPage() {
             { value: 'muerto', label: 'Bajas' },
           ]}
         />
+
+        {(soloSinCaravana || sinCaravana > 0) && (
+          <button
+            type="button"
+            onClick={() => setSoloSinCaravana((v) => !v)}
+            className={cn(
+              'inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13.5px] font-semibold transition-colors',
+              soloSinCaravana
+                ? 'border-primary bg-field-soft text-field-deep'
+                : 'border-border bg-card text-muted-foreground hover:text-ink',
+            )}
+          >
+            <Layers className="size-4" />
+            Sin caravana
+            <span className="tnum rounded-full bg-ink/[0.06] px-1.5 text-[12px]">
+              {sinCaravana}
+            </span>
+          </button>
+        )}
 
         <div className="ml-auto flex h-10 rounded-[10px] border border-border bg-secondary p-0.5">
           {(['tabla', 'potrero'] as const).map((v) => (

@@ -137,6 +137,16 @@ const fmt = new Intl.NumberFormat('es-AR', {
 })
 export const formatARS = (n: number) => fmt.format(n)
 
+/** Monto compacto para ejes/etiquetas: $1,2M / $30k / $50. Signo con −. */
+export function fmtCompact(n: number): string {
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '−' : ''
+  if (abs >= 1_000_000)
+    return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
+  return `${sign}$${abs}`
+}
+
 // ===== Rentabilidad por potrero =====
 // Lo que más le importa al productor: qué potrero rindió y cuál no. Solo entran
 // los movimientos imputados a un potrero (los de nivel campo no se prorratean).

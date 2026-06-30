@@ -1067,6 +1067,16 @@ export type Database = {
         }
         Returns: string
       }
+      crear_animales_masivo: {
+        Args: {
+          p_empresa_id: string
+          p_items?: Json
+          p_lote_id?: string
+          p_origen?: string
+          p_potrero_id?: string
+        }
+        Returns: number
+      }
       dar_baja_animal: {
         Args: {
           p_animal_id: string

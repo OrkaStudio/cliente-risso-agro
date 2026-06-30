@@ -94,6 +94,57 @@ export async function crearAnimal(input: NuevoAnimal): Promise<string> {
   return data
 }
 
+/** Una fila de la carga: categoría + cuántas cabezas de esa categoría. */
+export type ItemCargaMasiva = { categoria: CategoriaAnimal; cantidad: number }
+
+export type CargaMasiva = {
+  empresaId: string
+  potreroId?: string | null
+  /** Si se da un nombre de lote, se crea la tropa y se le asignan los animales. */
+  loteNombre?: string
+  loteProposito?: string
+  origen?: string
+  items: ItemCargaMasiva[]
+}
+
+/**
+ * Carga masiva por lote SIN caravana: crea N animales por cada {categoría,
+ * cantidad} (el sexo lo deriva Postgres). Si viene `loteNombre`, primero crea
+ * la tropa (lote) en el potrero y la usa como `lote_id`. Devuelve cuántos
+ * animales se crearon. Se caravanean después en el modo manga.
+ */
+export async function crearAnimalesMasivo(input: CargaMasiva): Promise<number> {
+  const items = input.items.filter((it) => it.cantidad > 0)
+  if (items.length === 0) throw new Error('No hay cantidades para cargar')
+
+  let loteId: string | null = null
+  const nombre = input.loteNombre?.trim()
+  if (nombre) {
+    const { data: lote, error: eLote } = await supabase
+      .from('lote')
+      .insert({
+        empresa_id: input.empresaId,
+        nombre,
+        proposito: input.loteProposito?.trim() || null,
+        potrero_id: input.potreroId || null,
+      })
+      .select('id')
+      .single()
+    if (eLote) throw new Error(eLote.message)
+    loteId = lote.id
+  }
+
+  const { data, error } = await supabase.rpc('crear_animales_masivo', {
+    p_empresa_id: input.empresaId,
+    p_potrero_id: input.potreroId || undefined,
+    p_lote_id: loteId || undefined,
+    p_origen: input.origen?.trim() || undefined,
+    p_items: items,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
 /** Cambiar la caravana conservando la identidad del animal (RPC transaccional). */
 export async function cambiarCaravana(input: {
   animalId: string
