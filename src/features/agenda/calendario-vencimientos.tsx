@@ -1,26 +1,54 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
+  Banknote,
   CalendarClock,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleDot,
+  CreditCard,
   Hash,
   Landmark,
   MousePointerClick,
+  Wallet,
 } from 'lucide-react'
-import type { Cheque } from '@/features/cheques/api'
-import { LiquidarChequeDialog } from '@/features/cheques/cheques-dialogs'
+import type { Database } from '@/lib/supabase/types'
+import { medioLabel, type Vencimiento } from '@/features/agenda/api'
+import { LiquidarDialog } from '@/features/agenda/liquidar-dialog'
 import { Panel } from '@/components/panel'
 import { rootZoom } from '@/lib/zoom'
 import { cn } from '@/lib/utils'
 
+type MedioPago = Database['public']['Enums']['medio_pago']
+
 const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do']
+
+/** Ícono del medio de pago (el cheque/echeq usa Landmark). */
+const MEDIO_ICON: Record<MedioPago, ComponentType<{ className?: string }>> = {
+  efectivo: Banknote,
+  transferencia: ArrowLeftRight,
+  cheque: Landmark,
+  mercadopago: Wallet,
+  otro: CircleDot,
+}
+/** Badge de medio de pago (ícono + label). Componente estático (no se crea en
+ *  render) → se renderiza por acceso de miembro, como el resto del repo. */
+function MedioBadge({ medio, esEcheq }: { medio: MedioPago | null; esEcheq: boolean }) {
+  const meta = medio ? { Icon: MEDIO_ICON[medio] } : { Icon: CreditCard }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 text-[10.5px] font-bold uppercase text-muted-foreground">
+      <meta.Icon className="size-3" />
+      {medioLabel(medio, esEcheq)}
+    </span>
+  )
+}
 
 function fmtCompact(n: number): string {
   const abs = Math.abs(n)
@@ -36,11 +64,11 @@ function estaVencido(fecha: string | null): boolean {
   return new Date(y, m - 1, d).getTime() < new Date().setHours(0, 0, 0, 0)
 }
 
-/** Fecha con la que el cheque se ubica en el calendario: los ya cobrados/pagados
- *  por su fecha de cobro/pago (cuándo pasó); los pendientes por su vencimiento. */
-function fechaEnCalendario(c: Cheque): string | null {
-  if (c.estado === 'liquidado') return c.fechaCobroPago ?? c.fechaVencimiento
-  return c.fechaVencimiento
+/** Fecha con la que el ítem se ubica en el calendario: los ya cobrados/pagados
+ *  por su fecha de cobro/pago; los pendientes por su vencimiento. */
+function fechaEnCalendario(v: Vencimiento): string | null {
+  if (v.estado === 'liquidado') return v.fechaCobroPago ?? v.fechaVencimiento
+  return v.fechaVencimiento
 }
 
 function diasTexto(fecha: string | null): { texto: string; urgente: boolean } | null {
@@ -50,8 +78,7 @@ function diasTexto(fecha: string | null): { texto: string; urgente: boolean } | 
     (new Date(y, m - 1, d).getTime() - new Date().setHours(0, 0, 0, 0)) /
       86400000,
   )
-  if (dias < 0)
-    return { texto: `vencido hace ${-dias} d`, urgente: true }
+  if (dias < 0) return { texto: `vencido hace ${-dias} d`, urgente: true }
   if (dias === 0) return { texto: 'vence hoy', urgente: true }
   if (dias === 1) return { texto: 'vence mañana', urgente: true }
   return { texto: `en ${dias} días`, urgente: dias <= 3 }
@@ -59,12 +86,9 @@ function diasTexto(fecha: string | null): { texto: string; urgente: boolean } | 
 
 const ddmmaaaa = (f: string) => f.split('-').reverse().join('/')
 
-// Coordenadas en espacio zoomeado (ver lib/zoom): `top`/`bottom` ya resueltos.
 type CardPos = { left: number; up: boolean; top: number; bottom: number }
 
-/** Calcula la posición de un popover anclado a `el`, corrigiendo el zoom de
- *  <html> (getBoundingClientRect/window.* vienen en px visuales → dividir por z).
- *  `ancho`/`alto` son estimaciones para decidir el flip y el clamp horizontal. */
+/** Posición de un popover anclado a `el`, corrigiendo el zoom de <html>. */
 function anclarPopover(el: HTMLElement, ancho: number, alto: number): CardPos {
   const z = rootZoom()
   const r = el.getBoundingClientRect()
@@ -76,31 +100,25 @@ function anclarPopover(el: HTMLElement, ancho: number, alto: number): CardPos {
   const clampedLeft = Math.min(Math.max(8, left), vw - ancho - 8)
   const espacioAbajo = vh - bottom
   const up = espacioAbajo < alto && top > espacioAbajo
-  return {
-    left: clampedLeft,
-    up,
-    top: bottom + 8,
-    bottom: vh - top + 8,
-  }
+  return { left: clampedLeft, up, top: bottom + 8, bottom: vh - top + 8 }
 }
 
-/** Tarjeta de detalle que aparece al pasar el mouse sobre un chip. Se posiciona
- *  contra la ventana (portal) para que no la recorte la grilla. */
+/** Tarjeta de detalle al pasar el mouse sobre un chip (portal contra la ventana). */
 function DetalleCard({
-  c,
+  v,
   pos,
   onEnter,
   onLeave,
 }: {
-  c: Cheque
+  v: Vencimiento
   pos: CardPos
   onEnter: () => void
   onLeave: () => void
 }) {
-  const cobro = c.tipo === 'ingreso'
-  const liquidado = c.estado === 'liquidado'
-  const dias = liquidado ? null : diasTexto(c.fechaVencimiento)
-  const titulo = c.contraparte ?? c.descripcion ?? (cobro ? 'Cobro' : 'Pago')
+  const cobro = v.tipo === 'ingreso'
+  const liquidado = v.estado === 'liquidado'
+  const dias = liquidado ? null : diasTexto(v.fechaVencimiento)
+  const titulo = v.contraparte ?? v.descripcion ?? (cobro ? 'Cobro' : 'Pago')
   return createPortal(
     <AnimatePresence>
       <motion.div
@@ -120,7 +138,6 @@ function DetalleCard({
         className="rounded-xl border border-border bg-card p-3.5 shadow-[0_14px_44px_rgba(16,30,20,0.2)]"
       >
         <div className="flex items-center gap-1.5">
-          {/* Estado: si ya se saldó, solo "Pagado/Cobrado" (no "A pagar"). */}
           {liquidado ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-field-deep/12 px-1.5 py-0.5 text-[10.5px] font-bold uppercase text-field-deep">
               <CheckCircle2 className="size-3" />
@@ -143,11 +160,7 @@ function DetalleCard({
               {cobro ? 'A cobrar' : 'A pagar'}
             </span>
           )}
-          {c.esEcheq && (
-            <span className="rounded-md bg-sky/15 px-1.5 py-0.5 text-[10.5px] font-bold uppercase text-sky">
-              echeq
-            </span>
-          )}
+          <MedioBadge medio={v.medio} esEcheq={v.esEcheq} />
         </div>
 
         <div className="mt-2 truncate font-heading text-[15px] font-bold text-ink">
@@ -157,29 +170,31 @@ function DetalleCard({
           className={cn(
             'tnum text-[22px] font-bold leading-tight',
             liquidado
-              ? 'text-ink/55' // ya saldado → tono neutro, no alarma
+              ? 'text-ink/55'
               : cobro
                 ? 'text-field-deep'
                 : 'text-tierra',
           )}
         >
-          {cobro ? '+' : '−'}${Math.round(c.monto).toLocaleString('es-AR')}
+          {cobro ? '+' : '−'}${Math.round(v.monto).toLocaleString('es-AR')}
         </div>
 
         <div className="mt-2.5 grid gap-1.5 border-t border-border/60 pt-2.5 text-[12.5px]">
-          {c.banco && (
+          {v.chequeBanco && (
             <div className="flex items-center gap-2">
               <Landmark className="size-3.5 text-faint" />
               <span className="text-muted-foreground">Banco</span>
-              <span className="ml-auto font-semibold text-ink">{c.banco}</span>
+              <span className="ml-auto font-semibold text-ink">
+                {v.chequeBanco}
+              </span>
             </div>
           )}
-          {c.numero && (
+          {v.chequeNumero && (
             <div className="flex items-center gap-2">
               <Hash className="size-3.5 text-faint" />
               <span className="text-muted-foreground">N° de cheque</span>
               <span className="tnum ml-auto font-semibold text-ink">
-                {c.numero}
+                {v.chequeNumero}
               </span>
             </div>
           )}
@@ -187,9 +202,9 @@ function DetalleCard({
             <CalendarClock className="size-3.5 text-faint" />
             <span className="text-muted-foreground">Vence</span>
             <span className="ml-auto flex items-center gap-1.5 font-semibold text-ink">
-              {c.fechaVencimiento ? (
+              {v.fechaVencimiento ? (
                 <>
-                  <span className="tnum">{ddmmaaaa(c.fechaVencimiento)}</span>
+                  <span className="tnum">{ddmmaaaa(v.fechaVencimiento)}</span>
                   {dias && (
                     <span
                       className={cn(
@@ -214,7 +229,7 @@ function DetalleCard({
           <div className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-field-soft py-1.5 text-[11.5px] font-semibold text-field-deep">
             <CheckCircle2 className="size-3.5" />
             {cobro ? 'Cobrado' : 'Pagado'}
-            {c.fechaCobroPago && ` el ${ddmmaaaa(c.fechaCobroPago)}`}
+            {v.fechaCobroPago && ` el ${ddmmaaaa(v.fechaCobroPago)}`}
           </div>
         ) : (
           <div className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-secondary py-1.5 text-[11.5px] font-semibold text-field-deep">
@@ -228,13 +243,14 @@ function DetalleCard({
   )
 }
 
-/** Chip de un cheque dentro de una celda; muestra detalle al hover y liquida al clic. */
-function ChequeChip({ c }: { c: Cheque }) {
-  const cobro = c.tipo === 'ingreso'
-  const liquidado = c.estado === 'liquidado'
-  const vencido = !liquidado && estaVencido(c.fechaVencimiento)
+/** Chip de un vencimiento dentro de una celda; detalle al hover, liquida al clic. */
+function VencChip({ v }: { v: Vencimiento }) {
+  const cobro = v.tipo === 'ingreso'
+  const liquidado = v.estado === 'liquidado'
+  const vencido = !liquidado && estaVencido(v.fechaVencimiento)
   const Icono = liquidado ? Check : cobro ? ArrowDownLeft : ArrowUpRight
-  const titulo = c.contraparte ?? c.descripcion ?? (cobro ? 'Cobro' : 'Pago')
+  const titulo = v.contraparte ?? v.descripcion ?? (cobro ? 'Cobro' : 'Pago')
+  const sub = v.medio === 'cheque' ? v.chequeBanco : medioLabel(v.medio, v.esEcheq)
   const [pos, setPos] = useState<CardPos | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const timer = useRef<number | undefined>(undefined)
@@ -248,8 +264,6 @@ function ChequeChip({ c }: { c: Cheque }) {
     timer.current = window.setTimeout(() => setPos(null), 110)
   }
 
-  // Saldado = gris "archivado" con check verde (se distingue de los pendientes:
-  // verde = a cobrar, rojo = a pagar). Pendiente conserva su identidad.
   const tono = liquidado
     ? 'text-muted-foreground'
     : cobro
@@ -280,7 +294,7 @@ function ChequeChip({ c }: { c: Cheque }) {
         >
           {titulo}
         </span>
-        {c.esEcheq && (
+        {v.esEcheq && (
           <span className="ml-auto shrink-0 rounded bg-sky/15 px-1 text-[8px] font-bold uppercase leading-tight text-sky">
             e
           </span>
@@ -289,11 +303,11 @@ function ChequeChip({ c }: { c: Cheque }) {
       <span className="flex items-baseline justify-between gap-1">
         <span className={cn('tnum text-[12px] font-bold leading-tight', tono)}>
           {cobro ? '+' : '−'}
-          {fmtCompact(c.monto)}
+          {fmtCompact(v.monto)}
         </span>
-        {c.banco && (
+        {sub && (
           <span className="truncate text-[9px] font-medium leading-tight text-ink/50">
-            {c.banco}
+            {sub}
           </span>
         )}
       </span>
@@ -302,11 +316,10 @@ function ChequeChip({ c }: { c: Cheque }) {
 
   return (
     <>
-      {/* Pendiente: clic abre el diálogo de liquidar. Liquidado: solo informativo. */}
-      {liquidado ? boton : <LiquidarChequeDialog cheque={c} trigger={boton} />}
+      {liquidado ? boton : <LiquidarDialog item={v} trigger={boton} />}
       {pos && (
         <DetalleCard
-          c={c}
+          v={v}
           pos={pos}
           onEnter={() => window.clearTimeout(timer.current)}
           onLeave={() => setPos(null)}
@@ -316,8 +329,7 @@ function ChequeChip({ c }: { c: Cheque }) {
   )
 }
 
-/** Popover con TODOS los movimientos de un día (scrollable, con sus acciones).
- *  z por debajo del diálogo de liquidar (z-50) y del hover de detalle (z-70). */
+/** Popover con TODOS los movimientos de un día (scrollable). */
 function DiaPopover({
   fecha,
   items,
@@ -325,7 +337,7 @@ function DiaPopover({
   onClose,
 }: {
   fecha: Date
-  items: Cheque[]
+  items: Vencimiento[]
   pos: CardPos
   onClose: () => void
 }) {
@@ -345,7 +357,6 @@ function DiaPopover({
 
   return createPortal(
     <>
-      {/* Backdrop para cerrar al tocar afuera */}
       <div className="fixed inset-0" style={{ zIndex: 40 }} onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, y: pos.up ? 6 : -6 }}
@@ -370,8 +381,8 @@ function DiaPopover({
           </span>
         </div>
         <div className="scroll-rounded flex flex-col gap-1 overflow-y-auto p-2">
-          {items.map((c) => (
-            <ChequeChip key={c.id} c={c} />
+          {items.map((v) => (
+            <VencChip key={v.id} v={v} />
           ))}
         </div>
       </motion.div>
@@ -380,8 +391,7 @@ function DiaPopover({
   )
 }
 
-/** Contenido de una celda con día: el número y el "+N más" abren el detalle del
- *  día. En la celda se ven hasta 2 chips; el resto vive en el popover. */
+/** Contenido de una celda con día: número + "+N más" abren el detalle del día. */
 function DiaContenido({
   fecha,
   dia,
@@ -391,7 +401,7 @@ function DiaContenido({
 }: {
   fecha: Date
   dia: number
-  items: Cheque[]
+  items: Vencimiento[]
   hoyCell: boolean
   pasado: boolean
 }) {
@@ -437,8 +447,8 @@ function DiaContenido({
       </div>
 
       <div className="flex flex-col gap-0.5">
-        {items.slice(0, 2).map((c) => (
-          <ChequeChip key={c.id} c={c} />
+        {items.slice(0, 2).map((v) => (
+          <VencChip key={v.id} v={v} />
         ))}
         {ocultos > 0 && (
           <button
@@ -463,8 +473,8 @@ function DiaContenido({
   )
 }
 
-/** Calendario mensual de cheques pendientes por fecha de vencimiento. */
-export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
+/** Calendario mensual de vencimientos (cualquier medio) por fecha. */
+export function CalendarioVencimientos({ items }: { items: Vencimiento[] }) {
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -473,24 +483,24 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
   const month = cursor.getMonth()
 
   const { semanas, sinFecha } = useMemo(() => {
-    const porDia = new Map<number, Cheque[]>()
-    const sin: Cheque[] = []
-    for (const c of cheques) {
-      const fecha = fechaEnCalendario(c)
+    const porDia = new Map<number, Vencimiento[]>()
+    const sin: Vencimiento[] = []
+    for (const v of items) {
+      const fecha = fechaEnCalendario(v)
       if (!fecha) {
-        sin.push(c)
+        sin.push(v)
         continue
       }
       const [y, m, d] = fecha.split('-').map(Number)
       if (y === year && m - 1 === month) {
         const arr = porDia.get(d) ?? []
-        arr.push(c)
+        arr.push(v)
         porDia.set(d, arr)
       }
     }
     const offset = (new Date(year, month, 1).getDay() + 6) % 7 // lunes = 0
     const diasEnMes = new Date(year, month + 1, 0).getDate()
-    type Celda = { dia: number; items: Cheque[] } | null
+    type Celda = { dia: number; items: Vencimiento[] } | null
     const celdas: Celda[] = []
     for (let i = 0; i < offset; i++) celdas.push(null)
     for (let d = 1; d <= diasEnMes; d++)
@@ -499,9 +509,8 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
     const sem: Celda[][] = []
     for (let i = 0; i < celdas.length; i += 7) sem.push(celdas.slice(i, i + 7))
     return { semanas: sem, sinFecha: sin }
-  }, [cheques, year, month])
+  }, [items, year, month])
 
-  // "Hoy" en estado: se actualiza solo al cambiar de día (timer a medianoche).
   const [hoy, setHoy] = useState(() => new Date())
   useEffect(() => {
     const ahora = new Date()
@@ -538,7 +547,6 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
 
   return (
     <Panel className="relative overflow-hidden p-0 bg-gradient-to-br from-field-soft/70 via-card to-field-soft/15">
-      {/* Blobs difuminados que dan profundidad al vidrio */}
       <div
         aria-hidden
         className="pointer-events-none absolute -left-16 -top-12 size-56 rounded-full bg-field/20 blur-3xl"
@@ -549,7 +557,6 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
       />
 
       <div className="relative z-10">
-        {/* Navegación */}
         <div className="flex items-center justify-between gap-3 border-b border-white/50 px-5 py-3">
           <span className="font-heading text-[18px] font-bold text-ink">
             {mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}
@@ -583,7 +590,6 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
           </div>
         </div>
 
-        {/* Encabezado de días */}
         <div className="grid grid-cols-7 border-b border-white/50">
           {DIAS.map((d, i) => (
             <div
@@ -598,7 +604,6 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
           ))}
         </div>
 
-        {/* Grilla */}
         <div>
           {semanas.map((sem, i) => (
             <div key={i} className="grid grid-cols-7">
@@ -621,7 +626,6 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
                       hoyCell && 'bg-white/55',
                     )}
                   >
-                    {/* Realce redondeado del día de hoy (más lindo que un borde) */}
                     {hoyCell && (
                       <div className="pointer-events-none absolute inset-1 rounded-xl bg-gradient-to-b from-field-soft/90 to-field-soft/35 shadow-[0_2px_12px_rgba(16,30,20,0.12)] ring-1 ring-field-deep/30" />
                     )}
@@ -641,15 +645,14 @@ export function ChequesCalendario({ cheques }: { cheques: Cheque[] }) {
           ))}
         </div>
 
-        {/* Sin fecha de vencimiento */}
         {sinFecha.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t border-white/50 px-5 py-3">
             <span className="text-[12px] font-semibold text-faint">
-              Sin fecha de vencimiento:
+              Sin fecha:
             </span>
-            {sinFecha.map((c) => (
-              <div key={c.id} className="w-44">
-                <ChequeChip c={c} />
+            {sinFecha.map((v) => (
+              <div key={v.id} className="w-44">
+                <VencChip v={v} />
               </div>
             ))}
           </div>

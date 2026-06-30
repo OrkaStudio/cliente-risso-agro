@@ -112,6 +112,7 @@ export function CargarRecurrenteDialog({ empresaId }: { empresaId: string }) {
     if (!monto || Number.isNaN(montoNum) || montoNum <= 0)
       return setError('Ingresá el monto de cada cuota')
     if (cant < 1) return setError('La cantidad de cuotas debe ser 1 o más')
+    if (!primera) return setError('Elegí la fecha de la primera cuota')
     if (!categoriaId) return setError('Elegí la categoría')
     if (!campoId) return setError('Elegí el campo')
     try {

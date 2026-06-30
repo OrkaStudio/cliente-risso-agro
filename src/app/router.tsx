@@ -47,9 +47,9 @@ const AnaliticaPage = lazy(() =>
     default: m.AnaliticaPage,
   })),
 )
-const ChequesPage = lazy(() =>
-  import('@/features/cheques/cheques-page').then((m) => ({
-    default: m.ChequesPage,
+const AgendaPage = lazy(() =>
+  import('@/features/agenda/agenda-page').then((m) => ({
+    default: m.AgendaPage,
   })),
 )
 
@@ -74,7 +74,9 @@ export const router = createBrowserRouter([
           { path: 'potreros', element: <Navigate to="/campos" replace /> },
           { path: 'potrero/:id', element: <PotreroDetailPage /> },
           { path: 'analitica', element: <AnaliticaPage /> },
-          { path: 'cheques', element: <ChequesPage /> },
+          { path: 'agenda', element: <AgendaPage /> },
+          // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
+          { path: 'cheques', element: <Navigate to="/agenda" replace /> },
         ],
       },
     ],

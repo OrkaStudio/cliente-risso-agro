@@ -14,7 +14,7 @@ import {
 import type { Database } from '@/lib/supabase/types'
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
-import { useCheques } from '@/features/cheques/hooks'
+import { useVencimientos } from '@/features/agenda/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { PotreroCard } from '@/features/potrero/potrero-card'
@@ -40,34 +40,34 @@ function fechaLarga(): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-/* ===== Alerta de cheques que vencen pronto ===== */
-function ChequesAlerta() {
-  const { data } = useCheques()
+/* ===== Alerta de vencimientos próximos (cualquier medio) ===== */
+function VencimientosAlerta() {
+  const { data } = useVencimientos()
   const hoy0 = new Date().setHours(0, 0, 0, 0)
-  const urgentes = (data ?? []).filter((c) => {
-    if (c.estado !== 'pendiente' || !c.fechaVencimiento) return false
-    const [y, m, d] = c.fechaVencimiento.split('-').map(Number)
+  const urgentes = (data ?? []).filter((v) => {
+    if (v.estado !== 'pendiente' || !v.fechaVencimiento) return false
+    const [y, m, d] = v.fechaVencimiento.split('-').map(Number)
     const dias = Math.round((new Date(y, m - 1, d).getTime() - hoy0) / 86400000)
     return dias <= 7
   })
   if (urgentes.length === 0) return null
 
   const aPagar = urgentes
-    .filter((c) => c.tipo === 'gasto')
-    .reduce((s, c) => s + c.monto, 0)
+    .filter((v) => v.tipo === 'gasto')
+    .reduce((s, v) => s + v.monto, 0)
   const aCobrar = urgentes
-    .filter((c) => c.tipo === 'ingreso')
-    .reduce((s, c) => s + c.monto, 0)
+    .filter((v) => v.tipo === 'ingreso')
+    .reduce((s, v) => s + v.monto, 0)
   const n = urgentes.length
 
   return (
     <Link
-      to="/cheques"
+      to="/agenda"
       className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] border border-sol-deep/30 bg-sol-soft px-[22px] py-4 transition-colors hover:border-sol-deep/60"
     >
       <TriangleAlert className="size-5 shrink-0 text-sol-deep" />
       <span className="text-sm font-bold text-ink">
-        {n} {n === 1 ? 'cheque vence' : 'cheques vencen'} en los próximos 7 días
+        {n} {n === 1 ? 'vencimiento' : 'vencimientos'} en los próximos 7 días
       </span>
       <span className="flex items-center gap-3 text-[13px] font-semibold">
         {aPagar > 0 && (
@@ -78,7 +78,7 @@ function ChequesAlerta() {
         )}
       </span>
       <span className="ml-auto text-[13px] font-semibold text-field-deep">
-        Ver cheques →
+        Ver agenda →
       </span>
     </Link>
   )
@@ -425,8 +425,8 @@ export function InicioPage() {
         }
       />
 
-      {/* Alerta de cheques que vencen pronto */}
-      <ChequesAlerta />
+      {/* Alerta de vencimientos próximos */}
+      <VencimientosAlerta />
 
       {/* KPIs — barra instrumental con celdas divididas por hairline */}
       <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">

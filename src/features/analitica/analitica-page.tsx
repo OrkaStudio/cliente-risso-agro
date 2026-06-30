@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowDownLeft,
+  ArrowRight,
   ArrowUpRight,
   Banknote,
   Receipt,
@@ -24,6 +25,7 @@ import {
   type Modo,
 } from '@/features/analitica/compute'
 import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
+import { CargarChequeDialog } from '@/features/analitica/cargar-cheque-dialog'
 import { CargarRecurrenteDialog } from '@/features/analitica/cargar-recurrente-dialog'
 import { RentabilidadActividad } from '@/features/analitica/rentabilidad-actividad'
 import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
@@ -123,6 +125,7 @@ export function AnaliticaPage() {
                 })),
               ]}
             />
+            <CargarChequeDialog empresaId={empresaId} />
             <CargarRecurrenteDialog empresaId={empresaId} />
             <CargarMovimientoDialog empresaId={empresaId} />
           </>
@@ -362,14 +365,33 @@ export function AnaliticaPage() {
               )}
             </Panel>
 
-            <Panel title="Plata en camino" sub="cobros y pagos">
+            <Panel title="Plata en camino" sub="resumen — detalle en la agenda">
               {pendientes.isLoading ? (
                 <Vacio>Cargando…</Vacio>
               ) : pendientesScope.length === 0 ? (
                 <Vacio>Sin cobros ni pagos pendientes.</Vacio>
               ) : (
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+                        Por cobrar
+                      </div>
+                      <div className="tnum mt-1 text-[20px] font-bold leading-none text-field-deep">
+                        {cuentas.porCobrar === 0 ? '—' : formatARS(cuentas.porCobrar)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+                        Por pagar
+                      </div>
+                      <div className="tnum mt-1 text-[20px] font-bold leading-none text-tierra">
+                        {cuentas.porPagar === 0 ? '—' : formatARS(cuentas.porPagar)}
+                      </div>
+                    </div>
+                  </div>
                 <div className="flex flex-col">
-                  {pendientesScope.slice(0, 6).map((v) => {
+                  {pendientesScope.slice(0, 3).map((v) => {
                     const cobro = v.tipo === 'ingreso'
                     const urgente = v.diasParaVencer != null && v.diasParaVencer <= 3
                     const dias =
@@ -425,6 +447,13 @@ export function AnaliticaPage() {
                       </div>
                     )
                   })}
+                </div>
+                  <Link
+                    to="/agenda"
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-field-soft py-2.5 text-[13px] font-semibold text-field-deep transition-colors hover:bg-field-soft/70"
+                  >
+                    Ver agenda completa <ArrowRight className="size-4" />
+                  </Link>
                 </div>
               )}
             </Panel>

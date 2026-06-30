@@ -194,6 +194,9 @@ export function CargarMovimientoDialog({
       return setError('Ingresá un monto válido')
     if (!categoriaId) return setError('Elegí la categoría')
     if (!campoId) return setError('Elegí el campo')
+    // Todo movimiento debe caer en la agenda → fecha obligatoria.
+    if (!liquidado && !vence)
+      return setError(`Poné la fecha en que lo tenés que ${esGasto ? 'pagar' : 'cobrar'}`)
 
     try {
       await crear.mutateAsync({
