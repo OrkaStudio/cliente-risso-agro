@@ -6,6 +6,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { LoginPage } from '@/features/auth/login-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { AppShell } from '@/app/app-shell'
+import { CampoShell } from '@/app/campo-shell'
+import { ResponsiveShell } from '@/app/responsive-shell'
 
 // Code-splitting por ruta: el código de cada sección se carga al entrar, no en
 // el bundle inicial (login). El AppShell envuelve el <Outlet> en <Suspense>.
@@ -52,6 +54,11 @@ const AgendaPage = lazy(() =>
     default: m.AgendaPage,
   })),
 )
+const MangaPage = lazy(() =>
+  import('@/features/campo/manga-page').then((m) => ({
+    default: m.MangaPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -62,21 +69,37 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       {
-        element: <AppShell />,
+        // Gate por dispositivo: misma web, distinta navegación según el equipo.
+        // Un móvil cae al Modo Campo; escritorio ve el Modo Oficina completo.
+        element: <ResponsiveShell />,
         children: [
-          { index: true, element: <InicioPage /> },
-          { path: 'hacienda', element: <AnimalesPage /> },
-          { path: 'hacienda/:id', element: <FichaAnimalPage /> },
-          { path: 'campos', element: <LotesPage /> },
-          { path: 'campos/:id', element: <CampoDetailPage /> },
-          { path: 'potreros/:id', element: <LoteFichaPage /> },
-          // Compat: la sección Potreros se unificó dentro de Campos.
-          { path: 'potreros', element: <Navigate to="/campos" replace /> },
-          { path: 'potrero/:id', element: <PotreroDetailPage /> },
-          { path: 'analitica', element: <AnaliticaPage /> },
-          { path: 'agenda', element: <AgendaPage /> },
-          // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
-          { path: 'cheques', element: <Navigate to="/agenda" replace /> },
+          {
+            // Modo Oficina (escritorio) — shell con sidebar.
+            element: <AppShell />,
+            children: [
+              { index: true, element: <InicioPage /> },
+              { path: 'hacienda', element: <AnimalesPage /> },
+              { path: 'hacienda/:id', element: <FichaAnimalPage /> },
+              { path: 'campos', element: <LotesPage /> },
+              { path: 'campos/:id', element: <CampoDetailPage /> },
+              { path: 'potreros/:id', element: <LoteFichaPage /> },
+              // Compat: la sección Potreros se unificó dentro de Campos.
+              { path: 'potreros', element: <Navigate to="/campos" replace /> },
+              { path: 'potrero/:id', element: <PotreroDetailPage /> },
+              { path: 'analitica', element: <AnaliticaPage /> },
+              { path: 'agenda', element: <AgendaPage /> },
+              // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
+              { path: 'cheques', element: <Navigate to="/agenda" replace /> },
+            ],
+          },
+          {
+            // Modo Campo (móvil) — shell con nav inferior.
+            element: <CampoShell />,
+            children: [
+              { path: 'campo', element: <Navigate to="/campo/manga" replace /> },
+              { path: 'campo/manga', element: <MangaPage /> },
+            ],
+          },
         ],
       },
     ],
