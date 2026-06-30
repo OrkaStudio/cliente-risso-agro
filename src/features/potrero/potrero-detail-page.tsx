@@ -19,7 +19,7 @@ import {
 } from '@/features/campos/labels'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { PotreroFormDialog } from '@/features/campos/campos-dialogs'
-import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
+import { CargarDialog } from '@/features/analitica/cargar-dialog'
 import { useMovimientos } from '@/features/analitica/hooks'
 import {
   formatARS,
@@ -351,7 +351,7 @@ export function PotreroDetailPage() {
                 potreroNombre: data.nombre,
               }}
             />
-            <CargarMovimientoDialog
+            <CargarDialog
               empresaId={empresaId}
               campoInicial={data.campoId}
               potreroInicial={data.id}

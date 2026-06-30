@@ -24,9 +24,7 @@ import {
   resumen,
   type Modo,
 } from '@/features/analitica/compute'
-import { CargarMovimientoDialog } from '@/features/analitica/cargar-movimiento-dialog'
-import { CargarChequeDialog } from '@/features/analitica/cargar-cheque-dialog'
-import { CargarRecurrenteDialog } from '@/features/analitica/cargar-recurrente-dialog'
+import { CargarDialog } from '@/features/analitica/cargar-dialog'
 import { RentabilidadActividad } from '@/features/analitica/rentabilidad-actividad'
 import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
 import { Panel } from '@/components/panel'
@@ -125,9 +123,7 @@ export function AnaliticaPage() {
                 })),
               ]}
             />
-            <CargarChequeDialog empresaId={empresaId} />
-            <CargarRecurrenteDialog empresaId={empresaId} />
-            <CargarMovimientoDialog empresaId={empresaId} />
+            <CargarDialog empresaId={empresaId} />
           </>
         }
       />
