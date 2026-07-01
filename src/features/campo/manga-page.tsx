@@ -3,16 +3,20 @@ import {
   AlertTriangle,
   Check,
   CloudOff,
+  MapPin,
   RefreshCw,
-  Syringe,
+  ScanLine,
   Wifi,
 } from 'lucide-react'
+import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
 import { categoriaLabel } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import { useManga, type AsignacionLocal } from './manga/use-manga'
 import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
 
-const CATEGORIAS = Object.entries(categoriaLabel) as [CategoriaAnimal, string][]
+const CATEGORIA_OPTS: DropdownOption[] = (
+  Object.entries(categoriaLabel) as [CategoriaAnimal, string][]
+).map(([value, label]) => ({ value, label }))
 const RAZAS = ['Angus', 'Hereford', 'Brangus', 'Braford', 'Limousin', 'Cruza']
 const PELAJES = ['Colorado', 'Negro', 'Blanco', 'Bayo', 'Overo', 'Pampa']
 
@@ -24,17 +28,21 @@ export function MangaPage() {
   const [pelaje, setPelaje] = useState('')
 
   if (m.cargando) {
-    return <p className="p-6 text-sm text-muted-foreground">Cargando manga…</p>
+    return (
+      <p className="p-6 text-center text-sm text-muted-foreground">
+        Cargando manga…
+      </p>
+    )
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-4 p-4">
+    <div className="mx-auto flex max-w-md flex-col gap-3.5 p-4">
       {/* Barra de estado: conexión + sincronización */}
       <div className="flex items-center justify-between gap-2 text-[12px]">
         <span
           className={cn(
-            'inline-flex items-center gap-1.5 font-medium',
-            m.online ? 'text-primary' : 'text-amber-600',
+            'inline-flex items-center gap-1.5 font-semibold',
+            m.online ? 'text-field' : 'text-accent',
           )}
         >
           {m.online ? (
@@ -48,54 +56,61 @@ export function MangaPage() {
           type="button"
           onClick={() => void m.sincronizar()}
           disabled={!m.online || m.sinSincronizar === 0 || m.sincronizando}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 font-medium text-foreground disabled:opacity-40"
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold transition-colors',
+            m.sinSincronizar > 0
+              ? 'border-accent/40 bg-accent/10 text-accent'
+              : 'border-border text-faint',
+          )}
         >
           <RefreshCw
             className={cn('size-3.5', m.sincronizando && 'animate-spin')}
           />
           {m.sinSincronizar > 0
             ? `${m.sinSincronizar} sin sincronizar`
-            : 'Todo sincronizado'}
+            : 'Todo al día'}
         </button>
       </div>
 
       {/* Alcance */}
-      <label className="flex flex-col gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
           Alcance
         </span>
-        <select
+        <Dropdown
+          block
+          ariaLabel="Alcance"
           value={
             m.scope.kind === 'todos' ? 'todos' : `${m.scope.kind}:${m.scope.id}`
           }
-          onChange={(e) => {
-            const opt = m.scopeOptions.find((o) => o.key === e.target.value)
+          onChange={(key) => {
+            const opt = m.scopeOptions.find((o) => o.key === key)
             if (opt) m.setScope(opt.scope)
           }}
-          className="h-11 rounded-xl border border-border bg-card px-3 text-[15px]"
-        >
-          {m.scopeOptions.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.label} ({o.pendientes})
-            </option>
-          ))}
-        </select>
-      </label>
+          options={m.scopeOptions.map((o) => ({
+            value: o.key,
+            label: `${o.label} · ${o.pendientes}`,
+          }))}
+          className="h-12 text-[15px]"
+        />
+      </div>
 
       {/* Contador */}
-      <div className="flex items-center justify-around rounded-xl bg-muted/50 py-2.5 text-center">
-        <div>
-          <div className="font-heading text-2xl font-bold text-foreground">
+      <div className="flex items-stretch overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
+        <div className="flex-1 py-3 text-center">
+          <div className="font-heading text-3xl font-bold leading-none text-ink">
             {m.quedan}
           </div>
-          <div className="text-[11px] text-muted-foreground">quedan</div>
+          <div className="mt-1 text-[11px] font-medium text-faint">quedan</div>
         </div>
-        <div className="h-8 w-px bg-border" />
-        <div>
-          <div className="font-heading text-2xl font-bold text-primary">
+        <div className="w-px bg-border" />
+        <div className="flex-1 bg-field-soft/40 py-3 text-center">
+          <div className="font-heading text-3xl font-bold leading-none text-field-deep">
             {m.listo}
           </div>
-          <div className="text-[11px] text-muted-foreground">listo</div>
+          <div className="mt-1 text-[11px] font-medium text-field-deep/70">
+            caravaneados
+          </div>
         </div>
       </div>
 
@@ -111,18 +126,18 @@ export function MangaPage() {
           onAsignar={(datos) => void m.asignar(m.actual!.id, datos)}
         />
       ) : (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-6 py-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Syringe className="size-6" />
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-6 py-14 text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-field-soft text-field">
+            <Check className="size-7" strokeWidth={2.2} />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm font-medium text-ink">
             No quedan animales sin caravana en este alcance.
           </p>
           <button
             type="button"
             onClick={() => void m.descargar()}
             disabled={!m.online}
-            className="text-[13px] font-medium text-primary disabled:opacity-40"
+            className="text-[13px] font-semibold text-field disabled:opacity-40"
           >
             Volver a cargar la lista
           </button>
@@ -131,15 +146,15 @@ export function MangaPage() {
 
       {/* Conflictos (RFID duplicado, etc.) */}
       {m.errores.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700">
+        <div className="flex flex-col gap-2 rounded-2xl border border-accent/40 bg-accent/10 p-3.5">
+          <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-accent">
             <AlertTriangle className="size-4" />
             {m.errores.length} con problema al sincronizar
           </div>
-          <ul className="flex flex-col gap-1 text-[12px] text-amber-800">
+          <ul className="flex flex-col gap-1 text-[12px] font-medium text-accent-foreground/80">
             {m.errores.slice(0, 5).map((e) => (
               <li key={e.local_id}>
-                RFID {e.rfid}: {e.error}
+                <span className="font-semibold">RFID {e.rfid}:</span> {e.error}
               </li>
             ))}
           </ul>
@@ -173,11 +188,11 @@ function AnimalForm({
   const [rfid, setRfid] = useState('')
   const [visual, setVisual] = useState('')
   const [categoria, setCategoria] = useState<CategoriaAnimal>(animal.categoria)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const [aviso, setAviso] = useState(false)
 
   const asignar = () => {
     if (!rfid.trim()) {
-      setAviso('Falta el RFID')
+      setAviso(true)
       return
     }
     onAsignar({
@@ -190,117 +205,178 @@ function AnimalForm({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <span className="font-heading text-lg font-bold text-foreground">
-          {categoriaLabel[animal.categoria]}
-        </span>
-        <span className="text-[12px] text-muted-foreground">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
+      {/* Contexto: qué tropa/potrero estoy caravaneando */}
+      <div className="flex items-center gap-2 border-b border-border/70 bg-secondary/60 px-4 py-2.5">
+        <span aria-hidden className="h-4 w-[3px] shrink-0 rounded-full bg-field" />
+        <MapPin className="size-3.5 text-faint" />
+        <span className="truncate text-[13px] font-semibold text-ink">
           {animal.lote_nombre
             ? `Tropa ${animal.lote_nombre}`
             : (animal.potrero_nombre ?? 'Sin potrero')}
         </span>
       </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-[12px] font-semibold text-foreground">
-          RFID (caravana) *
-        </span>
-        <input
-          value={rfid}
-          onChange={(e) => setRfid(e.target.value)}
-          onKeyDown={(e) => {
-            // El bastón "teclea" el número + Enter → asigna y pasa al siguiente
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              asignar()
-            }
-          }}
-          inputMode="numeric"
-          autoComplete="off"
-          autoFocus
-          placeholder="Escaneá o escribí el RFID"
-          className="h-12 rounded-xl border border-border bg-background px-3 text-[16px]"
-        />
-      </label>
+      <div className="flex flex-col gap-4 p-4">
+        {/* RFID: el héroe del flujo (el bastón teclea acá) */}
+        <div>
+          <label className="mb-1.5 flex items-center justify-between">
+            <span className="text-[12px] font-bold text-ink">
+              RFID (caravana)
+            </span>
+            <span className="text-[11px] font-medium text-faint">
+              escaneá o escribí
+            </span>
+          </label>
+          <div
+            className={cn(
+              'flex items-center gap-2.5 rounded-xl border-2 bg-field-soft/40 px-3.5 transition-colors',
+              aviso ? 'border-destructive' : 'border-field-soft focus-within:border-field',
+            )}
+          >
+            <ScanLine className="size-5 shrink-0 text-field" />
+            <input
+              value={rfid}
+              onChange={(e) => {
+                setRfid(e.target.value)
+                if (aviso) setAviso(false)
+              }}
+              onKeyDown={(e) => {
+                // El bastón "teclea" el número + Enter → asigna y pasa al siguiente
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  asignar()
+                }
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              placeholder="Número de caravana"
+              className="h-13 min-w-0 flex-1 bg-transparent py-3 text-[18px] font-bold tracking-wide text-ink outline-none placeholder:font-medium placeholder:text-faint"
+            />
+          </div>
+          {aviso && (
+            <p className="mt-1 text-[12px] font-semibold text-destructive">
+              Falta el RFID
+            </p>
+          )}
+        </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-[12px] font-semibold text-foreground">
-          Visual (opcional)
-        </span>
-        <input
-          value={visual}
-          onChange={(e) => setVisual(e.target.value)}
-          autoComplete="off"
-          placeholder="N° de caravana visual"
-          className="h-11 rounded-xl border border-border bg-background px-3 text-[15px]"
-        />
-      </label>
+        {/* Categoría (→ sexo derivado) + visual */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-bold text-ink">Categoría</span>
+            <Dropdown
+              block
+              ariaLabel="Categoría"
+              value={categoria}
+              onChange={(v) => setCategoria(v as CategoriaAnimal)}
+              options={CATEGORIA_OPTS}
+              className="h-11"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-bold text-ink">
+              Visual{' '}
+              <span className="font-medium text-faint">(opc.)</span>
+            </span>
+            <input
+              value={visual}
+              onChange={(e) => setVisual(e.target.value)}
+              autoComplete="off"
+              placeholder="N°"
+              className="h-11 rounded-[10px] border border-border bg-card px-3 text-[15px] font-medium text-ink outline-none transition-colors focus:border-field"
+            />
+          </div>
+        </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-[12px] font-semibold text-foreground">
-          Categoría
-        </span>
-        <select
-          value={categoria}
-          onChange={(e) => setCategoria(e.target.value as CategoriaAnimal)}
-          className="h-11 rounded-xl border border-border bg-background px-3 text-[15px]"
+        {/* Raza / Pelaje como chips (rápido, sin teclado, pegajoso) */}
+        <ChipPicker label="Raza" options={RAZAS} value={raza} onChange={onRaza} />
+        <ChipPicker
+          label="Pelaje"
+          options={PELAJES}
+          value={pelaje}
+          onChange={onPelaje}
+        />
+
+        <button
+          type="button"
+          onClick={asignar}
+          className="mt-0.5 flex h-13 items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-[16px] font-bold text-primary-foreground shadow-[0_6px_18px_rgba(16,138,85,0.28)] transition-all hover:bg-primary/90 active:translate-y-px"
         >
-          {CATEGORIAS.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-[12px] font-semibold text-foreground">Raza</span>
-          <input
-            list="razas"
-            value={raza}
-            onChange={(e) => onRaza(e.target.value)}
-            placeholder="Raza"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-[15px]"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[12px] font-semibold text-foreground">
-            Pelaje
-          </span>
-          <input
-            list="pelajes"
-            value={pelaje}
-            onChange={(e) => onPelaje(e.target.value)}
-            placeholder="Pelaje"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-[15px]"
-          />
-        </label>
+          <Check className="size-5" strokeWidth={2.5} />
+          Asignar → siguiente
+        </button>
       </div>
-      <datalist id="razas">
-        {RAZAS.map((r) => (
-          <option key={r} value={r} />
-        ))}
-      </datalist>
-      <datalist id="pelajes">
-        {PELAJES.map((p) => (
-          <option key={p} value={p} />
-        ))}
-      </datalist>
+    </section>
+  )
+}
 
-      {aviso && (
-        <p className="text-[12px] font-medium text-destructive">{aviso}</p>
+/** Selector por chips tocables + "Otro…" con input. Grande para el campo. */
+function ChipPicker({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: string[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  const esPreset = options.some((o) => o.toLowerCase() === value.toLowerCase())
+  const [otro, setOtro] = useState(value !== '' && !esPreset)
+
+  const chip = (activo: boolean) =>
+    cn(
+      'rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors',
+      activo
+        ? 'border-field bg-field-soft text-field-deep'
+        : 'border-border bg-card text-muted-foreground hover:border-faint',
+    )
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[12px] font-bold text-ink">
+        {label} <span className="font-medium text-faint">(opcional)</span>
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => {
+          const sel = !otro && value.toLowerCase() === o.toLowerCase()
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => {
+                setOtro(false)
+                onChange(sel ? '' : o)
+              }}
+              className={chip(sel)}
+            >
+              {o}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={() => {
+            setOtro(true)
+            onChange('')
+          }}
+          className={chip(otro)}
+        >
+          Otro…
+        </button>
+      </div>
+      {otro && (
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoFocus
+          placeholder={`Escribí ${label.toLowerCase()}`}
+          className="h-10 rounded-[10px] border border-border bg-card px-3 text-[15px] font-medium text-ink outline-none transition-colors focus:border-field"
+        />
       )}
-
-      <button
-        type="button"
-        onClick={asignar}
-        className="mt-1 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-semibold text-primary-foreground"
-      >
-        <Check className="size-5" />
-        Asignar → siguiente
-      </button>
     </div>
   )
 }
