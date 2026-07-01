@@ -48,6 +48,7 @@ export const tipoEventoLabel: Record<TipoEvento, string> = {
   destete: 'Destete',
   castracion: 'Castración',
   cambio_caravana: 'Cambio de caravana',
+  caravana_asignada: 'Caravana asignada',
   baja: 'Baja',
   nota: 'Nota',
 }

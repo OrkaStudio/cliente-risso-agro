@@ -21,6 +21,9 @@ export default defineConfig({
           if (!id.includes('node_modules')) return
           if (id.includes('@supabase')) return 'supabase-vendor'
           if (id.includes('@tanstack')) return 'query-vendor'
+          // Dexie sólo lo usa el Modo Campo (manga, ruta lazy) → su propio
+          // chunk para no cargarlo en el bundle inicial del login/Oficina.
+          if (/[\\/]node_modules[\\/]dexie[\\/]/.test(id)) return 'manga-vendor'
           if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
             return 'react-vendor'
           return 'vendor'

@@ -29,7 +29,9 @@ export type Database = {
           lote_id: string | null
           notas: string | null
           origen: string | null
+          pelaje: string | null
           potrero_id: string | null
+          raza: string | null
           sexo: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at: string
         }
@@ -43,7 +45,9 @@ export type Database = {
           lote_id?: string | null
           notas?: string | null
           origen?: string | null
+          pelaje?: string | null
           potrero_id?: string | null
+          raza?: string | null
           sexo?: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at?: string
         }
@@ -57,7 +61,9 @@ export type Database = {
           lote_id?: string | null
           notas?: string | null
           origen?: string | null
+          pelaje?: string | null
           potrero_id?: string | null
+          raza?: string | null
           sexo?: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at?: string
         }
@@ -1045,6 +1051,17 @@ export type Database = {
       }
     }
     Functions: {
+      asignar_caravana: {
+        Args: {
+          p_animal_id: string
+          p_categoria?: Database["public"]["Enums"]["categoria_animal"]
+          p_numero_rfid: string
+          p_numero_visual?: string
+          p_pelaje?: string
+          p_raza?: string
+        }
+        Returns: undefined
+      }
       auth_empresa_ids: { Args: never; Returns: string[] }
       cambiar_caravana: {
         Args: {
@@ -1139,6 +1156,7 @@ export type Database = {
         | "cambio_caravana"
         | "baja"
         | "nota"
+        | "caravana_asignada"
       tipo_infraestructura: "molino" | "laguna" | "tranquera" | "manga"
       tipo_movimiento: "ingreso" | "gasto"
     }
@@ -1323,6 +1341,7 @@ export const Constants = {
         "cambio_caravana",
         "baja",
         "nota",
+        "caravana_asignada",
       ],
       tipo_infraestructura: ["molino", "laguna", "tranquera", "manga"],
       tipo_movimiento: ["ingreso", "gasto"],

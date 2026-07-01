@@ -1,0 +1,12 @@
+-- =====================================================================
+--  tipo_evento += 'caravana_asignada'
+--
+--  Evento propio para la PRIMERA asignación de caravana en la manga
+--  (individualización de un animal cargado sin caravana). Distinto de
+--  'cambio_caravana' (re-taggeo de un animal que ya tenía una vigente).
+--  Tener el tipo propio deja un historial limpio para el export SENASA.
+--
+--  Va en su PROPIA migración: `ALTER TYPE ... ADD VALUE` no puede usarse en
+--  la misma transacción donde se agrega → separarlo del RPC que lo usa.
+-- =====================================================================
+alter type tipo_evento add value if not exists 'caravana_asignada';
