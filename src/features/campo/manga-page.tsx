@@ -31,27 +31,27 @@ export function MangaPage() {
 
   if (m.cargando) {
     return (
-      <p className="p-6 text-center text-sm text-muted-foreground">
+      <p className="p-8 text-center text-sm text-muted-foreground">
         Cargando manga…
       </p>
     )
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-md flex-col">
-      {/* Franja fina: estado + alcance + progreso (sin cartelones) */}
-      <div className="flex flex-col gap-2 px-4 pb-2 pt-3">
-        <div className="flex items-center justify-between text-[12px]">
+    <div className="mx-auto flex h-full w-full max-w-md flex-col">
+      {/* ===== Header fijo: estado, alcance, progreso ===== */}
+      <header className="flex shrink-0 flex-col gap-3 border-b border-border/70 bg-background px-5 pb-4 pt-4">
+        <div className="flex items-center justify-between text-[13px]">
           <span
             className={cn(
-              'inline-flex items-center gap-1.5 font-semibold',
+              'inline-flex items-center gap-1.5 font-bold',
               m.online ? 'text-field' : 'text-accent',
             )}
           >
             {m.online ? (
-              <Wifi className="size-4" />
+              <Wifi className="size-[18px]" />
             ) : (
-              <CloudOff className="size-4" />
+              <CloudOff className="size-[18px]" />
             )}
             {m.online ? 'Con señal' : 'Sin señal'}
           </span>
@@ -60,7 +60,7 @@ export function MangaPage() {
             onClick={() => void m.sincronizar()}
             disabled={!m.online || m.sinSincronizar === 0 || m.sincronizando}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-semibold transition-colors',
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold transition-colors',
               m.sinSincronizar > 0
                 ? 'border-accent/40 bg-accent/10 text-accent'
                 : 'border-transparent text-faint',
@@ -73,7 +73,7 @@ export function MangaPage() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1">
             <Dropdown
               block
@@ -91,22 +91,21 @@ export function MangaPage() {
                 value: o.key,
                 label: o.label,
               }))}
-              className="h-10"
+              className="h-11"
             />
           </div>
-          <div className="shrink-0 text-right leading-none">
-            <span className="font-heading text-xl font-bold text-ink">
+          <div className="shrink-0 pb-0.5 text-right leading-none">
+            <div className="font-heading text-[26px] font-bold leading-none text-ink tnum">
               {m.quedan}
-            </span>
-            <span className="ml-1 text-[12px] font-medium text-faint">
+            </div>
+            <div className="mt-1 text-[10.5px] font-bold uppercase tracking-[0.1em] text-faint">
               quedan
-            </span>
+            </div>
           </div>
         </div>
 
-        {/* Progreso del alcance */}
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+        <div className="flex items-center gap-2.5">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
             <motion.div
               className="h-full rounded-full bg-field"
               initial={false}
@@ -114,90 +113,92 @@ export function MangaPage() {
               transition={{ type: 'spring', stiffness: 200, damping: 30 }}
             />
           </div>
-          <span className="shrink-0 text-[11px] font-semibold text-field-deep">
+          <span className="shrink-0 text-[12px] font-bold text-field-deep tnum">
             {m.listo} listos
           </span>
         </div>
+      </header>
 
-        {/* Último caravaneo: confirmación + deshacer (pulsa en cada asignación) */}
-        {m.ultimo && (
+      {/* Último caravaneo: confirmación + deshacer (pulsa en cada asignación) */}
+      {m.ultimo && (
+        <div className="shrink-0 px-5 pt-3">
           <motion.div
             key={m.ultimo.local_id}
             initial={{ scale: 0.97, opacity: 0.5 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-            className="flex items-center justify-between gap-2 rounded-xl border border-field/30 bg-field-soft/60 px-3 py-2"
+            className="flex items-center justify-between gap-2 rounded-2xl border border-field/25 bg-field-soft/60 px-3.5 py-2.5"
           >
-            <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-semibold text-field-deep">
-              <Check className="size-4 shrink-0" strokeWidth={2.5} />
-              <span className="truncate">RFID {m.ultimo.rfid} listo</span>
+            <span className="flex min-w-0 items-center gap-2 text-[13px] font-bold text-field-deep">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-field text-white">
+                <Check className="size-4" strokeWidth={3} />
+              </span>
+              <span className="truncate">RFID {m.ultimo.rfid}</span>
             </span>
             <button
               type="button"
               onClick={() => void m.deshacer()}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[12px] font-semibold text-ink transition-colors hover:border-faint"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-ink transition-colors hover:border-faint active:scale-95"
             >
               <RotateCcw className="size-3.5" />
               Deshacer
             </button>
           </motion.div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Cuerpo */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {m.actual ? (
-          <AnimalForm
-            key={m.actual.id}
-            animal={m.actual}
-            raza={raza}
-            pelaje={pelaje}
-            rfidsUsados={m.rfidsUsados}
-            onRaza={setRaza}
-            onPelaje={setPelaje}
-            onAsignar={(datos) => {
-              // Confirmación háptica (vibra) al asignar; el pulso visual lo da
-              // la barra "Último".
-              if ('vibrate' in navigator) navigator.vibrate(50)
-              void m.asignar(m.actual!.id, datos)
-            }}
-          />
-        ) : (
-          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-6 py-14 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-field-soft text-field">
-              <Check className="size-7" strokeWidth={2.2} />
-            </div>
-            <p className="text-sm font-medium text-ink">
-              No quedan animales sin caravana en este alcance.
-            </p>
-            <button
-              type="button"
-              onClick={() => void m.descargar()}
-              disabled={!m.online}
-              className="text-[13px] font-semibold text-field disabled:opacity-40"
-            >
-              Volver a cargar la lista
-            </button>
-          </div>
-        )}
-
-        {m.errores.length > 0 && (
-          <div className="mt-3 flex flex-col gap-1.5 rounded-2xl border border-accent/40 bg-accent/10 p-3.5">
-            <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-accent">
+      {m.errores.length > 0 && (
+        <div className="shrink-0 px-5 pt-3">
+          <div className="flex flex-col gap-1.5 rounded-2xl border border-accent/40 bg-accent/10 p-3.5">
+            <div className="flex items-center gap-1.5 text-[13px] font-bold text-accent">
               <AlertTriangle className="size-4" />
               {m.errores.length} con problema al subir
             </div>
             <ul className="flex flex-col gap-1 text-[12px] font-medium text-accent-foreground/80">
               {m.errores.slice(0, 4).map((e) => (
                 <li key={e.local_id}>
-                  <span className="font-semibold">RFID {e.rfid}:</span>{' '}
-                  {e.error}
+                  <span className="font-semibold">RFID {e.rfid}:</span> {e.error}
                 </li>
               ))}
             </ul>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* ===== Cuerpo ===== */}
+      {m.actual ? (
+        <AnimalForm
+          key={m.actual.id}
+          animal={m.actual}
+          raza={raza}
+          pelaje={pelaje}
+          rfidsUsados={m.rfidsUsados}
+          onRaza={setRaza}
+          onPelaje={setPelaje}
+          onAsignar={(datos) => {
+            // Confirmación háptica al asignar; el pulso visual lo da "Último".
+            if ('vibrate' in navigator) navigator.vibrate(50)
+            void m.asignar(m.actual!.id, datos)
+          }}
+        />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 py-16 text-center">
+          <div className="flex size-20 items-center justify-center rounded-3xl bg-field-soft text-field">
+            <Check className="size-10" strokeWidth={2.2} />
+          </div>
+          <p className="text-[15px] font-semibold text-ink">
+            No quedan animales sin caravana en este alcance.
+          </p>
+          <button
+            type="button"
+            onClick={() => void m.descargar()}
+            disabled={!m.online}
+            className="text-[13.5px] font-semibold text-field disabled:opacity-40"
+          >
+            Volver a cargar la lista
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -213,9 +214,9 @@ type AnimalFormProps = {
 }
 
 /**
- * Form de un animal (keyado por id → arranca fresco). Vía rápida siempre a la
- * vista: contexto + RFID + categoría + Asignar. Raza/pelaje plegados (una
- * tropa es uniforme) para no meter ruido; se abren a un toque.
+ * Form de un animal (keyado por id → arranca fresco). El RFID es el héroe; el
+ * botón Asignar queda **anclado abajo** (sticky) para que el pulgar lo encuentre
+ * siempre. Raza/pelaje plegados (una tropa es uniforme).
  */
 function AnimalForm({
   animal,
@@ -256,151 +257,165 @@ function AnimalForm({
   const resumenDatos = [raza, pelaje].filter(Boolean).join(' · ')
 
   return (
-    <section className="mt-1 flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,19,0.05),0_6px_18px_rgba(16,24,19,0.05)]">
-      {/* Contexto */}
-      <div className="flex items-center gap-2">
-        <span aria-hidden className="h-4 w-[3px] shrink-0 rounded-full bg-field" />
-        <span className="truncate text-[13px] font-semibold text-ink">
-          {animal.lote_nombre
-            ? `Tropa ${animal.lote_nombre}`
-            : (animal.potrero_nombre ?? 'Sin potrero')}
-        </span>
-      </div>
-
-      {/* RFID: el héroe (el bastón teclea acá) */}
-      <div
-        className={cn(
-          'flex items-center gap-3 rounded-2xl border-2 bg-field-soft/40 px-4 transition-colors',
-          aviso
-            ? 'border-destructive'
-            : repetido
-              ? 'border-accent'
-              : 'border-field-soft focus-within:border-field',
-        )}
-      >
-        <ScanLine
-          className={cn(
-            'size-6 shrink-0',
-            repetido ? 'text-accent' : 'text-field',
-          )}
-        />
-        <input
-          value={rfid}
-          onChange={(e) => {
-            setRfid(e.target.value)
-            if (aviso) setAviso(null)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              asignar()
-            }
-          }}
-          inputMode="numeric"
-          autoComplete="off"
-          autoFocus
-          placeholder="Escaneá el RFID"
-          className="h-15 min-w-0 flex-1 bg-transparent text-[19px] font-bold tracking-wide text-ink outline-none placeholder:font-semibold placeholder:text-faint"
-        />
-      </div>
-      {aviso ? (
-        <p className="-mt-2 text-[12px] font-semibold text-destructive">
-          {aviso}
-        </p>
-      ) : (
-        repetido && (
-          <p className="-mt-2 flex items-center gap-1 text-[12px] font-semibold text-accent">
-            <AlertTriangle className="size-3.5" />
-            Ya usaste ese RFID recién
-          </p>
-        )
-      )}
-
-      {/* Categoría (compacta) + visual */}
-      <div className="grid grid-cols-[1fr_auto] items-end gap-2.5">
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-faint">
-            Categoría
-          </span>
-          <Dropdown
-            block
-            ariaLabel="Categoría"
-            value={categoria}
-            onChange={(v) => setCategoria(v as CategoriaAnimal)}
-            options={CATEGORIA_OPTS}
-            className="h-11"
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+        {/* Contexto: qué animal estoy por caravanear */}
+        <div className="flex items-center gap-2.5">
+          <span
+            aria-hidden
+            className="h-5 w-1 shrink-0 rounded-full bg-field"
           />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-faint">
-            Visual
+          <span className="truncate font-heading text-[17px] font-bold text-ink">
+            {animal.lote_nombre
+              ? `Tropa ${animal.lote_nombre}`
+              : (animal.potrero_nombre ?? 'Sin potrero')}
           </span>
-          <input
-            value={visual}
-            onChange={(e) => setVisual(e.target.value)}
-            autoComplete="off"
-            placeholder="opc."
-            className="h-11 w-24 rounded-[10px] border border-border bg-card px-3 text-[15px] font-medium text-ink outline-none transition-colors focus:border-field"
-          />
         </div>
-      </div>
 
-      {/* Raza / Pelaje: plegado (resumen a la vista, se abre a un toque) */}
-      <div className="rounded-xl border border-border">
-        <button
-          type="button"
-          onClick={() => setAbrirDatos((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left"
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {resumenDatos ? (
-              <>
-                <Pencil className="size-3.5 shrink-0 text-field" />
-                <span className="truncate text-[13.5px] font-semibold text-ink">
-                  {resumenDatos}
-                </span>
-              </>
-            ) : (
-              <span className="text-[13.5px] font-medium text-faint">
-                + Raza y pelaje (opcional)
-              </span>
-            )}
+        {/* RFID: el héroe (el bastón teclea acá) */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
+            Caravana RFID
           </span>
-          <ChevronDown
+          <div
             className={cn(
-              'size-4 shrink-0 text-faint transition-transform',
-              abrirDatos && 'rotate-180',
+              'flex items-center gap-3 rounded-2xl border-2 bg-field-soft/40 px-4 transition-colors',
+              aviso
+                ? 'border-destructive'
+                : repetido
+                  ? 'border-accent'
+                  : 'border-field-soft focus-within:border-field',
             )}
-          />
-        </button>
-        {abrirDatos && (
-          <div className="flex flex-col gap-3 border-t border-border px-3.5 pb-3.5 pt-3">
-            <ChipPicker
-              label="Raza"
-              options={RAZAS}
-              value={raza}
-              onChange={onRaza}
+          >
+            <ScanLine
+              className={cn(
+                'size-7 shrink-0',
+                repetido ? 'text-accent' : 'text-field',
+              )}
             />
-            <ChipPicker
-              label="Pelaje"
-              options={PELAJES}
-              value={pelaje}
-              onChange={onPelaje}
+            <input
+              value={rfid}
+              onChange={(e) => {
+                setRfid(e.target.value)
+                if (aviso) setAviso(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  asignar()
+                }
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              placeholder="Escaneá el RFID"
+              className="h-[68px] min-w-0 flex-1 bg-transparent text-[22px] font-bold tracking-wide text-ink outline-none placeholder:text-[19px] placeholder:font-semibold placeholder:text-faint"
             />
           </div>
-        )}
+          {aviso ? (
+            <p className="flex items-center gap-1 text-[12.5px] font-semibold text-destructive">
+              <AlertTriangle className="size-3.5" />
+              {aviso}
+            </p>
+          ) : (
+            repetido && (
+              <p className="flex items-center gap-1 text-[12.5px] font-semibold text-accent">
+                <AlertTriangle className="size-3.5" />
+                Ya usaste ese RFID recién
+              </p>
+            )
+          )}
+        </div>
+
+        {/* Categoría + visual */}
+        <div className="grid grid-cols-[1fr_auto] items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
+              Categoría
+            </span>
+            <Dropdown
+              block
+              ariaLabel="Categoría"
+              value={categoria}
+              onChange={(v) => setCategoria(v as CategoriaAnimal)}
+              options={CATEGORIA_OPTS}
+              className="h-12"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
+              Visual
+            </span>
+            <input
+              value={visual}
+              onChange={(e) => setVisual(e.target.value)}
+              autoComplete="off"
+              placeholder="opc."
+              className="h-12 w-24 rounded-xl border border-border bg-card px-3 text-[16px] font-medium text-ink outline-none transition-colors focus:border-field"
+            />
+          </div>
+        </div>
+
+        {/* Raza / Pelaje: plegado (resumen a la vista, se abre a un toque) */}
+        <div className="rounded-2xl border border-border">
+          <button
+            type="button"
+            onClick={() => setAbrirDatos((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3.5 text-left"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {resumenDatos ? (
+                <>
+                  <Pencil className="size-4 shrink-0 text-field" />
+                  <span className="truncate text-[14px] font-semibold text-ink">
+                    {resumenDatos}
+                  </span>
+                </>
+              ) : (
+                <span className="text-[14px] font-medium text-faint">
+                  + Raza y pelaje (opcional)
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              className={cn(
+                'size-4 shrink-0 text-faint transition-transform',
+                abrirDatos && 'rotate-180',
+              )}
+            />
+          </button>
+          {abrirDatos && (
+            <div className="flex flex-col gap-4 border-t border-border px-4 pb-4 pt-3.5">
+              <ChipPicker
+                label="Raza"
+                options={RAZAS}
+                value={raza}
+                onChange={onRaza}
+              />
+              <ChipPicker
+                label="Pelaje"
+                options={PELAJES}
+                value={pelaje}
+                onChange={onPelaje}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Acción principal */}
-      <button
-        type="button"
-        onClick={asignar}
-        className="flex h-15 items-center justify-center gap-2.5 rounded-2xl bg-primary text-[17px] font-bold text-primary-foreground shadow-[0_8px_20px_rgba(16,138,85,0.3)] transition-all hover:bg-primary/90 active:translate-y-px"
-      >
-        <Check className="size-6" strokeWidth={2.5} />
-        Asignar → siguiente
-      </button>
-    </section>
+      {/* Acción principal: footer fijo (siempre a la vista, el pulgar la
+          encuentra en el mismo lugar; nunca tapa el contenido que scrollea). */}
+      <div className="shrink-0 border-t border-border/70 bg-background px-5 pb-4 pt-3.5">
+        <button
+          type="button"
+          onClick={asignar}
+          className="flex h-16 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-[18px] font-bold text-primary-foreground shadow-[0_10px_24px_rgba(16,138,85,0.32)] transition-all hover:bg-primary/90 active:translate-y-px active:shadow-[0_6px_16px_rgba(16,138,85,0.28)]"
+        >
+          <Check className="size-6" strokeWidth={2.5} />
+          Asignar → siguiente
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -421,7 +436,7 @@ function ChipPicker({
 
   const chip = (activo: boolean) =>
     cn(
-      'rounded-full border px-3.5 py-2 text-[13.5px] font-semibold transition-colors',
+      'rounded-full border px-4 py-2 text-[14px] font-semibold transition-colors active:scale-95',
       activo
         ? 'border-field bg-field-soft text-field-deep'
         : 'border-border bg-card text-muted-foreground hover:border-faint',
@@ -429,7 +444,7 @@ function ChipPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-faint">
+      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
         {label}
       </span>
       <div className="flex flex-wrap gap-2">
@@ -466,7 +481,7 @@ function ChipPicker({
           onChange={(e) => onChange(e.target.value)}
           autoFocus
           placeholder={`Escribí ${label.toLowerCase()}`}
-          className="h-10 rounded-[10px] border border-border bg-card px-3 text-[15px] font-medium text-ink outline-none transition-colors focus:border-field"
+          className="h-11 rounded-xl border border-border bg-card px-3 text-[16px] font-medium text-ink outline-none transition-colors focus:border-field"
         />
       )}
     </div>

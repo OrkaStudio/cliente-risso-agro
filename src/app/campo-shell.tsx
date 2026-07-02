@@ -58,8 +58,10 @@ export function CampoShell() {
         </button>
       </header>
 
-      {/* Contenido */}
-      <main className="flex-1 overflow-y-auto">
+      {/* Contenido — caja acotada (min-h-0 para que el flex hijo pueda encoger).
+          Cada página se estructura como app: header fijo + región scrolleable
+          interna + footer fijo. main NO scrollea; scrollea la región interna. */}
+      <main className="min-h-0 flex-1 overflow-hidden">
         <Suspense
           fallback={
             <div className="p-6 text-sm text-muted-foreground">Cargando…</div>
