@@ -26,8 +26,7 @@ export type OutboxItem = {
   rfid: string
   visual: string | null
   categoria: CategoriaAnimal
-  raza: string | null
-  pelaje: string | null
+  nota: string | null
   estado: EstadoOutbox
   error: string | null
   created_at: number

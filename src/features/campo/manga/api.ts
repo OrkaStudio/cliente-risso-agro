@@ -55,14 +55,14 @@ export type AsignarInput = {
   rfid: string
   visual?: string | null
   categoria: CategoriaAnimal
-  raza?: string | null
-  pelaje?: string | null
+  nota?: string | null
 }
 
 /**
  * Primera asignación de caravana (RPC transaccional `asignar_caravana`):
- * caravana vigente + categoría/raza/pelaje + evento. Rechaza RFID duplicado
- * por empresa y animal que ya tenga vigente.
+ * caravana vigente + categoría + evento. Rechaza RFID duplicado por empresa y
+ * animal que ya tenga vigente. Si hay nota, se agrega como evento `nota` del
+ * animal (best-effort, tras la asignación: no rompe el caravaneo si falla).
  */
 export async function asignarCaravana(input: AsignarInput): Promise<void> {
   const { error } = await supabase.rpc('asignar_caravana', {
@@ -70,10 +70,29 @@ export async function asignarCaravana(input: AsignarInput): Promise<void> {
     p_numero_rfid: input.rfid.trim(),
     p_numero_visual: input.visual?.trim() || undefined,
     p_categoria: input.categoria,
-    p_raza: input.raza?.trim() || undefined,
-    p_pelaje: input.pelaje?.trim() || undefined,
   })
   if (error) throw new Error(error.message)
+
+  const nota = input.nota?.trim()
+  if (nota) {
+    try {
+      const { data: a } = await supabase
+        .from('animal')
+        .select('empresa_id')
+        .eq('id', input.animalId)
+        .maybeSingle()
+      if (a) {
+        await supabase.from('evento').insert({
+          empresa_id: a.empresa_id,
+          animal_id: input.animalId,
+          tipo: 'nota',
+          nota,
+        })
+      }
+    } catch {
+      /* la nota es best-effort; el caravaneo ya quedó */
+    }
+  }
 }
 
 /**

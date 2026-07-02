@@ -5,10 +5,10 @@ import {
   Check,
   ChevronDown,
   CloudOff,
-  Pencil,
   RefreshCw,
   RotateCcw,
   ScanLine,
+  StickyNote,
   Wifi,
 } from 'lucide-react'
 import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
@@ -20,14 +20,9 @@ import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
 const CATEGORIA_OPTS: DropdownOption[] = (
   Object.entries(categoriaLabel) as [CategoriaAnimal, string][]
 ).map(([value, label]) => ({ value, label }))
-const RAZAS = ['Angus', 'Hereford', 'Brangus', 'Braford', 'Limousin', 'Cruza']
-const PELAJES = ['Colorado', 'Negro', 'Blanco', 'Bayo', 'Overo', 'Pampa']
 
 export function MangaPage() {
   const m = useManga()
-  // Raza/pelaje "pegajosos" (una tropa es uniforme) → viven en el padre.
-  const [raza, setRaza] = useState('')
-  const [pelaje, setPelaje] = useState('')
 
   if (m.cargando) {
     return (
@@ -170,11 +165,7 @@ export function MangaPage() {
         <AnimalForm
           key={m.actual.id}
           animal={m.actual}
-          raza={raza}
-          pelaje={pelaje}
           rfidsUsados={m.rfidsUsados}
-          onRaza={setRaza}
-          onPelaje={setPelaje}
           onAsignar={(datos) => {
             // Confirmación háptica al asignar; el pulso visual lo da "Último".
             if ('vibrate' in navigator) navigator.vibrate(50)
@@ -205,33 +196,22 @@ export function MangaPage() {
 
 type AnimalFormProps = {
   animal: AnimalSinCaravana
-  raza: string
-  pelaje: string
   rfidsUsados: Set<string>
-  onRaza: (v: string) => void
-  onPelaje: (v: string) => void
   onAsignar: (datos: AsignacionLocal) => void
 }
 
 /**
  * Form de un animal (keyado por id → arranca fresco). El RFID es el héroe; el
- * botón Asignar queda **anclado abajo** (sticky) para que el pulgar lo encuentre
- * siempre. Raza/pelaje plegados (una tropa es uniforme).
+ * botón Asignar queda anclado abajo para que el pulgar lo encuentre siempre.
+ * Nota opcional plegada (algo que se observa del animal en la manga).
  */
-function AnimalForm({
-  animal,
-  raza,
-  pelaje,
-  rfidsUsados,
-  onRaza,
-  onPelaje,
-  onAsignar,
-}: AnimalFormProps) {
+function AnimalForm({ animal, rfidsUsados, onAsignar }: AnimalFormProps) {
   const [rfid, setRfid] = useState('')
   const [visual, setVisual] = useState('')
   const [categoria, setCategoria] = useState<CategoriaAnimal>(animal.categoria)
+  const [nota, setNota] = useState('')
   const [aviso, setAviso] = useState<string | null>(null)
-  const [abrirDatos, setAbrirDatos] = useState(false)
+  const [abrirNota, setAbrirNota] = useState(false)
 
   // Aviso instantáneo (sin esperar al sync): ¿ya usé este RFID en la sesión?
   const repetido = rfid.trim() !== '' && rfidsUsados.has(rfid.trim().toLowerCase())
@@ -249,12 +229,9 @@ function AnimalForm({
       rfid,
       visual: visual || undefined,
       categoria,
-      raza: raza || undefined,
-      pelaje: pelaje || undefined,
+      nota: nota.trim() || undefined,
     })
   }
-
-  const resumenDatos = [raza, pelaje].filter(Boolean).join(' · ')
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -356,47 +333,44 @@ function AnimalForm({
           </div>
         </div>
 
-        {/* Raza / Pelaje: plegado (resumen a la vista, se abre a un toque) */}
+        {/* Nota: plegada (opcional; algo que se observa del animal) */}
         <div className="rounded-2xl border border-border">
           <button
             type="button"
-            onClick={() => setAbrirDatos((v) => !v)}
+            onClick={() => setAbrirNota((v) => !v)}
             className="flex w-full items-center justify-between gap-2 px-4 py-3.5 text-left"
           >
             <span className="flex min-w-0 items-center gap-2">
-              {resumenDatos ? (
+              {nota.trim() ? (
                 <>
-                  <Pencil className="size-4 shrink-0 text-field" />
+                  <StickyNote className="size-4 shrink-0 text-field" />
                   <span className="truncate text-[14px] font-semibold text-ink">
-                    {resumenDatos}
+                    {nota.trim()}
                   </span>
                 </>
               ) : (
-                <span className="text-[14px] font-medium text-faint">
-                  + Raza y pelaje (opcional)
+                <span className="flex items-center gap-2 text-[14px] font-medium text-faint">
+                  <StickyNote className="size-4 shrink-0" />
+                  Agregar nota (opcional)
                 </span>
               )}
             </span>
             <ChevronDown
               className={cn(
                 'size-4 shrink-0 text-faint transition-transform',
-                abrirDatos && 'rotate-180',
+                abrirNota && 'rotate-180',
               )}
             />
           </button>
-          {abrirDatos && (
-            <div className="flex flex-col gap-4 border-t border-border px-4 pb-4 pt-3.5">
-              <ChipPicker
-                label="Raza"
-                options={RAZAS}
-                value={raza}
-                onChange={onRaza}
-              />
-              <ChipPicker
-                label="Pelaje"
-                options={PELAJES}
-                value={pelaje}
-                onChange={onPelaje}
+          {abrirNota && (
+            <div className="border-t border-border px-4 pb-4 pt-3.5">
+              <textarea
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                autoFocus
+                rows={2}
+                placeholder="Ej: renga, ojo lastimado, apartar…"
+                className="w-full resize-none rounded-xl border border-border bg-field-soft/30 px-3 py-2.5 text-[15px] text-ink outline-none focus:border-field"
               />
             </div>
           )}
@@ -415,75 +389,6 @@ function AnimalForm({
           Asignar → siguiente
         </button>
       </div>
-    </div>
-  )
-}
-
-/** Selector por chips tocables + "Otro…" con input. Grande para el campo. */
-function ChipPicker({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string
-  options: string[]
-  value: string
-  onChange: (v: string) => void
-}) {
-  const esPreset = options.some((o) => o.toLowerCase() === value.toLowerCase())
-  const [otro, setOtro] = useState(value !== '' && !esPreset)
-
-  const chip = (activo: boolean) =>
-    cn(
-      'rounded-full border px-4 py-2 text-[14px] font-semibold transition-colors active:scale-95',
-      activo
-        ? 'border-field bg-field-soft text-field-deep'
-        : 'border-border bg-card text-muted-foreground hover:border-faint',
-    )
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
-        {label}
-      </span>
-      <div className="flex flex-wrap gap-2">
-        {options.map((o) => {
-          const sel = !otro && value.toLowerCase() === o.toLowerCase()
-          return (
-            <button
-              key={o}
-              type="button"
-              onClick={() => {
-                setOtro(false)
-                onChange(sel ? '' : o)
-              }}
-              className={chip(sel)}
-            >
-              {o}
-            </button>
-          )
-        })}
-        <button
-          type="button"
-          onClick={() => {
-            setOtro(true)
-            onChange('')
-          }}
-          className={chip(otro)}
-        >
-          Otro…
-        </button>
-      </div>
-      {otro && (
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          autoFocus
-          placeholder={`Escribí ${label.toLowerCase()}`}
-          className="h-11 rounded-xl border border-border bg-card px-3 text-[16px] font-medium text-ink outline-none transition-colors focus:border-field"
-        />
-      )}
     </div>
   )
 }

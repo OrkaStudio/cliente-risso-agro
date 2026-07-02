@@ -19,8 +19,7 @@ export type AsignacionLocal = {
   rfid: string
   visual?: string
   categoria: CategoriaAnimal
-  raza?: string
-  pelaje?: string
+  nota?: string
 }
 
 function enScope(a: AnimalCache, s: Scope): boolean {
@@ -98,8 +97,7 @@ export function useManga() {
             rfid: item.rfid,
             visual: item.visual,
             categoria: item.categoria,
-            raza: item.raza,
-            pelaje: item.pelaje,
+            nota: item.nota,
           })
           await mangadb.outbox.update(item.local_id!, {
             estado: 'sincronizada',
@@ -173,8 +171,7 @@ export function useManga() {
         rfid: datos.rfid.trim(),
         visual: datos.visual?.trim() || null,
         categoria: datos.categoria,
-        raza: datos.raza?.trim() || null,
-        pelaje: datos.pelaje?.trim() || null,
+        nota: datos.nota?.trim() || null,
         estado: 'pendiente',
         error: null,
         created_at: Date.now(),
