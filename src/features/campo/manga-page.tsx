@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   AlertTriangle,
   Check,
@@ -6,6 +7,7 @@ import {
   CloudOff,
   Pencil,
   RefreshCw,
+  RotateCcw,
   ScanLine,
   Wifi,
 } from 'lucide-react'
@@ -99,13 +101,47 @@ export function MangaPage() {
             <span className="ml-1 text-[12px] font-medium text-faint">
               quedan
             </span>
-            {m.listo > 0 && (
-              <div className="mt-0.5 text-[11px] font-semibold text-field-deep">
-                {m.listo} caravaneados
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Progreso del alcance */}
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+            <motion.div
+              className="h-full rounded-full bg-field"
+              initial={false}
+              animate={{ width: `${Math.round(m.progreso * 100)}%` }}
+              transition={{ type: 'spring', stiffness: 200, damping: 30 }}
+            />
+          </div>
+          <span className="shrink-0 text-[11px] font-semibold text-field-deep">
+            {m.listo} listos
+          </span>
+        </div>
+
+        {/* Último caravaneo: confirmación + deshacer (pulsa en cada asignación) */}
+        {m.ultimo && (
+          <motion.div
+            key={m.ultimo.local_id}
+            initial={{ scale: 0.97, opacity: 0.5 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+            className="flex items-center justify-between gap-2 rounded-xl border border-field/30 bg-field-soft/60 px-3 py-2"
+          >
+            <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-semibold text-field-deep">
+              <Check className="size-4 shrink-0" strokeWidth={2.5} />
+              <span className="truncate">RFID {m.ultimo.rfid} listo</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void m.deshacer()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[12px] font-semibold text-ink transition-colors hover:border-faint"
+            >
+              <RotateCcw className="size-3.5" />
+              Deshacer
+            </button>
+          </motion.div>
+        )}
       </div>
 
       {/* Cuerpo */}
@@ -116,9 +152,15 @@ export function MangaPage() {
             animal={m.actual}
             raza={raza}
             pelaje={pelaje}
+            rfidsUsados={m.rfidsUsados}
             onRaza={setRaza}
             onPelaje={setPelaje}
-            onAsignar={(datos) => void m.asignar(m.actual!.id, datos)}
+            onAsignar={(datos) => {
+              // Confirmación háptica (vibra) al asignar; el pulso visual lo da
+              // la barra "Último".
+              if ('vibrate' in navigator) navigator.vibrate(50)
+              void m.asignar(m.actual!.id, datos)
+            }}
           />
         ) : (
           <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-6 py-14 text-center">
@@ -164,6 +206,7 @@ type AnimalFormProps = {
   animal: AnimalSinCaravana
   raza: string
   pelaje: string
+  rfidsUsados: Set<string>
   onRaza: (v: string) => void
   onPelaje: (v: string) => void
   onAsignar: (datos: AsignacionLocal) => void
@@ -178,6 +221,7 @@ function AnimalForm({
   animal,
   raza,
   pelaje,
+  rfidsUsados,
   onRaza,
   onPelaje,
   onAsignar,
@@ -185,12 +229,19 @@ function AnimalForm({
   const [rfid, setRfid] = useState('')
   const [visual, setVisual] = useState('')
   const [categoria, setCategoria] = useState<CategoriaAnimal>(animal.categoria)
-  const [aviso, setAviso] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
   const [abrirDatos, setAbrirDatos] = useState(false)
+
+  // Aviso instantáneo (sin esperar al sync): ¿ya usé este RFID en la sesión?
+  const repetido = rfid.trim() !== '' && rfidsUsados.has(rfid.trim().toLowerCase())
 
   const asignar = () => {
     if (!rfid.trim()) {
-      setAviso(true)
+      setAviso('Escaneá o escribí el RFID')
+      return
+    }
+    if (repetido) {
+      setAviso('Ese RFID ya lo usaste recién')
       return
     }
     onAsignar({
@@ -222,15 +273,22 @@ function AnimalForm({
           'flex items-center gap-3 rounded-2xl border-2 bg-field-soft/40 px-4 transition-colors',
           aviso
             ? 'border-destructive'
-            : 'border-field-soft focus-within:border-field',
+            : repetido
+              ? 'border-accent'
+              : 'border-field-soft focus-within:border-field',
         )}
       >
-        <ScanLine className="size-6 shrink-0 text-field" />
+        <ScanLine
+          className={cn(
+            'size-6 shrink-0',
+            repetido ? 'text-accent' : 'text-field',
+          )}
+        />
         <input
           value={rfid}
           onChange={(e) => {
             setRfid(e.target.value)
-            if (aviso) setAviso(false)
+            if (aviso) setAviso(null)
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -245,10 +303,17 @@ function AnimalForm({
           className="h-15 min-w-0 flex-1 bg-transparent text-[19px] font-bold tracking-wide text-ink outline-none placeholder:font-semibold placeholder:text-faint"
         />
       </div>
-      {aviso && (
+      {aviso ? (
         <p className="-mt-2 text-[12px] font-semibold text-destructive">
-          Escaneá o escribí el RFID
+          {aviso}
         </p>
+      ) : (
+        repetido && (
+          <p className="-mt-2 flex items-center gap-1 text-[12px] font-semibold text-accent">
+            <AlertTriangle className="size-3.5" />
+            Ya usaste ese RFID recién
+          </p>
+        )
       )}
 
       {/* Categoría (compacta) + visual */}

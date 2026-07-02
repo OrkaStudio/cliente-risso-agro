@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { mangadb, type AnimalCache } from './db'
-import { asignarCaravana, fetchSinCaravana, type CategoriaAnimal } from './api'
+import { mangadb, type AnimalCache, type OutboxItem } from './db'
+import {
+  asignarCaravana,
+  deshacerCaravana,
+  fetchSinCaravana,
+  type CategoriaAnimal,
+} from './api'
 
 export type Scope =
   | { kind: 'todos' }
@@ -135,6 +140,31 @@ export function useManga() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
 
+  /** Deshace el último caravaneo (por mis-scan): lo saca de la cola y devuelve
+   *  el animal a "quedan". Si ya se subió, lo revierte en Supabase (necesita
+   *  señal). Lee fresco de Dexie para no depender de estado stale. */
+  const deshacer = useCallback(async () => {
+    const items = await mangadb.outbox.toArray()
+    const item = items
+      .filter((o) => o.estado === 'pendiente' || o.estado === 'sincronizada')
+      .sort((a, b) => b.created_at - a.created_at)[0]
+    if (!item) return
+    if (item.estado === 'sincronizada') {
+      if (!navigator.onLine) {
+        setError('Sin señal: no se puede deshacer uno que ya se subió.')
+        return
+      }
+      try {
+        await deshacerCaravana(item.animal_id, item.rfid)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo deshacer')
+        return
+      }
+    }
+    await mangadb.outbox.delete(item.local_id!)
+    await mangadb.animales.update(item.animal_id, { caravaneado: 0 })
+  }, [])
+
   /** Asigna caravana al animal (local): encola + lo saca de "quedan" + sincroniza. */
   const asignar = useCallback(
     async (animalId: string, datos: AsignacionLocal) => {
@@ -168,6 +198,25 @@ export function useManga() {
   const listo = listaAnimales.filter((a) => a.caravaneado === 1).length
   const sinSincronizar = listaOutbox.filter((o) => o.estado === 'pendiente').length
   const errores = listaOutbox.filter((o) => o.estado === 'error')
+
+  // Progreso dentro del alcance elegido (para la barra).
+  const listoScope = listaAnimales.filter(
+    (a) => a.caravaneado === 1 && enScope(a, scope),
+  ).length
+  const totalScope = listoScope + quedan
+  const progreso = totalScope > 0 ? listoScope / totalScope : 0
+
+  // RFIDs ya usados en la sesión (para avisar del repetido al toque).
+  const rfidsUsados = new Set(
+    listaOutbox
+      .filter((o) => o.estado !== 'error')
+      .map((o) => o.rfid.trim().toLowerCase()),
+  )
+  // Último caravaneo activo (para el "deshacer" y la confirmación).
+  const ultimo: OutboxItem | null =
+    [...listaOutbox]
+      .filter((o) => o.estado === 'pendiente' || o.estado === 'sincronizada')
+      .sort((a, b) => b.created_at - a.created_at)[0] ?? null
 
   // Opciones de alcance (Todos + lotes + potreros presentes en la lista)
   const scopeOptions: ScopeOption[] = (() => {
@@ -216,9 +265,13 @@ export function useManga() {
     actual,
     quedan,
     listo,
+    progreso,
     sinSincronizar,
     errores,
+    rfidsUsados,
+    ultimo,
     asignar,
+    deshacer,
     sincronizar,
     descargar,
   }

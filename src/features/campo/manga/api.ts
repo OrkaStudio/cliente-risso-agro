@@ -75,3 +75,35 @@ export async function asignarCaravana(input: AsignarInput): Promise<void> {
   })
   if (error) throw new Error(error.message)
 }
+
+/**
+ * Deshacer un caravaneo ya sincronizado: borra la caravana vigente del animal
+ * (vuelve a "sin caravana", libera el RFID) y deja una nota de auditoría en el
+ * historial (append-only). RLS por empresa (caravana admite delete de la propia
+ * empresa). Requiere señal.
+ */
+export async function deshacerCaravana(
+  animalId: string,
+  rfid: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('caravana')
+    .delete()
+    .eq('animal_id', animalId)
+    .eq('vigente', true)
+  if (error) throw new Error(error.message)
+
+  const { data: a } = await supabase
+    .from('animal')
+    .select('empresa_id')
+    .eq('id', animalId)
+    .maybeSingle()
+  if (a) {
+    await supabase.from('evento').insert({
+      empresa_id: a.empresa_id,
+      animal_id: animalId,
+      tipo: 'nota',
+      nota: `Caravaneo deshecho (RFID ${rfid})`,
+    })
+  }
+}
