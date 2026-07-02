@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 
 const NAV = [
   { to: '/campo/manga', label: 'Manga', icon: Syringe, soon: false },
-  { to: '/campo/recorrida', label: 'Recorrida', icon: Footprints, soon: true },
+  { to: '/campo/recorrida', label: 'Recorrida', icon: Footprints, soon: false },
 ] as const
 
 export function CampoShell() {

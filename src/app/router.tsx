@@ -59,6 +59,11 @@ const MangaPage = lazy(() =>
     default: m.MangaPage,
   })),
 )
+const RecorridaPage = lazy(() =>
+  import('@/features/campo/recorrida-page').then((m) => ({
+    default: m.RecorridaPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -98,6 +103,7 @@ export const router = createBrowserRouter([
             children: [
               { path: 'campo', element: <Navigate to="/campo/manga" replace /> },
               { path: 'campo/manga', element: <MangaPage /> },
+              { path: 'campo/recorrida', element: <RecorridaPage /> },
             ],
           },
         ],
