@@ -24,7 +24,6 @@ const ROADS =
   'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
 const DEFAULT_CENTER: [number, number] = [-36.03, -59.1]
 const HALO = '#08140f'
-const LABEL_ZOOM = 15
 const OVERLAP_MIN_M2 = 50
 
 type Estado = 'normal' | 'hover' | 'selected'
@@ -192,10 +191,12 @@ export function CampoMapaReal({
         dashArray: uso === 'vacio' ? '3 6' : undefined,
       }
     }
-    function labelHtml(id: string, zoom: number): string {
+    // La etiqueta del potrero muestra el nombre y, si tiene hacienda cargada,
+    // el conteo ("N cab") — a cualquier zoom, para que se vea siempre.
+    function labelHtml(id: string): string {
       const p = datoDe(id)
       const nombre = p?.nombre ?? '—'
-      if (zoom >= LABEL_ZOOM && p && p.cabezas > 0) {
+      if (p && p.cabezas > 0) {
         return `<span class="pl-num">${nombre}</span><span class="pl-sub">${p.cabezas} cab</span>`
       }
       return `<span class="pl-num">${nombre}</span>`
@@ -240,7 +241,7 @@ export function CampoMapaReal({
         lineJoin: 'round',
       }).addTo(map)
       const main = L.polygon(pts, styleMain(id, 'normal')).addTo(map)
-      main.bindTooltip(labelHtml(id, map.getZoom()), {
+      main.bindTooltip(labelHtml(id), {
         permanent: true,
         direction: 'center',
         className: 'potrero-label',
@@ -358,9 +359,6 @@ export function CampoMapaReal({
     map.on('dragend', magnetToCenter)
     map.on('zoomend', () => {
       const z = map.getZoom()
-      layers.forEach(({ main }, id) =>
-        main.setTooltipContent(labelHtml(id, z)),
-      )
       // Al alejar, recentrar el campo; al acercar, dejar inspeccionar libre.
       if (z < prevZoom) magnetToCenter()
       prevZoom = z

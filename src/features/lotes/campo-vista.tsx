@@ -631,13 +631,18 @@ export function CampoVista({
               const uso = info.uso
               const sel = selected === s.id
               const hov = hoverId === s.id
+              const cab = info.cabezas ?? 0
               const usoText =
                 uso === 'ganadero'
-                  ? `Ganadero · ${info.cabezas ?? 0}`
+                  ? `Ganadero · ${cab}`
                   : uso === 'agricola'
                     ? `Agrícola${info.cultivo ? ` · ${info.cultivo}` : ''}`
                     : 'Vacío'
-              const showPill = !s.small
+              // Los potreros chicos no muestran el pill por espacio, PERO si
+              // tienen hacienda cargada (o están seleccionados/hover) sí, para
+              // que el conteo siempre se vea sobre el mapa (aunque desborde un
+              // poco el polígono chico).
+              const showPill = !s.small || (uso === 'ganadero' && cab > 0) || sel || hov
               return (
                 <g
                   key={s.id}
