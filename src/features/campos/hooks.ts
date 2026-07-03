@@ -209,6 +209,7 @@ export function useAsignarAnimalesALote(campoId: string) {
       api.asignarAnimalesALote(vars.loteId, vars.animalIds),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lotes-campo', campoId] })
+      qc.invalidateQueries({ queryKey: ['lotes-reparto', campoId] })
       qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
       qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
     },
