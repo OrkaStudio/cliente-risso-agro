@@ -482,6 +482,7 @@ export type Database = {
       }
       lote: {
         Row: {
+          campo_id: string | null
           created_at: string
           empresa_id: string
           especie: string | null
@@ -491,6 +492,7 @@ export type Database = {
           proposito: string | null
         }
         Insert: {
+          campo_id?: string | null
           created_at?: string
           empresa_id: string
           especie?: string | null
@@ -500,6 +502,7 @@ export type Database = {
           proposito?: string | null
         }
         Update: {
+          campo_id?: string | null
           created_at?: string
           empresa_id?: string
           especie?: string | null
@@ -510,6 +513,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "lote_campo_id_fkey"
+            columns: ["campo_id"]
+            isOneToOne: false
+            referencedRelation: "campo"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lote_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
@@ -518,6 +528,49 @@ export type Database = {
           },
           {
             foreignKeyName: "lote_potrero_id_fkey"
+            columns: ["potrero_id"]
+            isOneToOne: false
+            referencedRelation: "potrero"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lote_potrero: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          lote_id: string
+          potrero_id: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          lote_id: string
+          potrero_id: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          lote_id?: string
+          potrero_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lote_potrero_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lote_potrero_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lote"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lote_potrero_potrero_id_fkey"
             columns: ["potrero_id"]
             isOneToOne: false
             referencedRelation: "potrero"

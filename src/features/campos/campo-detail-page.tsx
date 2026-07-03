@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowUpRight,
@@ -5,6 +6,7 @@ import {
   ChevronLeft,
   Gauge,
   LandPlot,
+  Layers,
   MapPin,
   TrendingUp,
 } from 'lucide-react'
@@ -12,6 +14,8 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCamposConPotreros } from '@/features/campos/hooks'
 import type { CampoConPotreros } from '@/features/campos/api'
 import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dialogs'
+import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
+import { Button } from '@/components/ui/button'
 import { estadoCicloColor, estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
 import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
 import { useMovimientos } from '@/features/analitica/hooks'
@@ -434,6 +438,7 @@ export function CampoDetailPage() {
   const empresaId = empresa.data?.empresa_id ?? ''
   const campos = useCamposConPotreros()
   const movs = useMovimientos()
+  const [cargaOpen, setCargaOpen] = useState(false)
 
   if (campos.isLoading) {
     return <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -507,6 +512,19 @@ export function CampoDetailPage() {
               campoId={campo.id}
               triggerLabel="+ Nuevo potrero"
             />
+            {campo.potreros.length > 0 && (
+              <>
+                <Button onClick={() => setCargaOpen(true)} className="gap-1.5">
+                  <Layers className="size-4" />
+                  Cargar lote
+                </Button>
+                <CargaMasivaDialog
+                  open={cargaOpen}
+                  onOpenChange={setCargaOpen}
+                  prefill={{ campoId: campo.id, campoNombre: campo.nombre }}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>

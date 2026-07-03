@@ -12,7 +12,7 @@ import {
   especieLabel,
   type Especie,
 } from '@/features/hacienda/labels'
-import type { ItemCargaMasiva } from '@/features/hacienda/api'
+import type { BloqueCarga, ItemCargaMasiva } from '@/features/hacienda/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,10 +37,31 @@ const CAT_OPTIONS: DropdownOption[] = [
 
 /** Una fila editable de la carga (strings mientras se tipea). */
 type Fila = { categoria: string; cantidad: string }
+/** Un destino: un potrero del campo con sus filas de categoría/cantidad. */
+type Bloque = { potreroId: string; filas: Fila[] }
 
 const filaVacia = (): Fila => ({ categoria: '', cantidad: '' })
+const bloqueVacio = (potreroId = ''): Bloque => ({
+  potreroId,
+  filas: [filaVacia()],
+})
 
-/** Campo/potrero ya elegido (al abrir desde un potrero del mapa). */
+/** Agrega las filas de un bloque en items (una entrada por categoría). */
+function itemsDeFilas(filas: Fila[]): ItemCargaMasiva[] {
+  const acc = new Map<Categoria, number>()
+  for (const f of filas) {
+    const cat = f.categoria as Categoria
+    const n = parseInt(f.cantidad, 10)
+    if (!cat || !Number.isFinite(n) || n <= 0) continue
+    acc.set(cat, (acc.get(cat) ?? 0) + n)
+  }
+  return [...acc.entries()].map(([categoria, cantidad]) => ({ categoria, cantidad }))
+}
+
+const totalDeFilas = (filas: Fila[]) =>
+  itemsDeFilas(filas).reduce((s, it) => s + it.cantidad, 0)
+
+/** Campo/potrero ya elegido (al abrir desde un potrero o un campo del mapa). */
 export type PrefillCarga = {
   campoId?: string
   potreroId?: string
@@ -50,8 +71,11 @@ export type PrefillCarga = {
 
 /**
  * Carga masiva de animales por lote, SIN caravana (se caravanean después en la
- * manga). Reutilizable: sin `prefill` muestra los selectores de campo/potrero;
- * con `prefill` (desde el mapa de un potrero) los fija y solo pide categorías.
+ * manga). El mismo lote se puede repartir en varios potreros del campo (un
+ * bloque por potrero). Reutilizable:
+ *  · `prefill.potreroId` → destino fijo a un potrero (un solo bloque).
+ *  · `prefill.campoId` (sin potrero) → campo fijo, elegís los potreros.
+ *  · sin prefill → elegís campo y potreros.
  */
 export function CargaMasivaDialog({
   open,
@@ -67,53 +91,79 @@ export function CargaMasivaDialog({
   const potreros = usePotreros()
   const cargar = useCrearAnimalesMasivo()
 
-  const fijo = !!prefill?.potreroId
+  const potreroFijo = !!prefill?.potreroId
 
   const [campoId, setCampoId] = useState(prefill?.campoId ?? '')
-  const [potreroId, setPotreroId] = useState(prefill?.potreroId ?? '')
   const [loteNombre, setLoteNombre] = useState('')
   const [loteProposito, setLoteProposito] = useState('')
   const [origen, setOrigen] = useState('')
-  const [filas, setFilas] = useState<Fila[]>([filaVacia()])
+  const [bloques, setBloques] = useState<Bloque[]>([
+    bloqueVacio(prefill?.potreroId ?? ''),
+  ])
   const [error, setError] = useState<string | null>(null)
 
-  // Potreros del campo elegido (cuando no viene fijado por prefill).
+  // Potreros del campo elegido.
   const potrerosDeCampo = useMemo(
     () => (potreros.data ?? []).filter((p) => p.campo_id === campoId),
     [potreros.data, campoId],
   )
 
-  const items = useMemo<ItemCargaMasiva[]>(() => {
-    const acc = new Map<Categoria, number>()
-    for (const f of filas) {
-      const cat = f.categoria as Categoria
-      const n = parseInt(f.cantidad, 10)
-      if (!cat || !Number.isFinite(n) || n <= 0) continue
-      acc.set(cat, (acc.get(cat) ?? 0) + n)
-    }
-    return [...acc.entries()].map(([categoria, cantidad]) => ({ categoria, cantidad }))
-  }, [filas])
-
-  const total = items.reduce((s, it) => s + it.cantidad, 0)
+  const total = useMemo(
+    () => bloques.reduce((s, b) => s + totalDeFilas(b.filas), 0),
+    [bloques],
+  )
 
   function reset() {
     setCampoId(prefill?.campoId ?? '')
-    setPotreroId(prefill?.potreroId ?? '')
     setLoteNombre('')
     setLoteProposito('')
     setOrigen('')
-    setFilas([filaVacia()])
+    setBloques([bloqueVacio(prefill?.potreroId ?? '')])
     setError(null)
   }
 
-  function setFila(i: number, patch: Partial<Fila>) {
-    setFilas((prev) => prev.map((f, j) => (j === i ? { ...f, ...patch } : f)))
+  // --- edición de bloques y filas ---
+  function setBloque(bi: number, patch: Partial<Bloque>) {
+    setBloques((prev) => prev.map((b, j) => (j === bi ? { ...b, ...patch } : b)))
   }
-  function agregarFila() {
-    setFilas((prev) => [...prev, filaVacia()])
+  function agregarBloque() {
+    setBloques((prev) => [...prev, bloqueVacio()])
   }
-  function quitarFila(i: number) {
-    setFilas((prev) => (prev.length === 1 ? prev : prev.filter((_, j) => j !== i)))
+  function quitarBloque(bi: number) {
+    setBloques((prev) => (prev.length === 1 ? prev : prev.filter((_, j) => j !== bi)))
+  }
+  function setFila(bi: number, fi: number, patch: Partial<Fila>) {
+    setBloques((prev) =>
+      prev.map((b, j) =>
+        j === bi
+          ? { ...b, filas: b.filas.map((f, k) => (k === fi ? { ...f, ...patch } : f)) }
+          : b,
+      ),
+    )
+  }
+  function agregarFila(bi: number) {
+    setBloques((prev) =>
+      prev.map((b, j) => (j === bi ? { ...b, filas: [...b.filas, filaVacia()] } : b)),
+    )
+  }
+  function quitarFila(bi: number, fi: number) {
+    setBloques((prev) =>
+      prev.map((b, j) =>
+        j === bi
+          ? { ...b, filas: b.filas.length === 1 ? b.filas : b.filas.filter((_, k) => k !== fi) }
+          : b,
+      ),
+    )
+  }
+
+  /** Potreros disponibles para el bloque `bi` (sin repetir los ya elegidos). */
+  function potrerosDisponibles(bi: number) {
+    const tomados = new Set(
+      bloques.filter((_, j) => j !== bi).map((b) => b.potreroId).filter(Boolean),
+    )
+    return potrerosDeCampo.filter(
+      (p) => p.id === bloques[bi].potreroId || !tomados.has(p.id),
+    )
   }
 
   async function onSubmit(e: FormEvent) {
@@ -132,17 +182,23 @@ export function CargaMasivaDialog({
       setError(`Demasiados de una vez (${total}). Máximo 2000 por carga.`)
       return
     }
+    const bloquesPayload: BloqueCarga[] = bloques.map((b) => ({
+      potreroId: b.potreroId || null,
+      items: itemsDeFilas(b.filas),
+    }))
     try {
       const n = await cargar.mutateAsync({
         empresaId,
-        potreroId: potreroId || null,
+        campoId: campoId || null,
         loteNombre: loteNombre || undefined,
         loteProposito: loteProposito || undefined,
         origen: origen || undefined,
-        items,
+        bloques: bloquesPayload,
       })
+      const potrerosConAnimales = bloquesPayload.filter((b) => b.items.length > 0).length
       toast.success(
-        `${n} ${n === 1 ? 'animal cargado' : 'animales cargados'} sin caravana`,
+        `${n} ${n === 1 ? 'animal cargado' : 'animales cargados'} sin caravana` +
+          (potrerosConAnimales > 1 ? ` en ${potrerosConAnimales} potreros` : ''),
       )
       onOpenChange(false)
       reset()
@@ -176,8 +232,8 @@ export function CargaMasivaDialog({
         </Button>
       }
     >
-      {/* Destino: fijo (desde el mapa) o selectores */}
-      {fijo ? (
+      {/* Destino: potrero fijo, o campo (los potreros van por bloque) */}
+      {potreroFijo ? (
         <motion.div variants={formItem}>
           <div className="flex items-center gap-2.5 rounded-xl border border-border bg-secondary/50 px-3.5 py-3">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-field-soft text-field-deep">
@@ -195,36 +251,22 @@ export function CargaMasivaDialog({
           </div>
         </motion.div>
       ) : (
-        <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
-          <div className="grid gap-2">
-            <Label>Campo</Label>
-            <Dropdown
-              block
-              ariaLabel="Campo"
-              value={campoId}
-              onChange={(v) => {
-                setCampoId(v)
-                setPotreroId('')
-              }}
-              options={[
-                { value: '', label: 'Elegí…' },
-                ...(campos.data ?? []).map((c) => ({ value: c.id, label: c.nombre })),
-              ]}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Potrero</Label>
-            <Dropdown
-              block
-              ariaLabel="Potrero"
-              value={potreroId}
-              onChange={setPotreroId}
-              options={[
-                { value: '', label: campoId ? 'Sin asignar' : 'Elegí un campo' },
-                ...potrerosDeCampo.map((p) => ({ value: p.id, label: p.nombre })),
-              ]}
-            />
-          </div>
+        <motion.div variants={formItem} className="grid gap-2">
+          <Label>Campo</Label>
+          <Dropdown
+            block
+            ariaLabel="Campo"
+            value={campoId}
+            onChange={(v) => {
+              setCampoId(v)
+              // Al cambiar de campo, los potreros elegidos ya no aplican.
+              setBloques((prev) => prev.map((b) => ({ ...b, potreroId: '' })))
+            }}
+            options={[
+              { value: '', label: 'Elegí…' },
+              ...(campos.data ?? []).map((c) => ({ value: c.id, label: c.nombre })),
+            ]}
+          />
         </motion.div>
       )}
 
@@ -250,58 +292,126 @@ export function CargaMasivaDialog({
         </div>
       </motion.div>
 
-      {/* Categorías + cantidades */}
-      <motion.div variants={formItem} className="grid gap-2">
+      {/* Bloques: un potrero con sus categorías. El mismo lote, repartido. */}
+      <motion.div variants={formItem} className="grid gap-3">
         <div className="flex items-baseline justify-between">
-          <Label>Categorías y cantidades *</Label>
+          <Label>{potreroFijo ? 'Categorías y cantidades *' : 'Reparto por potrero *'}</Label>
           {total > 0 && (
             <span className="tnum text-[12.5px] font-bold text-field-deep">
               {total} {total === 1 ? 'cabeza' : 'cabezas'}
             </span>
           )}
         </div>
-        <div className="grid gap-2">
-          {filas.map((f, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <Dropdown
-                  block
-                  ariaLabel={`Categoría ${i + 1}`}
-                  value={f.categoria}
-                  onChange={(v) => setFila(i, { categoria: v })}
-                  options={CAT_OPTIONS}
-                />
+
+        {bloques.map((b, bi) => {
+          const subtotal = totalDeFilas(b.filas)
+          return (
+            <div
+              key={bi}
+              className={
+                potreroFijo
+                  ? 'grid gap-2'
+                  : 'grid gap-2.5 rounded-xl border border-border bg-secondary/30 p-3'
+              }
+            >
+              {/* Cabecera del bloque: potrero + subtotal + quitar */}
+              {!potreroFijo && (
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Dropdown
+                      block
+                      ariaLabel={`Potrero del bloque ${bi + 1}`}
+                      value={b.potreroId}
+                      onChange={(v) => setBloque(bi, { potreroId: v })}
+                      options={[
+                        {
+                          value: '',
+                          label: campoId ? 'Sin asignar' : 'Elegí un campo',
+                        },
+                        ...potrerosDisponibles(bi).map((p) => ({
+                          value: p.id,
+                          label: p.nombre,
+                        })),
+                      ]}
+                    />
+                  </div>
+                  {subtotal > 0 && (
+                    <span className="tnum shrink-0 text-[12px] font-semibold text-muted-foreground">
+                      {subtotal}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Quitar potrero"
+                    onClick={() => quitarBloque(bi)}
+                    disabled={bloques.length === 1}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Filas de categoría/cantidad */}
+              <div className="grid gap-2">
+                {b.filas.map((f, fi) => (
+                  <div key={fi} className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <Dropdown
+                        block
+                        ariaLabel={`Categoría ${bi + 1}.${fi + 1}`}
+                        value={f.categoria}
+                        onChange={(v) => setFila(bi, fi, { categoria: v })}
+                        options={CAT_OPTIONS}
+                      />
+                    </div>
+                    <Input
+                      className="w-24 text-center"
+                      inputMode="numeric"
+                      placeholder="0"
+                      aria-label={`Cantidad ${bi + 1}.${fi + 1}`}
+                      value={f.cantidad}
+                      onChange={(e) =>
+                        setFila(bi, fi, {
+                          cantidad: e.target.value.replace(/[^0-9]/g, ''),
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label="Quitar categoría"
+                      onClick={() => quitarFila(bi, fi)}
+                      disabled={b.filas.length === 1}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <Input
-                className="w-24 text-center"
-                inputMode="numeric"
-                placeholder="0"
-                aria-label={`Cantidad ${i + 1}`}
-                value={f.cantidad}
-                onChange={(e) =>
-                  setFila(i, { cantidad: e.target.value.replace(/[^0-9]/g, '') })
-                }
-              />
+
               <button
                 type="button"
-                aria-label="Quitar fila"
-                onClick={() => quitarFila(i)}
-                disabled={filas.length === 1}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+                onClick={() => agregarFila(bi)}
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg px-1 py-0.5 text-[13px] font-semibold text-field-deep transition-colors hover:text-field"
               >
-                <X className="size-4" />
+                <Plus className="size-4" />
+                Agregar categoría
               </button>
             </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={agregarFila}
-          className="mt-0.5 inline-flex w-fit items-center gap-1.5 rounded-lg px-1 py-1 text-[13px] font-semibold text-field-deep transition-colors hover:text-field"
-        >
-          <Plus className="size-4" />
-          Agregar categoría
-        </button>
+          )
+        })}
+
+        {!potreroFijo && (
+          <button
+            type="button"
+            onClick={agregarBloque}
+            className="inline-flex w-fit items-center gap-1.5 rounded-lg px-1 py-1 text-[13px] font-semibold text-field-deep transition-colors hover:text-field"
+          >
+            <Plus className="size-4" />
+            Agregar potrero
+          </button>
+        )}
       </motion.div>
 
       <motion.div variants={formItem} className="grid gap-2">
