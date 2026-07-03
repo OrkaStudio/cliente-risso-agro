@@ -2,22 +2,38 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { Layers, MapPin, Plus, X } from 'lucide-react'
-import { Constants } from '@/lib/supabase/types'
 import type { Database } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { usePotreros, useCrearAnimalesMasivo } from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
-import { categoriaLabel } from '@/features/hacienda/labels'
+import {
+  categoriaLabel,
+  categoriasPorEspecie,
+  especieLabel,
+  type Especie,
+} from '@/features/hacienda/labels'
 import type { ItemCargaMasiva } from '@/features/hacienda/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dropdown } from '@/components/ui/dropdown'
+import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
 import { FormDialog, formItem } from '@/components/form-dialog'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 
-const CATEGORIAS = Constants.public.Enums.categoria_animal
+const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+
+/** Opciones de categoría agrupadas por especie (Bovino/Ovino/Equino). */
+const CAT_OPTIONS: DropdownOption[] = [
+  { value: '', label: 'Categoría…' },
+  ...ESPECIES.flatMap((esp) =>
+    categoriasPorEspecie[esp].map((c) => ({
+      value: c,
+      label: categoriaLabel[c],
+      group: especieLabel[esp],
+    })),
+  ),
+]
 
 /** Una fila editable de la carga (strings mientras se tipea). */
 type Fila = { categoria: string; cantidad: string }
@@ -134,11 +150,6 @@ export function CargaMasivaDialog({
       setError(err instanceof Error ? err.message : 'Error al cargar')
     }
   }
-
-  const catOptions = [
-    { value: '', label: 'Categoría…' },
-    ...CATEGORIAS.map((c) => ({ value: c, label: categoriaLabel[c] })),
-  ]
 
   return (
     <FormDialog
@@ -258,7 +269,7 @@ export function CargaMasivaDialog({
                   ariaLabel={`Categoría ${i + 1}`}
                   value={f.categoria}
                   onChange={(v) => setFila(i, { categoria: v })}
-                  options={catOptions}
+                  options={CAT_OPTIONS}
                 />
               </div>
               <Input

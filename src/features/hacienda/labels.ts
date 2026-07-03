@@ -5,6 +5,40 @@ type Sexo = Database['public']['Enums']['sexo_animal']
 type Estado = Database['public']['Enums']['estado_animal']
 type TipoEvento = Database['public']['Enums']['tipo_evento']
 
+export type Especie = 'bovino' | 'ovino' | 'equino'
+
+export const especieLabel: Record<Especie, string> = {
+  bovino: 'Bovino',
+  ovino: 'Ovino',
+  equino: 'Equino',
+}
+
+/** Categorías ordenadas por especie (para selects agrupados). El orden acá es
+ *  el orden con el que se muestran en el formulario. */
+export const categoriasPorEspecie: Record<Especie, Categoria[]> = {
+  bovino: ['vaca', 'vaquillona', 'novillo', 'ternero', 'ternera', 'toro', 'capon'],
+  ovino: ['oveja', 'carnero', 'cordero', 'cordera'],
+  equino: ['yegua', 'padrillo', 'potrillo', 'potranca'],
+}
+
+export const especiePorCategoria: Record<Categoria, Especie> = {
+  vaca: 'bovino',
+  vaquillona: 'bovino',
+  novillo: 'bovino',
+  ternero: 'bovino',
+  ternera: 'bovino',
+  toro: 'bovino',
+  capon: 'bovino',
+  oveja: 'ovino',
+  carnero: 'ovino',
+  cordero: 'ovino',
+  cordera: 'ovino',
+  yegua: 'equino',
+  padrillo: 'equino',
+  potrillo: 'equino',
+  potranca: 'equino',
+}
+
 export const categoriaLabel: Record<Categoria, string> = {
   vaca: 'Vaca',
   vaquillona: 'Vaquillona',
@@ -13,6 +47,14 @@ export const categoriaLabel: Record<Categoria, string> = {
   ternera: 'Ternera',
   toro: 'Toro',
   capon: 'Capón',
+  oveja: 'Oveja',
+  carnero: 'Carnero',
+  cordero: 'Cordero',
+  cordera: 'Cordera',
+  yegua: 'Yegua',
+  padrillo: 'Padrillo',
+  potrillo: 'Potrillo',
+  potranca: 'Potranca',
 }
 
 /** Color de la serie de datos por categoría (paleta de gráficos g1–g5). */
@@ -24,6 +66,14 @@ export const categoriaColor: Record<Categoria, string> = {
   novillo: 'var(--g4)',
   toro: 'var(--g5)',
   capon: 'var(--g5)',
+  oveja: 'var(--g1)',
+  carnero: 'var(--g5)',
+  cordero: 'var(--g2)',
+  cordera: 'var(--g3)',
+  yegua: 'var(--g1)',
+  padrillo: 'var(--g5)',
+  potrillo: 'var(--g2)',
+  potranca: 'var(--g3)',
 }
 
 export const sexoLabel: Record<Sexo, string> = {

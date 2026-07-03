@@ -6,12 +6,31 @@ import { Beef } from 'lucide-react'
 import { Constants } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { usePotreros, useCrearAnimal } from '@/features/hacienda/hooks'
-import { categoriaLabel } from '@/features/hacienda/labels'
+import {
+  categoriaLabel,
+  categoriasPorEspecie,
+  especieLabel,
+  type Especie,
+} from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dropdown } from '@/components/ui/dropdown'
+import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
 import { FormDialog, formItem } from '@/components/form-dialog'
+
+const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+
+/** Opciones de categoría agrupadas por especie (Bovino/Ovino/Equino). */
+const CAT_OPTIONS: DropdownOption[] = [
+  { value: '', label: 'Elegí…' },
+  ...ESPECIES.flatMap((esp) =>
+    categoriasPorEspecie[esp].map((c) => ({
+      value: c,
+      label: categoriaLabel[c],
+      group: especieLabel[esp],
+    })),
+  ),
+]
 
 const schema = z.object({
   numeroRfid: z.string().trim().min(1, 'Ingresá el número de caravana'),
@@ -133,13 +152,7 @@ export function CrearAnimalDialog() {
             ariaLabel="Categoría"
             value={categoria}
             onChange={setCategoria}
-            options={[
-              { value: '', label: 'Elegí…' },
-              ...Constants.public.Enums.categoria_animal.map((c) => ({
-                value: c,
-                label: categoriaLabel[c],
-              })),
-            ]}
+            options={CAT_OPTIONS}
           />
           <p className="text-xs text-muted-foreground">
             El sexo se completa solo según la categoría.

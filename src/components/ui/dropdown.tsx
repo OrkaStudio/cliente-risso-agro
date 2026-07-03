@@ -15,6 +15,9 @@ export type DropdownOption = {
   label: string
   icon?: LucideIcon
   color?: string
+  /** Encabezado de sección. Si dos opciones consecutivas difieren en `group`,
+   *  se dibuja un título de grupo antes de la primera. Opcional. */
+  group?: string
 }
 
 const container: Variants = {
@@ -192,12 +195,24 @@ export function Dropdown({
                 className="overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-[0_12px_40px_rgba(16,30,20,0.18)]"
                 style={{ maxHeight: pos.maxH }}
               >
-                {options.map((o) => {
+                {options.map((o, i) => {
                   const esActivo = o.value === activo
                   const esSel = o.value === value
+                  const encabezado =
+                    o.group && o.group !== options[i - 1]?.group ? o.group : null
                   return (
+                    <React.Fragment key={o.value}>
+                      {encabezado && (
+                        <div
+                          className={cn(
+                            'px-3 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.1em] text-faint',
+                            i > 0 && 'mt-1 border-t border-border/70',
+                          )}
+                        >
+                          {encabezado}
+                        </div>
+                      )}
                     <motion.button
-                      key={o.value}
                       type="button"
                       variants={item}
                       onClick={() => {
@@ -231,6 +246,7 @@ export function Dropdown({
                         <Check className="relative z-10 size-4 shrink-0 text-field-deep" />
                       )}
                     </motion.button>
+                    </React.Fragment>
                   )
                 })}
               </motion.div>

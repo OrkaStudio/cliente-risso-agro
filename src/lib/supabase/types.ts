@@ -884,9 +884,12 @@ export type Database = {
           estado: Database["public"]["Enums"]["estado_animal"] | null
           fecha_nacimiento: string | null
           id: string | null
+          lote_id: string | null
           notas: string | null
           origen: string | null
+          pelaje: string | null
           potrero_id: string | null
+          raza: string | null
           sexo: Database["public"]["Enums"]["sexo_animal"] | null
           updated_at: string | null
         }
@@ -896,6 +899,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "lote"
             referencedColumns: ["id"]
           },
           {
@@ -1121,6 +1131,14 @@ export type Database = {
         | "ternera"
         | "toro"
         | "capon"
+        | "oveja"
+        | "carnero"
+        | "cordero"
+        | "cordera"
+        | "yegua"
+        | "padrillo"
+        | "potrillo"
+        | "potranca"
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
       estado_animal: "activo" | "vendido" | "muerto"
@@ -1303,6 +1321,14 @@ export const Constants = {
         "ternera",
         "toro",
         "capon",
+        "oveja",
+        "carnero",
+        "cordero",
+        "cordera",
+        "yegua",
+        "padrillo",
+        "potrillo",
+        "potranca",
       ],
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
