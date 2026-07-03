@@ -163,6 +163,14 @@ export const useLotesDeCampo = (campoId: string) =>
     enabled: !!campoId,
   })
 
+/** Lotes del campo con composición (categorías) y dispersión (potreros). */
+export const useLotesReparto = (campoId: string) =>
+  useQuery({
+    queryKey: ['lotes-reparto', campoId],
+    queryFn: () => api.getLotesDelCampo(campoId),
+    enabled: !!campoId,
+  })
+
 export function useCrearLote(campoId: string) {
   const qc = useQueryClient()
   return useMutation({

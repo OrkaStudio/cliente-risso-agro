@@ -370,6 +370,94 @@ export async function listLotes(campoId: string): Promise<Lote[]> {
   return (data ?? []).map(({ potrero: _p, ...lote }) => lote as Lote)
 }
 
+/** Un lote del campo con su composición (categorías) y dispersión (potreros). */
+export type LoteReparto = {
+  id: string
+  nombre: string
+  proposito: string | null
+  totalCabezas: number
+  composicion: { categoria: Categoria; cabezas: number }[]
+  dispersion: { potreroId: string; potreroNombre: string; cabezas: number }[]
+}
+
+/**
+ * Lotes de un campo con cómo están compuestos (por categoría) y cómo están
+ * dispersados (por potrero). El conteo sale de los animales activos; los
+ * potreros donde el lote está registrado sin animales (`lote_potrero`) también
+ * aparecen, con 0.
+ */
+export async function getLotesDelCampo(campoId: string): Promise<LoteReparto[]> {
+  const [{ data: pots, error: eP }, { data: lotes, error: eL }] = await Promise.all([
+    supabase.from('potrero').select('id, nombre').eq('campo_id', campoId).order('nombre'),
+    supabase
+      .from('lote')
+      .select('id, nombre, proposito')
+      .eq('campo_id', campoId)
+      .order('nombre'),
+  ])
+  if (eP) throw new Error(eP.message)
+  if (eL) throw new Error(eL.message)
+  const loteList = lotes ?? []
+  if (loteList.length === 0) return []
+
+  const potNombre = new Map((pots ?? []).map((p) => [p.id, p.nombre]))
+  const loteIds = loteList.map((l) => l.id)
+
+  const [{ data: animales, error: eA }, { data: lp, error: eLP }] = await Promise.all([
+    supabase
+      .from('v_animal_con_caravana')
+      .select('lote_id, categoria, potrero_id, estado')
+      .eq('estado', 'activo')
+      .in('lote_id', loteIds),
+    supabase.from('lote_potrero').select('lote_id, potrero_id').in('lote_id', loteIds),
+  ])
+  if (eA) throw new Error(eA.message)
+  if (eLP) throw new Error(eLP.message)
+
+  const catPorLote = new Map<string, Map<Categoria, number>>()
+  const potPorLote = new Map<string, Map<string, number>>()
+  for (const a of animales ?? []) {
+    if (!a.lote_id) continue
+    if (a.categoria) {
+      const m = catPorLote.get(a.lote_id) ?? new Map<Categoria, number>()
+      m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+      catPorLote.set(a.lote_id, m)
+    }
+    if (a.potrero_id) {
+      const m = potPorLote.get(a.lote_id) ?? new Map<string, number>()
+      m.set(a.potrero_id, (m.get(a.potrero_id) ?? 0) + 1)
+      potPorLote.set(a.lote_id, m)
+    }
+  }
+  // Potreros registrados sin animales (unificados / reserva) → aparecen con 0.
+  for (const r of lp ?? []) {
+    const m = potPorLote.get(r.lote_id) ?? new Map<string, number>()
+    if (!m.has(r.potrero_id)) m.set(r.potrero_id, 0)
+    potPorLote.set(r.lote_id, m)
+  }
+
+  return loteList.map((l) => {
+    const composicion = [...(catPorLote.get(l.id)?.entries() ?? [])]
+      .map(([categoria, cabezas]) => ({ categoria, cabezas }))
+      .sort((a, b) => b.cabezas - a.cabezas)
+    const dispersion = [...(potPorLote.get(l.id)?.entries() ?? [])]
+      .map(([potreroId, cabezas]) => ({
+        potreroId,
+        potreroNombre: potNombre.get(potreroId) ?? '—',
+        cabezas,
+      }))
+      .sort((a, b) => b.cabezas - a.cabezas || a.potreroNombre.localeCompare(b.potreroNombre))
+    return {
+      id: l.id,
+      nombre: l.nombre,
+      proposito: l.proposito,
+      totalCabezas: composicion.reduce((s, c) => s + c.cabezas, 0),
+      composicion,
+      dispersion,
+    }
+  })
+}
+
 export async function crearLote(input: TablesInsert<'lote'>): Promise<Lote> {
   const { data, error } = await supabase
     .from('lote')

@@ -215,8 +215,8 @@ export function CargaMasivaDialog({
         if (!v) reset()
       }}
       icon={Layers}
-      title="Carga masiva"
-      subtitle="Por tropa, sin caravana · se taggean en la manga"
+      title="Cargar animales"
+      subtitle="Sin caravana todavía · la ponés después en la manga"
       onSubmit={onSubmit}
       footer={
         <Button
@@ -227,7 +227,7 @@ export function CargaMasivaDialog({
           {cargar.isPending
             ? 'Cargando…'
             : total === 0
-              ? 'Agregá categorías'
+              ? 'Anotá las cantidades'
               : `Cargar ${total} ${total === 1 ? 'animal' : 'animales'}`}
         </Button>
       }
@@ -294,10 +294,18 @@ export function CargaMasivaDialog({
 
       {/* Bloques: un potrero con sus categorías. El mismo lote, repartido. */}
       <motion.div variants={formItem} className="grid gap-3">
-        <div className="flex items-baseline justify-between">
-          <Label>{potreroFijo ? 'Categorías y cantidades *' : 'Reparto por potrero *'}</Label>
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <Label>{potreroFijo ? '¿Cuántos animales? *' : '¿Cuántos hay en cada potrero? *'}</Label>
+            {!potreroFijo && (
+              <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+                Elegí un potrero y anotá cuántos hay de cada categoría. Podés sumar
+                más potreros para el mismo lote.
+              </p>
+            )}
+          </div>
           {total > 0 && (
-            <span className="tnum text-[12.5px] font-bold text-field-deep">
+            <span className="tnum shrink-0 text-[12.5px] font-bold text-field-deep">
               {total} {total === 1 ? 'cabeza' : 'cabezas'}
             </span>
           )}
@@ -326,7 +334,7 @@ export function CargaMasivaDialog({
                       options={[
                         {
                           value: '',
-                          label: campoId ? 'Sin asignar' : 'Elegí un campo',
+                          label: campoId ? 'Elegí el potrero' : 'Elegí un campo',
                         },
                         ...potrerosDisponibles(bi).map((p) => ({
                           value: p.id,
@@ -425,8 +433,8 @@ export function CargaMasivaDialog({
       </motion.div>
 
       <motion.p variants={formItem} className="text-xs text-muted-foreground">
-        Se crean como animales individuales sin caravana. Después los pasás por la
-        manga para asignarles la caravana y completar sus datos.
+        Se cargan sin caravana. Cuando pasen por la manga les ponés la caravana y
+        completás los datos.
       </motion.p>
 
       {error && (

@@ -11,8 +11,8 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { useCamposConPotreros } from '@/features/campos/hooks'
-import type { CampoConPotreros } from '@/features/campos/api'
+import { useCamposConPotreros, useLotesReparto } from '@/features/campos/hooks'
+import type { CampoConPotreros, LoteReparto } from '@/features/campos/api'
 import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
@@ -227,6 +227,115 @@ function UsoDelSuelo({ campo }: { campo: CampoConPotreros }) {
               </span>
             ))}
           </div>
+        </div>
+      )}
+    </Panel>
+  )
+}
+
+/* ===== Lotes del campo (composición + dispersión por potrero) ===== */
+function LoteCard({ lote }: { lote: LoteReparto }) {
+  const { nombre, proposito, totalCabezas, composicion, dispersion } = lote
+  return (
+    <div className="rounded-xl border border-border bg-card/60 p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Layers className="size-4 shrink-0 text-field" />
+          <span className="truncate font-semibold text-ink">{nombre}</span>
+          {proposito && (
+            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11.5px] font-semibold text-muted-foreground">
+              {proposito}
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 tnum font-bold text-ink">
+          {totalCabezas}{' '}
+          <span className="text-[13px] font-semibold text-muted-foreground">cab</span>
+        </span>
+      </div>
+
+      {totalCabezas > 0 ? (
+        <>
+          <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+            {composicion.map((c) => (
+              <span
+                key={c.categoria}
+                style={{
+                  width: `${(c.cabezas / totalCabezas) * 100}%`,
+                  background: categoriaColor[c.categoria],
+                }}
+                title={`${categoriaLabel[c.categoria]}: ${c.cabezas}`}
+              />
+            ))}
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
+            {composicion.map((c) => (
+              <span
+                key={c.categoria}
+                className="inline-flex items-center gap-1.5 text-[13px]"
+              >
+                <span
+                  className="size-2.5 rounded-[3px]"
+                  style={{ background: categoriaColor[c.categoria] }}
+                />
+                <span className="text-ink">{categoriaLabel[c.categoria]}</span>
+                <span className="tnum font-semibold text-muted-foreground">
+                  {c.cabezas}
+                </span>
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          Sin animales cargados todavía.
+        </p>
+      )}
+
+      {dispersion.length > 0 && (
+        <div className="mt-3.5 border-t border-border/60 pt-3">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+            En qué potreros está
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {dispersion.map((d) => (
+              <span
+                key={d.potreroId}
+                className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[12.5px] font-medium text-ink"
+              >
+                <MapPin className="size-3.5 text-field-deep" />
+                {d.potreroNombre}
+                <span className="tnum text-muted-foreground">{d.cabezas}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LotesDelCampo({ campoId }: { campoId: string }) {
+  const lotes = useLotesReparto(campoId)
+  const data = lotes.data ?? []
+
+  return (
+    <Panel
+      title="Lotes"
+      info="Cómo está compuesto cada lote (por categoría) y en qué potreros está repartido. El conteo sale de los animales cargados."
+    >
+      {lotes.isLoading ? (
+        <EmptyMini>Cargando…</EmptyMini>
+      ) : data.length === 0 ? (
+        <EmptyMini>
+          Todavía no armaste lotes en este campo. Usá “Cargar lote” para crear una
+          tropa y repartirla entre los potreros.
+        </EmptyMini>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {data.map((l) => (
+            <LoteCard key={l.id} lote={l} />
+          ))}
         </div>
       )}
     </Panel>
@@ -582,6 +691,9 @@ export function CampoDetailPage() {
             <ComposicionRodeo campo={campo} />
             <UsoDelSuelo campo={campo} />
           </div>
+
+          {/* Lotes: composición + dispersión por potrero */}
+          <LotesDelCampo campoId={campo.id} />
 
           {/* Rentabilidad por potrero (solo si hay movimientos) */}
           <RentabilidadPorPotrero campo={campo} movimientos={movs.data ?? []} />

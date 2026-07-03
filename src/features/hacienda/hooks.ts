@@ -37,6 +37,7 @@ export function useCrearAnimalesMasivo() {
       qc.invalidateQueries({ queryKey: ['campos-con-potreros'] })
       qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
       qc.invalidateQueries({ queryKey: ['lotes-campo'] })
+      qc.invalidateQueries({ queryKey: ['lotes-reparto'] })
     },
   })
 }
