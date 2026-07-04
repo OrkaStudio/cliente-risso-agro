@@ -575,25 +575,26 @@ export function CampoVista({
             {/* Fondo: si por algo la foto no llega a un borde, no se ve blanco */}
             <rect x="0" y="0" width={W} height={H} fill="#3a4a3f" />
 
-            {/* Surcos: relleno ámbar con líneas diagonales (rows de cultivo)
-                para los potreros agrícolas. El color diferencia la actividad. */}
+            {/* Surcos del potrero agrícola: base con el COLOR DEL CAMPO (identidad)
+                + líneas diagonales ÁMBAR (rows de cultivo) que contrastan sobre
+                el color del campo → se distingue sin perder la identidad. */}
             <defs>
               <pattern
                 id={surcosId}
-                width={9}
-                height={9}
+                width={10}
+                height={10}
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <rect width={9} height={9} fill={USO.agricola.color} fillOpacity={0.85} />
+                <rect width={10} height={10} fill={campo.color.hex} fillOpacity={0.5} />
                 <line
                   x1={0}
                   y1={0}
                   x2={0}
-                  y2={9}
-                  stroke="#5f3d06"
-                  strokeWidth={3.5}
-                  strokeOpacity={0.9}
+                  y2={10}
+                  stroke={USO.agricola.color}
+                  strokeWidth={4}
+                  strokeOpacity={0.95}
                 />
               </pattern>
             </defs>
@@ -684,19 +685,19 @@ export function CampoVista({
                   />
                   <polygon
                     points={s.points}
-                    fill={esAgricola ? `url(#${surcosId})` : USO[uso].color}
+                    fill={esAgricola ? `url(#${surcosId})` : campo.color.hex}
                     fillOpacity={
                       esAgricola
                         ? sel || hov
                           ? 1
-                          : 0.9
+                          : 0.92
                         : esVacio
                           ? sel || hov
-                            ? 0.42
-                            : 0.24
+                            ? 0.4
+                            : 0.2
                           : sel || hov
-                            ? 0.74
-                            : 0.56
+                            ? 0.66
+                            : 0.5
                     }
                     stroke={campo.color.hex}
                     strokeWidth={sel || hov ? 3 : 2}

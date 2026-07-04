@@ -12,6 +12,7 @@ import type { LatLng, PotreroMapa } from '@/features/campos/api'
 import { getCampoView, setCampoView } from '@/features/lotes/geo'
 import {
   PotreroSidePanel,
+  ReferenciasPotrero,
   USO,
   type PotreroInfo,
 } from '@/features/lotes/potrero-side-panel'
@@ -85,6 +86,7 @@ export function CampoMapaReal({
     if (!ref.current || mapRef.current) return
     const host = ref.current
     const hex = campo.color.hex
+    const surcosId = `surcos-le-${campo.id}`
     const map = L.map(host, {
       center: DEFAULT_CENTER,
       zoom: 13,
@@ -174,22 +176,60 @@ export function CampoMapaReal({
     }
     function styleMain(id: string, estado: Estado): L.PathOptions {
       const uso = usoDe(id)
-      const base = uso === 'vacio' ? 0.05 : 0.2
+      const esAgri = uso === 'agricola'
+      const active = estado !== 'normal'
       const fillOpacity =
-        estado === 'selected'
-          ? base + 0.3
-          : estado === 'hover'
-            ? base + 0.16
-            : base
+        uso === 'vacio'
+          ? active
+            ? 0.4
+            : 0.2
+          : esAgri
+            ? active
+              ? 1
+              : 0.92
+            : active
+              ? 0.66
+              : 0.5
       return {
         color: hex,
         weight: estado === 'normal' ? 2.5 : 3.5,
-        fillColor: USO[uso].color,
+        // Base = color del campo (identidad); agrícola con surcos ámbar (textura).
+        fillColor: esAgri ? `url(#${surcosId})` : hex,
         fillOpacity,
         lineJoin: 'round',
         lineCap: 'round',
-        dashArray: uso === 'vacio' ? '3 6' : undefined,
+        dashArray: uso === 'vacio' ? '4 5' : undefined,
       }
+    }
+    // Inyecta el patrón de surcos (base = color del campo + líneas ámbar) en el
+    // <svg> del overlay de Leaflet, para poder referenciarlo por url(#id).
+    function ensureSurcos() {
+      if (document.getElementById(surcosId)) return
+      const svg = host.querySelector<SVGSVGElement>('.leaflet-overlay-pane svg')
+      if (!svg) return
+      const NS = 'http://www.w3.org/2000/svg'
+      const defs = document.createElementNS(NS, 'defs')
+      const pat = document.createElementNS(NS, 'pattern')
+      pat.setAttribute('id', surcosId)
+      pat.setAttribute('width', '10')
+      pat.setAttribute('height', '10')
+      pat.setAttribute('patternUnits', 'userSpaceOnUse')
+      pat.setAttribute('patternTransform', 'rotate(45)')
+      const rect = document.createElementNS(NS, 'rect')
+      rect.setAttribute('width', '10')
+      rect.setAttribute('height', '10')
+      rect.setAttribute('fill', hex)
+      const line = document.createElementNS(NS, 'line')
+      line.setAttribute('x1', '0')
+      line.setAttribute('y1', '0')
+      line.setAttribute('x2', '0')
+      line.setAttribute('y2', '10')
+      line.setAttribute('stroke', USO.agricola.color)
+      line.setAttribute('stroke-width', '4')
+      pat.appendChild(rect)
+      pat.appendChild(line)
+      defs.appendChild(pat)
+      svg.insertBefore(defs, svg.firstChild)
     }
     // La etiqueta del potrero muestra el nombre y, si tiene hacienda cargada,
     // el conteo ("N cab") — a cualquier zoom, para que se vea siempre.
@@ -241,6 +281,7 @@ export function CampoMapaReal({
         lineJoin: 'round',
       }).addTo(map)
       const main = L.polygon(pts, styleMain(id, 'normal')).addTo(map)
+      ensureSurcos()
       main.bindTooltip(labelHtml(id), {
         permanent: true,
         direction: 'center',
@@ -315,6 +356,7 @@ export function CampoMapaReal({
       if (p.poligono && p.poligono.length > 0)
         addPotrero(p.id, p.nombre, p.poligono)
     }
+    ensureSurcos()
 
     function allBounds(): L.LatLngBounds | null {
       let b: L.LatLngBounds | null = boundaryLayer
@@ -475,9 +517,10 @@ export function CampoMapaReal({
   const refDe = (d: Cardinal) => refs.find((r) => r.dir === d)?.label
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row">
-      <div className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1">
-        <div ref={ref} className="absolute inset-0" />
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1">
+          <div ref={ref} className="absolute inset-0" />
         {/* Orientación: N/S/E/O (mapa norte-arriba) + referencia por lado */}
         <div className="pointer-events-none absolute inset-0 z-[450]">
           {CARDINALES.map(({ dir, pos, arrow }) => (
@@ -491,12 +534,14 @@ export function CampoMapaReal({
             </div>
           ))}
         </div>
+        </div>
+        <PotreroSidePanel
+          info={hover}
+          campo={campo}
+          onVerPotrero={(id) => verRef.current(id)}
+        />
       </div>
-      <PotreroSidePanel
-        info={hover}
-        campo={campo}
-        onVerPotrero={(id) => verRef.current(id)}
-      />
+      <ReferenciasPotrero campo={campo} />
     </div>
   )
 }

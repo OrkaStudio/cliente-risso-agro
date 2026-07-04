@@ -37,60 +37,59 @@ export const USO: Record<Uso, { label: string; color: string }> = {
 }
 
 /**
- * Estilo del swatch del glosario según la actividad — replica el relleno del
- * mapa: ganadero verde sólido, agrícola ámbar con surcos, vacío gris tenue.
+ * Estilo del swatch del glosario — replica el relleno del mapa: base con el
+ * COLOR DEL CAMPO (identidad) y la actividad marcada con textura: ganadero
+ * sólido, agrícola con surcos ÁMBAR (contrastan sobre el color del campo),
+ * vacío tenue + punteado.
  */
-export function fillStyleUso(uso: Uso): CSSProperties {
-  const c = USO[uso].color
-  if (uso === 'ganadero') return { background: `${c}d8`, border: `1.5px solid ${c}` }
+export function fillStyleUso(hex: string, uso: Uso): CSSProperties {
+  if (uso === 'ganadero') return { background: `${hex}c8`, border: `1.5px solid ${hex}` }
   if (uso === 'agricola')
     return {
-      background: `${c}cc`,
-      backgroundImage:
-        'repeating-linear-gradient(45deg, #5f3d06 0 2px, transparent 2px 6px)',
-      border: `1.5px solid ${c}`,
+      background: `${hex}88`,
+      backgroundImage: `repeating-linear-gradient(45deg, ${USO.agricola.color} 0 3px, transparent 3px 7px)`,
+      border: `1.5px solid ${hex}`,
     }
-  return { background: `${c}3a`, border: `1.5px dashed ${c}` }
+  return { background: `${hex}2e`, border: `1.5px dashed ${hex}aa` }
 }
 
 /**
- * Glosario para poner DEBAJO del mapa (siempre a la vista). El RELLENO (color)
- * dice la actividad; el BORDE identifica al campo.
+ * Glosario para poner DEBAJO del mapa (siempre a la vista). El COLOR identifica
+ * al campo; la TEXTURA del relleno dice la actividad del potrero.
  */
 export function ReferenciasPotrero({ campo }: { campo: CampoVM }) {
   const hex = campo.color.hex
   const items: { uso: Uso; sub: string }[] = [
-    { uso: 'ganadero', sub: 'verde' },
+    { uso: 'ganadero', sub: 'sólido' },
     { uso: 'agricola', sub: 'surcos' },
-    { uso: 'vacio', sub: 'gris' },
+    { uso: 'vacio', sub: 'tenue' },
   ]
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
-      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
-        Referencias
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
+          Referencias
+        </span>
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11.5px] font-semibold"
+          style={{ color: hex }}
+        >
+          <span className="size-2.5 rounded-full" style={{ background: hex }} />
+          color = {campo.nombre}
+        </span>
+      </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
         {items.map(({ uso, sub }) => (
           <span key={uso} className="inline-flex items-center gap-2 text-[13px]">
             <span
               className="size-5 shrink-0 rounded-[6px]"
-              style={fillStyleUso(uso)}
+              style={fillStyleUso(hex, uso)}
             />
             <span className="font-semibold text-ink">{USO[uso].label}</span>
             <span className="text-[12px] text-faint">· {sub}</span>
           </span>
         ))}
       </div>
-      <span
-        className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11.5px] font-semibold"
-        style={{ color: hex }}
-      >
-        <span
-          className="size-3 rounded-[4px]"
-          style={{ border: `2px solid ${hex}` }}
-        />
-        borde = {campo.nombre}
-      </span>
     </div>
   )
 }
