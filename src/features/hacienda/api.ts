@@ -118,18 +118,16 @@ export type CargaMasiva = {
 
 /**
  * Carga masiva por lote SIN caravana, repartida en uno o más potreros del
- * campo. Crea N animales por cada {categoría, cantidad} de cada bloque (el sexo
- * lo deriva Postgres). Si viene `loteNombre`, crea la tropa (lote) en el campo y
- * la registra en cada potrero (`lote_potrero`, M:N). Devuelve cuántos animales
- * se crearon en total. Se caravanean después en el modo manga.
- *
- * Nota: los bloques se cargan con una RPC por potrero (no es una sola tx). Si un
- * bloque fallara a mitad, los anteriores ya quedaron creados (acción de oficina,
- * poco frecuente — hardening pendiente si hace falta atomicidad total).
+ * campo, en UNA sola transacción (RPC `crear_lote_repartido`): crea el lote en
+ * el campo, lo registra en cada potrero (`lote_potrero`, M:N) y crea los
+ * animales distribuidos (el sexo lo deriva Postgres). Atómico: o todo, o nada.
+ * Devuelve cuántos animales se crearon. Se caravanean después en la manga.
  */
 export async function crearAnimalesMasivo(input: CargaMasiva): Promise<number> {
+  // Un bloque por potrero; items sin cantidad se descartan. Los bloques con
+  // potrero pero sin animales igual registran el potrero del lote (unificados).
   const bloques = input.bloques.map((b) => ({
-    potreroId: b.potreroId ?? null,
+    potrero_id: b.potreroId ?? null,
     items: b.items.filter((it) => it.cantidad > 0),
   }))
   const totalItems = bloques.reduce(
@@ -138,57 +136,17 @@ export async function crearAnimalesMasivo(input: CargaMasiva): Promise<number> {
   )
   if (totalItems === 0) throw new Error('No hay cantidades para cargar')
 
-  // Crear el lote una vez (en el campo). potrero_id legacy = primer potrero.
-  let loteId: string | null = null
-  const nombre = input.loteNombre?.trim()
-  if (nombre) {
-    const { data: lote, error: eLote } = await supabase
-      .from('lote')
-      .insert({
-        empresa_id: input.empresaId,
-        nombre,
-        proposito: input.loteProposito?.trim() || null,
-        campo_id: input.campoId || null,
-        potrero_id: bloques.find((b) => b.potreroId)?.potreroId ?? null,
-      })
-      .select('id')
-      .single()
-    if (eLote) throw new Error(eLote.message)
-    loteId = lote.id
-
-    // Registrar en qué potreros está el lote (reparto + unificados).
-    const potreroIds = [
-      ...new Set(
-        bloques.map((b) => b.potreroId).filter((p): p is string => !!p),
-      ),
-    ]
-    if (potreroIds.length > 0) {
-      const { error: eLP } = await supabase.from('lote_potrero').insert(
-        potreroIds.map((potrero_id) => ({
-          lote_id: loteId!,
-          potrero_id,
-          empresa_id: input.empresaId,
-        })),
-      )
-      if (eLP) throw new Error(eLP.message)
-    }
-  }
-
-  // Crear los animales, un potrero por vez.
-  let total = 0
-  for (const b of bloques) {
-    if (b.items.length === 0) continue
-    const { data, error } = await supabase.rpc('crear_animales_masivo', {
-      p_empresa_id: input.empresaId,
-      p_potrero_id: b.potreroId || undefined,
-      p_lote_id: loteId || undefined,
-      p_origen: input.origen?.trim() || undefined,
-      p_items: b.items,
-    })
-    if (error) throw new Error(error.message)
-    total += data
-  }
-  return total
+  const { data, error } = await supabase.rpc('crear_lote_repartido', {
+    p_empresa_id: input.empresaId,
+    p_campo_id: input.campoId || undefined,
+    p_lote_nombre: input.loteNombre?.trim() || undefined,
+    p_lote_proposito: input.loteProposito?.trim() || undefined,
+    p_origen: input.origen?.trim() || undefined,
+    p_bloques: bloques,
+  })
+  if (error) throw new Error(error.message)
+  const res = data as { lote_id: string | null; total: number }
+  return res.total
 }
 
 /** Cambiar la caravana conservando la identidad del animal (RPC transaccional). */

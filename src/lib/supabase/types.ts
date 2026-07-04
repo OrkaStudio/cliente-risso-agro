@@ -1157,6 +1157,17 @@ export type Database = {
         }
         Returns: number
       }
+      crear_lote_repartido: {
+        Args: {
+          p_bloques?: Json
+          p_campo_id?: string
+          p_empresa_id: string
+          p_lote_nombre?: string
+          p_lote_proposito?: string
+          p_origen?: string
+        }
+        Returns: Json
+      }
       dar_baja_animal: {
         Args: {
           p_animal_id: string
