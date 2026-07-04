@@ -5,16 +5,13 @@ import {
   FEATURES,
   type FeatureId,
 } from '@/features/lotes/potrero-features'
-import {
-  usoDeEstado,
-  type CampoVM,
-  type Uso,
-} from '@/features/campos/use-campo-mapa'
+import { usoDeEstado, type CampoVM } from '@/features/campos/use-campo-mapa'
 import type { Infraestructura, LatLng, PotreroMapa } from '@/features/campos/api'
 import { cargarSat, satCacheado } from '@/features/lotes/satelite-cache'
 import {
   PotreroSidePanel,
   ReferenciasPotrero,
+  USO,
   type EditarPotrero,
   type PotreroInfo,
 } from '@/features/lotes/potrero-side-panel'
@@ -98,18 +95,6 @@ function centroide(xy: XY[]) {
     return { cx: sx, cy: sy, w, h }
   }
   return { cx: cx / (6 * a), cy: cy / (6 * a), w, h }
-}
-// Color semántico del uso (canal distinto a la identidad del campo).
-const USO_COLOR: Record<Uso, string> = {
-  ganadero: '#2f7d3a',
-  agricola: '#bb7a12',
-  vacio: '#5d6770',
-}
-function fillOpFor(uso: Uso, sel: boolean, hov: boolean): number {
-  // Tintes livianos: dejan ver la foto satelital de fondo.
-  if (uso === 'vacio') return sel ? 0.18 : hov ? 0.12 : 0.04
-  if (uso === 'agricola') return sel ? 0.24 : hov ? 0.18 : 0.1
-  return sel ? 0.32 : hov ? 0.24 : 0.15
 }
 function pointInRing(lat: number, lng: number, ring: LatLng[]): boolean {
   let inside = false
@@ -590,8 +575,8 @@ export function CampoVista({
             {/* Fondo: si por algo la foto no llega a un borde, no se ve blanco */}
             <rect x="0" y="0" width={W} height={H} fill="#3a4a3f" />
 
-            {/* Surcos: relleno de líneas diagonales para los potreros agrícolas
-                (mismo color del campo). Convención del glosario. */}
+            {/* Surcos: relleno ámbar con líneas diagonales (rows de cultivo)
+                para los potreros agrícolas. El color diferencia la actividad. */}
             <defs>
               <pattern
                 id={surcosId}
@@ -600,15 +585,15 @@ export function CampoVista({
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <rect width={9} height={9} fill={campo.color.hex} fillOpacity={0.16} />
+                <rect width={9} height={9} fill={USO.agricola.color} fillOpacity={0.85} />
                 <line
                   x1={0}
                   y1={0}
                   x2={0}
                   y2={9}
-                  stroke={campo.color.hex}
-                  strokeWidth={3}
-                  strokeOpacity={0.55}
+                  stroke="#5f3d06"
+                  strokeWidth={3.5}
+                  strokeOpacity={0.9}
                 />
               </pattern>
             </defs>
@@ -657,6 +642,7 @@ export function CampoVista({
               const info = infoDe(s.id)
               const uso = info.uso
               const esAgricola = uso === 'agricola'
+              const esVacio = uso === 'vacio'
               const sel = selected === s.id
               const hov = hoverId === s.id
               const cab = info.cabezas ?? 0
@@ -698,14 +684,24 @@ export function CampoVista({
                   />
                   <polygon
                     points={s.points}
-                    fill={esAgricola ? `url(#${surcosId})` : campo.color.hex}
+                    fill={esAgricola ? `url(#${surcosId})` : USO[uso].color}
                     fillOpacity={
-                      esAgricola ? (sel || hov ? 1 : 0.82) : fillOpFor(uso, sel, hov)
+                      esAgricola
+                        ? sel || hov
+                          ? 1
+                          : 0.9
+                        : esVacio
+                          ? sel || hov
+                            ? 0.42
+                            : 0.24
+                          : sel || hov
+                            ? 0.74
+                            : 0.56
                     }
                     stroke={campo.color.hex}
-                    strokeWidth={sel || hov ? 2.5 : 1.5}
+                    strokeWidth={sel || hov ? 3 : 2}
                     strokeLinejoin="round"
-                    strokeDasharray={uso === 'vacio' ? '4 5' : undefined}
+                    strokeDasharray={esVacio ? '4 5' : undefined}
                     style={{ transition: 'fill-opacity 0.12s' }}
                   />
                   <text
@@ -740,7 +736,7 @@ export function CampoVista({
                             alignItems: 'center',
                             padding: '1.5px 8px',
                             borderRadius: '999px',
-                            background: USO_COLOR[uso],
+                            background: USO[uso].color,
                             color: '#fff',
                             fontSize: '11px',
                             fontWeight: 600,

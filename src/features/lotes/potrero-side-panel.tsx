@@ -25,65 +25,72 @@ type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 
 export type { Uso }
 
+/**
+ * Colores semánticos por actividad (canal principal de diferenciación en el
+ * mapa). Fuente única: la usan el mapa (relleno y pill), el mapa de edición y el
+ * glosario, para que todo diga lo mismo.
+ */
 export const USO: Record<Uso, { label: string; color: string }> = {
-  ganadero: { label: 'Ganadero', color: '#3f9d52' },
-  agricola: { label: 'Agrícola', color: '#d6a032' },
-  vacio: { label: 'Vacío', color: '#94a39a' },
+  ganadero: { label: 'Ganadero', color: '#3f9d52' }, // verde
+  agricola: { label: 'Agrícola', color: '#c6871a' }, // ámbar
+  vacio: { label: 'Vacío', color: '#7d8a93' }, // gris
 }
 
 /**
- * Estilo de relleno del potrero según su actividad, en el color del campo.
- * Es la MISMA convención que dibuja el mapa (ganadero sólido, agrícola surcos,
- * vacío tenue), para que el glosario diga la verdad.
+ * Estilo del swatch del glosario según la actividad — replica el relleno del
+ * mapa: ganadero verde sólido, agrícola ámbar con surcos, vacío gris tenue.
  */
-export function fillStyleUso(hex: string, uso: Uso): CSSProperties {
-  if (uso === 'ganadero') return { background: `${hex}9c`, border: `1.5px solid ${hex}` }
+export function fillStyleUso(uso: Uso): CSSProperties {
+  const c = USO[uso].color
+  if (uso === 'ganadero') return { background: `${c}d8`, border: `1.5px solid ${c}` }
   if (uso === 'agricola')
     return {
-      background: `${hex}22`,
-      backgroundImage: `repeating-linear-gradient(45deg, ${hex} 0 2.5px, transparent 2.5px 6px)`,
-      border: `1.5px solid ${hex}`,
+      background: `${c}cc`,
+      backgroundImage:
+        'repeating-linear-gradient(45deg, #5f3d06 0 2px, transparent 2px 6px)',
+      border: `1.5px solid ${c}`,
     }
-  return { background: `${hex}12`, border: `1.5px dashed ${hex}99` }
+  return { background: `${c}3a`, border: `1.5px dashed ${c}` }
 }
 
 /**
- * Glosario de referencias para poner DEBAJO del mapa (siempre a la vista). El
- * color identifica al campo; el estilo del relleno, la actividad del potrero.
+ * Glosario para poner DEBAJO del mapa (siempre a la vista). El RELLENO (color)
+ * dice la actividad; el BORDE identifica al campo.
  */
 export function ReferenciasPotrero({ campo }: { campo: CampoVM }) {
   const hex = campo.color.hex
   const items: { uso: Uso; sub: string }[] = [
-    { uso: 'ganadero', sub: 'sólido' },
+    { uso: 'ganadero', sub: 'verde' },
     { uso: 'agricola', sub: 'surcos' },
-    { uso: 'vacio', sub: 'tenue' },
+    { uso: 'vacio', sub: 'gris' },
   ]
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
-          Referencias
-        </span>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11.5px] font-semibold"
-          style={{ color: hex }}
-        >
-          <span className="size-2.5 rounded-full" style={{ background: hex }} />
-          color = {campo.nombre}
-        </span>
-      </div>
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
+        Referencias
+      </span>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
         {items.map(({ uso, sub }) => (
           <span key={uso} className="inline-flex items-center gap-2 text-[13px]">
             <span
               className="size-5 shrink-0 rounded-[6px]"
-              style={fillStyleUso(hex, uso)}
+              style={fillStyleUso(uso)}
             />
             <span className="font-semibold text-ink">{USO[uso].label}</span>
             <span className="text-[12px] text-faint">· {sub}</span>
           </span>
         ))}
       </div>
+      <span
+        className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11.5px] font-semibold"
+        style={{ color: hex }}
+      >
+        <span
+          className="size-3 rounded-[4px]"
+          style={{ border: `2px solid ${hex}` }}
+        />
+        borde = {campo.nombre}
+      </span>
     </div>
   )
 }
