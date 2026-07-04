@@ -14,6 +14,7 @@ import type { Infraestructura, LatLng, PotreroMapa } from '@/features/campos/api
 import { cargarSat, satCacheado } from '@/features/lotes/satelite-cache'
 import {
   PotreroSidePanel,
+  ReferenciasPotrero,
   type EditarPotrero,
   type PotreroInfo,
 } from '@/features/lotes/potrero-side-panel'
@@ -551,11 +552,14 @@ export function CampoVista({
   const activeId = selected ?? hoverId
   const panelInfo = activeId ? infoDe(activeId) : null
   const vacio = shapes.length === 0 && !boundary
+  // Patrón de surcos (líneas diagonales) para los potreros agrícolas.
+  const surcosId = `surcos-${campo.id}`
   const selMarker = markers.find((m) => m.id === selMk) ?? null
   const selFeat = selMarker ? FEATURE_MAP[selMarker.type] : null
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row">
+    <div className="flex flex-col gap-3">
+     <div className="flex flex-col gap-3 lg:flex-row">
       <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-border bg-[#eef1ec] lg:h-[500px] lg:flex-1">
         {vacio ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
@@ -585,6 +589,29 @@ export function CampoVista({
           >
             {/* Fondo: si por algo la foto no llega a un borde, no se ve blanco */}
             <rect x="0" y="0" width={W} height={H} fill="#3a4a3f" />
+
+            {/* Surcos: relleno de líneas diagonales para los potreros agrícolas
+                (mismo color del campo). Convención del glosario. */}
+            <defs>
+              <pattern
+                id={surcosId}
+                width={9}
+                height={9}
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+              >
+                <rect width={9} height={9} fill={campo.color.hex} fillOpacity={0.16} />
+                <line
+                  x1={0}
+                  y1={0}
+                  x2={0}
+                  y2={9}
+                  stroke={campo.color.hex}
+                  strokeWidth={3}
+                  strokeOpacity={0.55}
+                />
+              </pattern>
+            </defs>
 
             {/* Foto satelital: capa base (carga rápida) + nítida encima que
                 entra con un fundido cuando termina de renderizar Esri. Ambas
@@ -629,6 +656,7 @@ export function CampoVista({
             {shapes.map((s) => {
               const info = infoDe(s.id)
               const uso = info.uso
+              const esAgricola = uso === 'agricola'
               const sel = selected === s.id
               const hov = hoverId === s.id
               const cab = info.cabezas ?? 0
@@ -670,8 +698,10 @@ export function CampoVista({
                   />
                   <polygon
                     points={s.points}
-                    fill={campo.color.hex}
-                    fillOpacity={fillOpFor(uso, sel, hov)}
+                    fill={esAgricola ? `url(#${surcosId})` : campo.color.hex}
+                    fillOpacity={
+                      esAgricola ? (sel || hov ? 1 : 0.82) : fillOpFor(uso, sel, hov)
+                    }
                     stroke={campo.color.hex}
                     strokeWidth={sel || hov ? 2.5 : 1.5}
                     strokeLinejoin="round"
@@ -995,6 +1025,8 @@ export function CampoVista({
         onVerPotrero={onVerPotrero}
         edit={editProp}
       />
+     </div>
+      <ReferenciasPotrero campo={campo} />
     </div>
   )
 }

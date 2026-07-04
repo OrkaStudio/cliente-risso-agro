@@ -1,6 +1,6 @@
 // Exporta el componente + helpers (USO/tipos) del mismo módulo (patrón del repo).
 /* eslint-disable react-refresh/only-export-components */
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import {
   ArrowRight,
   Beef,
@@ -29,6 +29,63 @@ export const USO: Record<Uso, { label: string; color: string }> = {
   ganadero: { label: 'Ganadero', color: '#3f9d52' },
   agricola: { label: 'Agrícola', color: '#d6a032' },
   vacio: { label: 'Vacío', color: '#94a39a' },
+}
+
+/**
+ * Estilo de relleno del potrero según su actividad, en el color del campo.
+ * Es la MISMA convención que dibuja el mapa (ganadero sólido, agrícola surcos,
+ * vacío tenue), para que el glosario diga la verdad.
+ */
+export function fillStyleUso(hex: string, uso: Uso): CSSProperties {
+  if (uso === 'ganadero') return { background: `${hex}9c`, border: `1.5px solid ${hex}` }
+  if (uso === 'agricola')
+    return {
+      background: `${hex}22`,
+      backgroundImage: `repeating-linear-gradient(45deg, ${hex} 0 2.5px, transparent 2.5px 6px)`,
+      border: `1.5px solid ${hex}`,
+    }
+  return { background: `${hex}12`, border: `1.5px dashed ${hex}99` }
+}
+
+/**
+ * Glosario de referencias para poner DEBAJO del mapa (siempre a la vista). El
+ * color identifica al campo; el estilo del relleno, la actividad del potrero.
+ */
+export function ReferenciasPotrero({ campo }: { campo: CampoVM }) {
+  const hex = campo.color.hex
+  const items: { uso: Uso; sub: string }[] = [
+    { uso: 'ganadero', sub: 'sólido' },
+    { uso: 'agricola', sub: 'surcos' },
+    { uso: 'vacio', sub: 'tenue' },
+  ]
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
+          Referencias
+        </span>
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11.5px] font-semibold"
+          style={{ color: hex }}
+        >
+          <span className="size-2.5 rounded-full" style={{ background: hex }} />
+          color = {campo.nombre}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
+        {items.map(({ uso, sub }) => (
+          <span key={uso} className="inline-flex items-center gap-2 text-[13px]">
+            <span
+              className="size-5 shrink-0 rounded-[6px]"
+              style={fillStyleUso(hex, uso)}
+            />
+            <span className="font-semibold text-ink">{USO[uso].label}</span>
+            <span className="text-[12px] text-faint">· {sub}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export type PotreroInfo = {
@@ -284,52 +341,11 @@ export function PotreroSidePanel({
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col p-4">
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-            <MousePointer2 className="size-7 text-faint" />
-            <p className="text-[13px] text-muted-foreground">
-              Pasá el mouse o tocá un potrero para ver y editar su detalle.
-            </p>
-          </div>
-          <div className="grid gap-2 border-t border-border/60 pt-3">
-            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
-              Referencias · color = campo
-            </span>
-            <div className="flex items-center gap-2.5 text-[12.5px]">
-              <span
-                className="size-3.5 rounded-[4px] border"
-                style={{
-                  background: `${campo.color.hex}88`,
-                  borderColor: campo.color.hex,
-                }}
-              />
-              <span className="text-ink">Ganadero</span>
-              <span className="ml-auto text-faint">sólido</span>
-            </div>
-            <div className="flex items-center gap-2.5 text-[12.5px]">
-              <span
-                className="size-3.5 rounded-[4px] border"
-                style={{
-                  background: `${campo.color.hex}22`,
-                  backgroundImage: `repeating-linear-gradient(45deg, ${campo.color.hex} 0 2px, transparent 2px 5px)`,
-                  borderColor: campo.color.hex,
-                }}
-              />
-              <span className="text-ink">Agrícola</span>
-              <span className="ml-auto text-faint">surcos</span>
-            </div>
-            <div className="flex items-center gap-2.5 text-[12.5px]">
-              <span
-                className="size-3.5 rounded-[4px]"
-                style={{
-                  background: `${campo.color.hex}14`,
-                  border: `1.5px dashed ${campo.color.hex}99`,
-                }}
-              />
-              <span className="text-ink">Vacío</span>
-              <span className="ml-auto text-faint">tenue</span>
-            </div>
-          </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
+          <MousePointer2 className="size-7 text-faint" />
+          <p className="text-[13px] text-muted-foreground">
+            Pasá el mouse o tocá un potrero para ver y editar su detalle.
+          </p>
         </div>
       )}
     </aside>
