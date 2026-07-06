@@ -84,7 +84,7 @@ export function MangaPage() {
               }}
               options={m.scopeOptions.map((o) => ({
                 value: o.key,
-                label: o.label,
+                label: `${o.label} · ${o.pendientes}`,
               }))}
               className="h-11"
             />
@@ -172,6 +172,21 @@ export function MangaPage() {
             void m.asignar(m.actual!.id, datos)
           }}
         />
+      ) : m.sinLista && !m.online ? (
+        // Nunca se descargó la lista y no hay señal: decirlo tal cual (no es
+        // lo mismo que "todo caravaneado").
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 py-16 text-center">
+          <div className="flex size-20 items-center justify-center rounded-3xl bg-secondary text-faint">
+            <CloudOff className="size-10" strokeWidth={2} />
+          </div>
+          <p className="text-[15px] font-semibold text-ink">
+            Sin señal y sin lista descargada.
+          </p>
+          <p className="text-[13.5px] text-ink-soft">
+            Entrá una vez con señal para bajar los animales sin caravana; de
+            ahí en más la manga anda sin conexión.
+          </p>
+        </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 py-16 text-center">
           <div className="flex size-20 items-center justify-center rounded-3xl bg-field-soft text-field">
@@ -213,7 +228,8 @@ function AnimalForm({ animal, rfidsUsados, onAsignar }: AnimalFormProps) {
   const [aviso, setAviso] = useState<string | null>(null)
   const [abrirNota, setAbrirNota] = useState(false)
 
-  // Aviso instantáneo (sin esperar al sync): ¿ya usé este RFID en la sesión?
+  // Aviso instantáneo (sin esperar al sync): RFID ya usado en la sesión O en
+  // cualquier animal del rodeo (cache de vigentes).
   const repetido = rfid.trim() !== '' && rfidsUsados.has(rfid.trim().toLowerCase())
 
   const asignar = () => {
@@ -222,7 +238,7 @@ function AnimalForm({ animal, rfidsUsados, onAsignar }: AnimalFormProps) {
       return
     }
     if (repetido) {
-      setAviso('Ese RFID ya lo usaste recién')
+      setAviso('Ese RFID ya está en uso en otro animal')
       return
     }
     onAsignar({
@@ -298,7 +314,7 @@ function AnimalForm({ animal, rfidsUsados, onAsignar }: AnimalFormProps) {
             repetido && (
               <p className="flex items-center gap-1 text-[12.5px] font-semibold text-accent">
                 <AlertTriangle className="size-3.5" />
-                Ya usaste ese RFID recién
+                Ese RFID ya está en uso
               </p>
             )
           )}

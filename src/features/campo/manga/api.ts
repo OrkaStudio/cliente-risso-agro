@@ -17,14 +17,19 @@ export type AnimalSinCaravana = {
  * Trae todos los animales ACTIVOS sin caravana vigente de la empresa (bajo RLS),
  * enriquecidos con el nombre de potrero y lote para el selector de alcance.
  * "Sin caravana" = no aparece en `caravana` con `vigente = true`.
+ * Devuelve además los RFID YA en uso en la empresa: se cachean para avisar del
+ * duplicado al instante (offline), no recién cuando el sync lo rechaza.
  */
-export async function fetchSinCaravana(): Promise<AnimalSinCaravana[]> {
+export async function fetchSinCaravana(): Promise<{
+  animales: AnimalSinCaravana[]
+  rfidsEnUso: string[]
+}> {
   const [animalesRes, caravanasRes, potrerosRes, lotesRes] = await Promise.all([
     supabase
       .from('animal')
       .select('id, empresa_id, categoria, potrero_id, lote_id')
       .eq('estado', 'activo'),
-    supabase.from('caravana').select('animal_id').eq('vigente', true),
+    supabase.from('caravana').select('animal_id, numero_rfid').eq('vigente', true),
     supabase.from('potrero').select('id, nombre'),
     supabase.from('lote').select('id, nombre'),
   ])
@@ -37,7 +42,7 @@ export async function fetchSinCaravana(): Promise<AnimalSinCaravana[]> {
   const potreros = new Map((potrerosRes.data ?? []).map((p) => [p.id, p.nombre]))
   const lotes = new Map((lotesRes.data ?? []).map((l) => [l.id, l.nombre]))
 
-  return (animalesRes.data ?? [])
+  const animales = (animalesRes.data ?? [])
     .filter((a) => !taggeados.has(a.id))
     .map((a) => ({
       id: a.id,
@@ -48,6 +53,10 @@ export async function fetchSinCaravana(): Promise<AnimalSinCaravana[]> {
       lote_id: a.lote_id,
       lote_nombre: a.lote_id ? (lotes.get(a.lote_id) ?? null) : null,
     }))
+  const rfidsEnUso = (caravanasRes.data ?? []).map((c) =>
+    c.numero_rfid.trim().toLowerCase(),
+  )
+  return { animales, rfidsEnUso }
 }
 
 export type AsignarInput = {

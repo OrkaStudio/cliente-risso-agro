@@ -18,6 +18,14 @@ export type AnimalCache = {
   caravaneado: 0 | 1
 }
 
+/** RFIDs vigentes de la empresa (cache): aviso instantáneo de duplicado
+ *  contra TODO el rodeo, también sin señal. Singleton. */
+export type RfidsCache = {
+  id: 'rfids'
+  rfids: string[]
+  updated_at: number
+}
+
 export type EstadoOutbox = 'pendiente' | 'sincronizada' | 'error'
 
 export type OutboxItem = {
@@ -35,6 +43,7 @@ export type OutboxItem = {
 class MangaDB extends Dexie {
   animales!: Table<AnimalCache, string>
   outbox!: Table<OutboxItem, number>
+  refs!: Table<RfidsCache, string>
 
   constructor() {
     super('risso-manga')
@@ -42,6 +51,10 @@ class MangaDB extends Dexie {
       // PK + índices (no hace falta indexar todas las columnas)
       animales: 'id, empresa_id, caravaneado',
       outbox: '++local_id, animal_id, estado',
+    })
+    // v2: cache de RFIDs vigentes (duplicados offline contra todo el rodeo).
+    this.version(2).stores({
+      refs: 'id',
     })
   }
 }

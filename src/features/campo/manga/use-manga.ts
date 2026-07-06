@@ -50,6 +50,7 @@ export function useManga() {
   // o el cache se ve al instante, sin sincronizar estado a mano.
   const animales = useLiveQuery(() => mangadb.animales.toArray(), [])
   const outbox = useLiveQuery(() => mangadb.outbox.toArray(), [])
+  const refsArr = useLiveQuery(() => mangadb.refs.toArray(), [])
   const [scope, setScope] = useState<Scope>({ kind: 'todos' })
   const [descargando, setDescargando] = useState(false)
   const [sincronizando, setSincronizando] = useState(false)
@@ -60,7 +61,7 @@ export function useManga() {
     setDescargando(true)
     setError(null)
     try {
-      const frescos = await fetchSinCaravana()
+      const { animales: frescos, rfidsEnUso } = await fetchSinCaravana()
       // Conservamos los ya caravaneados localmente que todavía no sincronizaron.
       const yaLocal = new Set(
         (await mangadb.animales.where('caravaneado').equals(1).toArray()).map(
@@ -73,6 +74,11 @@ export function useManga() {
           .filter((a) => !yaLocal.has(a.id))
           .map((a) => ({ ...a, caravaneado: 0 as const })),
       )
+      await mangadb.refs.put({
+        id: 'rfids',
+        rfids: rfidsEnUso,
+        updated_at: Date.now(),
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo descargar la lista')
     } finally {
@@ -163,9 +169,19 @@ export function useManga() {
     await mangadb.animales.update(item.animal_id, { caravaneado: 0 })
   }, [])
 
-  /** Asigna caravana al animal (local): encola + lo saca de "quedan" + sincroniza. */
+  /** Asigna caravana al animal (local): encola + lo saca de "quedan" + sincroniza.
+   *  Si el animal tenía un intento fallido (error), se limpia: el error viejo
+   *  no queda colgado en el panel una vez corregido. */
   const asignar = useCallback(
     async (animalId: string, datos: AsignacionLocal) => {
+      const fallidos = await mangadb.outbox
+        .where('animal_id')
+        .equals(animalId)
+        .filter((o) => o.estado === 'error')
+        .toArray()
+      if (fallidos.length > 0) {
+        await mangadb.outbox.bulkDelete(fallidos.map((f) => f.local_id!))
+      }
       await mangadb.outbox.add({
         animal_id: animalId,
         rfid: datos.rfid.trim(),
@@ -203,12 +219,15 @@ export function useManga() {
   const totalScope = listoScope + quedan
   const progreso = totalScope > 0 ? listoScope / totalScope : 0
 
-  // RFIDs ya usados en la sesión (para avisar del repetido al toque).
-  const rfidsUsados = new Set(
-    listaOutbox
+  // RFIDs en uso: los de la sesión (outbox) MÁS los vigentes de todo el rodeo
+  // (cache de la última descarga) → el duplicado avisa al toque, aún offline,
+  // en vez de fallar recién al sincronizar.
+  const rfidsUsados = new Set([
+    ...listaOutbox
       .filter((o) => o.estado !== 'error')
       .map((o) => o.rfid.trim().toLowerCase()),
-  )
+    ...(refsArr?.[0]?.rfids ?? []),
+  ])
   // Último caravaneo activo (para el "deshacer" y la confirmación).
   const ultimo: OutboxItem | null =
     [...listaOutbox]
@@ -259,6 +278,8 @@ export function useManga() {
     scope,
     setScope,
     scopeOptions,
+    /** true = nunca se descargó la lista (distinto de "todo caravaneado"). */
+    sinLista: listaAnimales.length === 0,
     actual,
     quedan,
     listo,

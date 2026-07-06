@@ -170,6 +170,14 @@ function Stepper({
   onCierre: () => void
 }) {
   const [paso, setPaso] = useState(0)
+  // Retomar donde quedó: al montar (o cuando los potreros recién llegan de
+  // Dexie), arrancar en el primer potrero sin hacer — no en el 1 de la lista.
+  const [inicializado, setInicializado] = useState(false)
+  if (!inicializado && r.potreros.length > 0) {
+    setInicializado(true)
+    const primeroPendiente = r.potreros.findIndex((p) => p.hecho === 0)
+    if (primeroPendiente > 0) setPaso(primeroPendiente)
+  }
   const potrero = r.potreros[paso]
 
   const opcionesSalto: DropdownOption[] = r.potreros.map((p, i) => ({
