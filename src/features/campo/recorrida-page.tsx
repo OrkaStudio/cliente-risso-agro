@@ -112,6 +112,22 @@ export function RecorridaPage() {
 // Selector de campo
 // ---------------------------------------------------------------------------
 function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
+  // Nunca se cacheó nada y no hay señal: no se puede armar la recorrida.
+  if (!r.tieneRefs && !r.online) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+        <CloudOff className="size-10 text-faint" />
+        <p className="text-[15px] font-semibold text-ink">
+          Sin señal y sin campos guardados.
+        </p>
+        <p className="text-[13.5px] text-ink-soft">
+          Entrá una vez con señal para bajar los campos y potreros; de ahí en
+          más la recorrida arranca sin conexión.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto p-5">
       <div>
@@ -127,8 +143,8 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
       )}
       {!r.online && (
         <p className="flex items-center gap-2 rounded-xl bg-secondary px-3.5 py-2.5 text-[13px] font-medium text-ink-soft">
-          <CloudOff className="size-4 shrink-0 text-accent" /> Sin señal: para
-          empezar una recorrida hace falta conexión una vez.
+          <CloudOff className="size-4 shrink-0 text-accent" /> Sin señal: la
+          recorrida arranca igual y sube sola cuando vuelva.
         </p>
       )}
       <div className="flex flex-col gap-3">
@@ -136,7 +152,7 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
           <button
             key={c.id}
             type="button"
-            disabled={r.iniciando || !r.online}
+            disabled={r.iniciando}
             onClick={() => void r.empezar(c)}
             className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-5 text-left shadow-sm transition-all hover:border-field hover:shadow-md active:scale-[0.99] disabled:opacity-50"
           >

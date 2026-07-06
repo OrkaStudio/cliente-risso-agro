@@ -1,15 +1,27 @@
 import Dexie, { type Table } from 'dexie'
 import type {
   AguaEstado,
+  CampoRec,
   ElectricoEstado,
   EstadoCiclo,
   PastoEstado,
+  PotreroRec,
 } from './api'
 
 // Base local de la Recorrida (IndexedDB vía Dexie), separada de la manga.
+//   · refs:     cache de campos + potreros de TODA la empresa (se refresca con
+//     señal) — permite ARRANCAR una recorrida sin conexión. Singleton.
 //   · meta:     la recorrida en curso (campo + recorrida_id) — singleton.
 //   · potreros: cache de los potreros del campo, con flag `hecho`.
 //   · obs:      cola (outbox) de observaciones a subir; idempotente por potrero.
+
+export type RecRefs = {
+  id: 'refs'
+  campos: CampoRec[]
+  /** Potreros de todos los campos (con campo_id para filtrar). */
+  potreros: (PotreroRec & { campo_id: string })[]
+  updated_at: number
+}
 
 export type RecMeta = {
   id: 'actual'
@@ -20,6 +32,10 @@ export type RecMeta = {
   fecha: string
   lluvia_mm: number | null
   lluvia_ok: 0 | 1
+  /** 1 = la fila `recorrida` ya existe en el servidor. 0 = se arrancó offline
+   *  con UUID de cliente; el drenado la crea (o adopta la del día) antes de
+   *  subir observaciones. */
+  remota: 0 | 1
   /** 1 = el usuario terminó la recorrida pero queda algo sin subir. La sesión
    *  local NO se borra hasta que todo sincronice (si no, terminar sin señal
    *  perdería las observaciones pendientes). */
@@ -56,6 +72,7 @@ class RecorridaDB extends Dexie {
   meta!: Table<RecMeta, string>
   potreros!: Table<RecPotrero, string>
   obs!: Table<RecObs, string>
+  refs!: Table<RecRefs, string>
 
   constructor() {
     super('risso-recorrida')
@@ -63,6 +80,10 @@ class RecorridaDB extends Dexie {
       meta: 'id',
       potreros: 'id, campo_id, hecho',
       obs: 'potrero_id, estado',
+    })
+    // v2: cache de campos+potreros (arrancar la recorrida sin señal).
+    this.version(2).stores({
+      refs: 'id',
     })
   }
 }

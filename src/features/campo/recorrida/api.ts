@@ -6,7 +6,7 @@ export type AguaEstado = Database['public']['Enums']['agua_estado']
 export type ElectricoEstado = Database['public']['Enums']['electrico_estado']
 export type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 
-export type CampoRec = { id: string; nombre: string }
+export type CampoRec = { id: string; nombre: string; empresa_id: string }
 export type PotreroRec = {
   id: string
   nombre: string
@@ -26,65 +26,73 @@ export type Observacion = {
 
 const hoyISO = () => new Date().toISOString().slice(0, 10)
 
-export async function fetchCampos(): Promise<CampoRec[]> {
-  const { data, error } = await supabase
-    .from('campo')
-    .select('id, nombre')
-    .order('nombre')
-  if (error) throw error
-  return data ?? []
+/**
+ * Campos + potreros (con stock esperado) de TODA la empresa, para cachear en
+ * Dexie: la recorrida se puede ARRANCAR sin señal usando este cache.
+ */
+export async function fetchRefs(): Promise<{
+  campos: CampoRec[]
+  potreros: (PotreroRec & { campo_id: string })[]
+}> {
+  const [camposRes, potrerosRes, stockRes] = await Promise.all([
+    supabase.from('campo').select('id, nombre, empresa_id').order('nombre'),
+    supabase
+      .from('potrero')
+      .select('id, nombre, estado_ciclo, campo_id')
+      .order('nombre'),
+    supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
+  ])
+  if (camposRes.error) throw camposRes.error
+  if (potrerosRes.error) throw potrerosRes.error
+  if (stockRes.error) throw stockRes.error
+
+  const cab = new Map(
+    (stockRes.data ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
+  )
+  return {
+    campos: camposRes.data ?? [],
+    potreros: (potrerosRes.data ?? []).map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      estado_ciclo: p.estado_ciclo,
+      campo_id: p.campo_id,
+      cabezas: cab.get(p.id) ?? 0,
+    })),
+  }
 }
 
-/** Potreros del campo + stock esperado (pista para el conteo). */
-export async function fetchPotreros(campoId: string): Promise<PotreroRec[]> {
-  const [{ data: potreros, error: e1 }, { data: stock, error: e2 }] =
-    await Promise.all([
-      supabase
-        .from('potrero')
-        .select('id, nombre, estado_ciclo')
-        .eq('campo_id', campoId)
-        .order('nombre'),
-      supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
-    ])
-  if (e1) throw e1
-  if (e2) throw e2
-  const cab = new Map((stock ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]))
-  return (potreros ?? []).map((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    estado_ciclo: p.estado_ciclo,
-    cabezas: cab.get(p.id) ?? 0,
-  }))
-}
-
-/** Crea o retoma la recorrida de HOY del campo. */
-export async function getOrCreateRecorridaHoy(
-  campoId: string,
-): Promise<{ id: string; empresa_id: string }> {
-  const fecha = hoyISO()
+/**
+ * Garantiza que la fila `recorrida` exista en el servidor ANTES de subir
+ * observaciones (FK). La recorrida arranca local con UUID de cliente:
+ *   · si el servidor ya tiene la recorrida de (campo, fecha) — otra sesión u
+ *     otro dispositivo — se ADOPTA su id (el caller re-apunta las obs);
+ *   · si no, se inserta con el UUID local (reintentar no duplica: el select
+ *     de arriba la encuentra en el próximo intento).
+ * Devuelve el id remoto vigente.
+ */
+export async function asegurarRecorridaRemota(meta: {
+  recorrida_id: string
+  campo_id: string
+  empresa_id: string
+  fecha: string
+}): Promise<string> {
   const { data: existente, error: e1 } = await supabase
     .from('recorrida')
-    .select('id, empresa_id')
-    .eq('campo_id', campoId)
-    .eq('fecha', fecha)
+    .select('id')
+    .eq('campo_id', meta.campo_id)
+    .eq('fecha', meta.fecha)
     .maybeSingle()
-  if (e1) throw e1
-  if (existente) return existente
+  if (e1) throw new Error(e1.message)
+  if (existente) return existente.id
 
-  const { data: campo, error: e2 } = await supabase
-    .from('campo')
-    .select('empresa_id')
-    .eq('id', campoId)
-    .single()
-  if (e2) throw e2
-
-  const { data, error } = await supabase
-    .from('recorrida')
-    .insert({ campo_id: campoId, empresa_id: campo.empresa_id, fecha })
-    .select('id, empresa_id')
-    .single()
-  if (error) throw error
-  return data
+  const { error } = await supabase.from('recorrida').insert({
+    id: meta.recorrida_id,
+    campo_id: meta.campo_id,
+    empresa_id: meta.empresa_id,
+    fecha: meta.fecha,
+  })
+  if (error) throw new Error(error.message)
+  return meta.recorrida_id
 }
 
 /**

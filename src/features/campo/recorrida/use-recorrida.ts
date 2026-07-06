@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { recdb, type RecObs, type RecPotrero } from './db'
 import {
-  fetchCampos,
-  fetchPotreros,
-  getOrCreateRecorridaHoy,
+  asegurarRecorridaRemota,
+  fetchRefs,
   guardarLluvia,
   guardarObservacion,
   type CampoRec,
@@ -62,64 +61,77 @@ export function useRecorrida() {
   const metaArr = useLiveQuery(() => recdb.meta.toArray(), [])
   const potreros = useLiveQuery(() => recdb.potreros.toArray(), [])
   const obs = useLiveQuery(() => recdb.obs.toArray(), [])
+  const refsArr = useLiveQuery(() => recdb.refs.toArray(), [])
   const meta = metaArr?.[0] ?? null
+  const refs = refsArr?.[0] ?? null
 
-  const [campos, setCampos] = useState<CampoRec[]>([])
   const [iniciando, setIniciando] = useState(false)
   const [sincronizando, setSincronizando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // `empezar` dispara el sync pero se declara antes que `sincronizar` → ref.
+  const sincronizarRef = useRef<(() => Promise<void>) | null>(null)
 
-  // Cargar campos disponibles (para elegir cuál recorrer) si no hay recorrida.
-  useEffect(() => {
-    if (metaArr === undefined) return
-    if (!meta && navigator.onLine && campos.length === 0) {
-      fetchCampos()
-        .then(setCampos)
-        .catch((e) =>
-          setError(e instanceof Error ? e.message : 'No se pudieron cargar los campos'),
-        )
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metaArr === undefined, meta === null])
-
-  /** Empezar/retomar la recorrida de hoy de un campo (con señal). */
-  const empezar = useCallback(async (campo: CampoRec) => {
-    setIniciando(true)
-    setError(null)
+  /** Refresca el cache de campos+potreros (permite arrancar sin señal). */
+  const cargarRefs = useCallback(async () => {
     try {
-      const rec = await getOrCreateRecorridaHoy(campo.id)
-      const ps = await fetchPotreros(campo.id)
-      await recdb.transaction('rw', recdb.meta, recdb.potreros, recdb.obs, async () => {
-        await recdb.potreros.clear()
-        await recdb.obs.clear()
-        await recdb.meta.put({
-          id: 'actual',
-          recorrida_id: rec.id,
-          campo_id: campo.id,
-          campo_nombre: campo.nombre,
-          empresa_id: rec.empresa_id,
-          fecha: new Date().toISOString().slice(0, 10),
-          lluvia_mm: null,
-          lluvia_ok: 0,
-          terminada: 0,
-        })
-        await recdb.potreros.bulkPut(
-          ps.map((p) => ({
-            id: p.id,
-            campo_id: campo.id,
-            nombre: p.nombre,
-            estado_ciclo: p.estado_ciclo,
-            cabezas: p.cabezas,
-            hecho: 0 as const,
-          })),
-        )
-      })
+      const { campos, potreros: ps } = await fetchRefs()
+      await recdb.refs.put({ id: 'refs', campos, potreros: ps, updated_at: Date.now() })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo empezar la recorrida')
-    } finally {
-      setIniciando(false)
+      setError(
+        e instanceof Error ? e.message : 'No se pudieron cargar los campos',
+      )
     }
   }, [])
+
+  /**
+   * Empezar la recorrida de hoy de un campo — 100% local (anda sin señal):
+   * UUID de cliente + potreros del cache. La fila `recorrida` remota la crea
+   * (o adopta, si otro dispositivo ya la abrió hoy) el drenado.
+   */
+  const empezar = useCallback(
+    async (campo: CampoRec) => {
+      setIniciando(true)
+      setError(null)
+      try {
+        const ps = (refs?.potreros ?? []).filter(
+          (p) => p.campo_id === campo.id,
+        )
+        await recdb.transaction('rw', recdb.meta, recdb.potreros, recdb.obs, async () => {
+          await recdb.potreros.clear()
+          await recdb.obs.clear()
+          await recdb.meta.put({
+            id: 'actual',
+            recorrida_id: crypto.randomUUID(),
+            campo_id: campo.id,
+            campo_nombre: campo.nombre,
+            empresa_id: campo.empresa_id,
+            fecha: new Date().toISOString().slice(0, 10),
+            lluvia_mm: null,
+            lluvia_ok: 0,
+            terminada: 0,
+            remota: 0,
+          })
+          await recdb.potreros.bulkPut(
+            ps.map((p) => ({
+              id: p.id,
+              campo_id: campo.id,
+              nombre: p.nombre,
+              estado_ciclo: p.estado_ciclo,
+              cabezas: p.cabezas,
+              hecho: 0 as const,
+            })),
+          )
+        })
+        // Con señal, crea/adopta la recorrida remota al toque.
+        void sincronizarRef.current?.()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo empezar la recorrida')
+      } finally {
+        setIniciando(false)
+      }
+    },
+    [refs],
+  )
 
   // Drena las observaciones pendientes (+ la lluvia). Serializado por el lock de
   // módulo; idempotente (upsert por potrero) con compare-and-set en updated_at.
@@ -138,6 +150,35 @@ export function useRecorrida() {
           const m = await recdb.meta.get('actual')
           if (!m) break
 
+          // Paso 0: la fila `recorrida` tiene que existir en el servidor antes
+          // de subir observaciones (FK). Si se arrancó offline, acá se crea —
+          // o se adopta la de (campo, fecha) si otro dispositivo la abrió.
+          if (!m.remota) {
+            try {
+              const idRemoto = await asegurarRecorridaRemota(m)
+              if (idRemoto !== m.recorrida_id) {
+                await recdb.meta.update('actual', {
+                  recorrida_id: idRemoto,
+                  remota: 1,
+                })
+                // Re-apuntar las observaciones locales a la recorrida adoptada.
+                const todas = await recdb.obs.toArray()
+                for (const o of todas) {
+                  await recdb.obs.update(o.potrero_id, { recorrida_id: idRemoto })
+                }
+              } else {
+                await recdb.meta.update('actual', { remota: 1 })
+              }
+            } catch {
+              // Sin recorrida remota no se puede subir nada: se reintenta en
+              // el próximo drenado (p. ej. al volver la señal de verdad).
+              break
+            }
+          }
+
+          const mSync = await recdb.meta.get('actual')
+          if (!mSync) break
+
           const pend = await recdb.obs
             .where('estado')
             .equals('pendiente')
@@ -146,8 +187,8 @@ export function useRecorrida() {
             const snap = it.updated_at
             try {
               await guardarObservacion({
-                recorridaId: m.recorrida_id,
-                empresaId: m.empresa_id,
+                recorridaId: mSync.recorrida_id,
+                empresaId: mSync.empresa_id,
                 obs: {
                   potrero_id: it.potrero_id,
                   pasto: it.pasto,
@@ -205,9 +246,20 @@ export function useRecorrida() {
     await drainPromise
   }, [])
 
+  // Ref al drenado para `empezar` (declarado antes). Asignación en effect (el
+  // lint prohíbe escribir refs durante el render); `empezar` corre por click,
+  // siempre después del mount.
+  useEffect(() => {
+    sincronizarRef.current = sincronizar
+  }, [sincronizar])
+
+  // Al (re)entrar con señal: refrescar el cache de campos/potreros y drenar.
   useEffect(() => {
     if (!online) return
-    const t = setTimeout(() => void sincronizar(), 0)
+    const t = setTimeout(() => {
+      void cargarRefs()
+      void sincronizar()
+    }, 0)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
@@ -274,7 +326,7 @@ export function useRecorrida() {
   const total = listaPotreros.length
   const sinSubir = listaObs.filter((o) => o.estado === 'pendiente').length
   const errores = listaObs.filter((o) => o.estado === 'error')
-  const cargando = metaArr === undefined
+  const cargando = metaArr === undefined || refsArr === undefined
 
   return {
     online,
@@ -282,7 +334,10 @@ export function useRecorrida() {
     iniciando,
     sincronizando,
     error,
-    campos,
+    /** Campos del cache (refs): disponibles también sin señal. */
+    campos: refs?.campos ?? [],
+    /** false = nunca se cachearon campos (y sin señal no se puede empezar). */
+    tieneRefs: refs !== null && (refs.campos.length > 0),
     meta: meta ?? null,
     potreros: listaPotreros,
     obsPorPotrero,
@@ -296,6 +351,7 @@ export function useRecorrida() {
     terminar,
     descartarErrores,
     sincronizar,
+    cargarRefs,
   }
 }
 
