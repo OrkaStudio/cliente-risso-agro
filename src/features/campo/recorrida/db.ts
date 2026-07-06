@@ -20,6 +20,10 @@ export type RecMeta = {
   fecha: string
   lluvia_mm: number | null
   lluvia_ok: 0 | 1
+  /** 1 = el usuario terminó la recorrida pero queda algo sin subir. La sesión
+   *  local NO se borra hasta que todo sincronice (si no, terminar sin señal
+   *  perdería las observaciones pendientes). */
+  terminada: 0 | 1
 }
 
 export type RecPotrero = {

@@ -19,6 +19,27 @@ let draining = false
 let rerun = false
 let drainPromise: Promise<void> | null = null
 
+/**
+ * Cierra la sesión local SOLO si la recorrida está terminada y no queda nada
+ * por subir (ni observaciones pendientes/con error, ni lluvia). Así "terminar"
+ * sin señal nunca borra datos: la sesión queda esperando y se limpia sola
+ * cuando el drenado completa.
+ */
+async function finalizarSiCorresponde(): Promise<void> {
+  const m = await recdb.meta.get('actual')
+  if (!m?.terminada) return
+  const sinSubir = await recdb.obs
+    .filter((o) => o.estado !== 'sincronizada')
+    .count()
+  const lluviaPendiente = m.lluvia_mm != null && !m.lluvia_ok
+  if (sinSubir > 0 || lluviaPendiente) return
+  await recdb.transaction('rw', recdb.meta, recdb.potreros, recdb.obs, async () => {
+    await recdb.meta.clear()
+    await recdb.potreros.clear()
+    await recdb.obs.clear()
+  })
+}
+
 function useOnline(): boolean {
   const [online, setOnline] = useState(() => navigator.onLine)
   useEffect(() => {
@@ -80,6 +101,7 @@ export function useRecorrida() {
           fecha: new Date().toISOString().slice(0, 10),
           lluvia_mm: null,
           lluvia_ok: 0,
+          terminada: 0,
         })
         await recdb.potreros.bulkPut(
           ps.map((p) => ({
@@ -168,6 +190,9 @@ export function useRecorrida() {
             }
           }
         } while (rerun)
+        // Si la recorrida ya estaba terminada y este drenado subió lo último,
+        // recién acá se cierra la sesión local.
+        await finalizarSiCorresponde()
       } finally {
         draining = false
         drainPromise = null
@@ -217,15 +242,27 @@ export function useRecorrida() {
     void sincronizar()
   }, [sincronizar])
 
-  /** Terminar: borra la sesión local (ya sincronizada) y vuelve al selector. */
+  /**
+   * Terminar: marca la recorrida como terminada e intenta drenar. La sesión
+   * local se borra SOLO cuando todo subió (finalizarSiCorresponde); si no hay
+   * señal o algo falló, queda "terminada, esperando subir" — nunca se pierde
+   * una observación por terminar sin señal.
+   */
   const terminar = useCallback(async () => {
+    await recdb.meta.update('actual', { terminada: 1 })
     await sincronizar()
-    await recdb.transaction('rw', recdb.meta, recdb.potreros, recdb.obs, async () => {
-      await recdb.meta.clear()
-      await recdb.potreros.clear()
-      await recdb.obs.clear()
-    })
+    // Cubre el camino sin señal (sincronizar retorna sin drenar) y el caso
+    // "ya estaba todo subido": si no queda nada pendiente, cierra la sesión.
+    await finalizarSiCorresponde()
   }, [sincronizar])
+
+  /** Descarta SOLO las observaciones que el servidor rechazó (estado error),
+   *  a pedido explícito del usuario, y cierra la sesión si ya no queda nada. */
+  const descartarErrores = useCallback(async () => {
+    const errs = await recdb.obs.where('estado').equals('error').toArray()
+    await recdb.obs.bulkDelete(errs.map((e) => e.potrero_id))
+    await finalizarSiCorresponde()
+  }, [])
 
   // Derivados
   const listaPotreros = (potreros ?? []).slice().sort((a, b) =>
@@ -236,7 +273,7 @@ export function useRecorrida() {
   const hechos = listaPotreros.filter((p) => p.hecho === 1).length
   const total = listaPotreros.length
   const sinSubir = listaObs.filter((o) => o.estado === 'pendiente').length
-  const errores = listaObs.filter((o) => o.estado === 'error').length
+  const errores = listaObs.filter((o) => o.estado === 'error')
   const cargando = metaArr === undefined
 
   return {
@@ -257,6 +294,7 @@ export function useRecorrida() {
     guardar,
     setLluvia,
     terminar,
+    descartarErrores,
     sincronizar,
   }
 }

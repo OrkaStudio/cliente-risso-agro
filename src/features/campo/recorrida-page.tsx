@@ -7,12 +7,14 @@ import {
   ChevronRight,
   CloudOff,
   CloudRain,
+  CloudUpload,
   Droplets,
   Flag,
   Leaf,
   MapPin,
   RefreshCw,
   Stethoscope,
+  Trash2,
   Wifi,
   Zap,
 } from 'lucide-react'
@@ -72,6 +74,16 @@ export function RecorridaPage() {
   const r = useRecorrida()
   const [vista, setVista] = useState<'stepper' | 'cierre'>('stepper')
 
+  // Al arrancar OTRA recorrida, la vista vuelve al stepper (si no, quedaba
+  // pegada en 'cierre' de la recorrida anterior). Patrón React de "reset de
+  // estado al cambiar una prop": setState durante el render, sin effect.
+  const recorridaId = r.meta?.recorrida_id
+  const [vistaDe, setVistaDe] = useState(recorridaId)
+  if (vistaDe !== recorridaId) {
+    setVistaDe(recorridaId)
+    setVista('stepper')
+  }
+
   if (r.cargando) {
     return (
       <div className="flex h-full items-center justify-center text-faint">
@@ -82,6 +94,11 @@ export function RecorridaPage() {
 
   if (!r.meta) {
     return <SelectorCampo r={r} />
+  }
+
+  // Terminada pero con datos sin subir: la sesión espera (no se pierde nada).
+  if (r.meta.terminada) {
+    return <PendienteSync r={r} />
   }
 
   if (vista === 'cierre') {
@@ -468,6 +485,105 @@ function Segmento<T extends string>({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Terminada, esperando subir (sin señal o con errores). La sesión local se
+// cierra sola cuando el drenado completa; acá solo se informa y se ofrece
+// reintentar / descartar lo rechazado. Nunca se descarta nada en silencio.
+// ---------------------------------------------------------------------------
+function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
+  const lluviaPendiente = r.meta!.lluvia_mm != null && !r.meta!.lluvia_ok
+  const nombrePotrero = new Map(r.potreros.map((p) => [p.id, p.nombre]))
+
+  return (
+    <div className="mx-auto flex h-full w-full max-w-md flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
+        <div className="flex flex-col items-center gap-3 pt-6 text-center">
+          <span className="flex size-16 items-center justify-center rounded-3xl bg-field-soft text-field">
+            <CloudUpload className="size-8" strokeWidth={2} />
+          </span>
+          <h1 className="font-heading text-[22px] font-bold text-ink">
+            Recorrida guardada
+          </h1>
+          <p className="text-[14.5px] leading-snug text-ink-soft">
+            {r.sinSubir > 0 || lluviaPendiente ? (
+              <>
+                Quedan{' '}
+                <span className="font-bold text-ink">
+                  {r.sinSubir > 0 &&
+                    (r.sinSubir === 1
+                      ? '1 observación'
+                      : `${r.sinSubir} observaciones`)}
+                  {r.sinSubir > 0 && lluviaPendiente && ' y '}
+                  {lluviaPendiente && 'la lluvia'}
+                </span>{' '}
+                sin subir. Se suben solas cuando vuelva la señal — no hace
+                falta hacer nada.
+              </>
+            ) : (
+              'Subiendo lo último…'
+            )}
+          </p>
+        </div>
+
+        <div
+          className={cn(
+            'flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] font-bold',
+            r.online
+              ? 'bg-field-soft/60 text-field-deep'
+              : 'bg-secondary text-accent',
+          )}
+        >
+          {r.online ? (
+            <Wifi className="size-4" />
+          ) : (
+            <CloudOff className="size-4" />
+          )}
+          {r.online ? 'Con señal' : 'Sin señal'}
+        </div>
+
+        {r.errores.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-accent/40 bg-accent/10 p-4">
+            <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-accent">
+              <AlertTriangle className="size-4" />
+              {r.errores.length} que el servidor rechazó
+            </div>
+            <ul className="flex flex-col gap-1 text-[12.5px] font-medium text-ink-soft">
+              {r.errores.map((e) => (
+                <li key={e.potrero_id}>
+                  <span className="font-semibold text-ink">
+                    {nombrePotrero.get(e.potrero_id) ?? 'Potrero'}:
+                  </span>{' '}
+                  {e.error ?? 'error al subir'}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => void r.descartarErrores()}
+              className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-card px-3.5 py-2.5 text-[13px] font-semibold text-accent transition-colors active:scale-[0.98]"
+            >
+              <Trash2 className="size-4" />
+              Descartar los que fallaron
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-border bg-card px-5 pb-5 pt-3.5">
+        <button
+          type="button"
+          disabled={!r.online || r.sincronizando}
+          onClick={() => void r.sincronizar()}
+          className="flex h-15 w-full items-center justify-center gap-2.5 rounded-2xl bg-field text-[17px] font-bold text-white shadow-[0_10px_24px_rgba(16,138,85,0.3)] transition-all active:translate-y-px disabled:opacity-50"
+        >
+          <RefreshCw className={cn('size-5', r.sincronizando && 'animate-spin')} />
+          {r.sincronizando ? 'Subiendo…' : 'Subir ahora'}
+        </button>
+      </div>
     </div>
   )
 }
