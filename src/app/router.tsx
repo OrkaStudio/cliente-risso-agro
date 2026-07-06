@@ -64,6 +64,11 @@ const RecorridaPage = lazy(() =>
     default: m.RecorridaPage,
   })),
 )
+const PlataPage = lazy(() =>
+  import('@/features/campo/plata-page').then((m) => ({
+    default: m.PlataPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -104,6 +109,7 @@ export const router = createBrowserRouter([
               { path: 'campo', element: <Navigate to="/campo/manga" replace /> },
               { path: 'campo/manga', element: <MangaPage /> },
               { path: 'campo/recorrida', element: <RecorridaPage /> },
+              { path: 'campo/plata', element: <PlataPage /> },
             ],
           },
         ],

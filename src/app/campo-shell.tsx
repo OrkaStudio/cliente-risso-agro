@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
+import { Banknote, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 const NAV = [
   { to: '/campo/manga', label: 'Manga', icon: Syringe, soon: false },
   { to: '/campo/recorrida', label: 'Recorrida', icon: Footprints, soon: false },
+  { to: '/campo/plata', label: 'Plata', icon: Banknote, soon: false },
 ] as const
 
 export function CampoShell() {
