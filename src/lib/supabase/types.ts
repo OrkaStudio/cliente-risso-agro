@@ -742,6 +742,7 @@ export type Database = {
           agua: Database["public"]["Enums"]["agua_estado"] | null
           conteo: number | null
           created_at: string
+          cultivo: Database["public"]["Enums"]["cultivo_obs_estado"] | null
           electrico: Database["public"]["Enums"]["electrico_estado"] | null
           empresa_id: string
           en_tratamiento: boolean
@@ -755,6 +756,7 @@ export type Database = {
           agua?: Database["public"]["Enums"]["agua_estado"] | null
           conteo?: number | null
           created_at?: string
+          cultivo?: Database["public"]["Enums"]["cultivo_obs_estado"] | null
           electrico?: Database["public"]["Enums"]["electrico_estado"] | null
           empresa_id: string
           en_tratamiento?: boolean
@@ -768,6 +770,7 @@ export type Database = {
           agua?: Database["public"]["Enums"]["agua_estado"] | null
           conteo?: number | null
           created_at?: string
+          cultivo?: Database["public"]["Enums"]["cultivo_obs_estado"] | null
           electrico?: Database["public"]["Enums"]["electrico_estado"] | null
           empresa_id?: string
           en_tratamiento?: boolean
@@ -1206,6 +1209,7 @@ export type Database = {
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
       estado_animal: "activo" | "vendido" | "muerto"
+      cultivo_obs_estado: "bien" | "regular" | "mal"
       estado_ciclo_potrero:
         | "ganadero"
         | "descanso"
@@ -1397,6 +1401,7 @@ export const Constants = {
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
       estado_animal: ["activo", "vendido", "muerto"],
+      cultivo_obs_estado: ["bien", "regular", "mal"],
       estado_ciclo_potrero: [
         "ganadero",
         "descanso",

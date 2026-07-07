@@ -137,6 +137,8 @@ export function Croquis({
                 .map((pt, j) => `${j === 0 ? 'M' : 'L'}${aXY(pt)[0]},${aXY(pt)[1]}`)
                 .join(' ') + ' Z'
             const [cx, cy] = centroide(p.poligono!, aXY)
+            // Nombre real del potrero (10A, 3M, ...) — tamaño según largo.
+            const fs = p.nombre.length <= 3 ? 5 : p.nombre.length <= 6 ? 3.6 : 2.8
             return (
               <g key={p.id} onClick={() => onSaltar(i)} className="cursor-pointer">
                 <path
@@ -159,12 +161,12 @@ export function Croquis({
                   textAnchor="middle"
                   dominantBaseline="central"
                   className="c-mono"
-                  fontSize={5.5}
+                  fontSize={fs}
                   fontWeight={700}
                   fill={actual ? 'var(--c-mark)' : hecho ? '#fff' : 'var(--c-ink)'}
-                  style={{ pointerEvents: 'none' }}
+                  style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
                 >
-                  {i + 1}
+                  {p.nombre}
                 </text>
               </g>
             )
@@ -236,7 +238,7 @@ export function Croquis({
               return (
                 <CChip
                   key={p.id}
-                  label={`${i + 1} · ${p.nombre}`}
+                  label={p.nombre}
                   selected={i === paso}
                   onClick={() => onSaltar(i)}
                   className={cn(p.hecho === 1 && 'opacity-70')}

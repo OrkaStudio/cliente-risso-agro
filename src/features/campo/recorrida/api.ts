@@ -5,10 +5,23 @@ export type PastoEstado = Database['public']['Enums']['pasto_estado']
 export type AguaEstado = Database['public']['Enums']['agua_estado']
 export type ElectricoEstado = Database['public']['Enums']['electrico_estado']
 export type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
+export type CultivoEstado = Database['public']['Enums']['cultivo_obs_estado']
 
 export type CampoRec = { id: string; nombre: string; empresa_id: string }
 /** [lat, lng] — mismo formato que potrero.poligono (JSONB). */
 export type LatLng = [number, number]
+/** Última observación conocida del potrero (para "igual que la última vez"). */
+export type UltimaObs = {
+  fecha: string
+  pasto: PastoEstado | null
+  agua: AguaEstado | null
+  electrico: ElectricoEstado | null
+  conteo: number | null
+  en_tratamiento: boolean
+  novedad: string | null
+  cultivo: CultivoEstado | null
+}
+
 export type PotreroRec = {
   id: string
   nombre: string
@@ -16,6 +29,8 @@ export type PotreroRec = {
   cabezas: number
   /** Polígono del potrero (si se dibujó en Oficina) — alimenta el croquis. */
   poligono: LatLng[] | null
+  /** Última observación registrada (de cualquier recorrida anterior). */
+  ultima: UltimaObs | null
 }
 
 export type Observacion = {
@@ -26,6 +41,7 @@ export type Observacion = {
   conteo: number | null
   en_tratamiento: boolean
   novedad: string | null
+  cultivo: CultivoEstado | null
 }
 
 const hoyISO = () => new Date().toISOString().slice(0, 10)
@@ -38,21 +54,45 @@ export async function fetchRefs(): Promise<{
   campos: CampoRec[]
   potreros: (PotreroRec & { campo_id: string })[]
 }> {
-  const [camposRes, potrerosRes, stockRes] = await Promise.all([
+  const [camposRes, potrerosRes, stockRes, obsRes] = await Promise.all([
     supabase.from('campo').select('id, nombre, empresa_id').order('nombre'),
     supabase
       .from('potrero')
       .select('id, nombre, estado_ciclo, campo_id, poligono')
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
+    // Observaciones recientes → última por potrero ("igual que la última vez").
+    supabase
+      .from('observacion_potrero')
+      .select(
+        'potrero_id, pasto, agua, electrico, conteo, en_tratamiento, novedad, cultivo, created_at, recorrida:recorrida_id(fecha)',
+      )
+      .order('created_at', { ascending: false })
+      .limit(1000),
   ])
   if (camposRes.error) throw camposRes.error
   if (potrerosRes.error) throw potrerosRes.error
   if (stockRes.error) throw stockRes.error
+  if (obsRes.error) throw obsRes.error
 
   const cab = new Map(
     (stockRes.data ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
   )
+  // Primera aparición por potrero = la más reciente (vienen ordenadas desc).
+  const ultimas = new Map<string, UltimaObs>()
+  for (const o of obsRes.data ?? []) {
+    if (ultimas.has(o.potrero_id)) continue
+    ultimas.set(o.potrero_id, {
+      fecha: o.recorrida?.fecha ?? o.created_at.slice(0, 10),
+      pasto: o.pasto,
+      agua: o.agua,
+      electrico: o.electrico,
+      conteo: o.conteo,
+      en_tratamiento: o.en_tratamiento,
+      novedad: o.novedad,
+      cultivo: o.cultivo,
+    })
+  }
   return {
     campos: camposRes.data ?? [],
     potreros: (potrerosRes.data ?? []).map((p) => ({
@@ -62,6 +102,7 @@ export async function fetchRefs(): Promise<{
       campo_id: p.campo_id,
       cabezas: cab.get(p.id) ?? 0,
       poligono: (p.poligono as LatLng[] | null) ?? null,
+      ultima: ultimas.get(p.id) ?? null,
     })),
   }
 }
@@ -121,6 +162,7 @@ export async function guardarObservacion(input: {
     conteo: obs.conteo,
     en_tratamiento: obs.en_tratamiento,
     novedad: obs.novedad?.trim() || null,
+    cultivo: obs.cultivo,
   }
   const { data: existente } = await supabase
     .from('observacion_potrero')

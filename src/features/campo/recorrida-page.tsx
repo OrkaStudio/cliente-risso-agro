@@ -20,7 +20,14 @@ import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
 import { useRecorrida } from './recorrida/use-recorrida'
 import { Croquis } from './recorrida/croquis'
-import type { AguaEstado, ElectricoEstado, PastoEstado } from './recorrida/api'
+import type {
+  AguaEstado,
+  CultivoEstado,
+  ElectricoEstado,
+  EstadoCiclo,
+  PastoEstado,
+  UltimaObs,
+} from './recorrida/api'
 import { CChip, CLabel, CSegBtn, CSheet, type Tono } from './ui'
 
 const PASTO: { value: PastoEstado; label: string; tono: Tono }[] = [
@@ -39,6 +46,15 @@ const ELECTRICO: { value: ElectricoEstado; label: string; tono: Tono }[] = [
   { value: 'ok', label: 'Anda', tono: 'ok' },
   { value: 'cortado', label: 'Cortado', tono: 'bad' },
 ]
+const CULTIVO: { value: CultivoEstado; label: string; tono: Tono }[] = [
+  { value: 'bien', label: 'Viene bien', tono: 'ok' },
+  { value: 'regular', label: 'Regular', tono: 'warn' },
+  { value: 'mal', label: 'Viene mal', tono: 'bad' },
+]
+
+/** Potrero en ciclo agrícola: se observa el cultivo, no el pasto. */
+const esAgricola = (e: EstadoCiclo) =>
+  e === 'preparacion' || e === 'siembra' || e === 'cultivo' || e === 'cosecha'
 
 // Novedades frecuentes: un toque en vez de tipear manejando.
 const NOVEDADES = ['Alambre roto', 'Aguada sucia', 'Boyero bajo', 'Hacienda ajena'] as const
@@ -50,6 +66,7 @@ type Form = {
   conteo: number | null
   en_tratamiento: boolean
   novedad: string | null
+  cultivo: CultivoEstado | null
 }
 const FORM_VACIO: Form = {
   pasto: null,
@@ -58,6 +75,7 @@ const FORM_VACIO: Form = {
   conteo: null,
   en_tratamiento: false,
   novedad: null,
+  cultivo: null,
 }
 
 export function RecorridaPage() {
@@ -278,9 +296,12 @@ function Stepper({
           key={potrero.id}
           nombre={potrero.nombre}
           cabezas={potrero.cabezas}
+          estadoCiclo={potrero.estado_ciclo}
           ciclo={estadoCicloLabel[potrero.estado_ciclo]}
+          ultima={potrero.ultima ?? null}
           inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
           onGuardar={(f) => void r.guardar(potrero.id, f)}
+          onListo={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
         />
       </div>
 
@@ -364,7 +385,7 @@ function PotreroStrip({
             onClick={() => onSaltar(i)}
             title={p.nombre}
             className={cn(
-              'c-mono flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border-2 px-1 text-[13px] font-bold transition-colors',
+              'c-mono flex h-9 min-w-9 shrink-0 items-center justify-center gap-1 rounded-md border-2 px-1.5 text-[12.5px] font-bold uppercase transition-colors',
               actual
                 ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-mark)]'
                 : hecho
@@ -372,7 +393,8 @@ function PotreroStrip({
                   : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
             )}
           >
-            {hecho && !actual ? <Check className="size-4" strokeWidth={3} /> : i + 1}
+            {hecho && !actual && <Check className="size-3.5" strokeWidth={3} />}
+            {p.nombre}
           </button>
         )
       })}
@@ -391,7 +413,23 @@ function obsAForm(
     conteo: o.conteo,
     en_tratamiento: o.en_tratamiento,
     novedad: o.novedad,
+    cultivo: o.cultivo,
   }
+}
+
+const fmtFecha = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+
+function resumenUltima(u: UltimaObs, agricola: boolean): string {
+  const partes: string[] = []
+  if (agricola) {
+    if (u.cultivo) partes.push(`cultivo ${u.cultivo}`)
+  } else {
+    if (u.pasto) partes.push(`pasto ${u.pasto}`)
+    if (u.agua) partes.push(`agua ${u.agua}`)
+    if (u.electrico) partes.push(`boyero ${u.electrico === 'ok' ? 'anda' : 'cortado'}`)
+  }
+  if (u.en_tratamiento) partes.push('en tratamiento')
+  return partes.length ? partes.join(' · ') : 'sin estados cargados'
 }
 
 // ---------------------------------------------------------------------------
@@ -400,15 +438,21 @@ function obsAForm(
 function PotreroForm({
   nombre,
   cabezas,
+  estadoCiclo,
   ciclo,
+  ultima,
   inicial,
   onGuardar,
+  onListo,
 }: {
   nombre: string
   cabezas: number
+  estadoCiclo: EstadoCiclo
   ciclo: string
+  ultima: UltimaObs | null
   inicial: Form
   onGuardar: (f: Form) => void
+  onListo: () => void
 }) {
   // La novedad guardada se descompone: chips conocidos → seleccionados,
   // el resto queda como texto libre.
@@ -423,6 +467,11 @@ function PotreroForm({
       .join(' · '),
   )
   const [form, setForm] = useState<Form>(inicial)
+
+  const agricola = esAgricola(estadoCiclo)
+  // Conteo/tratamiento solo donde hay hacienda: potrero ganadero, o cualquier
+  // otro con cabezas esperadas (p. ej. pastoreando un rastrojo).
+  const conHacienda = estadoCiclo === 'ganadero' || cabezas > 0
 
   const componer = (chips: Set<string>, libre: string): string | null => {
     const s = [...chips, libre.trim()].filter(Boolean).join(' · ')
@@ -466,39 +515,91 @@ function PotreroForm({
         <CLabel className="mt-1">{ciclo}</CLabel>
       </div>
 
-      <div>
-        <CLabel className="mb-1.5">Pasto · ¿cómo está?</CLabel>
-        <Segmento opciones={PASTO} value={form.pasto} onChange={(v) => commit({ ...form, pasto: v })} />
-      </div>
+      {/* Confirmación rápida: copia los ESTADOS de la última observación
+          (no el conteo ni la novedad — esos son del día) y avanza solo. */}
+      {ultima && (
+        <button
+          type="button"
+          onClick={() => {
+            commit({
+              ...form,
+              pasto: agricola ? null : ultima.pasto,
+              agua: agricola ? null : ultima.agua,
+              electrico: agricola ? null : ultima.electrico,
+              cultivo: agricola ? ultima.cultivo : null,
+              en_tratamiento: ultima.en_tratamiento,
+            })
+            onListo()
+          }}
+          className="c-hard-sm flex items-center justify-between gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3.5 py-3 text-left"
+        >
+          <span className="min-w-0">
+            <span className="c-display block text-[15px] uppercase tracking-wide text-[var(--c-ok-deep)]">
+              Igual que la última vez
+            </span>
+            <span className="c-label mt-0.5 block truncate">
+              {resumenUltima(ultima, agricola)} · {fmtFecha(ultima.fecha)}
+            </span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-[var(--c-ok-deep)]" />
+        </button>
+      )}
 
-      <div>
-        <CLabel className="mb-1.5">Agua · aguadas y bebederos</CLabel>
-        <Segmento opciones={AGUA} value={form.agua} onChange={(v) => commit({ ...form, agua: v })} />
-      </div>
-
-      <div className="grid grid-cols-[1fr_auto] gap-2">
+      {agricola ? (
         <div>
-          <CLabel className="mb-1.5">Boyero eléctrico</CLabel>
-          <Segmento
-            opciones={ELECTRICO}
-            value={form.electrico}
-            onChange={(v) => commit({ ...form, electrico: v })}
-          />
+          <CLabel className="mb-1.5">Cultivo · ¿cómo viene?</CLabel>
+          <div className="grid grid-cols-3 gap-1.5">
+            {CULTIVO.map((o) => (
+              <CSegBtn
+                key={o.value}
+                label={o.label}
+                tono={o.tono}
+                selected={form.cultivo === o.value}
+                onClick={() => commit({ ...form, cultivo: o.value })}
+              />
+            ))}
+          </div>
         </div>
-        {/* En tratamiento */}
-        <div>
-          <CLabel className="mb-1.5">Tratam.</CLabel>
-          <CSegBtn
-            label={form.en_tratamiento ? 'Sí' : 'No'}
-            tono="warn"
-            selected={form.en_tratamiento}
-            onClick={() => commit({ ...form, en_tratamiento: !form.en_tratamiento })}
-            className="w-20"
-          />
-        </div>
-      </div>
+      ) : (
+        <>
+          <div>
+            <CLabel className="mb-1.5">Pasto · ¿cómo está?</CLabel>
+            <Segmento opciones={PASTO} value={form.pasto} onChange={(v) => commit({ ...form, pasto: v })} />
+          </div>
 
-      {/* Conteo: −/+ y un toque "= esperado" — sin teclado */}
+          <div>
+            <CLabel className="mb-1.5">Agua · aguadas y bebederos</CLabel>
+            <Segmento opciones={AGUA} value={form.agua} onChange={(v) => commit({ ...form, agua: v })} />
+          </div>
+
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <div>
+              <CLabel className="mb-1.5">Boyero eléctrico</CLabel>
+              <Segmento
+                opciones={ELECTRICO}
+                value={form.electrico}
+                onChange={(v) => commit({ ...form, electrico: v })}
+              />
+            </div>
+            {conHacienda && (
+              <div>
+                <CLabel className="mb-1.5">Tratam.</CLabel>
+                <CSegBtn
+                  label={form.en_tratamiento ? 'Sí' : 'No'}
+                  tono="warn"
+                  selected={form.en_tratamiento}
+                  onClick={() => commit({ ...form, en_tratamiento: !form.en_tratamiento })}
+                  className="w-20"
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Conteo: −/+ y un toque "= esperado" — sin teclado. Solo donde hay
+          (o debería haber) hacienda. */}
+      {conHacienda && (
       <div>
         <CLabel className="mb-1.5">Conteo de cabezas · opcional</CLabel>
         <div className="flex items-stretch gap-1.5">
@@ -551,6 +652,7 @@ function PotreroForm({
           </p>
         )}
       </div>
+      )}
 
       {/* Novedad por chips + libre */}
       <div>
@@ -726,6 +828,7 @@ function Cierre({
       if (o.pasto === 'escaso' || o.pasto === 'pelado') motivos.push(`pasto ${o.pasto}`)
       if (o.agua === 'baja' || o.agua === 'seca') motivos.push(`agua ${o.agua}`)
       if (o.electrico === 'cortado') motivos.push('boyero cortado')
+      if (o.cultivo === 'regular' || o.cultivo === 'mal') motivos.push(`cultivo ${o.cultivo}`)
       if (o.en_tratamiento) motivos.push('en tratamiento')
       if (o.novedad) motivos.push(o.novedad)
       if (motivos.length) items.push({ nombre: p.nombre, motivos })

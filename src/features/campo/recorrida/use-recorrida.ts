@@ -119,6 +119,7 @@ export function useRecorrida() {
               estado_ciclo: p.estado_ciclo,
               cabezas: p.cabezas,
               poligono: p.poligono,
+              ultima: p.ultima,
               hecho: 0 as const,
             })),
           )
@@ -198,6 +199,7 @@ export function useRecorrida() {
                   conteo: it.conteo,
                   en_tratamiento: it.en_tratamiento,
                   novedad: it.novedad,
+                  cultivo: it.cultivo,
                 },
               })
               // Solo marcar sincronizada si nadie editó la fila mientras subía;
@@ -276,12 +278,16 @@ export function useRecorrida() {
       void (async () => {
         const refsRow = await recdb.refs.get('refs')
         if (!refsRow) return
-        const porId = new Map(refsRow.potreros.map((p) => [p.id, p.poligono]))
+        const porId = new Map(refsRow.potreros.map((p) => [p.id, p]))
         const sesion = await recdb.potreros.toArray()
         for (const p of sesion) {
-          const poli = porId.get(p.id)
-          if (!p.poligono && poli) {
-            await recdb.potreros.update(p.id, { poligono: poli })
+          const ref = porId.get(p.id)
+          if (!ref) continue
+          const patch: Partial<typeof p> = {}
+          if (!p.poligono && ref.poligono) patch.poligono = ref.poligono
+          if (p.ultima === undefined && ref.ultima) patch.ultima = ref.ultima
+          if (Object.keys(patch).length > 0) {
+            await recdb.potreros.update(p.id, patch)
           }
         }
       })()
@@ -304,6 +310,7 @@ export function useRecorrida() {
         conteo: o.conteo,
         en_tratamiento: o.en_tratamiento,
         novedad: o.novedad,
+        cultivo: o.cultivo,
         estado: 'pendiente',
         error: null,
         updated_at: Date.now(),

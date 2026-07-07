@@ -2,10 +2,12 @@ import Dexie, { type Table } from 'dexie'
 import type {
   AguaEstado,
   CampoRec,
+  CultivoEstado,
   ElectricoEstado,
   EstadoCiclo,
   PastoEstado,
   PotreroRec,
+  UltimaObs,
 } from './api'
 
 // Base local de la Recorrida (IndexedDB vía Dexie), separada de la manga.
@@ -50,6 +52,8 @@ export type RecPotrero = {
   cabezas: number
   /** Polígono [lat,lng][] (si Oficina lo dibujó) — croquis del campo. */
   poligono: [number, number][] | null
+  /** Última observación conocida ("igual que la última vez"). */
+  ultima: UltimaObs | null
   hecho: 0 | 1
 }
 
@@ -65,6 +69,7 @@ export type RecObs = {
   conteo: number | null
   en_tratamiento: boolean
   novedad: string | null
+  cultivo: CultivoEstado | null
   estado: EstadoObs
   error: string | null
   updated_at: number
