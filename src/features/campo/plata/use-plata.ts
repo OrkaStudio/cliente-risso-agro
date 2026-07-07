@@ -171,6 +171,18 @@ export function usePlata() {
   const errores = lista.filter((o) => o.estado === 'error')
   const ultimo: PlataItem | null = lista[0] ?? null
 
+  // Resumen del día (lo cargado HOY desde este teléfono, sin errores):
+  // gasto suma negativo, ingreso positivo — el productor ve cuánto lleva.
+  const hoyISO = new Date().toISOString().slice(0, 10)
+  const deHoy = lista.filter((o) => o.fecha === hoyISO && o.estado !== 'error')
+  const hoyCantidad = deHoy.length
+  const hoyGastos = deHoy
+    .filter((o) => o.tipo === 'gasto')
+    .reduce((s, o) => s + o.monto, 0)
+  const hoyIngresos = deHoy
+    .filter((o) => o.tipo === 'ingreso')
+    .reduce((s, o) => s + o.monto, 0)
+
   const campoDefault =
     localStorage.getItem(CAMPO_KEY) ?? refs?.campos[0]?.id ?? ''
 
@@ -184,6 +196,9 @@ export function usePlata() {
     sinSubir,
     errores,
     ultimo,
+    hoyCantidad,
+    hoyGastos,
+    hoyIngresos,
     guardar,
     deshacer,
     reintentarErrores,

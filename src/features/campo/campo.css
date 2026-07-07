@@ -1,0 +1,120 @@
+/* ============================================================
+   MODO CAMPO — "Tablero de máquina"
+   Instrumento de trabajo, no app: tinta casi negra sobre hueso
+   cálido, bordes 2px, sombras SÓLIDAS (sin blur), radios chicos,
+   labels condensadas mayúsculas (Archivo font-stretch) y TODOS
+   los datos en JetBrains Mono (lectura de odómetro). El color es
+   semántica de dato (verde OK / ámbar ojo / rojo alerta), nunca
+   decoración. Scoped bajo `.campo`: Oficina no se entera.
+   ============================================================ */
+
+.campo {
+  --c-bg: #e7e3d7;        /* hueso cálido */
+  --c-panel: #f8f6ee;     /* papel de panel */
+  --c-sunk: #eeeadf;      /* superficie hundida */
+  --c-ink: #171a10;       /* tinta carbón */
+  --c-ink-soft: #4c4f40;
+  --c-faint: #8b8d7c;
+  --c-ok: #1d7a46;
+  --c-ok-deep: #0e5530;
+  --c-ok-soft: #dfeadc;
+  --c-warn: #b47710;
+  --c-warn-soft: #f4e6c3;
+  --c-bad: #ab3a24;
+  --c-bad-soft: #f1dcd2;
+  --c-mark: #f2c230;      /* amarillo marcador / resaltador */
+
+  background-color: var(--c-bg);
+  /* Grano de papel técnico: puntitos de tinta, no grilla de oficina */
+  background-image: radial-gradient(rgba(23, 26, 16, 0.055) 1px, transparent 1px);
+  background-size: 7px 7px;
+  color: var(--c-ink);
+}
+
+/* --- Tipografía ------------------------------------------------ */
+
+/* Señalética: Archivo condensado, mayúsculas, tracking ancho */
+.c-label {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-stretch: 72%;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--c-ink-soft);
+}
+
+/* Display condensado (títulos de sección / botones) */
+.c-display {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-stretch: 76%;
+  font-weight: 750;
+  letter-spacing: 0.015em;
+}
+
+/* Datos: mono tabular (RFID, montos, contadores, conteos) */
+.c-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* --- Superficies ------------------------------------------------ */
+
+.c-panel {
+  background: var(--c-panel);
+  border: 2px solid var(--c-ink);
+  border-radius: 10px;
+}
+
+/* Sombra dura de instrumento + pisada al presionar */
+.c-hard {
+  box-shadow: 3px 3px 0 0 var(--c-ink);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.c-hard:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 var(--c-ink);
+}
+.c-hard-sm {
+  box-shadow: 2px 2px 0 0 var(--c-ink);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.c-hard-sm:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 0 var(--c-ink);
+}
+
+/* Franjas de peligro (sin señal / advertencias de máquina) */
+.c-hazard {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--c-warn-soft) 0 10px,
+    #eeddb2 10px 20px
+  );
+}
+
+/* LED de estado (cuadradito con borde) */
+.c-led {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--c-ink);
+  border-radius: 2px;
+}
+
+/* Aparición de confirmación (ticker "último") */
+@keyframes c-stamp {
+  0% { transform: scale(0.94); opacity: 0.4; }
+  60% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.c-stamp { animation: c-stamp 220ms ease-out; }
+
+/* Scroll horizontal sin barra (tiras de chips / potreros) */
+.c-strip {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.c-strip::-webkit-scrollbar { display: none; }

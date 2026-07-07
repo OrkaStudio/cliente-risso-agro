@@ -4,6 +4,7 @@ import { Banknote, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
+import '@/features/campo/campo.css'
 
 /**
  * Shell del Modo Campo (móvil). Layout sobrio, pensado para el teléfono en la
@@ -28,17 +29,17 @@ export function CampoShell() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <header className="flex shrink-0 items-center gap-3 bg-sidebar px-4 py-3 text-sidebar-foreground">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-primary">
-          <Leaf className="size-5 text-white" strokeWidth={1.75} />
+    <div className="campo flex h-full flex-col overflow-hidden">
+      {/* Header — placa de máquina */}
+      <header className="flex shrink-0 items-center gap-3 border-b-2 border-[var(--c-ink)] bg-sidebar px-4 py-2.5 text-sidebar-foreground">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-white/25 bg-primary">
+          <Leaf className="size-5 text-white" strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate font-heading text-[15px] font-bold text-white">
+          <div className="c-display truncate text-[16px] uppercase tracking-wide text-white">
             Risso Agro
           </div>
-          <div className="truncate text-[11px] font-medium text-sidebar-foreground/55">
+          <div className="c-label truncate !text-sidebar-foreground/60">
             Modo Campo
           </div>
         </div>
@@ -61,31 +62,29 @@ export function CampoShell() {
 
       {/* Contenido — caja acotada (min-h-0 para que el flex hijo pueda encoger).
           Cada página se estructura como app: header fijo + región scrolleable
-          interna + footer fijo. main NO scrollea; scrollea la región interna. */}
-      <main className="min-h-0 flex-1 overflow-hidden">
+          interna + footer fijo. main NO scrollea; scrollea la región interna.
+          `relative`: las hojas (CSheet) se posicionan contra esta caja. */}
+      <main className="relative min-h-0 flex-1 overflow-hidden">
         <Suspense
           fallback={
-            <div className="p-6 text-sm text-muted-foreground">Cargando…</div>
+            <div className="c-label p-6 !text-[13px]">Cargando…</div>
           }
         >
           <Outlet />
         </Suspense>
       </main>
 
-      {/* Nav inferior (pulgar) */}
-      <nav className="flex shrink-0 items-stretch border-t border-border bg-card">
+      {/* Nav inferior (pulgar) — bloques de tablero, el activo se llena */}
+      <nav className="flex shrink-0 items-stretch gap-1.5 border-t-2 border-[var(--c-ink)] bg-[var(--c-sunk)] p-1.5">
         {NAV.map(({ to, label, icon: Icon, soon }) =>
           soon ? (
             <div
               key={to}
-              className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-muted-foreground/45"
+              className="flex flex-1 flex-col items-center gap-0.5 rounded-lg py-2 text-[var(--c-faint)]"
               title="Próximamente"
             >
               <Icon className="size-[22px]" strokeWidth={1.75} />
-              <span className="text-[11px] font-medium">{label}</span>
-              <span className="text-[9px] font-semibold uppercase tracking-wide">
-                pronto
-              </span>
+              <span className="c-label !text-[10px] !text-[var(--c-faint)]">{label}</span>
             </div>
           ) : (
             <NavLink
@@ -93,15 +92,28 @@ export function CampoShell() {
               to={to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors',
+                  'flex flex-1 flex-col items-center gap-1 rounded-lg border-2 py-2 transition-colors',
                   isActive
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-mark)]'
+                    : 'border-transparent text-[var(--c-ink-soft)]',
                 )
               }
             >
-              <Icon className="size-[22px]" strokeWidth={1.75} />
-              <span>{label}</span>
+              {({ isActive }) => (
+                <>
+                  <Icon className="size-[22px]" strokeWidth={2} />
+                  <span
+                    className={cn(
+                      'c-label !text-[10.5px]',
+                      isActive
+                        ? '!text-[var(--c-mark)]'
+                        : '!text-[var(--c-ink-soft)]',
+                    )}
+                  >
+                    {label}
+                  </span>
+                </>
+              )}
             </NavLink>
           ),
         )}

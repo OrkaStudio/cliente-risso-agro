@@ -1,5 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -8,50 +7,39 @@ import {
   CloudOff,
   CloudRain,
   CloudUpload,
-  Droplets,
   Flag,
-  Leaf,
   MapPin,
+  Minus,
+  Plus,
   RefreshCw,
-  Stethoscope,
   Trash2,
   Wifi,
-  Zap,
 } from 'lucide-react'
-import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
+import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
 import { useRecorrida } from './recorrida/use-recorrida'
-import type {
-  AguaEstado,
-  ElectricoEstado,
-  PastoEstado,
-} from './recorrida/api'
-
-type Tono = 'bien' | 'ok' | 'alerta' | 'mal'
-
-const TONO_CLS: Record<Tono, string> = {
-  bien: 'border-field bg-field text-white shadow-[0_6px_16px_rgba(16,138,85,0.28)]',
-  ok: 'border-lima bg-lima/85 text-ink shadow-[0_6px_16px_rgba(120,170,60,0.22)]',
-  alerta: 'border-accent bg-accent text-white shadow-[0_6px_16px_rgba(217,138,24,0.28)]',
-  mal: 'border-destructive bg-destructive text-white shadow-[0_6px_16px_rgba(200,50,50,0.24)]',
-}
+import type { AguaEstado, ElectricoEstado, PastoEstado } from './recorrida/api'
+import { CChip, CLabel, CSegBtn, type Tono } from './ui'
 
 const PASTO: { value: PastoEstado; label: string; tono: Tono }[] = [
-  { value: 'abundante', label: 'Abundante', tono: 'bien' },
-  { value: 'normal', label: 'Normal', tono: 'ok' },
-  { value: 'escaso', label: 'Escaso', tono: 'alerta' },
-  { value: 'pelado', label: 'Pelado', tono: 'mal' },
+  { value: 'abundante', label: 'Abund.', tono: 'ok' },
+  { value: 'normal', label: 'Normal', tono: 'mid' },
+  { value: 'escaso', label: 'Escaso', tono: 'warn' },
+  { value: 'pelado', label: 'Pelado', tono: 'bad' },
 ]
 const AGUA: { value: AguaEstado; label: string; tono: Tono }[] = [
-  { value: 'llena', label: 'Llena', tono: 'bien' },
-  { value: 'normal', label: 'Normal', tono: 'ok' },
-  { value: 'baja', label: 'Baja', tono: 'alerta' },
-  { value: 'seca', label: 'Seca', tono: 'mal' },
+  { value: 'llena', label: 'Llena', tono: 'ok' },
+  { value: 'normal', label: 'Normal', tono: 'mid' },
+  { value: 'baja', label: 'Baja', tono: 'warn' },
+  { value: 'seca', label: 'Seca', tono: 'bad' },
 ]
 const ELECTRICO: { value: ElectricoEstado; label: string; tono: Tono }[] = [
-  { value: 'ok', label: 'OK', tono: 'bien' },
-  { value: 'cortado', label: 'Cortado', tono: 'mal' },
+  { value: 'ok', label: 'Anda', tono: 'ok' },
+  { value: 'cortado', label: 'Cortado', tono: 'bad' },
 ]
+
+// Novedades frecuentes: un toque en vez de tipear manejando.
+const NOVEDADES = ['Alambre roto', 'Aguada sucia', 'Boyero bajo', 'Hacienda ajena'] as const
 
 type Form = {
   pasto: PastoEstado | null
@@ -86,7 +74,7 @@ export function RecorridaPage() {
 
   if (r.cargando) {
     return (
-      <div className="flex h-full items-center justify-center text-faint">
+      <div className="c-label flex h-full items-center justify-center !text-[13px]">
         Cargando…
       </div>
     )
@@ -116,11 +104,11 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
   if (!r.tieneRefs && !r.online) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
-        <CloudOff className="size-10 text-faint" />
-        <p className="text-[15px] font-semibold text-ink">
-          Sin señal y sin campos guardados.
+        <CloudOff className="size-10 text-[var(--c-faint)]" />
+        <p className="c-display text-[16px] uppercase tracking-wide text-[var(--c-ink)]">
+          Sin señal y sin campos guardados
         </p>
-        <p className="text-[13.5px] text-ink-soft">
+        <p className="text-[13.5px] text-[var(--c-ink-soft)]">
           Entrá una vez con señal para bajar los campos y potreros; de ahí en
           más la recorrida arranca sin conexión.
         </p>
@@ -129,46 +117,50 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto p-5">
+    <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto p-4">
       <div>
-        <h1 className="font-heading text-[26px] font-bold text-ink">Recorrida</h1>
-        <p className="mt-0.5 text-[14px] text-ink-soft">
-          Elegí el campo para arrancar la recorrida de hoy.
+        <h1 className="c-display text-[26px] uppercase tracking-wide text-[var(--c-ink)]">
+          Recorrida
+        </h1>
+        <p className="mt-0.5 text-[14px] text-[var(--c-ink-soft)]">
+          Elegí el campo. Un potrero por paso: tocás el estado y seguís.
         </p>
       </div>
       {r.error && (
-        <p className="rounded-xl bg-destructive/10 px-3.5 py-2.5 text-[13px] font-semibold text-destructive">
+        <p className="rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] px-3 py-2.5 text-[13px] font-semibold text-[var(--c-bad)]">
           {r.error}
         </p>
       )}
       {!r.online && (
-        <p className="flex items-center gap-2 rounded-xl bg-secondary px-3.5 py-2.5 text-[13px] font-medium text-ink-soft">
-          <CloudOff className="size-4 shrink-0 text-accent" /> Sin señal: la
-          recorrida arranca igual y sube sola cuando vuelva.
+        <p className="c-hazard flex items-center gap-2 rounded-lg border-2 border-[var(--c-ink)] px-3 py-2.5 text-[13px] font-semibold text-[var(--c-ink)]">
+          <CloudOff className="size-4 shrink-0" /> Sin señal: la recorrida
+          arranca igual y sube sola cuando vuelva.
         </p>
       )}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         {r.campos.map((c) => (
           <button
             key={c.id}
             type="button"
             disabled={r.iniciando}
             onClick={() => void r.empezar(c)}
-            className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-5 text-left shadow-sm transition-all hover:border-field hover:shadow-md active:scale-[0.99] disabled:opacity-50"
+            className="c-panel c-hard-sm group flex items-center justify-between px-4 py-4 text-left disabled:opacity-50"
           >
-            <span className="flex items-center gap-3.5">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-field-soft text-field">
+            <span className="flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]">
                 <MapPin className="size-5" />
               </span>
-              <span className="font-heading text-[18px] font-bold text-ink">
+              <span className="c-display text-[18px] uppercase tracking-wide text-[var(--c-ink)]">
                 {c.nombre}
               </span>
             </span>
-            <ChevronRight className="size-5 text-faint transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight className="size-5 text-[var(--c-faint)]" />
           </button>
         ))}
         {r.online && r.campos.length === 0 && !r.error && (
-          <p className="text-[13px] text-faint">No hay campos cargados todavía.</p>
+          <p className="text-[13px] text-[var(--c-faint)]">
+            No hay campos cargados todavía.
+          </p>
         )}
       </div>
     </div>
@@ -196,14 +188,9 @@ function Stepper({
   }
   const potrero = r.potreros[paso]
 
-  const opcionesSalto: DropdownOption[] = r.potreros.map((p, i) => ({
-    value: String(i),
-    label: `${p.hecho ? '✓ ' : ''}${p.nombre}`,
-  }))
-
   if (!potrero) {
     return (
-      <div className="flex h-full items-center justify-center px-8 text-center text-faint">
+      <div className="flex h-full items-center justify-center px-8 text-center text-[var(--c-faint)]">
         Este campo no tiene potreros cargados.
       </div>
     )
@@ -211,75 +198,56 @@ function Stepper({
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      {/* ===== Header fijo ===== */}
-      <header className="flex shrink-0 flex-col gap-3 border-b border-border/70 bg-background px-5 pb-4 pt-4">
-        <div className="flex items-center justify-between">
-          <span
-            className={cn(
-              'flex items-center gap-1.5 text-[14px] font-bold',
-              r.online ? 'text-field-deep' : 'text-accent',
-            )}
-          >
+      {/* ===== Barra de instrumento: campo · señal · cola + tira de potreros ===== */}
+      <header className="shrink-0 border-b-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="flex items-center gap-2">
             {r.online ? (
-              <Wifi className="size-[18px]" />
+              <Wifi className="size-4 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
             ) : (
-              <CloudOff className="size-[18px]" />
+              <CloudOff className="size-4 text-[var(--c-warn)]" strokeWidth={2.5} />
             )}
-            {r.online ? r.meta!.campo_nombre : 'Sin señal'}
-          </span>
-          {r.sinSubir > 0 && (
-            <span className="flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[12px] font-semibold text-accent">
-              <RefreshCw
-                className={cn('size-3.5', r.sincronizando && 'animate-spin')}
-              />
-              {r.sinSubir} sin subir
+            <span className="c-display text-[15px] uppercase tracking-wide text-[var(--c-ink)]">
+              {r.meta!.campo_nombre}
             </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <Dropdown
-              value={String(paso)}
-              onChange={(v) => setPaso(Number(v))}
-              options={opcionesSalto}
-              block
-              ariaLabel="Elegir potrero"
-              className="h-11"
-            />
-          </div>
-          <span className="shrink-0 text-[13px] font-bold text-faint tnum">
-            {paso + 1}/{r.total}
           </span>
+          <div className="flex items-center gap-2">
+            {r.sinSubir > 0 && (
+              <span className="c-hazard c-label rounded-md border-2 border-[var(--c-ink)] px-2 py-1 !text-[10.5px] !text-[var(--c-ink)]">
+                <RefreshCw
+                  className={cn('mr-1 inline size-3', r.sincronizando && 'animate-spin')}
+                />
+                {r.sinSubir} sin subir
+              </span>
+            )}
+            <span className="c-mono text-[15px] font-bold text-[var(--c-ink)]">
+              {r.hechos}/{r.total}
+            </span>
+          </div>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-secondary">
-          <motion.div
-            className="h-full rounded-full bg-field"
-            initial={false}
-            animate={{ width: `${Math.round((r.hechos / r.total) * 100)}%` }}
-            transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-          />
-        </div>
+        {/* Tira de potreros: estado de todos de un vistazo + salto directo */}
+        <PotreroStrip r={r} paso={paso} onSaltar={setPaso} />
       </header>
 
       {/* ===== Paso actual (scrollea) ===== */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">
         <PotreroForm
           key={potrero.id}
           nombre={potrero.nombre}
           cabezas={potrero.cabezas}
+          ciclo={estadoCicloLabel[potrero.estado_ciclo]}
           inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
           onGuardar={(f) => void r.guardar(potrero.id, f)}
         />
       </div>
 
       {/* ===== Navegación inferior (footer fijo) ===== */}
-      <div className="flex shrink-0 items-center gap-2.5 border-t border-border bg-card px-5 py-3.5">
+      <div className="flex shrink-0 items-center gap-2 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 py-3">
         <button
           type="button"
           disabled={paso === 0}
           onClick={() => setPaso((p) => Math.max(0, p - 1))}
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border text-ink transition-colors active:scale-95 disabled:opacity-40"
+          className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[var(--c-ink)] disabled:opacity-40 disabled:shadow-none"
           aria-label="Anterior"
         >
           <ChevronLeft className="size-6" />
@@ -288,7 +256,7 @@ function Stepper({
           <button
             type="button"
             onClick={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-field text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(16,138,85,0.28)] transition-all active:translate-y-px"
+            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[16px] uppercase tracking-wide text-white"
           >
             Siguiente potrero
             <ChevronRight className="size-5" />
@@ -297,7 +265,7 @@ function Stepper({
           <button
             type="button"
             onClick={onCierre}
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-field text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(16,138,85,0.28)] transition-all active:translate-y-px"
+            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-ink)] text-[16px] uppercase tracking-wide text-[var(--c-mark)]"
           >
             <Flag className="size-5" />
             Terminar recorrida
@@ -308,9 +276,54 @@ function Stepper({
   )
 }
 
-function obsAForm(o: ReturnType<
-  ReturnType<typeof useRecorrida>['obsPorPotrero']['get']
->): Form {
+/** Tira de celdas: cada potrero con su estado (tinta = actual, verde = hecho,
+ *  contorno = falta). Tocar salta directo — sin dropdown. */
+function PotreroStrip({
+  r,
+  paso,
+  onSaltar,
+}: {
+  r: ReturnType<typeof useRecorrida>
+  paso: number
+  onSaltar: (i: number) => void
+}) {
+  const actualRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    actualRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' })
+  }, [paso])
+
+  return (
+    <div className="c-strip -mx-4 flex gap-1 px-4">
+      {r.potreros.map((p, i) => {
+        const actual = i === paso
+        const hecho = p.hecho === 1
+        return (
+          <button
+            key={p.id}
+            ref={actual ? actualRef : undefined}
+            type="button"
+            onClick={() => onSaltar(i)}
+            title={p.nombre}
+            className={cn(
+              'c-mono flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border-2 px-1 text-[13px] font-bold transition-colors',
+              actual
+                ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-mark)]'
+                : hecho
+                  ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok)] text-white'
+                  : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+            )}
+          >
+            {hecho && !actual ? <Check className="size-4" strokeWidth={3} /> : i + 1}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function obsAForm(
+  o: ReturnType<ReturnType<typeof useRecorrida>['obsPorPotrero']['get']>,
+): Form {
   if (!o) return FORM_VACIO
   return {
     pasto: o.pasto,
@@ -328,16 +341,34 @@ function obsAForm(o: ReturnType<
 function PotreroForm({
   nombre,
   cabezas,
+  ciclo,
   inicial,
   onGuardar,
 }: {
   nombre: string
   cabezas: number
+  ciclo: string
   inicial: Form
   onGuardar: (f: Form) => void
 }) {
+  // La novedad guardada se descompone: chips conocidos → seleccionados,
+  // el resto queda como texto libre.
+  const [novChips, setNovChips] = useState<Set<string>>(() => {
+    const partes = (inicial.novedad ?? '').split(' · ')
+    return new Set(partes.filter((p) => (NOVEDADES as readonly string[]).includes(p)))
+  })
+  const [novLibre, setNovLibre] = useState(() =>
+    (inicial.novedad ?? '')
+      .split(' · ')
+      .filter((p) => !(NOVEDADES as readonly string[]).includes(p))
+      .join(' · '),
+  )
   const [form, setForm] = useState<Form>(inicial)
-  const [abrirNovedad, setAbrirNovedad] = useState(!!inicial.novedad)
+
+  const componer = (chips: Set<string>, libre: string): string | null => {
+    const s = [...chips, libre.trim()].filter(Boolean).join(' · ')
+    return s || null
+  }
 
   // Persiste apenas cambia algo (upsert idempotente en Dexie + cola).
   const commit = (next: Form) => {
@@ -345,132 +376,140 @@ function PotreroForm({
     onGuardar(next)
   }
 
+  const toggleNovedad = (n: string) => {
+    const chips = new Set(novChips)
+    if (chips.has(n)) chips.delete(n)
+    else chips.add(n)
+    setNovChips(chips)
+    commit({ ...form, novedad: componer(chips, novLibre) })
+  }
+
+  const ajustarConteo = (delta: number) => {
+    const base = form.conteo ?? (delta > 0 ? 0 : 0)
+    commit({ ...form, conteo: Math.max(0, base + delta) })
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-field-soft text-field">
-          <MapPin className="size-5" />
-        </span>
-        <h2 className="font-heading text-[22px] font-bold text-ink">{nombre}</h2>
-      </div>
-
-      <Bloque icon={<Leaf className="size-4" />} titulo="Pasto">
-        <Segmento
-          opciones={PASTO}
-          value={form.pasto}
-          onChange={(v) => commit({ ...form, pasto: v })}
-        />
-      </Bloque>
-
-      <Bloque icon={<Droplets className="size-4" />} titulo="Agua">
-        <Segmento
-          opciones={AGUA}
-          value={form.agua}
-          onChange={(v) => commit({ ...form, agua: v })}
-        />
-      </Bloque>
-
-      <Bloque icon={<Zap className="size-4" />} titulo="Eléctrico">
-        <Segmento
-          opciones={ELECTRICO}
-          value={form.electrico}
-          onChange={(v) => commit({ ...form, electrico: v })}
-        />
-      </Bloque>
-
-      <div className="flex gap-3">
-        {/* Conteo */}
-        <div className="flex-1 rounded-2xl border border-border bg-card p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[13px] font-bold text-ink">Conteo</span>
-            {cabezas > 0 && (
-              <span className="text-[11px] font-medium text-faint">
-                esperado: {cabezas}
-              </span>
-            )}
+    <div className="flex flex-col gap-3">
+      {/* Contexto del potrero: lo que el productor necesita saber al pisar */}
+      <div className="c-panel px-4 py-3">
+        <div className="flex items-end justify-between gap-3">
+          <h2 className="c-display min-w-0 truncate text-[24px] uppercase tracking-wide text-[var(--c-ink)]">
+            {nombre}
+          </h2>
+          <div className="shrink-0 text-right leading-none">
+            <span className="c-mono text-[22px] font-bold text-[var(--c-ink)]">
+              {cabezas}
+            </span>
+            <CLabel className="mt-0.5">cab. esperadas</CLabel>
           </div>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={form.conteo ?? ''}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                conteo: e.target.value === '' ? null : Number(e.target.value),
-              })
-            }
-            onBlur={() => onGuardar(form)}
-            placeholder="—"
-            className="h-12 w-full rounded-xl border border-border bg-field-soft/30 px-3 text-[20px] font-bold text-ink outline-none focus:border-field"
+        </div>
+        <CLabel className="mt-1">{ciclo}</CLabel>
+      </div>
+
+      <div>
+        <CLabel className="mb-1.5">Pasto · ¿cómo está?</CLabel>
+        <Segmento opciones={PASTO} value={form.pasto} onChange={(v) => commit({ ...form, pasto: v })} />
+      </div>
+
+      <div>
+        <CLabel className="mb-1.5">Agua · aguadas y bebederos</CLabel>
+        <Segmento opciones={AGUA} value={form.agua} onChange={(v) => commit({ ...form, agua: v })} />
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <div>
+          <CLabel className="mb-1.5">Boyero eléctrico</CLabel>
+          <Segmento
+            opciones={ELECTRICO}
+            value={form.electrico}
+            onChange={(v) => commit({ ...form, electrico: v })}
           />
         </div>
-
         {/* En tratamiento */}
-        <button
-          type="button"
-          onClick={() =>
-            commit({ ...form, en_tratamiento: !form.en_tratamiento })
-          }
-          className={cn(
-            'flex w-[116px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl border p-3 transition-colors active:scale-[0.98]',
-            form.en_tratamiento
-              ? 'border-accent bg-accent/10 text-accent'
-              : 'border-border bg-card text-ink-soft',
-          )}
-        >
-          <Stethoscope className="size-6" />
-          <span className="whitespace-pre-line text-center text-[12.5px] font-semibold leading-tight">
-            {form.en_tratamiento ? 'En\ntratamiento' : 'Sin\ntratamiento'}
-          </span>
-        </button>
-      </div>
-
-      {/* Novedad (plegable) */}
-      {abrirNovedad ? (
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <label className="mb-2 block text-[13px] font-bold text-ink">
-            Novedad
-          </label>
-          <textarea
-            value={form.novedad ?? ''}
-            onChange={(e) =>
-              setForm({ ...form, novedad: e.target.value || null })
-            }
-            onBlur={() => onGuardar(form)}
-            rows={2}
-            placeholder="Anotá algo (opcional)…"
-            className="w-full resize-none rounded-xl border border-border bg-field-soft/30 px-3 py-2.5 text-[15px] text-ink outline-none focus:border-field"
+        <div>
+          <CLabel className="mb-1.5">Tratam.</CLabel>
+          <CSegBtn
+            label={form.en_tratamiento ? 'Sí' : 'No'}
+            tono="warn"
+            selected={form.en_tratamiento}
+            onClick={() => commit({ ...form, en_tratamiento: !form.en_tratamiento })}
+            className="w-20"
           />
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAbrirNovedad(true)}
-          className="rounded-2xl border border-dashed border-border bg-card/60 px-4 py-3 text-left text-[14px] font-semibold text-faint transition-colors hover:border-faint"
-        >
-          + Novedad
-        </button>
-      )}
-    </div>
-  )
-}
-
-function Bloque({
-  icon,
-  titulo,
-  children,
-}: {
-  icon: ReactNode
-  titulo: string
-  children: ReactNode
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="mb-3 flex items-center gap-1.5 text-[13px] font-bold text-ink">
-        <span className="text-field">{icon}</span>
-        {titulo}
       </div>
-      {children}
+
+      {/* Conteo: −/+ y un toque "= esperado" — sin teclado */}
+      <div>
+        <CLabel className="mb-1.5">Conteo de cabezas · opcional</CLabel>
+        <div className="flex items-stretch gap-1.5">
+          <button
+            type="button"
+            onClick={() => ajustarConteo(-1)}
+            aria-label="Restar"
+            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[var(--c-ink)]"
+          >
+            <Minus className="size-5" strokeWidth={2.5} />
+          </button>
+          <div className="c-panel flex h-13 min-w-0 flex-1 items-center justify-center">
+            <span
+              className={cn(
+                'c-mono text-[24px] font-bold',
+                form.conteo != null ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
+              )}
+            >
+              {form.conteo ?? '—'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => ajustarConteo(1)}
+            aria-label="Sumar"
+            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[var(--c-ink)]"
+          >
+            <Plus className="size-5" strokeWidth={2.5} />
+          </button>
+          {cabezas > 0 && (
+            <button
+              type="button"
+              onClick={() => commit({ ...form, conteo: cabezas })}
+              className={cn(
+                'c-display shrink-0 rounded-lg border-2 px-2.5 text-[13px] uppercase',
+                form.conteo === cabezas
+                  ? 'border-[var(--c-ink)] bg-[var(--c-ok)] text-white'
+                  : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ok-deep)]',
+              )}
+            >
+              = {cabezas}
+            </button>
+          )}
+        </div>
+        {form.conteo != null && cabezas > 0 && form.conteo !== cabezas && (
+          <p className="c-label mt-1 !text-[11px] !text-[var(--c-warn)]">
+            {form.conteo < cabezas
+              ? `Faltan ${cabezas - form.conteo} de las esperadas`
+              : `${form.conteo - cabezas} de más que lo esperado`}
+          </p>
+        )}
+      </div>
+
+      {/* Novedad por chips + libre */}
+      <div>
+        <CLabel className="mb-1.5">Novedades · opcional</CLabel>
+        <div className="c-strip -mx-4 flex gap-1.5 px-4">
+          {NOVEDADES.map((n) => (
+            <CChip key={n} label={n} selected={novChips.has(n)} onClick={() => toggleNovedad(n)} />
+          ))}
+        </div>
+        <input
+          value={novLibre}
+          onChange={(e) => setNovLibre(e.target.value)}
+          onBlur={() => onGuardar({ ...form, novedad: componer(novChips, novLibre) })}
+          autoComplete="off"
+          placeholder="Otra novedad…"
+          className="mt-1.5 h-10 w-full rounded-lg border-2 border-[var(--c-ink)]/25 bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ink)]"
+        />
+      </div>
     </div>
   )
 }
@@ -487,28 +526,19 @@ function Segmento<T extends string>({
   return (
     <div
       className={cn(
-        'grid gap-2',
+        'grid gap-1.5',
         opciones.length === 2 ? 'grid-cols-2' : 'grid-cols-4',
       )}
     >
-      {opciones.map((o) => {
-        const sel = value === o.value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            className={cn(
-              'flex h-14 items-center justify-center rounded-xl border-2 text-[13.5px] font-bold transition-all active:scale-[0.97]',
-              sel
-                ? TONO_CLS[o.tono]
-                : 'border-border bg-field-soft/20 text-ink-soft hover:border-faint',
-            )}
-          >
-            {o.label}
-          </button>
-        )
-      })}
+      {opciones.map((o) => (
+        <CSegBtn
+          key={o.value}
+          label={o.label}
+          tono={o.tono}
+          selected={value === o.value}
+          onClick={() => onChange(o.value)}
+        />
+      ))}
     </div>
   )
 }
@@ -524,19 +554,19 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6">
         <div className="flex flex-col items-center gap-3 pt-6 text-center">
-          <span className="flex size-16 items-center justify-center rounded-3xl bg-field-soft text-field">
+          <span className="c-panel flex size-16 items-center justify-center text-[var(--c-ok-deep)]">
             <CloudUpload className="size-8" strokeWidth={2} />
           </span>
-          <h1 className="font-heading text-[22px] font-bold text-ink">
+          <h1 className="c-display text-[22px] uppercase tracking-wide text-[var(--c-ink)]">
             Recorrida guardada
           </h1>
-          <p className="text-[14.5px] leading-snug text-ink-soft">
+          <p className="text-[14.5px] leading-snug text-[var(--c-ink-soft)]">
             {r.sinSubir > 0 || lluviaPendiente ? (
               <>
                 Quedan{' '}
-                <span className="font-bold text-ink">
+                <span className="font-bold text-[var(--c-ink)]">
                   {r.sinSubir > 0 &&
                     (r.sinSubir === 1
                       ? '1 observación'
@@ -555,30 +585,32 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
 
         <div
           className={cn(
-            'flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] font-bold',
+            'flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5',
             r.online
-              ? 'bg-field-soft/60 text-field-deep'
-              : 'bg-secondary text-accent',
+              ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)]'
+              : 'c-hazard border-[var(--c-ink)]',
           )}
         >
           {r.online ? (
-            <Wifi className="size-4" />
+            <Wifi className="size-4 text-[var(--c-ok-deep)]" />
           ) : (
-            <CloudOff className="size-4" />
+            <CloudOff className="size-4 text-[var(--c-ink)]" />
           )}
-          {r.online ? 'Con señal' : 'Sin señal'}
+          <CLabel className={cn('!text-[12px]', r.online && '!text-[var(--c-ok-deep)]')}>
+            {r.online ? 'Con señal' : 'Sin señal'}
+          </CLabel>
         </div>
 
         {r.errores.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-2xl border border-accent/40 bg-accent/10 p-4">
-            <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-accent">
+          <div className="flex flex-col gap-2 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] p-3.5">
+            <div className="c-label flex items-center gap-1.5 !text-[12px] !text-[var(--c-bad)]">
               <AlertTriangle className="size-4" />
               {r.errores.length} que el servidor rechazó
             </div>
-            <ul className="flex flex-col gap-1 text-[12.5px] font-medium text-ink-soft">
+            <ul className="flex flex-col gap-1 text-[12.5px] text-[var(--c-ink-soft)]">
               {r.errores.map((e) => (
                 <li key={e.potrero_id}>
-                  <span className="font-semibold text-ink">
+                  <span className="font-semibold text-[var(--c-ink)]">
                     {nombrePotrero.get(e.potrero_id) ?? 'Potrero'}:
                   </span>{' '}
                   {e.error ?? 'error al subir'}
@@ -588,7 +620,7 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
             <button
               type="button"
               onClick={() => void r.descartarErrores()}
-              className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-card px-3.5 py-2.5 text-[13px] font-semibold text-accent transition-colors active:scale-[0.98]"
+              className="c-label mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-panel)] px-3 py-2.5 !text-[12px] !text-[var(--c-bad)] active:scale-[0.98]"
             >
               <Trash2 className="size-4" />
               Descartar los que fallaron
@@ -597,12 +629,12 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
         )}
       </div>
 
-      <div className="shrink-0 border-t border-border bg-card px-5 pb-5 pt-3.5">
+      <div className="shrink-0 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
         <button
           type="button"
           disabled={!r.online || r.sincronizando}
           onClick={() => void r.sincronizar()}
-          className="flex h-15 w-full items-center justify-center gap-2.5 rounded-2xl bg-field text-[17px] font-bold text-white shadow-[0_10px_24px_rgba(16,138,85,0.3)] transition-all active:translate-y-px disabled:opacity-50"
+          className="c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[17px] uppercase tracking-wide text-white disabled:opacity-50 disabled:shadow-none"
         >
           <RefreshCw className={cn('size-5', r.sincronizando && 'animate-spin')} />
           {r.sincronizando ? 'Subiendo…' : 'Subir ahora'}
@@ -622,9 +654,7 @@ function Cierre({
   r: ReturnType<typeof useRecorrida>
   onVolver: () => void
 }) {
-  const [mm, setMm] = useState<string>(
-    r.meta?.lluvia_mm != null ? String(r.meta.lluvia_mm) : '',
-  )
+  const [mm, setMm] = useState<number | null>(r.meta?.lluvia_mm ?? null)
   const [terminando, setTerminando] = useState(false)
 
   // Potreros que necesitan atención (para el resumen).
@@ -634,12 +664,11 @@ function Cierre({
       const o = r.obsPorPotrero.get(p.id)
       if (!o) continue
       const motivos: string[] = []
-      if (o.pasto === 'escaso' || o.pasto === 'pelado')
-        motivos.push(`pasto ${o.pasto}`)
+      if (o.pasto === 'escaso' || o.pasto === 'pelado') motivos.push(`pasto ${o.pasto}`)
       if (o.agua === 'baja' || o.agua === 'seca') motivos.push(`agua ${o.agua}`)
-      if (o.electrico === 'cortado') motivos.push('eléctrico cortado')
+      if (o.electrico === 'cortado') motivos.push('boyero cortado')
       if (o.en_tratamiento) motivos.push('en tratamiento')
-      if (o.novedad) motivos.push('novedad')
+      if (o.novedad) motivos.push(o.novedad)
       if (motivos.length) items.push({ nombre: p.nombre, motivos })
     }
     return items
@@ -647,51 +676,51 @@ function Cierre({
 
   const terminar = async () => {
     setTerminando(true)
-    await r.setLluvia(mm === '' ? null : Number(mm))
+    await r.setLluvia(mm)
     await r.terminar()
     // al terminar, meta se limpia → RecorridaPage vuelve al selector
   }
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pt-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
         <div className="flex items-center gap-2.5">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-field-soft text-field">
+          <span className="c-panel flex size-10 shrink-0 items-center justify-center text-[var(--c-ok-deep)]">
             <Flag className="size-5" />
           </span>
-          <h1 className="font-heading text-[24px] font-bold text-ink">
+          <h1 className="c-display text-[22px] uppercase tracking-wide text-[var(--c-ink)]">
             Cierre de recorrida
           </h1>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-4 text-[15px] text-ink">
+        <div className="c-panel px-4 py-3 text-[15px] text-[var(--c-ink)]">
           Recorriste{' '}
-          <span className="font-bold text-field-deep">
-            {r.hechos} de {r.total}
+          <span className="c-mono font-bold text-[var(--c-ok-deep)]">
+            {r.hechos}/{r.total}
           </span>{' '}
           potreros de {r.meta?.campo_nombre}.
         </div>
 
         {/* Necesita atención */}
         <div>
-          <h2 className="mb-2.5 flex items-center gap-1.5 text-[15px] font-bold text-ink">
-            <AlertTriangle className="size-4 text-accent" /> Necesita atención
-          </h2>
+          <CLabel className="mb-2 flex items-center gap-1.5 !text-[12px]">
+            <AlertTriangle className="size-4 text-[var(--c-warn)]" /> Necesita atención
+          </CLabel>
           {atencion.length === 0 ? (
-            <p className="flex items-center gap-2 rounded-xl bg-field-soft/50 px-3.5 py-3 text-[14px] font-medium text-field-deep">
+            <p className="flex items-center gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3 py-2.5 text-[14px] font-semibold text-[var(--c-ok-deep)]">
               <Check className="size-4" /> Todo en orden.
             </p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {atencion.map((a) => (
                 <div
                   key={a.nombre}
-                  className="rounded-xl border border-accent/30 bg-accent/5 px-3.5 py-2.5"
+                  className="rounded-lg border-2 border-[var(--c-warn)] bg-[var(--c-warn-soft)] px-3 py-2"
                 >
-                  <span className="text-[14px] font-bold text-ink">
+                  <span className="c-display text-[14px] uppercase text-[var(--c-ink)]">
                     {a.nombre}
                   </span>
-                  <span className="ml-2 text-[13px] text-ink-soft">
+                  <span className="ml-2 text-[13px] text-[var(--c-ink-soft)]">
                     {a.motivos.join(' · ')}
                   </span>
                 </div>
@@ -700,29 +729,49 @@ function Cierre({
           )}
         </div>
 
-        {/* Lluvia */}
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <label className="mb-2 flex items-center gap-1.5 text-[15px] font-bold text-ink">
-            <CloudRain className="size-4 text-field" /> Lluvia de hoy (mm)
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={mm}
-            onChange={(e) => setMm(e.target.value)}
-            placeholder="opcional"
-            className="h-13 w-full rounded-xl border border-border bg-field-soft/30 px-3.5 text-[20px] font-bold text-ink outline-none focus:border-field"
-          />
+        {/* Lluvia: stepper de a 5 mm, sin teclado */}
+        <div className="c-panel p-3.5">
+          <CLabel className="mb-2 flex items-center gap-1.5 !text-[12px]">
+            <CloudRain className="size-4 text-[var(--c-ok-deep)]" /> Lluvia de hoy · opcional
+          </CLabel>
+          <div className="flex items-stretch gap-1.5">
+            <button
+              type="button"
+              onClick={() => setMm((v) => Math.max(0, (v ?? 0) - 5))}
+              aria-label="Restar lluvia"
+              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)]"
+            >
+              <Minus className="size-5" strokeWidth={2.5} />
+            </button>
+            <div className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-sunk)]">
+              <span
+                className={cn(
+                  'c-mono text-[22px] font-bold',
+                  mm != null ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
+                )}
+              >
+                {mm != null ? `${mm} mm` : '— mm'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMm((v) => (v ?? 0) + 5)}
+              aria-label="Sumar lluvia"
+              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)]"
+            >
+              <Plus className="size-5" strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Acciones (footer fijo) */}
-      <div className="flex shrink-0 flex-col gap-2.5 border-t border-border bg-card px-5 pb-5 pt-3.5">
+      <div className="flex shrink-0 flex-col gap-2 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
         <button
           type="button"
           disabled={terminando}
           onClick={() => void terminar()}
-          className="flex h-15 items-center justify-center gap-2.5 rounded-2xl bg-field text-[17px] font-bold text-white shadow-[0_10px_24px_rgba(16,138,85,0.3)] transition-all active:translate-y-px disabled:opacity-60"
+          className="c-display c-hard flex h-14 items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[17px] uppercase tracking-wide text-white disabled:opacity-60"
         >
           <Check className="size-6" strokeWidth={2.5} />
           {terminando ? 'Guardando…' : 'Terminar y guardar'}
@@ -730,7 +779,7 @@ function Cierre({
         <button
           type="button"
           onClick={onVolver}
-          className="flex h-12 items-center justify-center rounded-2xl border border-border text-[15px] font-semibold text-ink transition-colors active:scale-[0.99]"
+          className="c-display flex h-11 items-center justify-center rounded-xl border-2 border-[var(--c-ink)]/30 text-[14px] uppercase tracking-wide text-[var(--c-ink-soft)]"
         >
           Volver a los potreros
         </button>

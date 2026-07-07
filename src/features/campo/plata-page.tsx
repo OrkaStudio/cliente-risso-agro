@@ -7,48 +7,44 @@ import {
   Camera,
   Check,
   CloudOff,
-  RefreshCw,
   RotateCcw,
   Wifi,
   X,
 } from 'lucide-react'
-import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
 import { usePlata } from './plata/use-plata'
 import { fotoAJpegBlob, type TipoMov } from './plata/api'
+import { CChip, CLabel, CNumpad } from './ui'
 
-const fmtMonto = (n: number) => `$${n.toLocaleString('es-AR')}`
+const fmt = (n: number) => `$${n.toLocaleString('es-AR')}`
+
+// Detalles frecuentes: un toque en vez de tipear en la camioneta.
+const DETALLES = ['Gasoil', 'Repuestos', 'Veterinaria', 'Ferretería', 'Flete', 'Comida'] as const
 
 /**
- * Plata (Modo Campo): registrar UN gasto o ingreso ahí mismo, sin señal.
- * Mínimo viable de campo: tipo + monto + categoría + campo (+ foto y detalle
- * opcionales). Fecha = hoy, estado = liquidado. Todo lo demás (pendientes,
- * cuotas, cheques, potrero, actividad) se completa/edita en Oficina.
- * Offline-first con el mismo patrón outbox que manga/recorrida.
+ * Plata (Modo Campo): registrar UN gasto o ingreso ahí mismo, sin señal y
+ * casi sin tipear: numpad propio (cero teclado del sistema), categorías y
+ * detalle por chips, campo por bloques. Fecha = hoy, estado = liquidado;
+ * lo fino (pendientes, cuotas, cheques, potrero) se completa en Oficina.
  */
 export function PlataPage() {
   const p = usePlata()
 
   if (p.cargando) {
-    return (
-      <p className="p-8 text-center text-sm text-muted-foreground">
-        Cargando…
-      </p>
-    )
+    return <p className="c-label p-8 text-center !text-[13px]">Cargando…</p>
   }
 
-  // Sin cache y sin señal: no hay categorías/campos para armar el form.
   if (p.categorias.length === 0 || p.campos.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
-        <CloudOff className="size-10 text-faint" />
-        <p className="text-[15px] font-semibold text-ink">
+        <CloudOff className="size-10 text-[var(--c-faint)]" />
+        <p className="c-display text-[16px] uppercase tracking-wide text-[var(--c-ink)]">
           {p.online
             ? 'Cargando categorías y campos…'
-            : 'Sin señal y sin datos guardados.'}
+            : 'Sin señal y sin datos guardados'}
         </p>
         {!p.online && (
-          <p className="text-[13.5px] text-ink-soft">
+          <p className="text-[13.5px] text-[var(--c-ink-soft)]">
             Entrá una vez con señal para poder cargar plata sin conexión.
           </p>
         )}
@@ -56,7 +52,7 @@ export function PlataPage() {
           <button
             type="button"
             onClick={() => void p.cargarRefs()}
-            className="text-[13.5px] font-semibold text-field"
+            className="c-display text-[14px] uppercase text-[var(--c-ok-deep)] underline underline-offset-4"
           >
             Reintentar
           </button>
@@ -67,63 +63,69 @@ export function PlataPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      {/* ===== Header fijo: estado de señal + sin subir ===== */}
-      <header className="flex shrink-0 items-center justify-between border-b border-border/70 bg-background px-5 py-3 text-[13px]">
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 font-bold',
-            p.online ? 'text-field' : 'text-accent',
-          )}
-        >
+      {/* ===== Barra de instrumento: señal · hoy · cola ===== */}
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 py-2.5">
+        <div className="flex items-center gap-2">
           {p.online ? (
-            <Wifi className="size-[18px]" />
+            <Wifi className="size-4 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
           ) : (
-            <CloudOff className="size-[18px]" />
+            <CloudOff className="size-4 text-[var(--c-warn)]" strokeWidth={2.5} />
           )}
-          {p.online ? 'Con señal' : 'Sin señal'}
-        </span>
-        <button
-          type="button"
-          onClick={() => void p.sincronizar()}
-          disabled={!p.online || p.sinSubir === 0}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold transition-colors',
-            p.sinSubir > 0
-              ? 'border-accent/40 bg-accent/10 text-accent'
-              : 'border-transparent text-faint',
+          <CLabel className={cn('!text-[11px]', !p.online && '!text-[var(--c-warn)]')}>
+            {p.online ? 'Señal' : 'Sin señal'}
+          </CLabel>
+        </div>
+        <div className="flex items-center gap-3">
+          {p.hoyCantidad > 0 && (
+            <div className="text-right leading-none">
+              <span className="c-mono text-[15px] font-bold text-[var(--c-ink)]">
+                {p.hoyGastos > 0 && `−${fmt(p.hoyGastos)}`}
+                {p.hoyGastos > 0 && p.hoyIngresos > 0 && ' · '}
+                {p.hoyIngresos > 0 && `+${fmt(p.hoyIngresos)}`}
+              </span>
+              <CLabel className="mt-0.5 text-right">
+                Hoy · {p.hoyCantidad} {p.hoyCantidad === 1 ? 'carga' : 'cargas'}
+              </CLabel>
+            </div>
           )}
-        >
-          <RefreshCw className="size-3.5" />
-          {p.sinSubir > 0 ? `${p.sinSubir} sin subir` : 'Al día'}
-        </button>
+          <button
+            type="button"
+            onClick={() => void p.sincronizar()}
+            disabled={!p.online || p.sinSubir === 0}
+            className={cn(
+              'c-label rounded-md border-2 px-2 py-1.5 !text-[10.5px]',
+              p.sinSubir > 0
+                ? 'c-hazard border-[var(--c-ink)] !text-[var(--c-ink)]'
+                : 'border-transparent !text-[var(--c-faint)]',
+            )}
+          >
+            {p.sinSubir > 0 ? `${p.sinSubir} sin subir` : 'Al día'}
+          </button>
+        </div>
       </header>
 
-      {/* Último cargado: confirmación + deshacer mientras no subió */}
+      {/* Último cargado: ticker + deshacer mientras no subió */}
       {p.ultimo && p.ultimo.estado !== 'error' && (
-        <div className="shrink-0 px-5 pt-3">
+        <div className="shrink-0 px-4 pt-2.5">
           <motion.div
             key={p.ultimo.id}
-            initial={{ scale: 0.97, opacity: 0.5 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-            className="flex items-center justify-between gap-2 rounded-2xl border border-field/25 bg-field-soft/60 px-3.5 py-2.5"
+            className="c-stamp flex items-center justify-between gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3 py-2"
           >
-            <span className="flex min-w-0 items-center gap-2 text-[13px] font-bold text-field-deep">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-field text-white">
-                <Check className="size-4" strokeWidth={3} />
+            <span className="flex min-w-0 items-center gap-2">
+              <Check className="size-4 shrink-0 text-[var(--c-ok-deep)]" strokeWidth={3} />
+              <span className="c-mono truncate text-[13.5px] font-bold text-[var(--c-ok-deep)]">
+                {p.ultimo.tipo === 'gasto' ? '−' : '+'}
+                {fmt(p.ultimo.monto)}
               </span>
-              <span className="truncate">
-                {p.ultimo.tipo === 'gasto' ? 'Gasto' : 'Ingreso'}{' '}
-                {fmtMonto(p.ultimo.monto)} · {p.ultimo.categoria_nombre}
-              </span>
+              <span className="c-label truncate">{p.ultimo.categoria_nombre}</span>
             </span>
             {p.ultimo.estado === 'pendiente' && (
               <button
                 type="button"
                 onClick={() => void p.deshacer(p.ultimo!.id)}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-ink transition-colors hover:border-faint active:scale-95"
+                className="c-label flex shrink-0 items-center gap-1 rounded-md border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-2 py-1 !text-[10.5px]"
               >
-                <RotateCcw className="size-3.5" />
+                <RotateCcw className="size-3" />
                 Deshacer
               </button>
             )}
@@ -132,27 +134,22 @@ export function PlataPage() {
       )}
 
       {p.errores.length > 0 && (
-        <div className="shrink-0 px-5 pt-3">
-          <div className="flex flex-col gap-1.5 rounded-2xl border border-accent/40 bg-accent/10 p-3.5">
-            <div className="flex items-center gap-1.5 text-[13px] font-bold text-accent">
-              <AlertTriangle className="size-4" />
+        <div className="shrink-0 px-4 pt-2.5">
+          <div className="flex flex-col gap-1 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] p-2.5">
+            <div className="c-label flex items-center gap-1.5 !text-[11px] !text-[var(--c-bad)]">
+              <AlertTriangle className="size-3.5" />
               {p.errores.length} con problema al subir
             </div>
-            <ul className="flex flex-col gap-1 text-[12px] font-medium text-ink-soft">
-              {p.errores.slice(0, 3).map((e) => (
-                <li key={e.id}>
-                  <span className="font-semibold">
-                    {fmtMonto(e.monto)} {e.categoria_nombre}:
-                  </span>{' '}
-                  {e.error}
-                </li>
-              ))}
-            </ul>
+            {p.errores.slice(0, 2).map((e) => (
+              <p key={e.id} className="text-[12px] text-[var(--c-ink-soft)]">
+                <span className="c-mono font-bold">{fmt(e.monto)}</span> {e.categoria_nombre}: {e.error}
+              </p>
+            ))}
             <button
               type="button"
               onClick={() => void p.reintentarErrores()}
               disabled={!p.online}
-              className="mt-0.5 self-start text-[13px] font-semibold text-accent disabled:opacity-50"
+              className="c-label self-start !text-[11px] !text-[var(--c-bad)] underline underline-offset-2 disabled:opacity-50"
             >
               Reintentar
             </button>
@@ -170,7 +167,8 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
   const [monto, setMonto] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
   const [campoId, setCampoId] = useState(p.campoDefault)
-  const [detalle, setDetalle] = useState('')
+  const [detalles, setDetalles] = useState<Set<string>>(new Set())
+  const [detalleLibre, setDetalleLibre] = useState('')
   const [foto, setFoto] = useState<Blob | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [procesandoFoto, setProcesandoFoto] = useState(false)
@@ -181,12 +179,21 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
   const categorias = p.categorias.filter(
     (c) => c.aplica_a === null || c.aplica_a === tipo,
   )
+  const esGasto = tipo === 'gasto'
 
   const cambiarTipo = (t: TipoMov) => {
     setTipo(t)
-    // Si la categoría elegida no aplica al nuevo tipo, se limpia.
     const cat = p.categorias.find((c) => c.id === categoriaId)
     if (cat && cat.aplica_a !== null && cat.aplica_a !== t) setCategoriaId('')
+  }
+
+  const toggleDetalle = (d: string) => {
+    setDetalles((prev) => {
+      const next = new Set(prev)
+      if (next.has(d)) next.delete(d)
+      else next.add(d)
+      return next
+    })
   }
 
   const limpiarFoto = () => {
@@ -213,22 +220,16 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
   }
 
   const guardar = async () => {
-    if (!montoNum || montoNum <= 0) {
-      setAviso('Poné el monto')
-      return
-    }
-    if (!categoriaId) {
-      setAviso('Elegí la categoría')
-      return
-    }
-    if (!campoId) {
-      setAviso('Elegí el campo')
-      return
-    }
+    if (!montoNum || montoNum <= 0) return setAviso('Poné el monto')
+    if (!categoriaId) return setAviso('Elegí la categoría')
+    if (!campoId) return setAviso('Elegí el campo')
     const campo = p.campos.find((c) => c.id === campoId)
     const cat = p.categorias.find((c) => c.id === categoriaId)
     if (!campo || !cat) return
     if ('vibrate' in navigator) navigator.vibrate(50)
+    const descripcion = [...detalles, detalleLibre.trim()]
+      .filter(Boolean)
+      .join(' · ')
     await p.guardar({
       tipo,
       monto: montoNum,
@@ -236,121 +237,140 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
       categoriaNombre: cat.nombre,
       campoId: campo.id,
       empresaId: campo.empresa_id,
-      descripcion: detalle,
+      descripcion,
       foto,
     })
-    // Listo para el próximo: se conservan tipo y campo (cargas seguidas).
+    // Listo para la próxima: quedan tipo y campo (cargas seguidas).
     setMonto('')
     setCategoriaId('')
-    setDetalle('')
+    setDetalles(new Set())
+    setDetalleLibre('')
     limpiarFoto()
     setAviso(null)
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-        {/* Tipo: gasto / ingreso */}
-        <div className="grid grid-cols-2 gap-2.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-2.5">
+        {/* Tipo: dos bloques — gasto tinta, ingreso verde */}
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => cambiarTipo('gasto')}
             className={cn(
-              'flex h-14 items-center justify-center gap-2 rounded-2xl border-2 text-[15px] font-bold transition-colors active:scale-[0.98]',
-              tipo === 'gasto'
-                ? 'border-tierra bg-tierra-soft text-tierra'
-                : 'border-border bg-card text-muted-foreground',
+              'c-display flex h-12 items-center justify-center gap-2 rounded-lg border-2 text-[15px] uppercase tracking-wide transition-colors',
+              esGasto
+                ? 'c-hard-sm border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-panel)]'
+                : 'border-[var(--c-ink)]/25 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
             )}
           >
-            <ArrowUpRight className="size-5" />
+            <ArrowUpRight className="size-4.5" strokeWidth={2.5} />
             Gasto
           </button>
           <button
             type="button"
             onClick={() => cambiarTipo('ingreso')}
             className={cn(
-              'flex h-14 items-center justify-center gap-2 rounded-2xl border-2 text-[15px] font-bold transition-colors active:scale-[0.98]',
-              tipo === 'ingreso'
-                ? 'border-field bg-field-soft text-field-deep'
-                : 'border-border bg-card text-muted-foreground',
+              'c-display flex h-12 items-center justify-center gap-2 rounded-lg border-2 text-[15px] uppercase tracking-wide transition-colors',
+              !esGasto
+                ? 'c-hard-sm border-[var(--c-ink)] bg-[var(--c-ok)] text-white'
+                : 'border-[var(--c-ink)]/25 bg-[var(--c-panel)] text-[var(--c-ok-deep)]',
             )}
           >
-            <ArrowDownLeft className="size-5" />
+            <ArrowDownLeft className="size-4.5" strokeWidth={2.5} />
             Ingreso
           </button>
         </div>
 
-        {/* Monto: el héroe */}
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
-            Monto
-          </span>
+        {/* Visor de monto + numpad propio (cero teclado del sistema) */}
+        <div>
           <div
             className={cn(
-              'flex items-center gap-2 rounded-2xl border-2 bg-field-soft/40 px-4 transition-colors',
-              aviso === 'Poné el monto'
-                ? 'border-destructive'
-                : 'border-field-soft focus-within:border-field',
+              'c-panel flex h-13 items-center justify-between px-4',
+              aviso === 'Poné el monto' && 'border-[var(--c-bad)]',
             )}
           >
-            <span className="font-heading text-[24px] font-bold text-faint">
-              $
+            <span className={cn('c-label !text-[12px]', esGasto ? '!text-[var(--c-ink-soft)]' : '!text-[var(--c-ok-deep)]')}>
+              {esGasto ? 'Sale −' : 'Entra +'}
             </span>
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="0"
-              value={monto ? Number(monto).toLocaleString('es-AR') : ''}
-              onChange={(e) => {
-                setMonto(e.target.value.replace(/\D/g, ''))
-                if (aviso) setAviso(null)
-              }}
-              className="tnum h-[60px] min-w-0 flex-1 bg-transparent text-[26px] font-bold text-ink outline-none placeholder:text-faint"
-            />
+            <span
+              className={cn(
+                'c-mono text-[28px] font-bold leading-none',
+                monto ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
+              )}
+            >
+              ${monto ? Number(monto).toLocaleString('es-AR') : '0'}
+            </span>
+          </div>
+          <CNumpad
+            className="mt-1.5"
+            onDigit={(d) => {
+              setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
+              if (aviso) setAviso(null)
+            }}
+            onBackspace={() => setMonto((m) => m.slice(0, -1))}
+          />
+        </div>
+
+        {/* Categoría: chips a la vista, un toque */}
+        <div>
+          <CLabel className={cn('mb-1.5', aviso === 'Elegí la categoría' && '!text-[var(--c-bad)]')}>
+            Categoría {esGasto ? 'del gasto' : 'del ingreso'}
+          </CLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {categorias.map((c) => (
+              <CChip
+                key={c.id}
+                label={c.nombre}
+                selected={categoriaId === c.id}
+                onClick={() => {
+                  setCategoriaId(c.id)
+                  if (aviso) setAviso(null)
+                }}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Categoría + campo */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
-              Categoría
-            </span>
-            <Dropdown
-              block
-              ariaLabel="Categoría"
-              value={categoriaId}
-              onChange={(v) => {
-                setCategoriaId(v)
-                if (aviso) setAviso(null)
-              }}
-              options={[
-                { value: '', label: 'Elegí…' },
-                ...categorias.map((c) => ({ value: c.id, label: c.nombre })),
-              ]}
-              className="h-12"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-faint">
-              Campo
-            </span>
-            <Dropdown
-              block
-              ariaLabel="Campo"
-              value={campoId}
-              onChange={(v) => {
-                setCampoId(v)
-                if (aviso) setAviso(null)
-              }}
-              options={p.campos.map((c) => ({ value: c.id, label: c.nombre }))}
-              className="h-12"
-            />
+        {/* Campo: bloques (son 2-3, siempre a la vista) */}
+        <div>
+          <CLabel className="mb-1.5">Campo</CLabel>
+          <div className="flex gap-1.5">
+            {p.campos.map((c) => (
+              <CChip
+                key={c.id}
+                label={c.nombre}
+                selected={campoId === c.id}
+                onClick={() => setCampoId(c.id)}
+                className="flex-1 truncate text-center"
+              />
+            ))}
           </div>
         </div>
 
-        {/* Foto del comprobante (opcional) */}
+        {/* Detalle por chips + libre (opcional) */}
+        <div>
+          <CLabel className="mb-1.5">Detalle · opcional</CLabel>
+          <div className="c-strip -mx-4 flex gap-1.5 px-4">
+            {DETALLES.map((d) => (
+              <CChip
+                key={d}
+                label={d}
+                selected={detalles.has(d)}
+                onClick={() => toggleDetalle(d)}
+              />
+            ))}
+          </div>
+          <input
+            value={detalleLibre}
+            onChange={(e) => setDetalleLibre(e.target.value)}
+            autoComplete="off"
+            placeholder="Otro detalle…"
+            className="mt-1.5 h-10 w-full rounded-lg border-2 border-[var(--c-ink)]/25 bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ink)]"
+          />
+        </div>
+
+        {/* Foto del comprobante */}
         <input
           ref={fileRef}
           type="file"
@@ -360,20 +380,18 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           className="hidden"
         />
         {fotoUrl ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+          <div className="c-panel flex items-center gap-3 p-2.5">
             <img
               src={fotoUrl}
               alt="Comprobante"
-              className="h-14 w-14 shrink-0 rounded-xl object-cover"
+              className="h-12 w-12 shrink-0 rounded-md border-2 border-[var(--c-ink)] object-cover"
             />
-            <span className="min-w-0 flex-1 text-[14px] font-semibold text-ink">
-              Foto lista
-            </span>
+            <span className="c-label min-w-0 flex-1 !text-[12px]">Foto lista</span>
             <button
               type="button"
               onClick={limpiarFoto}
               aria-label="Quitar foto"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-ink-soft active:scale-95"
+              className="flex size-9 shrink-0 items-center justify-center rounded-md border-2 border-[var(--c-ink)]/30 text-[var(--c-ink-soft)]"
             >
               <X className="size-4" />
             </button>
@@ -383,24 +401,15 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={procesandoFoto}
-            className="flex items-center justify-center gap-2 rounded-2xl border-[1.5px] border-dashed border-field/40 bg-field-soft/30 px-4 py-3.5 text-[14px] font-bold text-field-deep transition-colors active:scale-[0.99] disabled:opacity-60"
+            className="c-label flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--c-ink)]/40 bg-[var(--c-panel)]/60 py-3 !text-[12px] disabled:opacity-60"
           >
-            <Camera className="size-5" />
-            {procesandoFoto ? 'Procesando…' : 'Foto del comprobante (opcional)'}
+            <Camera className="size-4.5" />
+            {procesandoFoto ? 'Procesando…' : 'Foto del comprobante · opcional'}
           </button>
         )}
 
-        {/* Detalle opcional */}
-        <input
-          value={detalle}
-          onChange={(e) => setDetalle(e.target.value)}
-          autoComplete="off"
-          placeholder="Detalle (opcional): gasoil, repuesto…"
-          className="h-12 rounded-xl border border-border bg-card px-3.5 text-[15px] text-ink outline-none transition-colors focus:border-field"
-        />
-
         {aviso && (
-          <p className="flex items-center gap-1 text-[13px] font-semibold text-destructive">
+          <p className="c-label flex items-center gap-1 !text-[12px] !text-[var(--c-bad)]">
             <AlertTriangle className="size-3.5" />
             {aviso}
           </p>
@@ -408,14 +417,19 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
       </div>
 
       {/* Acción principal: footer fijo */}
-      <div className="shrink-0 border-t border-border/70 bg-background px-5 pb-4 pt-3.5">
+      <div className="shrink-0 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-3.5 pt-3">
         <button
           type="button"
           onClick={() => void guardar()}
-          className="flex h-16 w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-[18px] font-bold text-primary-foreground shadow-[0_10px_24px_rgba(16,138,85,0.32)] transition-all hover:bg-primary/90 active:translate-y-px"
+          className={cn(
+            'c-display c-hard flex h-15 w-full items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] text-[19px] uppercase tracking-wide',
+            esGasto
+              ? 'bg-[var(--c-ink)] text-[var(--c-panel)]'
+              : 'bg-[var(--c-ok)] text-white',
+          )}
         >
           <Check className="size-6" strokeWidth={2.5} />
-          Guardar {tipo === 'gasto' ? 'gasto' : 'ingreso'}
+          Guardar {esGasto ? 'gasto' : 'ingreso'}
         </button>
       </div>
     </div>
