@@ -265,6 +265,30 @@ export function useRecorrida() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
 
+  // Rehidratar polígonos en la sesión en curso: una recorrida arrancada antes
+  // de que el cache tuviera `poligono` (o antes de dibujarlos en Oficina) los
+  // recibe acá — el croquis aparece sin tener que terminar y volver a empezar.
+  const refsStamp = refs?.updated_at ?? 0
+  const metaId = meta?.recorrida_id
+  useEffect(() => {
+    if (!metaId || !refsStamp) return
+    const t = setTimeout(() => {
+      void (async () => {
+        const refsRow = await recdb.refs.get('refs')
+        if (!refsRow) return
+        const porId = new Map(refsRow.potreros.map((p) => [p.id, p.poligono]))
+        const sesion = await recdb.potreros.toArray()
+        for (const p of sesion) {
+          const poli = porId.get(p.id)
+          if (!p.poligono && poli) {
+            await recdb.potreros.update(p.id, { poligono: poli })
+          }
+        }
+      })()
+    }, 0)
+    return () => clearTimeout(t)
+  }, [metaId, refsStamp])
+
   /** Guarda (local) la observación de un potrero y lo marca hecho. */
   const guardar = useCallback(
     async (potreroId: string, o: Omit<Observacion, 'potrero_id'>) => {

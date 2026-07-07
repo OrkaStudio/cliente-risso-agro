@@ -193,6 +193,19 @@ function Stepper({
   // Croquis disponible si al menos un potrero tiene su polígono dibujado.
   const hayCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
 
+  // Salir al selector de campo: dos toques (confirmación inline, sin modal).
+  // Lo cargado NO se pierde: sale por el mismo camino que "terminar" — con
+  // señal cierra al toque; sin señal queda "guardada, esperando subir".
+  const [confirmaSalir, setConfirmaSalir] = useState(false)
+  const salir = () => {
+    if (!confirmaSalir) {
+      setConfirmaSalir(true)
+      setTimeout(() => setConfirmaSalir(false), 3500)
+      return
+    }
+    void r.terminar()
+  }
+
   if (!potrero) {
     return (
       <div className="flex h-full items-center justify-center px-8 text-center text-[var(--c-faint)]">
@@ -206,13 +219,28 @@ function Stepper({
       {/* ===== Barra de instrumento: campo · señal · cola + tira de potreros ===== */}
       <header className="shrink-0 border-b-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
         <div className="mb-2 flex items-center justify-between">
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
+            {/* Volver a elegir campo (dos toques). */}
+            <button
+              type="button"
+              onClick={salir}
+              aria-label="Cambiar de campo"
+              className={cn(
+                'flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border-2 px-1.5 transition-colors',
+                confirmaSalir
+                  ? 'c-hazard c-display border-[var(--c-ink)] px-2 text-[12px] uppercase tracking-wide text-[var(--c-ink)]'
+                  : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink)]',
+              )}
+            >
+              <ChevronLeft className="size-4" strokeWidth={2.5} />
+              {confirmaSalir && '¿Salir?'}
+            </button>
             {r.online ? (
-              <Wifi className="size-4 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
+              <Wifi className="size-4 shrink-0 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
             ) : (
-              <CloudOff className="size-4 text-[var(--c-warn)]" strokeWidth={2.5} />
+              <CloudOff className="size-4 shrink-0 text-[var(--c-warn)]" strokeWidth={2.5} />
             )}
-            <span className="c-display text-[15px] uppercase tracking-wide text-[var(--c-ink)]">
+            <span className="c-display truncate text-[15px] uppercase tracking-wide text-[var(--c-ink)]">
               {r.meta!.campo_nombre}
             </span>
           </span>
