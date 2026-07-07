@@ -6,6 +6,8 @@ import {
   fetchRefs,
   guardarLluvia,
   guardarObservacion,
+  pathAudio,
+  subirAudio,
   type CampoRec,
   type Observacion,
 } from './api'
@@ -188,6 +190,21 @@ export function useRecorrida() {
           for (const it of pend) {
             const snap = it.updated_at
             try {
+              // Nota de voz: sube ANTES del upsert (el registro apunta al path).
+              let audioPath = it.audio_path
+              if (it.audio && !it.audio_subido) {
+                audioPath = pathAudio(
+                  mSync.empresa_id,
+                  mSync.recorrida_id,
+                  it.potrero_id,
+                  it.audio.type,
+                )
+                await subirAudio(audioPath, it.audio)
+                await recdb.obs.update(it.potrero_id, {
+                  audio_subido: 1,
+                  audio_path: audioPath,
+                })
+              }
               await guardarObservacion({
                 recorridaId: mSync.recorrida_id,
                 empresaId: mSync.empresa_id,
@@ -200,6 +217,7 @@ export function useRecorrida() {
                   en_tratamiento: it.en_tratamiento,
                   novedad: it.novedad,
                   cultivo: it.cultivo,
+                  audio_url: audioPath,
                 },
               })
               // Solo marcar sincronizada si nadie editó la fila mientras subía;
@@ -209,6 +227,7 @@ export function useRecorrida() {
                 await recdb.obs.update(it.potrero_id, {
                   estado: 'sincronizada',
                   error: null,
+                  audio: null, // ya está en storage; no acumular blobs locales
                 })
               }
             } catch (e) {
@@ -295,11 +314,13 @@ export function useRecorrida() {
     return () => clearTimeout(t)
   }, [metaId, refsStamp])
 
-  /** Guarda (local) la observación de un potrero y lo marca hecho. */
+  /** Guarda (local) la observación de un potrero y lo marca hecho. La nota
+   *  de voz NO viaja acá (ver setAudio): se preserva la de la fila existente. */
   const guardar = useCallback(
-    async (potreroId: string, o: Omit<Observacion, 'potrero_id'>) => {
+    async (potreroId: string, o: Omit<Observacion, 'potrero_id' | 'audio_url'>) => {
       const m = await recdb.meta.get('actual')
       if (!m) return
+      const previa = await recdb.obs.get(potreroId)
       await recdb.obs.put({
         potrero_id: potreroId,
         recorrida_id: m.recorrida_id,
@@ -311,6 +332,40 @@ export function useRecorrida() {
         en_tratamiento: o.en_tratamiento,
         novedad: o.novedad,
         cultivo: o.cultivo,
+        audio: previa?.audio ?? null,
+        audio_path: previa?.audio_path ?? null,
+        audio_subido: previa?.audio_subido ?? 0,
+        estado: 'pendiente',
+        error: null,
+        updated_at: Date.now(),
+      })
+      await recdb.potreros.update(potreroId, { hecho: 1 })
+      void sincronizar()
+    },
+    [sincronizar],
+  )
+
+  /** Nota de voz del potrero: setea (Blob) o borra (null). Crea la observación
+   *  si todavía no existía (grabar audio ya cuenta como "recorrido"). */
+  const setAudio = useCallback(
+    async (potreroId: string, blob: Blob | null) => {
+      const m = await recdb.meta.get('actual')
+      if (!m) return
+      const previa = await recdb.obs.get(potreroId)
+      await recdb.obs.put({
+        potrero_id: potreroId,
+        recorrida_id: previa?.recorrida_id ?? m.recorrida_id,
+        empresa_id: m.empresa_id,
+        pasto: previa?.pasto ?? null,
+        agua: previa?.agua ?? null,
+        electrico: previa?.electrico ?? null,
+        conteo: previa?.conteo ?? null,
+        en_tratamiento: previa?.en_tratamiento ?? false,
+        novedad: previa?.novedad ?? null,
+        cultivo: previa?.cultivo ?? null,
+        audio: blob,
+        audio_path: blob ? null : null,
+        audio_subido: 0,
         estado: 'pendiente',
         error: null,
         updated_at: Date.now(),
@@ -349,8 +404,11 @@ export function useRecorrida() {
   }, [])
 
   // Derivados
+  // Orden NATURAL: 1A, 2A, … 10A (numeric evita que "10A" quede antes que
+  // "1A" por comparación de texto). Tira y croquis derivan de esta lista →
+  // siempre sincronizados entre sí.
   const listaPotreros = (potreros ?? []).slice().sort((a, b) =>
-    a.nombre.localeCompare(b.nombre, 'es'),
+    a.nombre.localeCompare(b.nombre, 'es', { numeric: true, sensitivity: 'base' }),
   )
   const listaObs = obs ?? []
   const obsPorPotrero = new Map(listaObs.map((o) => [o.potrero_id, o]))
@@ -379,6 +437,7 @@ export function useRecorrida() {
     errores,
     empezar,
     guardar,
+    setAudio,
     setLluvia,
     terminar,
     descartarErrores,

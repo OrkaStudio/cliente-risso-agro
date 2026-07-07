@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
+  Mic,
+  Square,
+  Trash2 as TrashIcon,
   ChevronLeft,
   ChevronRight,
   CloudOff,
@@ -300,7 +303,9 @@ function Stepper({
           ciclo={estadoCicloLabel[potrero.estado_ciclo]}
           ultima={potrero.ultima ?? null}
           inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
+          audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
           onGuardar={(f) => void r.guardar(potrero.id, f)}
+          onAudio={(b) => void r.setAudio(potrero.id, b)}
           onListo={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
         />
       </div>
@@ -442,7 +447,9 @@ function PotreroForm({
   ciclo,
   ultima,
   inicial,
+  audio,
   onGuardar,
+  onAudio,
   onListo,
 }: {
   nombre: string
@@ -451,7 +458,9 @@ function PotreroForm({
   ciclo: string
   ultima: UltimaObs | null
   inicial: Form
+  audio: Blob | null
   onGuardar: (f: Form) => void
+  onAudio: (b: Blob | null) => void
   onListo: () => void
 }) {
   // La novedad guardada se descompone: chips conocidos → seleccionados,
@@ -583,7 +592,7 @@ function PotreroForm({
             </div>
             {conHacienda && (
               <div>
-                <CLabel className="mb-1.5">Tratam.</CLabel>
+                <CLabel className="mb-1.5">¿En tratam.?</CLabel>
                 <CSegBtn
                   label={form.en_tratamiento ? 'Sí' : 'No'}
                   tono="warn"
@@ -670,7 +679,110 @@ function PotreroForm({
           placeholder="Otra novedad…"
           className="mt-1.5 h-10 w-full rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
         />
+        <NotaVoz audio={audio} onAudio={onAudio} />
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Nota de voz: en la camioneta se habla, no se tipea. Graba OFFLINE
+// (MediaRecorder es local); el blob viaja por el outbox y sube al bucket al
+// volver la señal. Se escucha acá y después en Oficina.
+// ---------------------------------------------------------------------------
+function NotaVoz({
+  audio,
+  onAudio,
+}: {
+  audio: Blob | null
+  onAudio: (b: Blob | null) => void
+}) {
+  const [grabando, setGrabando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const recRef = useRef<MediaRecorder | null>(null)
+
+  // ObjectURL del blob para el reproductor; el effect SOLO revoca (cleanup),
+  // sin setState — el lint del repo lo exige así.
+  const url = useMemo(() => (audio ? URL.createObjectURL(audio) : null), [audio])
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [url])
+
+  const empezar = async () => {
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : ''
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      const chunks: BlobPart[] = []
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setGrabando(false)
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+        if (blob.size > 0) onAudio(blob)
+      }
+      recRef.current = rec
+      rec.start()
+      setGrabando(true)
+    } catch {
+      setError('No pude usar el micrófono (¿permiso?)')
+    }
+  }
+
+  const frenar = () => recRef.current?.stop()
+
+  if (audio && url) {
+    return (
+      <div className="mt-1.5 flex items-center gap-2">
+        <audio controls src={url} className="h-10 min-w-0 flex-1" />
+        <button
+          type="button"
+          onClick={() => onAudio(null)}
+          aria-label="Borrar nota de voz"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-bad)] active:scale-95"
+        >
+          <TrashIcon className="size-4" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        onClick={grabando ? frenar : () => void empezar()}
+        className={cn(
+          'flex h-11 w-full items-center justify-center gap-2 rounded-xl border text-[14px] font-semibold transition-colors',
+          grabando
+            ? 'border-[var(--c-bad)]/60 bg-[var(--c-bad-soft)] text-[var(--c-bad)]'
+            : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+        )}
+      >
+        {grabando ? (
+          <>
+            <Square className="size-4 animate-pulse fill-current" />
+            Grabando… tocá para frenar
+          </>
+        ) : (
+          <>
+            <Mic className="size-4.5" />
+            Grabar nota de voz
+          </>
+        )}
+      </button>
+      {error && (
+        <p className="c-label mt-1 !text-[11px] !text-[var(--c-warn-deep)]">{error}</p>
+      )}
     </div>
   )
 }
@@ -831,6 +943,7 @@ function Cierre({
       if (o.cultivo === 'regular' || o.cultivo === 'mal') motivos.push(`cultivo ${o.cultivo}`)
       if (o.en_tratamiento) motivos.push('en tratamiento')
       if (o.novedad) motivos.push(o.novedad)
+      if (o.audio || o.audio_path) motivos.push('nota de voz')
       if (motivos.length) items.push({ nombre: p.nombre, motivos })
     }
     return items

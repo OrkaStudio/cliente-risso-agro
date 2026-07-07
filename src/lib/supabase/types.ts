@@ -740,6 +740,7 @@ export type Database = {
       observacion_potrero: {
         Row: {
           agua: Database["public"]["Enums"]["agua_estado"] | null
+          audio_url: string | null
           conteo: number | null
           created_at: string
           cultivo: Database["public"]["Enums"]["cultivo_obs_estado"] | null
@@ -754,6 +755,7 @@ export type Database = {
         }
         Insert: {
           agua?: Database["public"]["Enums"]["agua_estado"] | null
+          audio_url?: string | null
           conteo?: number | null
           created_at?: string
           cultivo?: Database["public"]["Enums"]["cultivo_obs_estado"] | null
@@ -768,6 +770,7 @@ export type Database = {
         }
         Update: {
           agua?: Database["public"]["Enums"]["agua_estado"] | null
+          audio_url?: string | null
           conteo?: number | null
           created_at?: string
           cultivo?: Database["public"]["Enums"]["cultivo_obs_estado"] | null

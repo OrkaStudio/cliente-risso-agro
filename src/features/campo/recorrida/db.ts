@@ -70,6 +70,11 @@ export type RecObs = {
   en_tratamiento: boolean
   novedad: string | null
   cultivo: CultivoEstado | null
+  /** Nota de voz grabada offline (Blob local hasta que sube). */
+  audio: Blob | null
+  /** Path en storage una vez subido (se manda como audio_url). */
+  audio_path: string | null
+  audio_subido: 0 | 1
   estado: EstadoObs
   error: string | null
   updated_at: number

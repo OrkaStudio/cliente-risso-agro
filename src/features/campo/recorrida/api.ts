@@ -42,6 +42,8 @@ export type Observacion = {
   en_tratamiento: boolean
   novedad: string | null
   cultivo: CultivoEstado | null
+  /** Path en storage de la nota de voz (null = sin audio / borrar). */
+  audio_url: string | null
 }
 
 const hoyISO = () => new Date().toISOString().slice(0, 10)
@@ -107,6 +109,38 @@ export async function fetchRefs(): Promise<{
   }
 }
 
+const EXT_AUDIO: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+}
+
+/** Path de la nota de voz en el bucket privado `comprobantes` (RLS por
+ *  prefijo de empresa, mismas policies que las fotos de Plata). Idempotente
+ *  por (recorrida, potrero): re-grabar pisa, reintentar no duplica. */
+export function pathAudio(
+  empresaId: string,
+  recorridaId: string,
+  potreroId: string,
+  mime: string,
+): string {
+  const ext = EXT_AUDIO[mime.split(';')[0]] ?? 'webm'
+  return `${empresaId}/rec-${recorridaId}-${potreroId}.${ext}`
+}
+
+/** Sube la nota de voz. `upsert` no está permitido por las policies (solo
+ *  insert): si ya existe (reintento o re-grabación), se borra… no hay delete.
+ *  → El path es determinístico y el objeto existente se acepta como subido;
+ *  una re-grabación DESPUÉS de sincronizar queda para Oficina (v2). */
+export async function subirAudio(path: string, blob: Blob): Promise<void> {
+  const { error } = await supabase.storage
+    .from('comprobantes')
+    .upload(path, blob, { contentType: blob.type || 'audio/webm', upsert: false })
+  if (error && !/already exists|duplicate/i.test(error.message)) {
+    throw new Error(error.message)
+  }
+}
+
 /**
  * Garantiza que la fila `recorrida` exista en el servidor ANTES de subir
  * observaciones (FK). La recorrida arranca local con UUID de cliente:
@@ -163,6 +197,7 @@ export async function guardarObservacion(input: {
     en_tratamiento: obs.en_tratamiento,
     novedad: obs.novedad?.trim() || null,
     cultivo: obs.cultivo,
+    audio_url: obs.audio_url,
   }
   const { data: existente } = await supabase
     .from('observacion_potrero')
