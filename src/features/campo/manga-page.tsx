@@ -36,7 +36,7 @@ export function MangaPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
       {/* ===== Barra de instrumento: señal · cola · alcance · contadores ===== */}
-      <header className="shrink-0 border-b-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+      <header className="shrink-0 border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
         <div className="mb-2.5 flex items-center justify-between">
           <span className="flex items-center gap-2">
             {m.online ? (
@@ -53,9 +53,9 @@ export function MangaPage() {
             onClick={() => void m.sincronizar()}
             disabled={!m.online || m.sinSincronizar === 0 || m.sincronizando}
             className={cn(
-              'c-label rounded-md border-2 px-2 py-1.5 !text-[10.5px]',
+              'c-label rounded-md border px-2 py-1.5 !text-[10.5px]',
               m.sinSincronizar > 0
-                ? 'c-hazard border-[var(--c-ink)] !text-[var(--c-ink)]'
+                ? 'c-hazard'
                 : 'border-transparent !text-[var(--c-faint)]',
             )}
           >
@@ -82,7 +82,7 @@ export function MangaPage() {
                 value: o.key,
                 label: `${o.label} · ${o.pendientes}`,
               }))}
-              className="h-11 !rounded-lg !border-2 !border-[var(--c-ink)]"
+              className="h-11"
             />
           </div>
           <div className="flex shrink-0 items-end gap-3 pb-0.5">
@@ -101,7 +101,7 @@ export function MangaPage() {
           </div>
         </div>
 
-        <div className="mt-2 h-2 overflow-hidden rounded-sm border border-[var(--c-ink)]/40 bg-[var(--c-sunk)]">
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--c-sunk)]">
           <motion.div
             className="h-full bg-[var(--c-ok)]"
             initial={false}
@@ -116,7 +116,7 @@ export function MangaPage() {
         <div className="shrink-0 px-4 pt-2.5">
           <motion.div
             key={m.ultimo.local_id}
-            className="c-stamp flex items-center justify-between gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3 py-2"
+            className="c-stamp flex items-center justify-between gap-2 rounded-lg border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3 py-2"
           >
             <span className="flex min-w-0 items-center gap-2">
               <Check className="size-4 shrink-0 text-[var(--c-ok-deep)]" strokeWidth={3} />
@@ -130,7 +130,7 @@ export function MangaPage() {
             <button
               type="button"
               onClick={() => void m.deshacer()}
-              className="c-label flex shrink-0 items-center gap-1 rounded-md border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-2 py-1 !text-[10.5px]"
+              className="c-label flex shrink-0 items-center gap-1 rounded-md border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-2 py-1 !text-[10.5px]"
             >
               <RotateCcw className="size-3" />
               Deshacer
@@ -141,7 +141,7 @@ export function MangaPage() {
 
       {m.errores.length > 0 && (
         <div className="shrink-0 px-4 pt-2.5">
-          <div className="flex flex-col gap-1 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] p-2.5">
+          <div className="flex flex-col gap-1 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-bad-soft)] p-2.5">
             <div className="c-label flex items-center gap-1.5 !text-[11px] !text-[var(--c-bad)]">
               <AlertTriangle className="size-3.5" />
               {m.errores.length} con problema al subir
@@ -173,7 +173,7 @@ export function MangaPage() {
       ) : m.sinLista && !m.online ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
           <CloudOff className="size-10 text-[var(--c-faint)]" />
-          <p className="c-display text-[16px] uppercase tracking-wide text-[var(--c-ink)]">
+          <p className="c-display text-[16px] text-[var(--c-ink)]">
             Sin señal y sin lista descargada
           </p>
           <p className="text-[13.5px] text-[var(--c-ink-soft)]">
@@ -186,7 +186,7 @@ export function MangaPage() {
           <div className="c-panel flex size-18 items-center justify-center text-[var(--c-ok-deep)]">
             <Check className="size-9" strokeWidth={2.2} />
           </div>
-          <p className="c-display text-[16px] uppercase tracking-wide text-[var(--c-ink)]">
+          <p className="c-display text-[16px] text-[var(--c-ink)]">
             No quedan animales sin caravana acá
           </p>
           <button
@@ -261,7 +261,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
         {/* Contexto: qué animal estoy por caravanear */}
         <div className="flex items-center justify-between gap-2">
-          <span className="c-display min-w-0 truncate text-[17px] uppercase tracking-wide text-[var(--c-ink)]">
+          <span className="c-display min-w-0 truncate text-[17px] text-[var(--c-ink)]">
             {animal.lote_nombre
               ? `Tropa ${animal.lote_nombre}`
               : (animal.potrero_nombre ?? 'Sin potrero')}
@@ -270,7 +270,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
           <button
             type="button"
             onClick={() => setAbrirCategoria(true)}
-            className="c-display flex shrink-0 items-center gap-1 rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-3 py-2 text-[14px] uppercase tracking-wide text-[var(--c-ink)]"
+            className="c-display flex shrink-0 items-center gap-1 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 py-2 text-[14px] text-[var(--c-ink)]"
           >
             {categoriaLabel[categoria]}
             <ChevronDown className="size-4" />
@@ -284,12 +284,12 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
           </CLabel>
           <div
             className={cn(
-              'flex items-center gap-3 rounded-xl border-2 bg-[var(--c-panel)] px-4',
+              'flex items-center gap-3 rounded-xl border-2 bg-[var(--c-panel)] px-4 shadow-sm transition-colors',
               aviso
-                ? 'border-[var(--c-bad)]'
+                ? 'border-[var(--c-bad)]/70'
                 : repetido
-                  ? 'border-[var(--c-warn)]'
-                  : 'border-[var(--c-ink)]',
+                  ? 'border-[var(--c-warn)]/70'
+                  : 'border-[var(--c-line-strong)] focus-within:border-[var(--c-ok)]',
             )}
           >
             <ScanLine
@@ -342,7 +342,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
               inputMode="numeric"
               autoComplete="off"
               placeholder="N°"
-              className="c-mono h-12 w-28 rounded-lg border-2 border-[var(--c-ink)]/25 bg-[var(--c-panel)] px-3 text-[18px] font-bold text-[var(--c-ink)] outline-none focus:border-[var(--c-ink)]"
+              className="c-mono h-12 w-28 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[18px] font-bold text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
             />
             {visualSugerido && visual !== visualSugerido && (
               <CChip
@@ -370,7 +370,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
               autoFocus
               autoComplete="off"
               placeholder="Otra nota…"
-              className="mt-1.5 h-10 w-full rounded-lg border-2 border-[var(--c-ink)]/25 bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ink)]"
+              className="mt-1.5 h-10 w-full rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
             />
           ) : (
             <button
@@ -385,11 +385,11 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
       </div>
 
       {/* Acción principal: footer fijo */}
-      <div className="shrink-0 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-3.5 pt-3">
+      <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-3.5 pt-3">
         <button
           type="button"
           onClick={asignar}
-          className="c-display c-hard flex h-15 w-full items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[19px] uppercase tracking-wide text-white"
+          className="c-display c-hard flex h-15 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent bg-[var(--c-ok)] text-[19px] text-white"
         >
           <Check className="size-6" strokeWidth={2.5} />
           Asignar → siguiente
@@ -413,10 +413,10 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
                   setAbrirCategoria(false)
                 }}
                 className={cn(
-                  'c-display h-12 rounded-lg border-2 text-[15px] uppercase tracking-wide',
+                  'h-12 rounded-xl border text-[14.5px] font-semibold transition-colors',
                   categoria === value
-                    ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-panel)]'
-                    : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+                    ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+                    : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
                 )}
               >
                 {label}

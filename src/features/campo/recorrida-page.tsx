@@ -125,7 +125,7 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
         <CloudOff className="size-10 text-[var(--c-faint)]" />
-        <p className="c-display text-[16px] uppercase tracking-wide text-[var(--c-ink)]">
+        <p className="c-display text-[16px] text-[var(--c-ink)]">
           Sin señal y sin campos guardados
         </p>
         <p className="text-[13.5px] text-[var(--c-ink-soft)]">
@@ -139,7 +139,7 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto p-4">
       <div>
-        <h1 className="c-display text-[26px] uppercase tracking-wide text-[var(--c-ink)]">
+        <h1 className="c-display text-[26px] text-[var(--c-ink)]">
           Recorrida
         </h1>
         <p className="mt-0.5 text-[14px] text-[var(--c-ink-soft)]">
@@ -147,12 +147,12 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
         </p>
       </div>
       {r.error && (
-        <p className="rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] px-3 py-2.5 text-[13px] font-semibold text-[var(--c-bad)]">
+        <p className="rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-bad-soft)] px-3 py-2.5 text-[13px] font-semibold text-[var(--c-bad)]">
           {r.error}
         </p>
       )}
       {!r.online && (
-        <p className="c-hazard flex items-center gap-2 rounded-lg border-2 border-[var(--c-ink)] px-3 py-2.5 text-[13px] font-semibold text-[var(--c-ink)]">
+        <p className="c-hazard flex items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-semibold text-[var(--c-ink)]">
           <CloudOff className="size-4 shrink-0" /> Sin señal: la recorrida
           arranca igual y sube sola cuando vuelva.
         </p>
@@ -167,10 +167,10 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
             className="c-panel c-hard-sm group flex items-center justify-between px-4 py-4 text-left disabled:opacity-50"
           >
             <span className="flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]">
                 <MapPin className="size-5" />
               </span>
-              <span className="c-display text-[18px] uppercase tracking-wide text-[var(--c-ink)]">
+              <span className="c-display text-[18px] text-[var(--c-ink)]">
                 {c.nombre}
               </span>
             </span>
@@ -235,7 +235,7 @@ function Stepper({
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
       {/* ===== Barra de instrumento: campo · señal · cola + tira de potreros ===== */}
-      <header className="shrink-0 border-b-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+      <header className="shrink-0 border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
         <div className="mb-2 flex items-center justify-between">
           <span className="flex min-w-0 items-center gap-2">
             {/* Volver a elegir campo (dos toques). */}
@@ -246,7 +246,7 @@ function Stepper({
               className={cn(
                 'flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border-2 px-1.5 transition-colors',
                 confirmaSalir
-                  ? 'c-hazard c-display border-[var(--c-ink)] px-2 text-[12px] uppercase tracking-wide text-[var(--c-ink)]'
+                  ? 'c-hazard c-display border-[var(--c-ink)] px-2 text-[12px] text-[var(--c-ink)]'
                   : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink)]',
               )}
             >
@@ -258,13 +258,13 @@ function Stepper({
             ) : (
               <CloudOff className="size-4 shrink-0 text-[var(--c-warn)]" strokeWidth={2.5} />
             )}
-            <span className="c-display truncate text-[15px] uppercase tracking-wide text-[var(--c-ink)]">
+            <span className="c-display truncate text-[15px] text-[var(--c-ink)]">
               {r.meta!.campo_nombre}
             </span>
           </span>
           <div className="flex items-center gap-2">
             {r.sinSubir > 0 && (
-              <span className="c-hazard c-label rounded-md border-2 border-[var(--c-ink)] px-2 py-1 !text-[10.5px] !text-[var(--c-ink)]">
+              <span className="c-hazard c-label rounded-md border border-[var(--c-line-strong)] px-2 py-1 !text-[10.5px] !text-[var(--c-ink)]">
                 <RefreshCw
                   className={cn('mr-1 inline size-3', r.sincronizando && 'animate-spin')}
                 />
@@ -278,7 +278,7 @@ function Stepper({
               <button
                 type="button"
                 onClick={() => setAbrirCroquis(true)}
-                className="c-display flex items-center gap-1 rounded-md border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-2 py-1 text-[12px] uppercase tracking-wide text-[var(--c-ink)]"
+                className="c-display flex items-center gap-1 rounded-md border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-2 py-1 text-[12px] text-[var(--c-ink)]"
               >
                 <MapIcon className="size-4" />
                 Croquis
@@ -306,12 +306,12 @@ function Stepper({
       </div>
 
       {/* ===== Navegación inferior (footer fijo) ===== */}
-      <div className="flex shrink-0 items-center gap-2 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 py-3">
+      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 py-3">
         <button
           type="button"
           disabled={paso === 0}
           onClick={() => setPaso((p) => Math.max(0, p - 1))}
-          className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[var(--c-ink)] disabled:opacity-40 disabled:shadow-none"
+          className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] disabled:opacity-40 disabled:shadow-none"
           aria-label="Anterior"
         >
           <ChevronLeft className="size-6" />
@@ -320,7 +320,7 @@ function Stepper({
           <button
             type="button"
             onClick={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
-            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[16px] uppercase tracking-wide text-white"
+            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
           >
             Siguiente potrero
             <ChevronRight className="size-5" />
@@ -329,7 +329,7 @@ function Stepper({
           <button
             type="button"
             onClick={onCierre}
-            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-ink)] text-[16px] uppercase tracking-wide text-[var(--c-mark)]"
+            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ink)] text-[16px] text-white"
           >
             <Flag className="size-5" />
             Terminar recorrida
@@ -387,7 +387,7 @@ function PotreroStrip({
             className={cn(
               'c-mono flex h-9 min-w-9 shrink-0 items-center justify-center gap-1 rounded-md border-2 px-1.5 text-[12.5px] font-bold uppercase transition-colors',
               actual
-                ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-mark)]'
+                ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-white'
                 : hecho
                   ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok)] text-white'
                   : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
@@ -502,7 +502,7 @@ function PotreroForm({
       {/* Contexto del potrero: lo que el productor necesita saber al pisar */}
       <div className="c-panel px-4 py-3">
         <div className="flex items-end justify-between gap-3">
-          <h2 className="c-display min-w-0 truncate text-[24px] uppercase tracking-wide text-[var(--c-ink)]">
+          <h2 className="c-display min-w-0 truncate text-[24px] text-[var(--c-ink)]">
             {nombre}
           </h2>
           <div className="shrink-0 text-right leading-none">
@@ -531,10 +531,10 @@ function PotreroForm({
             })
             onListo()
           }}
-          className="c-hard-sm flex items-center justify-between gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3.5 py-3 text-left"
+          className="c-hard-sm flex items-center justify-between gap-2 rounded-lg border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3.5 py-3 text-left"
         >
           <span className="min-w-0">
-            <span className="c-display block text-[15px] uppercase tracking-wide text-[var(--c-ok-deep)]">
+            <span className="c-display block text-[15px] text-[var(--c-ok-deep)]">
               Igual que la última vez
             </span>
             <span className="c-label mt-0.5 block truncate">
@@ -607,7 +607,7 @@ function PotreroForm({
             type="button"
             onClick={() => ajustarConteo(-1)}
             aria-label="Restar"
-            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[var(--c-ink)]"
+            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]"
           >
             <Minus className="size-5" strokeWidth={2.5} />
           </button>
@@ -625,7 +625,7 @@ function PotreroForm({
             type="button"
             onClick={() => ajustarConteo(1)}
             aria-label="Sumar"
-            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[var(--c-ink)]"
+            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]"
           >
             <Plus className="size-5" strokeWidth={2.5} />
           </button>
@@ -668,7 +668,7 @@ function PotreroForm({
           onBlur={() => onGuardar({ ...form, novedad: componer(novChips, novLibre) })}
           autoComplete="off"
           placeholder="Otra novedad…"
-          className="mt-1.5 h-10 w-full rounded-lg border-2 border-[var(--c-ink)]/25 bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ink)]"
+          className="mt-1.5 h-10 w-full rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
         />
       </div>
     </div>
@@ -720,7 +720,7 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
           <span className="c-panel flex size-16 items-center justify-center text-[var(--c-ok-deep)]">
             <CloudUpload className="size-8" strokeWidth={2} />
           </span>
-          <h1 className="c-display text-[22px] uppercase tracking-wide text-[var(--c-ink)]">
+          <h1 className="c-display text-[22px] text-[var(--c-ink)]">
             Recorrida guardada
           </h1>
           <p className="text-[14.5px] leading-snug text-[var(--c-ink-soft)]">
@@ -749,7 +749,7 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
             'flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5',
             r.online
               ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)]'
-              : 'c-hazard border-[var(--c-ink)]',
+              : 'c-hazard',
           )}
         >
           {r.online ? (
@@ -763,7 +763,7 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
         </div>
 
         {r.errores.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] p-3.5">
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-bad-soft)] p-3.5">
             <div className="c-label flex items-center gap-1.5 !text-[12px] !text-[var(--c-bad)]">
               <AlertTriangle className="size-4" />
               {r.errores.length} que el servidor rechazó
@@ -781,7 +781,7 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
             <button
               type="button"
               onClick={() => void r.descartarErrores()}
-              className="c-label mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-panel)] px-3 py-2.5 !text-[12px] !text-[var(--c-bad)] active:scale-[0.98]"
+              className="c-label mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-panel)] px-3 py-2.5 !text-[12px] !text-[var(--c-bad)] active:scale-[0.98]"
             >
               <Trash2 className="size-4" />
               Descartar los que fallaron
@@ -790,12 +790,12 @@ function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
         )}
       </div>
 
-      <div className="shrink-0 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
+      <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
         <button
           type="button"
           disabled={!r.online || r.sincronizando}
           onClick={() => void r.sincronizar()}
-          className="c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[17px] uppercase tracking-wide text-white disabled:opacity-50 disabled:shadow-none"
+          className="c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white disabled:opacity-50 disabled:shadow-none"
         >
           <RefreshCw className={cn('size-5', r.sincronizando && 'animate-spin')} />
           {r.sincronizando ? 'Subiendo…' : 'Subir ahora'}
@@ -850,7 +850,7 @@ function Cierre({
           <span className="c-panel flex size-10 shrink-0 items-center justify-center text-[var(--c-ok-deep)]">
             <Flag className="size-5" />
           </span>
-          <h1 className="c-display text-[22px] uppercase tracking-wide text-[var(--c-ink)]">
+          <h1 className="c-display text-[22px] text-[var(--c-ink)]">
             Cierre de recorrida
           </h1>
         </div>
@@ -869,7 +869,7 @@ function Cierre({
             <AlertTriangle className="size-4 text-[var(--c-warn)]" /> Necesita atención
           </CLabel>
           {atencion.length === 0 ? (
-            <p className="flex items-center gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3 py-2.5 text-[14px] font-semibold text-[var(--c-ok-deep)]">
+            <p className="flex items-center gap-2 rounded-lg border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3 py-2.5 text-[14px] font-semibold text-[var(--c-ok-deep)]">
               <Check className="size-4" /> Todo en orden.
             </p>
           ) : (
@@ -877,7 +877,7 @@ function Cierre({
               {atencion.map((a) => (
                 <div
                   key={a.nombre}
-                  className="rounded-lg border-2 border-[var(--c-warn)] bg-[var(--c-warn-soft)] px-3 py-2"
+                  className="rounded-lg border border-[var(--c-warn)]/45 bg-[var(--c-warn-soft)] px-3 py-2"
                 >
                   <span className="c-display text-[14px] uppercase text-[var(--c-ink)]">
                     {a.nombre}
@@ -901,11 +901,11 @@ function Cierre({
               type="button"
               onClick={() => setMm((v) => Math.max(0, (v ?? 0) - 5))}
               aria-label="Restar lluvia"
-              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)]"
+              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
             >
               <Minus className="size-5" strokeWidth={2.5} />
             </button>
-            <div className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-sunk)]">
+            <div className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-sunk)]">
               <span
                 className={cn(
                   'c-mono text-[22px] font-bold',
@@ -919,7 +919,7 @@ function Cierre({
               type="button"
               onClick={() => setMm((v) => (v ?? 0) + 5)}
               aria-label="Sumar lluvia"
-              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)]"
+              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
             >
               <Plus className="size-5" strokeWidth={2.5} />
             </button>
@@ -928,12 +928,12 @@ function Cierre({
       </div>
 
       {/* Acciones (footer fijo) */}
-      <div className="flex shrink-0 flex-col gap-2 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
+      <div className="flex shrink-0 flex-col gap-2 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
         <button
           type="button"
           disabled={terminando}
           onClick={() => void terminar()}
-          className="c-display c-hard flex h-14 items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] bg-[var(--c-ok)] text-[17px] uppercase tracking-wide text-white disabled:opacity-60"
+          className="c-display c-hard flex h-14 items-center justify-center gap-2.5 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white disabled:opacity-60"
         >
           <Check className="size-6" strokeWidth={2.5} />
           {terminando ? 'Guardando…' : 'Terminar y guardar'}
@@ -941,7 +941,7 @@ function Cierre({
         <button
           type="button"
           onClick={onVolver}
-          className="c-display flex h-11 items-center justify-center rounded-xl border-2 border-[var(--c-ink)]/30 text-[14px] uppercase tracking-wide text-[var(--c-ink-soft)]"
+          className="c-display flex h-11 items-center justify-center rounded-xl border border-[var(--c-line-strong)] text-[14px] text-[var(--c-ink-soft)]"
         >
           Volver a los potreros
         </button>

@@ -38,7 +38,7 @@ export function PlataPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
         <CloudOff className="size-10 text-[var(--c-faint)]" />
-        <p className="c-display text-[16px] uppercase tracking-wide text-[var(--c-ink)]">
+        <p className="c-display text-[16px] text-[var(--c-ink)]">
           {p.online
             ? 'Cargando categorías y campos…'
             : 'Sin señal y sin datos guardados'}
@@ -64,7 +64,7 @@ export function PlataPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
       {/* ===== Barra de instrumento: señal · hoy · cola ===== */}
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 py-2.5">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 py-2.5">
         <div className="flex items-center gap-2">
           {p.online ? (
             <Wifi className="size-4 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
@@ -93,9 +93,9 @@ export function PlataPage() {
             onClick={() => void p.sincronizar()}
             disabled={!p.online || p.sinSubir === 0}
             className={cn(
-              'c-label rounded-md border-2 px-2 py-1.5 !text-[10.5px]',
+              'c-label rounded-md border px-2 py-1.5 !text-[10.5px]',
               p.sinSubir > 0
-                ? 'c-hazard border-[var(--c-ink)] !text-[var(--c-ink)]'
+                ? 'c-hazard'
                 : 'border-transparent !text-[var(--c-faint)]',
             )}
           >
@@ -109,7 +109,7 @@ export function PlataPage() {
         <div className="shrink-0 px-4 pt-2.5">
           <motion.div
             key={p.ultimo.id}
-            className="c-stamp flex items-center justify-between gap-2 rounded-lg border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-3 py-2"
+            className="c-stamp flex items-center justify-between gap-2 rounded-lg border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3 py-2"
           >
             <span className="flex min-w-0 items-center gap-2">
               <Check className="size-4 shrink-0 text-[var(--c-ok-deep)]" strokeWidth={3} />
@@ -123,7 +123,7 @@ export function PlataPage() {
               <button
                 type="button"
                 onClick={() => void p.deshacer(p.ultimo!.id)}
-                className="c-label flex shrink-0 items-center gap-1 rounded-md border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-2 py-1 !text-[10.5px]"
+                className="c-label flex shrink-0 items-center gap-1 rounded-md border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-2 py-1 !text-[10.5px]"
               >
                 <RotateCcw className="size-3" />
                 Deshacer
@@ -135,7 +135,7 @@ export function PlataPage() {
 
       {p.errores.length > 0 && (
         <div className="shrink-0 px-4 pt-2.5">
-          <div className="flex flex-col gap-1 rounded-lg border-2 border-[var(--c-bad)] bg-[var(--c-bad-soft)] p-2.5">
+          <div className="flex flex-col gap-1 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-bad-soft)] p-2.5">
             <div className="c-label flex items-center gap-1.5 !text-[11px] !text-[var(--c-bad)]">
               <AlertTriangle className="size-3.5" />
               {p.errores.length} con problema al subir
@@ -258,10 +258,10 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
             type="button"
             onClick={() => cambiarTipo('gasto')}
             className={cn(
-              'c-display flex h-12 items-center justify-center gap-2 rounded-lg border-2 text-[15px] uppercase tracking-wide transition-colors',
+              'flex h-12 items-center justify-center gap-2 rounded-xl border text-[15px] font-semibold transition-colors',
               esGasto
-                ? 'c-hard-sm border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-panel)]'
-                : 'border-[var(--c-ink)]/25 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+                ? 'c-hard-sm border-transparent bg-[var(--c-ink)] text-white'
+                : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
             )}
           >
             <ArrowUpRight className="size-4.5" strokeWidth={2.5} />
@@ -271,10 +271,10 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
             type="button"
             onClick={() => cambiarTipo('ingreso')}
             className={cn(
-              'c-display flex h-12 items-center justify-center gap-2 rounded-lg border-2 text-[15px] uppercase tracking-wide transition-colors',
+              'flex h-12 items-center justify-center gap-2 rounded-xl border text-[15px] font-semibold transition-colors',
               !esGasto
-                ? 'c-hard-sm border-[var(--c-ink)] bg-[var(--c-ok)] text-white'
-                : 'border-[var(--c-ink)]/25 bg-[var(--c-panel)] text-[var(--c-ok-deep)]',
+                ? 'c-hard-sm border-transparent bg-[var(--c-ok)] text-white'
+                : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
             )}
           >
             <ArrowDownLeft className="size-4.5" strokeWidth={2.5} />
@@ -366,7 +366,7 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
             onChange={(e) => setDetalleLibre(e.target.value)}
             autoComplete="off"
             placeholder="Otro detalle…"
-            className="mt-1.5 h-10 w-full rounded-lg border-2 border-[var(--c-ink)]/25 bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ink)]"
+            className="mt-1.5 h-10 w-full rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
           />
         </div>
 
@@ -384,14 +384,14 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
             <img
               src={fotoUrl}
               alt="Comprobante"
-              className="h-12 w-12 shrink-0 rounded-md border-2 border-[var(--c-ink)] object-cover"
+              className="h-12 w-12 shrink-0 rounded-md border border-[var(--c-line-strong)] object-cover"
             />
             <span className="c-label min-w-0 flex-1 !text-[12px]">Foto lista</span>
             <button
               type="button"
               onClick={limpiarFoto}
               aria-label="Quitar foto"
-              className="flex size-9 shrink-0 items-center justify-center rounded-md border-2 border-[var(--c-ink)]/30 text-[var(--c-ink-soft)]"
+              className="flex size-9 shrink-0 items-center justify-center rounded-md border border-[var(--c-line-strong)] text-[var(--c-ink-soft)]"
             >
               <X className="size-4" />
             </button>
@@ -401,7 +401,7 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={procesandoFoto}
-            className="c-label flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--c-ink)]/40 bg-[var(--c-panel)]/60 py-3 !text-[12px] disabled:opacity-60"
+            className="c-label flex items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--c-line-strong)] bg-[var(--c-panel)]/60 py-3 !text-[12px] disabled:opacity-60"
           >
             <Camera className="size-4.5" />
             {procesandoFoto ? 'Procesando…' : 'Foto del comprobante · opcional'}
@@ -417,12 +417,12 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
       </div>
 
       {/* Acción principal: footer fijo */}
-      <div className="shrink-0 border-t-2 border-[var(--c-ink)] bg-[var(--c-bg)] px-4 pb-3.5 pt-3">
+      <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-3.5 pt-3">
         <button
           type="button"
           onClick={() => void guardar()}
           className={cn(
-            'c-display c-hard flex h-15 w-full items-center justify-center gap-2.5 rounded-xl border-2 border-[var(--c-ink)] text-[19px] uppercase tracking-wide',
+            'c-display c-hard flex h-15 w-full items-center justify-center gap-2.5 rounded-xl border border-[var(--c-line-strong)] text-[19px]',
             esGasto
               ? 'bg-[var(--c-ink)] text-[var(--c-panel)]'
               : 'bg-[var(--c-ok)] text-white',

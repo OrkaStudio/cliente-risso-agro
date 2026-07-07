@@ -1,59 +1,69 @@
 /* ============================================================
-   MODO CAMPO — "Tablero de máquina"
-   Instrumento de trabajo, no app: tinta casi negra sobre hueso
-   cálido, bordes 2px, sombras SÓLIDAS (sin blur), radios chicos,
-   labels condensadas mayúsculas (Archivo font-stretch) y TODOS
-   los datos en JetBrains Mono (lectura de odómetro). El color es
-   semántica de dato (verde OK / ámbar ojo / rojo alerta), nunca
-   decoración. Scoped bajo `.campo`: Oficina no se entera.
+   MODO CAMPO — misma identidad que Oficina ("Precisión agro-tech")
+   Porcelana fría + tarjetas blancas con hairline + verde campo +
+   números en JetBrains Mono. Lo field-first está en la ERGONOMÍA
+   (targets grandes, chips, steppers, un paso por pantalla), no en
+   gritar visualmente: el color es semántica y aparece al elegir.
+   Scoped bajo `.campo`: Oficina no se entera.
    ============================================================ */
 
 .campo {
-  --c-bg: #e7e3d7;        /* hueso cálido */
-  --c-panel: #f8f6ee;     /* papel de panel */
-  --c-sunk: #eeeadf;      /* superficie hundida */
-  --c-ink: #171a10;       /* tinta carbón */
-  --c-ink-soft: #4c4f40;
-  --c-faint: #8b8d7c;
-  --c-ok: #1d7a46;
-  --c-ok-deep: #0e5530;
-  --c-ok-soft: #dfeadc;
-  --c-warn: #b47710;
-  --c-warn-soft: #f4e6c3;
-  --c-bad: #ab3a24;
-  --c-bad-soft: #f1dcd2;
-  --c-mark: #f2c230;      /* amarillo marcador / resaltador */
+  /* Superficies (alineadas a los tokens de Oficina) */
+  --c-bg: #eef0eb;          /* porcelana fría (= --background) */
+  --c-panel: #ffffff;       /* card */
+  --c-sunk: #f2f4ef;        /* superficie hundida (= --secondary) */
+  --c-line: #e4e7e1;        /* hairline (= --border) */
+  --c-line-strong: #cdd3ca; /* borde de control (tap target visible) */
+
+  /* Tinta */
+  --c-ink: #131b16;
+  --c-ink-soft: #4b5750;
+  --c-faint: #828e85;
+
+  /* Semánticos de campo (= acentos de Oficina) */
+  --c-ok: #178a55;          /* verde campo */
+  --c-ok-deep: #0b5837;
+  --c-ok-soft: #e2f2e9;
+  --c-mid: #79ad28;         /* lima */
+  --c-mid-soft: #eff6de;
+  --c-warn: #d98a18;        /* sol */
+  --c-warn-deep: #9c620c;
+  --c-warn-soft: #fbf1de;
+  --c-bad: #cd3a2c;
+  --c-bad-soft: #f7e2de;
 
   background-color: var(--c-bg);
-  /* Grano de papel técnico: puntitos de tinta, no grilla de oficina */
-  background-image: radial-gradient(rgba(23, 26, 16, 0.055) 1px, transparent 1px);
-  background-size: 7px 7px;
+  /* La misma grilla cartográfica fina de Oficina — continuidad, no ruido */
+  background-image:
+    linear-gradient(rgba(16, 24, 19, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 24, 19, 0.022) 1px, transparent 1px);
+  background-size: 28px 28px;
   color: var(--c-ink);
 }
 
 /* --- Tipografía ------------------------------------------------ */
 
-/* Señalética: Archivo condensado, mayúsculas, tracking ancho */
+/* Label de sección: chiquita, mayúscula, apagada (como Oficina) */
 .c-label {
   font-family: 'Archivo', system-ui, sans-serif;
-  font-stretch: 72%;
-  font-weight: 650;
+  font-stretch: 82%;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  font-size: 11px;
+  letter-spacing: 0.07em;
+  font-size: 10.5px;
   line-height: 1.2;
-  color: var(--c-ink-soft);
+  color: var(--c-faint);
 }
 
-/* Display condensado (títulos de sección / botones) */
+/* Títulos: Archivo (el font-heading de Oficina), sin mayúsculas forzadas */
 .c-display {
   font-family: 'Archivo', system-ui, sans-serif;
-  font-stretch: 76%;
-  font-weight: 750;
-  letter-spacing: 0.015em;
+  font-stretch: 92%;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
-/* Datos: mono tabular (RFID, montos, contadores, conteos) */
+/* Datos: mono tabular (RFID, montos, contadores) — igual que Oficina */
 .c-mono {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
@@ -64,53 +74,40 @@
 
 .c-panel {
   background: var(--c-panel);
-  border: 2px solid var(--c-ink);
-  border-radius: 10px;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 30, 20, 0.05);
 }
 
-/* Sombra dura de instrumento + pisada al presionar */
+/* Elevación suave + feedback táctil (reemplaza a las sombras duras) */
 .c-hard {
-  box-shadow: 3px 3px 0 0 var(--c-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease;
+  box-shadow: 0 4px 14px rgba(16, 30, 20, 0.16);
+  transition: transform 80ms ease;
 }
 .c-hard:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 0 var(--c-ink);
+  transform: translateY(1px) scale(0.99);
 }
 .c-hard-sm {
-  box-shadow: 2px 2px 0 0 var(--c-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease;
+  box-shadow: 0 1px 3px rgba(16, 30, 20, 0.08);
+  transition: transform 80ms ease;
 }
 .c-hard-sm:active {
-  transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0 0 var(--c-ink);
+  transform: scale(0.98);
 }
 
-/* Franjas de peligro (sin señal / advertencias de máquina) */
+/* Aviso pendiente (antes franjas de peligro): badge sol calmo */
 .c-hazard {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    var(--c-warn-soft) 0 10px,
-    #eeddb2 10px 20px
-  );
-}
-
-/* LED de estado (cuadradito con borde) */
-.c-led {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid var(--c-ink);
-  border-radius: 2px;
+  background: var(--c-warn-soft);
+  border-color: rgba(217, 138, 24, 0.45) !important;
+  color: var(--c-warn-deep) !important;
 }
 
 /* Aparición de confirmación (ticker "último") */
 @keyframes c-stamp {
-  0% { transform: scale(0.94); opacity: 0.4; }
-  60% { transform: scale(1.02); }
+  0% { transform: scale(0.97); opacity: 0.5; }
   100% { transform: scale(1); opacity: 1; }
 }
-.c-stamp { animation: c-stamp 220ms ease-out; }
+.c-stamp { animation: c-stamp 200ms ease-out; }
 
 /* Scroll horizontal sin barra (tiras de chips / potreros) */
 .c-strip {

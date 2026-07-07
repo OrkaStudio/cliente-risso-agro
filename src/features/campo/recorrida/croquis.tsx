@@ -145,14 +145,14 @@ export function Croquis({
                   d={d}
                   fill={
                     actual
-                      ? 'var(--c-ink)'
+                      ? 'var(--c-ok)'
                       : hecho
-                        ? 'var(--c-ok)'
+                        ? 'var(--c-ok-soft)'
                         : 'var(--c-sunk)'
                   }
-                  fillOpacity={actual ? 1 : hecho ? 0.85 : 1}
-                  stroke="var(--c-ink)"
-                  strokeWidth={actual ? 1.1 : 0.55}
+                  stroke={actual ? 'var(--c-ok-deep)' : 'var(--c-ink-soft)'}
+                  strokeOpacity={actual ? 1 : 0.45}
+                  strokeWidth={actual ? 0.9 : 0.45}
                   strokeLinejoin="round"
                 />
                 <text
@@ -163,7 +163,7 @@ export function Croquis({
                   className="c-mono"
                   fontSize={fs}
                   fontWeight={700}
-                  fill={actual ? 'var(--c-mark)' : hecho ? '#fff' : 'var(--c-ink)'}
+                  fill={actual ? '#fff' : hecho ? 'var(--c-ok-deep)' : 'var(--c-ink-soft)'}
                   style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
                 >
                   {p.nombre}
@@ -174,16 +174,16 @@ export function Croquis({
           {/* ESTÁS ACÁ: punto GPS pulsante */}
           {gpsXY && gpsDentro && (
             <g style={{ pointerEvents: 'none' }}>
-              <circle cx={gpsXY[0]} cy={gpsXY[1]} r={3.2} fill="var(--c-mark)" opacity={0.35}>
+              <circle cx={gpsXY[0]} cy={gpsXY[1]} r={3.2} fill="var(--c-warn)" opacity={0.3}>
                 <animate attributeName="r" values="2.4;4.6;2.4" dur="1.6s" repeatCount="indefinite" />
               </circle>
               <circle
                 cx={gpsXY[0]}
                 cy={gpsXY[1]}
                 r={1.7}
-                fill="var(--c-mark)"
-                stroke="var(--c-ink)"
-                strokeWidth={0.6}
+                fill="var(--c-warn)"
+                stroke="#fff"
+                strokeWidth={0.5}
               />
             </g>
           )}
@@ -196,7 +196,7 @@ export function Croquis({
           type="button"
           onClick={buscarGPS}
           disabled={gps.k === 'buscando'}
-          className="c-display c-hard-sm flex h-11 shrink-0 items-center gap-2 rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-3 text-[14px] uppercase tracking-wide text-[var(--c-ink)] disabled:opacity-60"
+          className="c-display c-hard-sm flex h-11 shrink-0 items-center gap-2 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] disabled:opacity-60"
         >
           {gps.k === 'buscando' ? (
             <LoaderCircle className="size-4.5 animate-spin" />
@@ -210,7 +210,7 @@ export function Croquis({
             <button
               type="button"
               onClick={() => onSaltar(potreroPisado)}
-              className="c-display w-full truncate rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-mark)] px-3 py-2.5 text-left text-[13px] uppercase tracking-wide text-[var(--c-ink)]"
+              className="c-hazard w-full truncate rounded-xl border px-3 py-2.5 text-left text-[13.5px] font-semibold"
             >
               Estás en {potreros[potreroPisado].nombre} → ir
             </button>

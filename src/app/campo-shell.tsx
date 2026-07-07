@@ -31,12 +31,12 @@ export function CampoShell() {
   return (
     <div className="campo flex h-full flex-col overflow-hidden">
       {/* Header — placa de máquina */}
-      <header className="flex shrink-0 items-center gap-3 border-b-2 border-[var(--c-ink)] bg-sidebar px-4 py-2.5 text-sidebar-foreground">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-white/25 bg-primary">
+      <header className="flex shrink-0 items-center gap-3 border-b border-[var(--c-line)] bg-sidebar px-4 py-2.5 text-sidebar-foreground">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-primary">
           <Leaf className="size-5 text-white" strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="c-display truncate text-[16px] uppercase tracking-wide text-white">
+          <div className="c-display truncate text-[16px] text-white">
             Risso Agro
           </div>
           <div className="c-label truncate !text-sidebar-foreground/60">
@@ -75,7 +75,7 @@ export function CampoShell() {
       </main>
 
       {/* Nav inferior (pulgar) — bloques de tablero, el activo se llena */}
-      <nav className="flex shrink-0 items-stretch gap-1.5 border-t-2 border-[var(--c-ink)] bg-[var(--c-sunk)] p-1.5">
+      <nav className="flex shrink-0 items-stretch gap-1.5 border-t border-[var(--c-line)] bg-[var(--c-sunk)] p-1.5">
         {NAV.map(({ to, label, icon: Icon, soon }) =>
           soon ? (
             <div
@@ -92,10 +92,10 @@ export function CampoShell() {
               to={to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-1 flex-col items-center gap-1 rounded-lg border-2 py-2 transition-colors',
+                  'flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors',
                   isActive
-                    ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-mark)]'
-                    : 'border-transparent text-[var(--c-ink-soft)]',
+                    ? 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+                    : 'text-[var(--c-ink-soft)]',
                 )
               }
             >
@@ -106,8 +106,8 @@ export function CampoShell() {
                     className={cn(
                       'c-label !text-[10.5px]',
                       isActive
-                        ? '!text-[var(--c-mark)]'
-                        : '!text-[var(--c-ink-soft)]',
+                        ? '!text-[var(--c-ok-deep)]'
+                        : '!text-[var(--c-faint)]',
                     )}
                   >
                     {label}

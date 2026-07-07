@@ -3,43 +3,37 @@ import { Delete } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * Primitivas del Modo Campo ("tablero de máquina"). Comparten el lenguaje
- * entre manga / recorrida / plata: bordes 2px, sombras duras, labels
- * condensadas, datos en mono. Ver campo.css.
+ * Primitivas del Modo Campo. Mismo lenguaje visual que Oficina (tarjetas
+ * blancas, hairline, verde campo, mono para datos); lo field-first está en
+ * los targets grandes y en que el color aparece AL ELEGIR — sin ruido en
+ * reposo. Ver campo.css.
  */
 
 export type Tono = 'ok' | 'mid' | 'warn' | 'bad' | 'ink'
 
 const TONO_FILL: Record<Tono, string> = {
-  ok: 'bg-[var(--c-ok)] text-white border-[var(--c-ink)]',
-  mid: 'bg-[#71941f] text-white border-[var(--c-ink)]',
-  warn: 'bg-[var(--c-warn)] text-white border-[var(--c-ink)]',
-  bad: 'bg-[var(--c-bad)] text-white border-[var(--c-ink)]',
-  ink: 'bg-[var(--c-ink)] text-[var(--c-panel)] border-[var(--c-ink)]',
+  ok: 'border-[var(--c-ok)] bg-[var(--c-ok)] text-white',
+  mid: 'border-[var(--c-mid)] bg-[var(--c-mid)] text-white',
+  warn: 'border-[var(--c-warn)] bg-[var(--c-warn)] text-white',
+  bad: 'border-[var(--c-bad)] bg-[var(--c-bad)] text-white',
+  ink: 'border-[var(--c-ink)] bg-[var(--c-ink)] text-white',
 }
 const TONO_TEXT: Record<Tono, string> = {
   ok: 'text-[var(--c-ok-deep)]',
   mid: 'text-[#5c7a15]',
-  warn: 'text-[var(--c-warn)]',
+  warn: 'text-[var(--c-warn-deep)]',
   bad: 'text-[var(--c-bad)]',
   ink: 'text-[var(--c-ink)]',
 }
-const TONO_TICK: Record<Tono, string> = {
-  ok: 'bg-[var(--c-ok)]',
-  mid: 'bg-[#71941f]',
-  warn: 'bg-[var(--c-warn)]',
-  bad: 'bg-[var(--c-bad)]',
-  ink: 'bg-[var(--c-ink)]',
-}
+export { TONO_TEXT }
 
 export function CLabel({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cn('c-label block', className)}>{children}</span>
 }
 
 /**
- * Botón de estado con la semántica SIEMPRE visible: sin seleccionar muestra su
- * tono en texto + tick de color; seleccionado se llena del tono. Nada de gris
- * mudo hasta que toques.
+ * Botón de estado: en reposo es una tarjeta neutra (sin ruido); al elegirlo
+ * se llena con su color semántico. Target alto (h-13) para dedo con guante.
  */
 export function CSegBtn({
   label,
@@ -59,22 +53,13 @@ export function CSegBtn({
       type="button"
       onClick={onClick}
       className={cn(
-        'c-display flex h-13 items-center justify-center gap-1.5 rounded-lg border-2 px-1 text-[14px] uppercase tracking-wide transition-colors',
+        'flex h-13 items-center justify-center rounded-xl border px-1 text-[13.5px] font-semibold transition-colors active:scale-[0.98]',
         selected
           ? cn(TONO_FILL[tono], 'c-hard-sm')
-          : cn(
-              'border-[var(--c-ink)]/25 bg-[var(--c-panel)]',
-              TONO_TEXT[tono],
-            ),
+          : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
         className,
       )}
     >
-      {!selected && (
-        <span
-          aria-hidden
-          className={cn('h-2.5 w-2.5 shrink-0 rounded-[2px]', TONO_TICK[tono])}
-        />
-      )}
       {label}
     </button>
   )
@@ -97,37 +82,15 @@ export function CChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'c-display shrink-0 rounded-lg border-2 px-3 py-2 text-[13px] uppercase tracking-wide transition-colors',
+        'shrink-0 rounded-xl border px-3 py-2 text-[13.5px] font-semibold transition-colors active:scale-[0.98]',
         selected
-          ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-panel)]'
-          : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+          ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+          : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
         className,
       )}
     >
       {label}
     </button>
-  )
-}
-
-/** Bloque de dato del header-instrumento: label chiquita + cifra mono. */
-export function CGauge({
-  label,
-  value,
-  tono = 'ink',
-  className,
-}: {
-  label: string
-  value: ReactNode
-  tono?: Tono
-  className?: string
-}) {
-  return (
-    <div className={cn('flex flex-col items-end leading-none', className)}>
-      <span className={cn('c-mono text-[30px] font-bold', TONO_TEXT[tono])}>
-        {value}
-      </span>
-      <CLabel className="mt-1">{label}</CLabel>
-    </div>
   )
 }
 
@@ -155,7 +118,7 @@ export function CNumpad({
             type="button"
             aria-label="Borrar"
             onClick={onBackspace}
-            className="c-hard-sm flex h-11 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-sunk)] text-[var(--c-ink)]"
+            className="flex h-11 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-sunk)] text-[var(--c-ink-soft)] transition-transform active:scale-95"
           >
             <Delete className="size-5" />
           </button>
@@ -164,7 +127,7 @@ export function CNumpad({
             key={k}
             type="button"
             onClick={() => onDigit(k)}
-            className="c-mono c-hard-sm flex h-11 items-center justify-center rounded-lg border-2 border-[var(--c-ink)] bg-[var(--c-panel)] text-[19px] font-bold text-[var(--c-ink)]"
+            className="c-mono flex h-11 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[19px] font-bold text-[var(--c-ink)] transition-transform active:scale-95"
           >
             {k}
           </button>
@@ -193,11 +156,11 @@ export function CSheet({
         type="button"
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--c-ink)]/45"
+        className="absolute inset-0 bg-[var(--c-ink)]/40"
       />
-      <div className="relative max-h-[75%] overflow-y-auto rounded-t-2xl border-2 border-b-0 border-[var(--c-ink)] bg-[var(--c-panel)] px-4 pb-6 pt-3">
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--c-ink)]/25" />
-        <CLabel className="mb-3 text-[12px]">{title}</CLabel>
+      <div className="relative max-h-[75%] overflow-y-auto rounded-t-2xl border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-6 pt-3 shadow-[0_-8px_30px_rgba(16,30,20,0.18)]">
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--c-line-strong)]" />
+        <CLabel className="mb-3 !text-[11px]">{title}</CLabel>
         {children}
       </div>
     </div>
