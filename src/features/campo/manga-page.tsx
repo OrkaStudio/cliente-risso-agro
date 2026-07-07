@@ -11,14 +11,21 @@ import {
   Wifi,
 } from 'lucide-react'
 import { Dropdown } from '@/components/ui/dropdown'
-import { categoriaLabel } from '@/features/hacienda/labels'
+import {
+  categoriaLabel,
+  categoriasPorEspecie,
+  especieLabel,
+  type Especie,
+} from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import { useManga, type AsignacionLocal } from './manga/use-manga'
 import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
 import { CChip, CLabel, CSheet } from './ui'
 
-// Notas frecuentes en la manga: un toque con guantes, nada de tipear.
-const NOTAS = ['Renga', 'Ojo lastimado', 'Flaca', 'Apartar', 'Preñada'] as const
+// Observaciones rápidas de manga: lo que se VE del animal, un toque con
+// guantes. Preñada/Vacía son excluyentes (estado reproductivo).
+const OBSERVACIONES = ['Preñada', 'Vacía', 'Renga', 'Lastimada', 'Flaca', 'Apartar'] as const
+const EXCLUYENTES: Record<string, string> = { 'Preñada': 'Vacía', 'Vacía': 'Preñada' }
 
 export function MangaPage() {
   const m = useManga()
@@ -250,8 +257,13 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
   const toggleNota = (n: string) => {
     setNotas((prev) => {
       const next = new Set(prev)
-      if (next.has(n)) next.delete(n)
-      else next.add(n)
+      if (next.has(n)) {
+        next.delete(n)
+      } else {
+        next.add(n)
+        const opuesta = EXCLUYENTES[n]
+        if (opuesta) next.delete(opuesta) // preñada ⊕ vacía
+      }
       return next
     })
   }
@@ -355,12 +367,19 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
           </div>
         </div>
 
-        {/* Notas por chips + libre (plegada) */}
+        {/* Observación rápida: grilla SIEMPRE visible (nada de scroll para
+            encontrar el botón — "¿está renga? toco Renga y sigo") */}
         <div>
-          <CLabel className="mb-1.5">Notas del animal · opcional</CLabel>
-          <div className="c-strip -mx-4 flex gap-1.5 px-4">
-            {NOTAS.map((n) => (
-              <CChip key={n} label={n} selected={notas.has(n)} onClick={() => toggleNota(n)} />
+          <CLabel className="mb-1.5">¿Ves algo? · un toque y seguís</CLabel>
+          <div className="grid grid-cols-3 gap-1.5">
+            {OBSERVACIONES.map((n) => (
+              <CChip
+                key={n}
+                label={n}
+                selected={notas.has(n)}
+                onClick={() => toggleNota(n)}
+                className="h-11 text-center"
+              />
             ))}
           </div>
           {abrirNota ? (
@@ -402,27 +421,32 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
         title="Categoría del animal"
         onClose={() => setAbrirCategoria(false)}
       >
-        <div className="grid grid-cols-2 gap-1.5">
-          {(Object.entries(categoriaLabel) as [CategoriaAnimal, string][]).map(
-            ([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setCategoria(value)
-                  setAbrirCategoria(false)
-                }}
-                className={cn(
-                  'h-12 rounded-xl border text-[14.5px] font-semibold transition-colors',
-                  categoria === value
-                    ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
-                    : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
-                )}
-              >
-                {label}
-              </button>
-            ),
-          )}
+        <div className="flex flex-col gap-3">
+          {(Object.keys(categoriasPorEspecie) as Especie[]).map((especie) => (
+            <div key={especie}>
+              <CLabel className="mb-1.5">{especieLabel[especie]}</CLabel>
+              <div className="grid grid-cols-3 gap-1.5">
+                {categoriasPorEspecie[especie].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setCategoria(value)
+                      setAbrirCategoria(false)
+                    }}
+                    className={cn(
+                      'h-12 rounded-xl border text-[14px] font-semibold transition-colors',
+                      categoria === value
+                        ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+                        : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+                    )}
+                  >
+                    {categoriaLabel[value]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </CSheet>
     </div>
