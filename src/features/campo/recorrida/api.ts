@@ -7,11 +7,15 @@ export type ElectricoEstado = Database['public']['Enums']['electrico_estado']
 export type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 
 export type CampoRec = { id: string; nombre: string; empresa_id: string }
+/** [lat, lng] — mismo formato que potrero.poligono (JSONB). */
+export type LatLng = [number, number]
 export type PotreroRec = {
   id: string
   nombre: string
   estado_ciclo: EstadoCiclo
   cabezas: number
+  /** Polígono del potrero (si se dibujó en Oficina) — alimenta el croquis. */
+  poligono: LatLng[] | null
 }
 
 export type Observacion = {
@@ -38,7 +42,7 @@ export async function fetchRefs(): Promise<{
     supabase.from('campo').select('id, nombre, empresa_id').order('nombre'),
     supabase
       .from('potrero')
-      .select('id, nombre, estado_ciclo, campo_id')
+      .select('id, nombre, estado_ciclo, campo_id, poligono')
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
   ])
@@ -57,6 +61,7 @@ export async function fetchRefs(): Promise<{
       estado_ciclo: p.estado_ciclo,
       campo_id: p.campo_id,
       cabezas: cab.get(p.id) ?? 0,
+      poligono: (p.poligono as LatLng[] | null) ?? null,
     })),
   }
 }

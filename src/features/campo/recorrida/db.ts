@@ -48,6 +48,8 @@ export type RecPotrero = {
   nombre: string
   estado_ciclo: EstadoCiclo
   cabezas: number
+  /** Polígono [lat,lng][] (si Oficina lo dibujó) — croquis del campo. */
+  poligono: [number, number][] | null
   hecho: 0 | 1
 }
 

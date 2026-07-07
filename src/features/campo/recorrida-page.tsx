@@ -15,11 +15,13 @@ import {
   Trash2,
   Wifi,
 } from 'lucide-react'
+import { Map as MapIcon } from 'lucide-react'
 import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
 import { useRecorrida } from './recorrida/use-recorrida'
+import { Croquis } from './recorrida/croquis'
 import type { AguaEstado, ElectricoEstado, PastoEstado } from './recorrida/api'
-import { CChip, CLabel, CSegBtn, type Tono } from './ui'
+import { CChip, CLabel, CSegBtn, CSheet, type Tono } from './ui'
 
 const PASTO: { value: PastoEstado; label: string; tono: Tono }[] = [
   { value: 'abundante', label: 'Abund.', tono: 'ok' },
@@ -178,6 +180,7 @@ function Stepper({
   onCierre: () => void
 }) {
   const [paso, setPaso] = useState(0)
+  const [abrirCroquis, setAbrirCroquis] = useState(false)
   // Retomar donde quedó: al montar (o cuando los potreros recién llegan de
   // Dexie), arrancar en el primer potrero sin hacer — no en el 1 de la lista.
   const [inicializado, setInicializado] = useState(false)
@@ -187,6 +190,8 @@ function Stepper({
     if (primeroPendiente > 0) setPaso(primeroPendiente)
   }
   const potrero = r.potreros[paso]
+  // Croquis disponible si al menos un potrero tiene su polígono dibujado.
+  const hayCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
 
   if (!potrero) {
     return (
@@ -223,6 +228,16 @@ function Stepper({
             <span className="c-mono text-[15px] font-bold text-[var(--c-ink)]">
               {r.hechos}/{r.total}
             </span>
+            {hayCroquis && (
+              <button
+                type="button"
+                onClick={() => setAbrirCroquis(true)}
+                className="c-display flex items-center gap-1 rounded-md border-2 border-[var(--c-ink)] bg-[var(--c-panel)] px-2 py-1 text-[12px] uppercase tracking-wide text-[var(--c-ink)]"
+              >
+                <MapIcon className="size-4" />
+                Croquis
+              </button>
+            )}
           </div>
         </div>
         {/* Tira de potreros: estado de todos de un vistazo + salto directo */}
@@ -272,6 +287,22 @@ function Stepper({
           </button>
         )}
       </div>
+
+      {/* Croquis del campo: la forma real de los potreros, tocable + GPS */}
+      <CSheet
+        open={abrirCroquis}
+        title={`Croquis · ${r.meta!.campo_nombre}`}
+        onClose={() => setAbrirCroquis(false)}
+      >
+        <Croquis
+          potreros={r.potreros}
+          paso={paso}
+          onSaltar={(i) => {
+            setPaso(i)
+            setAbrirCroquis(false)
+          }}
+        />
+      </CSheet>
     </div>
   )
 }

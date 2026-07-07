@@ -118,6 +118,7 @@ export function useRecorrida() {
               nombre: p.nombre,
               estado_ciclo: p.estado_ciclo,
               cabezas: p.cabezas,
+              poligono: p.poligono,
               hecho: 0 as const,
             })),
           )
