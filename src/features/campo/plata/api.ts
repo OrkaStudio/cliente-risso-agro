@@ -13,6 +13,8 @@ export type HistItem = {
   categoria: string | null
   campo: string | null
   fecha: string
+  /** Cuándo se cargó (para agrupar por semana). */
+  cargadoEn: string
   descripcion: string | null
   /** URL firmada del comprobante (bucket privado) o null. */
   comprobanteUrl: string | null
@@ -28,7 +30,7 @@ export async function fetchHistorial(limit = 50): Promise<HistItem[]> {
   const { data, error } = await supabase
     .from('movimiento_financiero')
     .select(
-      'id, tipo, monto, fecha_devengo, descripcion, comprobante_url, iva_total, categoria:categoria_id(nombre), campo:campo_id(nombre)',
+      'id, tipo, monto, fecha_devengo, created_at, descripcion, comprobante_url, iva_total, categoria:categoria_id(nombre), campo:campo_id(nombre)',
     )
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -55,6 +57,7 @@ export async function fetchHistorial(limit = 50): Promise<HistItem[]> {
     categoria: m.categoria?.nombre ?? null,
     campo: m.campo?.nombre ?? null,
     fecha: m.fecha_devengo,
+    cargadoEn: m.created_at,
     descripcion: m.descripcion,
     comprobanteUrl: m.comprobante_url
       ? (firmadas.get(m.comprobante_url) ?? null)

@@ -1,33 +1,25 @@
 import { Suspense } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { Banknote, ClipboardList, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
-import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
 
 /**
  * Shell del Modo Campo (móvil). Layout sobrio, pensado para el teléfono en la
  * manga/recorrida: header compacto + contenido scrolleable + nav inferior con
- * pulgar. Solo expone las secciones de campo; un link discreto a "Oficina"
- * deja escaparse al Modo Oficina cuando hace falta.
+ * pulgar. El móvil ve SOLO campo: los 3 modos de captura viven en la nav de
+ * abajo (pulgar) y el Historial (revisar/doble check) va en el header.
  */
 
 const NAV = [
   { to: '/campo/manga', label: 'Manga', icon: Syringe, soon: false },
   { to: '/campo/recorrida', label: 'Recorrida', icon: Footprints, soon: false },
   { to: '/campo/plata', label: 'Plata', icon: Banknote, soon: false },
-  { to: '/campo/historial', label: 'Historial', icon: ClipboardList, soon: false },
 ] as const
 
 export function CampoShell() {
   const { signOut } = useAuth()
-  const navigate = useNavigate()
-
-  const irAOficina = () => {
-    setForceOficina(true)
-    navigate('/')
-  }
 
   return (
     <div className="campo flex h-full flex-col overflow-hidden">
@@ -44,13 +36,20 @@ export function CampoShell() {
             Modo Campo
           </div>
         </div>
-        <button
-          type="button"
-          onClick={irAOficina}
-          className="rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white"
+        <NavLink
+          to="/campo/historial"
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors',
+              isActive
+                ? 'bg-white/[0.12] text-white'
+                : 'text-sidebar-foreground/60 hover:bg-white/[0.07] hover:text-white',
+            )
+          }
         >
-          Oficina
-        </button>
+          <ClipboardList className="size-[17px]" />
+          Historial
+        </NavLink>
         <button
           type="button"
           onClick={() => void signOut()}
