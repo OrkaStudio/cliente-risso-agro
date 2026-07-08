@@ -621,6 +621,10 @@ export type Database = {
           cheque_numero: string | null
           comprobante_url: string | null
           contraparte: string | null
+          comprobante_tipo: Database["public"]["Enums"]["comprobante_fiscal_tipo"] | null
+          cuit_contraparte: string | null
+          neto_total: number | null
+          iva_total: number | null
           created_at: string
           created_by: string | null
           descripcion: string | null
@@ -650,6 +654,10 @@ export type Database = {
           cheque_numero?: string | null
           comprobante_url?: string | null
           contraparte?: string | null
+          comprobante_tipo?: Database["public"]["Enums"]["comprobante_fiscal_tipo"] | null
+          cuit_contraparte?: string | null
+          neto_total?: number | null
+          iva_total?: number | null
           created_at?: string
           created_by?: string | null
           descripcion?: string | null
@@ -679,6 +687,10 @@ export type Database = {
           cheque_numero?: string | null
           comprobante_url?: string | null
           contraparte?: string | null
+          comprobante_tipo?: Database["public"]["Enums"]["comprobante_fiscal_tipo"] | null
+          cuit_contraparte?: string | null
+          neto_total?: number | null
+          iva_total?: number | null
           created_at?: string
           created_by?: string | null
           descripcion?: string | null
@@ -739,6 +751,57 @@ export type Database = {
             columns: ["potrero_id"]
             isOneToOne: false
             referencedRelation: "potrero"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimiento_iva_linea: {
+        Row: {
+          alicuota: number
+          concepto: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          iva: number
+          movimiento_id: string
+          neto: number
+          orden: number
+        }
+        Insert: {
+          alicuota?: number
+          concepto?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          iva?: number
+          movimiento_id: string
+          neto?: number
+          orden?: number
+        }
+        Update: {
+          alicuota?: number
+          concepto?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          iva?: number
+          movimiento_id?: string
+          neto?: number
+          orden?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimiento_iva_linea_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimiento_iva_linea_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "movimiento_financiero"
             referencedColumns: ["id"]
           },
         ]
@@ -1218,6 +1281,7 @@ export type Database = {
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
       estado_animal: "activo" | "vendido" | "muerto"
+      comprobante_fiscal_tipo: "a" | "b" | "c" | "otro"
       cultivo_obs_estado: "bien" | "regular" | "mal"
       estado_ciclo_potrero:
         | "ganadero"
@@ -1410,6 +1474,7 @@ export const Constants = {
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
       estado_animal: ["activo", "vendido", "muerto"],
+      comprobante_fiscal_tipo: ["a", "b", "c", "otro"],
       cultivo_obs_estado: ["bien", "regular", "mal"],
       estado_ciclo_potrero: [
         "ganadero",

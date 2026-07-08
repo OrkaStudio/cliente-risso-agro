@@ -4,6 +4,15 @@ import type { Database } from '@/lib/supabase/types'
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
 type ActividadMov = Database['public']['Enums']['actividad_movimiento']
+export type ComprobanteTipo = Database['public']['Enums']['comprobante_fiscal_tipo']
+
+/** Línea de IVA discriminado (una por base imponible + alícuota). */
+export type IvaLinea = {
+  concepto: string | null
+  neto: number
+  alicuota: number
+  iva: number
+}
 export type CategoriaMov = Database['public']['Tables']['categoria_movimiento']['Row']
 
 export type MovimientoConDetalle =
@@ -81,6 +90,26 @@ export type NuevoMovimiento = {
   chequeNumero?: string | null
   chequeBanco?: string | null
   contraparte?: string | null
+  // Fiscal / comprobante
+  cuit?: string | null
+  comprobanteTipo?: ComprobanteTipo | null
+  ivaLineas?: IvaLinea[]
+  /** Imagen del comprobante (JPEG ya achicado) a adjuntar en Storage. */
+  comprobanteImg?: Blob | null
+}
+
+/** Sube la imagen del comprobante al bucket privado (RLS por empresa). */
+async function subirComprobante(
+  empresaId: string,
+  movimientoId: string,
+  img: Blob,
+): Promise<string> {
+  const path = `${empresaId}/${movimientoId}.jpg`
+  const { error } = await supabase.storage
+    .from('comprobantes')
+    .upload(path, img, { contentType: 'image/jpeg', upsert: true })
+  if (error) throw new Error(error.message)
+  return path
 }
 
 // ===== Series: gastos recurrentes / en cuotas =====
@@ -169,7 +198,21 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
   // estado derivado: si tiene fecha de cobro/pago, ya pasó por caja → liquidado.
   const liquidado = !!input.fechaCobroPago
   const esCheque = input.medioPago === 'cheque'
+  // id de cliente: lo necesitamos para el path de la imagen y las líneas de IVA.
+  const id = crypto.randomUUID()
+
+  const lineas = (input.ivaLineas ?? []).filter((l) => l.neto || l.iva)
+  const netoTotal = lineas.reduce((s, l) => s + (l.neto || 0), 0)
+  const ivaTotal = lineas.reduce((s, l) => s + (l.iva || 0), 0)
+
+  // La imagen sube ANTES del insert para setear comprobante_url de una.
+  let comprobanteUrl: string | null = null
+  if (input.comprobanteImg) {
+    comprobanteUrl = await subirComprobante(input.empresaId, id, input.comprobanteImg)
+  }
+
   const { error } = await supabase.from('movimiento_financiero').insert({
+    id,
     empresa_id: input.empresaId,
     tipo: input.tipo,
     categoria_id: input.categoriaId,
@@ -187,6 +230,26 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
     cheque_numero: esCheque ? input.chequeNumero?.trim() || null : null,
     cheque_banco: esCheque ? input.chequeBanco?.trim() || null : null,
     contraparte: input.contraparte?.trim() || null,
+    cuit_contraparte: input.cuit?.trim() || null,
+    comprobante_tipo: input.comprobanteTipo ?? null,
+    comprobante_url: comprobanteUrl,
+    neto_total: lineas.length ? netoTotal : null,
+    iva_total: lineas.length ? ivaTotal : null,
   })
   if (error) throw new Error(error.message)
+
+  if (lineas.length) {
+    const { error: eLineas } = await supabase.from('movimiento_iva_linea').insert(
+      lineas.map((l, i) => ({
+        empresa_id: input.empresaId,
+        movimiento_id: id,
+        concepto: l.concepto?.trim() || null,
+        neto: l.neto || 0,
+        alicuota: l.alicuota,
+        iva: l.iva || 0,
+        orden: i,
+      })),
+    )
+    if (eLineas) throw new Error(eLineas.message)
+  }
 }

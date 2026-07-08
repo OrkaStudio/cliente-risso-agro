@@ -381,11 +381,11 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
 
         {/* Opcionales: una fila — foto · detalle · medio de pago · voz */}
         <div className="grid grid-cols-5 gap-1.5">
+          {/* Sin `capture`: el chooser nativo ofrece cámara O galería. */}
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={(e) => void onElegirFoto(e)}
             className="hidden"
           />

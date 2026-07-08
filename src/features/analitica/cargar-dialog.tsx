@@ -11,8 +11,10 @@ import {
   Landmark,
   Layers,
   Loader2,
+  Plus,
   Receipt,
   Repeat,
+  X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { Constants, type Database } from '@/lib/supabase/types'
@@ -23,7 +25,12 @@ import {
   useCrearSerie,
 } from '@/features/analitica/hooks'
 import { actividadLabel } from '@/features/analitica/compute'
-import { frecuenciaLabel, type Frecuencia } from '@/features/analitica/api'
+import {
+  frecuenciaLabel,
+  type Frecuencia,
+  type ComprobanteTipo,
+  type IvaLinea,
+} from '@/features/analitica/api'
 import { Button } from '@/components/ui/button'
 import { Dropdown } from '@/components/ui/dropdown'
 import {
@@ -80,12 +87,21 @@ type ComprobanteOCR = {
   descripcion: string | null
   contraparte: string | null
   categoria_id: string | null
+  cuit: string | null
+  comprobante_tipo: ComprobanteTipo | null
+  iva_lineas: IvaLinea[] | null
   confianza: 'alta' | 'media' | 'baja'
 }
 
-async function fotoAJpegBase64(
+// Alícuotas de IVA argentinas (venta hacienda 10,5%; insumos 21%).
+const ALICUOTAS = [21, 10.5, 27, 0] as const
+/** IVA = neto × alícuota%, redondeado a 2 decimales. */
+const calcIva = (neto: number, alicuota: number) =>
+  Math.round(neto * (alicuota / 100) * 100) / 100
+
+async function fotoAJpeg(
   file: File,
-): Promise<{ base64: string; mediaType: string }> {
+): Promise<{ base64: string; mediaType: string; blob: Blob }> {
   const bitmap = await createImageBitmap(file)
   const max = 1500
   const escala = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
@@ -98,7 +114,14 @@ async function fotoAJpegBase64(
   if (!ctx) throw new Error('No se pudo procesar la imagen')
   ctx.drawImage(bitmap, 0, 0, w, h)
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-  return { base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' }
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'))),
+      'image/jpeg',
+      0.85,
+    )
+  })
+  return { base64: dataUrl.split(',')[1], mediaType: 'image/jpeg', blob }
 }
 
 // Chips cortos del indicador + descripción para el subtítulo.
@@ -149,6 +172,12 @@ export function CargarDialog({
   const [error, setError] = useState<string | null>(null)
   const [escaneando, setEscaneando] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Fiscal / comprobante
+  const [cuit, setCuit] = useState('')
+  const [comprobanteTipo, setComprobanteTipo] = useState<ComprobanteTipo | ''>('')
+  const [ivaLineas, setIvaLineas] = useState<IvaLinea[]>([])
+  const [comprobanteImg, setComprobanteImg] = useState<Blob | null>(null)
+  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null)
 
   const categorias = useCategorias()
   const campos = useCampos()
@@ -164,6 +193,11 @@ export function CargarDialog({
   const total = montoNum > 0 ? montoNum * cant : 0
   const ultima = cant > 0 ? addMeses(primera, (cant - 1) * OFFSET[frecuencia]) : primera
   const pendiente = crearMov.isPending || crearSerie.isPending
+  const ivaTotalCalc = ivaLineas.reduce((s, l) => s + (l.iva || 0), 0)
+  const money = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
+  /** Actualiza una línea de IVA por índice (inmutable). */
+  const setLinea = (i: number, patch: Partial<IvaLinea>) =>
+    setIvaLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)))
 
   const categoriasFiltradas = useMemo(
     () =>
@@ -194,6 +228,12 @@ export function CargarDialog({
     setPotreroId(potreroInicial ?? '')
     setActividad('')
     setDescripcion('')
+    setCuit('')
+    setComprobanteTipo('')
+    setIvaLineas([])
+    setComprobanteImg(null)
+    if (comprobanteUrl) URL.revokeObjectURL(comprobanteUrl)
+    setComprobanteUrl(null)
     setError(null)
   }
 
@@ -222,7 +262,10 @@ export function CargarDialog({
     setError(null)
     setEscaneando(true)
     try {
-      const { base64, mediaType } = await fotoAJpegBase64(file)
+      const { base64, mediaType, blob } = await fotoAJpeg(file)
+      setComprobanteImg(blob)
+      if (comprobanteUrl) URL.revokeObjectURL(comprobanteUrl)
+      setComprobanteUrl(URL.createObjectURL(blob))
       const cats = (categorias.data ?? []).map((c) => ({
         id: c.id,
         nombre: c.nombre,
@@ -247,6 +290,18 @@ export function CargarDialog({
       if (data.categoria_id) setCategoriaId(data.categoria_id)
       if (data.descripcion) setDescripcion(data.descripcion)
       if (data.contraparte) setContraparte(data.contraparte)
+      if (data.cuit) setCuit(data.cuit)
+      if (data.comprobante_tipo) setComprobanteTipo(data.comprobante_tipo)
+      if (Array.isArray(data.iva_lineas) && data.iva_lineas.length > 0) {
+        setIvaLineas(
+          data.iva_lineas.map((l) => ({
+            concepto: l.concepto ?? null,
+            neto: Number(l.neto) || 0,
+            alicuota: Number(l.alicuota) || 21,
+            iva: Number(l.iva) || calcIva(Number(l.neto) || 0, Number(l.alicuota) || 21),
+          })),
+        )
+      }
       setPaso(2) // saltá a confirmar la plata
 
       if (data.confianza === 'baja')
@@ -307,6 +362,10 @@ export function CargarDialog({
           chequeNumero,
           chequeBanco,
           contraparte,
+          cuit,
+          comprobanteTipo: comprobanteTipo || null,
+          ivaLineas,
+          comprobanteImg,
         })
         toast.success('Movimiento cargado')
       }
@@ -831,6 +890,128 @@ export function CargarDialog({
                   onChange={(e) => setContraparte(e.target.value)}
                   placeholder={esGasto ? 'A quién le pagás' : 'Quién te paga'}
                   className={formField}
+                />
+              </motion.div>
+            )}
+
+            {/* Sección fiscal: IVA discriminado (crédito en gastos, débito en
+                ventas). Prellenada por el OCR; el productor ajusta. */}
+            <motion.div
+              variants={formItem}
+              className="rounded-xl border border-line bg-secondary/40 p-3"
+            >
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <Receipt className="size-4 text-field-deep" />
+                  IVA {esGasto ? 'crédito' : 'débito'}
+                  <span className="font-normal text-faint">· opcional</span>
+                </span>
+                {ivaTotalCalc > 0 && (
+                  <span className="tnum text-[13px] font-bold text-field-deep">
+                    {money(ivaTotalCalc)}
+                  </span>
+                )}
+              </div>
+
+              <div className="mb-2.5 grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className={formLabel}>Comprobante</label>
+                  <Dropdown
+                    block
+                    ariaLabel="Tipo de comprobante"
+                    value={comprobanteTipo}
+                    onChange={(v) => setComprobanteTipo(v as ComprobanteTipo | '')}
+                    options={[
+                      { value: '', label: '—' },
+                      { value: 'a', label: 'Factura A' },
+                      { value: 'b', label: 'Factura B' },
+                      { value: 'c', label: 'Factura C' },
+                      { value: 'otro', label: 'Otro / ticket' },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label className={formLabel}>CUIT</label>
+                  <input
+                    value={cuit}
+                    onChange={(e) => setCuit(e.target.value.replace(/[^\d]/g, ''))}
+                    inputMode="numeric"
+                    placeholder="Sin guiones"
+                    className={formField}
+                  />
+                </div>
+              </div>
+
+              {ivaLineas.length > 0 && (
+                <div className="mb-2 space-y-1.5">
+                  {ivaLineas.map((l, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <input
+                        value={l.concepto ?? ''}
+                        onChange={(e) => setLinea(i, { concepto: e.target.value })}
+                        placeholder="Concepto"
+                        className={cn(formField, 'h-9 min-w-0 flex-1 text-[13px]')}
+                      />
+                      <input
+                        value={l.neto || ''}
+                        onChange={(e) => {
+                          const neto = Number(e.target.value.replace(/[^\d.]/g, '')) || 0
+                          setLinea(i, { neto, iva: calcIva(neto, l.alicuota) })
+                        }}
+                        inputMode="numeric"
+                        placeholder="Neto"
+                        className={cn(formField, 'h-9 w-[84px] text-right text-[13px]')}
+                      />
+                      <select
+                        value={l.alicuota}
+                        onChange={(e) => {
+                          const alicuota = Number(e.target.value)
+                          setLinea(i, { alicuota, iva: calcIva(l.neto, alicuota) })
+                        }}
+                        aria-label="Alícuota"
+                        className="h-9 rounded-lg border border-line bg-card px-1 text-[13px] font-semibold text-ink"
+                      >
+                        {ALICUOTAS.map((a) => (
+                          <option key={a} value={a}>
+                            {a}%
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setIvaLineas((ls) => ls.filter((_, j) => j !== i))}
+                        aria-label="Quitar línea"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg text-faint hover:text-destructive"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setIvaLineas((ls) => [
+                    ...ls,
+                    { concepto: null, neto: 0, alicuota: esGasto ? 21 : 10.5, iva: 0 },
+                  ])
+                }
+                className="flex items-center gap-1 text-[12.5px] font-semibold text-field-deep"
+              >
+                <Plus className="size-3.5" />
+                {ivaLineas.length ? 'Otra línea de IVA' : 'Agregar IVA (21% / 10,5%…)'}
+              </button>
+            </motion.div>
+
+            {comprobanteUrl && (
+              <motion.div variants={formItem}>
+                <label className={formLabel}>Comprobante adjunto</label>
+                <img
+                  src={comprobanteUrl}
+                  alt="Comprobante escaneado"
+                  className="max-h-40 rounded-xl border border-line object-contain"
                 />
               </motion.div>
             )}
