@@ -131,3 +131,51 @@ export async function fetchHistorialRecorridas(limit = 40): Promise<RecorridaHis
     alertas: conteo.get(r.id)?.alertas ?? 0,
   }))
 }
+
+// ===== Detalle de una recorrida (para el pop-up) =====
+
+export type ObsDetalle = {
+  potrero: string | null
+  pasto: string | null
+  agua: string | null
+  electrico: string | null
+  cultivo: string | null
+  conteo: number | null
+  enTratamiento: boolean
+  novedad: string | null
+  /** URL firmada de la nota de voz (si hay). */
+  audioUrl: string | null
+}
+
+export async function fetchRecorridaDetalle(recorridaId: string): Promise<ObsDetalle[]> {
+  const { data, error } = await supabase
+    .from('observacion_potrero')
+    .select(
+      'pasto, agua, electrico, cultivo, conteo, en_tratamiento, novedad, audio_url, potrero:potrero_id(nombre)',
+    )
+    .eq('recorrida_id', recorridaId)
+  if (error) throw new Error(error.message)
+  const obs = data ?? []
+
+  // Firmamos los audios en lote.
+  const paths = obs.map((o) => o.audio_url).filter((p): p is string => !!p)
+  const firmadas = new Map<string, string>()
+  if (paths.length) {
+    const { data: urls } = await supabase.storage
+      .from('comprobantes')
+      .createSignedUrls(paths, 3600)
+    for (const u of urls ?? []) if (u.path && u.signedUrl) firmadas.set(u.path, u.signedUrl)
+  }
+
+  return obs.map((o) => ({
+    potrero: o.potrero?.nombre ?? null,
+    pasto: o.pasto,
+    agua: o.agua,
+    electrico: o.electrico,
+    cultivo: o.cultivo,
+    conteo: o.conteo,
+    enTratamiento: o.en_tratamiento,
+    novedad: o.novedad,
+    audioUrl: o.audio_url ? (firmadas.get(o.audio_url) ?? null) : null,
+  }))
+}
