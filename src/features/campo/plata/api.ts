@@ -3,6 +3,7 @@ import type { Database } from '@/lib/supabase/types'
 import type { PlataItem, RefCampo, RefCategoria } from './db'
 
 export type TipoMov = Database['public']['Enums']['tipo_movimiento']
+export type MedioPago = Database['public']['Enums']['medio_pago']
 
 /** Categorías y campos para el formulario (se cachean en Dexie). */
 export async function fetchRefs(): Promise<{
@@ -27,6 +28,33 @@ export async function fetchRefs(): Promise<{
 /** Path del comprobante dentro del bucket (RLS por prefijo de empresa). */
 export function pathComprobante(item: PlataItem): string {
   return `${item.empresa_id}/${item.id}.jpg`
+}
+
+const EXT_AUDIO: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+}
+
+/** Path de la nota de voz del movimiento (determinístico por id → reintentar
+ *  no duplica). */
+export function pathAudioMovimiento(item: PlataItem): string {
+  const ext = EXT_AUDIO[(item.audio?.type ?? '').split(';')[0]] ?? 'webm'
+  return `${item.empresa_id}/mov-${item.id}.${ext}`
+}
+
+/** Sube la nota de voz (idempotente: objeto existente = subido). */
+export async function subirAudioMovimiento(item: PlataItem): Promise<void> {
+  if (!item.audio) return
+  const { error } = await supabase.storage
+    .from('comprobantes')
+    .upload(pathAudioMovimiento(item), item.audio, {
+      contentType: item.audio.type || 'audio/webm',
+      upsert: false,
+    })
+  if (error && !/already exists|duplicate/i.test(error.message)) {
+    throw new Error(error.message)
+  }
 }
 
 /**
@@ -63,8 +91,10 @@ export async function insertarMovimiento(item: PlataItem): Promise<void> {
     fecha_devengo: item.fecha,
     fecha_cobro_pago: item.fecha,
     estado: 'liquidado',
+    medio_pago: item.medio_pago,
     descripcion: item.descripcion,
-    comprobante_url: item.foto ? pathComprobante(item) : null,
+    comprobante_url: item.foto || item.foto_subida ? pathComprobante(item) : null,
+    audio_url: item.audio_path,
   })
   if (error && error.code !== '23505') throw new Error(error.message)
 }

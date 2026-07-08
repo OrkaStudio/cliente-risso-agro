@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { platadb, type PlataItem } from './db'
-import { fetchRefs, insertarMovimiento, subirFoto, type TipoMov } from './api'
+import {
+  fetchRefs,
+  insertarMovimiento,
+  pathAudioMovimiento,
+  subirAudioMovimiento,
+  subirFoto,
+  type MedioPago,
+  type TipoMov,
+} from './api'
 
 // Campo por defecto (el último usado): sobrevive entre sesiones.
 const CAMPO_KEY = 'plata-campo-default'
@@ -14,7 +22,9 @@ export type NuevoGasto = {
   campoId: string
   empresaId: string
   descripcion?: string
+  medioPago?: MedioPago | null
   foto?: Blob | null
+  audio?: Blob | null
 }
 
 // Lock a nivel módulo (mismo patrón que la recorrida): un drenado a la vez.
@@ -87,12 +97,22 @@ export function usePlata() {
                 await subirFoto(item)
                 await platadb.outbox.update(item.id, { foto_subida: 1 })
               }
-              await insertarMovimiento(item)
-              // Subido: soltamos el Blob para no acumular fotos en el teléfono.
+              let audioPath = item.audio_path
+              if (item.audio && !item.audio_subido) {
+                await subirAudioMovimiento(item)
+                audioPath = pathAudioMovimiento(item)
+                await platadb.outbox.update(item.id, {
+                  audio_subido: 1,
+                  audio_path: audioPath,
+                })
+              }
+              await insertarMovimiento({ ...item, audio_path: audioPath })
+              // Subido: soltamos los Blobs para no acumular en el teléfono.
               await platadb.outbox.update(item.id, {
                 estado: 'sincronizada',
                 error: null,
                 foto: null,
+                audio: null,
               })
             } catch (e) {
               await platadb.outbox.update(item.id, {
@@ -149,6 +169,10 @@ export function usePlata() {
         categoria_nombre: n.categoriaNombre,
         fecha: new Date().toISOString().slice(0, 10),
         descripcion: n.descripcion?.trim() || null,
+        medio_pago: n.medioPago ?? null,
+        audio: n.audio ?? null,
+        audio_path: null,
+        audio_subido: 0,
         foto: n.foto ?? null,
         foto_subida: 0,
         estado: 'pendiente',
@@ -199,6 +223,18 @@ export function usePlata() {
   const campoDefault =
     localStorage.getItem(CAMPO_KEY) ?? refs?.campos[0]?.id ?? ''
 
+  // Montos frecuentes: los que más se repiten en el historial local; hasta
+  // completar 4 con redondos típicos. Un toque carga el monto.
+  const frecuencia = new Map<number, number>()
+  for (const o of lista) {
+    if (o.estado === 'error') continue
+    frecuencia.set(o.monto, (frecuencia.get(o.monto) ?? 0) + 1)
+  }
+  const aprendidos = [...frecuencia.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0] - a[0])
+    .map(([monto]) => monto)
+  const montosFrecuentes = [...new Set([...aprendidos, 10000, 20000, 50000, 100000])].slice(0, 4)
+
   return {
     online,
     cargando,
@@ -212,6 +248,7 @@ export function usePlata() {
     hoyCantidad,
     hoyGastos,
     hoyIngresos,
+    montosFrecuentes,
     guardar,
     deshacer,
     reintentarErrores,

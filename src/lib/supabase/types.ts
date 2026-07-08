@@ -617,6 +617,7 @@ export type Database = {
           campo_id: string
           categoria_id: string
           cheque_banco: string | null
+          audio_url: string | null
           cheque_numero: string | null
           comprobante_url: string | null
           contraparte: string | null
@@ -645,6 +646,7 @@ export type Database = {
           campo_id: string
           categoria_id: string
           cheque_banco?: string | null
+          audio_url?: string | null
           cheque_numero?: string | null
           comprobante_url?: string | null
           contraparte?: string | null
@@ -673,6 +675,7 @@ export type Database = {
           campo_id?: string
           categoria_id?: string
           cheque_banco?: string | null
+          audio_url?: string | null
           cheque_numero?: string | null
           comprobante_url?: string | null
           contraparte?: string | null

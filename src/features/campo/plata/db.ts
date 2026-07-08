@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { TipoMov } from './api'
+import type { MedioPago, TipoMov } from './api'
 
 // Base local de Plata (IndexedDB vía Dexie), separada de manga y recorrida.
 //   · refs:   cache de categorías y campos (para cargar sin señal). Se
@@ -40,6 +40,12 @@ export type PlataItem = {
   categoria_nombre: string
   fecha: string
   descripcion: string | null
+  /** Medio de pago rápido de campo (efectivo/transferencia) o null. */
+  medio_pago: MedioPago | null
+  /** Nota de voz (Blob local hasta que sube). */
+  audio: Blob | null
+  audio_path: string | null
+  audio_subido: 0 | 1
   foto: Blob | null
   /** 1 = la foto ya quedó en Storage (para no re-subirla si el insert falló). */
   foto_subida: 0 | 1
