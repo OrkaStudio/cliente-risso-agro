@@ -35,6 +35,12 @@ export type OutboxItem = {
   visual: string | null
   categoria: CategoriaAnimal
   nota: string | null
+  /** Nota de voz del animal (Blob local hasta que sube). */
+  audio: Blob | null
+  /** UUID de cliente para el path en storage (estable ante reintentos). */
+  audio_id: string | null
+  audio_path: string | null
+  audio_subido: 0 | 1
   estado: EstadoOutbox
   error: string | null
   created_at: number

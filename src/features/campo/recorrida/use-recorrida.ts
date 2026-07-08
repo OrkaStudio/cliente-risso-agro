@@ -286,33 +286,87 @@ export function useRecorrida() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
 
-  // Rehidratar polígonos en la sesión en curso: una recorrida arrancada antes
-  // de que el cache tuviera `poligono` (o antes de dibujarlos en Oficina) los
-  // recibe acá — el croquis aparece sin tener que terminar y volver a empezar.
+  // Reconciliación TOTAL de la sesión en curso con los refs frescos (spec
+  // sync Oficina→Campo): lo que cambia en Oficina impacta en la recorrida
+  // abierta — el croquis nunca miente. Lo cargado por el productor (obs,
+  // hecho, audio) no se toca jamás.
   const refsStamp = refs?.updated_at ?? 0
   const metaId = meta?.recorrida_id
   useEffect(() => {
     if (!metaId || !refsStamp) return
     const t = setTimeout(() => {
       void (async () => {
+        const m = await recdb.meta.get('actual')
         const refsRow = await recdb.refs.get('refs')
-        if (!refsRow) return
-        const porId = new Map(refsRow.potreros.map((p) => [p.id, p]))
+        if (!m || !refsRow) return
+        const delCampo = refsRow.potreros.filter((p) => p.campo_id === m.campo_id)
+        const porId = new Map(delCampo.map((p) => [p.id, p]))
         const sesion = await recdb.potreros.toArray()
+        const enSesion = new Set(sesion.map((p) => p.id))
+
         for (const p of sesion) {
           const ref = porId.get(p.id)
-          if (!ref) continue
-          const patch: Partial<typeof p> = {}
-          if (!p.poligono && ref.poligono) patch.poligono = ref.poligono
-          if (p.ultima === undefined && ref.ultima) patch.ultima = ref.ultima
-          if (Object.keys(patch).length > 0) {
-            await recdb.potreros.update(p.id, patch)
+          if (ref) {
+            // Pisar lo que Oficina cambió (nombre / polígono / cabezas /
+            // ciclo); completar `ultima` si faltaba.
+            const patch: Partial<typeof p> = {}
+            if (p.nombre !== ref.nombre) patch.nombre = ref.nombre
+            if (JSON.stringify(p.poligono) !== JSON.stringify(ref.poligono)) {
+              patch.poligono = ref.poligono
+            }
+            if (p.cabezas !== ref.cabezas) patch.cabezas = ref.cabezas
+            if (p.estado_ciclo !== ref.estado_ciclo) {
+              patch.estado_ciclo = ref.estado_ciclo
+            }
+            if (p.ultima === undefined && ref.ultima) patch.ultima = ref.ultima
+            if (p.eliminado) patch.eliminado = 0
+            if (Object.keys(patch).length > 0) {
+              await recdb.potreros.update(p.id, patch)
+            }
+          } else {
+            // Eliminado en Oficina: sin observación local se saca; con
+            // observación se conserva marcado (nada se pierde en silencio).
+            const obsLocal = await recdb.obs.get(p.id)
+            if (!obsLocal) await recdb.potreros.delete(p.id)
+            else if (!p.eliminado) {
+              await recdb.potreros.update(p.id, { eliminado: 1 })
+            }
+          }
+        }
+        // Nuevos en Oficina: se suman a la recorrida en curso (hecho = 0).
+        for (const ref of delCampo) {
+          if (!enSesion.has(ref.id)) {
+            await recdb.potreros.put({
+              id: ref.id,
+              campo_id: m.campo_id,
+              nombre: ref.nombre,
+              estado_ciclo: ref.estado_ciclo,
+              cabezas: ref.cabezas,
+              poligono: ref.poligono,
+              ultima: ref.ultima,
+              eliminado: 0,
+              hecho: 0,
+            })
           }
         }
       })()
     }, 0)
     return () => clearTimeout(t)
   }, [metaId, refsStamp])
+
+  // Refresco por oportunidad (spec sync): además de mount+online, cuando la
+  // app vuelve al frente (el productor la tuvo minimizada en el campo).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void cargarRefs()
+        void sincronizar()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** Guarda (local) la observación de un potrero y lo marca hecho. La nota
    *  de voz NO viaja acá (ver setAudio): se preserva la de la fila existente. */
@@ -428,6 +482,8 @@ export function useRecorrida() {
     campos: refs?.campos ?? [],
     /** false = nunca se cachearon campos (y sin señal no se puede empezar). */
     tieneRefs: refs !== null && (refs.campos.length > 0),
+    /** Timestamp del último refresco de refs (frescura del cache). */
+    refsActualizado: refs?.updated_at ?? null,
     meta: meta ?? null,
     potreros: listaPotreros,
     obsPorPotrero,

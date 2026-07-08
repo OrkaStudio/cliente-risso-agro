@@ -65,6 +65,35 @@ export type AsignarInput = {
   visual?: string | null
   categoria: CategoriaAnimal
   nota?: string | null
+  /** Path en storage de la nota de voz (ya subida) — evento.audio_url. */
+  audioUrl?: string | null
+}
+
+const EXT_AUDIO: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+}
+
+/** Path de la nota de voz del animal en el bucket privado `comprobantes`
+ *  (RLS por prefijo de empresa). El uuid es de cliente: reintentar no
+ *  duplica (el objeto existente se acepta como subido). */
+export function pathAudioEvento(
+  empresaId: string,
+  audioId: string,
+  mime: string,
+): string {
+  const ext = EXT_AUDIO[mime.split(';')[0]] ?? 'webm'
+  return `${empresaId}/evento-${audioId}.${ext}`
+}
+
+export async function subirAudioEvento(path: string, blob: Blob): Promise<void> {
+  const { error } = await supabase.storage
+    .from('comprobantes')
+    .upload(path, blob, { contentType: blob.type || 'audio/webm', upsert: false })
+  if (error && !/already exists|duplicate/i.test(error.message)) {
+    throw new Error(error.message)
+  }
 }
 
 /**
@@ -83,7 +112,7 @@ export async function asignarCaravana(input: AsignarInput): Promise<void> {
   if (error) throw new Error(error.message)
 
   const nota = input.nota?.trim()
-  if (nota) {
+  if (nota || input.audioUrl) {
     try {
       const { data: a } = await supabase
         .from('animal')
@@ -95,7 +124,8 @@ export async function asignarCaravana(input: AsignarInput): Promise<void> {
           empresa_id: a.empresa_id,
           animal_id: input.animalId,
           tipo: 'nota',
-          nota,
+          nota: nota || null,
+          audio_url: input.audioUrl ?? null,
         })
       }
     } catch {

@@ -54,6 +54,9 @@ export type RecPotrero = {
   poligono: [number, number][] | null
   /** Última observación conocida ("igual que la última vez"). */
   ultima: UltimaObs | null
+  /** 1 = el potrero fue eliminado en Oficina DURANTE la recorrida; se
+   *  conserva si tiene observación local (nunca se pierde en silencio). */
+  eliminado?: 0 | 1
   hecho: 0 | 1
 }
 

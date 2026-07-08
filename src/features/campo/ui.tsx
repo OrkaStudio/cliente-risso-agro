@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react'
-import { Delete } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { Delete, Mic, Square, Trash2 as TrashIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -163,6 +163,108 @@ export function CSheet({
         <CLabel className="mb-3 !text-[11px]">{title}</CLabel>
         {children}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Nota de voz: en el campo se habla, no se tipea. Graba OFFLINE
+ * (MediaRecorder es local); el blob viaja por el outbox de cada sección y
+ * sube al bucket al volver la señal. Compartida por recorrida y manga.
+ */
+export function NotaVoz({
+  audio,
+  onAudio,
+}: {
+  audio: Blob | null
+  onAudio: (b: Blob | null) => void
+}) {
+  const [grabando, setGrabando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const recRef = useRef<MediaRecorder | null>(null)
+
+  // ObjectURL del blob para el reproductor; el effect SOLO revoca (cleanup),
+  // sin setState — el lint del repo lo exige así.
+  const url = useMemo(() => (audio ? URL.createObjectURL(audio) : null), [audio])
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [url])
+
+  const empezar = async () => {
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : ''
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      const chunks: BlobPart[] = []
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setGrabando(false)
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+        if (blob.size > 0) onAudio(blob)
+      }
+      recRef.current = rec
+      rec.start()
+      setGrabando(true)
+    } catch {
+      setError('No pude usar el micrófono (¿permiso?)')
+    }
+  }
+
+  const frenar = () => recRef.current?.stop()
+
+  if (audio && url) {
+    return (
+      <div className="mt-1.5 flex items-center gap-2">
+        <audio controls src={url} className="h-10 min-w-0 flex-1" />
+        <button
+          type="button"
+          onClick={() => onAudio(null)}
+          aria-label="Borrar nota de voz"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-bad)] active:scale-95"
+        >
+          <TrashIcon className="size-4" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        onClick={grabando ? frenar : () => void empezar()}
+        className={cn(
+          'flex h-11 w-full items-center justify-center gap-2 rounded-xl border text-[14px] font-semibold transition-colors',
+          grabando
+            ? 'border-[var(--c-bad)]/60 bg-[var(--c-bad-soft)] text-[var(--c-bad)]'
+            : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+        )}
+      >
+        {grabando ? (
+          <>
+            <Square className="size-4 animate-pulse fill-current" />
+            Grabando… tocá para frenar
+          </>
+        ) : (
+          <>
+            <Mic className="size-4.5" />
+            Grabar nota de voz
+          </>
+        )}
+      </button>
+      {error && (
+        <p className="c-label mt-1 !text-[11px] !text-[var(--c-warn-deep)]">{error}</p>
+      )}
     </div>
   )
 }

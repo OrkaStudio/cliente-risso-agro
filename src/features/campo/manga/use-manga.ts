@@ -5,6 +5,8 @@ import {
   asignarCaravana,
   deshacerCaravana,
   fetchSinCaravana,
+  pathAudioEvento,
+  subirAudioEvento,
   type CategoriaAnimal,
 } from './api'
 
@@ -20,6 +22,7 @@ export type AsignacionLocal = {
   visual?: string
   categoria: CategoriaAnimal
   nota?: string
+  audio?: Blob | null
 }
 
 function enScope(a: AnimalCache, s: Scope): boolean {
@@ -98,16 +101,35 @@ export function useManga() {
         .toArray()
       for (const item of pendientes) {
         try {
+          // Nota de voz: sube antes del evento (el registro apunta al path).
+          let audioPath = item.audio_path
+          if (item.audio && !item.audio_subido && item.audio_id) {
+            const animal = await mangadb.animales.get(item.animal_id)
+            if (animal) {
+              audioPath = pathAudioEvento(
+                animal.empresa_id,
+                item.audio_id,
+                item.audio.type,
+              )
+              await subirAudioEvento(audioPath, item.audio)
+              await mangadb.outbox.update(item.local_id!, {
+                audio_subido: 1,
+                audio_path: audioPath,
+              })
+            }
+          }
           await asignarCaravana({
             animalId: item.animal_id,
             rfid: item.rfid,
             visual: item.visual,
             categoria: item.categoria,
             nota: item.nota,
+            audioUrl: audioPath,
           })
           await mangadb.outbox.update(item.local_id!, {
             estado: 'sincronizada',
             error: null,
+            audio: null, // ya está en storage; no acumular blobs
           })
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Error al sincronizar'
@@ -143,6 +165,20 @@ export function useManga() {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
+
+  // Refresco por oportunidad: app al frente con señal → lista + RFIDs frescos
+  // (descargar conserva los caravaneados locales sin sincronizar) y drenado.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void descargar()
+        void sincronizar()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** Deshace el último caravaneo (por mis-scan): lo saca de la cola y devuelve
    *  el animal a "quedan". Si ya se subió, lo revierte en Supabase (necesita
@@ -188,6 +224,10 @@ export function useManga() {
         visual: datos.visual?.trim() || null,
         categoria: datos.categoria,
         nota: datos.nota?.trim() || null,
+        audio: datos.audio ?? null,
+        audio_id: datos.audio ? crypto.randomUUID() : null,
+        audio_path: null,
+        audio_subido: 0,
         estado: 'pendiente',
         error: null,
         created_at: Date.now(),

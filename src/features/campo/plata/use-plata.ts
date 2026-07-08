@@ -123,6 +123,19 @@ export function usePlata() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
 
+  // Refresco por oportunidad: la app vuelve al frente con señal.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void cargarRefs()
+        void sincronizar()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /** Encola el movimiento (local) y dispara el sync. */
   const guardar = useCallback(
     async (n: NuevoGasto) => {

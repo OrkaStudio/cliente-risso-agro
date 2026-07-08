@@ -326,6 +326,7 @@ export type Database = {
       evento: {
         Row: {
           animal_id: string
+          audio_url: string | null
           created_at: string
           created_by: string | null
           datos: Json
@@ -337,6 +338,7 @@ export type Database = {
         }
         Insert: {
           animal_id: string
+          audio_url?: string | null
           created_at?: string
           created_by?: string | null
           datos?: Json
@@ -348,6 +350,7 @@ export type Database = {
         }
         Update: {
           animal_id?: string
+          audio_url?: string | null
           created_at?: string
           created_by?: string | null
           datos?: Json

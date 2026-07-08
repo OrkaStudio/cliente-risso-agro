@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useManga, type AsignacionLocal } from './manga/use-manga'
 import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
-import { CChip, CLabel, CSheet } from './ui'
+import { CChip, CLabel, CSheet, NotaVoz } from './ui'
 
 // Observaciones rápidas de manga: lo que se VE del animal, un toque con
 // guantes. Preñada/Vacía son excluyentes (estado reproductivo).
@@ -228,6 +228,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
   const [categoria, setCategoria] = useState<CategoriaAnimal>(animal.categoria)
   const [notas, setNotas] = useState<Set<string>>(new Set())
   const [notaLibre, setNotaLibre] = useState('')
+  const [audio, setAudio] = useState<Blob | null>(null)
   const [abrirNota, setAbrirNota] = useState(false)
   const [abrirCategoria, setAbrirCategoria] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -251,6 +252,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
       visual: visual || undefined,
       categoria,
       nota: nota || undefined,
+      audio,
     })
   }
 
@@ -382,6 +384,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
               />
             ))}
           </div>
+          <NotaVoz audio={audio} onAudio={setAudio} />
           {abrirNota ? (
             <input
               value={notaLibre}
