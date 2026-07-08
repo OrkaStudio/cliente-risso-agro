@@ -354,14 +354,18 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           ))}
         </div>
 
-        {/* ===== Zona 2 · Numpad ===== */}
-        <CNumpad
-          onDigit={(d) => {
-            setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
-            if (aviso) setAviso(null)
-          }}
-          onBackspace={() => setMonto((m) => m.slice(0, -1))}
-        />
+        {/* ===== Zona 2 · Numpad (crece para llenar el alto disponible) ===== */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <CNumpad
+            fill
+            className="flex-1"
+            onDigit={(d) => {
+              setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
+              if (aviso) setAviso(null)
+            }}
+            onBackspace={() => setMonto((m) => m.slice(0, -1))}
+          />
+        </div>
 
         {/* ===== Zona 3 · Obligatorios: chips-con-valor → hoja ===== */}
         <div className="grid grid-cols-2 gap-1.5">

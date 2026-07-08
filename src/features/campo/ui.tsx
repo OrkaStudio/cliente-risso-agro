@@ -104,13 +104,21 @@ export function CNumpad({
   onDigit,
   onBackspace,
   className,
+  fill,
 }: {
   onDigit: (d: string) => void
   onBackspace: () => void
   className?: string
+  /** Estira las teclas para llenar el alto disponible (no dejar aire muerto
+   *  en pantallas altas; teclas más grandes para el guante). */
+  fill?: boolean
 }) {
+  // En modo fill el grid ocupa todo el alto y las 4 filas se reparten parejo.
+  const grid = fill ? 'grid grid-cols-3 gap-1.5 h-full auto-rows-fr' : 'grid grid-cols-3 gap-1.5'
+  const key = fill ? 'h-full min-h-[46px]' : 'h-11'
+  const txt = fill ? 'text-[22px]' : 'text-[19px]'
   return (
-    <div className={cn('grid grid-cols-3 gap-1.5', className)}>
+    <div className={cn(grid, className)}>
       {NUMPAD_KEYS.map((k) =>
         k === 'back' ? (
           <button
@@ -118,7 +126,10 @@ export function CNumpad({
             type="button"
             aria-label="Borrar"
             onClick={onBackspace}
-            className="flex h-11 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-sunk)] text-[var(--c-ink-soft)] transition-transform active:scale-95"
+            className={cn(
+              'flex items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-sunk)] text-[var(--c-ink-soft)] transition-transform active:scale-95',
+              key,
+            )}
           >
             <Delete className="size-5" />
           </button>
@@ -127,7 +138,11 @@ export function CNumpad({
             key={k}
             type="button"
             onClick={() => onDigit(k)}
-            className="c-mono flex h-11 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[19px] font-bold text-[var(--c-ink)] transition-transform active:scale-95"
+            className={cn(
+              'c-mono flex items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] font-bold text-[var(--c-ink)] transition-transform active:scale-95',
+              key,
+              txt,
+            )}
           >
             {k}
           </button>
