@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { mangadb, type AnimalCache, type OutboxItem } from './db'
 import {
@@ -58,25 +58,36 @@ export function useManga() {
   const [descargando, setDescargando] = useState(false)
   const [sincronizando, setSincronizando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Cerrojos de re-entrada: los disparadores automáticos (señal, foreground,
+  // carga inicial) pueden solaparse; el guard de estado no alcanza porque el
+  // setState es asíncrono. Un ref se lee/escribe sincrónicamente.
+  const descargandoRef = useRef(false)
+  const sincronizandoRef = useRef(false)
 
-  /** Descarga la lista desde Supabase y la cachea local (pisa el cache). */
+  /** Descarga la lista desde Supabase y la cachea local. Conserva los animales
+   *  caravaneados en el teléfono (subidos o no) para que "Listos" no parpadee
+   *  al refrescar; sólo repone los que siguen SIN caravana en el servidor. */
   const descargar = useCallback(async () => {
+    if (descargandoRef.current) return // evita descargas superpuestas
+    descargandoRef.current = true
     setDescargando(true)
     setError(null)
     try {
       const { animales: frescos, rfidsEnUso } = await fetchSinCaravana()
-      // Conservamos los ya caravaneados localmente que todavía no sincronizaron.
-      const yaLocal = new Set(
-        (await mangadb.animales.where('caravaneado').equals(1).toArray()).map(
-          (a) => a.id,
-        ),
-      )
+      // Los caravaneados localmente se preservan intactos (no se pisan ni se
+      // pierden); los frescos que ya están hechos acá no se reponen.
+      const locales = await mangadb.animales
+        .where('caravaneado')
+        .equals(1)
+        .toArray()
+      const hechosLocal = new Set(locales.map((a) => a.id))
       await mangadb.animales.clear()
-      await mangadb.animales.bulkPut(
-        frescos
-          .filter((a) => !yaLocal.has(a.id))
+      await mangadb.animales.bulkPut([
+        ...locales,
+        ...frescos
+          .filter((a) => !hechosLocal.has(a.id))
           .map((a) => ({ ...a, caravaneado: 0 as const })),
-      )
+      ])
       await mangadb.refs.put({
         id: 'rfids',
         rfids: rfidsEnUso,
@@ -86,13 +97,15 @@ export function useManga() {
       setError(e instanceof Error ? e.message : 'No se pudo descargar la lista')
     } finally {
       setDescargando(false)
+      descargandoRef.current = false
     }
   }, [])
 
   // Drena la cola: por cada pendiente llama al RPC; conflicto marca ese ítem y
   // sigue (no frena el resto). El animal que falló vuelve a "quedan" para corregir.
   const sincronizar = useCallback(async () => {
-    if (!navigator.onLine || sincronizando) return
+    if (!navigator.onLine || sincronizandoRef.current) return
+    sincronizandoRef.current = true
     setSincronizando(true)
     try {
       const pendientes = await mangadb.outbox
@@ -143,8 +156,19 @@ export function useManga() {
       }
     } finally {
       setSincronizando(false)
+      sincronizandoRef.current = false
     }
-  }, [sincronizando])
+  }, [])
+
+  /** Puesta al día completa, SECUENCIADA para que no se pisen: primero empuja
+   *  lo cargado offline (sincronizar) y recién después baja el estado fresco
+   *  del servidor (descargar). Cada uno tiene su cerrojo, así que reentrar es
+   *  inofensivo. Es el disparador de "volvió la señal" y "volví a la app". */
+  const refrescar = useCallback(async () => {
+    if (!navigator.onLine) return
+    await sincronizar()
+    await descargar()
+  }, [sincronizar, descargar])
 
   // Carga inicial: si el cache local está vacío y hay señal, descarga (diferido,
   // fuera del cuerpo síncrono del effect).
@@ -157,22 +181,21 @@ export function useManga() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animales === undefined])
 
-  // Al volver la señal, drenar automáticamente (diferido, fuera del cuerpo
-  // síncrono del effect).
+  // Al volver la señal: subir lo pendiente Y re-bajar la lista (cerrar el hueco
+  // de un cache viejo). Diferido, fuera del cuerpo síncrono del effect.
   useEffect(() => {
     if (!online) return
-    const t = setTimeout(() => void sincronizar(), 0)
+    const t = setTimeout(() => void refrescar(), 0)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
 
-  // Refresco por oportunidad: app al frente con señal → lista + RFIDs frescos
-  // (descargar conserva los caravaneados locales sin sincronizar) y drenado.
+  // Refresco por oportunidad: app al frente con señal → sincroniza y baja
+  // lista + RFIDs frescos (conserva los caravaneados locales sin sincronizar).
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        void descargar()
-        void sincronizar()
+        void refrescar()
       }
     }
     document.addEventListener('visibilitychange', onVisible)
