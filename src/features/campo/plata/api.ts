@@ -5,6 +5,64 @@ import type { PlataItem, RefCampo, RefCategoria } from './db'
 export type TipoMov = Database['public']['Enums']['tipo_movimiento']
 export type MedioPago = Database['public']['Enums']['medio_pago']
 
+/** Fila del historial de plata (para el Modo Campo). */
+export type HistItem = {
+  id: string
+  tipo: TipoMov
+  monto: number
+  categoria: string | null
+  campo: string | null
+  fecha: string
+  descripcion: string | null
+  /** URL firmada del comprobante (bucket privado) o null. */
+  comprobanteUrl: string | null
+  ivaTotal: number | null
+}
+
+/**
+ * Últimos movimientos de la empresa (bajo RLS), con nombre de categoría/campo
+ * y una URL FIRMADA del comprobante (el bucket es privado). Para el historial
+ * del Modo Campo: mirar/confirmar desde el teléfono lo cargado. Requiere señal.
+ */
+export async function fetchHistorial(limit = 50): Promise<HistItem[]> {
+  const { data, error } = await supabase
+    .from('movimiento_financiero')
+    .select(
+      'id, tipo, monto, fecha_devengo, descripcion, comprobante_url, iva_total, categoria:categoria_id(nombre), campo:campo_id(nombre)',
+    )
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+
+  // Firmamos los comprobantes en lote (1 h de validez).
+  const paths = (data ?? [])
+    .map((m) => m.comprobante_url)
+    .filter((p): p is string => !!p)
+  const firmadas = new Map<string, string>()
+  if (paths.length) {
+    const { data: urls } = await supabase.storage
+      .from('comprobantes')
+      .createSignedUrls(paths, 3600)
+    for (const u of urls ?? []) {
+      if (u.path && u.signedUrl) firmadas.set(u.path, u.signedUrl)
+    }
+  }
+
+  return (data ?? []).map((m) => ({
+    id: m.id,
+    tipo: m.tipo,
+    monto: Number(m.monto),
+    categoria: m.categoria?.nombre ?? null,
+    campo: m.campo?.nombre ?? null,
+    fecha: m.fecha_devengo,
+    descripcion: m.descripcion,
+    comprobanteUrl: m.comprobante_url
+      ? (firmadas.get(m.comprobante_url) ?? null)
+      : null,
+    ivaTotal: m.iva_total,
+  }))
+}
+
 /** Categorías y campos para el formulario (se cachean en Dexie). */
 export async function fetchRefs(): Promise<{
   categorias: RefCategoria[]

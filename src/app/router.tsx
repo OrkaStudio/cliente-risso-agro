@@ -69,6 +69,11 @@ const PlataPage = lazy(() =>
     default: m.PlataPage,
   })),
 )
+const HistorialPage = lazy(() =>
+  import('@/features/campo/historial-page').then((m) => ({
+    default: m.HistorialPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -110,6 +115,7 @@ export const router = createBrowserRouter([
               { path: 'campo/manga', element: <MangaPage /> },
               { path: 'campo/recorrida', element: <RecorridaPage /> },
               { path: 'campo/plata', element: <PlataPage /> },
+              { path: 'campo/historial', element: <HistorialPage /> },
             ],
           },
         ],
