@@ -3,10 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  ChevronRight,
   CloudOff,
   Footprints,
-  Image as ImageIcon,
   Loader2,
   RefreshCw,
   Syringe,
@@ -90,9 +88,9 @@ type Entrada = EntGasto | EntManga | EntRec
 
 /**
  * Historial del Modo Campo: registro visual de "qué se hizo / se cargó",
- * segmentado Plata · Manga · Recorrida y agrupado por semana. Cada fila abre
- * un pop-up con el detalle esencial de ese caso (monto completo, comprobante,
- * potreros recorridos con su audio). Doble check desde el teléfono.
+ * segmentado Plata · Manga · Recorrida y agrupado por semana. Las filas son
+ * mínimas (sólo lo que se lee de un vistazo); el detalle completo — monto
+ * exacto, comprobante, potreros con su audio — vive en el pop-up al tocar.
  */
 export function HistorialPage() {
   const [online, setOnline] = useState(() => navigator.onLine)
@@ -262,7 +260,7 @@ export function HistorialPage() {
                 type="button"
                 onClick={() => setSub(k)}
                 className={cn(
-                  'rounded-lg border px-3 py-1 text-[12px] font-semibold capitalize transition-colors',
+                  'rounded-lg border px-3 py-1 text-[12px] font-semibold transition-colors',
                   sub === k
                     ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
                     : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
@@ -341,21 +339,18 @@ export function HistorialPage() {
   )
 }
 
-// ===== Filas (tocables) =====
+// ===== Filas (mínimas y tocables) =====
 
-function Badge({ estado }: { estado?: 'pendiente' | 'error' }) {
+/** Punto de estado sobre el ícono (sin subir / error) — sin texto, sin ruido. */
+function Punto({ estado }: { estado?: 'pendiente' | 'error' }) {
   if (!estado) return null
   return (
     <span
       className={cn(
-        'c-label shrink-0 rounded px-1 py-0.5 !text-[9px]',
-        estado === 'error'
-          ? 'bg-[var(--c-bad-soft)] !text-[var(--c-bad)]'
-          : 'bg-[var(--c-warn-soft)] !text-[var(--c-warn-deep)]',
+        'absolute -right-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-[var(--c-panel)]',
+        estado === 'error' ? 'bg-[var(--c-bad)]' : 'bg-[var(--c-warn)]',
       )}
-    >
-      {estado === 'error' ? 'error' : 'sin subir'}
-    </span>
+    />
   )
 }
 
@@ -372,10 +367,10 @@ function Card({
     <button
       type="button"
       onClick={onClick}
-      className="c-panel flex w-full items-stretch gap-0 overflow-hidden !rounded-xl text-left transition-transform active:scale-[0.99]"
+      className="c-panel flex w-full items-stretch gap-0 overflow-hidden !rounded-xl text-left transition-transform active:scale-[0.985]"
     >
       <span className="w-1 shrink-0" style={{ background: accent }} />
-      <div className="flex flex-1 items-center gap-3 p-2.5 pl-3">{children}</div>
+      <div className="flex flex-1 items-center gap-3 py-2.5 pl-3 pr-3">{children}</div>
     </button>
   )
 }
@@ -386,7 +381,7 @@ function FilaGasto({ e, onAbrir }: { e: EntGasto; onAbrir: () => void }) {
     <Card accent={esGasto ? 'var(--c-warn)' : 'var(--c-ok)'} onClick={onAbrir}>
       <span
         className={cn(
-          'flex size-9 shrink-0 items-center justify-center rounded-lg',
+          'relative flex size-9 shrink-0 items-center justify-center rounded-lg',
           esGasto
             ? 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]'
             : 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]',
@@ -397,34 +392,20 @@ function FilaGasto({ e, onAbrir }: { e: EntGasto; onAbrir: () => void }) {
         ) : (
           <ArrowDownLeft className="size-4.5" strokeWidth={2.5} />
         )}
+        <Punto estado={e.estado} />
       </span>
-      <div className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-[14px] font-semibold text-[var(--c-ink)]">
-          {e.categoria ?? (esGasto ? 'Gasto' : 'Ingreso')}
-        </span>
-        <div className="flex min-w-0 items-center gap-1">
-          <Badge estado={e.estado} />
-          <span className="truncate text-[12px] text-[var(--c-ink-soft)]">
-            {[e.campo, e.descripcion].filter(Boolean).join(' · ') ||
-              (esGasto ? 'Gasto' : 'Ingreso')}
-          </span>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {e.comprobante && (
-          <ImageIcon className="size-3.5 text-[var(--c-faint)]" />
+      <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-[var(--c-ink)]">
+        {e.categoria ?? (esGasto ? 'Gasto' : 'Ingreso')}
+      </span>
+      <span
+        className={cn(
+          'c-mono shrink-0 text-[15px] font-bold tabular-nums',
+          esGasto ? 'text-[var(--c-warn-deep)]' : 'text-[var(--c-ok-deep)]',
         )}
-        <span
-          className={cn(
-            'c-mono text-[14.5px] font-bold',
-            esGasto ? 'text-[var(--c-warn-deep)]' : 'text-[var(--c-ok-deep)]',
-          )}
-        >
-          {esGasto ? '−' : '+'}
-          {compact(e.monto)}
-        </span>
-        <ChevronRight className="size-4 text-[var(--c-faint)]" />
-      </div>
+      >
+        {esGasto ? '−' : '+'}
+        {compact(e.monto)}
+      </span>
     </Card>
   )
 }
@@ -432,25 +413,22 @@ function FilaGasto({ e, onAbrir }: { e: EntGasto; onAbrir: () => void }) {
 function FilaManga({ e, onAbrir }: { e: EntManga; onAbrir: () => void }) {
   return (
     <Card accent="var(--c-mid)" onClick={onAbrir}>
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--c-sunk)] text-[var(--c-ink)]">
+      <span className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--c-sunk)] text-[var(--c-ink)]">
         <Syringe className="size-4.5" strokeWidth={2.2} />
+        <Punto estado={e.estado} />
       </span>
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate text-[14px] font-semibold text-[var(--c-ink)]">
-            {e.categoria ?? 'Caravaneado'}
-          </span>
-          <Badge estado={e.estado} />
-        </div>
-        <div className="c-mono truncate text-[12px] text-[var(--c-ink-soft)]">
-          RFID …{e.rfid.slice(-6)}
+        <span className="block truncate text-[14.5px] font-semibold text-[var(--c-ink)]">
+          {e.categoria ?? 'Caravaneado'}
+        </span>
+        <span className="c-mono block truncate text-[11.5px] text-[var(--c-ink-soft)]">
+          …{e.rfid.slice(-6)}
           {e.visual ? ` · N° ${e.visual}` : ''}
-        </div>
+        </span>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <span className="text-[11.5px] font-medium text-[var(--c-faint)]">{fmtDia(e.cargadoEn)}</span>
-        <ChevronRight className="size-4 text-[var(--c-faint)]" />
-      </div>
+      <span className="shrink-0 text-[11.5px] font-medium text-[var(--c-faint)]">
+        {fmtDia(e.cargadoEn)}
+      </span>
     </Card>
   )
 }
@@ -462,82 +440,120 @@ function FilaRecorrida({ e, onAbrir }: { e: EntRec; onAbrir: () => void }) {
         <Footprints className="size-4.5" strokeWidth={2.2} />
       </span>
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-[14px] font-semibold text-[var(--c-ink)]">
-          Recorrida{e.campo ? ` · ${e.campo}` : ''}
-        </div>
-        <div className="flex items-center gap-2 text-[12px] text-[var(--c-ink-soft)]">
-          <span>{e.potreros} potreros</span>
+        <span className="block truncate text-[14.5px] font-semibold text-[var(--c-ink)]">
+          {e.campo ?? 'Recorrida'}
+        </span>
+        <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--c-ink-soft)]">
+          {e.potreros} potreros
           {e.alertas > 0 && (
-            <span className="flex items-center gap-0.5 font-semibold text-[var(--c-warn-deep)]">
+            <span className="inline-flex items-center gap-0.5 font-semibold text-[var(--c-warn-deep)]">
               <TriangleAlert className="size-3" />
               {e.alertas}
             </span>
           )}
-        </div>
+        </span>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <span className="text-[11.5px] font-medium text-[var(--c-faint)]">{fmtDia(e.fecha)}</span>
-        <ChevronRight className="size-4 text-[var(--c-faint)]" />
-      </div>
+      <span className="shrink-0 text-[11.5px] font-medium text-[var(--c-faint)]">
+        {fmtDia(e.fecha)}
+      </span>
     </Card>
   )
 }
 
-// ===== Detalles (pop-up) =====
+// ===== Detalle (pop-up) — hero + revelado escalonado =====
 
-function DatoFila({ k, v }: { k: string; v: React.ReactNode }) {
+/** Tarjeta de dato (label arriba, valor abajo), en grilla. */
+function Dato({ k, v, full }: { k: string; v: React.ReactNode; full?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-[var(--c-line)] py-2 last:border-0">
-      <span className="c-label !text-[11px]">{k}</span>
-      <span className="text-right text-[14px] font-semibold text-[var(--c-ink)]">{v}</span>
+    <div
+      className={cn(
+        'rounded-xl border border-[var(--c-line)] bg-[var(--c-sunk)] px-3 py-2',
+        full && 'col-span-2',
+      )}
+    >
+      <span className="c-label block !text-[10px]">{k}</span>
+      <span className="mt-0.5 block text-[14px] font-semibold text-[var(--c-ink)]">{v}</span>
     </div>
   )
 }
 
+const rise = (i: number) => ({ animationDelay: `${i * 55}ms` }) as React.CSSProperties
+
 function DetalleGasto({ e }: { e: EntGasto }) {
   const esGasto = e.tipo === 'gasto'
+  const [zoom, setZoom] = useState(false)
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
+    <div className="space-y-2.5">
+      {/* Hero: el monto manda, con el tono del tipo */}
+      <div
+        className={cn(
+          'c-rise relative overflow-hidden rounded-2xl p-4',
+          esGasto ? 'bg-[var(--c-warn-soft)]' : 'bg-[var(--c-ok-soft)]',
+        )}
+        style={rise(0)}
+      >
+        {esGasto ? (
+          <ArrowUpRight
+            className="pointer-events-none absolute -right-3 -top-3 size-24 text-[var(--c-warn)]/15"
+            strokeWidth={2}
+          />
+        ) : (
+          <ArrowDownLeft
+            className="pointer-events-none absolute -right-3 -top-3 size-24 text-[var(--c-ok)]/15"
+            strokeWidth={2}
+          />
+        )}
         <span
           className={cn(
-            'c-label rounded-md px-2 py-1 !text-[11px]',
-            esGasto
-              ? 'bg-[var(--c-warn-soft)] !text-[var(--c-warn-deep)]'
-              : 'bg-[var(--c-ok-soft)] !text-[var(--c-ok-deep)]',
+            'c-label relative !text-[11px]',
+            esGasto ? '!text-[var(--c-warn-deep)]' : '!text-[var(--c-ok-deep)]',
           )}
         >
           {esGasto ? 'Gasto' : 'Ingreso'}
         </span>
-        <span
+        <div
           className={cn(
-            'c-mono text-[26px] font-bold leading-none',
+            'c-mono relative mt-1 text-[30px] font-bold leading-none tabular-nums',
             esGasto ? 'text-[var(--c-warn-deep)]' : 'text-[var(--c-ok-deep)]',
           )}
         >
           {esGasto ? '−' : '+'}
           {money(e.monto)}
-        </span>
+        </div>
+        <div className="relative mt-1.5 text-[12px] font-medium text-[var(--c-ink-soft)]">
+          {e.categoria ?? '—'} · cargado {fmtDia(e.cargadoEn)}
+        </div>
       </div>
-      {e.categoria && <DatoFila k="Categoría" v={e.categoria} />}
-      {e.campo && <DatoFila k="Campo" v={e.campo} />}
-      <DatoFila k="Fecha" v={fmtFecha(e.fecha)} />
-      {e.descripcion && <DatoFila k="Detalle" v={e.descripcion} />}
-      {e.iva ? <DatoFila k="IVA" v={money(e.iva)} /> : null}
-      {e.estado && (
-        <DatoFila
-          k="Estado"
-          v={e.estado === 'error' ? 'Error al subir' : 'Sin subir (guardado)'}
-        />
-      )}
+
+      {/* Datos en grilla */}
+      <div className="c-rise grid grid-cols-2 gap-2" style={rise(1)}>
+        <Dato k="Fecha" v={fmtFecha(e.fecha)} />
+        {e.campo && <Dato k="Campo" v={e.campo} />}
+        {e.iva ? <Dato k="IVA" v={money(e.iva)} /> : null}
+        {e.estado && (
+          <Dato k="Estado" v={e.estado === 'error' ? 'Error al subir' : 'Sin subir'} />
+        )}
+        {e.descripcion && <Dato k="Detalle" v={e.descripcion} full />}
+      </div>
+
+      {/* Comprobante */}
       {e.comprobante && (
-        <div className="mt-3">
-          <span className="c-label mb-1.5 block !text-[11px]">Comprobante</span>
-          <img
-            src={e.comprobante}
-            alt="Comprobante"
-            className="mx-auto max-h-[46vh] w-full rounded-xl border border-[var(--c-line)] object-contain"
-          />
+        <div className="c-rise" style={rise(2)}>
+          <span className="c-label mb-1.5 block !text-[10px]">Comprobante</span>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => !z)}
+            className="block w-full overflow-hidden rounded-xl border border-[var(--c-line)]"
+          >
+            <img
+              src={e.comprobante}
+              alt="Comprobante"
+              className={cn(
+                'mx-auto w-full bg-[var(--c-sunk)] object-contain transition-all',
+                zoom ? 'max-h-[70vh]' : 'max-h-[38vh]',
+              )}
+            />
+          </button>
         </div>
       )}
     </div>
@@ -546,19 +562,27 @@ function DetalleGasto({ e }: { e: EntGasto }) {
 
 function DetalleManga({ e }: { e: EntManga }) {
   return (
-    <div>
-      <div className="mb-1 text-[22px] font-bold text-[var(--c-ink)]">
-        {e.categoria ?? 'Caravaneado'}
-      </div>
-      <DatoFila k="RFID" v={<span className="c-mono">{e.rfid}</span>} />
-      {e.visual && <DatoFila k="N° visual" v={<span className="c-mono">{e.visual}</span>} />}
-      <DatoFila k="Cargado" v={fmtDia(e.cargadoEn)} />
-      {e.estado && (
-        <DatoFila
-          k="Estado"
-          v={e.estado === 'error' ? 'Error al subir' : 'Sin subir (guardado)'}
+    <div className="space-y-2.5">
+      <div className="c-rise relative overflow-hidden rounded-2xl bg-[var(--c-sunk)] p-4" style={rise(0)}>
+        <Syringe
+          className="pointer-events-none absolute -right-2 -top-2 size-20 text-[var(--c-ink)]/[0.06]"
+          strokeWidth={2}
         />
-      )}
+        <span className="c-label relative !text-[11px]">Caravaneado</span>
+        <div className="relative mt-1 text-[24px] font-bold leading-none text-[var(--c-ink)]">
+          {e.categoria ?? 'Animal'}
+        </div>
+        <div className="relative mt-1.5 text-[12px] font-medium text-[var(--c-ink-soft)]">
+          cargado {fmtDia(e.cargadoEn)}
+        </div>
+      </div>
+      <div className="c-rise grid grid-cols-2 gap-2" style={rise(1)}>
+        <Dato k="RFID" v={<span className="c-mono text-[13px]">{e.rfid}</span>} full />
+        {e.visual && <Dato k="N° visual" v={<span className="c-mono">{e.visual}</span>} />}
+        {e.estado && (
+          <Dato k="Estado" v={e.estado === 'error' ? 'Error al subir' : 'Sin subir'} />
+        )}
+      </div>
     </div>
   )
 }
@@ -583,19 +607,30 @@ function DetalleRecorrida({ e }: { e: EntRec }) {
   }, [e.id])
 
   return (
-    <div>
-      <div className="mb-1 text-[18px] font-bold text-[var(--c-ink)]">
-        {e.campo ? e.campo : 'Recorrida'}
-      </div>
-      <div className="mb-3 flex items-center gap-3 text-[12.5px] text-[var(--c-ink-soft)]">
-        <span>{fmtFecha(e.fecha)}</span>
-        <span>{e.potreros} potreros</span>
-        {e.alertas > 0 && (
-          <span className="flex items-center gap-0.5 font-semibold text-[var(--c-warn-deep)]">
-            <TriangleAlert className="size-3.5" />
-            {e.alertas} con atención
+    <div className="space-y-2.5">
+      {/* Hero con stats */}
+      <div className="c-rise relative overflow-hidden rounded-2xl bg-[var(--c-ok-soft)] p-4" style={rise(0)}>
+        <Footprints
+          className="pointer-events-none absolute -right-2 -top-2 size-20 text-[var(--c-ok)]/15"
+          strokeWidth={2}
+        />
+        <span className="c-label relative !text-[11px] !text-[var(--c-ok-deep)]">
+          {fmtFecha(e.fecha)} · cargado {fmtDia(e.cargadoEn)}
+        </span>
+        <div className="relative mt-1 text-[22px] font-bold leading-none text-[var(--c-ink)]">
+          {e.campo ?? 'Campo'}
+        </div>
+        <div className="relative mt-2.5 flex gap-1.5">
+          <span className="rounded-lg bg-[var(--c-panel)]/70 px-2.5 py-1 text-[12px] font-semibold text-[var(--c-ink)]">
+            {e.potreros} potreros
           </span>
-        )}
+          {e.alertas > 0 && (
+            <span className="flex items-center gap-1 rounded-lg bg-[var(--c-warn-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--c-warn-deep)]">
+              <TriangleAlert className="size-3.5" />
+              {e.alertas} con atención
+            </span>
+          )}
+        </div>
       </div>
 
       {!obs && !err && (
@@ -615,18 +650,21 @@ function DetalleRecorrida({ e }: { e: EntRec }) {
             o.cultivo && CULT[o.cultivo],
             o.enTratamiento && 'En tratamiento',
           ].filter(Boolean) as string[]
+          const alerta = esAlerta(o)
           return (
             <div
               key={i}
               className={cn(
-                'rounded-xl border p-2.5',
-                esAlerta(o)
+                'c-rise rounded-xl border p-2.5',
+                alerta
                   ? 'border-[var(--c-warn)]/45 bg-[var(--c-warn-soft)]'
                   : 'border-[var(--c-line)] bg-[var(--c-panel)]',
               )}
+              style={rise(i + 1)}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[14px] font-semibold text-[var(--c-ink)]">
+                <span className="flex items-center gap-1.5 text-[14px] font-semibold text-[var(--c-ink)]">
+                  {alerta && <TriangleAlert className="size-3.5 text-[var(--c-warn-deep)]" />}
                   {o.potrero ?? 'Potrero'}
                 </span>
                 {o.conteo != null && (
@@ -636,11 +674,16 @@ function DetalleRecorrida({ e }: { e: EntRec }) {
                 )}
               </div>
               {chips.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
+                <div className="mt-1.5 flex flex-wrap gap-1">
                   {chips.map((c) => (
                     <span
                       key={c}
-                      className="c-label rounded bg-[var(--c-sunk)] px-1.5 py-0.5 !text-[10px] !text-[var(--c-ink-soft)]"
+                      className={cn(
+                        'rounded-md px-1.5 py-0.5 text-[10.5px] font-medium',
+                        alerta
+                          ? 'bg-[var(--c-panel)]/70 text-[var(--c-ink-soft)]'
+                          : 'bg-[var(--c-sunk)] text-[var(--c-ink-soft)]',
+                      )}
                     >
                       {c}
                     </span>
@@ -648,10 +691,10 @@ function DetalleRecorrida({ e }: { e: EntRec }) {
                 </div>
               )}
               {o.novedad && (
-                <p className="mt-1 text-[12.5px] text-[var(--c-ink-soft)]">{o.novedad}</p>
+                <p className="mt-1.5 text-[12.5px] text-[var(--c-ink-soft)]">{o.novedad}</p>
               )}
               {o.audioUrl && (
-                <audio controls src={o.audioUrl} className="mt-1.5 h-9 w-full" />
+                <audio controls src={o.audioUrl} className="mt-2 h-9 w-full" />
               )}
             </div>
           )

@@ -171,9 +171,9 @@ export function CSheet({
         type="button"
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--c-ink)]/40"
+        className="c-sheet-back absolute inset-0 bg-[var(--c-ink)]/40"
       />
-      <div className="relative max-h-[75%] overflow-y-auto rounded-t-2xl border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-6 pt-3 shadow-[0_-8px_30px_rgba(16,30,20,0.18)]">
+      <div className="c-sheet-panel relative max-h-[82%] overflow-y-auto rounded-t-2xl border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-6 pt-3 shadow-[0_-8px_30px_rgba(16,30,20,0.18)]">
         <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--c-line-strong)]" />
         <CLabel className="mb-3 !text-[11px]">{title}</CLabel>
         {children}
