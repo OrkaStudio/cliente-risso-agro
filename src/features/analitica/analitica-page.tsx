@@ -26,6 +26,7 @@ import {
 } from '@/features/analitica/compute'
 import { CargarDialog } from '@/features/analitica/cargar-dialog'
 import { RentabilidadActividad } from '@/features/analitica/rentabilidad-actividad'
+import { PosicionIva } from '@/features/analitica/posicion-iva'
 import { SeriesRecurrentes } from '@/features/analitica/series-recurrentes'
 import { Panel } from '@/components/panel'
 import { PageHeader } from '@/components/page-header'
@@ -224,6 +225,9 @@ export function AnaliticaPage() {
 
           {/* Rentabilidad por actividad — qué actividad rinde */}
           <RentabilidadActividad actividades={actividades} />
+
+          {/* Posición de IVA — débito − crédito del período (Resp. Inscripto) */}
+          <PosicionIva movimientos={data} empresaId={empresaId} />
 
           {/* Proyección de flujo de fondos — lo que va a entrar/salir por mes */}
           <Panel

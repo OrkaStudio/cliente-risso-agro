@@ -147,6 +147,52 @@ export function fmtCompact(n: number): string {
   return `${sign}$${abs}`
 }
 
+// ===== Posición de IVA =====
+// Fiscal = siempre devengado (fecha_devengo). IVA débito = de las VENTAS
+// (ingresos); IVA crédito = de las COMPRAS (gastos). Posición del período:
+// débito − crédito (positivo → a pagar; negativo → saldo a favor, el caso
+// crónico del agro por vender al 10,5% y comprar al 21%).
+
+export type LineaIvaMes = {
+  mes: string
+  debito: number
+  credito: number
+  posicion: number // débito − crédito
+}
+
+export function ivaPorMes(movs: MovimientoConDetalle[]): LineaIvaMes[] {
+  const map = new Map<string, { debito: number; credito: number }>()
+  for (const m of movs) {
+    const iva = Number(m.iva_total ?? 0)
+    if (!iva) continue
+    const mes = (m.fecha_devengo ?? '').slice(0, 7)
+    if (!mes) continue
+    const cur = map.get(mes) ?? { debito: 0, credito: 0 }
+    if (m.tipo === 'ingreso') cur.debito += iva
+    else cur.credito += iva
+    map.set(mes, cur)
+  }
+  return [...map.entries()]
+    .map(([mes, v]) => ({ mes, ...v, posicion: v.debito - v.credito }))
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+}
+
+export type ResumenIva = {
+  debito: number
+  credito: number
+  /** débito − crédito acumulado (sin arrastre). */
+  posicion: number
+  meses: LineaIvaMes[]
+}
+
+/** Resumen del rango cargado (para el panel de Posición de IVA). */
+export function resumenIva(movs: MovimientoConDetalle[]): ResumenIva {
+  const meses = ivaPorMes(movs)
+  const debito = meses.reduce((s, m) => s + m.debito, 0)
+  const credito = meses.reduce((s, m) => s + m.credito, 0)
+  return { debito, credito, posicion: debito - credito, meses }
+}
+
 // ===== Rentabilidad por potrero =====
 // Lo que más le importa al productor: qué potrero rindió y cuál no. Solo entran
 // los movimientos imputados a un potrero (los de nivel campo no se prorratean).
