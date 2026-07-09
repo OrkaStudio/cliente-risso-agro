@@ -1,4 +1,5 @@
-import { useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   ArrowDownLeft,
@@ -148,6 +149,29 @@ export function AgendaPage() {
 
   const data = useMemo(() => venc.data ?? [], [venc.data])
 
+  // Deep-link desde el Inicio (`/agenda?mov=<id>`): abre el modal de ese
+  // cobro/pago. Si el id no existe o ya está liquidado, se limpia el param.
+  const [params, setParams] = useSearchParams()
+  const movId = params.get('mov')
+  const movItem = useMemo(
+    () => data.find((v) => v.id === movId) ?? null,
+    [data, movId],
+  )
+  const cerrarMov = () =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev)
+        p.delete('mov')
+        return p
+      },
+      { replace: true },
+    )
+  useEffect(() => {
+    if (!movId || venc.isLoading) return
+    if (!movItem) cerrarMov() // id inexistente → limpiamos el param
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movId, movItem, venc.isLoading])
+
   // Filtros que aplican a TODAS las vistas (no el horizonte ni "ver liquidados").
   const base = useMemo(
     () =>
@@ -255,6 +279,15 @@ export function AgendaPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {movItem && (
+        <LiquidarDialog
+          item={movItem}
+          open
+          onOpenChange={(o) => {
+            if (!o) cerrarMov()
+          }}
+        />
+      )}
       <PageHeader
         title="Agenda"
         meta={

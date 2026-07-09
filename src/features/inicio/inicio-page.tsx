@@ -1,21 +1,18 @@
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   Beef,
   CalendarClock,
   LandPlot,
   MapPin,
   TrendingUp,
-  TriangleAlert,
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
-import { useVencimientos } from '@/features/agenda/hooks'
 import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
+import { CobrosPagosProximos } from '@/features/inicio/cobros-pagos-proximos'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { PotreroCard } from '@/features/potrero/potrero-card'
 import { Panel } from '@/components/panel'
@@ -38,50 +35,6 @@ function fechaLarga(): string {
     month: 'long',
   })
   return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
-/* ===== Alerta de vencimientos próximos (cualquier medio) ===== */
-function VencimientosAlerta() {
-  const { data } = useVencimientos()
-  const hoy0 = new Date().setHours(0, 0, 0, 0)
-  const urgentes = (data ?? []).filter((v) => {
-    if (v.estado !== 'pendiente' || !v.fechaVencimiento) return false
-    const [y, m, d] = v.fechaVencimiento.split('-').map(Number)
-    const dias = Math.round((new Date(y, m - 1, d).getTime() - hoy0) / 86400000)
-    return dias <= 7
-  })
-  if (urgentes.length === 0) return null
-
-  const aPagar = urgentes
-    .filter((v) => v.tipo === 'gasto')
-    .reduce((s, v) => s + v.monto, 0)
-  const aCobrar = urgentes
-    .filter((v) => v.tipo === 'ingreso')
-    .reduce((s, v) => s + v.monto, 0)
-  const n = urgentes.length
-
-  return (
-    <Link
-      to="/agenda"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] border border-sol-deep/30 bg-sol-soft px-[22px] py-4 transition-colors hover:border-sol-deep/60"
-    >
-      <TriangleAlert className="size-5 shrink-0 text-sol-deep" />
-      <span className="text-sm font-bold text-ink">
-        {n} {n === 1 ? 'vencimiento' : 'vencimientos'} en los próximos 7 días
-      </span>
-      <span className="flex items-center gap-3 text-[13px] font-semibold">
-        {aPagar > 0 && (
-          <span className="text-tierra">a pagar {fmtCompact(aPagar)}</span>
-        )}
-        {aCobrar > 0 && (
-          <span className="text-field-deep">a cobrar {fmtCompact(aCobrar)}</span>
-        )}
-      </span>
-      <span className="ml-auto text-[13px] font-semibold text-field-deep">
-        Ver agenda →
-      </span>
-    </Link>
-  )
 }
 
 /* ===== KPI ===== */
@@ -408,7 +361,6 @@ export function InicioPage() {
 
   const campos = new Set(data.potreros.map((p) => p.campoNombre)).size
   const superficie = data.potreros.reduce((s, p) => s + (p.hectareas ?? 0), 0)
-  const proximos = data.vencimientos.slice(0, 5)
   const camposAgrupados = agruparPorCampo(data.potreros)
 
   return (
@@ -424,9 +376,6 @@ export function InicioPage() {
           </>
         }
       />
-
-      {/* Alerta de vencimientos próximos */}
-      <VencimientosAlerta />
 
       {/* KPIs — barra instrumental con celdas divididas por hairline */}
       <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">
@@ -472,105 +421,20 @@ export function InicioPage() {
         />
       </div>
 
+      {/* Cobros y pagos que se vienen (reemplaza la alerta + el panel de vencimientos) */}
+      <CobrosPagosProximos />
+
       {/* Pronóstico 7 días del campo */}
       <PronosticoPanel />
 
-      {/* Stock por categoría + vencimientos */}
-      <div className="grid items-stretch gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Panel
-          title="Estructura del rodeo"
-          info="La forma de tu rodeo por sexo y etapa, con indicadores de manejo: cuántos vientres tenés, la relación toro:vaca (ideal 1 toro cada 25 vacas) y el índice de destete (terneros por vaca)."
-          className="flex flex-col"
-        >
-          <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
-        </Panel>
-
-        <Panel
-          title="Próximos vencimientos"
-          info="Cobros y pagos pendientes, ordenados por urgencia. En rojo, los que vencen en 3 días o menos."
-          className="flex flex-col"
-        >
-          {proximos.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
-              <CalendarClock className="size-7 text-faint" />
-              <p className="text-sm text-muted-foreground">
-                Sin vencimientos próximos.
-              </p>
-              <p className="text-xs text-faint">
-                Los cobros y pagos pendientes aparecen acá.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-1 flex-col">
-              {proximos.map((v) => {
-                const cobro = v.tipo === 'ingreso'
-                const urgente =
-                  v.diasParaVencer != null && v.diasParaVencer <= 3
-                const dias =
-                  v.diasParaVencer == null
-                    ? '—'
-                    : v.diasParaVencer <= 0
-                      ? 'hoy'
-                      : `en ${v.diasParaVencer} d`
-                return (
-                  <div
-                    key={v.id}
-                    className="flex items-center gap-3 border-b border-border/60 py-2.5 last:border-0"
-                  >
-                    <span
-                      className="flex size-9 shrink-0 items-center justify-center rounded-xl"
-                      style={{
-                        color: cobro ? 'var(--field-deep)' : 'var(--tierra)',
-                        background: cobro
-                          ? 'var(--field-soft)'
-                          : 'var(--tierra-soft)',
-                      }}
-                    >
-                      {cobro ? (
-                        <ArrowDownLeft className="size-4" />
-                      ) : (
-                        <ArrowUpRight className="size-4" />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-ink">
-                        {v.descripcion}
-                      </div>
-                      <span
-                        className={cn(
-                          'inline-block rounded-full px-1.5 text-[10.5px] font-bold',
-                          urgente
-                            ? 'bg-destructive/10 text-destructive'
-                            : 'bg-secondary text-faint',
-                        )}
-                      >
-                        {dias}
-                      </span>
-                    </div>
-                    <span
-                      className={cn(
-                        'tnum shrink-0 text-sm font-bold',
-                        cobro ? 'text-field-deep' : 'text-ink',
-                      )}
-                    >
-                      {cobro ? '+' : '−'}
-                      {v.monto != null ? fmtCompact(v.monto) : '—'}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          <div className="mt-4 border-t border-border/60 pt-3 text-[13px]">
-            <Link
-              to="/analitica"
-              className="font-semibold text-field-deep hover:underline"
-            >
-              Ver Analítica →
-            </Link>
-          </div>
-        </Panel>
-      </div>
+      {/* Estructura del rodeo */}
+      <Panel
+        title="Estructura del rodeo"
+        info="La forma de tu rodeo por sexo y etapa, con indicadores de manejo: cuántos vientres tenés, la relación toro:vaca (ideal 1 toro cada 25 vacas) y el índice de destete (terneros por vaca)."
+        className="flex flex-col"
+      >
+        <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
+      </Panel>
 
       {/* Estado de los campos — agrupado por campo */}
       <Panel
