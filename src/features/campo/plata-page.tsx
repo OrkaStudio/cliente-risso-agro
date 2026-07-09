@@ -354,11 +354,12 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           ))}
         </div>
 
-        {/* ===== Zona 2 · Numpad (crece para llenar el alto disponible) ===== */}
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* ===== Zona 2 · Numpad (crece para llenar; nunca por debajo de las
+             teclas — si no, al abrir Detalle las filas se montaban) ===== */}
+        <div className="flex flex-1 flex-col">
           <CNumpad
             fill
-            className="flex-1"
+            className="min-h-[210px] flex-1"
             onDigit={(d) => {
               setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
               if (aviso) setAviso(null)

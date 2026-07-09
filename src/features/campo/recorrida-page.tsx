@@ -7,6 +7,7 @@ import {
   CloudOff,
   CloudRain,
   CloudUpload,
+  Copy,
   Flag,
   MapPin,
   Minus,
@@ -302,8 +303,9 @@ function Stepper({
         <PotreroStrip r={r} paso={paso} onSaltar={setPaso} />
       </header>
 
-      {/* ===== Paso actual (scrollea) ===== */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">
+      {/* ===== Paso actual (scrollea). El nav vive AL FINAL del contenido:
+           se llega tras completar el potrero y no le come lugar a la vista. ===== */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3.5">
         <PotreroForm
           key={potrero.id}
           nombre={potrero.nombre}
@@ -319,40 +321,40 @@ function Stepper({
           audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
           onGuardar={(f) => void r.guardar(potrero.id, f)}
           onAudio={(b) => void r.setAudio(potrero.id, b)}
-          onListo={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
         />
-      </div>
 
-      {/* ===== Navegación inferior (footer fijo) ===== */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 py-3">
-        <button
-          type="button"
-          disabled={paso === 0}
-          onClick={() => setPaso((p) => Math.max(0, p - 1))}
-          className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] disabled:opacity-40 disabled:shadow-none"
-          aria-label="Anterior"
-        >
-          <ChevronLeft className="size-6" />
-        </button>
-        {paso < r.total - 1 ? (
+        {/* Navegación: mt-auto la ancla al fondo cuando sobra alto; cuando el
+            potrero es largo aparece después de todo (hay que llegar a ella). */}
+        <div className="mt-auto flex items-center gap-2 pt-5">
           <button
             type="button"
-            onClick={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
-            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
+            disabled={paso === 0}
+            onClick={() => setPaso((p) => Math.max(0, p - 1))}
+            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] disabled:opacity-40 disabled:shadow-none"
+            aria-label="Anterior"
           >
-            Siguiente potrero
-            <ChevronRight className="size-5" />
+            <ChevronLeft className="size-6" />
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onCierre}
-            className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ink)] text-[16px] text-white"
-          >
-            <Flag className="size-5" />
-            Terminar recorrida
-          </button>
-        )}
+          {paso < r.total - 1 ? (
+            <button
+              type="button"
+              onClick={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
+              className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
+            >
+              Siguiente potrero
+              <ChevronRight className="size-5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onCierre}
+              className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ink)] text-[16px] text-white"
+            >
+              <Flag className="size-5" />
+              Terminar recorrida
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Croquis del campo: la forma real de los potreros, tocable + GPS */}
@@ -473,7 +475,6 @@ function PotreroForm({
   audio,
   onGuardar,
   onAudio,
-  onListo,
 }: {
   nombre: string
   cabezas: number
@@ -484,7 +485,6 @@ function PotreroForm({
   audio: Blob | null
   onGuardar: (f: Form) => void
   onAudio: (b: Blob | null) => void
-  onListo: () => void
 }) {
   // La novedad guardada se descompone: chips conocidos → seleccionados,
   // el resto queda como texto libre.
@@ -547,12 +547,13 @@ function PotreroForm({
         <CLabel className="mt-1">{ciclo}</CLabel>
       </div>
 
-      {/* Confirmación rápida: copia los ESTADOS de la última observación
-          (no el conteo ni la novedad — esos son del día) y avanza solo. */}
+      {/* Trae los ESTADOS de la última observación (no el conteo ni la novedad
+          — esos son del día) para que el productor los REVISE y ajuste; no
+          avanza solo (puede que no se acuerde y quiera cambiar algo). */}
       {ultima && (
         <button
           type="button"
-          onClick={() => {
+          onClick={() =>
             commit({
               ...form,
               pasto: agricola ? null : ultima.pasto,
@@ -561,19 +562,18 @@ function PotreroForm({
               cultivo: agricola ? ultima.cultivo : null,
               en_tratamiento: ultima.en_tratamiento,
             })
-            onListo()
-          }}
+          }
           className="c-hard-sm flex items-center justify-between gap-2 rounded-lg border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3.5 py-3 text-left"
         >
           <span className="min-w-0">
             <span className="c-display block text-[15px] text-[var(--c-ok-deep)]">
-              Igual que la última vez
+              Traer la última vez
             </span>
             <span className="c-label mt-0.5 block truncate">
               {resumenUltima(ultima, agricola)} · {fmtFecha(ultima.fecha)}
             </span>
           </span>
-          <ChevronRight className="size-5 shrink-0 text-[var(--c-ok-deep)]" />
+          <Copy className="size-5 shrink-0 text-[var(--c-ok-deep)]" />
         </button>
       )}
 
