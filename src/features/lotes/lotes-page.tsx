@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight,
@@ -29,9 +29,15 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { CampoFormDialog } from '@/features/campos/campos-dialogs'
 import { PageHeader, Stat } from '@/components/page-header'
 import { PotreroCard } from '@/features/potrero/potrero-card'
-import {
-  CampoMapaReal,
-} from '@/features/lotes/campo-mapa-real'
+import { MapErrorBoundary } from '@/components/map-error-boundary'
+// El mapa satelital (Leaflet + Geoman) se carga lazy y aislado: si falla —al
+// cargar su chunk o al renderizar— cae SOLO su recuadro, no toda la app.
+// Ver lección leaflet-geoman-prod-build.
+const CampoMapaReal = lazy(() =>
+  import('@/features/lotes/campo-mapa-real').then((m) => ({
+    default: m.CampoMapaReal,
+  })),
+)
 import { CampoVista } from '@/features/lotes/campo-vista'
 import { CatastroDialog } from '@/features/lotes/catastro-dialog'
 import { cn } from '@/lib/utils'
@@ -249,29 +255,39 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                 Traé el contorno del catastro y dibujá los potreros adentro.
               </span>
             </div>
-            <CampoMapaReal
-              key={`${vm.id}-${ver}`}
-              campo={vm}
-              contorno={contorno}
-              potreros={potreros}
-              onDibujarPotrero={async (nombre, poligono) => {
-                const existing = potreros.find((p) => p.nombre === nombre)
-                const id = existing
-                  ? existing.id
-                  : await crearPotrero.mutateAsync({
-                      empresaId,
-                      campoId: vm.id,
-                      nombre,
-                      estadoCiclo: 'descanso',
-                    })
-                await setPoligono.mutateAsync({ potreroId: id, poligono })
-                return id
-              }}
-              onSetPoligono={(potreroId, poligono) =>
-                setPoligono.mutate({ potreroId, poligono })
-              }
-              onVerPotrero={(id) => navigate(`/potrero/${id}`)}
-            />
+            <MapErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[360px] w-full items-center justify-center rounded-2xl border border-border bg-secondary/40 text-[12.5px] text-muted-foreground">
+                    Cargando mapa…
+                  </div>
+                }
+              >
+                <CampoMapaReal
+                  key={`${vm.id}-${ver}`}
+                  campo={vm}
+                  contorno={contorno}
+                  potreros={potreros}
+                  onDibujarPotrero={async (nombre, poligono) => {
+                    const existing = potreros.find((p) => p.nombre === nombre)
+                    const id = existing
+                      ? existing.id
+                      : await crearPotrero.mutateAsync({
+                          empresaId,
+                          campoId: vm.id,
+                          nombre,
+                          estadoCiclo: 'descanso',
+                        })
+                    await setPoligono.mutateAsync({ potreroId: id, poligono })
+                    return id
+                  }}
+                  onSetPoligono={(potreroId, poligono) =>
+                    setPoligono.mutate({ potreroId, poligono })
+                  }
+                  onVerPotrero={(id) => navigate(`/potrero/${id}`)}
+                />
+              </Suspense>
+            </MapErrorBoundary>
             <p className="mt-3 text-[12.5px] text-muted-foreground">
               Usá la herramienta de polígono (arriba a la izquierda) para{' '}
               <b>dibujar cada potrero</b> y ponele su número. Cuando termines,

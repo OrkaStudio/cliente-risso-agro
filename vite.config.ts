@@ -26,6 +26,11 @@ export default defineConfig({
           if (/[\\/]node_modules[\\/]dexie[\\/]/.test(id)) return 'manga-vendor'
           if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
             return 'react-vendor'
+          // Leaflet-Geoman referencia el global `L` al evaluarse y sólo se usa
+          // en el mapa (ruta lazy). Se carga dinámico tras exponer window.L →
+          // que quede en su chunk propio, NO en el vendor que carga en cada
+          // página (si no, "L is not defined" rompe toda la app en prod).
+          if (id.includes('@geoman-io')) return
           return 'vendor'
         },
       },

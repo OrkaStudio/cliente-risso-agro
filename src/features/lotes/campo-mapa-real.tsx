@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
-import '@geoman-io/leaflet-geoman-free'
 import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
+// Geoman es un plugin de Leaflet que referencia el global `L` (window.L) al
+// evaluarse. Con ESM + build de producción minificado, `L` es una binding local
+// → "L is not defined" y se cae toda la app (el plugin quedaba en el vendor que
+// carga en cada página). Exponemos L en window y cargamos el plugin de forma
+// DINÁMICA (top-level await) para que quede en su propio chunk lazy.
+if (typeof window !== 'undefined')
+  (window as unknown as { L: typeof L }).L = L
+await import('@geoman-io/leaflet-geoman-free')
 import { toast } from 'sonner'
 import intersect from '@turf/intersect'
 import area from '@turf/area'

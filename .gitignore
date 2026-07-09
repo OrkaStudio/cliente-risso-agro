@@ -40,3 +40,6 @@ dist-ssr
 
 # Capturas del tour visual de la maqueta (design/tour.js)
 /design/shots
+
+# Vercel (link local del CLI)
+.vercel
