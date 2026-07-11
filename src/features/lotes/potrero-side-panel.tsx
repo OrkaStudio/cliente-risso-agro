@@ -4,12 +4,14 @@ import { useState, type CSSProperties } from 'react'
 import {
   ArrowRight,
   Beef,
+  Layers,
   LandPlot,
   MousePointer2,
   Pencil,
   Sprout,
 } from 'lucide-react'
 import { FEATURE_MAP, type FeatureId } from '@/features/lotes/potrero-features'
+import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import {
   usoToEstadoCiclo,
   type CampoVM,
@@ -254,10 +256,13 @@ export function PotreroSidePanel({
   onVerPotrero?: (potreroId: string) => void
   edit?: EditarPotrero
 }) {
-  // Snapshot del potrero al abrir la edición → el hover no lo cambia mientras editás.
+  // Snapshot del potrero al abrir edición/carga → el hover no lo cambia mientras
+  // el formulario está abierto.
   const [editInfo, setEditInfo] = useState<PotreroInfo | null>(null)
+  const [cargaInfo, setCargaInfo] = useState<PotreroInfo | null>(null)
 
   return (
+    <>
     <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-auto lg:w-[300px]">
       <div className="flex items-center gap-2.5 border-b border-border px-4 py-3.5">
         <span
@@ -325,6 +330,16 @@ export function PotreroSidePanel({
           </div>
 
           <div className="mt-auto grid gap-2">
+            {/* Carga de animales / lote directo a ESTE potrero (ya elegido en el
+                mapa) → el diálogo abre con el destino fijo. */}
+            <button
+              type="button"
+              onClick={() => setCargaInfo(info)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-field py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(16,30,20,0.18)] transition-colors hover:bg-field-deep"
+            >
+              <Layers className="size-4" />
+              Cargar animales
+            </button>
             {onVerPotrero && (
               <button
                 type="button"
@@ -355,5 +370,23 @@ export function PotreroSidePanel({
         </div>
       )}
     </aside>
+
+    {/* Carga de animales con el potrero YA fijo (snapshot: el hover no lo mueve).
+        El diálogo se muestra en su modo de un solo destino. */}
+    {cargaInfo && (
+      <CargaMasivaDialog
+        open
+        onOpenChange={(v) => {
+          if (!v) setCargaInfo(null)
+        }}
+        prefill={{
+          campoId: campo.id,
+          potreroId: cargaInfo.potreroId,
+          campoNombre: campo.nombre,
+          potreroNombre: cargaInfo.numero,
+        }}
+      />
+    )}
+    </>
   )
 }
