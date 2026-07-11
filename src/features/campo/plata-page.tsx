@@ -251,10 +251,45 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* ===== CORE fijo: visor + numpad. Nunca ceden → el monto que tipeás y
-           el teclado están SIEMPRE a la vista; el resto scrollea abajo.
-           Ver spec plata-v3-layout-responsive. ===== */}
-      <div className="flex shrink-0 flex-col gap-2.5 px-4 pb-2 pt-2.5">
+      {/* Todo el formulario scrollea junto (una sola página). Cada bloque va
+           `shrink-0` para que NINGUNO se aplaste: si no entra, scrollea — el
+           visor nunca se comprime. "Guardar" queda fijo en el footer.
+           Ver spec plata-v3-layout-responsive. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-2.5">
+        {/* Otra vez lo mismo: la carga recurrente en un toque */}
+        {p.ultimo && p.ultimo.estado !== 'error' && (
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={repetirUltima}
+              className="c-hard-sm flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3 text-left"
+            >
+              <Repeat className="size-4 shrink-0 text-[var(--c-ok-deep)]" />
+              <span className="c-mono shrink-0 text-[13.5px] font-bold text-[var(--c-ok-deep)]">
+                {p.ultimo.tipo === 'gasto' ? '−' : '+'}
+                {fmt(p.ultimo.monto)}
+              </span>
+              <span className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-ink-soft)]">
+                {p.ultimo.categoria_nombre}
+                {p.ultimo.descripcion ? ` · ${p.ultimo.descripcion}` : ''}
+              </span>
+              <span className="c-label ml-auto shrink-0 !text-[10px] !text-[var(--c-ok-deep)]">
+                otra vez
+              </span>
+            </button>
+            {p.ultimo.estado === 'pendiente' && (
+              <button
+                type="button"
+                onClick={() => void p.deshacer(p.ultimo!.id)}
+                aria-label="Deshacer última carga"
+                className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)] active:scale-95"
+              >
+                <RotateCcw className="size-4" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Zona 1 · Visor: toggle integrado + monto rey */}
         <div
           className={cn(
@@ -308,56 +343,8 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           </div>
         </div>
 
-        {/* Zona 2 · Numpad — alto fijo (sin fill): no crece ni colapsa. */}
-        <CNumpad
-          onDigit={(d) => {
-            setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
-            if (aviso) setAviso(null)
-          }}
-          onBackspace={() => setMonto((m) => m.slice(0, -1))}
-        />
-      </div>
-
-      {/* ===== Metadata: la ÚNICA región que scrollea (recurrente, montos
-           frecuentes, obligatorios, opcionales, expansiones). Nunca aplasta
-           al core; "Guardar" queda fijo en el footer. ===== */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 pb-3 pt-2">
-        {/* Otra vez lo mismo: la carga recurrente en un toque */}
-        {p.ultimo && p.ultimo.estado !== 'error' && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={repetirUltima}
-              className="c-hard-sm flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3 text-left"
-            >
-              <Repeat className="size-4 shrink-0 text-[var(--c-ok-deep)]" />
-              <span className="c-mono shrink-0 text-[13.5px] font-bold text-[var(--c-ok-deep)]">
-                {p.ultimo.tipo === 'gasto' ? '−' : '+'}
-                {fmt(p.ultimo.monto)}
-              </span>
-              <span className="min-w-0 truncate text-[13px] font-semibold text-[var(--c-ink-soft)]">
-                {p.ultimo.categoria_nombre}
-                {p.ultimo.descripcion ? ` · ${p.ultimo.descripcion}` : ''}
-              </span>
-              <span className="c-label ml-auto shrink-0 !text-[10px] !text-[var(--c-ok-deep)]">
-                otra vez
-              </span>
-            </button>
-            {p.ultimo.estado === 'pendiente' && (
-              <button
-                type="button"
-                onClick={() => void p.deshacer(p.ultimo!.id)}
-                aria-label="Deshacer última carga"
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)] active:scale-95"
-              >
-                <RotateCcw className="size-4" />
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Montos frecuentes: un toque */}
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid shrink-0 grid-cols-4 gap-1.5">
           {p.montosFrecuentes.map((m) => (
             <button
               key={m}
@@ -373,8 +360,19 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           ))}
         </div>
 
+        {/* Zona 2 · Numpad — alto fijo (sin fill): no crece ni colapsa. */}
+        <div className="shrink-0">
+          <CNumpad
+            onDigit={(d) => {
+              setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
+              if (aviso) setAviso(null)
+            }}
+            onBackspace={() => setMonto((m) => m.slice(0, -1))}
+          />
+        </div>
+
         {/* ===== Zona 3 · Obligatorios: chips-con-valor → hoja ===== */}
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid shrink-0 grid-cols-2 gap-1.5">
           <Selector
             label="Categoría"
             valor={categoria?.nombre ?? null}
@@ -390,7 +388,7 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
         </div>
 
         {/* Opcionales: una fila — foto · detalle · medio de pago · voz */}
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid shrink-0 grid-cols-5 gap-1.5">
           {/* Sin `capture`: el chooser nativo ofrece cámara O galería. */}
           <input
             ref={fileRef}
