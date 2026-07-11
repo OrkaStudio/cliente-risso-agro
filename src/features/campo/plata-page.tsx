@@ -289,7 +289,10 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
         {/* ===== Zona 1 · Visor: toggle integrado + monto rey ===== */}
         <div
           className={cn(
-            'c-panel flex items-stretch overflow-hidden',
+            // shrink-0: el visor NUNCA se aplasta. Con overflow-hidden su
+            // min-height flex vale 0 y era el primero en comprimirse (el monto
+            // desaparecía). Ver spec plata-v3-layout-responsive.
+            'c-panel flex shrink-0 items-stretch overflow-hidden',
             aviso === 'Poné el monto' && '!border-[var(--c-bad)]/60',
           )}
         >
@@ -354,12 +357,11 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           ))}
         </div>
 
-        {/* ===== Zona 2 · Numpad (crece para llenar; nunca por debajo de las
-             teclas — si no, al abrir Detalle las filas se montaban) ===== */}
-        <div className="flex flex-1 flex-col">
+        {/* ===== Zona 2 · Numpad — alto FIJO (sin fill): no crece ni colapsa,
+             así el visor no se aplasta y las teclas no se montan. Lo que sobra
+             scrollea en este contenedor. Ver spec plata-v3-layout-responsive. ===== */}
+        <div className="shrink-0">
           <CNumpad
-            fill
-            className="min-h-[210px] flex-1"
             onDigit={(d) => {
               setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
               if (aviso) setAviso(null)
