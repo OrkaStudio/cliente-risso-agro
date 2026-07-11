@@ -251,7 +251,77 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-2.5">
+      {/* ===== CORE fijo: visor + numpad. Nunca ceden → el monto que tipeás y
+           el teclado están SIEMPRE a la vista; el resto scrollea abajo.
+           Ver spec plata-v3-layout-responsive. ===== */}
+      <div className="flex shrink-0 flex-col gap-2.5 px-4 pb-2 pt-2.5">
+        {/* Zona 1 · Visor: toggle integrado + monto rey */}
+        <div
+          className={cn(
+            // shrink-0: el visor NUNCA se aplasta (con overflow-hidden su
+            // min-height flex vale 0 y era el primero en comprimirse).
+            'c-panel flex shrink-0 items-stretch overflow-hidden',
+            aviso === 'Poné el monto' && '!border-[var(--c-bad)]/60',
+          )}
+        >
+          <div className="flex w-[104px] shrink-0 flex-col border-r border-[var(--c-line)]">
+            <button
+              type="button"
+              onClick={() => cambiarTipo('gasto')}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1 text-[13.5px] font-semibold transition-colors',
+                esGasto
+                  ? 'bg-[var(--c-ink)] text-white'
+                  : 'bg-[var(--c-panel)] text-[var(--c-faint)]',
+              )}
+            >
+              <ArrowUpRight className="size-3.5" strokeWidth={2.5} />
+              Gasto
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarTipo('ingreso')}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1 border-t border-[var(--c-line)] text-[13.5px] font-semibold transition-colors',
+                !esGasto
+                  ? 'bg-[var(--c-ok)] text-white'
+                  : 'bg-[var(--c-panel)] text-[var(--c-faint)]',
+              )}
+            >
+              <ArrowDownLeft className="size-3.5" strokeWidth={2.5} />
+              Ingreso
+            </button>
+          </div>
+          <div className="flex h-[78px] min-w-0 flex-1 items-center justify-end px-4">
+            <span
+              className={cn(
+                'c-mono truncate text-[40px] font-bold leading-none tracking-tight',
+                monto
+                  ? esGasto
+                    ? 'text-[var(--c-ink)]'
+                    : 'text-[var(--c-ok-deep)]'
+                  : 'text-[var(--c-faint)]',
+              )}
+            >
+              {esGasto ? '−' : '+'}${monto ? Number(monto).toLocaleString('es-AR') : '0'}
+            </span>
+          </div>
+        </div>
+
+        {/* Zona 2 · Numpad — alto fijo (sin fill): no crece ni colapsa. */}
+        <CNumpad
+          onDigit={(d) => {
+            setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
+            if (aviso) setAviso(null)
+          }}
+          onBackspace={() => setMonto((m) => m.slice(0, -1))}
+        />
+      </div>
+
+      {/* ===== Metadata: la ÚNICA región que scrollea (recurrente, montos
+           frecuentes, obligatorios, opcionales, expansiones). Nunca aplasta
+           al core; "Guardar" queda fijo en el footer. ===== */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 pb-3 pt-2">
         {/* Otra vez lo mismo: la carga recurrente en un toque */}
         {p.ultimo && p.ultimo.estado !== 'error' && (
           <div className="flex items-center gap-2">
@@ -286,60 +356,6 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
           </div>
         )}
 
-        {/* ===== Zona 1 · Visor: toggle integrado + monto rey ===== */}
-        <div
-          className={cn(
-            // shrink-0: el visor NUNCA se aplasta. Con overflow-hidden su
-            // min-height flex vale 0 y era el primero en comprimirse (el monto
-            // desaparecía). Ver spec plata-v3-layout-responsive.
-            'c-panel flex shrink-0 items-stretch overflow-hidden',
-            aviso === 'Poné el monto' && '!border-[var(--c-bad)]/60',
-          )}
-        >
-          <div className="flex w-[104px] shrink-0 flex-col border-r border-[var(--c-line)]">
-            <button
-              type="button"
-              onClick={() => cambiarTipo('gasto')}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1 text-[13.5px] font-semibold transition-colors',
-                esGasto
-                  ? 'bg-[var(--c-ink)] text-white'
-                  : 'bg-[var(--c-panel)] text-[var(--c-faint)]',
-              )}
-            >
-              <ArrowUpRight className="size-3.5" strokeWidth={2.5} />
-              Gasto
-            </button>
-            <button
-              type="button"
-              onClick={() => cambiarTipo('ingreso')}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1 border-t border-[var(--c-line)] text-[13.5px] font-semibold transition-colors',
-                !esGasto
-                  ? 'bg-[var(--c-ok)] text-white'
-                  : 'bg-[var(--c-panel)] text-[var(--c-faint)]',
-              )}
-            >
-              <ArrowDownLeft className="size-3.5" strokeWidth={2.5} />
-              Ingreso
-            </button>
-          </div>
-          <div className="flex h-[72px] min-w-0 flex-1 items-center justify-end px-4">
-            <span
-              className={cn(
-                'c-mono truncate text-[34px] font-bold leading-none',
-                monto
-                  ? esGasto
-                    ? 'text-[var(--c-ink)]'
-                    : 'text-[var(--c-ok-deep)]'
-                  : 'text-[var(--c-faint)]',
-              )}
-            >
-              {esGasto ? '−' : '+'}${monto ? Number(monto).toLocaleString('es-AR') : '0'}
-            </span>
-          </div>
-        </div>
-
         {/* Montos frecuentes: un toque */}
         <div className="grid grid-cols-4 gap-1.5">
           {p.montosFrecuentes.map((m) => (
@@ -355,19 +371,6 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
               {fmtCorto(m)}
             </button>
           ))}
-        </div>
-
-        {/* ===== Zona 2 · Numpad — alto FIJO (sin fill): no crece ni colapsa,
-             así el visor no se aplasta y las teclas no se montan. Lo que sobra
-             scrollea en este contenedor. Ver spec plata-v3-layout-responsive. ===== */}
-        <div className="shrink-0">
-          <CNumpad
-            onDigit={(d) => {
-              setMonto((m) => (m + d).replace(/^0+(?=\d)/, '').slice(0, 10))
-              if (aviso) setAviso(null)
-            }}
-            onBackspace={() => setMonto((m) => m.slice(0, -1))}
-          />
         </div>
 
         {/* ===== Zona 3 · Obligatorios: chips-con-valor → hoja ===== */}
