@@ -40,6 +40,10 @@ const CampoMapaReal = lazy(() =>
 )
 import { CampoVista } from '@/features/lotes/campo-vista'
 import { CatastroDialog } from '@/features/lotes/catastro-dialog'
+import {
+  MoverAnimalesDialog,
+  type PuntoMovimiento,
+} from '@/features/hacienda/mover-animales-dialog'
 import { cn } from '@/lib/utils'
 
 type Vista = 'mapa' | 'lista'
@@ -154,6 +158,11 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
   const setContorno = useSetCampoContorno(campoId)
   const crearPotrero = useCrearPotrero(campoId)
   const setPoligono = useSetPotreroPoligono(campoId)
+
+  // Modo mover: vive ACÁ (no en CampoVista) para sobrevivir al cambio de
+  // campo por las pills → el destino puede ser un potrero de OTRO campo.
+  const [moverOrigen, setMoverOrigen] = useState<PuntoMovimiento | null>(null)
+  const [moverDestino, setMoverDestino] = useState<PuntoMovimiento | null>(null)
 
   // Modo edición (satelital). Se decide una vez por campo, al cargar su
   // geometría: arranca en edición si todavía no está delimitado. No se deriva
@@ -301,6 +310,36 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
             contorno={contorno}
             potreros={potreros}
             infra={infraRows}
+            onMoverDesde={(info) =>
+              setMoverOrigen({
+                campoId: vm.id,
+                campoNombre: vm.nombre,
+                campoColor: vm.color.hex,
+                potreroId: info.potreroId,
+                potreroNombre: info.numero,
+                cabezas: info.cabezas,
+              })
+            }
+            mover={
+              moverOrigen
+                ? {
+                    activo: !moverDestino,
+                    origenPotreroId:
+                      moverOrigen.campoId === vm.id ? moverOrigen.potreroId : null,
+                    origenLabel: `${moverOrigen.potreroNombre} · ${moverOrigen.campoNombre}`,
+                    origenCabezas: moverOrigen.cabezas,
+                    onElegirDestino: (potreroId, nombre) =>
+                      setMoverDestino({
+                        campoId: vm.id,
+                        campoNombre: vm.nombre,
+                        campoColor: vm.color.hex,
+                        potreroId,
+                        potreroNombre: nombre,
+                      }),
+                    onCancelar: () => setMoverOrigen(null),
+                  }
+                : undefined
+            }
             onGuardarPotrero={(potreroId, v) =>
               guardarPotrero.mutate({
                 id: potreroId,
@@ -329,6 +368,21 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
           />
         )}
       </section>
+
+      {/* Confirmación del movimiento (origen y destino ya tocados en el mapa) */}
+      {moverOrigen && moverDestino && (
+        <MoverAnimalesDialog
+          empresaId={empresaId}
+          origen={moverOrigen}
+          destino={moverDestino}
+          onOpenChange={(v) => {
+            if (!v) {
+              setMoverOrigen(null)
+              setMoverDestino(null)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -23,6 +23,8 @@ function invalidarStock(qc: QueryClient) {
     ['potrero-detalle'],
     ['lotes-campo'],
     ['lotes-reparto'],
+    ['tropas-potrero'],
+    ['tropas-campo'],
     ['panorama-inicio'],
   ]) {
     qc.invalidateQueries({ queryKey: key })
@@ -57,6 +59,34 @@ export function useCrearAnimalesMasivo() {
   return useMutation({
     mutationFn: api.crearAnimalesMasivo,
     onSuccess: () => invalidarStock(qc),
+  })
+}
+
+/** Tropas (y sueltos) que ocupan un potrero — panel del mapa y diálogo de mover. */
+export const useTropasDelPotrero = (potreroId: string | null) =>
+  useQuery({
+    queryKey: ['tropas-potrero', potreroId],
+    queryFn: () => api.getTropasDelPotrero(potreroId!),
+    enabled: !!potreroId,
+  })
+
+/** Tropas de un campo — selector de tropa destino al mover. */
+export const useTropasCampo = (campoId: string | null) =>
+  useQuery({
+    queryKey: ['tropas-campo', campoId],
+    queryFn: () => api.listTropasCampo(campoId!),
+    enabled: !!campoId,
+  })
+
+export function useMoverAnimales() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.moverAnimales,
+    onSuccess: () => {
+      invalidarStock(qc)
+      // El movimiento deja un evento en el historial de cada animal movido.
+      qc.invalidateQueries({ queryKey: ['eventos'] })
+    },
   })
 }
 

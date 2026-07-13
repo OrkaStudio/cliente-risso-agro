@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { Beef, Leaf, Sprout, Tractor, Wheat } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
+import { categoriaColor, categoriaNombre } from '@/features/hacienda/labels'
 import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
 
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -112,7 +112,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
                   width: `${(c.cabezas / totalComp) * 100}%`,
                   background: categoriaColor[c.categoria],
                 }}
-                title={`${categoriaLabel[c.categoria]}: ${c.cabezas}`}
+                title={`${categoriaNombre(c.categoria, c.cabezas)}: ${c.cabezas}`}
               />
             ))}
           </div>
@@ -124,7 +124,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
                   style={{ background: categoriaColor[c.categoria] }}
                 />
                 <span className="text-muted-foreground">
-                  {categoriaLabel[c.categoria]}
+                  {categoriaNombre(c.categoria, c.cabezas)}
                 </span>
                 <b className="tnum font-bold text-ink">{c.cabezas}</b>
               </span>

@@ -149,6 +149,135 @@ export async function crearAnimalesMasivo(input: CargaMasiva): Promise<number> {
   return res.total
 }
 
+/** Una tropa presente en un potrero, con su composición. `loteId: null` agrupa
+ *  los animales sueltos (sin tropa). `sinCaravana` permite avisar en la UI
+ *  cuando un movimiento por cantidad va a tocar animales identificados. */
+export type TropaDelPotrero = {
+  loteId: string | null
+  nombre: string | null
+  proposito: string | null
+  cabezas: number
+  composicion: { categoria: CategoriaAnimal; cabezas: number; sinCaravana: number }[]
+}
+
+/** Tropas (y sueltos) que ocupan un potrero, derivadas de los animales activos. */
+export async function getTropasDelPotrero(
+  potreroId: string,
+): Promise<TropaDelPotrero[]> {
+  const { data: animales, error } = await supabase
+    .from('v_animal_con_caravana')
+    .select('lote_id, categoria, caravana_rfid')
+    .eq('potrero_id', potreroId)
+    .eq('estado', 'activo')
+  if (error) throw new Error(error.message)
+
+  const porLote = new Map<
+    string | null,
+    Map<CategoriaAnimal, { cabezas: number; sinCaravana: number }>
+  >()
+  for (const a of animales ?? []) {
+    if (!a.categoria) continue
+    const cats = porLote.get(a.lote_id) ?? new Map()
+    const c = cats.get(a.categoria) ?? { cabezas: 0, sinCaravana: 0 }
+    c.cabezas += 1
+    if (!a.caravana_rfid) c.sinCaravana += 1
+    cats.set(a.categoria, c)
+    porLote.set(a.lote_id, cats)
+  }
+
+  const loteIds = [...porLote.keys()].filter((k): k is string => k !== null)
+  const nombres = new Map<string, { nombre: string; proposito: string | null }>()
+  if (loteIds.length > 0) {
+    const { data: lotes, error: eL } = await supabase
+      .from('lote')
+      .select('id, nombre, proposito')
+      .in('id', loteIds)
+    if (eL) throw new Error(eL.message)
+    for (const l of lotes ?? []) nombres.set(l.id, l)
+  }
+
+  return [...porLote.entries()]
+    .map(([loteId, cats]) => ({
+      loteId,
+      nombre: loteId ? (nombres.get(loteId)?.nombre ?? '—') : null,
+      proposito: loteId ? (nombres.get(loteId)?.proposito ?? null) : null,
+      cabezas: [...cats.values()].reduce((s, c) => s + c.cabezas, 0),
+      composicion: [...cats.entries()].map(([categoria, c]) => ({
+        categoria,
+        cabezas: c.cabezas,
+        sinCaravana: c.sinCaravana,
+      })),
+    }))
+    .sort((a, b) => (a.nombre ?? 'zzz').localeCompare(b.nombre ?? 'zzz'))
+}
+
+/** Tropas de un campo (para elegir tropa destino al mover). */
+export async function listTropasCampo(campoId: string) {
+  const { data, error } = await supabase
+    .from('lote')
+    .select('id, nombre, proposito')
+    .eq('campo_id', campoId)
+    .order('nombre')
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+export type MoverAnimalesInput = {
+  empresaId: string
+  potreroOrigenId: string
+  potreroDestinoId: string
+  /** Tropa de origen (null = animales sueltos). */
+  loteId: string | null
+  /** Qué se mueve: la tropa entera del potrero, o cantidades por categoría. */
+  seleccion: { todo: true } | { items: ItemCargaMasiva[] }
+  /** A qué tropa llegan. Omitido = conservan la de origen (cruzar de campo
+   *  conservando tropa solo vale si se muda entera; lo valida Postgres). */
+  destino?: { loteId: string } | { nuevoNombre: string }
+}
+
+export type MoverAnimalesResult = {
+  movidos: number
+  loteDestinoId: string | null
+  tropaMudada: boolean
+}
+
+/**
+ * Mover animales entre potreros (y campos) en UNA transacción (RPC
+ * `mover_animales`): update de potrero/tropa + un evento 'movimiento' por
+ * animal + `lote_potrero` coherente. Al mover por cantidad elige primero los
+ * SIN caravana. Atómico: o todo, o nada.
+ */
+export async function moverAnimales(
+  input: MoverAnimalesInput,
+): Promise<MoverAnimalesResult> {
+  const { data, error } = await supabase.rpc('mover_animales', {
+    p_empresa_id: input.empresaId,
+    p_potrero_destino: input.potreroDestinoId,
+    p_potrero_origen: input.potreroOrigenId,
+    p_lote_id: input.loteId ?? undefined,
+    ...('todo' in input.seleccion
+      ? { p_todo: true }
+      : { p_items: input.seleccion.items.filter((it) => it.cantidad > 0) }),
+    ...(input.destino && 'loteId' in input.destino
+      ? { p_lote_destino: input.destino.loteId }
+      : {}),
+    ...(input.destino && 'nuevoNombre' in input.destino
+      ? { p_lote_nuevo: input.destino.nuevoNombre.trim() }
+      : {}),
+  })
+  if (error) throw new Error(error.message)
+  const res = data as {
+    movidos: number
+    lote_destino_id: string | null
+    tropa_mudada: boolean
+  }
+  return {
+    movidos: res.movidos,
+    loteDestinoId: res.lote_destino_id,
+    tropaMudada: res.tropa_mudada,
+  }
+}
+
 /** Cambiar la caravana conservando la identidad del animal (RPC transaccional). */
 export async function cambiarCaravana(input: {
   animalId: string

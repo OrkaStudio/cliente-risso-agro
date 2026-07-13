@@ -7,6 +7,7 @@ import { useCampos } from '@/features/campos/hooks'
 import {
   categoriaColor,
   categoriaLabel,
+  categoriaNombre,
   sexoLabel,
 } from '@/features/hacienda/labels'
 import { CrearAnimalDialog } from '@/features/hacienda/crear-animal-dialog'
@@ -148,7 +149,7 @@ export function AnimalesPage() {
                     width: `${(c.n / totalActivos) * 100}%`,
                     background: categoriaColor[c.categoria],
                   }}
-                  title={`${categoriaLabel[c.categoria]}: ${c.n}`}
+                  title={`${categoriaNombre(c.categoria, c.n)}: ${c.n}`}
                 />
               ))}
             </div>
@@ -159,7 +160,7 @@ export function AnimalesPage() {
                     className="size-[11px] shrink-0 rounded-[3px]"
                     style={{ background: categoriaColor[c.categoria] }}
                   />
-                  <span className="text-ink">{categoriaLabel[c.categoria]}</span>
+                  <span className="text-ink">{categoriaNombre(c.categoria, c.n)}</span>
                   <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
                     {c.n}
                   </span>

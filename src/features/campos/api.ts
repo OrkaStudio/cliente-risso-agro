@@ -367,7 +367,11 @@ export async function listLotes(campoId: string): Promise<Lote[]> {
     .eq('potrero.campo_id', campoId)
   if (error) throw new Error(error.message)
   // Quitar el join anidado (solo se usó para filtrar por campo).
-  return (data ?? []).map(({ potrero: _p, ...lote }) => lote as Lote)
+  return (data ?? []).map((row) => {
+    const { potrero, ...lote } = row
+    void potrero
+    return lote as Lote
+  })
 }
 
 /** Un lote del campo con su composición (categorías) y dispersión (potreros). */

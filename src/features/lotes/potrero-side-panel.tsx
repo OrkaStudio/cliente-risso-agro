@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from 'react'
 import {
   ArrowRight,
+  ArrowRightLeft,
   Beef,
   Layers,
   LandPlot,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 import { FEATURE_MAP, type FeatureId } from '@/features/lotes/potrero-features'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
+import { useTropasDelPotrero } from '@/features/hacienda/hooks'
 import {
   usoToEstadoCiclo,
   type CampoVM,
@@ -119,6 +121,87 @@ export type EditarPotrero = {
       estadoCiclo: EstadoCiclo
     },
   ) => void
+}
+
+/** Datos del modo mover que el panel necesita para GUIAR el paso a paso. */
+export type MoverPanel = {
+  origenPotreroId: string | null
+  origenLabel: string
+  origenCabezas?: number
+  onCancelar: () => void
+}
+
+/** Panel-guía mientras se elige el destino: muestra el origen fijo, qué
+ *  potrero está bajo el mouse como candidato y cómo confirmar o cancelar. */
+function GuiaMover({ mover, info }: { mover: MoverPanel; info: PotreroInfo | null }) {
+  const esOrigen = info?.potreroId === mover.origenPotreroId
+  return (
+    <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex items-center gap-2">
+        <ArrowRightLeft className="size-4 shrink-0 text-field-deep" />
+        <span className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+          Moviendo animales
+        </span>
+      </div>
+
+      <div className="rounded-xl bg-secondary/60 px-3 py-2.5">
+        <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+          Desde
+        </span>
+        <span className="text-[13.5px] font-semibold text-ink">
+          Potrero {mover.origenLabel}
+        </span>
+        {mover.origenCabezas != null && (
+          <span className="tnum text-[13px] text-muted-foreground">
+            {' '}
+            · {mover.origenCabezas} cab
+          </span>
+        )}
+      </div>
+
+      {info && !esOrigen ? (
+        <div className="rounded-xl border-2 border-dashed border-field/60 bg-field-soft/50 px-3 py-2.5">
+          <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-field-deep">
+            Destino
+          </span>
+          <span className="text-[13.5px] font-semibold text-ink">
+            Potrero {info.numero}
+          </span>
+          <span className="tnum text-[13px] text-muted-foreground">
+            {' '}
+            · {info.uso === 'ganadero' ? `${info.cabezas ?? 0} cab` : USO[info.uso].label}
+          </span>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Tocalo para confirmarlo como destino.
+          </p>
+        </div>
+      ) : esOrigen ? (
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          Ese es el potrero de origen — elegí otro como destino.
+        </p>
+      ) : (
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          Ahora tocá en el mapa el potrero adonde van los animales. ¿Van a otro
+          campo? Cambiá de campo con los botones de arriba.
+        </p>
+      )}
+
+      <p className="text-[12px] leading-snug text-faint">
+        Un potrero vacío también sirve como destino.
+      </p>
+
+      <div className="mt-auto">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={mover.onCancelar}
+        >
+          Cancelar movimiento
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function UsoBadge({ uso }: { uso: Uso }) {
@@ -249,17 +332,25 @@ export function PotreroSidePanel({
   info,
   campo,
   onVerPotrero,
+  onMoverDesde,
+  mover,
   edit,
 }: {
   info: PotreroInfo | null
   campo: CampoVM
   onVerPotrero?: (potreroId: string) => void
+  /** Arranca el modo mover con este potrero como ORIGEN (el destino se toca en el mapa). */
+  onMoverDesde?: (info: PotreroInfo) => void
+  /** Con el modo mover activo, el panel se vuelve la guía del paso a paso. */
+  mover?: MoverPanel
   edit?: EditarPotrero
 }) {
   // Snapshot del potrero al abrir edición/carga → el hover no lo cambia mientras
   // el formulario está abierto.
   const [editInfo, setEditInfo] = useState<PotreroInfo | null>(null)
   const [cargaInfo, setCargaInfo] = useState<PotreroInfo | null>(null)
+  // Tropas del potrero activo (cacheado por potrero; el hover no re-consulta).
+  const tropas = useTropasDelPotrero(info?.potreroId ?? null)
 
   return (
     <>
@@ -276,7 +367,9 @@ export function PotreroSidePanel({
         </span>
       </div>
 
-      {editInfo && edit ? (
+      {mover ? (
+        <GuiaMover mover={mover} info={info} />
+      ) : editInfo && edit ? (
         <FormEditar
           info={editInfo}
           edit={edit}
@@ -297,6 +390,35 @@ export function PotreroSidePanel({
               <span className="text-[14px] font-semibold text-muted-foreground">
                 cabezas
               </span>
+            </div>
+          )}
+
+          {/* Potrero ganadero vacío: decir qué hacer, no dejar el 0 mudo. */}
+          {info.uso === 'ganadero' && (info.cabezas ?? 0) === 0 && (
+            <p className="text-[12.5px] leading-snug text-muted-foreground">
+              Este potrero no tiene animales todavía. Sumalos con{' '}
+              <b>“Cargar animales”</b>, o movelos desde otro potrero con{' '}
+              <b>“Mover animales”</b>.
+            </p>
+          )}
+
+          {/* Qué tropas ocupan el potrero (para planificar movimientos). */}
+          {info.uso === 'ganadero' && (tropas.data?.length ?? 0) > 0 && (
+            <div className="grid gap-1.5 rounded-xl bg-secondary/60 px-3 py-2.5">
+              {tropas.data!.map((t) => (
+                <div
+                  key={t.loteId ?? 'sueltos'}
+                  className="flex items-baseline justify-between gap-2 text-[12.5px]"
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-ink">
+                    <Layers className="size-3.5 shrink-0 text-field-deep" />
+                    <span className="truncate">{t.nombre ?? 'Sueltos (sin tropa)'}</span>
+                  </span>
+                  <span className="tnum shrink-0 font-semibold text-muted-foreground">
+                    {t.cabezas} cab
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -340,6 +462,17 @@ export function PotreroSidePanel({
               <Layers className="size-4" />
               Cargar animales
             </button>
+            {/* Mover: el origen queda fijo acá; el DESTINO se toca en el mapa. */}
+            {onMoverDesde && info.uso === 'ganadero' && (info.cabezas ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => onMoverDesde(info)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-field-soft py-2.5 text-[13px] font-semibold text-field-deep transition-colors hover:bg-field-soft/70"
+              >
+                <ArrowRightLeft className="size-4" />
+                Mover animales
+              </button>
+            )}
             {onVerPotrero && (
               <button
                 type="button"
@@ -365,7 +498,11 @@ export function PotreroSidePanel({
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
           <MousePointer2 className="size-7 text-faint" />
           <p className="text-[13px] text-muted-foreground">
-            Pasá el mouse o tocá un potrero para ver y editar su detalle.
+            Tocá un potrero del mapa para ver su detalle.
+          </p>
+          <p className="text-[12px] leading-snug text-faint">
+            Desde acá cargás animales, los movés entre potreros y editás la
+            superficie o el uso de cada uno.
           </p>
         </div>
       )}

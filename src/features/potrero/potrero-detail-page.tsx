@@ -9,7 +9,7 @@ import {
   Sprout,
   TrendingUp,
 } from 'lucide-react'
-import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
+import { categoriaColor, categoriaLabel, categoriaNombre } from '@/features/hacienda/labels'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -190,7 +190,7 @@ function StockCategoria({ d }: { d: PotreroDetalle }) {
               className="size-[11px] shrink-0 rounded-[3px]"
               style={{ background: categoriaColor[c.categoria] }}
             />
-            <span className="text-ink">{categoriaLabel[c.categoria]}</span>
+            <span className="text-ink">{categoriaNombre(c.categoria, c.cabezas)}</span>
             <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
               {c.cabezas}
             </span>

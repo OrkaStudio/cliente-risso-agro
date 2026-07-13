@@ -273,10 +273,10 @@ export function CargaMasivaDialog({
       {/* Lote / tropa */}
       <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="lote-nombre">Lote / tropa (opcional)</Label>
+          <Label htmlFor="lote-nombre">Tropa (opcional)</Label>
           <Input
             id="lote-nombre"
-            placeholder="Ej. Lote 1"
+            placeholder="Ej. Tropa 1"
             value={loteNombre}
             onChange={(e) => setLoteNombre(e.target.value)}
           />
@@ -300,7 +300,7 @@ export function CargaMasivaDialog({
             {!potreroFijo && (
               <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
                 Elegí un potrero y anotá cuántos hay de cada categoría. Podés sumar
-                más potreros para el mismo lote.
+                más potreros para la misma tropa.
               </p>
             )}
           </div>

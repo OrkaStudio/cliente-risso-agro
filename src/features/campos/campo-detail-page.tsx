@@ -17,7 +17,7 @@ import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dia
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
 import { estadoCicloColor, estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
-import { categoriaColor, categoriaLabel } from '@/features/hacienda/labels'
+import { categoriaColor, categoriaNombre } from '@/features/hacienda/labels'
 import { useMovimientos } from '@/features/analitica/hooks'
 import { formatARS, porPotrero, resumen } from '@/features/analitica/compute'
 import { usoDeEstado, type Uso } from '@/features/campos/use-campo-mapa'
@@ -128,7 +128,7 @@ function ComposicionRodeo({ campo }: { campo: CampoConPotreros }) {
   const items = [...acc.entries()]
     .map(([categoria, cabezas]) => ({
       key: categoria,
-      label: categoriaLabel[categoria],
+      label: categoriaNombre(categoria, cabezas),
       value: cabezas,
       color: categoriaColor[categoria],
     }))
@@ -264,7 +264,7 @@ function LoteCard({ lote }: { lote: LoteReparto }) {
                   width: `${(c.cabezas / totalCabezas) * 100}%`,
                   background: categoriaColor[c.categoria],
                 }}
-                title={`${categoriaLabel[c.categoria]}: ${c.cabezas}`}
+                title={`${categoriaNombre(c.categoria, c.cabezas)}: ${c.cabezas}`}
               />
             ))}
           </div>
@@ -278,7 +278,7 @@ function LoteCard({ lote }: { lote: LoteReparto }) {
                   className="size-2.5 rounded-[3px]"
                   style={{ background: categoriaColor[c.categoria] }}
                 />
-                <span className="text-ink">{categoriaLabel[c.categoria]}</span>
+                <span className="text-ink">{categoriaNombre(c.categoria, c.cabezas)}</span>
                 <span className="tnum font-semibold text-muted-foreground">
                   {c.cabezas}
                 </span>
@@ -321,15 +321,15 @@ function LotesDelCampo({ campoId }: { campoId: string }) {
 
   return (
     <Panel
-      title="Lotes"
-      info="Cómo está compuesto cada lote (por categoría) y en qué potreros está repartido. El conteo sale de los animales cargados."
+      title="Tropas"
+      info="Cómo está compuesta cada tropa (por categoría) y en qué potreros está repartida. El conteo sale de los animales cargados."
     >
       {lotes.isLoading ? (
         <EmptyMini>Cargando…</EmptyMini>
       ) : data.length === 0 ? (
         <EmptyMini>
-          Todavía no armaste lotes en este campo. Usá “Cargar lote” para crear una
-          tropa y repartirla entre los potreros.
+          Todavía no armaste tropas en este campo. Usá “Cargar tropa” para
+          crear una y repartirla entre los potreros.
         </EmptyMini>
       ) : (
         <div className="flex flex-col gap-4">
@@ -625,7 +625,7 @@ export function CampoDetailPage() {
               <>
                 <Button onClick={() => setCargaOpen(true)} className="gap-1.5">
                   <Layers className="size-4" />
-                  Cargar lote
+                  Cargar tropa
                 </Button>
                 <CargaMasivaDialog
                   open={cargaOpen}

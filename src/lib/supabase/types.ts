@@ -614,19 +614,19 @@ export type Database = {
         Row: {
           actividad: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id: string | null
+          audio_url: string | null
           campo_id: string
           categoria_id: string
           cheque_banco: string | null
-          audio_url: string | null
           cheque_numero: string | null
+          comprobante_tipo:
+            | Database["public"]["Enums"]["comprobante_fiscal_tipo"]
+            | null
           comprobante_url: string | null
           contraparte: string | null
-          comprobante_tipo: Database["public"]["Enums"]["comprobante_fiscal_tipo"] | null
-          cuit_contraparte: string | null
-          neto_total: number | null
-          iva_total: number | null
           created_at: string
           created_by: string | null
+          cuit_contraparte: string | null
           descripcion: string | null
           empresa_id: string
           es_echeq: boolean
@@ -635,9 +635,11 @@ export type Database = {
           fecha_devengo: string
           fecha_vencimiento: string | null
           id: string
+          iva_total: number | null
           medio_pago: Database["public"]["Enums"]["medio_pago"] | null
           moneda: string
           monto: number
+          neto_total: number | null
           potrero_id: string | null
           serie_id: string | null
           tipo: Database["public"]["Enums"]["tipo_movimiento"]
@@ -647,19 +649,19 @@ export type Database = {
         Insert: {
           actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
+          audio_url?: string | null
           campo_id: string
           categoria_id: string
           cheque_banco?: string | null
-          audio_url?: string | null
           cheque_numero?: string | null
+          comprobante_tipo?:
+            | Database["public"]["Enums"]["comprobante_fiscal_tipo"]
+            | null
           comprobante_url?: string | null
           contraparte?: string | null
-          comprobante_tipo?: Database["public"]["Enums"]["comprobante_fiscal_tipo"] | null
-          cuit_contraparte?: string | null
-          neto_total?: number | null
-          iva_total?: number | null
           created_at?: string
           created_by?: string | null
+          cuit_contraparte?: string | null
           descripcion?: string | null
           empresa_id: string
           es_echeq?: boolean
@@ -668,9 +670,11 @@ export type Database = {
           fecha_devengo: string
           fecha_vencimiento?: string | null
           id?: string
+          iva_total?: number | null
           medio_pago?: Database["public"]["Enums"]["medio_pago"] | null
           moneda?: string
           monto: number
+          neto_total?: number | null
           potrero_id?: string | null
           serie_id?: string | null
           tipo: Database["public"]["Enums"]["tipo_movimiento"]
@@ -680,19 +684,19 @@ export type Database = {
         Update: {
           actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
+          audio_url?: string | null
           campo_id?: string
           categoria_id?: string
           cheque_banco?: string | null
-          audio_url?: string | null
           cheque_numero?: string | null
+          comprobante_tipo?:
+            | Database["public"]["Enums"]["comprobante_fiscal_tipo"]
+            | null
           comprobante_url?: string | null
           contraparte?: string | null
-          comprobante_tipo?: Database["public"]["Enums"]["comprobante_fiscal_tipo"] | null
-          cuit_contraparte?: string | null
-          neto_total?: number | null
-          iva_total?: number | null
           created_at?: string
           created_by?: string | null
+          cuit_contraparte?: string | null
           descripcion?: string | null
           empresa_id?: string
           es_echeq?: boolean
@@ -701,9 +705,11 @@ export type Database = {
           fecha_devengo?: string
           fecha_vencimiento?: string | null
           id?: string
+          iva_total?: number | null
           medio_pago?: Database["public"]["Enums"]["medio_pago"] | null
           moneda?: string
           monto?: number
+          neto_total?: number | null
           potrero_id?: string | null
           serie_id?: string | null
           tipo?: Database["public"]["Enums"]["tipo_movimiento"]
@@ -802,6 +808,13 @@ export type Database = {
             columns: ["movimiento_id"]
             isOneToOne: false
             referencedRelation: "movimiento_financiero"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimiento_iva_linea_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "v_pendientes"
             referencedColumns: ["id"]
           },
         ]
@@ -1252,6 +1265,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      mover_animales: {
+        Args: {
+          p_animal_ids?: string[]
+          p_empresa_id: string
+          p_items?: Json
+          p_lote_destino?: string
+          p_lote_id?: string
+          p_lote_nuevo?: string
+          p_potrero_destino: string
+          p_potrero_origen?: string
+          p_todo?: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       actividad_movimiento: "cria" | "invernada" | "agricultura" | "estructura"
@@ -1278,11 +1305,11 @@ export type Database = {
         | "padrillo"
         | "potrillo"
         | "potranca"
+      comprobante_fiscal_tipo: "a" | "b" | "c" | "otro"
+      cultivo_obs_estado: "bien" | "regular" | "mal"
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
       estado_animal: "activo" | "vendido" | "muerto"
-      comprobante_fiscal_tipo: "a" | "b" | "c" | "otro"
-      cultivo_obs_estado: "bien" | "regular" | "mal"
       estado_ciclo_potrero:
         | "ganadero"
         | "descanso"
@@ -1471,11 +1498,11 @@ export const Constants = {
         "potrillo",
         "potranca",
       ],
+      comprobante_fiscal_tipo: ["a", "b", "c", "otro"],
+      cultivo_obs_estado: ["bien", "regular", "mal"],
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
       estado_animal: ["activo", "vendido", "muerto"],
-      comprobante_fiscal_tipo: ["a", "b", "c", "otro"],
-      cultivo_obs_estado: ["bien", "regular", "mal"],
       estado_ciclo_potrero: [
         "ganadero",
         "descanso",

@@ -29,11 +29,6 @@ const FichaAnimalPage = lazy(() =>
 const LotesPage = lazy(() =>
   import('@/features/lotes/lotes-page').then((m) => ({ default: m.LotesPage })),
 )
-const LoteFichaPage = lazy(() =>
-  import('@/features/lotes/lote-ficha-page').then((m) => ({
-    default: m.LoteFichaPage,
-  })),
-)
 const CampoDetailPage = lazy(() =>
   import('@/features/campos/campo-detail-page').then((m) => ({
     default: m.CampoDetailPage,
@@ -97,7 +92,6 @@ export const router = createBrowserRouter([
               { path: 'hacienda/:id', element: <FichaAnimalPage /> },
               { path: 'campos', element: <LotesPage /> },
               { path: 'campos/:id', element: <CampoDetailPage /> },
-              { path: 'potreros/:id', element: <LoteFichaPage /> },
               // Compat: la sección Potreros se unificó dentro de Campos.
               { path: 'potreros', element: <Navigate to="/campos" replace /> },
               { path: 'potrero/:id', element: <PotreroDetailPage /> },

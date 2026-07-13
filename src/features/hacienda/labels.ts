@@ -57,6 +57,30 @@ export const categoriaLabel: Record<Categoria, string> = {
   potranca: 'Potranca',
 }
 
+/** Plural de cada categoría — para etiquetas junto a un conteo ("14 vaquillonas"). */
+export const categoriaPlural: Record<Categoria, string> = {
+  vaca: 'Vacas',
+  vaquillona: 'Vaquillonas',
+  novillo: 'Novillos',
+  ternero: 'Terneros',
+  ternera: 'Terneras',
+  toro: 'Toros',
+  capon: 'Capones',
+  oveja: 'Ovejas',
+  carnero: 'Carneros',
+  cordero: 'Corderos',
+  cordera: 'Corderas',
+  yegua: 'Yeguas',
+  padrillo: 'Padrillos',
+  potrillo: 'Potrillos',
+  potranca: 'Potrancas',
+}
+
+/** Nombre de la categoría según la cantidad: 1 → singular, N → plural. */
+export function categoriaNombre(c: Categoria, n: number): string {
+  return n === 1 ? categoriaLabel[c] : categoriaPlural[c]
+}
+
 /** Color de la serie de datos por categoría (paleta de gráficos g1–g5). */
 export const categoriaColor: Record<Categoria, string> = {
   vaca: 'var(--g1)',

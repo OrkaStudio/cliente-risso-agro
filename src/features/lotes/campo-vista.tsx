@@ -120,6 +120,19 @@ function closestOnSeg(px: number, py: number, a: XY, b: XY) {
   return { cx, cy, d: Math.hypot(px - cx, py - cy) }
 }
 
+/** Modo mover: el mapa se vuelve el selector del potrero DESTINO. */
+export type MoverEnMapa = {
+  activo: boolean
+  /** Potrero origen, solo si está en ESTE campo (para resaltarlo y no ofrecerlo). */
+  origenPotreroId: string | null
+  /** "1M · Don Gilberto" — el origen puede ser de otro campo (cross-campo por pills). */
+  origenLabel: string
+  /** Cabezas del origen al arrancar el modo (para la guía del panel). */
+  origenCabezas?: number
+  onElegirDestino: (potreroId: string, nombre: string) => void
+  onCancelar: () => void
+}
+
 export function CampoVista({
   campo,
   contorno,
@@ -130,6 +143,8 @@ export function CampoVista({
   onActualizarInfra,
   onBorrarInfra,
   onVerPotrero,
+  onMoverDesde,
+  mover,
 }: {
   campo: CampoVM
   contorno: LatLng[] | null
@@ -140,6 +155,8 @@ export function CampoVista({
   onActualizarInfra: (id: string, patch: PatchInfraInput) => void
   onBorrarInfra: (id: string) => void
   onVerPotrero: (potreroId: string) => void
+  onMoverDesde?: (info: PotreroInfo) => void
+  mover?: MoverEnMapa
 }) {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
@@ -534,7 +551,9 @@ export function CampoVista({
     }
   }, [hiHref, hiHit])
 
-  const activeId = selected ?? hoverId
+  // En modo mover manda el HOVER (el panel guía muestra el candidato a
+  // destino); si no, manda la selección.
+  const activeId = mover?.activo ? (hoverId ?? selected) : (selected ?? hoverId)
   const panelInfo = activeId ? infoDe(activeId) : null
   const vacio = shapes.length === 0 && !boundary
   // Patrón de surcos (líneas diagonales) para los potreros agrícolas.
@@ -658,13 +677,23 @@ export function CampoVista({
               // que el conteo siempre se vea sobre el mapa (aunque desborde un
               // poco el polígono chico).
               const showPill = !s.small || (uso === 'ganadero' && cab > 0) || sel || hov
+              const esOrigen = mover?.activo && mover.origenPotreroId === s.id
               return (
                 <g
                   key={s.id}
                   className="cursor-pointer"
+                  style={
+                    mover?.activo
+                      ? { cursor: esOrigen ? 'not-allowed' : 'crosshair' }
+                      : undefined
+                  }
                   onMouseEnter={() => setHoverId(s.id)}
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (mover?.activo) {
+                      if (!esOrigen) mover.onElegirDestino(s.id, s.numero)
+                      return
+                    }
                     if (placing) {
                       void placeAt(e)
                       return
@@ -705,6 +734,40 @@ export function CampoVista({
                     strokeDasharray={esVacio ? '4 5' : undefined}
                     style={{ transition: 'fill-opacity 0.12s' }}
                   />
+                  {/* Anillo blanco: potrero seleccionado, o candidato a
+                      destino bajo el mouse en modo mover. */}
+                  {((sel && !mover?.activo) ||
+                    (mover?.activo && hov && !esOrigen)) && (
+                    <polygon
+                      points={s.points}
+                      fill="none"
+                      stroke="#fff"
+                      strokeWidth={2.2}
+                      strokeOpacity={0.95}
+                      strokeLinejoin="round"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                  {/* Origen del movimiento: borde blanco animado ("hormigas") */}
+                  {esOrigen && (
+                    <polygon
+                      points={s.points}
+                      fill="none"
+                      stroke="#fff"
+                      strokeWidth={2.5}
+                      strokeDasharray="10 7"
+                      strokeLinejoin="round"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      <animate
+                        attributeName="stroke-dashoffset"
+                        from="0"
+                        to="-34"
+                        dur="1.2s"
+                        repeatCount="indefinite"
+                      />
+                    </polygon>
+                  )}
                   <text
                     x={s.cx}
                     y={s.cy}
@@ -923,8 +986,31 @@ export function CampoVista({
           </div>
         )}
 
+        {/* Banner del modo mover: el mapa es el selector de destino */}
+        {mover?.activo && !vacio && (
+          <div className="absolute inset-x-0 top-3 z-30 flex justify-center px-3">
+            <div className="flex max-w-full items-center gap-2.5 rounded-full border border-field-deep/25 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-md backdrop-blur">
+              <span className="relative flex size-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-field opacity-60" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-field" />
+              </span>
+              <span className="truncate text-[12.5px] font-medium text-ink">
+                Moviendo desde <b>{mover.origenLabel}</b> — tocá el potrero
+                destino
+              </span>
+              <button
+                type="button"
+                onClick={mover.onCancelar}
+                className="shrink-0 rounded-full border border-border bg-card px-2.5 py-1 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Toolbar */}
-        {!vacio && (
+        {!vacio && !mover?.activo && (
           <div className="absolute left-3 top-3 flex items-center gap-1">
             <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Marcar:
@@ -1020,6 +1106,17 @@ export function CampoVista({
         info={panelInfo}
         campo={campo}
         onVerPotrero={onVerPotrero}
+        onMoverDesde={onMoverDesde}
+        mover={
+          mover?.activo
+            ? {
+                origenPotreroId: mover.origenPotreroId,
+                origenLabel: mover.origenLabel,
+                origenCabezas: mover.origenCabezas,
+                onCancelar: mover.onCancelar,
+              }
+            : undefined
+        }
         edit={editProp}
       />
      </div>
