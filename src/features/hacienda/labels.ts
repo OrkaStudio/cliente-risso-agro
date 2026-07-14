@@ -81,23 +81,25 @@ export function categoriaNombre(c: Categoria, n: number): string {
   return n === 1 ? categoriaLabel[c] : categoriaPlural[c]
 }
 
-/** Color de la serie de datos por categoría (paleta de gráficos g1–g5). */
+/** Color de la serie de datos por categoría (paleta de gráficos g1–g7).
+ * Cada categoría con color propio DENTRO de su especie: en un potrero conviven
+ * categorías de la misma especie y, si dos comparten color, la barra miente. */
 export const categoriaColor: Record<Categoria, string> = {
   vaca: 'var(--g1)',
   ternero: 'var(--g2)',
-  ternera: 'var(--g2)',
+  ternera: 'var(--g6)',
   vaquillona: 'var(--g3)',
   novillo: 'var(--g4)',
-  toro: 'var(--g5)',
+  toro: 'var(--g7)',
   capon: 'var(--g5)',
   oveja: 'var(--g1)',
-  carnero: 'var(--g5)',
+  carnero: 'var(--g7)',
   cordero: 'var(--g2)',
-  cordera: 'var(--g3)',
+  cordera: 'var(--g6)',
   yegua: 'var(--g1)',
-  padrillo: 'var(--g5)',
+  padrillo: 'var(--g7)',
   potrillo: 'var(--g2)',
-  potranca: 'var(--g3)',
+  potranca: 'var(--g6)',
 }
 
 export const sexoLabel: Record<Sexo, string> = {

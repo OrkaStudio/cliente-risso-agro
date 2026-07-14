@@ -5,6 +5,7 @@ import type {
   TablesUpdate,
 } from '@/lib/supabase/types'
 import type { PotreroCardData } from '@/features/potrero/potrero-card'
+import { ordenNaturalPotreros } from '@/features/potrero/orden'
 
 type TipoCampo = Database['public']['Enums']['tipo_campo']
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -91,9 +92,8 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
   }
 
   return (campos ?? []).map((c) => {
-    const ps = (potrerosPorCampo.get(c.id) ?? []).sort(
-      (a, b) => b.cabezas - a.cabezas,
-    )
+    // Orden natural por nombre (1A, 2A … 10A) — como los nombra el productor.
+    const ps = (potrerosPorCampo.get(c.id) ?? []).sort(ordenNaturalPotreros)
     return {
       id: c.id,
       nombre: c.nombre,

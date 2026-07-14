@@ -39,17 +39,16 @@ function partesFecha(f: string) {
   return { dia: d, mes }
 }
 
-/**
- * Prioridad de una fecha. **Destacada** = vencida o de este mes (lo que hay que
- * atender ya). Lo de meses siguientes va apagado. El countdown se muestra en
- * chip de color si es destacada, en texto tenue si no → diferencia visual entre
- * "este mes" y "más adelante".
- */
-function prioridad(f: string) {
-  const d = diasDe(f)
+/** ¿La fecha cae en el mes calendario corriente? */
+function esDelMes(f: string): boolean {
   const [y, m] = f.split('-').map(Number)
   const now = new Date()
-  const esteMes = y === now.getFullYear() && m - 1 === now.getMonth()
+  return y === now.getFullYear() && m - 1 === now.getMonth()
+}
+
+/** Urgencia de una fecha: countdown + color del chip (rojo = vencido/hoy). */
+function prioridad(f: string) {
+  const d = diasDe(f)
   const vencido = d < 0
   const urgente = vencido || d === 0
   let label: string
@@ -58,7 +57,6 @@ function prioridad(f: string) {
   else if (d === 1) label = 'Mañana'
   else label = `En ${d} días`
   return {
-    destacada: vencido || esteMes,
     urgente,
     label,
     pillCls: urgente ? 'bg-destructive/12 text-destructive' : 'bg-sol-soft text-sol-deep',
@@ -77,16 +75,15 @@ function Alerta({ v, i }: { v: Vencimiento; i: number }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(i, 8) * 0.05, duration: 0.35, ease: 'easeOut' }}
-      className="shrink-0 snap-start"
+      // La fila se acomoda a la cantidad: pocas tarjetas crecen (hasta un tope),
+      // muchas quedan a lo mínimo y el riel scrollea.
+      className="min-w-[212px] max-w-[300px] flex-1 shrink-0 snap-start"
     >
       <Link
         to={`/agenda?mov=${v.id}`}
         className={cn(
-          'group flex w-[212px] overflow-hidden rounded-xl border bg-card transition-[transform,box-shadow,opacity,filter] duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field',
+          'group flex w-full overflow-hidden rounded-xl border bg-card shadow-[0_5px_16px_rgba(16,24,19,0.10)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(16,24,19,0.15)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field',
           p.urgente ? 'border-destructive/40 ring-1 ring-destructive/35' : 'border-border',
-          p.destacada
-            ? 'shadow-[0_5px_16px_rgba(16,24,19,0.10)] hover:shadow-[0_12px_26px_rgba(16,24,19,0.15)]'
-            : 'opacity-[0.5] saturate-[0.8] shadow-[0_1px_2px_rgba(16,24,19,0.05)] hover:opacity-100 hover:saturate-100 hover:shadow-[0_10px_24px_rgba(16,24,19,0.12)]',
         )}
       >
         {/* Talón: el día, grande — el dato que no hay que olvidar */}
@@ -128,19 +125,14 @@ function Alerta({ v, i }: { v: Vencimiento; i: number }) {
             {pesos(v.monto)}
           </span>
           <span className="truncate text-[12px] font-medium text-ink">{titulo}</span>
-          {/* Countdown: chip de color si es de este mes/vencido; tenue si es más lejano */}
-          {p.destacada ? (
-            <span
-              className={cn(
-                'inline-flex w-fit items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold',
-                p.pillCls,
-              )}
-            >
-              {p.label}
-            </span>
-          ) : (
-            <span className="text-[10.5px] font-medium text-faint">{p.label}</span>
-          )}
+          <span
+            className={cn(
+              'inline-flex w-fit items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+              p.pillCls,
+            )}
+          >
+            {p.label}
+          </span>
         </div>
       </Link>
     </motion.div>
@@ -174,12 +166,11 @@ function NavBtn({
 }
 
 /**
- * Alertas de plata del Inicio: un riel de "hojas de calendario" con los cobros
- * y pagos que se vienen, en orden por fecha (vencidos primero). El talón con el
- * día grande hace visible *cuándo* — para que no se junten pagos ni se olviden
- * cobros. Verde = entra, tierra = sale. Lo vencido/de este mes se ve vivo; lo
- * de meses siguientes, apagado. Cada tarjeta abre su modal en la Agenda
- * (`?mov=<id>`). Reemplaza la banda de alerta + el panel de vencimientos.
+ * Alertas de plata del Inicio: un riel de "hojas de calendario" con lo que hay
+ * que atender YA — solo lo vencido sin saldar y lo del mes corriente (lo de más
+ * adelante vive en la Agenda). El talón con el día grande hace visible *cuándo*
+ * — para que no se junten pagos ni se olviden cobros. Verde = entra, tierra =
+ * sale. Cada tarjeta abre su modal en la Agenda (`?mov=<id>`).
  */
 export function CobrosPagosProximos() {
   const { data, isLoading } = useVencimientos()
@@ -187,7 +178,12 @@ export function CobrosPagosProximos() {
   const { items, nVencidos } = useMemo(() => {
     const base = hoy0()
     const pend = (data ?? [])
-      .filter((v) => v.estado === 'pendiente' && v.fechaVencimiento)
+      .filter(
+        (v) =>
+          v.estado === 'pendiente' &&
+          v.fechaVencimiento &&
+          (tsDe(v.fechaVencimiento) < base || esDelMes(v.fechaVencimiento)),
+      )
       .sort((a, b) =>
         (a.fechaVencimiento as string).localeCompare(b.fechaVencimiento as string),
       )
@@ -263,7 +259,9 @@ export function CobrosPagosProximos() {
           <CheckCircle2 className="size-6 shrink-0 text-field/70" />
           <div>
             <p className="text-sm font-medium text-ink">Estás al día.</p>
-            <p className="text-xs text-faint">No hay cobros ni pagos pendientes.</p>
+            <p className="text-xs text-faint">
+              Nada vencido ni cobros/pagos pendientes este mes.
+            </p>
           </div>
         </div>
       ) : (

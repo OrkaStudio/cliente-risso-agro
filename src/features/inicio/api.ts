@@ -34,6 +34,15 @@ export type Vencimiento = {
   diasParaVencer: number | null
 }
 
+export type IvaPanorama = {
+  /** IVA de las ventas (ingresos). */
+  debito: number
+  /** IVA de las compras (gastos). */
+  credito: number
+  /** Hay al menos un comprobante con IVA cargado (si no, la celda va vacía). */
+  conComprobantes: boolean
+}
+
 export type PanoramaInicio = {
   totalCabezas: number
   porCategoria: CategoriaConteo[]
@@ -43,6 +52,8 @@ export type PanoramaInicio = {
   /** Pendientes de pago/cobro próximos, ordenados por urgencia. */
   vencimientos: Vencimiento[]
   porPagarTotal: number
+  /** Posición de IVA acumulada (misma cuenta que el panel de Analítica). */
+  iva: IvaPanorama
 }
 
 /**
@@ -57,6 +68,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     { data: stock, error: eStock },
     { data: flujo, error: eFlujo },
     { data: pendientes, error: ePend },
+    { data: movsIva, error: eIva },
   ] = await Promise.all([
     supabase
       .from('v_animal_con_caravana')
@@ -74,12 +86,18 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       .from('v_pendientes')
       .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
       .order('dias_para_vencer', { ascending: true }),
+    supabase
+      .from('movimiento_financiero')
+      .select('tipo, iva_total')
+      .gt('iva_total', 0)
+      .neq('estado', 'anulado'),
   ])
   if (eAni) throw new Error(eAni.message)
   if (ePot) throw new Error(ePot.message)
   if (eStock) throw new Error(eStock.message)
   if (eFlujo) throw new Error(eFlujo.message)
   if (ePend) throw new Error(ePend.message)
+  if (eIva) throw new Error(eIva.message)
 
   // Stock por categoría
   const catMap = new Map<Categoria, number>()
@@ -147,6 +165,15 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     .filter((v) => v.tipo === 'gasto')
     .reduce((s, v) => s + (v.monto ?? 0), 0)
 
+  // Posición de IVA: débito de las ventas − crédito de las compras.
+  let ivaDebito = 0
+  let ivaCredito = 0
+  for (const m of movsIva ?? []) {
+    const iva = Number(m.iva_total ?? 0)
+    if (m.tipo === 'ingreso') ivaDebito += iva
+    else ivaCredito += iva
+  }
+
   return {
     totalCabezas,
     porCategoria,
@@ -154,5 +181,10 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     netoAnual,
     vencimientos,
     porPagarTotal,
+    iva: {
+      debito: ivaDebito,
+      credito: ivaCredito,
+      conComprobantes: (movsIva ?? []).length > 0,
+    },
   }
 }

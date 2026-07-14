@@ -26,13 +26,58 @@ export async function getAnimal(id: string): Promise<AnimalConCaravana | null> {
   return data
 }
 
-export async function getEventos(animalId: string): Promise<Evento[]> {
+/** Evento del historial con la nota de voz ya firmada (si tiene). */
+export type EventoConAudio = Evento & { audioFirmado: string | null }
+
+export async function getEventos(animalId: string): Promise<EventoConAudio[]> {
   const { data, error } = await supabase
     .from('evento')
     .select('*')
     .eq('animal_id', animalId)
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false })
+  if (error) throw error
+
+  // Notas de voz (manga): firmar en lote desde el bucket privado.
+  const paths = (data ?? [])
+    .map((e) => e.audio_url)
+    .filter((p): p is string => !!p)
+  const firmadas = new Map<string, string>()
+  if (paths.length) {
+    const { data: urls } = await supabase.storage
+      .from('comprobantes')
+      .createSignedUrls(paths, 3600)
+    for (const u of urls ?? [])
+      if (u.path && u.signedUrl) firmadas.set(u.path, u.signedUrl)
+  }
+  return (data ?? []).map((e) => ({
+    ...e,
+    audioFirmado: e.audio_url ? (firmadas.get(e.audio_url) ?? null) : null,
+  }))
+}
+
+/**
+ * Eventos que alimentan las señales del rodeo (tacto/sanidad/pesaje/parto),
+ * de TODOS los animales de la empresa (la RLS acota). Livianito: 4 columnas.
+ */
+export async function listEventosSenales() {
+  const { data, error } = await supabase
+    .from('evento')
+    .select('animal_id, tipo, fecha, datos')
+    .in('tipo', ['tacto', 'sanidad', 'pesaje', 'parto'])
+    .order('fecha', { ascending: false })
+    .limit(5000)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Nombre de la tropa (lote) de un animal, para la ficha. */
+export async function getLote(id: string) {
+  const { data, error } = await supabase
+    .from('lote')
+    .select('id, nombre, proposito')
+    .eq('id', id)
+    .maybeSingle()
   if (error) throw error
   return data
 }
@@ -324,13 +369,16 @@ export const TIPOS_EVENTO_MANUAL = [
 ] as const
 export type TipoEventoManual = (typeof TIPOS_EVENTO_MANUAL)[number]
 
-/** Registrar un evento en el historial append-only del animal (insert directo). */
+/** Registrar un evento en el historial append-only del animal (insert directo).
+ *  `datos` lleva el detalle estructurado según el tipo (ver senales.ts):
+ *  pesaje {kg} · tacto {resultado, meses} · sanidad {tratamiento, retiro_hasta}. */
 export async function registrarEvento(input: {
   empresaId: string
   animalId: string
   tipo: TipoEventoManual
   fecha: string
   nota?: string
+  datos?: Record<string, unknown>
 }): Promise<void> {
   const { error } = await supabase.from('evento').insert({
     empresa_id: input.empresaId,
@@ -338,6 +386,7 @@ export async function registrarEvento(input: {
     tipo: input.tipo,
     fecha: input.fecha,
     nota: input.nota?.trim() || null,
+    datos: (input.datos ?? {}) as Database['public']['Tables']['evento']['Insert']['datos'],
   })
   if (error) throw new Error(error.message)
 }

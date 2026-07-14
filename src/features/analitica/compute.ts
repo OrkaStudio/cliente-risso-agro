@@ -163,6 +163,7 @@ export type LineaIvaMes = {
 export function ivaPorMes(movs: MovimientoConDetalle[]): LineaIvaMes[] {
   const map = new Map<string, { debito: number; credito: number }>()
   for (const m of movs) {
+    if (m.estado === 'anulado') continue
     const iva = Number(m.iva_total ?? 0)
     if (!iva) continue
     const mes = (m.fecha_devengo ?? '').slice(0, 7)

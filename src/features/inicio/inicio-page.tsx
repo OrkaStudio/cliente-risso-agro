@@ -4,17 +4,17 @@ import {
   Beef,
   CalendarClock,
   LandPlot,
-  MapPin,
+  Scale,
   TrendingUp,
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-import { tipoCampoLabel } from '@/features/campos/labels'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
-import type { CategoriaConteo, PotreroPanorama } from '@/features/inicio/api'
+import type { CategoriaConteo } from '@/features/inicio/api'
 import { CobrosPagosProximos } from '@/features/inicio/cobros-pagos-proximos'
+import { ParaAtenderCampo } from '@/features/inicio/para-atender'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
-import { PotreroCard } from '@/features/potrero/potrero-card'
 import { Panel } from '@/components/panel'
 import { PageHeader, Stat } from '@/components/page-header'
 import { cn } from '@/lib/utils'
@@ -46,6 +46,7 @@ function Kpi({
   unit,
   detail,
   detailColor,
+  to,
 }: {
   label: string
   icon: typeof Beef
@@ -54,10 +55,12 @@ function Kpi({
   unit?: string
   detail?: string
   detailColor?: string
+  /** Si está, la celda entera navega ahí (ej: IVA → Analítica). */
+  to?: string
 }) {
   const vacio = value === '—'
-  return (
-    <div className="flex min-h-[96px] flex-1 flex-col items-center justify-center px-[22px] py-[18px] text-center">
+  const contenido = (
+    <>
       <div className="flex items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
         <Icon className="size-4" style={{ color: iconColor }} />
         {label}
@@ -81,8 +84,18 @@ function Kpi({
           {detail}
         </div>
       )}
-    </div>
+    </>
   )
+  const celda =
+    'flex min-h-[96px] flex-1 flex-col items-center justify-center px-[22px] py-[18px] text-center'
+  if (to) {
+    return (
+      <Link to={to} className={cn(celda, 'transition-colors hover:bg-secondary/50')}>
+        {contenido}
+      </Link>
+    )
+  }
+  return <div className={celda}>{contenido}</div>
 }
 
 /* ===== Estructura del rodeo ===== */
@@ -214,11 +227,13 @@ function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number })
   const machos = toros + novillos + terneros
   const max = Math.max(vacas, vaquillonas, terneras, toros, novillos, terneros, 1)
 
-  // Indicadores de manejo
+  // Indicadores de manejo. Toro:vaca honesto en las dos puntas (ideal ~1:25):
+  // muchas vacas por toro = faltan toros; pocas = toros de más.
   const vientres = vacas + vaquillonas
   const pctVientres = Math.round((vientres / total) * 100)
   const ratioToro = toros > 0 ? Math.round(vacas / toros) : null
-  const ratioOk = ratioToro != null && ratioToro >= 22
+  const faltanToros = ratioToro != null && ratioToro > 30
+  const sobranToros = ratioToro != null && ratioToro < 20
   const destete =
     vacas > 0 ? Math.round(((terneros + terneras) / vacas) * 100) : null
 
@@ -262,11 +277,13 @@ function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number })
           nota={
             ratioToro == null
               ? 'sin toros'
-              : ratioOk
-                ? 'en rango (ideal 1:25)'
-                : 'muchos toros (ideal 1:25)'
+              : faltanToros
+                ? 'faltan toros (ideal 1:25)'
+                : sobranToros
+                  ? 'muchos toros (ideal 1:25)'
+                  : 'en rango (ideal 1:25)'
           }
-          tono={ratioToro != null && !ratioOk ? 'alerta' : 'ok'}
+          tono={faltanToros || sobranToros ? 'alerta' : 'ok'}
         />
         <Indicador
           label="Destete"
@@ -278,74 +295,9 @@ function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number })
   )
 }
 
-/* ===== Grupo de un campo con sus potreros ===== */
-type CampoGrupo = {
-  id: string
-  nombre: string
-  tipo: Database['public']['Enums']['tipo_campo']
-  potreros: PotreroPanorama[]
-  cabezas: number
-  hectareas: number
-}
-
-function CampoGroup({ campo }: { campo: CampoGrupo }) {
-  return (
-    <div>
-      <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-border pb-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <MapPin className="size-[18px] shrink-0 text-field" />
-          <h4 className="truncate font-heading text-[17px] font-semibold text-ink">
-            {campo.nombre}
-          </h4>
-          <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-            {tipoCampoLabel[campo.tipo]}
-          </span>
-        </div>
-        <div className="tnum shrink-0 text-[13px] font-medium text-faint">
-          {campo.potreros.length}{' '}
-          {campo.potreros.length === 1 ? 'potrero' : 'potreros'} · {campo.cabezas}{' '}
-          cab{campo.hectareas > 0 ? ` · ${campo.hectareas} ha` : ''}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        {campo.potreros.map((p) => (
-          <PotreroCard key={p.id} p={p} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/** Agrupa los potreros por campo (jerarquía real: un campo tiene varios
- *  potreros), ordena campos y potreros por hacienda descendente. */
-function agruparPorCampo(potreros: PotreroPanorama[]): CampoGrupo[] {
-  const porCampo = potreros.reduce((acc, p) => {
-    const g = acc.get(p.campoId) ?? {
-      id: p.campoId,
-      nombre: p.campoNombre,
-      tipo: p.campoTipo,
-      potreros: [] as PotreroPanorama[],
-      cabezas: 0,
-      hectareas: 0,
-    }
-    return acc.set(p.campoId, {
-      ...g,
-      potreros: [...g.potreros, p],
-      cabezas: g.cabezas + p.cabezas,
-      hectareas: g.hectareas + (p.hectareas ?? 0),
-    })
-  }, new Map<string, CampoGrupo>())
-
-  return [...porCampo.values()]
-    .map((c) => ({
-      ...c,
-      potreros: [...c.potreros].sort((a, b) => b.cabezas - a.cabezas),
-    }))
-    .sort((a, b) => b.cabezas - a.cabezas)
-}
-
 export function InicioPage() {
   const { data, isLoading, error } = usePanoramaInicio()
+  const empresa = useEmpresa()
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -361,7 +313,15 @@ export function InicioPage() {
 
   const campos = new Set(data.potreros.map((p) => p.campoNombre)).size
   const superficie = data.potreros.reduce((s, p) => s + (p.hectareas ?? 0), 0)
-  const camposAgrupados = agruparPorCampo(data.potreros)
+
+  // Posición de IVA — misma cuenta que el panel de Analítica: débito − crédito
+  // − saldo a favor arrastrado (dato del contador; v1 vive en localStorage).
+  const empresaId = empresa.data?.empresa_id ?? ''
+  const saldoIvaInicial = (() => {
+    const v = Number(localStorage.getItem(`iva-saldo-inicial-${empresaId}`) ?? '0')
+    return Number.isFinite(v) ? v : 0
+  })()
+  const ivaEstimado = data.iva.debito - data.iva.credito - saldoIvaInicial
 
   return (
     <div className="flex flex-col gap-6">
@@ -391,7 +351,7 @@ export function InicioPage() {
           icon={data.netoAnual >= 0 ? TrendingUp : Wallet}
           iconColor="var(--sol-deep)"
           value={data.netoAnual === 0 ? '—' : fmtCompact(data.netoAnual)}
-          detail={data.netoAnual === 0 ? 'sin movimientos cargados' : 'flujo de caja · devengado'}
+          detail={data.netoAnual === 0 ? 'sin movimientos cargados' : 'flujo de caja del año'}
           detailColor={
             data.netoAnual > 0
               ? 'var(--field-deep)'
@@ -410,6 +370,29 @@ export function InicioPage() {
               ? 'al día'
               : `${data.vencimientos.length} pendiente${data.vencimientos.length === 1 ? '' : 's'}`
           }
+        />
+        <Kpi
+          label="IVA"
+          icon={Scale}
+          iconColor="var(--field-deep)"
+          value={data.iva.conComprobantes ? fmtCompact(Math.abs(ivaEstimado)) : '—'}
+          detail={
+            !data.iva.conComprobantes
+              ? 'sin comprobantes'
+              : ivaEstimado > 0
+                ? 'estimado a pagar'
+                : ivaEstimado < 0
+                  ? 'saldo a favor'
+                  : 'sin saldo'
+          }
+          detailColor={
+            !data.iva.conComprobantes || ivaEstimado === 0
+              ? undefined
+              : ivaEstimado > 0
+                ? 'var(--sol-deep)'
+                : 'var(--field-deep)'
+          }
+          to="/analitica"
         />
         <Kpi
           label="Superficie"
@@ -436,26 +419,9 @@ export function InicioPage() {
         <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
       </Panel>
 
-      {/* Estado de los campos — agrupado por campo */}
-      <Panel
-        title="Estado de los campos"
-        info="Tus potreros agrupados por campo, con su hacienda y estado de ciclo. Tocá uno para ver todo su detalle."
-      >
-        {camposAgrupados.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Todavía no hay potreros cargados.{' '}
-            <Link to="/campos" className="font-semibold text-field-deep hover:underline">
-              Crear el primero →
-            </Link>
-          </p>
-        ) : (
-          <div className="flex flex-col gap-7">
-            {camposAgrupados.map((campo) => (
-              <CampoGroup key={campo.id} campo={campo} />
-            ))}
-          </div>
-        )}
-      </Panel>
+      {/* Para atender en el campo — lo accionable de las últimas recorridas
+          (la grilla de potreros vive en Campos, donde está el mapa) */}
+      <ParaAtenderCampo />
     </div>
   )
 }

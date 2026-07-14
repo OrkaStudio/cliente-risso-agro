@@ -54,6 +54,11 @@ function AccionDialog({
 }
 
 // --- Registrar evento -------------------------------------------------
+/**
+ * Además de tipo/fecha/nota, cada tipo pide su detalle y lo guarda
+ * estructurado en `evento.datos` — de ahí salen las señales del rodeo
+ * (preñadas, retiros, para vender) y los datos clave de la ficha.
+ */
 export function RegistrarEventoDialog({
   animalId,
   empresaId,
@@ -65,8 +70,25 @@ export function RegistrarEventoDialog({
   const [tipo, setTipo] = useState<TipoEventoManual | ''>('')
   const [fecha, setFecha] = useState(hoy())
   const [nota, setNota] = useState('')
+  // Detalle estructurado por tipo
+  const [kg, setKg] = useState('')
+  const [resultadoTacto, setResultadoTacto] = useState<'prenada' | 'vacia' | ''>('')
+  const [mesesTacto, setMesesTacto] = useState('')
+  const [tratamiento, setTratamiento] = useState('')
+  const [retiroHasta, setRetiroHasta] = useState('')
   const [error, setError] = useState<string | null>(null)
   const mut = useRegistrarEvento(animalId)
+
+  function reset() {
+    setTipo('')
+    setNota('')
+    setFecha(hoy())
+    setKg('')
+    setResultadoTacto('')
+    setMesesTacto('')
+    setTratamiento('')
+    setRetiroHasta('')
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -75,13 +97,36 @@ export function RegistrarEventoDialog({
       setError('Elegí el tipo de evento')
       return
     }
+    let datos: Record<string, unknown> | undefined
+    if (tipo === 'pesaje') {
+      const n = Number(kg)
+      if (!n || n <= 0) {
+        setError('Ingresá los kilos de la pesada')
+        return
+      }
+      datos = { kg: n }
+    } else if (tipo === 'tacto') {
+      if (!resultadoTacto) {
+        setError('Elegí el resultado del tacto')
+        return
+      }
+      datos = {
+        resultado: resultadoTacto,
+        ...(resultadoTacto === 'prenada' && Number(mesesTacto) > 0
+          ? { meses: Number(mesesTacto) }
+          : {}),
+      }
+    } else if (tipo === 'sanidad') {
+      datos = {
+        ...(tratamiento.trim() ? { tratamiento: tratamiento.trim() } : {}),
+        ...(retiroHasta ? { retiro_hasta: retiroHasta } : {}),
+      }
+    }
     try {
-      await mut.mutateAsync({ empresaId, animalId, tipo, fecha, nota })
+      await mut.mutateAsync({ empresaId, animalId, tipo, fecha, nota, datos })
       toast.success('Evento registrado')
       setOpen(false)
-      setTipo('')
-      setNota('')
-      setFecha(hoy())
+      reset()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error')
     }
@@ -111,6 +156,79 @@ export function RegistrarEventoDialog({
             ]}
           />
         </div>
+
+        {tipo === 'pesaje' && (
+          <div className="grid gap-2">
+            <Label htmlFor="ev-kg">Peso (kg)</Label>
+            <Input
+              id="ev-kg"
+              inputMode="numeric"
+              placeholder="425"
+              value={kg}
+              onChange={(e) => setKg(e.target.value.replace(/[^\d]/g, ''))}
+              autoFocus
+            />
+          </div>
+        )}
+
+        {tipo === 'tacto' && (
+          <>
+            <div className="grid gap-2">
+              <Label>Resultado</Label>
+              <Dropdown
+                block
+                ariaLabel="Resultado del tacto"
+                value={resultadoTacto}
+                onChange={(v) => setResultadoTacto(v as 'prenada' | 'vacia')}
+                options={[
+                  { value: '', label: 'Elegí…' },
+                  { value: 'prenada', label: 'Preñada' },
+                  { value: 'vacia', label: 'Vacía' },
+                ]}
+              />
+            </div>
+            {resultadoTacto === 'prenada' && (
+              <div className="grid gap-2">
+                <Label htmlFor="ev-meses">Meses de gestación (opcional)</Label>
+                <Input
+                  id="ev-meses"
+                  inputMode="numeric"
+                  placeholder="6"
+                  value={mesesTacto}
+                  onChange={(e) => setMesesTacto(e.target.value.replace(/[^\d]/g, ''))}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {tipo === 'sanidad' && (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="ev-trat">Tratamiento (opcional)</Label>
+              <Input
+                id="ev-trat"
+                placeholder="Antibiótico por cojera…"
+                value={tratamiento}
+                onChange={(e) => setTratamiento(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ev-retiro">Retiro hasta (opcional)</Label>
+              <Input
+                id="ev-retiro"
+                type="date"
+                value={retiroHasta}
+                onChange={(e) => setRetiroHasta(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Si el tratamiento tiene tiempo de retiro, el animal queda
+                marcado "no vender" hasta esa fecha.
+              </p>
+            </div>
+          </>
+        )}
+
         <div className="grid gap-2">
           <Label htmlFor="ev-fecha">Fecha</Label>
           <Input
@@ -213,7 +331,14 @@ export function CambiarCaravanaDialog({ animalId }: { animalId: string }) {
 }
 
 // --- Dar de baja ------------------------------------------------------
-export function DarBajaDialog({ animalId }: { animalId: string }) {
+/** `trigger` opcional: la lista de Hacienda lo abre desde el menú de la fila. */
+export function DarBajaDialog({
+  animalId,
+  trigger,
+}: {
+  animalId: string
+  trigger?: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const [estado, setEstado] = useState<'vendido' | 'muerto' | ''>('')
   const [fecha, setFecha] = useState(hoy())
@@ -242,7 +367,7 @@ export function DarBajaDialog({ animalId }: { animalId: string }) {
       open={open}
       setOpen={setOpen}
       titulo="Dar de baja"
-      trigger={<Button variant="destructive" size="sm">Dar de baja</Button>}
+      trigger={trigger ?? <Button variant="destructive" size="sm">Dar de baja</Button>}
     >
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2">

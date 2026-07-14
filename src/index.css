@@ -71,6 +71,8 @@
     --color-g3: var(--g3);
     --color-g4: var(--g4);
     --color-g5: var(--g5);
+    --color-g6: var(--g6);
+    --color-g7: var(--g7);
     --color-g-mute: var(--g-mute);
 
     --color-sidebar-ring: var(--sidebar-ring);
@@ -141,6 +143,8 @@
     --g3: #5189a8;           /* agua / acero */
     --g4: #b97950;           /* arcilla */
     --g5: #8fa08f;           /* salvia */
+    --g6: #9a6b96;           /* malva */
+    --g7: #7a5a40;           /* cuero */
     --g-mute: #c6cfc3;       /* base apagada (contexto) */
 
     /* Semánticos (shadcn) */

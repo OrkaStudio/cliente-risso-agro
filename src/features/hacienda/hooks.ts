@@ -40,8 +40,20 @@ export const useAnimal = (id: string) =>
 export const useEventos = (id: string) =>
   useQuery({ queryKey: ['eventos', id], queryFn: () => api.getEventos(id) })
 
+/** Eventos de toda la empresa que alimentan las señales del rodeo. */
+export const useEventosSenales = () =>
+  useQuery({ queryKey: ['eventos-senales'], queryFn: api.listEventosSenales })
+
 export const usePotreros = () =>
   useQuery({ queryKey: ['potreros'], queryFn: api.listPotreros })
+
+/** Tropa (lote) de un animal — para mostrarla en la ficha. */
+export const useLote = (loteId: string | null | undefined) =>
+  useQuery({
+    queryKey: ['lote', loteId],
+    queryFn: () => api.getLote(loteId!),
+    enabled: !!loteId,
+  })
 
 export const useStockPorPotrero = () =>
   useQuery({ queryKey: ['stock-potrero'], queryFn: api.getStockPorPotrero })
@@ -94,7 +106,11 @@ export function useRegistrarEvento(animalId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: api.registrarEvento,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos', animalId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos', animalId] })
+      // Un tacto/sanidad/pesaje nuevo puede prender o apagar señales.
+      qc.invalidateQueries({ queryKey: ['eventos-senales'] })
+    },
   })
 }
 

@@ -1,8 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Layers, Search, X } from 'lucide-react'
+import { motion } from 'framer-motion'
+import {
+  ArrowRight,
+  HeartPulse,
+  Layers,
+  LogOut,
+  Scissors,
+  Search,
+  Stethoscope,
+  Tag,
+  X,
+} from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-import { useAnimales, usePotreros } from '@/features/hacienda/hooks'
+import {
+  useAnimales,
+  useEventosSenales,
+  usePotreros,
+} from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
 import {
   categoriaColor,
@@ -10,7 +25,17 @@ import {
   categoriaNombre,
   sexoLabel,
 } from '@/features/hacienda/labels'
+import {
+  PESO_VENTA_KG,
+  edadMeses,
+  partoEstimado,
+  resumirEventos,
+  senalesDe,
+  type Senal,
+} from '@/features/hacienda/senales'
 import { CrearAnimalDialog } from '@/features/hacienda/crear-animal-dialog'
+import { DarBajaDialog } from '@/features/hacienda/acciones-animal'
+import { Contador } from '@/components/contador'
 import { Panel } from '@/components/panel'
 import { PageHeader, Stat } from '@/components/page-header'
 import { Dropdown } from '@/components/ui/dropdown'
@@ -23,16 +48,49 @@ type Animal = Database['public']['Views']['v_animal_con_caravana']['Row']
 const CATEGORIAS = Object.keys(categoriaLabel) as Categoria[]
 
 function edad(fechaNac: string | null): string {
-  if (!fechaNac) return '—'
-  const nac = new Date(fechaNac)
-  const now = new Date()
-  let meses =
-    (now.getFullYear() - nac.getFullYear()) * 12 +
-    (now.getMonth() - nac.getMonth())
-  if (now.getDate() < nac.getDate()) meses -= 1
-  if (meses < 0) return '—'
+  const meses = edadMeses(fechaNac)
+  if (meses == null) return '—'
   if (meses < 24) return `${meses} m`
   return `${Math.floor(meses / 12)} a`
+}
+
+/* ===== Señales del rodeo ===== */
+
+const SENAL_UI: Record<
+  Senal,
+  { label: string; icon: ComponentType<{ className?: string }>; tile: string; chip: string }
+> = {
+  retiro: {
+    label: 'En tratamiento',
+    icon: Stethoscope,
+    tile: 'bg-destructive/10 text-destructive',
+    chip: 'bg-destructive/10 text-destructive',
+  },
+  prenada: {
+    label: 'Preñadas',
+    icon: HeartPulse,
+    tile: 'bg-field-soft text-field-deep',
+    chip: 'bg-field-soft text-field-deep',
+  },
+  vender: {
+    label: 'Para vender',
+    icon: Tag,
+    tile: 'bg-sol-soft text-sol-deep',
+    chip: 'bg-sol-soft text-sol-deep',
+  },
+  destete: {
+    label: 'Para destetar',
+    icon: Scissors,
+    tile: 'bg-sky-soft text-sky',
+    chip: 'bg-sky-soft text-sky',
+  },
+}
+
+const SENAL_CHIP_LABEL: Record<Senal, string> = {
+  retiro: 'retiro vigente',
+  prenada: 'preñada',
+  vender: 'para vender',
+  destete: 'destete',
 }
 
 
@@ -40,6 +98,7 @@ export function AnimalesPage() {
   const animales = useAnimales()
   const potreros = usePotreros()
   const campos = useCampos()
+  const eventosSenales = useEventosSenales()
 
   const [q, setQ] = useState('')
   const [catF, setCatF] = useState<'todas' | Categoria>('todas')
@@ -47,6 +106,7 @@ export function AnimalesPage() {
   const [potF, setPotF] = useState<string | null>(null)
   const [campoF, setCampoF] = useState<string | null>(null)
   const [soloSinCaravana, setSoloSinCaravana] = useState(false)
+  const [senalF, setSenalF] = useState<Senal | null>(null)
   const [view, setView] = useState<'tabla' | 'potrero'>('tabla')
 
   const potreroNombre = useMemo(
@@ -89,6 +149,54 @@ export function AnimalesPage() {
     }
   }, [lista])
 
+  // Señales: qué dice el historial (evento.datos) de cada animal activo.
+  const hoyISO = new Date().toISOString().slice(0, 10)
+  const resumen = useMemo(
+    () => resumirEventos(eventosSenales.data ?? []),
+    [eventosSenales.data],
+  )
+  const senalesPorAnimal = useMemo(() => {
+    const map = new Map<string, Senal[]>()
+    for (const a of lista) {
+      if (a.estado !== 'activo' || !a.id) continue
+      const s = senalesDe(
+        { categoria: a.categoria, fecha_nacimiento: a.fecha_nacimiento },
+        resumen.get(a.id),
+        hoyISO,
+      )
+      if (s.length) map.set(a.id, s)
+    }
+    return map
+  }, [lista, resumen, hoyISO])
+
+  // Conteos y subtítulos del panel de señales (sobre el alcance del campo).
+  const senalesResumen = useMemo(() => {
+    const conteo: Record<Senal, number> = { retiro: 0, prenada: 0, vender: 0, destete: 0 }
+    let paren90 = 0
+    let kgSuma = 0
+    let kgN = 0
+    // Hoy + 90 días, derivado de hoyISO (determinístico para el render).
+    const [hy, hm, hd] = hoyISO.split('-').map(Number)
+    const f90 = new Date(hy, hm - 1, hd + 90)
+    const en90 = `${f90.getFullYear()}-${String(f90.getMonth() + 1).padStart(2, '0')}-${String(f90.getDate()).padStart(2, '0')}`
+    for (const a of lista) {
+      if (a.estado !== 'activo' || !a.id) continue
+      const s = senalesPorAnimal.get(a.id)
+      if (!s) continue
+      for (const x of s) conteo[x] += 1
+      const r = resumen.get(a.id)
+      if (s.includes('prenada') && r?.prenada) {
+        const est = partoEstimado(r.prenada)
+        if (est && est <= en90) paren90 += 1
+      }
+      if (s.includes('vender') && r?.ultimoPeso) {
+        kgSuma += r.ultimoPeso.kg
+        kgN += 1
+      }
+    }
+    return { conteo, paren90, kgProm: kgN ? Math.round(kgSuma / kgN) : null }
+  }, [lista, senalesPorAnimal, resumen, hoyISO])
+
   const filtered = useMemo(() => {
     const txt = q.trim().toLowerCase()
     return lista.filter((a) => {
@@ -96,6 +204,8 @@ export function AnimalesPage() {
       if (soloSinCaravana && a.caravana_rfid) return false
       if (catF !== 'todas' && a.categoria !== catF) return false
       if (potF && a.potrero_id !== potF) return false
+      if (senalF && !(a.id && senalesPorAnimal.get(a.id)?.includes(senalF)))
+        return false
       if (
         txt &&
         !`${a.caravana_rfid ?? ''} ${a.caravana_visual ?? ''}`
@@ -105,7 +215,7 @@ export function AnimalesPage() {
         return false
       return true
     })
-  }, [lista, q, catF, estF, potF, soloSinCaravana])
+  }, [lista, q, catF, estF, potF, soloSinCaravana, senalF, senalesPorAnimal])
 
   const potrerosConAnimales = useMemo(
     () => new Set(lista.filter((a) => a.estado === 'activo').map((a) => a.potrero_id)).size,
@@ -132,44 +242,129 @@ export function AnimalesPage() {
         action={<CrearAnimalDialog />}
       />
 
-      {/* Stock por categoría */}
-      <Panel title="Stock por categoría" sub={`${totalActivos} cabezas activas`}>
-        {totalActivos === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Todavía no hay animales activos.
-          </p>
-        ) : (
-          <>
-            <div className="flex h-3 gap-0.5 overflow-hidden rounded-md">
-              {porCategoria.map((c) => (
-                <span
-                  key={c.categoria}
-                  className="h-full rounded-sm"
-                  style={{
-                    width: `${(c.n / totalActivos) * 100}%`,
-                    background: categoriaColor[c.categoria],
-                  }}
-                  title={`${categoriaNombre(c.categoria, c.n)}: ${c.n}`}
-                />
-              ))}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13.5px] sm:grid-cols-3">
-              {porCategoria.map((c) => (
-                <div key={c.categoria} className="flex items-center gap-2.5">
+      {/* Stock por categoría + Señales del rodeo */}
+      <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+        <Panel title="Stock por categoría" sub={`${totalActivos} cabezas activas`}>
+          {totalActivos === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Todavía no hay animales activos.
+            </p>
+          ) : (
+            <>
+              <div className="flex h-3 gap-0.5 overflow-hidden rounded-md">
+                {porCategoria.map((c) => (
                   <span
-                    className="size-[11px] shrink-0 rounded-[3px]"
-                    style={{ background: categoriaColor[c.categoria] }}
+                    key={c.categoria}
+                    className="h-full rounded-sm"
+                    style={{
+                      width: `${(c.n / totalActivos) * 100}%`,
+                      background: categoriaColor[c.categoria],
+                    }}
+                    title={`${categoriaNombre(c.categoria, c.n)}: ${c.n}`}
                   />
-                  <span className="text-ink">{categoriaNombre(c.categoria, c.n)}</span>
-                  <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
-                    {c.n}
+                ))}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13.5px] sm:grid-cols-3">
+                {porCategoria.map((c) => (
+                  <div key={c.categoria} className="flex items-center gap-2.5">
+                    <span
+                      className="size-[11px] shrink-0 rounded-[3px]"
+                      style={{ background: categoriaColor[c.categoria] }}
+                    />
+                    <span className="text-ink">{categoriaNombre(c.categoria, c.n)}</span>
+                    <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
+                      {c.n}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </Panel>
+
+        <Panel
+          title="Señales"
+          action={
+            senalF ? (
+              <button
+                type="button"
+                onClick={() => setSenalF(null)}
+                className="flex items-center gap-1 text-[13px] font-semibold text-field-deep hover:underline"
+              >
+                <X className="size-3.5" /> quitar filtro
+              </button>
+            ) : (
+              <span className="text-[13.5px] text-faint">tocá para filtrar</span>
+            )
+          }
+        >
+          <div className="grid grid-cols-2 gap-2.5">
+            {(Object.keys(SENAL_UI) as Senal[]).map((s, i) => {
+              const ui = SENAL_UI[s]
+              const Icon = ui.icon
+              const n = senalesResumen.conteo[s]
+              const sub =
+                s === 'retiro'
+                  ? 'con retiro sanitario'
+                  : s === 'prenada'
+                    ? senalesResumen.paren90 > 0
+                      ? `~${senalesResumen.paren90} paren en 90 días`
+                      : 'según último tacto'
+                    : s === 'vender'
+                      ? senalesResumen.kgProm
+                        ? `~${senalesResumen.kgProm} kg promedio`
+                        : `novillos ≥${PESO_VENTA_KG} kg`
+                      : 'crías de 6-8 meses'
+              return (
+                <motion.button
+                  key={s}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.06, duration: 0.3, ease: 'easeOut' }}
+                  type="button"
+                  onClick={() => setSenalF(senalF === s ? null : s)}
+                  aria-pressed={senalF === s}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl border p-3 text-left transition-colors',
+                    senalF === s
+                      ? 'border-field-deep bg-field-soft/50'
+                      : 'border-border bg-card hover:border-faint',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex size-10 shrink-0 items-center justify-center rounded-xl',
+                      ui.tile,
+                    )}
+                  >
+                    <Icon className="size-5" />
                   </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </Panel>
+                  <span className="min-w-0">
+                    <span
+                      className={cn(
+                        'tnum block text-[21px] font-bold leading-none',
+                        n === 0 ? 'text-faint' : 'text-ink',
+                      )}
+                    >
+                      <Contador n={n} />
+                    </span>
+                    <span className="mt-0.5 block text-[12px] font-semibold text-muted-foreground">
+                      {ui.label}
+                    </span>
+                    <span className="block truncate text-[10.5px] text-faint">{sub}</span>
+                  </span>
+                </motion.button>
+              )
+            })}
+          </div>
+          {[...senalesPorAnimal.values()].length === 0 && (
+            <p className="mt-3 text-[11.5px] leading-snug text-faint">
+              Las señales se prenden solas con lo que se registra en el
+              historial: tactos, tratamientos con retiro, pesadas y edades.
+            </p>
+          )}
+        </Panel>
+      </div>
 
       {/* Toolbar de filtros */}
       <div className="flex flex-wrap items-center gap-2.5">
@@ -283,9 +478,17 @@ export function AnimalesPage() {
             Sin animales con ese filtro.
           </p>
         ) : view === 'tabla' ? (
-          <AnimalTable rows={filtered} potreroNombre={potreroNombre} />
+          <AnimalTable
+            rows={filtered}
+            potreroNombre={potreroNombre}
+            senales={senalesPorAnimal}
+          />
         ) : (
-          <PorPotrero rows={filtered} potreroNombre={potreroNombre} />
+          <PorPotrero
+            rows={filtered}
+            potreroNombre={potreroNombre}
+            senales={senalesPorAnimal}
+          />
         )}
       </Panel>
     </div>
@@ -296,16 +499,18 @@ export function AnimalesPage() {
 function AnimalTable({
   rows,
   potreroNombre,
+  senales,
 }: {
   rows: Animal[]
   potreroNombre: Map<string, string>
+  senales: Map<string, Senal[]>
 }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="border-b border-border text-left">
-            {['Caravana', 'Categoría', 'Sexo', 'Potrero', 'Edad', ''].map(
+            {['Caravana', 'Categoría', 'Sexo', 'Potrero', 'Edad', 'Señales', ''].map(
               (h) => (
                 <th
                   key={h}
@@ -318,56 +523,110 @@ function AnimalTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((a) => (
-            <tr
-              key={a.id}
-              className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/50"
-            >
-              <td className="px-4 py-3.5">
-                <span className="tnum text-[13px] font-semibold text-ink">
-                  {a.caravana_rfid ?? '—'}
-                </span>
-                {a.caravana_visual && (
-                  <span className="ml-2 text-xs text-faint">
-                    {a.caravana_visual}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3.5 text-sm">
-                {a.categoria ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ background: categoriaColor[a.categoria] }}
-                    />
-                    {categoriaLabel[a.categoria]}
-                  </span>
-                ) : (
-                  '—'
-                )}
-              </td>
-              <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                {a.sexo ? sexoLabel[a.sexo] : '—'}
-              </td>
-              <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                {a.potrero_id ? (potreroNombre.get(a.potrero_id) ?? '—') : '—'}
-              </td>
-              <td className="tnum px-4 py-3.5 text-sm text-muted-foreground">
-                {edad(a.fecha_nacimiento)}
-              </td>
-              <td className="px-4 py-3.5 text-right">
-                {a.id && (
-                  <Link
-                    to={`/hacienda/${a.id}`}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-field-deep hover:underline"
-                  >
-                    Ver ficha
-                    <ArrowRight className="size-3.5" />
-                  </Link>
-                )}
-              </td>
-            </tr>
-          ))}
+          {rows.map((a) => {
+            const s = a.id ? senales.get(a.id) : undefined
+            return (
+              <tr
+                key={a.id}
+                className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/50"
+              >
+                <td className="px-4 py-3.5">
+                  {a.caravana_rfid ? (
+                    <span className="tnum text-[13px] font-semibold text-ink">
+                      {a.caravana_rfid}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-faint">
+                      sin caravana
+                    </span>
+                  )}
+                  {a.caravana_visual && (
+                    <span className="ml-2 text-xs text-faint">
+                      {a.caravana_visual}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3.5 text-sm">
+                  {a.categoria ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ background: categoriaColor[a.categoria] }}
+                      />
+                      {categoriaLabel[a.categoria]}
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td className="px-4 py-3.5 text-sm text-muted-foreground">
+                  {a.sexo ? sexoLabel[a.sexo] : '—'}
+                </td>
+                <td className="px-4 py-3.5 text-sm">
+                  {a.potrero_id ? (
+                    <Link
+                      to={`/potrero/${a.potrero_id}`}
+                      className="font-medium text-muted-foreground transition-colors hover:text-field-deep hover:underline"
+                    >
+                      {potreroNombre.get(a.potrero_id) ?? '—'}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="tnum px-4 py-3.5 text-sm text-muted-foreground">
+                  {edad(a.fecha_nacimiento)}
+                </td>
+                <td className="px-4 py-3.5">
+                  {s?.length ? (
+                    <div className="flex flex-wrap gap-1">
+                      {s.map((x) => (
+                        <span
+                          key={x}
+                          className={cn(
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-bold',
+                            SENAL_UI[x].chip,
+                          )}
+                        >
+                          {SENAL_CHIP_LABEL[x]}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-faint">—</span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3.5 text-right">
+                  {a.id && (
+                    <span className="inline-flex items-center gap-3">
+                      <Link
+                        to={`/hacienda/${a.id}`}
+                        className="inline-flex items-center gap-1 text-sm font-semibold text-field-deep hover:underline"
+                      >
+                        Ver ficha
+                        <ArrowRight className="size-3.5" />
+                      </Link>
+                      {a.estado === 'activo' && (
+                        <DarBajaDialog
+                          animalId={a.id}
+                          trigger={
+                            <button
+                              type="button"
+                              title="Dar de baja (venta, muerte o error de carga)"
+                              aria-label="Dar de baja"
+                              className="inline-flex size-7 items-center justify-center rounded-lg text-faint transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <LogOut className="size-4" />
+                            </button>
+                          }
+                        />
+                      )}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -378,9 +637,11 @@ function AnimalTable({
 function PorPotrero({
   rows,
   potreroNombre,
+  senales,
 }: {
   rows: Animal[]
   potreroNombre: Map<string, string>
+  senales: Map<string, Senal[]>
 }) {
   const grupos = useMemo(() => {
     const map = new Map<string, Animal[]>()
@@ -409,7 +670,11 @@ function PorPotrero({
             </span>
           </div>
           <div className="bg-card">
-            <AnimalTable rows={animales} potreroNombre={potreroNombre} />
+            <AnimalTable
+              rows={animales}
+              potreroNombre={potreroNombre}
+              senales={senales}
+            />
           </div>
         </div>
       ))}
