@@ -16,6 +16,7 @@ import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useClima, useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 
 function fechaHoy(): string {
@@ -91,6 +92,7 @@ function initials(email?: string) {
 
 export function AppShell() {
   const { user, signOut } = useAuth()
+  const { data: membresia } = useEmpresa()
 
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('side-collapsed') === '1',
@@ -118,7 +120,7 @@ export function AppShell() {
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate font-heading text-[17px] font-bold text-white">
-                Risso Agro
+                {MARCA}
               </div>
               <div className="truncate text-[11px] font-medium text-sidebar-foreground/55">
                 Gestión de campo
@@ -198,7 +200,7 @@ export function AppShell() {
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[13px] font-semibold text-sidebar-foreground">
-                Risso
+                {membresia?.empresa?.nombre ?? '—'}
               </div>
               <div className="truncate text-[11px] text-sidebar-foreground/55">
                 {user?.email}

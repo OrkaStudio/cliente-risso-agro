@@ -1,10 +1,12 @@
 // Archivo de composición de rutas (define componentes lazy + exporta el router).
 // No es un módulo de componentes para Fast Refresh → desactivamos la regla acá.
 /* eslint-disable react-refresh/only-export-components */
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { LoginPage } from '@/features/auth/login-page'
+import { SignupPage } from '@/features/auth/signup-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
+import { RequireEmpresa } from '@/features/auth/require-empresa'
 import { AppShell } from '@/app/app-shell'
 import { CampoShell } from '@/app/campo-shell'
 import { ResponsiveShell } from '@/app/responsive-shell'
@@ -69,6 +71,11 @@ const HistorialPage = lazy(() =>
     default: m.HistorialPage,
   })),
 )
+const OnboardingPage = lazy(() =>
+  import('@/features/onboarding/onboarding-page').then((m) => ({
+    default: m.OnboardingPage,
+  })),
+)
 
 export const router = createBrowserRouter([
   {
@@ -76,13 +83,30 @@ export const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
+    path: '/registro',
+    element: <SignupPage />,
+  },
+  {
     element: <ProtectedRoute />,
     children: [
       {
-        // Gate por dispositivo: misma web, distinta navegación según el equipo.
-        // Un móvil cae al Modo Campo; escritorio ve el Modo Oficina completo.
-        element: <ResponsiveShell />,
+        // Recién registrado, sin empresa todavía: arma la suya acá.
+        path: '/onboarding',
+        element: (
+          <Suspense fallback={null}>
+            <OnboardingPage />
+          </Suspense>
+        ),
+      },
+      {
+        // Usuario sin membresía → onboarding; con empresa → la app.
+        element: <RequireEmpresa />,
         children: [
+          {
+            // Gate por dispositivo: misma web, distinta navegación según el equipo.
+            // Un móvil cae al Modo Campo; escritorio ve el Modo Oficina completo.
+            element: <ResponsiveShell />,
+            children: [
           {
             // Modo Oficina (escritorio) — shell con sidebar.
             element: <AppShell />,
@@ -101,15 +125,17 @@ export const router = createBrowserRouter([
               { path: 'cheques', element: <Navigate to="/agenda" replace /> },
             ],
           },
-          {
-            // Modo Campo (móvil) — shell con nav inferior.
-            element: <CampoShell />,
-            children: [
-              { path: 'campo', element: <Navigate to="/campo/manga" replace /> },
-              { path: 'campo/manga', element: <MangaPage /> },
-              { path: 'campo/recorrida', element: <RecorridaPage /> },
-              { path: 'campo/plata', element: <PlataPage /> },
-              { path: 'campo/historial', element: <HistorialPage /> },
+              {
+                // Modo Campo (móvil) — shell con nav inferior.
+                element: <CampoShell />,
+                children: [
+                  { path: 'campo', element: <Navigate to="/campo/manga" replace /> },
+                  { path: 'campo/manga', element: <MangaPage /> },
+                  { path: 'campo/recorrida', element: <RecorridaPage /> },
+                  { path: 'campo/plata', element: <PlataPage /> },
+                  { path: 'campo/historial', element: <HistorialPage /> },
+                ],
+              },
             ],
           },
         ],

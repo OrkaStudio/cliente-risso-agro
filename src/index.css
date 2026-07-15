@@ -461,3 +461,13 @@
   border-radius: 10px !important;
   overflow: hidden;
 }
+
+/* Foco en los formularios de auth/onboarding: borde verde + anillo SEPARADO
+   (outline con offset). El anillo pegado al borde se veía recortado en las
+   esquinas redondeadas; despegado 2px respira y las puntas quedan suaves. */
+.auth-forms input:focus-visible {
+  border-color: var(--ring);
+  outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent);
+  outline-offset: 2px;
+  box-shadow: none;
+}

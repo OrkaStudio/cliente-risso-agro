@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Banknote, ClipboardList, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
+import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
 
@@ -30,7 +31,7 @@ export function CampoShell() {
         </div>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="c-display truncate text-[16px] text-white">
-            Risso Agro
+            {MARCA}
           </div>
           <div className="c-label truncate !text-sidebar-foreground/60">
             Modo Campo

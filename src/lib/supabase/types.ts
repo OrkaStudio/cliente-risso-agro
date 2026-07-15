@@ -1245,6 +1245,7 @@ export type Database = {
         }
         Returns: number
       }
+      crear_empresa_con_dueno: { Args: { p_nombre: string }; Returns: string }
       crear_lote_repartido: {
         Args: {
           p_bloques?: Json
