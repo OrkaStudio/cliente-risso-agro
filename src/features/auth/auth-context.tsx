@@ -8,6 +8,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
+import { leerSesionPersistida } from '@/lib/supabase/persisted-session'
 
 type AuthState = {
   session: Session | null
@@ -49,19 +50,39 @@ function traducirErrorAuth(message: string): string {
 const AuthContext = createContext<AuthState | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Arranque instantáneo desde storage, SIN esperar la red: si el token está
+  // vencido y no hay señal, `getSession()` se colgaría intentando refrescar y
+  // trabaría la app en "Cargando…" (el caso del campo). Leyendo la sesión del
+  // storage en el init del estado ya podemos decidir la ruta en el primer
+  // render. Ver [[clientes/risso-agro/tareas/TASK-042-2026-07-15]].
+  const [session, setSession] = useState<Session | null>(leerSesionPersistida)
+  // Si ya hay sesión en storage, no esperamos nada. Si no, puede que venga en
+  // la URL (confirmación de email vía detectSessionInUrl) → mostramos "Cargando…"
+  // hasta que getSession la procese, para no redirigir a /login antes de tiempo.
+  const [loading, setLoading] = useState(() => leerSesionPersistida() === null)
 
   useEffect(() => {
-    // Sesión inicial (puede venir de localStorage).
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+    // Reconciliar con supabase (renueva el token si hay red, o levanta la sesión
+    // que venía en la URL). Si se cuelga o falla offline no importa: la sesión de
+    // storage ya se aplicó en el init del estado.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session) setSession(data.session)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
 
-    // Cambios posteriores (login, logout, refresh de token).
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
+    // Cambios posteriores (login, logout, refresh de token, confirmación por URL).
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      // Sólo un cierre de sesión explícito nos saca. Un `null` de INITIAL_SESSION
+      // offline (el refresh del token vencido falló por falta de red) NO debe
+      // pisar la sesión que levantamos de storage y echar al usuario a /login.
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        return
+      }
+      if (next) setSession(next)
     })
 
     return () => sub.subscription.unsubscribe()

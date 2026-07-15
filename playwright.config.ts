@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test'
 // Credenciales seed por env (no hardcodear): E2E_EMAIL / E2E_PASSWORD.
 export default defineConfig({
   testDir: './e2e',
+  // offline.spec.ts corre contra el build de prod (playwright.offline.config.ts).
+  testIgnore: 'offline.spec.ts',
   timeout: 45_000,
   expect: { timeout: 10_000 },
   use: {

@@ -2,5 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "headers": [
+    {
+      "comment": "El service worker y el manifest se revalidan SIEMPRE: si el CDN los cachea, un deploy nuevo no se detecta y los usuarios quedan clavados en la versión vieja. Los assets con hash en el nombre sí se cachean para siempre (los maneja Workbox).",
+      "source": "/(sw.js|manifest.webmanifest)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
+  ]
 }

@@ -7,6 +7,14 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
+    <!-- PWA: ícono e integración de "Agregar a inicio" en iOS (el manifest lo
+         inyecta vite-plugin-pwa, pero apple-touch-icon y theme-color no). -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#178a55" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Risso Agro" />
     <title>Risso Agro</title>
   </head>
   <body>

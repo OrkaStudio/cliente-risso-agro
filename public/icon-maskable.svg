@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Versión maskable: el contenido vive dentro del safe-zone central (~80%),
+       el fondo verde sangra hasta el borde para que el recorte del launcher no
+       coma el brote. Provisional — reemplazar al decidir el branding. -->
+  <rect width="512" height="512" fill="#0b5837"/>
+  <g fill="none" stroke="#f4f1e9" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 356 V236"/>
+    <path d="M256 268 C 256 226, 290 204, 334 204 C 334 246, 300 268, 256 268 Z" fill="#f4f1e9" stroke="none"/>
+    <path d="M256 298 C 256 256, 222 234, 178 234 C 178 276, 212 298, 256 298 Z" fill="#f4f1e9" stroke="none"/>
+    <path d="M172 356 H340"/>
+  </g>
+</svg>
