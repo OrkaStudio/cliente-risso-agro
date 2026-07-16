@@ -29,6 +29,7 @@ export function Panel({
   action,
   children,
   className,
+  guia,
 }: {
   title?: string
   sub?: string
@@ -36,10 +37,13 @@ export function Panel({
   action?: ReactNode
   children: ReactNode
   className?: string
+  /** Ancla para la guía asistida (data-guia) — ver features/guia. */
+  guia?: string
 }) {
   const hasHeader = Boolean(title || sub || info || action)
   return (
     <section
+      data-guia={guia}
       className={cn(
         'rounded-[14px] border border-border bg-card p-6 shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]',
         className,

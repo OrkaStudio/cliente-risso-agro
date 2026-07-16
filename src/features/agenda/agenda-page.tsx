@@ -331,7 +331,10 @@ export function AgendaPage() {
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* Vista */}
-          <div className="flex h-10 rounded-[11px] border border-border bg-secondary p-1">
+          <div
+            data-guia="agenda-vistas"
+            className="flex h-10 rounded-[11px] border border-border bg-secondary p-1"
+          >
             {(
               [
                 ['calendario', 'Calendario', CalendarDays],
@@ -437,7 +440,8 @@ export function AgendaPage() {
         )}
       </div>
 
-      {/* Contenido */}
+      {/* Contenido (wrapper de un solo hijo: no cambia el layout; ancla de la guía) */}
+      <div data-guia="agenda-contenido">
       {venc.isLoading ? (
         <Panel>
           <p className="py-8 text-center text-sm text-muted-foreground">Cargando…</p>
@@ -465,6 +469,7 @@ export function AgendaPage() {
           revirtiendo={revertir.isPending}
         />
       )}
+      </div>
     </div>
   )
 }

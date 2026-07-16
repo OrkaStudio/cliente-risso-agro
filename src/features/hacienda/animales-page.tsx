@@ -239,12 +239,20 @@ export function AnimalesPage() {
             )}
           </>
         }
-        action={<CrearAnimalDialog />}
+        action={
+          <div data-guia="hacienda-acciones">
+            <CrearAnimalDialog />
+          </div>
+        }
       />
 
       {/* Stock por categoría + Señales del rodeo */}
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-        <Panel title="Stock por categoría" sub={`${totalActivos} cabezas activas`}>
+        <Panel
+          title="Stock por categoría"
+          sub={`${totalActivos} cabezas activas`}
+          guia="hacienda-stock"
+        >
           {totalActivos === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               Todavía no hay animales activos.
@@ -284,6 +292,7 @@ export function AnimalesPage() {
 
         <Panel
           title="Señales"
+          guia="hacienda-senales"
           action={
             senalF ? (
               <button
@@ -464,7 +473,7 @@ export function AnimalesPage() {
       </div>
 
       {/* Contenido */}
-      <Panel className={cn(animales.isLoading && 'animate-pulse')}>
+      <Panel className={cn(animales.isLoading && 'animate-pulse')} guia="hacienda-tabla">
         {animales.isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Cargando…

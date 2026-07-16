@@ -255,7 +255,10 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
           </div>
         ) : editar ? (
           <>
-            <div className="mb-3 flex flex-wrap items-center gap-2.5">
+            <div
+              data-guia="campos-catastro"
+              className="mb-3 flex flex-wrap items-center gap-2.5"
+            >
               <CatastroDialog
                 onAplicar={(anillo: LatLng[]) => setContorno.mutate(anillo)}
                 onAplicado={() => setVer((v) => v + 1)}
@@ -264,6 +267,9 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                 Traé el contorno del catastro y dibujá los potreros adentro.
               </span>
             </div>
+            {/* Ancla del asistente: SOLO el mapa (no todo MapaVista — un ancla
+                a pantalla completa no explica nada). */}
+            <div data-guia="campos-mapa">
             <MapErrorBoundary>
               <Suspense
                 fallback={
@@ -297,6 +303,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                 />
               </Suspense>
             </MapErrorBoundary>
+            </div>
             <p className="mt-3 text-[12.5px] text-muted-foreground">
               Usá la herramienta de polígono (arriba a la izquierda) para{' '}
               <b>dibujar cada potrero</b> y ponele su número. Cuando termines,
@@ -304,6 +311,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
             </p>
           </>
         ) : (
+          <div data-guia="campos-mapa">
           <CampoVista
             key={vm.id}
             campo={vm}
@@ -366,6 +374,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
             onBorrarInfra={(id) => borrarInfra.mutate(id)}
             onVerPotrero={(id) => navigate(`/potrero/${id}`)}
           />
+          </div>
         )}
       </section>
 
@@ -477,8 +486,12 @@ export function LotesPage() {
         }
         action={
           <>
-            <VistaToggle vista={vista} setVista={setVista} />
-            <CampoFormDialog empresaId={empresaId} triggerLabel="+ Nuevo campo" />
+            <div data-guia="campos-vista">
+              <VistaToggle vista={vista} setVista={setVista} />
+            </div>
+            <div data-guia="campos-acciones">
+              <CampoFormDialog empresaId={empresaId} triggerLabel="+ Nuevo campo" />
+            </div>
           </>
         }
       />

@@ -338,7 +338,10 @@ export function InicioPage() {
       />
 
       {/* KPIs — barra instrumental con celdas divididas por hairline */}
-      <div className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border">
+      <div
+        data-guia="inicio-kpis"
+        className="flex flex-wrap overflow-hidden rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)] [&>*+*]:border-l [&>*+*]:border-border"
+      >
         <Kpi
           label="Stock total"
           icon={Beef}
@@ -405,7 +408,9 @@ export function InicioPage() {
       </div>
 
       {/* Cobros y pagos que se vienen (reemplaza la alerta + el panel de vencimientos) */}
-      <CobrosPagosProximos />
+      <div data-guia="inicio-vencimientos">
+        <CobrosPagosProximos />
+      </div>
 
       {/* Pronóstico 7 días del campo */}
       <PronosticoPanel />
@@ -415,13 +420,16 @@ export function InicioPage() {
         title="Estructura del rodeo"
         info="La forma de tu rodeo por sexo y etapa, con indicadores de manejo: cuántos vientres tenés, la relación toro:vaca (ideal 1 toro cada 25 vacas) y el índice de destete (terneros por vaca)."
         className="flex flex-col"
+        guia="inicio-rodeo"
       >
         <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
       </Panel>
 
       {/* Para atender en el campo — lo accionable de las últimas recorridas
           (la grilla de potreros vive en Campos, donde está el mapa) */}
-      <ParaAtenderCampo />
+      <div data-guia="inicio-atender">
+        <ParaAtenderCampo />
+      </div>
     </div>
   )
 }

@@ -124,7 +124,9 @@ export function AnaliticaPage() {
                 })),
               ]}
             />
-            <CargarDialog empresaId={empresaId} />
+            <div data-guia="analitica-cargar">
+              <CargarDialog empresaId={empresaId} />
+            </div>
           </>
         }
       />
@@ -167,6 +169,7 @@ export function AnaliticaPage() {
           {/* Rentabilidad por campo — comparación (tabla) */}
           <Panel
             title="Rentabilidad por campo"
+            guia="analitica-rentabilidad"
             sub={campoF ? 'campo filtrado' : 'comparación entre campos'}
           >
             {campos.length === 0 ? (
@@ -227,11 +230,14 @@ export function AnaliticaPage() {
           <RentabilidadActividad actividades={actividades} />
 
           {/* Posición de IVA — débito − crédito del período (Resp. Inscripto) */}
-          <PosicionIva movimientos={data} empresaId={empresaId} />
+          <div data-guia="analitica-iva">
+            <PosicionIva movimientos={data} empresaId={empresaId} />
+          </div>
 
           {/* Proyección de flujo de fondos — lo que va a entrar/salir por mes */}
           <Panel
             title="Proyección de flujo de fondos"
+            guia="analitica-flujo"
             info="Cobros y pagos pendientes agrupados por mes de vencimiento, con el saldo proyectado acumulado. Las cuotas de las series recurrentes ya están incluidas."
           >
             {flujo.length === 0 ? (

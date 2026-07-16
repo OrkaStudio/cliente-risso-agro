@@ -12,6 +12,8 @@ import {
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
+import { BotonGuia, Guia } from '@/features/guia/guia'
+import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useClima, useDolarBlue } from '@/features/cotizaciones/hooks'
@@ -227,6 +229,7 @@ export function AppShell() {
           </div>
 
           <Ticker />
+          <BotonGuia />
         </header>
 
         {/* Sólo el contenido scrollea */}
@@ -242,6 +245,12 @@ export function AppShell() {
           </div>
         </main>
       </div>
+
+      {/* Guía asistida por sección (tour de primera vez + relanzable) */}
+      <Guia />
+
+      {/* Panel del Asistente: checklist de puesta a punto + fichas */}
+      <AsistentePanel />
     </div>
   )
 }
