@@ -49,7 +49,7 @@ export function PosicionIva({
   }
 
   return (
-    <Panel title="Posición de IVA" sub="estimado según lo cargado">
+    <Panel title="Posición de IVA" sub="estimado según lo cargado" guia="analitica-iva">
       {/* Titular: a pagar o saldo a favor */}
       <div className="flex items-end justify-between gap-3 border-b border-line pb-4">
         <div className="min-w-0">

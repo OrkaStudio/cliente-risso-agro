@@ -14,6 +14,7 @@ import {
 import type { Database } from '@/lib/supabase/types'
 import { useCampos } from '@/features/campos/hooks'
 import { useVencimientos, useRevertirLiquidacion } from '@/features/agenda/hooks'
+import { useCancelarSerie } from '@/features/analitica/hooks'
 import { medioLabel, type Vencimiento } from '@/features/agenda/api'
 import { CalendarioVencimientos } from '@/features/agenda/calendario-vencimientos'
 import { LiquidarDialog } from '@/features/agenda/liquidar-dialog'
@@ -226,8 +227,8 @@ export function AgendaPage() {
       arr.push(v)
       map.set(v.serieId, arr)
     }
-    return [...map.values()]
-      .map((items) => {
+    return [...map.entries()]
+      .map(([serieId, items]) => {
         const ordenadas = [...items].sort((a, b) =>
           (a.fechaVencimiento ?? '').localeCompare(b.fechaVencimiento ?? ''),
         )
@@ -241,11 +242,13 @@ export function AgendaPage() {
             .replace(/\s*\(cuota.*$/i, '')
             .trim()
         return {
+          serieId,
           nombre,
           total: ordenadas.length,
           pagadas,
           proxima,
           restante,
+          restantes: ordenadas.filter((v) => v.estado === 'pendiente').length,
           tipo: ordenadas[0].tipo,
         }
       })
@@ -594,12 +597,62 @@ function TablaView({
 
 /* ===== Cuotas (plan por serie) ===== */
 type SerieResumen = {
+  serieId: string
   nombre: string
   total: number
   pagadas: number
   proxima: Vencimiento | null
   restante: number
+  restantes: number
   tipo: Vencimiento['tipo']
+}
+
+/** Cancelar las cuotas que faltan de una serie (vino de Analítica — la
+ *  gestión de cuotas vive acá, decisión de curaduría de Lau 17/07). */
+function CancelarSerie({ serieId, restantes }: { serieId: string; restantes: number }) {
+  const [confirmar, setConfirmar] = useState(false)
+  const cancelar = useCancelarSerie()
+
+  async function onCancelar() {
+    try {
+      await cancelar.mutateAsync(serieId)
+      toast.success('Cuotas restantes canceladas')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error')
+    }
+  }
+
+  if (confirmar) {
+    return (
+      <span className="flex items-center justify-center gap-2 text-[12px]">
+        <span className="text-muted-foreground">¿Anular {restantes}?</span>
+        <button
+          type="button"
+          onClick={onCancelar}
+          disabled={cancelar.isPending}
+          className="rounded-lg bg-destructive px-2.5 py-1 font-semibold text-white"
+        >
+          Sí
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmar(false)}
+          className="rounded-lg border border-border px-2.5 py-1 font-semibold text-muted-foreground"
+        >
+          No
+        </button>
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirmar(true)}
+      className="w-full rounded-lg border border-border bg-card py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+    >
+      Cancelar restantes
+    </button>
+  )
 }
 
 function CuotasView({ series }: { series: SerieResumen[] }) {
@@ -694,8 +747,9 @@ function CuotasView({ series }: { series: SerieResumen[] }) {
               </div>
 
               {prox && (
-                <div className="mt-3">
+                <div className="mt-3 grid gap-2">
                   <LiquidarDialog item={prox} />
+                  <CancelarSerie serieId={s.serieId} restantes={s.restantes} />
                 </div>
               )}
             </div>

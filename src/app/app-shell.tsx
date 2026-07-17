@@ -12,8 +12,9 @@ import {
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
-import { BotonGuia, Guia } from '@/features/guia/guia'
+import { Guia } from '@/features/guia/guia'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
+import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useClima, useDolarBlue } from '@/features/cotizaciones/hooks'
@@ -229,12 +230,12 @@ export function AppShell() {
           </div>
 
           <Ticker />
-          <BotonGuia />
         </header>
 
-        {/* Sólo el contenido scrollea */}
+        {/* Sólo el contenido scrollea. El padding inferior deja aire para la
+            burbuja flotante del Asistente (no tapa la última card). */}
         <main className="flex-1 overflow-y-auto">
-          <div className="w-full px-4 py-7 sm:px-6">
+          <div className="w-full px-4 pb-24 pt-7 sm:px-6">
             <Suspense
               fallback={
                 <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -249,8 +250,9 @@ export function AppShell() {
       {/* Guía asistida por sección (tour de primera vez + relanzable) */}
       <Guia />
 
-      {/* Panel del Asistente: checklist de puesta a punto + fichas */}
+      {/* Panel del Asistente (preguntas) + smart checklist de puesta a punto */}
       <AsistentePanel />
+      <PuestaAPunto />
     </div>
   )
 }

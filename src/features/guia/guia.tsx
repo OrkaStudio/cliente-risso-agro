@@ -5,7 +5,6 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { Sparkles, X } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import {
-  abrirPanel,
   guiaVista,
   marcarGuiaVista,
   useGuiaPedida,
@@ -17,7 +16,6 @@ import {
   type SeccionGuia,
 } from '@/features/guia/pasos'
 import { rootZoom } from '@/lib/zoom'
-import { cn } from '@/lib/utils'
 
 /**
  * Guía asistida por sección (tour de coach marks sobre la UI real).
@@ -503,21 +501,5 @@ function Velo4Paneles({ rect, vw, vh }: { rect: Rect; vw: number; vh: number }) 
   )
 }
 
-/** Botón "Asistente" de la topbar: abre el PANEL (checklist + fichas). El
- *  recorrido de la sección se relanza desde adentro del panel — conviven. */
-export function BotonGuia() {
-  return (
-    <button
-      type="button"
-      onClick={abrirPanel}
-      title="Abrí el asistente"
-      className={cn(
-        'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold',
-        'border border-white/15 text-sidebar-foreground/75 transition-colors hover:bg-white/[0.08] hover:text-white',
-      )}
-    >
-      <Sparkles className="size-[15px] text-lima" />
-      <span className="hidden md:inline">Asistente</span>
-    </button>
-  )
-}
+// El launcher del Asistente es la burbuja flotante (asistente-panel.tsx);
+// el botón de topbar se retiró (decisión de Lau: checklist arriba, chat abajo).

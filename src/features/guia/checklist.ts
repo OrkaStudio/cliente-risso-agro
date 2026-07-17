@@ -13,6 +13,10 @@ import { supabase } from '@/lib/supabase/client'
 export type ItemChecklist = {
   id: 'campo' | 'potreros' | 'hacienda' | 'tropas' | 'recorrida'
   titulo: string
+  /** Qué es y por qué importa, en criollo — el productor lee y entiende. */
+  detalle: string
+  /** Qué pasa al tocar el botón del paso. */
+  cta: string
   /** Sección de la app donde se resuelve (para navegar). */
   ruta: string
   /** Ancla data-guia a clickear para abrir la herramienta (null = solo navegar). */
@@ -66,14 +70,19 @@ export function useChecklist() {
       return [
         {
           id: 'campo',
-          titulo: 'Traer el campo del catastro',
+          titulo: 'Traé tu campo',
+          // Una línea. La explicación larga vive en la ficha y en el diálogo real.
+          detalle: 'Con la boleta de ARBA, el mapa se arma solo.',
+          cta: 'Traer mi campo',
           ruta: '/campos',
           accion: 'campos-catastro',
           hecho: campos >= 1,
         },
         {
           id: 'potreros',
-          titulo: 'Dibujar los potreros',
+          titulo: 'Dibujá los potreros',
+          detalle: 'Marcalos en el mapa y poneles su número.',
+          cta: 'Ir al mapa',
           ruta: '/campos',
           accion: null,
           // Umbral del spec: con 2 potreros dibujados el mapa ya trabaja.
@@ -81,21 +90,27 @@ export function useChecklist() {
         },
         {
           id: 'hacienda',
-          titulo: 'Cargar la hacienda',
+          titulo: 'Cargá tu hacienda',
+          detalle: 'Con o sin caravana, en un minuto.',
+          cta: 'Cargar animales',
           ruta: '/hacienda',
           accion: 'hacienda-acciones',
           hecho: activos >= 1,
         },
         {
           id: 'tropas',
-          titulo: 'Ubicar los animales en sus potreros',
+          titulo: 'Ubicá las tropas',
+          detalle: 'Cada tropa en su potrero, tocando el mapa.',
+          cta: 'Ver el mapa',
           ruta: '/campos',
           accion: null,
           hecho: ubicados >= 1,
         },
         {
           id: 'recorrida',
-          titulo: 'Probar la Recorrida',
+          titulo: 'Probá la Recorrida',
+          detalle: 'Una vez con señal, y queda lista para el campo.',
+          cta: '',
           ruta: '/campo/recorrida',
           accion: null,
           movil: true,

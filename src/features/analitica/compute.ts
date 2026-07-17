@@ -130,6 +130,105 @@ export function cuentasPendientes(movs: MovimientoConDetalle[]): {
   return { porCobrar, porPagar }
 }
 
+// ===== Período (regla madre, Lau 17/07) =====
+// Todo lo retrospectivo (resultado, rentabilidades, categorías) muestra SOLO
+// lo realizado (modo caja) dentro del período elegido. Lo comprometido vive
+// únicamente en la proyección de flujo y la Agenda.
+
+export type Periodo = '12m' | 'anio' | 'todo'
+
+export const periodoLabel: Record<Periodo, string> = {
+  '12m': 'Últimos 12 meses',
+  anio: 'Este año',
+  todo: 'Desde el inicio',
+}
+
+/** [desde, hasta] en YYYY-MM-DD (hasta = hoy). 'todo' → desde null. */
+export function rangoPeriodo(p: Periodo, hoy = new Date()): {
+  desde: string | null
+  hasta: string
+} {
+  const hasta = hoy.toISOString().slice(0, 10)
+  if (p === 'todo') return { desde: null, hasta }
+  if (p === 'anio') return { desde: `${hoy.getFullYear()}-01-01`, hasta }
+  const d = new Date(hoy)
+  d.setMonth(d.getMonth() - 11)
+  d.setDate(1)
+  return { desde: d.toISOString().slice(0, 10), hasta }
+}
+
+/** Rango equivalente ANTERIOR (para la tendencia vs período previo). */
+export function rangoAnterior(p: Periodo, hoy = new Date()): {
+  desde: string
+  hasta: string
+} | null {
+  if (p === 'todo') return null
+  const { desde, hasta } = rangoPeriodo(p, hoy)
+  if (!desde) return null
+  const d1 = new Date(desde)
+  const d2 = new Date(hasta)
+  const dias = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86_400_000))
+  const prevHasta = new Date(d1)
+  prevHasta.setDate(prevHasta.getDate() - 1)
+  const prevDesde = new Date(prevHasta)
+  prevDesde.setDate(prevDesde.getDate() - dias)
+  return {
+    desde: prevDesde.toISOString().slice(0, 10),
+    hasta: prevHasta.toISOString().slice(0, 10),
+  }
+}
+
+/** Fecha efectiva de un movimiento realizado (caja). */
+const fechaCaja = (m: MovimientoConDetalle) => m.fecha_cobro_pago ?? null
+
+/** Movimientos REALIZADOS dentro de un rango [desde, hasta]. */
+export function realizadosEnRango(
+  movs: MovimientoConDetalle[],
+  desde: string | null,
+  hasta: string,
+): MovimientoConDetalle[] {
+  return movs.filter((m) => {
+    if (!entra(m, 'caja')) return false
+    const f = fechaCaja(m)
+    if (!f) return false
+    if (desde && f < desde) return false
+    return f <= hasta
+  })
+}
+
+/**
+ * Serie mensual CONTINUA del neto realizado (para el gráfico del resultado):
+ * rellena con 0 los meses sin movimientos — sin saltos de tiempo.
+ */
+export function serieMensualNeto(
+  movs: MovimientoConDetalle[],
+  desde: string | null,
+  hasta: string,
+): { mes: string; valor: number }[] {
+  const porMes = new Map<string, number>()
+  let minMes: string | null = desde ? desde.slice(0, 7) : null
+  for (const m of movs) {
+    const f = fechaCaja(m)
+    if (!f) continue
+    const mes = f.slice(0, 7)
+    const delta = m.tipo === 'ingreso' ? Number(m.monto) : -Number(m.monto)
+    porMes.set(mes, (porMes.get(mes) ?? 0) + delta)
+    if (!minMes || mes < minMes) minMes = mes
+  }
+  if (!minMes) return []
+  const out: { mes: string; valor: number }[] = []
+  const fin = hasta.slice(0, 7)
+  const cursor = new Date(`${minMes}-01T00:00:00`)
+  // Tope de seguridad: 10 años de meses.
+  for (let i = 0; i < 120; i++) {
+    const mes = cursor.toISOString().slice(0, 7)
+    if (mes > fin) break
+    out.push({ mes, valor: porMes.get(mes) ?? 0 })
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+  return out
+}
+
 const fmt = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
