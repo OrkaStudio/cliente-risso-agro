@@ -17,7 +17,11 @@ import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dia
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
 import { estadoCicloColor, estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
-import { categoriaColor, categoriaNombre } from '@/features/hacienda/labels'
+import {
+  coloresPorCategoria,
+  categoriaNombre,
+  propositoLabel,
+} from '@/features/hacienda/labels'
 import { useMovimientos } from '@/features/analitica/hooks'
 import { formatARS, porPotrero, resumen } from '@/features/analitica/compute'
 import { usoDeEstado, type Uso } from '@/features/campos/use-campo-mapa'
@@ -82,10 +86,11 @@ function Distribucion({
 }) {
   return (
     <>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-secondary">
+      <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-secondary">
         {items.map((it) => (
           <span
             key={it.key}
+            className="first:rounded-l-full last:rounded-r-full"
             style={{ width: `${(it.value / total) * 100}%`, background: it.color }}
             title={`${it.label}: ${it.value}`}
           />
@@ -125,12 +130,13 @@ function ComposicionRodeo({ campo }: { campo: CampoConPotreros }) {
   for (const p of campo.potreros)
     for (const c of p.porCategoria)
       acc.set(c.categoria, (acc.get(c.categoria) ?? 0) + c.cabezas)
+  const colores = coloresPorCategoria(acc.keys())
   const items = [...acc.entries()]
     .map(([categoria, cabezas]) => ({
       key: categoria,
       label: categoriaNombre(categoria, cabezas),
       value: cabezas,
-      color: categoriaColor[categoria],
+      color: colores[categoria],
     }))
     .sort((a, b) => b.value - a.value)
   const total = items.reduce((s, c) => s + c.value, 0)
@@ -236,6 +242,7 @@ function UsoDelSuelo({ campo }: { campo: CampoConPotreros }) {
 /* ===== Lotes del campo (composición + dispersión por potrero) ===== */
 function LoteCard({ lote }: { lote: LoteReparto }) {
   const { nombre, proposito, totalCabezas, composicion, dispersion } = lote
+  const colores = coloresPorCategoria(composicion.map((c) => c.categoria))
   return (
     <div className="rounded-xl border border-border bg-card/60 p-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -244,7 +251,7 @@ function LoteCard({ lote }: { lote: LoteReparto }) {
           <span className="truncate font-semibold text-ink">{nombre}</span>
           {proposito && (
             <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11.5px] font-semibold text-muted-foreground">
-              {proposito}
+              {propositoLabel[proposito as keyof typeof propositoLabel] ?? proposito}
             </span>
           )}
         </div>
@@ -256,13 +263,14 @@ function LoteCard({ lote }: { lote: LoteReparto }) {
 
       {totalCabezas > 0 ? (
         <>
-          <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div className="mt-3 flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-secondary">
             {composicion.map((c) => (
               <span
                 key={c.categoria}
+                className="first:rounded-l-full last:rounded-r-full"
                 style={{
                   width: `${(c.cabezas / totalCabezas) * 100}%`,
-                  background: categoriaColor[c.categoria],
+                  background: colores[c.categoria],
                 }}
                 title={`${categoriaNombre(c.categoria, c.cabezas)}: ${c.cabezas}`}
               />
@@ -276,7 +284,7 @@ function LoteCard({ lote }: { lote: LoteReparto }) {
               >
                 <span
                   className="size-2.5 rounded-[3px]"
-                  style={{ background: categoriaColor[c.categoria] }}
+                  style={{ background: colores[c.categoria] }}
                 />
                 <span className="text-ink">{categoriaNombre(c.categoria, c.cabezas)}</span>
                 <span className="tnum font-semibold text-muted-foreground">

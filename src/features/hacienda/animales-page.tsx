@@ -20,7 +20,7 @@ import {
 } from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
 import {
-  categoriaColor,
+  coloresPorCategoria,
   categoriaLabel,
   categoriaNombre,
   sexoLabel,
@@ -148,6 +148,8 @@ export function AnimalesPage() {
       sinCaravana: activos.filter((a) => !a.caravana_rfid).length,
     }
   }, [lista])
+  // Colores por presencia → barra, leyenda y puntos de la tabla coinciden.
+  const coloresCat = coloresPorCategoria(porCategoria.map((c) => c.categoria))
 
   // Señales: qué dice el historial (evento.datos) de cada animal activo.
   const hoyISO = new Date().toISOString().slice(0, 10)
@@ -266,7 +268,7 @@ export function AnimalesPage() {
                     className="h-full rounded-sm"
                     style={{
                       width: `${(c.n / totalActivos) * 100}%`,
-                      background: categoriaColor[c.categoria],
+                      background: coloresCat[c.categoria],
                     }}
                     title={`${categoriaNombre(c.categoria, c.n)}: ${c.n}`}
                   />
@@ -277,7 +279,7 @@ export function AnimalesPage() {
                   <div key={c.categoria} className="flex items-center gap-2.5">
                     <span
                       className="size-[11px] shrink-0 rounded-[3px]"
-                      style={{ background: categoriaColor[c.categoria] }}
+                      style={{ background: coloresCat[c.categoria] }}
                     />
                     <span className="text-ink">{categoriaNombre(c.categoria, c.n)}</span>
                     <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
@@ -491,12 +493,14 @@ export function AnimalesPage() {
             rows={filtered}
             potreroNombre={potreroNombre}
             senales={senalesPorAnimal}
+            colores={coloresCat}
           />
         ) : (
           <PorPotrero
             rows={filtered}
             potreroNombre={potreroNombre}
             senales={senalesPorAnimal}
+            colores={coloresCat}
           />
         )}
       </Panel>
@@ -509,10 +513,12 @@ function AnimalTable({
   rows,
   potreroNombre,
   senales,
+  colores,
 }: {
   rows: Animal[]
   potreroNombre: Map<string, string>
   senales: Map<string, Senal[]>
+  colores: Record<Categoria, string>
 }) {
   return (
     <div className="overflow-x-auto">
@@ -560,7 +566,7 @@ function AnimalTable({
                     <span className="inline-flex items-center gap-2">
                       <span
                         className="size-2.5 shrink-0 rounded-full"
-                        style={{ background: categoriaColor[a.categoria] }}
+                        style={{ background: colores[a.categoria] }}
                       />
                       {categoriaLabel[a.categoria]}
                     </span>
@@ -647,10 +653,12 @@ function PorPotrero({
   rows,
   potreroNombre,
   senales,
+  colores,
 }: {
   rows: Animal[]
   potreroNombre: Map<string, string>
   senales: Map<string, Senal[]>
+  colores: Record<Categoria, string>
 }) {
   const grupos = useMemo(() => {
     const map = new Map<string, Animal[]>()
@@ -683,6 +691,7 @@ function PorPotrero({
               rows={animales}
               potreroNombre={potreroNombre}
               senales={senales}
+              colores={colores}
             />
           </div>
         </div>

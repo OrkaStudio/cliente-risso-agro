@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Beef, LandPlot, Leaf, Sprout, Tractor, Wheat } from 'lucide-react'
 import { Contador } from '@/components/contador'
 import type { Database } from '@/lib/supabase/types'
-import { categoriaColor, categoriaNombre } from '@/features/hacienda/labels'
+import { coloresPorCategoria, categoriaNombre } from '@/features/hacienda/labels'
 import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
 
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -81,6 +81,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
     p.hectareas && p.hectareas > 0 ? p.cabezas / p.hectareas : null
   const color = estadoCicloColor[p.estadoCiclo]
   const totalComp = p.porCategoria.reduce((s, c) => s + c.cabezas, 0)
+  const colores = coloresPorCategoria(p.porCategoria.map((c) => c.categoria))
   const conHacienda = p.cabezas > 0 && totalComp > 0
   const MAX_CHIPS = 3
 
@@ -130,7 +131,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
                 animate={{ flexGrow: c.cabezas / totalComp, opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.08 * i, ease: 'easeOut' }}
                 className="min-w-[5px] rounded-full"
-                style={{ background: categoriaColor[c.categoria] }}
+                style={{ background: colores[c.categoria] }}
                 title={`${categoriaNombre(c.categoria, c.cabezas)}: ${c.cabezas}`}
               />
             ))}
@@ -145,7 +146,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
               >
                 <span
                   className="size-1.5 shrink-0 rounded-full"
-                  style={{ background: categoriaColor[c.categoria] }}
+                  style={{ background: colores[c.categoria] }}
                 />
                 <b className="tnum font-bold text-ink">{c.cabezas}</b>
                 {categoriaNombre(c.categoria, c.cabezas)}

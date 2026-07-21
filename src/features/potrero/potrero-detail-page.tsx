@@ -9,7 +9,8 @@ import {
   Sprout,
   TrendingUp,
 } from 'lucide-react'
-import { categoriaColor, categoriaLabel, categoriaNombre } from '@/features/hacienda/labels'
+import { coloresPorCategoria, categoriaLabel } from '@/features/hacienda/labels'
+import { ComposicionView } from '@/features/hacienda/composicion-view'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -170,35 +171,7 @@ function StockCategoria({ d }: { d: PotreroDetalle }) {
       </div>
     )
   }
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-secondary">
-        {d.porCategoria.map((c) => (
-          <span
-            key={c.categoria}
-            style={{
-              width: `${(c.cabezas / d.totalCabezas) * 100}%`,
-              background: categoriaColor[c.categoria],
-            }}
-          />
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13.5px] sm:grid-cols-3">
-        {d.porCategoria.map((c) => (
-          <div key={c.categoria} className="flex items-center gap-2.5">
-            <span
-              className="size-[11px] shrink-0 rounded-[3px]"
-              style={{ background: categoriaColor[c.categoria] }}
-            />
-            <span className="text-ink">{categoriaNombre(c.categoria, c.cabezas)}</span>
-            <span className="tnum ml-auto text-[12.5px] font-bold text-ink">
-              {c.cabezas}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  return <ComposicionView items={d.porCategoria} total={d.totalCabezas} />
 }
 
 /* ===== Campaña agrícola (cultivo + fechas, carga manual) ===== */
@@ -304,6 +277,8 @@ export function PotreroDetailPage() {
       : null
   const gastosCat = gastosPorCategoria(delPotrero, 'devengado')
   const ingresosCat = ingresosPorCategoria(delPotrero, 'devengado')
+  // Un solo mapa de colores del potrero → el gráfico y la tabla coinciden.
+  const coloresCat = coloresPorCategoria(data.porCategoria.map((c) => c.categoria))
 
   return (
     <div className="flex flex-col gap-6">
@@ -568,7 +543,7 @@ export function PotreroDetailPage() {
                     <span className="inline-flex items-center gap-2 text-sm text-ink">
                       <span
                         className="size-2 rounded-full"
-                        style={{ background: categoriaColor[a.categoria] }}
+                        style={{ background: coloresCat[a.categoria] }}
                       />
                       {categoriaLabel[a.categoria]}
                     </span>
