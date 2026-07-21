@@ -558,6 +558,9 @@ export function CampoVista({
   const vacio = shapes.length === 0 && !boundary
   // Patrón de surcos (líneas diagonales) para los potreros agrícolas.
   const surcosId = `surcos-${campo.id}`
+  // Patrón de "rebaño" (puntos orgánicos) para los potreros ganaderos: así se
+  // ve un rodeo desde arriba. Hace que el ganadero resalte del vacío (hueco).
+  const rebanoId = `rebano-${campo.id}`
   const selMarker = markers.find((m) => m.id === selMk) ?? null
   const selFeat = selMarker ? FEATURE_MAP[selMarker.type] : null
 
@@ -616,6 +619,24 @@ export function CampoVista({
                   strokeOpacity={0.95}
                 />
               </pattern>
+              {/* Rebaño: base con el COLOR DEL CAMPO + puntos oscuros orgánicos
+                  (cabezas vistas desde arriba). Tamaños/posiciones irregulares
+                  para que lea como un rodeo real, no como una grilla. */}
+              <pattern
+                id={rebanoId}
+                width={30}
+                height={30}
+                patternUnits="userSpaceOnUse"
+              >
+                <rect width={30} height={30} fill={campo.color.hex} fillOpacity={0.58} />
+                <g fill="#0c1c14" fillOpacity={0.42}>
+                  <circle cx={6} cy={7} r={2.5} />
+                  <circle cx={18} cy={11} r={2} />
+                  <circle cx={25} cy={5.5} r={2.3} />
+                  <circle cx={11.5} cy={22} r={2.3} />
+                  <circle cx={23} cy={25} r={2.6} />
+                </g>
+              </pattern>
             </defs>
 
             {/* Foto satelital: capa base (carga rápida) + nítida encima que
@@ -666,17 +687,23 @@ export function CampoVista({
               const sel = selected === s.id
               const hov = hoverId === s.id
               const cab = info.cabezas ?? 0
-              const usoText =
+              // El COLOR del relleno ya dice el uso → el texto no lo repite.
+              // Solo mostramos el DATO valioso: cabezas (ganadero) o cultivo
+              // (agrícola). Vacío no muestra nada (el gris punteado ya lo dice).
+              const subText =
                 uso === 'ganadero'
-                  ? `Ganadero · ${cab}`
+                  ? cab > 0
+                    ? `${cab} cab`
+                    : null
                   : uso === 'agricola'
-                    ? `Agrícola${info.cultivo ? ` · ${info.cultivo}` : ''}`
-                    : 'Vacío'
-              // Los potreros chicos no muestran el pill por espacio, PERO si
-              // tienen hacienda cargada (o están seleccionados/hover) sí, para
-              // que el conteo siempre se vea sobre el mapa (aunque desborde un
-              // poco el polígono chico).
-              const showPill = !s.small || (uso === 'ganadero' && cab > 0) || sel || hov
+                    ? info.cultivo || null
+                    : null
+              // Los potreros chicos no muestran la sublínea por espacio, PERO si
+              // tienen hacienda (o están seleccionados/hover) sí, para que el
+              // conteo se vea siempre (aunque desborde un poco el polígono chico).
+              const showPill =
+                subText != null &&
+                (!s.small || (uso === 'ganadero' && cab > 0) || sel || hov)
               const esOrigen = mover?.activo && mover.origenPotreroId === s.id
               return (
                 <g
@@ -714,19 +741,28 @@ export function CampoVista({
                   />
                   <polygon
                     points={s.points}
-                    fill={esAgricola ? `url(#${surcosId})` : campo.color.hex}
+                    fill={
+                      esAgricola
+                        ? `url(#${surcosId})`
+                        : esVacio
+                          ? campo.color.hex
+                          : `url(#${rebanoId})`
+                    }
                     fillOpacity={
                       esAgricola
                         ? sel || hov
                           ? 1
                           : 0.92
                         : esVacio
-                          ? sel || hov
-                            ? 0.4
-                            : 0.2
-                          : sel || hov
-                            ? 0.66
-                            : 0.5
+                          ? // Vacío = hueco: casi sin relleno, solo el contorno
+                            // punteado → el ganadero (con textura) resalta.
+                            sel || hov
+                            ? 0.16
+                            : 0.05
+                          : // Ganadero (rebaño): textura al frente.
+                            sel || hov
+                            ? 1
+                            : 0.85
                     }
                     stroke={campo.color.hex}
                     strokeWidth={sel || hov ? 3 : 2}
@@ -781,41 +817,25 @@ export function CampoVista({
                     paintOrder="stroke"
                     style={{ pointerEvents: 'none' }}
                   >
-                    <tspan x={s.cx} dy={showPill ? '-0.6em' : '0'} fontWeight={700} fontSize={s.small ? 15 : 22}>
+                    <tspan
+                      x={s.cx}
+                      dy={showPill ? '-0.55em' : '0'}
+                      fontWeight={700}
+                      fontSize={s.small ? 15 : 22}
+                    >
                       {s.numero}
                     </tspan>
+                    {showPill && subText && (
+                      <tspan
+                        x={s.cx}
+                        dy="1.5em"
+                        fontWeight={600}
+                        fontSize={s.small ? 11 : 14}
+                      >
+                        {subText}
+                      </tspan>
+                    )}
                   </text>
-                  {showPill && (
-                    <foreignObject
-                      x={s.cx - 70}
-                      y={s.cy + 4}
-                      width={140}
-                      height={22}
-                      style={{ overflow: 'visible', pointerEvents: 'none' }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '1.5px 8px',
-                            borderRadius: '999px',
-                            background: USO[uso].color,
-                            color: '#fff',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            letterSpacing: '0.01em',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                            border: '1px solid rgba(255,255,255,0.25)',
-                            fontFamily: 'var(--font-body, sans-serif)',
-                          }}
-                        >
-                          {usoText}
-                        </span>
-                      </div>
-                    </foreignObject>
-                  )}
                 </g>
               )
             })}
