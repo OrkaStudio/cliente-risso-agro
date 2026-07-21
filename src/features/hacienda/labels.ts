@@ -1,6 +1,7 @@
 import type { Database } from '@/lib/supabase/types'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
+type Proposito = Database['public']['Enums']['proposito_lote']
 type Sexo = Database['public']['Enums']['sexo_animal']
 type Estado = Database['public']['Enums']['estado_animal']
 type TipoEvento = Database['public']['Enums']['tipo_evento']
@@ -100,6 +101,69 @@ export const categoriaColor: Record<Categoria, string> = {
   padrillo: 'var(--g7)',
   potrillo: 'var(--g2)',
   potranca: 'var(--g6)',
+}
+
+/**
+ * Paleta categórica AGRO, anclada a los tokens de la marca (verde campo, sol,
+ * cielo, tierra) + ciruela. Validada con la skill dataviz `--pairs all`:
+ * normal-vision ΔE 15.2 (PASS) → todo lector full-color las distingue. El CVD
+ * queda apoyado en la etiqueta (siempre visible) + gap de 2px. El color es canal
+ * de APOYO: la identidad la lleva la etiqueta. 5 hues terrosos distintos; una 6ª
+ * categoría recicla lejos y la etiqueta desambigua.
+ */
+export const SERIE_COLORS = [
+  '#178a55', // verde campo
+  '#dca01f', // sol (dorado)
+  '#2779c4', // cielo
+  '#b8442a', // tierra (terracota)
+  '#7d4a9c', // ciruela
+]
+
+/** Orden canónico de TODAS las categorías (bovino → ovino → equino). */
+const ORDEN_CATEGORIA: Categoria[] = [
+  ...categoriasPorEspecie.bovino,
+  ...categoriasPorEspecie.ovino,
+  ...categoriasPorEspecie.equino,
+]
+
+/**
+ * Asigna un color a cada categoría PRESENTE, en orden canónico. Dentro de un
+ * mismo gráfico las presentes NUNCA comparten color (hasta 8); si hay más,
+ * recicla lejos y la etiqueta desambigua. Estable dentro del gráfico; puede
+ * variar entre gráficos con distinta composición (el color es apoyo, no ID).
+ */
+export function coloresPorCategoria(
+  categorias: Iterable<Categoria>,
+): Record<Categoria, string> {
+  const presentes = [...new Set(categorias)].sort(
+    (a, b) => ORDEN_CATEGORIA.indexOf(a) - ORDEN_CATEGORIA.indexOf(b),
+  )
+  const out = {} as Record<Categoria, string>
+  presentes.forEach((c, i) => {
+    out[c] = SERIE_COLORS[i % SERIE_COLORS.length]
+  })
+  return out
+}
+
+/** Propósito de una tropa = su rol en el ciclo productivo. Set estandarizado
+ *  (antes era texto libre → inconsistente). "General" es el catch-all para lo
+ *  no decidido todavía. El orden es el del desplegable en la carga. */
+export const PROPOSITOS: Proposito[] = [
+  'cria',
+  'recria',
+  'invernada',
+  'reproductores',
+  'consumo',
+  'general',
+]
+
+export const propositoLabel: Record<Proposito, string> = {
+  cria: 'Cría',
+  recria: 'Recría',
+  invernada: 'Invernada',
+  reproductores: 'Reproductores',
+  consumo: 'Consumo',
+  general: 'General',
 }
 
 export const sexoLabel: Record<Sexo, string> = {

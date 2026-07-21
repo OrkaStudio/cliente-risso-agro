@@ -492,7 +492,7 @@ export type Database = {
           id: string
           nombre: string
           potrero_id: string | null
-          proposito: string | null
+          proposito: Database["public"]["Enums"]["proposito_lote"]
         }
         Insert: {
           campo_id?: string | null
@@ -502,7 +502,7 @@ export type Database = {
           id?: string
           nombre: string
           potrero_id?: string | null
-          proposito?: string | null
+          proposito?: Database["public"]["Enums"]["proposito_lote"]
         }
         Update: {
           campo_id?: string | null
@@ -512,7 +512,7 @@ export type Database = {
           id?: string
           nombre?: string
           potrero_id?: string | null
-          proposito?: string | null
+          proposito?: Database["public"]["Enums"]["proposito_lote"]
         }
         Relationships: [
           {
@@ -1251,6 +1251,7 @@ export type Database = {
           p_bloques?: Json
           p_campo_id?: string
           p_empresa_id: string
+          p_lote_id?: string
           p_lote_nombre?: string
           p_lote_proposito?: string
           p_origen?: string
@@ -1328,6 +1329,13 @@ export type Database = {
         | "mercadopago"
         | "otro"
       pasto_estado: "abundante" | "normal" | "escaso" | "pelado"
+      proposito_lote:
+        | "cria"
+        | "recria"
+        | "invernada"
+        | "reproductores"
+        | "consumo"
+        | "general"
       sexo_animal: "macho" | "hembra"
       tipo_campo: "propio" | "alquilado"
       tipo_evento:

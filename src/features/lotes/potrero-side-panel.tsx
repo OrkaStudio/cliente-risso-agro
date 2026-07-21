@@ -1,6 +1,6 @@
 // Exporta el componente + helpers (USO/tipos) del mismo módulo (patrón del repo).
 /* eslint-disable react-refresh/only-export-components */
-import { useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import {
   ArrowRight,
   ArrowRightLeft,
@@ -15,6 +15,11 @@ import { FEATURE_MAP, type FeatureId } from '@/features/lotes/potrero-features'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { useTropasDelPotrero } from '@/features/hacienda/hooks'
 import {
+  coloresPorCategoria,
+  categoriaNombre,
+  propositoLabel,
+} from '@/features/hacienda/labels'
+import {
   usoToEstadoCiclo,
   type CampoVM,
   type Uso,
@@ -26,6 +31,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
+type Categoria = Database['public']['Enums']['categoria_animal']
 
 export type { Uso }
 
@@ -42,19 +48,25 @@ export const USO: Record<Uso, { label: string; color: string }> = {
 
 /**
  * Estilo del swatch del glosario — replica el relleno del mapa: base con el
- * COLOR DEL CAMPO (identidad) y la actividad marcada con textura: ganadero
- * sólido, agrícola con surcos ÁMBAR (contrastan sobre el color del campo),
- * vacío tenue + punteado.
+ * COLOR DEL CAMPO (identidad) y la actividad marcada con textura: ganadero con
+ * PUNTOS (rebaño visto desde arriba), agrícola con surcos ÁMBAR, vacío HUECO
+ * (casi sin relleno + punteado).
  */
 export function fillStyleUso(hex: string, uso: Uso): CSSProperties {
-  if (uso === 'ganadero') return { background: `${hex}c8`, border: `1.5px solid ${hex}` }
+  if (uso === 'ganadero')
+    return {
+      background: `${hex}94`,
+      backgroundImage: `radial-gradient(circle, #0c1c14 1.1px, transparent 1.6px)`,
+      backgroundSize: '6px 6px',
+      border: `1.5px solid ${hex}`,
+    }
   if (uso === 'agricola')
     return {
       background: `${hex}88`,
       backgroundImage: `repeating-linear-gradient(45deg, ${USO.agricola.color} 0 3px, transparent 3px 7px)`,
       border: `1.5px solid ${hex}`,
     }
-  return { background: `${hex}2e`, border: `1.5px dashed ${hex}aa` }
+  return { background: `${hex}0f`, border: `1.5px dashed ${hex}aa` }
 }
 
 /**
@@ -64,9 +76,9 @@ export function fillStyleUso(hex: string, uso: Uso): CSSProperties {
 export function ReferenciasPotrero({ campo }: { campo: CampoVM }) {
   const hex = campo.color.hex
   const items: { uso: Uso; sub: string }[] = [
-    { uso: 'ganadero', sub: 'sólido' },
+    { uso: 'ganadero', sub: 'puntos' },
     { uso: 'agricola', sub: 'surcos' },
-    { uso: 'vacio', sub: 'tenue' },
+    { uso: 'vacio', sub: 'hueco' },
   ]
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
@@ -349,8 +361,27 @@ export function PotreroSidePanel({
   // el formulario está abierto.
   const [editInfo, setEditInfo] = useState<PotreroInfo | null>(null)
   const [cargaInfo, setCargaInfo] = useState<PotreroInfo | null>(null)
+  const [verTropas, setVerTropas] = useState(false)
   // Tropas del potrero activo (cacheado por potrero; el hover no re-consulta).
   const tropas = useTropasDelPotrero(info?.potreroId ?? null)
+
+  // Composición del potrero = suma de las categorías de TODAS sus tropas. Es lo
+  // que el productor quiere leer de un vistazo ("cuántos terneros, vacas") sin
+  // entrar al potrero. Las tropas quedan como detalle secundario (colapsable).
+  const composicion = useMemo(() => {
+    const acc = new Map<Categoria, number>()
+    for (const t of tropas.data ?? [])
+      for (const c of t.composicion)
+        acc.set(c.categoria, (acc.get(c.categoria) ?? 0) + c.cabezas)
+    return [...acc.entries()]
+      .map(([categoria, cabezas]) => ({ categoria, cabezas }))
+      .sort((a, b) => b.cabezas - a.cabezas)
+  }, [tropas.data])
+  // Colores por presencia → mismo criterio que el gráfico del detalle.
+  const composColores = useMemo(
+    () => coloresPorCategoria(composicion.map((c) => c.categoria)),
+    [composicion],
+  )
 
   return (
     <>
@@ -402,23 +433,76 @@ export function PotreroSidePanel({
             </p>
           )}
 
-          {/* Qué tropas ocupan el potrero (para planificar movimientos). */}
+          {/* Composición por categoría (suma de todas las tropas): lo que el
+              productor necesita sin entrar al potrero. Punto de color = misma
+              paleta que Analítica; el número es el protagonista. */}
+          {info.uso === 'ganadero' && composicion.length > 0 && (
+            <div className="grid gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+                Composición
+              </span>
+              <div className="grid gap-1.5 rounded-xl bg-secondary/60 px-3 py-2.5">
+                {composicion.map((c) => (
+                  <div
+                    key={c.categoria}
+                    className="flex items-center gap-2 text-[13px]"
+                  >
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: composColores[c.categoria] }}
+                    />
+                    <span className="min-w-0 truncate text-ink">
+                      {categoriaNombre(c.categoria, c.cabezas)}
+                    </span>
+                    <span className="tnum ml-auto shrink-0 font-semibold text-ink">
+                      {c.cabezas}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tropas del potrero: detalle secundario para planificar movimientos.
+              Colapsado por defecto — la composición ya responde el "qué hay". */}
           {info.uso === 'ganadero' && (tropas.data?.length ?? 0) > 0 && (
-            <div className="grid gap-1.5 rounded-xl bg-secondary/60 px-3 py-2.5">
-              {tropas.data!.map((t) => (
-                <div
-                  key={t.loteId ?? 'sueltos'}
-                  className="flex items-baseline justify-between gap-2 text-[12.5px]"
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-ink">
-                    <Layers className="size-3.5 shrink-0 text-field-deep" />
-                    <span className="truncate">{t.nombre ?? 'Sueltos (sin tropa)'}</span>
-                  </span>
-                  <span className="tnum shrink-0 font-semibold text-muted-foreground">
-                    {t.cabezas} cab
-                  </span>
+            <div className="grid gap-1.5">
+              <button
+                type="button"
+                onClick={() => setVerTropas((v) => !v)}
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-field-deep transition-colors hover:text-field"
+              >
+                <Layers className="size-3.5" />
+                {verTropas
+                  ? 'Ocultar tropas'
+                  : `Ver ${tropas.data!.length} ${tropas.data!.length === 1 ? 'tropa' : 'tropas'}`}
+              </button>
+              {verTropas && (
+                <div className="grid gap-1.5 rounded-xl bg-secondary/60 px-3 py-2.5">
+                  {tropas.data!.map((t) => (
+                    <div
+                      key={t.loteId ?? 'sueltos'}
+                      className="flex items-baseline justify-between gap-2 text-[12.5px]"
+                    >
+                      <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-ink">
+                        <Layers className="size-3.5 shrink-0 text-field-deep" />
+                        <span className="truncate">
+                          {t.nombre ?? 'Sueltos (sin tropa)'}
+                        </span>
+                        {t.proposito && (
+                          <span className="shrink-0 rounded-full bg-card px-1.5 py-[1px] text-[10px] font-semibold text-muted-foreground">
+                            {propositoLabel[t.proposito as keyof typeof propositoLabel] ??
+                              t.proposito}
+                          </span>
+                        )}
+                      </span>
+                      <span className="tnum shrink-0 font-semibold text-muted-foreground">
+                        {t.cabezas} cab
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
 

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
 type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
+type PropositoLote = Database['public']['Enums']['proposito_lote']
 
 export type AnimalConCaravana =
   Database['public']['Views']['v_animal_con_caravana']['Row']
@@ -153,9 +154,11 @@ export type CargaMasiva = {
   empresaId: string
   /** El lote pertenece a este campo (puede estar en varios de sus potreros). */
   campoId?: string | null
-  /** Si se da un nombre de lote, se crea la tropa y se le asignan los animales. */
+  /** Sumar a una tropa YA existente (se ignora loteNombre/loteProposito). */
+  loteId?: string
+  /** Si se da un nombre de lote (y no loteId), se crea la tropa nueva. */
   loteNombre?: string
-  loteProposito?: string
+  loteProposito?: PropositoLote
   origen?: string
   /** Uno o más potreros con sus cantidades (el mismo lote repartido). */
   bloques: BloqueCarga[]
@@ -184,8 +187,9 @@ export async function crearAnimalesMasivo(input: CargaMasiva): Promise<number> {
   const { data, error } = await supabase.rpc('crear_lote_repartido', {
     p_empresa_id: input.empresaId,
     p_campo_id: input.campoId || undefined,
+    p_lote_id: input.loteId || undefined,
     p_lote_nombre: input.loteNombre?.trim() || undefined,
-    p_lote_proposito: input.loteProposito?.trim() || undefined,
+    p_lote_proposito: input.loteProposito || undefined,
     p_origen: input.origen?.trim() || undefined,
     p_bloques: bloques,
   })

@@ -4,12 +4,18 @@ import { toast } from 'sonner'
 import { Layers, MapPin, Plus, X } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { usePotreros, useCrearAnimalesMasivo } from '@/features/hacienda/hooks'
+import {
+  usePotreros,
+  useCrearAnimalesMasivo,
+  useTropasCampo,
+} from '@/features/hacienda/hooks'
 import { useCampos } from '@/features/campos/hooks'
 import {
   categoriaLabel,
   categoriasPorEspecie,
   especieLabel,
+  propositoLabel,
+  PROPOSITOS,
   type Especie,
 } from '@/features/hacienda/labels'
 import type { BloqueCarga, ItemCargaMasiva } from '@/features/hacienda/api'
@@ -20,6 +26,11 @@ import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
 import { FormDialog, formItem } from '@/components/form-dialog'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
+type Proposito = Database['public']['Enums']['proposito_lote']
+
+/** Selección de tropa: '' = sin tropa, 'nueva' = crear una, uuid = existente. */
+const SIN_TROPA = ''
+const NUEVA_TROPA = 'nueva'
 
 const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
 
@@ -94,8 +105,10 @@ export function CargaMasivaDialog({
   const potreroFijo = !!prefill?.potreroId
 
   const [campoId, setCampoId] = useState(prefill?.campoId ?? '')
+  // Tropa: sin tropa / nueva / una existente (uuid). Evita duplicar tropas.
+  const [loteSel, setLoteSel] = useState<string>(SIN_TROPA)
   const [loteNombre, setLoteNombre] = useState('')
-  const [loteProposito, setLoteProposito] = useState('')
+  const [loteProposito, setLoteProposito] = useState<Proposito>('general')
   const [origen, setOrigen] = useState('')
   const [bloques, setBloques] = useState<Bloque[]>([
     bloqueVacio(prefill?.potreroId ?? ''),
@@ -108,6 +121,17 @@ export function CargaMasivaDialog({
     [potreros.data, campoId],
   )
 
+  // Tropas que ya existen en el campo → para elegir una en vez de duplicarla.
+  const tropas = useTropasCampo(campoId || null)
+  const tropasCampo = useMemo(() => tropas.data ?? [], [tropas.data])
+
+  // Crosscheck: en modo "Nueva", ¿el nombre tipeado ya existe en el campo?
+  const nombreDup = useMemo(() => {
+    const n = loteNombre.trim().toLowerCase()
+    if (loteSel !== NUEVA_TROPA || !n) return null
+    return tropasCampo.find((t) => (t.nombre ?? '').trim().toLowerCase() === n) ?? null
+  }, [loteSel, loteNombre, tropasCampo])
+
   const total = useMemo(
     () => bloques.reduce((s, b) => s + totalDeFilas(b.filas), 0),
     [bloques],
@@ -115,8 +139,9 @@ export function CargaMasivaDialog({
 
   function reset() {
     setCampoId(prefill?.campoId ?? '')
+    setLoteSel(SIN_TROPA)
     setLoteNombre('')
-    setLoteProposito('')
+    setLoteProposito('general')
     setOrigen('')
     setBloques([bloqueVacio(prefill?.potreroId ?? '')])
     setError(null)
@@ -186,12 +211,16 @@ export function CargaMasivaDialog({
       potreroId: b.potreroId || null,
       items: itemsDeFilas(b.filas),
     }))
+    // Tropa: sumar a una existente (uuid), crear una nueva, o ninguna.
+    const usaExistente = loteSel !== SIN_TROPA && loteSel !== NUEVA_TROPA
+    const creaNueva = loteSel === NUEVA_TROPA
     try {
       const n = await cargar.mutateAsync({
         empresaId,
         campoId: campoId || null,
-        loteNombre: loteNombre || undefined,
-        loteProposito: loteProposito || undefined,
+        loteId: usaExistente ? loteSel : undefined,
+        loteNombre: creaNueva ? loteNombre || undefined : undefined,
+        loteProposito: creaNueva ? loteProposito : undefined,
         origen: origen || undefined,
         bloques: bloquesPayload,
       })
@@ -259,8 +288,9 @@ export function CargaMasivaDialog({
             value={campoId}
             onChange={(v) => {
               setCampoId(v)
-              // Al cambiar de campo, los potreros elegidos ya no aplican.
+              // Al cambiar de campo, los potreros y la tropa elegidos ya no aplican.
               setBloques((prev) => prev.map((b) => ({ ...b, potreroId: '' })))
+              setLoteSel(SIN_TROPA)
             }}
             options={[
               { value: '', label: 'Elegí…' },
@@ -270,26 +300,74 @@ export function CargaMasivaDialog({
         </motion.div>
       )}
 
-      {/* Lote / tropa */}
-      <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="lote-nombre">Tropa (opcional)</Label>
-          <Input
-            id="lote-nombre"
-            placeholder="Ej. Tropa 1"
-            value={loteNombre}
-            onChange={(e) => setLoteNombre(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="lote-prop">Propósito (opcional)</Label>
-          <Input
-            id="lote-prop"
-            placeholder="Cría, invernada…"
-            value={loteProposito}
-            onChange={(e) => setLoteProposito(e.target.value)}
-          />
-        </div>
+      {/* Tropa: elegir una EXISTENTE del campo (evita duplicarla) o crear una
+          nueva. El propósito es un set fijo → alimenta filtros y analítica. */}
+      <motion.div variants={formItem} className="grid gap-2">
+        <Label>Tropa (opcional)</Label>
+        <Dropdown
+          block
+          ariaLabel="Tropa"
+          value={loteSel}
+          onChange={setLoteSel}
+          options={[
+            { value: SIN_TROPA, label: 'Sin tropa' },
+            ...tropasCampo.map((t) => ({
+              value: t.id,
+              label: t.proposito
+                ? `${t.nombre} · ${propositoLabel[t.proposito]}`
+                : (t.nombre ?? '—'),
+              group: 'Tropas del campo',
+            })),
+            { value: NUEVA_TROPA, label: '＋ Nueva tropa' },
+          ]}
+        />
+
+        {loteSel === NUEVA_TROPA && (
+          <div className="grid grid-cols-2 gap-4 pt-1">
+            <div className="grid gap-2">
+              <Label htmlFor="lote-nombre">Nombre</Label>
+              <Input
+                id="lote-nombre"
+                placeholder="Ej. Tropa 1"
+                value={loteNombre}
+                onChange={(e) => setLoteNombre(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="lote-prop">Propósito</Label>
+              <Dropdown
+                block
+                ariaLabel="Propósito"
+                value={loteProposito}
+                onChange={(v) => setLoteProposito(v as Proposito)}
+                options={PROPOSITOS.map((p) => ({
+                  value: p,
+                  label: propositoLabel[p],
+                }))}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Crosscheck: el nombre tipeado ya existe en el campo → ofrecer usarla
+            en vez de crear un duplicado. */}
+        {nombreDup && (
+          <div
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-3 py-2 text-[12.5px] text-ink"
+            style={{ background: '#fbf3e2', border: '1px solid #e4c680' }}
+          >
+            <span>
+              Ya existe la tropa <b>«{nombreDup.nombre}»</b> en este campo.
+            </span>
+            <button
+              type="button"
+              onClick={() => setLoteSel(nombreDup.id)}
+              className="font-semibold text-field-deep underline underline-offset-2 hover:no-underline"
+            >
+              Sumar animales a esa
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* Bloques: un potrero con sus categorías. El mismo lote, repartido. */}
