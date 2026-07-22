@@ -261,8 +261,21 @@ function Recorrida({
           >
             <ChevronLeft className="size-5" strokeWidth={2.5} />
           </button>
-          <span className="min-w-0 flex-1">
-            <span className="c-display block truncate text-[16px] text-[var(--c-ink)]">
+          {/* El progreso ES el disparador del panel: el número que leés
+              ("2 de 12") es el que tocás para ver qué falta. Antes había un
+              botón ⏱ aparte que decía lo mismo y apretaba el header. */}
+          <button
+            type="button"
+            disabled={pendientes.length === 0}
+            onClick={() => setPanelAbierto(true)}
+            aria-label={
+              pendientes.length > 0
+                ? `${pendientes.length} potreros por recorrer — ver la lista`
+                : undefined
+            }
+            className="flex min-w-0 flex-1 flex-col items-start text-left disabled:opacity-100"
+          >
+            <span className="c-display block max-w-full truncate text-[16px] text-[var(--c-ink)]">
               {r.meta!.campo_nombre}
             </span>
             <span className="flex items-center gap-1.5">
@@ -272,25 +285,17 @@ function Recorrida({
                 <CloudOff className="size-3.5 shrink-0 text-[var(--c-warn)]" strokeWidth={2.5} />
               )}
               <CLabel className="!text-[11px]">
-                {r.hechos} de {r.total} potreros
+                {r.hechos} de {r.total}
                 {lluvia != null && ` · ${lluvia === 0 ? 'sin lluvia' : `${lluvia} mm`}`}
               </CLabel>
+              {pendientes.length > 0 && (
+                <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--c-sunk)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--c-ink-soft)]">
+                  <History className="size-3" strokeWidth={2.5} />
+                  {pendientes.length}
+                </span>
+              )}
             </span>
-          </span>
-          {/* Panel de atrasados: cuántos potreros faltan de un vistazo, y el
-              atajo para ir directo al que hace más que no se mira. La antigüedad
-              vive acá y no en el croquis, que se satura. */}
-          {pendientes.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setPanelAbierto(true)}
-              aria-label={`${pendientes.length} potreros por recorrer`}
-              className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-2.5 text-[var(--c-ink)]"
-            >
-              <History className="size-[18px]" strokeWidth={2} />
-              <span className="c-mono text-[15px] font-bold">{pendientes.length}</span>
-            </button>
-          )}
+          </button>
           <button
             type="button"
             onClick={onCierre}
