@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Crosshair, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RecPotrero } from './db'
@@ -125,6 +125,46 @@ function polo(pts: XY[]): { x: number; y: number; r: number } {
   return mejor
 }
 
+/** Mínimo táctil (px). Debajo de esto, el potrero sale a un pin. */
+const TAP_MIN = 44
+
+/**
+ * Ubica el pin de un potrero chico: prueba 12 direcciones alrededor de su polo
+ * y elige la que cae en espacio libre — fuera de todos los polígonos y lejos
+ * de las otras etiquetas. Así el target grande no se come al vecino, que es
+ * exactamente lo que había que evitar.
+ */
+function ubicarPin(
+  origen: { x: number; y: number },
+  dist: number,
+  radio: number,
+  poligonos: XY[][],
+  ocupados: { x: number; y: number }[],
+): { x: number; y: number } {
+  let mejor = { x: origen.x + dist, y: origen.y, score: -Infinity }
+  // Varias distancias: con una sola, si el potrero está rodeado, el pin cae
+  // igual encima de un vecino. Estirando el brazo llega al fondo libre.
+  for (const k of [1, 1.5, 2.1, 2.9]) {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2
+      const x = origen.x + Math.cos(a) * dist * k
+      const y = origen.y + Math.sin(a) * dist * k
+      let score = -k * 6 // a igualdad de condiciones, el pin cerca del potrero
+      // Tapar otro potrero es lo peor: le esconde el número al vecino.
+      for (const poly of poligonos) {
+        if (distanciaAlBorde(x, y, poly) > -radio * 0.5) score -= 260
+      }
+      // Y penaliza acercarse a etiquetas/pines ya colocados.
+      for (const o of ocupados) {
+        const d = Math.hypot(x - o.x, y - o.y)
+        if (d < radio * 2.4) score -= (radio * 2.4 - d) * 25
+      }
+      if (score > mejor.score) mejor = { x, y, score }
+    }
+  }
+  return { x: mejor.x, y: mejor.y }
+}
+
 type EstadoGPS =
   | { k: 'idle' }
   | { k: 'buscando' }
@@ -140,6 +180,19 @@ export function Croquis({
   onAbrir: (potreroId: string) => void
 }) {
   const [gps, setGps] = useState<EstadoGPS>({ k: 'idle' })
+  // Medimos el dibujo REAL en píxeles: sin eso no se puede saber si un potrero
+  // llega al mínimo táctil (el viewBox es relativo al tamaño del campo).
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) =>
+      setBox({ w: e.contentRect.width, h: e.contentRect.height }),
+    )
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const conPoligono = potreros.filter((p) => p.poligono && p.poligono.length >= 3)
   const sinPoligono = potreros.filter((p) => !p.poligono || p.poligono.length < 3)
@@ -172,13 +225,54 @@ export function Croquis({
       ? potreros.find((p) => p.id === gps.potreroId)
       : null
 
+  // ---- Reparto etiqueta interna vs pin -------------------------------------
+  // Un potrero astilla (12A en La Porteña) no tiene ni superficie para el
+  // número ni superficie para el dedo. En vez de seguir achicando la letra, se
+  // lo saca a un PIN de 44px anclado con línea guía, ubicado en espacio libre.
+  // El polígono sigue siendo tocable; el pin es el target confiable.
+  const escalaPx =
+    proy && box.w > 0
+      ? Math.min(box.w / (proy.vw + 6), box.h / (proy.vh + 6))
+      : 0
+  const pinR = escalaPx > 0 ? TAP_MIN / 2 / escalaPx : 0
+
+  type Capa = {
+    p: RecPotrero
+    pts: XY[]
+    x: number
+    y: number
+    r: number
+    chico: boolean
+    pin: { x: number; y: number } | null
+  }
+  const capas: Capa[] = []
+  if (aXY) {
+    const polys = conPoligono.map((p) => p.poligono!.map(aXY))
+    const ocupados: { x: number; y: number }[] = []
+    conPoligono.forEach((p, i) => {
+      const { x, y, r } = polo(polys[i])
+      const chico = escalaPx > 0 && r * 2 * escalaPx < TAP_MIN
+      capas.push({ p, pts: polys[i], x, y, r, chico, pin: null })
+      if (!chico) ocupados.push({ x, y })
+    })
+    // Los pines se colocan después, esquivando las etiquetas ya asentadas.
+    for (const c of capas) {
+      if (!c.chico) continue
+      c.pin = ubicarPin({ x: c.x, y: c.y }, c.r + pinR * 1.6, pinR, polys, ocupados)
+      ocupados.push(c.pin)
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* ===== El dibujo: se come todo el alto disponible. Es lo que mira. ===== */}
       {/* Fondo de TIERRA, no del color de las tarjetas: antes el potrero
           (#ffffff) y la superficie (#f2f4ef) diferían un 3% y el croquis se
           leía como una maraña de líneas sin figura contra fondo. */}
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-[#cbd3c4] p-1.5">
+      <div
+        ref={boxRef}
+        className="relative min-h-0 flex-1 overflow-hidden bg-[#cbd3c4] p-1.5"
+      >
         {aXY && proy ? (
           <svg
             viewBox={`-3 -3 ${proy.vw + 6} ${proy.vh + 6}`}
@@ -187,19 +281,14 @@ export function Croquis({
             role="img"
             aria-label="Croquis del campo — tocá un potrero para cargarlo"
           >
-            {conPoligono.map((p) => {
+            {/* 1) Los polígonos. Siempre tocables, aunque sean chicos. */}
+            {capas.map(({ p, pts, x, y, r, chico }) => {
               const hecho = p.hecho === 1
               const acaEstoy = pisando?.id === p.id
-              const pts = p.poligono!.map(aXY)
               const d =
                 pts.map((q, j) => `${j === 0 ? 'M' : 'L'}${q[0]},${q[1]}`).join(' ') + ' Z'
-              // Etiqueta en el punto más adentro, con el cuerpo que entre ahí.
-              const { x: cx, y: cy, r } = polo(pts)
               const largo = Math.max(2, p.nombre.length)
-              // Piso de legibilidad: en un potrero astilla el número entra
-              // "mal" a propósito y se sale un poco del contorno — leerlo vale
-              // más que respetar el borde, y el halo lo despega del vecino.
-              const fs = Math.max(2.9, Math.min(r * 1.15, (r * 3.1) / largo, 9))
+              const fs = Math.min(r * 1.15, (r * 3.1) / largo, 9)
               const conTilde = hecho && fs >= 3.4
               return (
                 <g
@@ -218,32 +307,95 @@ export function Croquis({
                     strokeWidth={acaEstoy ? 1.6 : 0.7}
                     strokeLinejoin="round"
                   />
-                  {fs >= 1.6 && (
-                    <text
-                      x={cx}
-                      y={conTilde ? cy - fs * 0.3 : cy}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      className="c-mono"
-                      fontSize={fs}
-                      fontWeight={800}
-                      fill={hecho ? '#fff' : 'var(--c-ink)'}
-                      // Halo: si dos potreros chicos quedan juntos, el número
-                      // sigue legible sobre cualquier vecino.
-                      stroke={hecho ? 'var(--c-ok)' : '#fff'}
-                      strokeWidth={fs * 0.16}
-                      paintOrder="stroke"
-                      style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
-                    >
-                      {p.nombre}
-                    </text>
+                  {/* El número va adentro solo si el potrero le da lugar; si
+                      no, se dibuja en el pin (abajo) y acá no va nada. */}
+                  {!chico && (
+                    <>
+                      <text
+                        x={x}
+                        y={conTilde ? y - fs * 0.3 : y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        className="c-mono"
+                        fontSize={fs}
+                        fontWeight={800}
+                        fill={hecho ? '#fff' : 'var(--c-ink)'}
+                        stroke={hecho ? 'var(--c-ok)' : '#fff'}
+                        strokeWidth={fs * 0.16}
+                        paintOrder="stroke"
+                        style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
+                      >
+                        {p.nombre}
+                      </text>
+                      {conTilde && (
+                        <path
+                          d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth={fs * 0.16}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ pointerEvents: 'none' }}
+                        />
+                      )}
+                    </>
                   )}
-                  {conTilde && (
+                </g>
+              )
+            })}
+
+            {/* 2) Los pines de los potreros chicos, ENCIMA de todo para que
+                   ningún vecino los tape. Cada uno mide 44px de verdad. */}
+            {capas.map(({ p, x, y, pin }) => {
+              if (!pin) return null
+              const hecho = p.hecho === 1
+              const fs = Math.min((pinR * 2.6) / Math.max(2, p.nombre.length), pinR * 0.95)
+              return (
+                <g
+                  key={`pin-${p.id}`}
+                  onClick={() => onAbrir(p.id)}
+                  className="cursor-pointer"
+                  role="button"
+                  aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
+                >
+                  {/* Línea guía: dice a qué potrero pertenece el pin. */}
+                  <line
+                    x1={x}
+                    y1={y}
+                    x2={pin.x}
+                    y2={pin.y}
+                    stroke="#3c463b"
+                    strokeWidth={pinR * 0.09}
+                    strokeDasharray={`${pinR * 0.18} ${pinR * 0.14}`}
+                  />
+                  <circle cx={x} cy={y} r={pinR * 0.13} fill="#3c463b" />
+                  <circle
+                    cx={pin.x}
+                    cy={pin.y}
+                    r={pinR}
+                    fill={hecho ? 'var(--c-ok)' : '#ffffff'}
+                    stroke={pisando?.id === p.id ? 'var(--c-warn)' : '#3c463b'}
+                    strokeWidth={pinR * 0.11}
+                  />
+                  <text
+                    x={pin.x}
+                    y={hecho ? pin.y - pinR * 0.22 : pin.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className="c-mono"
+                    fontSize={fs}
+                    fontWeight={800}
+                    fill={hecho ? '#fff' : 'var(--c-ink)'}
+                    style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
+                  >
+                    {p.nombre}
+                  </text>
+                  {hecho && (
                     <path
-                      d={`M${cx - fs * 0.34},${cy + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
+                      d={`M${pin.x - pinR * 0.3},${pin.y + pinR * 0.42} l${pinR * 0.22},${pinR * 0.22} l${pinR * 0.44},${-pinR * 0.46}`}
                       fill="none"
                       stroke="#fff"
-                      strokeWidth={fs * 0.16}
+                      strokeWidth={pinR * 0.13}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       style={{ pointerEvents: 'none' }}
