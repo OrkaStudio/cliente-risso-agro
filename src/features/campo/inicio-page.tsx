@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
+  Banknote,
   CloudOff,
   Footprints,
-  MapPin,
   PencilRuler,
   RefreshCw,
   Syringe,
@@ -46,11 +46,6 @@ export function CampoInicioPage() {
         <h1 className="c-display text-[26px] text-[var(--c-ink)]">
           {r.meta ? 'Tenés una recorrida abierta' : '¿Qué vas a hacer?'}
         </h1>
-        {!r.meta && (
-          <p className="mt-0.5 text-[14px] text-[var(--c-ink-soft)]">
-            Para cargar un gasto o un ticket, usá Plata acá abajo.
-          </p>
-        )}
       </div>
 
       {!r.online && (
@@ -119,16 +114,23 @@ export function CampoInicioPage() {
           titulo="Manga"
           detalle="Caravanear, pesar, sanidad"
         />
-        {r.meta && (
-          <AccionGrande
-            to="/campo/recorrida"
-            icon={<MapPin className="size-6" />}
-            titulo="Otro campo"
-            detalle="Terminá la actual desde adentro para cambiar"
-            tenue
-          />
-        )}
       </div>
+
+      {/* Plata no es una jornada que se elige — es la interrupción de la
+          estación de servicio o la veterinaria. Vive en la barra de abajo y se
+          puede meter en cualquier momento, también con la recorrida abierta:
+          al volver, se retoma donde estaba. */}
+      <Link
+        to="/campo/plata"
+        className="flex items-center gap-2.5 rounded-xl border border-dashed border-[var(--c-line-strong)] px-3 py-3 text-left"
+      >
+        <Banknote className="size-4 shrink-0 text-[var(--c-ink-soft)]" />
+        <span className="text-[13px] leading-snug text-[var(--c-ink-soft)]">
+          ¿Cargaste nafta o pagaste algo?{' '}
+          <span className="font-bold text-[var(--c-ink)]">Anotalo en Plata</span>
+          {r.meta && ' — la recorrida te espera donde la dejaste'}.
+        </span>
+      </Link>
 
       {/* Lo que el servidor RECHAZÓ no se descarta nunca en silencio: se
           muestra y se pide confirmación explícita para tirarlo. */}
@@ -177,21 +179,16 @@ function AccionGrande({
   icon,
   titulo,
   detalle,
-  tenue,
 }: {
   to: string
   icon: React.ReactNode
   titulo: string
   detalle: string
-  tenue?: boolean
 }) {
   return (
     <Link
       to={to}
-      className={cn(
-        'c-panel c-hard-sm flex items-center gap-3 px-4 py-4 text-left',
-        tenue && 'opacity-75',
-      )}
+      className="c-panel c-hard-sm flex items-center gap-3 px-4 py-4 text-left"
     >
       <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-sunk)] text-[var(--c-ink)]">
         {icon}

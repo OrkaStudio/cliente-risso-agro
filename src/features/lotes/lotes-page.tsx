@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   Layers,
   Map as MapIcon,
+  PencilRuler,
 } from 'lucide-react'
 import {
   useCamposConPotreros,
@@ -96,6 +97,34 @@ function vmDe(c: CampoConPotreros, index: number): CampoVM {
   }
 }
 
+/**
+ * Aviso de potreros sin dibujar. Oficina es donde se traza el polígono, así
+ * que el aviso tiene que estar acá y no solo en el celular: en Modo Campo el
+ * productor descubre que le falta el croquis JUSTO cuando ya está en el campo
+ * y no lo puede resolver. Acá sí puede. Con eso el ciclo cierra por los dos lados.
+ */
+function SinDibujarAviso({ campo }: { campo: CampoConPotreros }) {
+  const sinDibujo = campo.sinDibujar
+  if (sinDibujo.length === 0) return null
+  const todos = sinDibujo.length === campo.potreros.length
+
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 dark:border-amber-500/40 dark:bg-amber-950/30">
+      <PencilRuler className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+      <div className="min-w-0 flex-1 text-[13px] leading-snug text-ink">
+        <span className="font-semibold">
+          {todos
+            ? 'Ninguno de estos potreros está dibujado en el mapa.'
+            : `${sinDibujo.length} ${sinDibujo.length === 1 ? 'potrero sin dibujar' : 'potreros sin dibujar'}: ${sinDibujo.join(", ")}.`}
+        </span>{' '}
+        En el celular, la recorrida usa el croquis para ubicarse en el campo —
+        sin dibujo, esos potreros se cargan por lista. Se dibujan una sola vez
+        desde la vista <span className="font-semibold">Mapa</span>.
+      </div>
+    </div>
+  )
+}
+
 /* ===== Vista LISTA: un bloque por campo con tarjetas de potrero ===== */
 function CampoBloque({ campo, index }: { campo: CampoConPotreros; index: number }) {
   const color = colorDeCampo(index, campo.nombre)
@@ -124,11 +153,14 @@ function CampoBloque({ campo, index }: { campo: CampoConPotreros; index: number 
           Este campo todavía no tiene potreros.
         </p>
       ) : (
-        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-          {campo.potreros.map((p) => (
-            <PotreroCard key={p.id} p={p} />
-          ))}
-        </div>
+        <>
+          <SinDibujarAviso campo={campo} />
+          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+            {campo.potreros.map((p) => (
+              <PotreroCard key={p.id} p={p} />
+            ))}
+          </div>
+        </>
       )}
     </section>
   )

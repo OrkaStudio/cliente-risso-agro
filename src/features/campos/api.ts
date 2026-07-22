@@ -29,6 +29,10 @@ export type CampoConPotreros = {
   totalCabezas: number
   /** Superficie sumada de los potreros (ha). */
   totalHa: number
+  /** Nombres de los potreros SIN polígono dibujado. Sin dibujo no hay croquis,
+   *  y el croquis es como el productor se ubica en Modo Campo — Oficina avisa
+   *  porque es acá donde se puede resolver. */
+  sinDibujar: string[]
 }
 
 /**
@@ -46,7 +50,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
     supabase
       .from('potrero')
       .select(
-        'id, nombre, campo_id, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada, destino',
+        'id, nombre, campo_id, estado_ciclo, hectareas, cultivo, fecha_siembra, fecha_cosecha_estimada, destino, poligono',
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
@@ -70,7 +74,14 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
   }
 
   const potrerosPorCampo = new Map<string, PotreroCardData[]>()
+  const sinDibujarPorCampo = new Map<string, string[]>()
   for (const p of potreros ?? []) {
+    const pts = p.poligono as LatLng[] | null
+    if (!pts || pts.length < 3) {
+      const sd = sinDibujarPorCampo.get(p.campo_id) ?? []
+      sd.push(p.nombre)
+      sinDibujarPorCampo.set(p.campo_id, sd)
+    }
     const composicion = [...(catPorPotrero.get(p.id)?.entries() ?? [])]
       .map(([categoria, cabezas]) => ({ categoria, cabezas }))
       .sort((x, y) => y.cabezas - x.cabezas)
@@ -102,6 +113,9 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
       potreros: ps,
       totalCabezas: ps.reduce((s, p) => s + p.cabezas, 0),
       totalHa: ps.reduce((s, p) => s + (p.hectareas ?? 0), 0),
+      sinDibujar: (sinDibujarPorCampo.get(c.id) ?? [])
+        .slice()
+        .sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
     }
   })
 }

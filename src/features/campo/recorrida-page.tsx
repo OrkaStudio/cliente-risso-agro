@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -10,12 +10,12 @@ import {
   Copy,
   Flag,
   MapPin,
+  PencilRuler,
   Minus,
   Plus,
   RefreshCw,
   Wifi,
 } from 'lucide-react'
-import { Map as MapIcon } from 'lucide-react'
 import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
 import { useRecorrida } from './recorrida/use-recorrida'
@@ -112,7 +112,7 @@ export function RecorridaPage() {
     return <Cierre r={r} onVolver={() => setVista('stepper')} />
   }
 
-  return <Stepper r={r} onCierre={() => setVista('cierre')} />
+  return <Recorrida r={r} onCierre={() => setVista('cierre')} />
 }
 
 // ---------------------------------------------------------------------------
@@ -198,10 +198,17 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
   )
 }
 
+
 // ---------------------------------------------------------------------------
-// Stepper por potrero
+// La recorrida: el croquis ES la pantalla
+//
+// Antes era un stepper lineal (potrero 1 → 2 → 3) con el croquis escondido en
+// un modal detrás de un botón de 28px. Pero el productor no recorre en orden de
+// lista: mira el dibujo, decide a qué potrero va, frena, carga y sigue. Ahora
+// el mapa es la navegación y vuelve solo después de cada potrero, así que nunca
+// tiene que ir a buscarlo (que era cuando se deslogueaba sin querer).
 // ---------------------------------------------------------------------------
-function Stepper({
+function Recorrida({
   r,
   onCierre,
 }: {
@@ -209,35 +216,12 @@ function Stepper({
   onCierre: () => void
 }) {
   const navigate = useNavigate()
-  const [paso, setPaso] = useState(0)
-  const [abrirCroquis, setAbrirCroquis] = useState(false)
-  // Retomar donde quedó: al montar (o cuando los potreros recién llegan de
-  // Dexie), arrancar en el primer potrero sin hacer — no en el 1 de la lista.
-  const [inicializado, setInicializado] = useState(false)
-  if (!inicializado && r.potreros.length > 0) {
-    setInicializado(true)
-    const primeroPendiente = r.potreros.findIndex((p) => p.hecho === 0)
-    if (primeroPendiente > 0) setPaso(primeroPendiente)
-  }
-  const potrero = r.potreros[paso]
-  // Croquis disponible si al menos un potrero tiene su polígono dibujado.
-  const hayCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
+  const [abierto, setAbierto] = useState<string | null>(null)
+  const potrero = r.potreros.find((p) => p.id === abierto) ?? null
+  // Sin ningún potrero dibujado no hay croquis: la recorrida cae a lista.
+  const conCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
 
-  // Volver PAUSA la recorrida: la deja abierta y suelta la pantalla. Irse a
-  // cargar un gasto o a la veterinaria no puede cerrar la jornada — el landing
-  // la ofrece para retomar. Terminar es un acto explícito, en el Cierre.
-  const [confirmaSalir, setConfirmaSalir] = useState(false)
-  const salir = () => {
-    if (!confirmaSalir) {
-      setConfirmaSalir(true)
-      setTimeout(() => setConfirmaSalir(false), 3500)
-      return
-    }
-    void r.pausar()
-    navigate('/campo')
-  }
-
-  if (!potrero) {
+  if (r.total === 0) {
     return (
       <div className="flex h-full items-center justify-center px-8 text-center text-[var(--c-faint)]">
         Este campo no tiene potreros cargados.
@@ -246,178 +230,135 @@ function Stepper({
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      {/* ===== Barra de instrumento: campo · señal · cola + tira de potreros ===== */}
-      <header className="shrink-0 border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="flex min-w-0 items-center gap-2">
-            {/* Volver a elegir campo (dos toques). */}
-            <button
-              type="button"
-              onClick={salir}
-              aria-label="Cambiar de campo"
-              className={cn(
-                'flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border-2 px-1.5 transition-colors',
-                confirmaSalir
-                  ? 'c-hazard c-display border-[var(--c-ink)] px-2 text-[12px] text-[var(--c-ink)]'
-                  : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink)]',
-              )}
-            >
-              <ChevronLeft className="size-4" strokeWidth={2.5} />
-              {confirmaSalir && '¿Salir?'}
-            </button>
-            {r.online ? (
-              <Wifi className="size-4 shrink-0 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
-            ) : (
-              <CloudOff className="size-4 shrink-0 text-[var(--c-warn)]" strokeWidth={2.5} />
-            )}
-            <span className="c-display truncate text-[15px] text-[var(--c-ink)]">
-              {r.meta!.campo_nombre}
-            </span>
-          </span>
-          <div className="flex items-center gap-2">
-            {r.sinSubir > 0 && (
-              <span className="c-hazard c-label rounded-md border border-[var(--c-line-strong)] px-2 py-1 !text-[10.5px] !text-[var(--c-ink)]">
-                <RefreshCw
-                  className={cn('mr-1 inline size-3', r.sincronizando && 'animate-spin')}
-                />
-                {r.sinSubir} sin subir
-              </span>
-            )}
-            <span className="c-mono text-[15px] font-bold text-[var(--c-ink)]">
-              {r.hechos}/{r.total}
-            </span>
-            {hayCroquis && (
-              <button
-                type="button"
-                onClick={() => setAbrirCroquis(true)}
-                className="c-display flex items-center gap-1 rounded-md border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-2 py-1 text-[12px] text-[var(--c-ink)]"
-              >
-                <MapIcon className="size-4" />
-                Croquis
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Tira de potreros: estado de todos de un vistazo + salto directo */}
-        <PotreroStrip r={r} paso={paso} onSaltar={setPaso} />
-      </header>
-
-      {/* ===== Paso actual (scrollea). El nav vive AL FINAL del contenido:
-           se llega tras completar el potrero y no le come lugar a la vista. ===== */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3.5">
-        <PotreroForm
-          key={potrero.id}
-          nombre={potrero.nombre}
-          cabezas={potrero.cabezas}
-          estadoCiclo={potrero.estado_ciclo}
-          ciclo={
-            potrero.eliminado
-              ? 'Ya no existe en Oficina — tu observación se conserva'
-              : estadoCicloLabel[potrero.estado_ciclo]
-          }
-          ultima={potrero.ultima ?? null}
-          inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
-          audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
-          onGuardar={(f) => void r.guardar(potrero.id, f)}
-          onAudio={(b) => void r.setAudio(potrero.id, b)}
-        />
-
-        {/* Navegación: mt-auto la ancla al fondo cuando sobra alto; cuando el
-            potrero es largo aparece después de todo (hay que llegar a ella). */}
-        <div className="mt-auto flex items-center gap-2 pt-5">
+    <div className="flex h-full flex-col">
+      {/* Header compacto: el mapa se queda con el alto. Volver PAUSA. */}
+      <header className="shrink-0 border-b border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={paso === 0}
-            onClick={() => setPaso((p) => Math.max(0, p - 1))}
-            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] disabled:opacity-40 disabled:shadow-none"
-            aria-label="Anterior"
+            onClick={() => {
+              void r.pausar()
+              navigate('/campo')
+            }}
+            aria-label="Volver — la recorrida queda abierta"
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]"
           >
-            <ChevronLeft className="size-6" />
+            <ChevronLeft className="size-5" strokeWidth={2.5} />
           </button>
-          {paso < r.total - 1 ? (
-            <button
-              type="button"
-              onClick={() => setPaso((p) => Math.min(r.total - 1, p + 1))}
-              className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
-            >
-              Siguiente potrero
-              <ChevronRight className="size-5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onCierre}
-              className="c-display c-hard flex h-13 flex-1 items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ink)] text-[16px] text-white"
-            >
-              <Flag className="size-5" />
-              Terminar recorrida
-            </button>
-          )}
+          <span className="min-w-0 flex-1">
+            <span className="c-display block truncate text-[16px] text-[var(--c-ink)]">
+              {r.meta!.campo_nombre}
+            </span>
+            <span className="flex items-center gap-1.5">
+              {r.online ? (
+                <Wifi className="size-3.5 shrink-0 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
+              ) : (
+                <CloudOff className="size-3.5 shrink-0 text-[var(--c-warn)]" strokeWidth={2.5} />
+              )}
+              <CLabel className="!text-[11px]">
+                {r.hechos} de {r.total} potreros
+              </CLabel>
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onCierre}
+            className="c-display flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)]"
+          >
+            <Flag className="size-4" />
+            Terminar
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Croquis del campo: la forma real de los potreros, tocable + GPS */}
+      {conCroquis ? (
+        <Croquis potreros={r.potreros} onAbrir={setAbierto} />
+      ) : (
+        <ListaPotreros r={r} onAbrir={setAbierto} />
+      )}
+
+      {/* El parte del potrero sube en una hoja y, al cerrarse, devuelve al
+          croquis con el potrero ya pintado. Ese ida y vuelta ES la recorrida. */}
       <CSheet
-        open={abrirCroquis}
-        title={`Croquis · ${r.meta!.campo_nombre}`}
-        onClose={() => setAbrirCroquis(false)}
+        open={potrero != null}
+        title={potrero ? `Potrero ${potrero.nombre}` : ''}
+        onClose={() => setAbierto(null)}
       >
-        <Croquis
-          potreros={r.potreros}
-          paso={paso}
-          onSaltar={(i) => {
-            setPaso(i)
-            setAbrirCroquis(false)
-          }}
-        />
+        {potrero && (
+          <>
+            <PotreroForm
+              key={potrero.id}
+              nombre={potrero.nombre}
+              cabezas={potrero.cabezas}
+              estadoCiclo={potrero.estado_ciclo}
+              ciclo={
+                potrero.eliminado
+                  ? 'Ya no existe en Oficina — tu observación se conserva'
+                  : estadoCicloLabel[potrero.estado_ciclo]
+              }
+              ultima={potrero.ultima ?? null}
+              inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
+              audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
+              onGuardar={(f) => void r.guardar(potrero.id, f)}
+              onAudio={(b) => void r.setAudio(potrero.id, b)}
+            />
+            <button
+              type="button"
+              onClick={() => setAbierto(null)}
+              className="c-display c-hard mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white"
+            >
+              <Check className="size-5" strokeWidth={2.5} />
+              Listo, volver al croquis
+            </button>
+          </>
+        )}
       </CSheet>
     </div>
   )
 }
 
-/** Tira de celdas: cada potrero con su estado (tinta = actual, verde = hecho,
- *  contorno = falta). Tocar salta directo — sin dropdown. */
-function PotreroStrip({
+/** Campo sin potreros dibujados: mismo flujo, lista en vez de mapa. */
+function ListaPotreros({
   r,
-  paso,
-  onSaltar,
+  onAbrir,
 }: {
   r: ReturnType<typeof useRecorrida>
-  paso: number
-  onSaltar: (i: number) => void
+  onAbrir: (id: string) => void
 }) {
-  const actualRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    actualRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' })
-  }, [paso])
-
   return (
-    <div className="c-strip -mx-4 flex gap-1 px-4">
-      {r.potreros.map((p, i) => {
-        const actual = i === paso
-        const hecho = p.hecho === 1
-        return (
-          <button
-            key={p.id}
-            ref={actual ? actualRef : undefined}
-            type="button"
-            onClick={() => onSaltar(i)}
-            title={p.nombre}
-            className={cn(
-              'c-mono flex h-9 min-w-9 shrink-0 items-center justify-center gap-1 rounded-md border-2 px-1.5 text-[12.5px] font-bold uppercase transition-colors',
-              actual
-                ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-white'
-                : hecho
-                  ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok)] text-white'
-                  : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
-            )}
-          >
-            {hecho && !actual && <Check className="size-3.5" strokeWidth={3} />}
-            {p.nombre}
-          </button>
-        )
-      })}
+    <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="c-hazard mb-3 flex items-start gap-2.5 rounded-xl border px-3 py-2.5">
+        <PencilRuler className="mt-0.5 size-4 shrink-0 text-[var(--c-ink)]" />
+        <p className="text-[12.5px] leading-snug text-[var(--c-ink)]">
+          Este campo todavía no tiene los potreros dibujados, así que no hay
+          croquis para ubicarte. Se dibujan una vez desde Modo Oficina, en Campos.
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {r.potreros.map((p) => {
+          const hecho = p.hecho === 1
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onAbrir(p.id)}
+              className={cn(
+                'c-hard-sm flex h-16 items-center gap-3 rounded-xl border px-4 text-left',
+                hecho
+                  ? 'border-transparent bg-[var(--c-ok)] text-white'
+                  : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]',
+              )}
+            >
+              <span className="c-display flex-1 truncate text-[19px]">{p.nombre}</span>
+              {hecho ? (
+                <Check className="size-5 shrink-0" strokeWidth={3} />
+              ) : (
+                <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
+              )}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
