@@ -217,7 +217,10 @@ function Recorrida({
 }) {
   const navigate = useNavigate()
   const [abierto, setAbierto] = useState<string | null>(null)
+  const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
+  // null = todavía no contestó · 0 = no llovió · >0 = mm del pluviómetro.
+  const lluvia = r.meta?.lluvia_mm ?? null
   // Sin ningún potrero dibujado no hay croquis: la recorrida cae a lista.
   const conCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
 
@@ -257,6 +260,7 @@ function Recorrida({
               )}
               <CLabel className="!text-[11px]">
                 {r.hechos} de {r.total} potreros
+                {lluvia != null && ` · ${lluvia === 0 ? 'sin lluvia' : `${lluvia} mm`}`}
               </CLabel>
             </span>
           </span>
@@ -271,11 +275,36 @@ function Recorrida({
         </div>
       </header>
 
+      {/* La lluvia es un dato del DÍA, no del cierre. Antes vivía solo en la
+          pantalla de Cierre y se guardaba recién al terminar: si no terminaba
+          la recorrida —que es lo que pasa casi siempre— no se registraba nunca.
+          Ahora se pregunta arriba, se guarda al toque y desaparece. */}
+      {lluvia == null && (
+        <button
+          type="button"
+          onClick={() => setLluviaAbierta(true)}
+          className="flex h-12 shrink-0 items-center justify-center gap-2 border-b border-[var(--c-line)] bg-[var(--c-warn-soft,#fdf3e0)] px-3 text-[14px] font-semibold text-[var(--c-ink)]"
+        >
+          <CloudRain className="size-[18px]" />
+          ¿Llovió? Anotalo ahora
+        </button>
+      )}
+
       {conCroquis ? (
         <Croquis potreros={r.potreros} onAbrir={setAbierto} />
       ) : (
         <ListaPotreros r={r} onAbrir={setAbierto} />
       )}
+
+      <LluviaSheet
+        open={lluviaAbierta}
+        valor={lluvia}
+        onCerrar={() => setLluviaAbierta(false)}
+        onGuardar={(mm) => {
+          void r.setLluvia(mm)
+          setLluviaAbierta(false)
+        }}
+      />
 
       {/* El parte del potrero sube en una hoja y, al cerrarse, devuelve al
           croquis con el potrero ya pintado. Ese ida y vuelta ES la recorrida. */}
@@ -314,6 +343,72 @@ function Recorrida({
         )}
       </CSheet>
     </div>
+  )
+}
+
+/**
+ * ¿Llovió? Se responde durante la recorrida, no al cerrarla.
+ *
+ * "No llovió" es una respuesta de primera clase (0 mm), no la ausencia de
+ * respuesta: misma filosofía que el parte del potrero, donde "sin novedad"
+ * también es dato. Sin eso no se puede distinguir un día seco de un día que
+ * nadie registró — y la serie de lluvias es lo que después sostiene la
+ * comparación contra el promedio.
+ */
+function LluviaSheet({
+  open,
+  valor,
+  onCerrar,
+  onGuardar,
+}: {
+  open: boolean
+  valor: number | null
+  onCerrar: () => void
+  onGuardar: (mm: number) => void
+}) {
+  const [mm, setMm] = useState(valor ?? 10)
+  return (
+    <CSheet open={open} title="Lluvia de hoy" onClose={onCerrar}>
+      <button
+        type="button"
+        onClick={() => onGuardar(0)}
+        className="c-hard-sm mb-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[16px] font-semibold text-[var(--c-ink)]"
+      >
+        No llovió
+      </button>
+      <CLabel className="mb-2 !text-[12px]">Sí llovió — cuántos mm</CLabel>
+      <div className="flex items-stretch gap-1.5">
+        <button
+          type="button"
+          onClick={() => setMm((v) => Math.max(1, v - 5))}
+          aria-label="Restar 5 mm"
+          className="c-hard-sm flex size-14 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
+        >
+          <Minus className="size-6" strokeWidth={2.5} />
+        </button>
+        <div className="flex h-14 min-w-0 flex-1 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-sunk)]">
+          <span className="c-mono text-[24px] font-bold text-[var(--c-ink)]">
+            {mm} mm
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMm((v) => v + 5)}
+          aria-label="Sumar 5 mm"
+          className="c-hard-sm flex size-14 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
+        >
+          <Plus className="size-6" strokeWidth={2.5} />
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => onGuardar(mm)}
+        className="c-display c-hard mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white"
+      >
+        <CloudRain className="size-5" />
+        Guardar {mm} mm
+      </button>
+    </CSheet>
   )
 }
 
