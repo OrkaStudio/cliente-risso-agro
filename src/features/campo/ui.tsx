@@ -39,12 +39,17 @@ export function CSegBtn({
   label,
   tono,
   selected,
+  propuesto,
   onClick,
   className,
 }: {
   label: string
   tono: Tono
   selected: boolean
+  /** Muestra el valor de la última vez SIN darlo por confirmado: contorno
+   *  punteado, no el relleno sólido de una selección real. El productor lo ve
+   *  como propuesta y decide si lo confirma o lo cambia. */
+  propuesto?: boolean
   onClick: () => void
   className?: string
 }) {
@@ -56,7 +61,9 @@ export function CSegBtn({
         'flex h-13 items-center justify-center rounded-xl border px-1 text-[13.5px] font-semibold transition-colors active:scale-[0.98]',
         selected
           ? cn(TONO_FILL[tono], 'c-hard-sm')
-          : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+          : propuesto
+            ? 'border-2 border-dashed border-[var(--c-ok)]/60 bg-[var(--c-ok-soft)]/40 text-[var(--c-ink-soft)]'
+            : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
         className,
       )}
     >

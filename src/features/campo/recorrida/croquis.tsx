@@ -128,32 +128,6 @@ function polo(pts: XY[]): { x: number; y: number; r: number } {
 /** Mínimo táctil (px). Debajo de esto, el potrero sale a un pin. */
 const TAP_MIN = 44
 
-/** Días desde la última observación. null = nunca se recorrió. */
-function diasDesde(fecha: string | undefined | null): number | null {
-  if (!fecha) return null
-  const d = Date.parse(`${fecha}T00:00:00`)
-  if (Number.isNaN(d)) return null
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.round((hoy.getTime() - d) / 86_400_000))
-}
-
-/**
- * Relleno del potrero pendiente según hace cuánto no se mira: del blanco
- * (recién visto) al tostado de pasto seco (lo más atrasado del campo).
- *
- * La escala es RELATIVA al propio campo, no un umbral que inventamos: el
- * potrero más atrasado marca el extremo y el resto se mide contra él. Así se
- * autocalibra al ritmo real del productor y nunca afirma "esto está mal" —
- * solo "esto es lo que más te falta". El número exacto de días va al lado.
- */
-function tono(dias: number | null, maxDias: number): string {
-  if (dias == null || maxDias <= 0) return '#ffffff'
-  const t = Math.min(1, dias / maxDias)
-  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t)
-  return `rgb(${lerp(255, 224)},${lerp(255, 205)},${lerp(255, 158)})`
-}
-
 /**
  * Ubica el pin de un potrero chico: prueba 12 direcciones alrededor de su polo
  * y elige la que cae en espacio libre — fuera de todos los polígonos y lejos
@@ -269,31 +243,16 @@ export function Croquis({
     y: number
     r: number
     chico: boolean
-    dias: number | null
     pin: { x: number; y: number } | null
   }
   const capas: Capa[] = []
-  // El potrero más atrasado del campo fija el extremo de la rampa.
-  const maxDias = conPoligono.reduce(
-    (m, p) => Math.max(m, diasDesde(p.ultima?.fecha) ?? 0),
-    0,
-  )
   if (aXY) {
     const polys = conPoligono.map((p) => p.poligono!.map(aXY))
     const ocupados: { x: number; y: number }[] = []
     conPoligono.forEach((p, i) => {
       const { x, y, r } = polo(polys[i])
       const chico = escalaPx > 0 && r * 2 * escalaPx < TAP_MIN
-      capas.push({
-        p,
-        pts: polys[i],
-        x,
-        y,
-        r,
-        chico,
-        dias: diasDesde(p.ultima?.fecha),
-        pin: null,
-      })
+      capas.push({ p, pts: polys[i], x, y, r, chico, pin: null })
       if (!chico) ocupados.push({ x, y })
     })
     // Los pines se colocan después, esquivando las etiquetas ya asentadas.
@@ -322,24 +281,17 @@ export function Croquis({
             role="img"
             aria-label="Croquis del campo — tocá un potrero para cargarlo"
           >
-            {/* 1) Los polígonos. Siempre tocables, aunque sean chicos. */}
-            {capas.map(({ p, pts, x, y, r, chico, dias }) => {
+            {/* 1) Los polígonos. Dos estados y nada más: pendiente (blanco) y
+                   hecho de hoy (verde + tilde). La antigüedad ya NO vive acá —
+                   satura el mapa, que se mira de reojo; vive en su panel. */}
+            {capas.map(({ p, pts, x, y, r, chico }) => {
               const hecho = p.hecho === 1
               const acaEstoy = pisando?.id === p.id
-              const nunca = dias == null
               const d =
                 pts.map((q, j) => `${j === 0 ? 'M' : 'L'}${q[0]},${q[1]}`).join(' ') + ' Z'
               const largo = Math.max(2, p.nombre.length)
               const fs = Math.min(r * 1.15, (r * 3.1) / largo, 9)
               const conTilde = hecho && fs >= 3.4
-              // La antigüedad solo se escribe si REALMENTE entra: se estima el
-              // ancho del texto contra la holgura del potrero. Sin esta guarda
-              // el subtítulo se derramaba sobre los vecinos. Si no entra, el
-              // relleno tostado y el borde punteado siguen contando la historia.
-              const sub = nunca ? 'nunca' : `hace ${dias}d`
-              const fsSub = fs * 0.46
-              const conDias =
-                !hecho && !chico && fs >= 4.2 && sub.length * fsSub * 0.62 < r * 1.7
               return (
                 <g
                   key={p.id}
@@ -350,14 +302,11 @@ export function Croquis({
                 >
                   <path
                     d={d}
-                    // Alto contraste para el sol: el hecho se LLENA de verde.
-                    // El pendiente va del blanco al tostado según hace cuánto
-                    // no se mira; "nunca recorrido" NO es el extremo de esa
-                    // rampa sino otra cosa — blanco con borde punteado.
-                    fill={hecho ? 'var(--c-ok)' : tono(dias, maxDias)}
+                    // Alto contraste para el sol: el hecho se LLENA de verde,
+                    // el pendiente queda blanco. Se lee de reojo, sin enfocar.
+                    fill={hecho ? 'var(--c-ok)' : '#ffffff'}
                     stroke={acaEstoy ? 'var(--c-warn)' : '#5a6659'}
                     strokeWidth={acaEstoy ? 1.6 : 0.7}
-                    strokeDasharray={!hecho && nunca ? `${r * 0.22} ${r * 0.16}` : undefined}
                     strokeLinejoin="round"
                   />
                   {/* El número va adentro solo si el potrero le da lugar; si
@@ -366,7 +315,7 @@ export function Croquis({
                     <>
                       <text
                         x={x}
-                        y={conTilde ? y - fs * 0.3 : conDias ? y - fs * 0.34 : y}
+                        y={conTilde ? y - fs * 0.3 : y}
                         textAnchor="middle"
                         dominantBaseline="central"
                         className="c-mono"
@@ -380,26 +329,6 @@ export function Croquis({
                       >
                         {p.nombre}
                       </text>
-                      {/* Hace cuánto, en días exactos. El relleno da el
-                          vistazo; el número da la verdad, sin veredictos. */}
-                      {conDias && (
-                        <text
-                          x={x}
-                          y={y + fs * 0.52}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          className="c-mono"
-                          fontSize={fsSub}
-                          fontWeight={700}
-                          fill="#5a6659"
-                          stroke={tono(dias, maxDias)}
-                          strokeWidth={fs * 0.09}
-                          paintOrder="stroke"
-                          style={{ pointerEvents: 'none' }}
-                        >
-                          {sub}
-                        </text>
-                      )}
                       {conTilde && (
                         <path
                           d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}

@@ -48,6 +48,24 @@ export type Observacion = {
 
 const hoyISO = () => new Date().toISOString().slice(0, 10)
 
+/** Días desde la última observación de un potrero. null = nunca se recorrió. */
+export function diasDesde(fecha: string | undefined | null): number | null {
+  if (!fecha) return null
+  const d = Date.parse(`${fecha}T00:00:00`)
+  if (Number.isNaN(d)) return null
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  return Math.max(0, Math.round((hoy.getTime() - d) / 86_400_000))
+}
+
+/** Texto humano de antigüedad para el panel de atrasados. */
+export function haceCuantoTxt(dias: number | null): string {
+  if (dias == null) return 'nunca'
+  if (dias === 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  return `hace ${dias} días`
+}
+
 /**
  * Campos + potreros (con stock esperado) de TODA la empresa, para cachear en
  * Dexie: la recorrida se puede ARRANCAR sin señal usando este cache.

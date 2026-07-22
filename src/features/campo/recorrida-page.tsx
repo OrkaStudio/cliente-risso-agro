@@ -7,8 +7,8 @@ import {
   ChevronRight,
   CloudOff,
   CloudRain,
-  Copy,
   Flag,
+  History,
   MapPin,
   PencilRuler,
   Minus,
@@ -20,6 +20,7 @@ import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
 import { useRecorrida } from './recorrida/use-recorrida'
 import { Croquis } from './recorrida/croquis'
+import { diasDesde, haceCuantoTxt } from './recorrida/api'
 import type {
   AguaEstado,
   CultivoEstado,
@@ -218,9 +219,21 @@ function Recorrida({
   const navigate = useNavigate()
   const [abierto, setAbierto] = useState<string | null>(null)
   const [lluviaAbierta, setLluviaAbierta] = useState(false)
+  const [panelAbierto, setPanelAbierto] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
   // null = todavía no contestó · 0 = no llovió · >0 = mm del pluviómetro.
   const lluvia = r.meta?.lluvia_mm ?? null
+
+  // Pendientes de ESTA sesión, ordenados por atraso: nunca recorridos primero,
+  // después de más a menos días. Es lo que alimenta el panel y su conteo.
+  const pendientes = r.potreros
+    .filter((p) => p.hecho === 0)
+    .map((p) => ({ p, dias: diasDesde(p.ultima?.fecha) }))
+    .sort((a, b) => {
+      if (a.dias == null) return b.dias == null ? 0 : -1
+      if (b.dias == null) return 1
+      return b.dias - a.dias
+    })
   // Sin ningún potrero dibujado no hay croquis: la recorrida cae a lista.
   const conCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
 
@@ -264,6 +277,20 @@ function Recorrida({
               </CLabel>
             </span>
           </span>
+          {/* Panel de atrasados: cuántos potreros faltan de un vistazo, y el
+              atajo para ir directo al que hace más que no se mira. La antigüedad
+              vive acá y no en el croquis, que se satura. */}
+          {pendientes.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPanelAbierto(true)}
+              aria-label={`${pendientes.length} potreros por recorrer`}
+              className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-2.5 text-[var(--c-ink)]"
+            >
+              <History className="size-[18px]" strokeWidth={2} />
+              <span className="c-mono text-[15px] font-bold">{pendientes.length}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onCierre}
@@ -296,6 +323,46 @@ function Recorrida({
         <ListaPotreros r={r} onAbrir={setAbierto} />
       )}
 
+      {/* Panel de atrasados: lista, no informe. Cada fila lleva DIRECTO al
+          parte de ese potrero — es un atajo de navegación hacia lo que falta. */}
+      <CSheet
+        open={panelAbierto}
+        title="Lo que falta recorrer"
+        onClose={() => setPanelAbierto(false)}
+      >
+        <div className="flex flex-col gap-1.5">
+          {pendientes.map(({ p, dias }) => {
+            const nunca = dias == null
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setPanelAbierto(false)
+                  setAbierto(p.id)
+                }}
+                className="c-hard-sm flex h-14 items-center gap-3 rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 text-left"
+              >
+                <span className="c-display w-14 shrink-0 text-[18px] text-[var(--c-ink)]">
+                  {p.nombre}
+                </span>
+                <span
+                  className={cn(
+                    'flex-1 text-[14px]',
+                    nunca
+                      ? 'font-semibold text-[var(--c-warn)]'
+                      : 'text-[var(--c-ink-soft)]',
+                  )}
+                >
+                  {nunca ? 'Sin recorrer nunca' : haceCuantoTxt(dias)}
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
+              </button>
+            )
+          })}
+        </div>
+      </CSheet>
+
       <LluviaSheet
         open={lluviaAbierta}
         valor={lluvia}
@@ -327,6 +394,7 @@ function Recorrida({
               }
               ultima={potrero.ultima ?? null}
               inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
+              yaEnSesion={r.obsPorPotrero.has(potrero.id)}
               audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
               onGuardar={(f) => void r.guardar(potrero.id, f)}
               onAudio={(b) => void r.setAudio(potrero.id, b)}
@@ -501,6 +569,10 @@ function resumenUltima(u: UltimaObs, agricola: boolean): string {
 // ---------------------------------------------------------------------------
 // Formulario de un potrero
 // ---------------------------------------------------------------------------
+/** Campos de ESTADO que se pueden proponer desde la última vez (no el conteo
+ *  ni la novedad, que son del día). */
+type CampoEstado = 'pasto' | 'agua' | 'electrico' | 'cultivo' | 'en_tratamiento'
+
 function PotreroForm({
   nombre,
   cabezas,
@@ -508,6 +580,7 @@ function PotreroForm({
   ciclo,
   ultima,
   inicial,
+  yaEnSesion,
   audio,
   onGuardar,
   onAudio,
@@ -518,10 +591,47 @@ function PotreroForm({
   ciclo: string
   ultima: UltimaObs | null
   inicial: Form
+  /** true = ya se cargó en ESTA recorrida (no proponemos, editamos lo cargado). */
+  yaEnSesion: boolean
   audio: Blob | null
   onGuardar: (f: Form) => void
   onAudio: (b: Blob | null) => void
 }) {
+  const agricola = esAgricola(estadoCiclo)
+
+  // ---- Modo propuesta -------------------------------------------------------
+  // Al abrir un potrero con historial que aún no se tocó en esta recorrida, los
+  // controles arrancan PRE-CARGADOS con lo de la última vez, pero en estado
+  // "propuesto" (punteado), NO confirmado. Nada se escribe en Dexie hasta que el
+  // productor hace un acto explícito — tocar un control o "Está igual que la
+  // última vez". Así abrir y cerrar sin mirar no registra un parte que nadie vio
+  // (ley de la observación fechada, [D8] / TASK-034).
+  const propuestaInicial: Set<CampoEstado> = (() => {
+    if (yaEnSesion || !ultima) return new Set()
+    const s = new Set<CampoEstado>()
+    if (agricola) {
+      if (ultima.cultivo) s.add('cultivo')
+    } else {
+      if (ultima.pasto) s.add('pasto')
+      if (ultima.agua) s.add('agua')
+      if (ultima.electrico) s.add('electrico')
+    }
+    if (ultima.en_tratamiento) s.add('en_tratamiento')
+    return s
+  })()
+
+  const formInicial: Form =
+    propuestaInicial.size > 0
+      ? {
+          ...FORM_VACIO,
+          pasto: agricola ? null : (ultima?.pasto ?? null),
+          agua: agricola ? null : (ultima?.agua ?? null),
+          electrico: agricola ? null : (ultima?.electrico ?? null),
+          cultivo: agricola ? (ultima?.cultivo ?? null) : null,
+          en_tratamiento: ultima?.en_tratamiento ?? false,
+        }
+      : inicial
+
   // La novedad guardada se descompone: chips conocidos → seleccionados,
   // el resto queda como texto libre.
   const [novChips, setNovChips] = useState<Set<string>>(() => {
@@ -534,9 +644,10 @@ function PotreroForm({
       .filter((p) => !(NOVEDADES as readonly string[]).includes(p))
       .join(' · '),
   )
-  const [form, setForm] = useState<Form>(inicial)
+  const [form, setForm] = useState<Form>(formInicial)
+  const [propuestos, setPropuestos] = useState<Set<CampoEstado>>(propuestaInicial)
+  const esProp = (k: CampoEstado) => propuestos.has(k)
 
-  const agricola = esAgricola(estadoCiclo)
   // Conteo/tratamiento solo donde hay hacienda: potrero ganadero, o cualquier
   // otro con cabezas esperadas (p. ej. pastoreando un rastrojo).
   const conHacienda = estadoCiclo === 'ganadero' || cabezas > 0
@@ -546,10 +657,22 @@ function PotreroForm({
     return s || null
   }
 
-  // Persiste apenas cambia algo (upsert idempotente en Dexie + cola).
-  const commit = (next: Form) => {
+  // Persiste apenas cambia algo (upsert idempotente en Dexie + cola). El primer
+  // commit ES el acto explícito que confirma el potrero.
+  const commit = (next: Form, confirma?: CampoEstado) => {
     setForm(next)
+    if (confirma && propuestos.has(confirma)) {
+      const s = new Set(propuestos)
+      s.delete(confirma)
+      setPropuestos(s)
+    }
     onGuardar(next)
+  }
+
+  /** "Está igual que la última vez": confirma TODO lo propuesto de un toque. */
+  const confirmarTodo = () => {
+    setPropuestos(new Set())
+    onGuardar(form)
   }
 
   const toggleNovedad = (n: string) => {
@@ -564,6 +687,8 @@ function PotreroForm({
     const base = form.conteo ?? (delta > 0 ? 0 : 0)
     commit({ ...form, conteo: Math.max(0, base + delta) })
   }
+
+  const hayPropuesta = propuestos.size > 0
 
   return (
     <div className="flex flex-col gap-3">
@@ -583,34 +708,33 @@ function PotreroForm({
         <CLabel className="mt-1">{ciclo}</CLabel>
       </div>
 
-      {/* Trae los ESTADOS de la última observación (no el conteo ni la novedad
-          — esos son del día) para que el productor los REVISE y ajuste; no
-          avanza solo (puede que no se acuerde y quiera cambiar algo). */}
-      {ultima && (
-        <button
-          type="button"
-          onClick={() =>
-            commit({
-              ...form,
-              pasto: agricola ? null : ultima.pasto,
-              agua: agricola ? null : ultima.agua,
-              electrico: agricola ? null : ultima.electrico,
-              cultivo: agricola ? ultima.cultivo : null,
-              en_tratamiento: ultima.en_tratamiento,
-            })
-          }
-          className="c-hard-sm flex items-center justify-between gap-2 rounded-lg border border-[var(--c-ok)]/45 bg-[var(--c-ok-soft)] px-3.5 py-3 text-left"
-        >
-          <span className="min-w-0">
-            <span className="c-display block text-[15px] text-[var(--c-ok-deep)]">
-              Traer la última vez
-            </span>
-            <span className="c-label mt-0.5 block truncate">
-              {resumenUltima(ultima, agricola)} · {fmtFecha(ultima.fecha)}
-            </span>
-          </span>
-          <Copy className="size-5 shrink-0 text-[var(--c-ok-deep)]" />
-        </button>
+      {/* Franja "así estaba": cuando hay propuesta, los controles muestran lo
+          de la última vez PUNTEADO (propuesto, sin confirmar). Un toque en
+          "Está igual" confirma todo; tocar un control confirma ese campo. Abrir
+          y cerrar sin tocar nada NO registra observación. */}
+      {ultima && hayPropuesta && (
+        <div className="c-hard-sm rounded-lg border border-dashed border-[var(--c-ok)]/50 bg-[var(--c-ok-soft)]/40 px-3.5 py-3">
+          <div className="flex items-start gap-2">
+            <History className="mt-0.5 size-4 shrink-0 text-[var(--c-ok-deep)]" />
+            <div className="min-w-0 flex-1">
+              <span className="c-display block text-[14px] text-[var(--c-ok-deep)]">
+                Así estaba {fmtFecha(ultima.fecha)}
+                {diasDesde(ultima.fecha) != null && ` · ${haceCuantoTxt(diasDesde(ultima.fecha))}`}
+              </span>
+              <span className="c-label mt-0.5 block">
+                {resumenUltima(ultima, agricola)}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={confirmarTodo}
+            className="c-display c-hard-sm mt-2.5 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ok)] text-[15px] text-white"
+          >
+            <Check className="size-5" strokeWidth={2.5} />
+            Está igual que la última vez
+          </button>
+        </div>
       )}
 
       {agricola ? (
@@ -622,8 +746,9 @@ function PotreroForm({
                 key={o.value}
                 label={o.label}
                 tono={o.tono}
-                selected={form.cultivo === o.value}
-                onClick={() => commit({ ...form, cultivo: o.value })}
+                selected={form.cultivo === o.value && !esProp('cultivo')}
+                propuesto={form.cultivo === o.value && esProp('cultivo')}
+                onClick={() => commit({ ...form, cultivo: o.value }, 'cultivo')}
               />
             ))}
           </div>
@@ -632,12 +757,22 @@ function PotreroForm({
         <>
           <div>
             <CLabel className="mb-1.5">Pasto · ¿cómo está?</CLabel>
-            <Segmento opciones={PASTO} value={form.pasto} onChange={(v) => commit({ ...form, pasto: v })} />
+            <Segmento
+              opciones={PASTO}
+              value={form.pasto}
+              propuesto={esProp('pasto')}
+              onChange={(v) => commit({ ...form, pasto: v }, 'pasto')}
+            />
           </div>
 
           <div>
             <CLabel className="mb-1.5">Agua · aguadas y bebederos</CLabel>
-            <Segmento opciones={AGUA} value={form.agua} onChange={(v) => commit({ ...form, agua: v })} />
+            <Segmento
+              opciones={AGUA}
+              value={form.agua}
+              propuesto={esProp('agua')}
+              onChange={(v) => commit({ ...form, agua: v }, 'agua')}
+            />
           </div>
 
           <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -646,7 +781,8 @@ function PotreroForm({
               <Segmento
                 opciones={ELECTRICO}
                 value={form.electrico}
-                onChange={(v) => commit({ ...form, electrico: v })}
+                propuesto={esProp('electrico')}
+                onChange={(v) => commit({ ...form, electrico: v }, 'electrico')}
               />
             </div>
             {conHacienda && (
@@ -655,8 +791,11 @@ function PotreroForm({
                 <CSegBtn
                   label={form.en_tratamiento ? 'Sí' : 'No'}
                   tono="warn"
-                  selected={form.en_tratamiento}
-                  onClick={() => commit({ ...form, en_tratamiento: !form.en_tratamiento })}
+                  selected={form.en_tratamiento && !esProp('en_tratamiento')}
+                  propuesto={form.en_tratamiento && esProp('en_tratamiento')}
+                  onClick={() =>
+                    commit({ ...form, en_tratamiento: !form.en_tratamiento }, 'en_tratamiento')
+                  }
                   className="w-20"
                 />
               </div>
@@ -748,10 +887,13 @@ function PotreroForm({
 function Segmento<T extends string>({
   opciones,
   value,
+  propuesto,
   onChange,
 }: {
   opciones: { value: T; label: string; tono: Tono }[]
   value: T | null
+  /** true = `value` viene de la última vez y aún no se confirmó. */
+  propuesto?: boolean
   onChange: (v: T) => void
 }) {
   return (
@@ -766,7 +908,8 @@ function Segmento<T extends string>({
           key={o.value}
           label={o.label}
           tono={o.tono}
-          selected={value === o.value}
+          selected={value === o.value && !propuesto}
+          propuesto={value === o.value && propuesto}
           onClick={() => onChange(o.value)}
         />
       ))}
