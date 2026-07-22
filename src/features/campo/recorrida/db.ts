@@ -11,11 +11,20 @@ import type {
 } from './api'
 
 // Base local de la Recorrida (IndexedDB vía Dexie), separada de la manga.
-//   · refs:     cache de campos + potreros de TODA la empresa (se refresca con
+//   · refs:       cache de campos + potreros de TODA la empresa (se refresca con
 //     señal) — permite ARRANCAR una recorrida sin conexión. Singleton.
-//   · meta:     la recorrida en curso (campo + recorrida_id) — singleton.
-//   · potreros: cache de los potreros del campo, con flag `hecho`.
-//   · obs:      cola (outbox) de observaciones a subir; idempotente por potrero.
+//   · recorridas: OUTBOX de cabeceras. Toda recorrida con algo sin subir vive
+//     acá, esté activa o no — incluye lo necesario (campo/empresa/fecha) para
+//     crear su fila remota más tarde, sin depender de la sesión en curso.
+//   · meta:       puntero a la recorrida ACTIVA (singleton).
+//   · potreros:   cache de los potreros del campo activo, con flag `hecho`.
+//   · outbox:     cola de observaciones; PK compuesta [recorrida_id+potrero_id]
+//     para que dos recorridas pendientes del mismo potrero no se pisen.
+//
+// Por qué el outbox está separado de la sesión: arrancar una recorrida nueva
+// NO puede destruir lo que otra dejó sin subir. Ver la spec del ciclo de la
+// jornada (2026-07-22) — con `PendienteSync` bloqueando la pantalla este
+// camino era inalcanzable; al permitir arrancar otro campo, se vuelve real.
 
 export type RecRefs = {
   id: 'refs'
@@ -25,8 +34,14 @@ export type RecRefs = {
   updated_at: number
 }
 
-export type RecMeta = {
+/** Puntero a la recorrida activa. `null` = ninguna abierta. */
+export type RecPuntero = {
   id: 'actual'
+  recorrida_id: string | null
+}
+
+/** Cabecera de una recorrida: la activa y toda otra que deba algo al servidor. */
+export type RecSesion = {
   recorrida_id: string
   campo_id: string
   campo_nombre: string
@@ -84,9 +99,10 @@ export type RecObs = {
 }
 
 class RecorridaDB extends Dexie {
-  meta!: Table<RecMeta, string>
+  meta!: Table<RecPuntero, string>
+  recorridas!: Table<RecSesion, string>
   potreros!: Table<RecPotrero, string>
-  obs!: Table<RecObs, string>
+  outbox!: Table<RecObs, [string, string]>
   refs!: Table<RecRefs, string>
 
   constructor() {
@@ -100,6 +116,30 @@ class RecorridaDB extends Dexie {
     this.version(2).stores({
       refs: 'id',
     })
+    // v3: el outbox deja de vivir dentro de la sesión. `meta` pasa de guardar
+    // la recorrida entera a ser un puntero; la cabecera se muda a `recorridas`
+    // y las observaciones a `outbox` (PK compuesta). Migra lo que haya sin
+    // subir — el padre puede tener observaciones pendientes en el teléfono.
+    this.version(3)
+      .stores({
+        recorridas: 'recorrida_id, terminada',
+        outbox: '[recorrida_id+potrero_id], estado, recorrida_id',
+      })
+      .upgrade(async (tx) => {
+        const vieja = await tx.table('meta').get('actual')
+        if (!vieja) return
+        const cabecera = { ...vieja }
+        delete (cabecera as Record<string, unknown>).id
+        await tx.table('recorridas').put(cabecera)
+        await tx.table('meta').put({ id: 'actual', recorrida_id: vieja.recorrida_id })
+        const obsViejas = await tx.table('obs').toArray()
+        for (const o of obsViejas) {
+          await tx.table('outbox').put({ ...o, recorrida_id: o.recorrida_id ?? vieja.recorrida_id })
+        }
+      })
+    // v4: recién acá se borra la tabla vieja — Dexie corre las versiones en
+    // orden, así que el upgrade de v3 todavía la pudo leer.
+    this.version(4).stores({ obs: null })
   }
 }
 

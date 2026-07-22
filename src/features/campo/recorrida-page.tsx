@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Check,
@@ -6,14 +7,12 @@ import {
   ChevronRight,
   CloudOff,
   CloudRain,
-  CloudUpload,
   Copy,
   Flag,
   MapPin,
   Minus,
   Plus,
   RefreshCw,
-  Trash2,
   Wifi,
 } from 'lucide-react'
 import { Map as MapIcon } from 'lucide-react'
@@ -101,13 +100,12 @@ export function RecorridaPage() {
     )
   }
 
+  // Sin recorrida abierta → elegir campo. Lo que haya quedado sin subir NO
+  // bloquea: vive en el outbox y avisa con un chip (spec del ciclo de la
+  // jornada). Antes esto era una pantalla completa que impedía arrancar otro
+  // campo sin señal — justo en el peor momento, en el campo y sin datos.
   if (!r.meta) {
     return <SelectorCampo r={r} />
-  }
-
-  // Terminada pero con datos sin subir: la sesión espera (no se pierde nada).
-  if (r.meta.terminada) {
-    return <PendienteSync r={r} />
   }
 
   if (vista === 'cierre') {
@@ -210,6 +208,7 @@ function Stepper({
   r: ReturnType<typeof useRecorrida>
   onCierre: () => void
 }) {
+  const navigate = useNavigate()
   const [paso, setPaso] = useState(0)
   const [abrirCroquis, setAbrirCroquis] = useState(false)
   // Retomar donde quedó: al montar (o cuando los potreros recién llegan de
@@ -224,9 +223,9 @@ function Stepper({
   // Croquis disponible si al menos un potrero tiene su polígono dibujado.
   const hayCroquis = r.potreros.some((p) => p.poligono && p.poligono.length >= 3)
 
-  // Salir al selector de campo: dos toques (confirmación inline, sin modal).
-  // Lo cargado NO se pierde: sale por el mismo camino que "terminar" — con
-  // señal cierra al toque; sin señal queda "guardada, esperando subir".
+  // Volver PAUSA la recorrida: la deja abierta y suelta la pantalla. Irse a
+  // cargar un gasto o a la veterinaria no puede cerrar la jornada — el landing
+  // la ofrece para retomar. Terminar es un acto explícito, en el Cierre.
   const [confirmaSalir, setConfirmaSalir] = useState(false)
   const salir = () => {
     if (!confirmaSalir) {
@@ -234,7 +233,8 @@ function Stepper({
       setTimeout(() => setConfirmaSalir(false), 3500)
       return
     }
-    void r.terminar()
+    void r.pausar()
+    navigate('/campo')
   }
 
   if (!potrero) {
@@ -738,106 +738,6 @@ function Segmento<T extends string>({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Terminada, esperando subir (sin señal o con errores). La sesión local se
-// cierra sola cuando el drenado completa; acá solo se informa y se ofrece
-// reintentar / descartar lo rechazado. Nunca se descarta nada en silencio.
-// ---------------------------------------------------------------------------
-function PendienteSync({ r }: { r: ReturnType<typeof useRecorrida> }) {
-  const lluviaPendiente = r.meta!.lluvia_mm != null && !r.meta!.lluvia_ok
-  const nombrePotrero = new Map(r.potreros.map((p) => [p.id, p.nombre]))
-
-  return (
-    <div className="mx-auto flex h-full w-full max-w-md flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6">
-        <div className="flex flex-col items-center gap-3 pt-6 text-center">
-          <span className="c-panel flex size-16 items-center justify-center text-[var(--c-ok-deep)]">
-            <CloudUpload className="size-8" strokeWidth={2} />
-          </span>
-          <h1 className="c-display text-[22px] text-[var(--c-ink)]">
-            Recorrida guardada
-          </h1>
-          <p className="text-[14.5px] leading-snug text-[var(--c-ink-soft)]">
-            {r.sinSubir > 0 || lluviaPendiente ? (
-              <>
-                Quedan{' '}
-                <span className="font-bold text-[var(--c-ink)]">
-                  {r.sinSubir > 0 &&
-                    (r.sinSubir === 1
-                      ? '1 observación'
-                      : `${r.sinSubir} observaciones`)}
-                  {r.sinSubir > 0 && lluviaPendiente && ' y '}
-                  {lluviaPendiente && 'la lluvia'}
-                </span>{' '}
-                sin subir. Se suben solas cuando vuelva la señal — no hace
-                falta hacer nada.
-              </>
-            ) : (
-              'Subiendo lo último…'
-            )}
-          </p>
-        </div>
-
-        <div
-          className={cn(
-            'flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5',
-            r.online
-              ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)]'
-              : 'c-hazard',
-          )}
-        >
-          {r.online ? (
-            <Wifi className="size-4 text-[var(--c-ok-deep)]" />
-          ) : (
-            <CloudOff className="size-4 text-[var(--c-ink)]" />
-          )}
-          <CLabel className={cn('!text-[12px]', r.online && '!text-[var(--c-ok-deep)]')}>
-            {r.online ? 'Con señal' : 'Sin señal'}
-          </CLabel>
-        </div>
-
-        {r.errores.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-bad-soft)] p-3.5">
-            <div className="c-label flex items-center gap-1.5 !text-[12px] !text-[var(--c-bad)]">
-              <AlertTriangle className="size-4" />
-              {r.errores.length} que el servidor rechazó
-            </div>
-            <ul className="flex flex-col gap-1 text-[12.5px] text-[var(--c-ink-soft)]">
-              {r.errores.map((e) => (
-                <li key={e.potrero_id}>
-                  <span className="font-semibold text-[var(--c-ink)]">
-                    {nombrePotrero.get(e.potrero_id) ?? 'Potrero'}:
-                  </span>{' '}
-                  {e.error ?? 'error al subir'}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              onClick={() => void r.descartarErrores()}
-              className="c-label mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-panel)] px-3 py-2.5 !text-[12px] !text-[var(--c-bad)] active:scale-[0.98]"
-            >
-              <Trash2 className="size-4" />
-              Descartar los que fallaron
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
-        <button
-          type="button"
-          disabled={!r.online || r.sincronizando}
-          onClick={() => void r.sincronizar()}
-          className="c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white disabled:opacity-50 disabled:shadow-none"
-        >
-          <RefreshCw className={cn('size-5', r.sincronizando && 'animate-spin')} />
-          {r.sincronizando ? 'Subiendo…' : 'Subir ahora'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Cierre

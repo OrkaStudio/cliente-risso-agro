@@ -51,6 +51,11 @@ const AgendaPage = lazy(() =>
     default: m.AgendaPage,
   })),
 )
+const CampoInicioPage = lazy(() =>
+  import('@/features/campo/inicio-page').then((m) => ({
+    default: m.CampoInicioPage,
+  })),
+)
 const MangaPage = lazy(() =>
   import('@/features/campo/manga-page').then((m) => ({
     default: m.MangaPage,
@@ -129,7 +134,7 @@ export const router = createBrowserRouter([
                 // Modo Campo (móvil) — shell con nav inferior.
                 element: <CampoShell />,
                 children: [
-                  { path: 'campo', element: <Navigate to="/campo/manga" replace /> },
+                  { path: 'campo', element: <CampoInicioPage /> },
                   { path: 'campo/manga', element: <MangaPage /> },
                   { path: 'campo/recorrida', element: <RecorridaPage /> },
                   { path: 'campo/plata', element: <PlataPage /> },

@@ -21,7 +21,7 @@ export function ResponsiveShell() {
 
   // Teléfono, sin override y parado en una ruta de Oficina → al Modo Campo.
   if (isMobile && !forceOficina && !enCampo) {
-    return <Navigate to="/campo/manga" replace />
+    return <Navigate to="/campo" replace />
   }
 
   return (
@@ -41,7 +41,7 @@ function VolverACampo() {
       type="button"
       onClick={() => {
         setForceOficina(false)
-        navigate('/campo/manga')
+        navigate('/campo')
       }}
       className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_8px_24px_rgba(16,30,20,0.28)]"
     >

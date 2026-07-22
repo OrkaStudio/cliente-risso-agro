@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Banknote, ClipboardList, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
@@ -19,8 +19,44 @@ const NAV = [
   { to: '/campo/plata', label: 'Plata', icon: Banknote, soon: false },
 ] as const
 
-export function CampoShell() {
+/**
+ * Cerrar sesión con confirmación de dos toques — el mismo patrón que ya usa
+ * "salir" de la recorrida. Antes era un botón de 32px, sin confirmación,
+ * pegado al del croquis en la esquina superior derecha: el productor iba a
+ * buscar el croquis para ubicarse y se deslogueaba. Prod juntó 9 recorridas
+ * con cero observaciones con esa firma exacta. Target a 44px y armado.
+ */
+function SalirDeLaCuenta() {
   const { signOut } = useAuth()
+  const [armado, setArmado] = useState(false)
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (!armado) {
+          setArmado(true)
+          setTimeout(() => setArmado(false), 3500)
+          return
+        }
+        void signOut()
+      }}
+      title="Cerrar sesión"
+      aria-label="Cerrar sesión"
+      className={cn(
+        'flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-semibold transition-colors',
+        armado
+          ? 'bg-[var(--c-warn)] text-[#1c1400]'
+          : 'min-w-11 text-sidebar-foreground/55 hover:bg-white/[0.07] hover:text-white',
+      )}
+    >
+      <LogOut className="size-[17px]" />
+      {armado && '¿Cerrar sesión?'}
+    </button>
+  )
+}
+
+export function CampoShell() {
 
   return (
     <div className="campo flex h-full flex-col overflow-hidden">
@@ -51,14 +87,7 @@ export function CampoShell() {
           <ClipboardList className="size-[17px]" />
           Historial
         </NavLink>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          title="Salir"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white"
-        >
-          <LogOut className="size-[17px]" />
-        </button>
+        <SalirDeLaCuenta />
       </header>
 
       {/* Contenido — caja acotada (min-h-0 para que el flex hijo pueda encoger).
