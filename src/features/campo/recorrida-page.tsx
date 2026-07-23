@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
-import { useRecorrida } from './recorrida/use-recorrida'
+import { useRecorrida, type RecPotrero } from './recorrida/use-recorrida'
 import { Croquis } from './recorrida/croquis'
 import { diasDesde, haceCuantoTxt } from './recorrida/api'
 import type {
@@ -245,6 +245,19 @@ function Recorrida({
     )
   }
 
+  // Parte de un potrero: PANTALLA COMPLETA, no una hoja a media altura. El
+  // productor está en el campo y necesita toda la pantalla — grande, cómoda,
+  // sin el mapa oscurecido atrás compitiendo por la atención.
+  if (potrero) {
+    return (
+      <ParteScreen
+        potrero={potrero}
+        r={r}
+        onVolver={() => setAbierto(null)}
+      />
+    )
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Header compacto: el mapa se queda con el alto. Volver PAUSA. */}
@@ -377,44 +390,97 @@ function Recorrida({
           setLluviaAbierta(false)
         }}
       />
+    </div>
+  )
+}
 
-      {/* El parte del potrero sube en una hoja y, al cerrarse, devuelve al
-          croquis con el potrero ya pintado. Ese ida y vuelta ES la recorrida. */}
-      <CSheet
-        open={potrero != null}
-        title={potrero ? `Potrero ${potrero.nombre}` : ''}
-        onClose={() => setAbierto(null)}
-      >
-        {potrero && (
-          <>
-            <PotreroForm
-              key={potrero.id}
-              nombre={potrero.nombre}
-              cabezas={potrero.cabezas}
-              estadoCiclo={potrero.estado_ciclo}
-              ciclo={
-                potrero.eliminado
-                  ? 'Ya no existe en Oficina — tu observación se conserva'
-                  : estadoCicloLabel[potrero.estado_ciclo]
-              }
-              ultima={potrero.ultima ?? null}
-              inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
-              yaEnSesion={r.obsPorPotrero.has(potrero.id)}
-              audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
-              onGuardar={(f) => void r.guardar(potrero.id, f)}
-              onAudio={(b) => void r.setAudio(potrero.id, b)}
-            />
-            <button
-              type="button"
-              onClick={() => setAbierto(null)}
-              className="c-display c-hard mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white"
-            >
+// ---------------------------------------------------------------------------
+// Parte de un potrero — PANTALLA COMPLETA
+//
+// El productor está en el campo: necesita toda la pantalla para leer y tocar
+// cómodo, no una hoja a media altura con el mapa oscurecido atrás. Header con
+// la identidad del potrero, cuerpo scrolleable y una acción fija abajo (zona
+// del pulgar) para volver al croquis.
+// ---------------------------------------------------------------------------
+function ParteScreen({
+  potrero,
+  r,
+  onVolver,
+}: {
+  potrero: RecPotrero
+  r: ReturnType<typeof useRecorrida>
+  onVolver: () => void
+}) {
+  const cicloTxt = potrero.eliminado
+    ? 'Ya no existe en Oficina — tu observación se conserva'
+    : estadoCicloLabel[potrero.estado_ciclo]
+  const yaCargado = r.obsPorPotrero.has(potrero.id)
+
+  return (
+    <div className="flex h-full flex-col bg-[var(--c-bg)]">
+      {/* Header: volver al croquis + identidad del potrero, grande y legible */}
+      <header className="shrink-0 border-b border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 py-2.5">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onVolver}
+            aria-label="Volver al croquis"
+            className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-ink)]/15 bg-[var(--c-panel)] text-[var(--c-ink)] active:scale-95"
+          >
+            <ChevronLeft className="size-7" strokeWidth={2.5} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="c-display truncate text-[26px] leading-none text-[var(--c-ink)]">
+              {potrero.nombre}
+            </h1>
+            <span className="c-label mt-1 block truncate !text-[11px]">{cicloTxt}</span>
+          </div>
+          <div className="shrink-0 rounded-xl bg-[var(--c-sunk)] px-3 py-1.5 text-center leading-none">
+            <span className="c-mono block text-[22px] font-bold text-[var(--c-ink)]">
+              {potrero.cabezas}
+            </span>
+            <CLabel className="mt-1 !text-[9.5px]">cab. esperadas</CLabel>
+          </div>
+        </div>
+      </header>
+
+      {/* Cuerpo scrolleable */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <PotreroForm
+          key={potrero.id}
+          cabezas={potrero.cabezas}
+          estadoCiclo={potrero.estado_ciclo}
+          ultima={potrero.ultima ?? null}
+          inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
+          yaEnSesion={yaCargado}
+          audio={r.obsPorPotrero.get(potrero.id)?.audio ?? null}
+          onGuardar={(f) => void r.guardar(potrero.id, f)}
+          onAudio={(b) => void r.setAudio(potrero.id, b)}
+        />
+      </div>
+
+      {/* Acción fija: volver al croquis. Neutro (tinta), NO verde — el verde es
+          confirmar; volver es navegación, guarde o no (lo cargado ya se guardó
+          al tocar cada control). */}
+      <div className="shrink-0 border-t border-[var(--c-line-strong)] bg-[var(--c-bg)] px-4 pb-4 pt-3">
+        <button
+          type="button"
+          onClick={onVolver}
+          className="c-display c-hard flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ink)] text-[17px] text-white active:scale-[0.99]"
+        >
+          {yaCargado ? (
+            <>
               <Check className="size-5" strokeWidth={2.5} />
               Listo, volver al croquis
-            </button>
-          </>
-        )}
-      </CSheet>
+            </>
+          ) : (
+            <>
+              <ChevronLeft className="size-5" strokeWidth={2.5} />
+              Volver al croquis
+            </>
+          )}
+        </button>
+      </div>
     </div>
   )
 }
@@ -579,10 +645,8 @@ function resumenUltima(u: UltimaObs, agricola: boolean): string {
 type CampoEstado = 'pasto' | 'agua' | 'electrico' | 'cultivo' | 'en_tratamiento'
 
 function PotreroForm({
-  nombre,
   cabezas,
   estadoCiclo,
-  ciclo,
   ultima,
   inicial,
   yaEnSesion,
@@ -590,10 +654,8 @@ function PotreroForm({
   onGuardar,
   onAudio,
 }: {
-  nombre: string
   cabezas: number
   estadoCiclo: EstadoCiclo
-  ciclo: string
   ultima: UltimaObs | null
   inicial: Form
   /** true = ya se cargó en ESTA recorrida (no proponemos, editamos lo cargado). */
@@ -696,37 +758,21 @@ function PotreroForm({
   const hayPropuesta = propuestos.size > 0
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Contexto del potrero: lo que el productor necesita saber al pisar */}
-      <div className="c-panel px-4 py-3">
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="c-display min-w-0 truncate text-[24px] text-[var(--c-ink)]">
-            {nombre}
-          </h2>
-          <div className="shrink-0 text-right leading-none">
-            <span className="c-mono text-[22px] font-bold text-[var(--c-ink)]">
-              {cabezas}
-            </span>
-            <CLabel className="mt-0.5">cab. esperadas</CLabel>
-          </div>
-        </div>
-        <CLabel className="mt-1">{ciclo}</CLabel>
-      </div>
-
+    <div className="flex flex-col gap-4">
       {/* Franja "así estaba": cuando hay propuesta, los controles muestran lo
           de la última vez PUNTEADO (propuesto, sin confirmar). Un toque en
           "Está igual" confirma todo; tocar un control confirma ese campo. Abrir
           y cerrar sin tocar nada NO registra observación. */}
       {ultima && hayPropuesta && (
-        <div className="c-hard-sm rounded-lg border border-dashed border-[var(--c-ok)]/50 bg-[var(--c-ok-soft)]/40 px-3.5 py-3">
+        <div className="c-hard-sm rounded-xl border-2 border-dashed border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3.5 py-3">
           <div className="flex items-start gap-2">
-            <History className="mt-0.5 size-4 shrink-0 text-[var(--c-ok-deep)]" />
+            <History className="mt-0.5 size-[18px] shrink-0 text-[var(--c-ok-deep)]" strokeWidth={2.25} />
             <div className="min-w-0 flex-1">
-              <span className="c-display block text-[14px] text-[var(--c-ok-deep)]">
+              <span className="c-display block text-[15px] text-[var(--c-ok-deep)]">
                 Así estaba {fmtFecha(ultima.fecha)}
                 {diasDesde(ultima.fecha) != null && ` · ${haceCuantoTxt(diasDesde(ultima.fecha))}`}
               </span>
-              <span className="c-label mt-0.5 block">
+              <span className="mt-0.5 block text-[13px] font-semibold text-[var(--c-ink-soft)]">
                 {resumenUltima(ultima, agricola)}
               </span>
             </div>
@@ -734,7 +780,7 @@ function PotreroForm({
           <button
             type="button"
             onClick={confirmarTodo}
-            className="c-display c-hard-sm mt-2.5 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-transparent bg-[var(--c-ok)] text-[15px] text-white"
+            className="c-display c-hard mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[16px] text-white active:scale-[0.99]"
           >
             <Check className="size-5" strokeWidth={2.5} />
             Está igual que la última vez
@@ -744,7 +790,7 @@ function PotreroForm({
 
       {agricola ? (
         <div>
-          <CLabel className="mb-1.5">Cultivo · ¿cómo viene?</CLabel>
+          <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Cultivo · ¿cómo viene?</CLabel>
           <div className="grid grid-cols-3 gap-1.5">
             {CULTIVO.map((o) => (
               <CSegBtn
@@ -761,7 +807,7 @@ function PotreroForm({
       ) : (
         <>
           <div>
-            <CLabel className="mb-1.5">Pasto · ¿cómo está?</CLabel>
+            <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Pasto · ¿cómo está?</CLabel>
             <Segmento
               opciones={PASTO}
               value={form.pasto}
@@ -771,7 +817,7 @@ function PotreroForm({
           </div>
 
           <div>
-            <CLabel className="mb-1.5">Agua · aguadas y bebederos</CLabel>
+            <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Agua · aguadas y bebederos</CLabel>
             <Segmento
               opciones={AGUA}
               value={form.agua}
@@ -782,7 +828,7 @@ function PotreroForm({
 
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <div>
-              <CLabel className="mb-1.5">Boyero eléctrico</CLabel>
+              <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Boyero eléctrico</CLabel>
               <Segmento
                 opciones={ELECTRICO}
                 value={form.electrico}
@@ -792,7 +838,7 @@ function PotreroForm({
             </div>
             {conHacienda && (
               <div>
-                <CLabel className="mb-1.5">¿En tratam.?</CLabel>
+                <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">¿En tratam.?</CLabel>
                 <CSegBtn
                   label={form.en_tratamiento ? 'Sí' : 'No'}
                   tono="warn"
@@ -813,7 +859,7 @@ function PotreroForm({
           (o debería haber) hacienda. */}
       {conHacienda && (
       <div>
-        <CLabel className="mb-1.5">Conteo de cabezas · opcional</CLabel>
+        <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Conteo de cabezas · opcional</CLabel>
         <div className="flex items-stretch gap-1.5">
           <button
             type="button"
@@ -868,7 +914,7 @@ function PotreroForm({
 
       {/* Novedad por chips + libre */}
       <div>
-        <CLabel className="mb-1.5">Novedades · opcional</CLabel>
+        <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Novedades · opcional</CLabel>
         <div className="c-strip -mx-4 flex gap-1.5 px-4">
           {NOVEDADES.map((n) => (
             <CChip key={n} label={n} selected={novChips.has(n)} onClick={() => toggleNovedad(n)} />

@@ -58,12 +58,16 @@ export function CSegBtn({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex h-13 items-center justify-center rounded-xl border px-1 text-[13.5px] font-semibold transition-colors active:scale-[0.98]',
+        'flex h-14 items-center justify-center rounded-xl border-2 px-1 text-[15px] font-bold transition-colors active:scale-[0.97]',
         selected
           ? cn(TONO_FILL[tono], 'c-hard-sm')
           : propuesto
-            ? 'border-2 border-dashed border-[var(--c-ok)]/60 bg-[var(--c-ok-soft)]/40 text-[var(--c-ink-soft)]'
-            : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+            ? // Propuesto = lo de la última vez, sin confirmar: punteado ok con
+              // texto ok-deep LEGIBLE (no el gris lavado de antes).
+              'border-dashed border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+            : // Sin elegir: texto TINTA plena (se lee al sol) sobre panel, borde
+              // marcado para que el target se vea.
+              'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]',
         className,
       )}
     >
