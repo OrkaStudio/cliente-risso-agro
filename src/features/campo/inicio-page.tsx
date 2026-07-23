@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowLeftRight,
   Banknote,
   ChevronRight,
   CloudOff,
@@ -101,6 +102,18 @@ export function CampoInicioPage() {
             </span>
           </span>
           <ChevronRight className="size-6 shrink-0 text-[var(--c-ok-deep)]" />
+        </Link>
+      )}
+
+      {/* Cambiar de campo: la recorrida actual queda guardada y se retoma
+          después. Sin esto no había forma de recorrer otro campo sin terminar. */}
+      {r.meta && (
+        <Link
+          to="/campo/recorrida?cambiar=1"
+          className="-mt-1.5 flex items-center gap-2 self-start rounded-lg px-2 py-1.5 text-[13px] font-semibold text-[var(--c-ink-soft)] active:scale-[0.98]"
+        >
+          <ArrowLeftRight className="size-4" />
+          Recorrer otro campo
         </Link>
       )}
 

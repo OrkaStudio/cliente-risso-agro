@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   Check,
@@ -9,6 +9,7 @@ import {
   CloudRain,
   Droplet,
   Flag,
+  Footprints,
   Hash,
   History,
   MapPin,
@@ -88,6 +89,11 @@ const FORM_VACIO: Form = {
 export function RecorridaPage() {
   const r = useRecorrida()
   const [vista, setVista] = useState<'stepper' | 'cierre'>('stepper')
+  // ?cambiar=1 → el hub pide elegir OTRO campo aunque ya haya una recorrida
+  // abierta. Sin esto, /campo/recorrida con recorrida abierta va directo al
+  // croquis y no hay forma de cambiar de campo sin terminar primero.
+  const [sp, setSp] = useSearchParams()
+  const cambiando = sp.get('cambiar') === '1'
 
   // Al arrancar OTRA recorrida, la vista vuelve al stepper (si no, quedaba
   // pegada en 'cierre' de la recorrida anterior). Patrón React de "reset de
@@ -111,8 +117,14 @@ export function RecorridaPage() {
   // bloquea: vive en el outbox y avisa con un chip (spec del ciclo de la
   // jornada). Antes esto era una pantalla completa que impedía arrancar otro
   // campo sin señal — justo en el peor momento, en el campo y sin datos.
-  if (!r.meta) {
-    return <SelectorCampo r={r} />
+  if (!r.meta || cambiando) {
+    return (
+      <SelectorCampo
+        r={r}
+        cambiando={cambiando && r.meta != null}
+        onElegido={() => setSp({}, { replace: true })}
+      />
+    )
   }
 
   if (vista === 'cierre') {
@@ -125,7 +137,17 @@ export function RecorridaPage() {
 // ---------------------------------------------------------------------------
 // Selector de campo
 // ---------------------------------------------------------------------------
-function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
+function SelectorCampo({
+  r,
+  cambiando = false,
+  onElegido,
+}: {
+  r: ReturnType<typeof useRecorrida>
+  /** true = ya hay una recorrida abierta y se está eligiendo OTRO campo. */
+  cambiando?: boolean
+  onElegido?: () => void
+}) {
+  const abiertoId = r.meta?.campo_id ?? null
   // Nunca se cacheó nada y no hay señal: no se puede armar la recorrida.
   if (!r.tieneRefs && !r.online) {
     return (
@@ -146,10 +168,12 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
     <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto p-4">
       <div>
         <h1 className="c-display text-[26px] text-[var(--c-ink)]">
-          Recorrida
+          {cambiando ? 'Cambiar de campo' : 'Recorrida'}
         </h1>
         <p className="mt-0.5 text-[14px] text-[var(--c-ink-soft)]">
-          Elegí el campo. Un potrero por paso: tocás el estado y seguís.
+          {cambiando
+            ? 'Elegí a qué campo vas. La recorrida actual queda guardada; la retomás cuando quieras.'
+            : 'Elegí el campo. Un potrero por paso: tocás el estado y seguís.'}
         </p>
         {r.refsActualizado && (
           <button
@@ -176,25 +200,51 @@ function SelectorCampo({ r }: { r: ReturnType<typeof useRecorrida> }) {
         </p>
       )}
       <div className="flex flex-col gap-2.5">
-        {r.campos.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            disabled={r.iniciando}
-            onClick={() => void r.empezar(c)}
-            className="c-panel c-hard-sm group flex items-center justify-between px-4 py-4 text-left disabled:opacity-50"
-          >
-            <span className="flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]">
-                <MapPin className="size-5" />
+        {r.campos.map((c) => {
+          const esAbierto = c.id === abiertoId
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={r.iniciando}
+              onClick={() => {
+                // El campo que ya está abierto: no re-empezar (lo resetearía) —
+                // solo volver a su croquis. Otro campo: empezar (cierra+guarda
+                // el actual) y volver al croquis del nuevo.
+                if (!esAbierto) void r.empezar(c)
+                onElegido?.()
+              }}
+              className={cn(
+                'c-hard-sm group flex items-center justify-between rounded-2xl border-2 px-4 py-4 text-left disabled:opacity-50',
+                esAbierto
+                  ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)]'
+                  : 'border-[var(--c-line-strong)] bg-[var(--c-panel)]',
+              )}
+            >
+              <span className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    'flex size-11 shrink-0 items-center justify-center rounded-xl text-white',
+                    esAbierto ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-ink)]',
+                  )}
+                >
+                  {esAbierto ? <Footprints className="size-6" /> : <MapPin className="size-6" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="c-display block text-[19px] text-[var(--c-ink)]">
+                    {c.nombre}
+                  </span>
+                  {esAbierto && (
+                    <CLabel className="!text-[11px] !text-[var(--c-ok-deep)]">
+                      Abierta · {r.hechos}/{r.total} · seguir
+                    </CLabel>
+                  )}
+                </span>
               </span>
-              <span className="c-display text-[18px] text-[var(--c-ink)]">
-                {c.nombre}
-              </span>
-            </span>
-            <ChevronRight className="size-5 text-[var(--c-faint)]" />
-          </button>
-        ))}
+              <ChevronRight className="size-6 shrink-0 text-[var(--c-faint)]" />
+            </button>
+          )
+        })}
         {r.online && r.campos.length === 0 && !r.error && (
           <p className="text-[13px] text-[var(--c-faint)]">
             No hay campos cargados todavía.

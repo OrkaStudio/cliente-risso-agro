@@ -1,6 +1,6 @@
 import { Suspense, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Banknote, ClipboardList, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
+import { Banknote, ClipboardList, Home, Leaf, LogOut, Footprints, Syringe } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
@@ -13,10 +13,13 @@ import '@/features/campo/campo.css'
  * abajo (pulgar) y el Historial (revisar/doble check) va en el header.
  */
 
+// Inicio es el HUB: desde ahí el productor se reparte a las secciones y siempre
+// puede volver. `end` = activo SOLO en /campo exacto (no en las sub-rutas).
 const NAV = [
-  { to: '/campo/manga', label: 'Manga', icon: Syringe, soon: false },
-  { to: '/campo/recorrida', label: 'Recorrida', icon: Footprints, soon: false },
-  { to: '/campo/plata', label: 'Plata', icon: Banknote, soon: false },
+  { to: '/campo', label: 'Inicio', icon: Home, soon: false, end: true },
+  { to: '/campo/recorrida', label: 'Recorrida', icon: Footprints, soon: false, end: false },
+  { to: '/campo/manga', label: 'Manga', icon: Syringe, soon: false, end: false },
+  { to: '/campo/plata', label: 'Plata', icon: Banknote, soon: false, end: false },
 ] as const
 
 /**
@@ -106,7 +109,7 @@ export function CampoShell() {
 
       {/* Nav inferior (pulgar) — bloques de tablero, el activo se llena */}
       <nav className="flex shrink-0 items-stretch gap-1.5 border-t border-[var(--c-line)] bg-[var(--c-sunk)] p-1.5">
-        {NAV.map(({ to, label, icon: Icon, soon }) =>
+        {NAV.map(({ to, label, icon: Icon, soon, end }) =>
           soon ? (
             <div
               key={to}
@@ -120,6 +123,7 @@ export function CampoShell() {
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) =>
                 cn(
                   'flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors',
