@@ -81,6 +81,10 @@ export type RecObs = {
   potrero_id: string // PK: una observación por potrero (idempotente)
   recorrida_id: string
   empresa_id: string
+  /** Nombre del potrero al momento de observarlo. Snapshot local: si Oficina
+   *  lo borra, la lista (derivada de refs) lo perdería — con esto se sigue
+   *  mostrando ("nunca se pierde en silencio"). No viaja al servidor. */
+  potrero_nombre?: string
   pasto: PastoEstado | null
   agua: AguaEstado | null
   electrico: ElectricoEstado | null
@@ -101,7 +105,6 @@ export type RecObs = {
 class RecorridaDB extends Dexie {
   meta!: Table<RecPuntero, string>
   recorridas!: Table<RecSesion, string>
-  potreros!: Table<RecPotrero, string>
   outbox!: Table<RecObs, [string, string]>
   refs!: Table<RecRefs, string>
 
@@ -140,6 +143,13 @@ class RecorridaDB extends Dexie {
     // v4: recién acá se borra la tabla vieja — Dexie corre las versiones en
     // orden, así que el upgrade de v3 todavía la pudo leer.
     this.version(4).stores({ obs: null })
+    // v5: se DROPEA el cache de potreros. La lista de potreros pasa a DERIVARSE
+    // de `refs` (filtrada por el campo activo) y el flag `hecho` del `outbox`
+    // (¿hay observación para [recorrida_id+potrero_id]?). Sin cache mutable:
+    //   · reconciliación Oficina→Campo automática (refs cambia → lista cambia),
+    //   · cambiar de campo = mover el puntero (no se borra ni se pierde nada),
+    //   · varias recorridas abiertas conviven → pausar/retomar por campo.
+    this.version(5).stores({ potreros: null })
   }
 }
 

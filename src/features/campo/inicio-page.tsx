@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -26,6 +26,7 @@ import { CLabel } from './ui'
  */
 export function CampoInicioPage() {
   const r = useRecorrida()
+  const navigate = useNavigate()
 
   if (r.cargando) {
     return (
@@ -42,11 +43,17 @@ export function CampoInicioPage() {
     r.potrerosRef.length > 0 &&
     r.potrerosRef.every((p) => !p.poligono || p.poligono.length < 3)
 
+  const hayAbiertas = r.abiertas.length > 0
+
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto p-4">
       <div>
         <h1 className="c-display text-[26px] text-[var(--c-ink)]">
-          {r.meta ? 'Tenés una recorrida abierta' : '¿Qué vas a hacer?'}
+          {hayAbiertas
+            ? r.abiertas.length === 1
+              ? 'Tenés una recorrida abierta'
+              : `Tenés ${r.abiertas.length} recorridas abiertas`
+            : '¿Qué vas a hacer?'}
         </h1>
       </div>
 
@@ -80,11 +87,17 @@ export function CampoInicioPage() {
         </div>
       )}
 
-      {/* Retomar: primero y grande. La recorrida sobrevive a irse a cargar un
-          gasto, a la veterinaria o a cerrar la app. */}
-      {r.meta && (
-        <Link
-          to="/campo/recorrida"
+      {/* Retomar: una tarjeta por campo abierto. Cada uno conserva su avance —
+          el productor recorre varios campos cercanos en la misma salida y salta
+          entre ellos sin perder nada. Tocar activa esa recorrida y va al croquis. */}
+      {r.abiertas.map((a) => (
+        <button
+          key={a.recorridaId}
+          type="button"
+          onClick={async () => {
+            await r.activar(a.recorridaId)
+            navigate('/campo/recorrida')
+          }}
           className="c-hard flex items-center gap-3.5 rounded-2xl border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-4 py-5 text-left active:scale-[0.99]"
         >
           <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--c-ok)] text-white shadow-[0_2px_8px_rgba(11,88,55,0.3)]">
@@ -92,41 +105,37 @@ export function CampoInicioPage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="c-display block truncate text-[20px] text-[var(--c-ink)]">
-              Seguí en {r.meta.campo_nombre}
+              Seguí en {a.campoNombre}
             </span>
             <span className="mt-0.5 flex items-center gap-1.5">
               <span className="c-mono text-[13px] font-bold text-[var(--c-ok-deep)]">
-                {r.hechos}/{r.total}
+                {a.hechos}/{a.total}
               </span>
               <CLabel className="!text-[11px]">potreros hechos</CLabel>
             </span>
           </span>
           <ChevronRight className="size-6 shrink-0 text-[var(--c-ok-deep)]" />
-        </Link>
-      )}
-
-      {/* Cambiar de campo: la recorrida actual queda guardada y se retoma
-          después. Sin esto no había forma de recorrer otro campo sin terminar. */}
-      {r.meta && (
-        <Link
-          to="/campo/recorrida?cambiar=1"
-          className="-mt-1.5 flex items-center gap-2 self-start rounded-lg px-2 py-1.5 text-[13px] font-semibold text-[var(--c-ink-soft)] active:scale-[0.98]"
-        >
-          <ArrowLeftRight className="size-4" />
-          Recorrer otro campo
-        </Link>
-      )}
+        </button>
+      ))}
 
       <div className="flex flex-col gap-2.5">
-        {!r.meta && (
-          <AccionGrande
-            to="/campo/recorrida"
-            icon={<Footprints className="size-7" strokeWidth={2} />}
-            titulo="Recorrer"
-            detalle="Potrero por potrero, sobre el croquis"
-            acento="ok"
-          />
-        )}
+        <AccionGrande
+          to={hayAbiertas ? '/campo/recorrida?cambiar=1' : '/campo/recorrida'}
+          icon={
+            hayAbiertas ? (
+              <ArrowLeftRight className="size-6" strokeWidth={2} />
+            ) : (
+              <Footprints className="size-7" strokeWidth={2} />
+            )
+          }
+          titulo={hayAbiertas ? 'Recorrer otro campo' : 'Recorrer'}
+          detalle={
+            hayAbiertas
+              ? 'Las abiertas quedan guardadas'
+              : 'Potrero por potrero, sobre el croquis'
+          }
+          acento="ok"
+        />
         <AccionGrande
           to="/campo/manga"
           icon={<Syringe className="size-7" strokeWidth={2} />}
@@ -150,7 +159,7 @@ export function CampoInicioPage() {
         <span className="flex-1 text-[13px] leading-snug text-[var(--c-ink-soft)]">
           ¿Cargaste nafta o pagaste algo?{' '}
           <span className="font-bold text-[var(--c-ink)]">Anotalo en Plata</span>
-          {r.meta && ' — la recorrida te espera'}.
+          {hayAbiertas && ' — la recorrida te espera'}.
         </span>
         <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
       </Link>

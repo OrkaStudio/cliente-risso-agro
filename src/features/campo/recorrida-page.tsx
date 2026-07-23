@@ -147,7 +147,9 @@ function SelectorCampo({
   cambiando?: boolean
   onElegido?: () => void
 }) {
-  const abiertoId = r.meta?.campo_id ?? null
+  // Campos con una recorrida ABIERTA (pausada o activa) → se retoman con su
+  // avance; los demás se empiezan de cero. Nada se cierra al elegir otro.
+  const abiertasPorCampo = new Map(r.abiertas.map((a) => [a.campoId, a]))
   // Nunca se cacheó nada y no hay señal: no se puede armar la recorrida.
   if (!r.tieneRefs && !r.online) {
     return (
@@ -172,7 +174,7 @@ function SelectorCampo({
         </h1>
         <p className="mt-0.5 text-[14px] text-[var(--c-ink-soft)]">
           {cambiando
-            ? 'Elegí a qué campo vas. La recorrida actual queda guardada; la retomás cuando quieras.'
+            ? 'Elegí a qué campo vas. Las abiertas quedan guardadas con su avance; saltás entre campos sin perder nada.'
             : 'Elegí el campo. Un potrero por paso: tocás el estado y seguís.'}
         </p>
         {r.refsActualizado && (
@@ -201,22 +203,21 @@ function SelectorCampo({
       )}
       <div className="flex flex-col gap-2.5">
         {r.campos.map((c) => {
-          const esAbierto = c.id === abiertoId
+          const abierta = abiertasPorCampo.get(c.id)
           return (
             <button
               key={c.id}
               type="button"
               disabled={r.iniciando}
-              onClick={() => {
-                // El campo que ya está abierto: no re-empezar (lo resetearía) —
-                // solo volver a su croquis. Otro campo: empezar (cierra+guarda
-                // el actual) y volver al croquis del nuevo.
-                if (!esAbierto) void r.empezar(c)
+              onClick={async () => {
+                // empezar() retoma si ya hay abierta para el campo (no la pisa),
+                // o crea una nueva. Las OTRAS abiertas quedan pausadas.
+                await r.empezar(c)
                 onElegido?.()
               }}
               className={cn(
                 'c-hard-sm group flex items-center justify-between rounded-2xl border-2 px-4 py-4 text-left disabled:opacity-50',
-                esAbierto
+                abierta
                   ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)]'
                   : 'border-[var(--c-line-strong)] bg-[var(--c-panel)]',
               )}
@@ -225,18 +226,18 @@ function SelectorCampo({
                 <span
                   className={cn(
                     'flex size-11 shrink-0 items-center justify-center rounded-xl text-white',
-                    esAbierto ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-ink)]',
+                    abierta ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-ink)]',
                   )}
                 >
-                  {esAbierto ? <Footprints className="size-6" /> : <MapPin className="size-6" />}
+                  {abierta ? <Footprints className="size-6" /> : <MapPin className="size-6" />}
                 </span>
                 <span className="min-w-0">
                   <span className="c-display block text-[19px] text-[var(--c-ink)]">
                     {c.nombre}
                   </span>
-                  {esAbierto && (
+                  {abierta && (
                     <CLabel className="!text-[11px] !text-[var(--c-ok-deep)]">
-                      Abierta · {r.hechos}/{r.total} · seguir
+                      Abierta · {abierta.hechos}/{abierta.total} · seguir
                     </CLabel>
                   )}
                 </span>
