@@ -414,7 +414,8 @@ function ParteScreen({
   const cicloTxt = potrero.eliminado
     ? 'Ya no existe en Oficina — tu observación se conserva'
     : estadoCicloLabel[potrero.estado_ciclo]
-  const yaCargado = r.obsPorPotrero.has(potrero.id)
+  const obs = r.obsPorPotrero.get(potrero.id)
+  const yaCargado = obs != null
 
   return (
     <div className="flex h-full flex-col bg-[var(--c-bg)]">
@@ -433,7 +434,21 @@ function ParteScreen({
             <h1 className="c-display truncate text-[26px] leading-none text-[var(--c-ink)]">
               {potrero.nombre}
             </h1>
-            <span className="c-label mt-1 block truncate !text-[11px]">{cicloTxt}</span>
+            {/* Señal de guardado: no hay botón "Guardar" porque cada toque se
+                guarda solo — esta línea lo hace VISIBLE. El chip reanima
+                (key=updated_at) en cada guardado, así el productor ve que quedó. */}
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="c-label min-w-0 truncate !text-[11px]">{cicloTxt}</span>
+              {yaCargado && (
+                <span
+                  key={obs.updated_at}
+                  className="c-stamp inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--c-ok-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--c-ok-deep)]"
+                >
+                  <Check className="size-3" strokeWidth={3} />
+                  Guardado
+                </span>
+              )}
+            </div>
           </div>
           <div className="shrink-0 rounded-xl bg-[var(--c-sunk)] px-3 py-1.5 text-center leading-none">
             <span className="c-mono block text-[22px] font-bold text-[var(--c-ink)]">
