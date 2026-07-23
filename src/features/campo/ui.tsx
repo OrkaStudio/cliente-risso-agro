@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { Delete, Mic, Square, Trash2 as TrashIcon } from 'lucide-react'
+import { Check, Delete, Mic, Square, Trash2 as TrashIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -93,13 +93,15 @@ export function CChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'shrink-0 rounded-xl border px-3 py-2 text-[13.5px] font-semibold transition-colors active:scale-[0.98]',
+        // h-11 = 44px: mínimo táctil para dedo con guante (antes ~34px).
+        'flex h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 px-3.5 text-[14px] font-bold transition-colors active:scale-[0.97]',
         selected
-          ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
-          : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink-soft)]',
+          ? 'border-transparent bg-[var(--c-ok)] text-white'
+          : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]',
         className,
       )}
     >
+      {selected && <Check className="size-4 shrink-0" strokeWidth={3} />}
       {label}
     </button>
   )

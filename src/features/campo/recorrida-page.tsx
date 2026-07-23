@@ -7,14 +7,20 @@ import {
   ChevronRight,
   CloudOff,
   CloudRain,
+  Droplet,
   Flag,
+  Hash,
   History,
   MapPin,
+  MessageSquare,
   PencilRuler,
   Minus,
   Plus,
   RefreshCw,
+  Sprout,
+  Stethoscope,
   Wifi,
+  Zap,
 } from 'lucide-react'
 import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
@@ -655,6 +661,26 @@ function resumenUltima(u: UltimaObs, agricola: boolean): string {
 // ---------------------------------------------------------------------------
 // Formulario de un potrero
 // ---------------------------------------------------------------------------
+/** Rótulo de sección con ícono: ancla la pregunta para que el productor la
+ *  ubique de un vistazo. La PREGUNTA es neutra (ícono en chip tinta); la
+ *  RESPUESTA lleva el color (los botones de estado). Así se escanea sin ruido. */
+function SeccionLabel({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof Sprout
+  children: React.ReactNode
+}) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--c-sunk)] text-[var(--c-ink)]">
+        <Icon className="size-[15px]" strokeWidth={2.25} />
+      </span>
+      <span className="c-label !text-[12px] !text-[var(--c-ink-soft)]">{children}</span>
+    </div>
+  )
+}
+
 /** Campos de ESTADO que se pueden proponer desde la última vez (no el conteo
  *  ni la novedad, que son del día). */
 type CampoEstado = 'pasto' | 'agua' | 'electrico' | 'cultivo' | 'en_tratamiento'
@@ -805,7 +831,7 @@ function PotreroForm({
 
       {agricola ? (
         <div>
-          <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Cultivo · ¿cómo viene?</CLabel>
+          <SeccionLabel icon={Sprout}>Cultivo · ¿cómo viene?</SeccionLabel>
           <div className="grid grid-cols-3 gap-1.5">
             {CULTIVO.map((o) => (
               <CSegBtn
@@ -822,7 +848,7 @@ function PotreroForm({
       ) : (
         <>
           <div>
-            <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Pasto · ¿cómo está?</CLabel>
+            <SeccionLabel icon={Sprout}>Pasto · ¿cómo está?</SeccionLabel>
             <Segmento
               opciones={PASTO}
               value={form.pasto}
@@ -832,7 +858,7 @@ function PotreroForm({
           </div>
 
           <div>
-            <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Agua · aguadas y bebederos</CLabel>
+            <SeccionLabel icon={Droplet}>Agua · aguadas y bebederos</SeccionLabel>
             <Segmento
               opciones={AGUA}
               value={form.agua}
@@ -843,7 +869,7 @@ function PotreroForm({
 
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <div>
-              <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Boyero eléctrico</CLabel>
+              <SeccionLabel icon={Zap}>Boyero eléctrico</SeccionLabel>
               <Segmento
                 opciones={ELECTRICO}
                 value={form.electrico}
@@ -853,7 +879,7 @@ function PotreroForm({
             </div>
             {conHacienda && (
               <div>
-                <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">¿En tratam.?</CLabel>
+                <SeccionLabel icon={Stethoscope}>Tratam.</SeccionLabel>
                 <CSegBtn
                   label={form.en_tratamiento ? 'Sí' : 'No'}
                   tono="warn"
@@ -862,7 +888,7 @@ function PotreroForm({
                   onClick={() =>
                     commit({ ...form, en_tratamiento: !form.en_tratamiento }, 'en_tratamiento')
                   }
-                  className="w-20"
+                  className="h-14 w-24"
                 />
               </div>
             )}
@@ -874,20 +900,20 @@ function PotreroForm({
           (o debería haber) hacienda. */}
       {conHacienda && (
       <div>
-        <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Conteo de cabezas · opcional</CLabel>
-        <div className="flex items-stretch gap-1.5">
+        <SeccionLabel icon={Hash}>Conteo de cabezas · opcional</SeccionLabel>
+        <div className="flex items-stretch gap-2">
           <button
             type="button"
             onClick={() => ajustarConteo(-1)}
             aria-label="Restar"
-            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]"
+            className="c-hard-sm flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] active:scale-95"
           >
-            <Minus className="size-5" strokeWidth={2.5} />
+            <Minus className="size-7" strokeWidth={2.5} />
           </button>
-          <div className="c-panel flex h-13 min-w-0 flex-1 items-center justify-center">
+          <div className="flex h-16 min-w-0 flex-1 flex-col items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-sunk)]">
             <span
               className={cn(
-                'c-mono text-[24px] font-bold',
+                'c-mono text-[30px] font-bold leading-none',
                 form.conteo != null ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
               )}
             >
@@ -898,22 +924,23 @@ function PotreroForm({
             type="button"
             onClick={() => ajustarConteo(1)}
             aria-label="Sumar"
-            className="c-hard-sm flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]"
+            className="c-hard-sm flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] active:scale-95"
           >
-            <Plus className="size-5" strokeWidth={2.5} />
+            <Plus className="size-7" strokeWidth={2.5} />
           </button>
           {cabezas > 0 && (
             <button
               type="button"
               onClick={() => commit({ ...form, conteo: cabezas })}
               className={cn(
-                'c-display shrink-0 rounded-lg border-2 px-2.5 text-[13px] uppercase',
+                'c-display flex h-16 shrink-0 flex-col items-center justify-center rounded-xl border-2 px-3 leading-none active:scale-95',
                 form.conteo === cabezas
-                  ? 'border-[var(--c-ink)] bg-[var(--c-ok)] text-white'
-                  : 'border-[var(--c-ink)]/30 bg-[var(--c-panel)] text-[var(--c-ok-deep)]',
+                  ? 'border-transparent bg-[var(--c-ok)] text-white'
+                  : 'border-[var(--c-ok)]/40 bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]',
               )}
             >
-              = {cabezas}
+              <span className="text-[11px] uppercase opacity-80">esperado</span>
+              <span className="c-mono text-[18px] font-bold">{cabezas}</span>
             </button>
           )}
         </div>
@@ -927,23 +954,26 @@ function PotreroForm({
       </div>
       )}
 
-      {/* Novedad por chips + libre */}
+      {/* Novedad: primero los chips de un toque, después VOZ (en el campo se
+          habla, no se tipea), y recién al final el teclado como último recurso. */}
       <div>
-        <CLabel className="mb-2 !text-[12px] !text-[var(--c-ink-soft)]">Novedades · opcional</CLabel>
+        <SeccionLabel icon={MessageSquare}>Novedades · opcional</SeccionLabel>
         <div className="c-strip -mx-4 flex gap-1.5 px-4">
           {NOVEDADES.map((n) => (
             <CChip key={n} label={n} selected={novChips.has(n)} onClick={() => toggleNovedad(n)} />
           ))}
+        </div>
+        <div className="mt-2">
+          <NotaVoz audio={audio} onAudio={onAudio} />
         </div>
         <input
           value={novLibre}
           onChange={(e) => setNovLibre(e.target.value)}
           onBlur={() => onGuardar({ ...form, novedad: componer(novChips, novLibre) })}
           autoComplete="off"
-          placeholder="Otra novedad…"
-          className="mt-1.5 h-10 w-full rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[14px] text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
+          placeholder="…o escribí otra novedad"
+          className="mt-2 h-12 w-full rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3.5 text-[15px] text-[var(--c-ink)] outline-none placeholder:text-[var(--c-faint)] focus:border-[var(--c-ok)]"
         />
-        <NotaVoz audio={audio} onAudio={onAudio} />
       </div>
     </div>
   )

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   Banknote,
+  ChevronRight,
   CloudOff,
   Footprints,
   PencilRuler,
@@ -83,19 +84,23 @@ export function CampoInicioPage() {
       {r.meta && (
         <Link
           to="/campo/recorrida"
-          className="c-panel c-hard flex items-center gap-3 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-4 py-5 text-left"
+          className="c-hard flex items-center gap-3.5 rounded-2xl border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-4 py-5 text-left active:scale-[0.99]"
         >
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--c-ok)] text-white">
-            <Footprints className="size-6" />
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--c-ok)] text-white shadow-[0_2px_8px_rgba(11,88,55,0.3)]">
+            <Footprints className="size-7" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="c-display block truncate text-[19px] text-[var(--c-ink)]">
+            <span className="c-display block truncate text-[20px] text-[var(--c-ink)]">
               Seguí en {r.meta.campo_nombre}
             </span>
-            <CLabel className="!text-[11.5px]">
-              {r.hechos} de {r.total} potreros
-            </CLabel>
+            <span className="mt-0.5 flex items-center gap-1.5">
+              <span className="c-mono text-[13px] font-bold text-[var(--c-ok-deep)]">
+                {r.hechos}/{r.total}
+              </span>
+              <CLabel className="!text-[11px]">potreros hechos</CLabel>
+            </span>
           </span>
+          <ChevronRight className="size-6 shrink-0 text-[var(--c-ok-deep)]" />
         </Link>
       )}
 
@@ -103,16 +108,18 @@ export function CampoInicioPage() {
         {!r.meta && (
           <AccionGrande
             to="/campo/recorrida"
-            icon={<Footprints className="size-6" />}
+            icon={<Footprints className="size-7" strokeWidth={2} />}
             titulo="Recorrer"
             detalle="Potrero por potrero, sobre el croquis"
+            acento="ok"
           />
         )}
         <AccionGrande
           to="/campo/manga"
-          icon={<Syringe className="size-6" />}
+          icon={<Syringe className="size-7" strokeWidth={2} />}
           titulo="Manga"
           detalle="Caravanear, pesar, sanidad"
+          acento="ink"
         />
       </div>
 
@@ -122,14 +129,17 @@ export function CampoInicioPage() {
           al volver, se retoma donde estaba. */}
       <Link
         to="/campo/plata"
-        className="flex items-center gap-2.5 rounded-xl border border-dashed border-[var(--c-line-strong)] px-3 py-3 text-left"
+        className="flex items-center gap-2.5 rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3.5 py-3 text-left active:scale-[0.99]"
       >
-        <Banknote className="size-4 shrink-0 text-[var(--c-ink-soft)]" />
-        <span className="text-[13px] leading-snug text-[var(--c-ink-soft)]">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--c-sunk)] text-[var(--c-ink)]">
+          <Banknote className="size-[18px]" />
+        </span>
+        <span className="flex-1 text-[13px] leading-snug text-[var(--c-ink-soft)]">
           ¿Cargaste nafta o pagaste algo?{' '}
           <span className="font-bold text-[var(--c-ink)]">Anotalo en Plata</span>
-          {r.meta && ' — la recorrida te espera donde la dejaste'}.
+          {r.meta && ' — la recorrida te espera'}.
         </span>
+        <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
       </Link>
 
       {/* Lo que el servidor RECHAZÓ no se descarta nunca en silencio: se
@@ -179,26 +189,34 @@ function AccionGrande({
   icon,
   titulo,
   detalle,
+  acento,
 }: {
   to: string
   icon: React.ReactNode
   titulo: string
   detalle: string
+  acento: 'ok' | 'ink'
 }) {
   return (
     <Link
       to={to}
-      className="c-panel c-hard-sm flex items-center gap-3 px-4 py-4 text-left"
+      className="c-hard-sm flex items-center gap-3.5 rounded-2xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 py-4 text-left active:scale-[0.99]"
     >
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-sunk)] text-[var(--c-ink)]">
+      <span
+        className={cn(
+          'flex size-14 shrink-0 items-center justify-center rounded-2xl text-white',
+          acento === 'ok' ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-ink)]',
+        )}
+      >
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="c-display block truncate text-[18px] text-[var(--c-ink)]">
+        <span className="c-display block truncate text-[19px] text-[var(--c-ink)]">
           {titulo}
         </span>
         <CLabel className="!text-[11.5px]">{detalle}</CLabel>
       </span>
+      <ChevronRight className="size-6 shrink-0 text-[var(--c-faint)]" />
     </Link>
   )
 }
