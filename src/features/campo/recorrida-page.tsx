@@ -994,8 +994,13 @@ function Cierre({
   r: ReturnType<typeof useRecorrida>
   onVolver: () => void
 }) {
-  const [mm, setMm] = useState<number | null>(r.meta?.lluvia_mm ?? null)
+  const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [terminando, setTerminando] = useState(false)
+  // La lluvia YA se pregunta durante la recorrida (barra de arriba). Acá no se
+  // vuelve a cargar con otro widget: se MUESTRA lo contestado, con opción de
+  // cambiarlo abriendo la misma hoja. `meta` es reactivo (Dexie), así que la
+  // fila se actualiza sola tras guardar.
+  const lluvia = r.meta?.lluvia_mm ?? null
 
   // Potreros que necesitan atención (para el resumen).
   const atencion = useMemo(() => {
@@ -1018,7 +1023,8 @@ function Cierre({
 
   const terminar = async () => {
     setTerminando(true)
-    await r.setLluvia(mm)
+    // La lluvia ya se guardó al contestarla (durante la recorrida o en la hoja
+    // de acá) — terminar NO la vuelve a escribir, así no pisa lo cargado.
     await r.terminar()
     // al terminar, meta se limpia → RecorridaPage vuelve al selector
   }
@@ -1071,41 +1077,46 @@ function Cierre({
           )}
         </div>
 
-        {/* Lluvia: stepper de a 5 mm, sin teclado */}
-        <div className="c-panel p-3.5">
-          <CLabel className="mb-2 flex items-center gap-1.5 !text-[12px]">
-            <CloudRain className="size-4 text-[var(--c-ok-deep)]" /> Lluvia de hoy · opcional
-          </CLabel>
-          <div className="flex items-stretch gap-1.5">
+        {/* Lluvia: se muestra lo ya contestado. Si falta, un toque abre la
+            MISMA hoja que en la recorrida (con "No llovió" de primera clase). */}
+        {lluvia != null ? (
+          <div className="c-panel flex items-center gap-2.5 px-4 py-3">
+            <CloudRain className="size-[18px] shrink-0 text-[var(--c-ok-deep)]" />
+            <span className="flex-1 text-[15px] font-semibold text-[var(--c-ink)]">
+              {lluvia === 0 ? 'No llovió hoy' : `Llovió ${lluvia} mm`}
+            </span>
             <button
               type="button"
-              onClick={() => setMm((v) => Math.max(0, (v ?? 0) - 5))}
-              aria-label="Restar lluvia"
-              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
+              onClick={() => setLluviaAbierta(true)}
+              className="c-label rounded-lg border border-[var(--c-line-strong)] px-3 py-2 !text-[11px] !text-[var(--c-ink-soft)]"
             >
-              <Minus className="size-5" strokeWidth={2.5} />
-            </button>
-            <div className="flex h-12 min-w-0 flex-1 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-sunk)]">
-              <span
-                className={cn(
-                  'c-mono text-[22px] font-bold',
-                  mm != null ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
-                )}
-              >
-                {mm != null ? `${mm} mm` : '— mm'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMm((v) => (v ?? 0) + 5)}
-              aria-label="Sumar lluvia"
-              className="c-hard-sm flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
-            >
-              <Plus className="size-5" strokeWidth={2.5} />
+              Cambiar
             </button>
           </div>
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setLluviaAbierta(true)}
+            className="c-panel flex items-center gap-2.5 px-4 py-3.5 text-left"
+          >
+            <CloudRain className="size-[18px] shrink-0 text-[var(--c-warn-deep)]" />
+            <span className="flex-1 text-[15px] font-semibold text-[var(--c-ink)]">
+              ¿Llovió hoy? Anotalo
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
+          </button>
+        )}
       </div>
+
+      <LluviaSheet
+        open={lluviaAbierta}
+        valor={lluvia}
+        onCerrar={() => setLluviaAbierta(false)}
+        onGuardar={(mm) => {
+          void r.setLluvia(mm)
+          setLluviaAbierta(false)
+        }}
+      />
 
       {/* Acciones (footer fijo) */}
       <div className="flex shrink-0 flex-col gap-2 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-4 pt-3">

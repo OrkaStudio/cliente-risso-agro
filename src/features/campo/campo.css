@@ -15,10 +15,13 @@
   --c-line: #e4e7e1;        /* hairline (= --border) */
   --c-line-strong: #cdd3ca; /* borde de control (tap target visible) */
 
-  /* Tinta */
+  /* Tinta. El tono más tenue igual DEBE leerse al sol: #646f68 mide 4.56:1
+     sobre el fondo y 5.23:1 sobre panel (WCAG AA ≥ 4.5). El #828e85 anterior
+     estaba en 2.97:1 y se lavaba — la investigación de apps agro pide 4.5
+     mínimo para el mediodía. Sigue siendo el tier más tenue (ink-soft = 7.56). */
   --c-ink: #131b16;
   --c-ink-soft: #4b5750;
-  --c-faint: #828e85;
+  --c-faint: #646f68;
 
   /* Semánticos de campo (= acentos de Oficina) */
   --c-ok: #178a55;          /* verde campo */
