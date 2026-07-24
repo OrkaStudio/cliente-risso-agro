@@ -37,23 +37,23 @@ export type CampoColor = { hex: string; nombre: string; letra: string }
 // SIN verde ni marrón (ni sus variantes oliva/teja): se confunden con el pasto
 // y la tierra en el campo, y el verde ya es el color de "hecho" en el croquis.
 // idx 0 (Amarillo) y 1 (Azul) se conservan para no mover Don Gilberto/La Porteña.
-// Colores para MÁXIMA diferencia entre campos — sin verde ni marrón. A-D se
-// mantienen (amarillo, azul, violeta, naranja: ya bien distintos); E-J se
-// eligieron para no repetir familia casi igual (antes había 3 rosas y 3 azules
-// casi idénticos). Se alternan cálido/frío para que campos consecutivos
-// contrasten, y los de la misma familia se separan por brillo (cian claro vs
-// índigo oscuro; violeta vs magenta vs rosa).
+// Paleta VIBRANTE y variada — sin verde (pasto) ni marrón (tierra). 5 cálidos
+// + 5 fríos bien repartidos por todo el círculo (oro, naranja, coral, rojo,
+// fucsia / azul, turquesa, índigo, púrpura, celeste) para que NO sea todo
+// rojo-azul-violeta. Ordenados cálido/frío alternado: campos consecutivos
+// contrastan al máximo. Los de familia parecida se separan por brillo (azul
+// medio vs celeste claro vs turquesa; índigo oscuro vs púrpura).
 const PALETA: { hex: string; nombre: string }[] = [
-  { hex: '#e7b41f', nombre: 'Amarillo' },
-  { hex: '#3b7dd8', nombre: 'Azul' },
-  { hex: '#7c5cc4', nombre: 'Violeta' },
-  { hex: '#e07b39', nombre: 'Naranja' },
-  { hex: '#d92d2d', nombre: 'Rojo' },
-  { hex: '#17a3bd', nombre: 'Cian' },
-  { hex: '#e24f9e', nombre: 'Rosa' },
-  { hex: '#2e3a8c', nombre: 'Índigo' },
-  { hex: '#b23bb0', nombre: 'Magenta' },
-  { hex: '#79b0e0', nombre: 'Celeste' },
+  { hex: '#f5b301', nombre: 'Oro' },
+  { hex: '#2e7df7', nombre: 'Azul' },
+  { hex: '#fb6107', nombre: 'Naranja' },
+  { hex: '#08bdba', nombre: 'Turquesa' },
+  { hex: '#f72585', nombre: 'Fucsia' },
+  { hex: '#4f46e5', nombre: 'Índigo' },
+  { hex: '#e5383b', nombre: 'Rojo' },
+  { hex: '#9333ea', nombre: 'Púrpura' },
+  { hex: '#ff8c42', nombre: 'Coral' },
+  { hex: '#38bdf8', nombre: 'Celeste' },
 ]
 /** Letra del campo por su índice: 0→A, 1→B, … Wrappea a AA, AB… por si acaso. */
 function letraDeIndice(i: number): string {
