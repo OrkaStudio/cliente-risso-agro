@@ -45,7 +45,7 @@ import { cn } from '@/lib/utils'
 type Rect = { top: number; left: number; width: number; height: number }
 
 /** Margen de la luz alrededor del elemento señalado. */
-const PAD = 6
+const PAD = 8
 /** Ancho del bloque de narración (px, en espacio zoomeado). */
 const CAP_W = 380
 /** Alto inicial estimado del bloque hasta que el ResizeObserver lo mide. */
@@ -352,10 +352,27 @@ function Escena({
           </filter>
           <mask id="guia-luz">
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
+            {/* Pluma exterior: borde de luz difuminado. */}
             <motion.rect
               fill="black"
               rx={20}
               filter="url(#guia-pluma)"
+              initial={false}
+              animate={{
+                x: luz.x,
+                y: luz.y,
+                width: luz.width,
+                height: luz.height,
+              }}
+              transition={VIAJE}
+            />
+            {/* Núcleo sólido: el blur difumina hacia adentro también y en
+                elementos chicos (un botón) el centro quedaba semi-velado,
+                "apagado". Este rect sin blur garantiza el interior 100%
+                despejado; la pluma de arriba queda solo como halo. */}
+            <motion.rect
+              fill="black"
+              rx={14}
               initial={false}
               animate={{
                 x: luz.x,
