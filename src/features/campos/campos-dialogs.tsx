@@ -146,19 +146,24 @@ export function CampoFormDialog({
 export function PotreroFormDialog({
   empresaId,
   campoId,
+  letra,
   potrero,
   triggerLabel,
   triggerVariant = 'default',
 }: {
   empresaId: string
   campoId: string
+  /** Letra FIJA del campo (la fuerza el trigger igual; acá es para mostrarla). */
+  letra: string
   potrero?: Potrero
   triggerLabel: string
   triggerVariant?: 'default' | 'outline'
 }) {
   const editing = !!potrero
   const [open, setOpen] = useState(false)
-  const nombre = potrero?.nombre ?? ''
+  // Solo el NÚMERO se edita; la letra es fija. Al editar, se toma el número del
+  // nombre actual (ej. "5B" → "5").
+  const [numero, setNumero] = useState(potrero?.nombre.match(/^\d+/)?.[0] ?? '')
   const [estadoCiclo, setEstadoCiclo] = useState(
     potrero?.estado_ciclo ?? 'ganadero',
   )
@@ -174,19 +179,22 @@ export function PotreroFormDialog({
     e.preventDefault()
     setError(null)
     try {
+      // Se manda número+letra; el trigger fuerza la letra del campo igual. Si el
+      // número va vacío (solo al crear), el trigger pone el siguiente.
+      const nombre = `${numero.trim()}${letra}`
       if (editing) {
         await actualizar.mutateAsync({
           id: potrero.id,
+          nombre,
           estadoCiclo,
           hectareas: parseHa(hectareas),
         })
         toast.success('Potrero actualizado')
       } else {
-        // El nombre lo asigna el sistema (trigger): letra del campo + número.
         await crear.mutateAsync({
           empresaId,
           campoId,
-          nombre: '',
+          nombre,
           estadoCiclo,
           hectareas: parseHa(hectareas),
         })
@@ -220,19 +228,27 @@ export function PotreroFormDialog({
           </Button>
         }
       >
-        {/* El nombre lo asigna el sistema (letra del campo + número) y no se
-            edita: en editar se muestra fijo; en crear, un aviso. */}
+        {/* El NÚMERO lo elige el productor; la LETRA es la del campo y no se
+            cambia (la fuerza la DB). Se muestra fija al lado del número. */}
         <motion.div variants={formItem} className="grid gap-2">
-          <Label>Nombre</Label>
-          {editing ? (
-            <div className="flex h-10 items-center rounded-lg border border-border bg-secondary px-3 text-[15px] font-bold text-ink">
-              {nombre}
-            </div>
-          ) : (
-            <p className="rounded-lg border border-dashed border-border bg-secondary/50 px-3 py-2 text-[13px] text-muted-foreground">
-              Se asigna solo: la letra del campo + el siguiente número.
-            </p>
-          )}
+          <Label htmlFor="potrero-num">Número de potrero</Label>
+          <div className="flex items-stretch gap-2">
+            <Input
+              id="potrero-num"
+              inputMode="numeric"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value.replace(/\D/g, ''))}
+              placeholder={editing ? '' : 'siguiente'}
+              autoFocus
+              className="flex-1"
+            />
+            <span className="flex min-w-11 items-center justify-center rounded-lg bg-secondary px-3 text-[17px] font-bold text-ink">
+              {letra}
+            </span>
+          </div>
+          <p className="text-[12px] text-muted-foreground">
+            La letra <b>{letra}</b> es del campo y no se cambia.
+          </p>
         </motion.div>
         <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">

@@ -335,6 +335,7 @@ export function PotreroDetailPage() {
             <PotreroFormDialog
               empresaId={empresaId}
               campoId={data.campoId}
+              letra={data.nombre.match(/[A-Za-z]+$/)?.[0]?.toUpperCase() ?? 'A'}
               potrero={{
                 id: data.id,
                 nombre: data.nombre,

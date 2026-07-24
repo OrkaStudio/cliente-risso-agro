@@ -460,25 +460,32 @@ export function CampoMapaReal({
         toast.error(`No puede superponerse al potrero ${clash}`)
         return
       }
-      // El nombre lo asigna el SISTEMA (no se elige): letra del campo + el
-      // siguiente número. Se muestra para confirmar; la DB lo blinda igual.
+      // El NÚMERO lo elige el productor (pre-cargado con el siguiente); la LETRA
+      // es la del campo y no se cambia (la DB la fuerza igual).
+      const letra = campo.color.letra
       const nums = potrerosRef.current
         .map((p) => parseInt(String(p.nombre).match(/^\d+/)?.[0] ?? '', 10))
         .filter((n) => Number.isFinite(n))
-      const numero = `${(nums.length ? Math.max(...nums) : 0) + 1}${campo.color.letra}`
+      const sugerido = String((nums.length ? Math.max(...nums) : 0) + 1)
       const box = L.DomUtil.create('div', 'potrero-input')
       box.innerHTML =
-        `<label>Nuevo potrero</label>` +
-        `<div class="pi-row"><span class="pi-name">${numero}</span><button class="pi-ok" type="button">Guardar</button></div>`
+        `<label>Número de potrero</label>` +
+        `<div class="pi-row"><input class="pi-field" inputmode="numeric" value="${sugerido}" />` +
+        `<span class="pi-name">${letra}</span>` +
+        `<button class="pi-ok" type="button">Guardar</button></div>`
       L.DomEvent.disableClickPropagation(box)
+      const field = box.querySelector('.pi-field') as HTMLInputElement
       const okBtn = box.querySelector('.pi-ok') as HTMLButtonElement
       const popup = L.popup({ className: 'potrero-popup', closeButton: true })
         .setLatLng(raw.getBounds().getCenter())
         .setContent(box)
         .openOn(map)
+      setTimeout(() => field.select(), 60)
       let saved = false
       const commit = async () => {
         if (saved) return
+        const n = field.value.trim().replace(/\D/g, '') || sugerido
+        const numero = `${n}${letra}`
         saved = true
         okBtn.disabled = true
         okBtn.textContent = 'Guardando…'
@@ -497,6 +504,9 @@ export function CampoMapaReal({
         }
       }
       okBtn.addEventListener('click', () => void commit())
+      field.addEventListener('keydown', (ev) => {
+        if ((ev as KeyboardEvent).key === 'Enter') void commit()
+      })
       map.on('popupclose', function onClose(ev: L.PopupEvent) {
         if (ev.popup !== popup) return
         map.off('popupclose', onClose)

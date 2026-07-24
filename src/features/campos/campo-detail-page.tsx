@@ -24,7 +24,7 @@ import {
 } from '@/features/hacienda/labels'
 import { useMovimientos } from '@/features/analitica/hooks'
 import { formatARS, porPotrero, resumen } from '@/features/analitica/compute'
-import { usoDeEstado, type Uso } from '@/features/campos/use-campo-mapa'
+import { colorDeCampo, usoDeEstado, type Uso } from '@/features/campos/use-campo-mapa'
 import { PotreroCard } from '@/features/potrero/potrero-card'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
@@ -628,6 +628,7 @@ export function CampoDetailPage() {
             <PotreroFormDialog
               empresaId={empresaId}
               campoId={campo.id}
+              letra={colorDeCampo(campo.color_idx).letra}
               triggerLabel="+ Nuevo potrero"
             />
             {campo.potreros.length > 0 && (
