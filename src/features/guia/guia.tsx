@@ -347,8 +347,10 @@ function Escena({
           sin marcos ni bordes verdes alrededor del elemento. */}
       <svg className="pointer-events-none fixed inset-0 h-full w-full">
         <defs>
+          {/* Pluma sutil: desenfoque solo en los bordes (Lau prefirió el halo
+              chico, no el resplandor grande). */}
           <filter id="guia-pluma" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="16" />
+            <feGaussianBlur stdDeviation="7" />
           </filter>
           <mask id="guia-luz">
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
