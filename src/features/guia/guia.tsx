@@ -16,6 +16,7 @@ import {
   type SeccionGuia,
 } from '@/features/guia/pasos'
 import { rootZoom } from '@/lib/zoom'
+import { cn } from '@/lib/utils'
 
 /**
  * Guía asistida por sección (tour de coach marks sobre la UI real).
@@ -39,7 +40,7 @@ type Rect = { top: number; left: number; width: number; height: number }
 /** Margen del spotlight alrededor del elemento resaltado. */
 const PAD = 6
 /** Ancho máximo de la tarjeta (px, en espacio zoomeado). */
-const CARD_W = 380
+const CARD_W = 408
 /** Alto estimado de la burbuja para decidir arriba/abajo antes de medirla.
  *  Con header + texto + CTA ronda los 250px — quedarse corto acá hacía que
  *  eligiera "abajo" sin lugar y la tarjeta se cortara con el borde. */
@@ -137,10 +138,16 @@ function GuiaSeccion({
   }, [guia])
 
   // Primera visita a la sección: auto-arranca tras dejar renderizar la página
-  // (el timeout también difiere el setState — regla del repo).
+  // (el timeout también difiere el setState — regla del repo). Se marca "vista"
+  // apenas se MUESTRA (no solo al cerrar): así aparece UNA vez por sección, aunque
+  // el usuario navegue a otra pantalla sin cerrarla. El botón de la topbar la
+  // relanza cuando quiera.
   React.useEffect(() => {
     if (guiaVista(seccion, userId)) return
-    const t = setTimeout(() => abrir(), 700)
+    const t = setTimeout(() => {
+      abrir()
+      marcarGuiaVista(seccion, userId)
+    }, 700)
     return () => clearTimeout(t)
   }, [seccion, userId, abrir])
 
@@ -207,10 +214,15 @@ function GuiaSeccion({
     }
   }
 
-  // Posición de la tarjeta: centrada (paso sin ancla), pegada al hueco (abajo
-  // si entra, arriba si no), o fija abajo al centro cuando el hueco ocupa casi
-  // toda la pantalla y no queda lugar ni arriba ni abajo.
-  let cardStyle: React.CSSProperties
+  // Posición de la tarjeta. IMPORTANTE: la animación (framer-motion) controla el
+  // `transform`, así que NUNCA se centra con transform (lo pisa y la tarjeta cae
+  // abajo-derecha — el bug de "descentrado"). Cuando hay ancla se posiciona con
+  // left/top puros; sin ancla (bienvenida) o con el hueco a pantalla casi
+  // completa, se centra con FLEXBOX en un contenedor aparte.
+  const ancho = Math.min(CARD_W, vw - MARGEN * 2)
+  let cardStyle: React.CSSProperties = { position: 'fixed', width: ancho }
+  // modo: 'ancla' (posición calc.) · 'centro' (flex-center) · 'abajo' (flex-bottom)
+  let modo: 'ancla' | 'centro' | 'abajo' = 'centro'
   if (hueco) {
     const abajo = vh - (hueco.top + hueco.height)
     const arriba = hueco.top
@@ -218,20 +230,16 @@ function GuiaSeccion({
       Math.max(hueco.left + hueco.width / 2 - CARD_W / 2, MARGEN),
       vw - CARD_W - MARGEN,
     )
-    const ancho = Math.min(CARD_W, vw - MARGEN * 2)
     if (abajo >= CARD_H_EST + MARGEN) {
+      modo = 'ancla'
       cardStyle = {
         position: 'fixed',
         width: ancho,
         left,
-        // Clamp: aunque la burbuja real supere el estimado, nunca puede
-        // pasarse del borde de la pantalla.
-        top: Math.min(
-          hueco.top + hueco.height + PAD + 12,
-          vh - CARD_H_EST - MARGEN,
-        ),
+        top: Math.min(hueco.top + hueco.height + PAD + 12, vh - CARD_H_EST - MARGEN),
       }
     } else if (arriba >= CARD_H_EST + MARGEN) {
+      modo = 'ancla'
       cardStyle = {
         position: 'fixed',
         width: ancho,
@@ -239,22 +247,8 @@ function GuiaSeccion({
         bottom: Math.max(vh - hueco.top + PAD + 12, MARGEN),
       }
     } else {
-      // Hueco casi a pantalla completa: la tarjeta flota abajo, sobre el hueco.
-      cardStyle = {
-        position: 'fixed',
-        width: ancho,
-        left: '50%',
-        bottom: MARGEN,
-        transform: 'translateX(-50%)',
-      }
-    }
-  } else {
-    cardStyle = {
-      position: 'fixed',
-      width: Math.min(CARD_W, vw - MARGEN * 2),
-      left: '50%',
-      top: '50%',
-      transform: 'translate(-50%, -50%)',
+      // Hueco casi a pantalla completa: la tarjeta flota abajo al centro.
+      modo = 'abajo'
     }
   }
 
@@ -289,9 +283,20 @@ function GuiaSeccion({
         {/* Bloquea interacción con la página mientras la guía está abierta. */}
         <div className="fixed inset-0" onClick={cerrar} />
 
-        {/* Burbuja del asistente: viaja de paso a paso (entra con blur+spring,
-            el spotlight vuela con ella), el texto se ESCRIBE como un chat y
-            los controles son chips de respuesta rápida. */}
+        {/* Burbuja del asistente. El wrapper centra con FLEXBOX cuando no hay
+            ancla (o el hueco es enorme) — así el `transform` de la animación no
+            pelea con el centrado. Con ancla, `display: contents` lo hace
+            transparente y la tarjeta se posiciona sola con left/top. */}
+        <div
+          className={
+            modo === 'ancla'
+              ? 'contents'
+              : cn(
+                  'pointer-events-none fixed inset-0 flex justify-center p-4',
+                  modo === 'centro' ? 'items-center' : 'items-end',
+                )
+          }
+        >
         <AnimatePresence mode="wait">
           <motion.div
             key={idx}
@@ -299,32 +304,47 @@ function GuiaSeccion({
             animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: -10, scale: 0.98, filter: 'blur(4px)' }}
             transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-            style={cardStyle}
-            className="overflow-hidden rounded-[22px] border border-border bg-card shadow-[0_24px_70px_rgba(10,20,14,0.4)]"
+            style={modo === 'ancla' ? cardStyle : { width: ancho }}
+            className={cn(
+              'overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_28px_80px_rgba(10,20,14,0.42)]',
+              modo !== 'ancla' && 'pointer-events-auto',
+            )}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Firma del asistente: hairline degradé vivo */}
             <div className="h-[3px] w-full bg-gradient-to-r from-field via-lima to-sky" />
-            <div className="p-5">
-              <div className="flex items-center gap-2.5">
+            <div className="p-6">
+              <div className="flex items-center gap-3">
                 <Orbe />
                 <div className="min-w-0 flex-1 leading-tight">
-                  <div className="text-[13px] font-bold text-ink">Asistente</div>
-                  <div className="truncate text-[10.5px] font-bold uppercase tracking-[0.11em] text-faint">
-                    {guia.nombre} · paso {nroActual} de {visibles.length}
+                  <div className="text-[14px] font-bold text-ink">Asistente</div>
+                  <div className="mt-0.5 text-[11px] font-medium text-faint">
+                    {guia.nombre}
                   </div>
+                </div>
+                {/* Progreso: puntitos, más limpio que "PASO 1 DE 5". */}
+                <div className="flex shrink-0 items-center gap-1" aria-label={`Paso ${nroActual} de ${visibles.length}`}>
+                  {visibles.map((_, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        'block size-1.5 rounded-full transition-colors',
+                        i + 1 === nroActual ? 'bg-field-deep' : 'bg-border',
+                      )}
+                    />
+                  ))}
                 </div>
                 <button
                   type="button"
                   onClick={cerrar}
                   aria-label="Cerrar el asistente"
-                  className="-mr-1 flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
+                  className="-mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
                 >
                   <X className="size-4" />
                 </button>
               </div>
 
-              <h2 className="mt-3 font-heading text-[19px] font-bold leading-snug text-ink">
+              <h2 className="mt-4 font-heading text-[21px] font-bold leading-tight text-ink">
                 {paso.titulo}
               </h2>
               <TextoStream texto={paso.texto} />
@@ -392,6 +412,7 @@ function GuiaSeccion({
             </div>
           </motion.div>
         </AnimatePresence>
+        </div>
       </div>
     </MotionConfig>,
     document.body,
@@ -431,7 +452,7 @@ export function TextoStream({ texto }: { texto: string }) {
       variants={{
         visible: { transition: { staggerChildren: 0.026, delayChildren: 0.12 } },
       }}
-      className="mt-1.5 text-[14.5px] leading-relaxed text-muted-foreground"
+      className="mt-2 text-[15px] leading-relaxed text-muted-foreground"
     >
       {palabras.map((p, i) => (
         <motion.span
