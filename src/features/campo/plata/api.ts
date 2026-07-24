@@ -76,7 +76,7 @@ export async function fetchRefs(): Promise<{
       .from('categoria_movimiento')
       .select('id, nombre, aplica_a')
       .order('nombre'),
-    supabase.from('campo').select('id, nombre, empresa_id').order('nombre'),
+    supabase.from('campo').select('id, nombre, empresa_id').order('color_idx'),
   ])
   if (catsRes.error) throw catsRes.error
   if (camposRes.error) throw camposRes.error

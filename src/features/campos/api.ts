@@ -48,7 +48,9 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
     { data: stock, error: eS },
     { data: animales, error: eA },
   ] = await Promise.all([
-    supabase.from('campo').select('id, nombre, tipo, hectareas, color_idx').order('nombre'),
+    // Orden por color_idx = orden de la letra (A, B, C…), coherente con las
+    // letras de los potreros (Toimil=C va antes que Los Pampas=D).
+    supabase.from('campo').select('id, nombre, tipo, hectareas, color_idx').order('color_idx'),
     supabase
       .from('potrero')
       .select(

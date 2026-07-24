@@ -81,7 +81,9 @@ export async function fetchRefs(): Promise<{
   potreros: (PotreroRec & { campo_id: string })[]
 }> {
   const [camposRes, potrerosRes, stockRes, obsRes] = await Promise.all([
-    supabase.from('campo').select('id, nombre, empresa_id, color_idx').order('nombre'),
+    // Orden por color_idx = orden de la letra (A, B, C…): la lista de campos
+    // queda coherente con las letras de sus potreros en toda la app.
+    supabase.from('campo').select('id, nombre, empresa_id, color_idx').order('color_idx'),
     supabase
       .from('potrero')
       .select('id, nombre, estado_ciclo, campo_id, poligono')

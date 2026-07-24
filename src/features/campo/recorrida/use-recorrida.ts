@@ -539,7 +539,8 @@ export function useRecorrida() {
         color: colorCampo(s.campo_id),
       }
     })
-    .sort((a, b) => ordenNatural(a.campoNombre, b.campoNombre))
+    // Orden por letra (A, B, C…) = coherente con el resto de la app.
+    .sort((a, b) => a.color.letra.localeCompare(b.color.letra))
 
   const sinSubir = todoElOutbox.filter((o) => o.estado === 'pendiente').length
   const errores = todoElOutbox.filter((o) => o.estado === 'error')
