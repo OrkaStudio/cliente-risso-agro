@@ -272,13 +272,12 @@ function Escena({
     }
   }
 
-  // Destino de la narración. Debajo del elemento si hay lugar; arriba si no.
-  // Con un hueco casi a pantalla completa cae abajo al centro SOBRE la zona
-  // iluminada → ese caso lleva un scrim para que el texto blanco se lea.
+  // Destino de la narración. Debajo del elemento si hay lugar; arriba si no;
+  // con un hueco casi a pantalla completa, abajo al centro (el scrim propio
+  // del bloque garantiza que se lea también sobre la zona iluminada).
   const ancho = Math.min(CAP_W, vw - MARGEN * 2)
   let capX = (vw - ancho) / 2
   let capY = Math.max(vh / 2 - capH / 2 - 40, MARGEN)
-  let sobreLuz = false
   if (hueco) {
     capX = Math.min(
       Math.max(hueco.left + hueco.width / 2 - ancho / 2, MARGEN),
@@ -291,7 +290,6 @@ function Escena({
       capY = hueco.top - PAD - 20 - capH
     } else {
       capY = vh - capH - MARGEN
-      sobreLuz = true
     }
   }
   // Pase lo que pase, el bloque queda entero a la vista.
@@ -313,6 +311,25 @@ function Escena({
   const nroActual = visibles.indexOf(paso) + 1
   const esUltimo = nroActual === visibles.length
   const esPrimero = nroActual <= 1
+
+  // La narración arranca recién cuando el usuario YA ESTÁ situado: primero el
+  // viaje (scroll + luz), después la escritura — si no, todo choca. `listo` se
+  // enciende 500 ms después de que la luz dejó de moverse (cada movimiento
+  // resetea el timer). El reset por paso es ajuste de estado durante render.
+  const [vistoIdx, setVistoIdx] = React.useState(idx)
+  const [listo, setListo] = React.useState(false)
+  const [finNarracion, setFinNarracion] = React.useState(false)
+  if (vistoIdx !== idx) {
+    setVistoIdx(idx)
+    setListo(false)
+    setFinNarracion(false)
+  }
+  // Bucket de 8px: el jitter de re-mediciones no resetea el timer.
+  const luzKey = `${idx}:${Math.round(luz.x / 8)}:${Math.round(luz.y / 8)}:${Math.round(luz.width / 8)}`
+  React.useEffect(() => {
+    const t = setTimeout(() => setListo(true), 500)
+    return () => clearTimeout(t)
+  }, [luzKey])
 
   return (
     <motion.div
@@ -367,16 +384,12 @@ function Escena({
         onClick={() => ir(idx, 1)}
       />
 
-      {/* Narración viajera: SIN card. El texto se escribe a máquina directo
-          sobre el velo oscuro y viaja con la luz. Solo cuando cae sobre la
-          zona iluminada (hueco gigante) lleva un scrim para leerse. */}
+      {/* Narración viajera: SIN card blanca — un scrim oscuro parejo (siempre,
+          no a veces: quedaba inconsistente) con el texto escribiéndose a
+          máquina. Viaja con la luz. */}
       <motion.div
         ref={capRef}
-        className={cn(
-          'pointer-events-auto fixed',
-          sobreLuz &&
-            'rounded-[20px] bg-[rgba(11,20,15,0.78)] p-5 backdrop-blur-md',
-        )}
+        className="pointer-events-auto fixed rounded-[20px] bg-[rgba(11,20,15,0.78)] p-5 backdrop-blur-md"
         style={{ width: ancho }}
         initial={{ opacity: 0, left: capX, top: capY }}
         animate={{ opacity: 1, left: capX, top: capY }}
@@ -392,26 +405,28 @@ function Escena({
           <div className="flex items-start gap-3">
             <Orbe />
             <div className="min-w-0 flex-1 pt-0.5">
-              <h2
-                className="font-heading text-[19px] font-bold leading-snug text-white"
-                style={{ textShadow: '0 2px 18px rgba(0,0,0,0.5)' }}
-              >
+              <h2 className="font-heading text-[19px] font-bold leading-snug text-white">
                 {paso.titulo}
               </h2>
               <TextoStream
                 texto={paso.texto}
+                activo={listo}
+                onFin={() => setFinNarracion(true)}
                 className="text-white/85"
-                style={{ textShadow: '0 1px 14px rgba(0,0,0,0.5)' }}
               />
 
               {/* Acción del paso: el asistente no solo señala — abre el
-                  formulario o dispara la herramienta ahí mismo. */}
+                  formulario o dispara la herramienta ahí mismo. Aparece
+                  cuando la narración terminó de escribirse. */}
               {paso.accion && (
                 <motion.button
                   type="button"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
+                  initial={false}
+                  animate={{
+                    opacity: finNarracion ? 1 : 0,
+                    y: finNarracion ? 0 : 4,
+                  }}
+                  style={{ pointerEvents: finNarracion ? 'auto' : 'none' }}
                   onClick={() => {
                     const destino = paso.accion!.click
                     cerrar()
@@ -506,69 +521,96 @@ export function Orbe() {
   )
 }
 
-/** El texto del paso se ESCRIBE carácter por carácter, máquina de escribir
- *  con cursor, como un asistente que narra en vivo. Solo opacidad (cero
- *  reflow: el texto completo reserva su lugar desde el arranque); respeta
- *  reduced-motion vía el MotionConfig del overlay. Lo usa también el panel. */
+/** Milisegundos por carácter de la máquina de escribir. */
+const MS_POR_CHAR = 14
+
+/** El texto del paso se ESCRIBE como una máquina de escribir DE VERDAD: los
+ *  caracteres se agregan de a uno y el cursor va pegado a lo último escrito
+ *  (sólido mientras escribe — nada de palito titilando suelto al principio o
+ *  al final — y desaparece al terminar). El texto completo reserva su lugar
+ *  invisible desde el arranque, así el bloque no cambia de alto mientras
+ *  escribe. `activo` difiere el arranque (ej.: hasta que la luz llegó).
+ *  Con reduced-motion el texto aparece entero al instante.
+ *  Lo usa también el panel del asistente. */
 export function TextoStream({
   texto,
+  activo = true,
+  onFin,
   className,
   style,
 }: {
   texto: string
+  /** La escritura arranca recién cuando pasa a true (default: enseguida). */
+  activo?: boolean
+  /** Se llama una vez cuando terminó de escribirse el texto completo. */
+  onFin?: () => void
   className?: string
   style?: React.CSSProperties
 }) {
-  const chars = React.useMemo(() => [...texto], [texto])
-  // El cursor parpadea mientras "escribe" y desaparece al terminar. El reset
-  // ante texto nuevo es ajuste de estado DURANTE el render (patrón de React
-  // para "state from props"), no un setState sincrónico en un effect.
-  const [escribiendo, setEscribiendo] = React.useState(true)
-  const [prevChars, setPrevChars] = React.useState(chars)
-  if (prevChars !== chars) {
-    setPrevChars(chars)
-    setEscribiendo(true)
+  const instantaneo = React.useMemo(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+  const [n, setN] = React.useState(0)
+  // Reset ante texto nuevo: ajuste de estado DURANTE el render (patrón de
+  // React para "state from props"), no un setState sincrónico en un effect.
+  const [prevTexto, setPrevTexto] = React.useState(texto)
+  if (prevTexto !== texto) {
+    setPrevTexto(texto)
+    setN(0)
   }
+
   React.useEffect(() => {
-    const durMs = (0.15 + chars.length * 0.011) * 1000 + 250
-    const t = setTimeout(() => setEscribiendo(false), durMs)
+    if (!activo || instantaneo) return
+    const iv = setInterval(() => {
+      setN((v) => {
+        if (v >= texto.length) {
+          clearInterval(iv)
+          return v
+        }
+        return v + 1
+      })
+    }, MS_POR_CHAR)
+    return () => clearInterval(iv)
+  }, [activo, instantaneo, texto])
+
+  // Aviso de fin (para el CTA del paso): por timer, no por setState sync.
+  // El ref se actualiza en un effect (no en render — regla del linter); corre
+  // antes que el timer de abajo dispare, así siempre llama al onFin vigente.
+  const onFinRef = React.useRef(onFin)
+  React.useEffect(() => {
+    onFinRef.current = onFin
+  }, [onFin])
+  React.useEffect(() => {
+    if (!activo) return
+    const durMs = instantaneo ? 0 : texto.length * MS_POR_CHAR + 120
+    const t = setTimeout(() => onFinRef.current?.(), durMs)
     return () => clearTimeout(t)
-  }, [chars])
+  }, [activo, instantaneo, texto])
+
+  const mostrado = instantaneo && activo ? texto.length : n
+  const escribiendo = activo && !instantaneo && mostrado < texto.length
+
   return (
-    <motion.p
-      initial="oculto"
-      animate="visible"
-      variants={{
-        visible: { transition: { staggerChildren: 0.011, delayChildren: 0.15 } },
-      }}
+    <p
+      aria-label={texto}
       className={cn(
-        'mt-1 text-[14.5px] leading-relaxed',
+        'relative mt-1 text-[14.5px] leading-relaxed',
         className ?? 'text-muted-foreground',
       )}
       style={style}
     >
-      {chars.map((c, i) => (
-        <motion.span
-          key={i}
-          variants={{
-            oculto: { opacity: 0 },
-            visible: { opacity: 1, transition: { duration: 0.01 } },
-          }}
-        >
-          {c}
-        </motion.span>
-      ))}
-      {escribiendo && (
-        <motion.span
-          aria-hidden
-          className="ml-0.5 inline-block"
-          animate={{ opacity: [1, 0, 1] }}
-          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-        >
-          ▍
-        </motion.span>
-      )}
-    </motion.p>
+      {/* El texto entero, invisible: reserva el alto/ancho definitivos. */}
+      <span aria-hidden className="invisible">
+        {texto}
+      </span>
+      {/* Lo escrito hasta ahora, superpuesto (misma tipografía → mismos
+          cortes de línea), con el cursor pegado al último carácter. */}
+      <span aria-hidden className="absolute inset-0">
+        {texto.slice(0, mostrado)}
+        {escribiendo && <span className="opacity-90">▍</span>}
+      </span>
+    </p>
   )
 }
 
