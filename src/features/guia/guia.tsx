@@ -16,15 +16,17 @@ import {
   type SeccionGuia,
 } from '@/features/guia/pasos'
 import { rootZoom } from '@/lib/zoom'
+import { cn } from '@/lib/utils'
 
 /**
  * Recorrido asistido por sección (Modo Oficina).
  *
- * No es un tour de tarjetas: es un VIAJE. Un único velo con una luz de borde
- * difuminado (SVG + máscara con blur) se desliza de elemento a elemento con
- * spring; la caption del asistente viaja con la luz (nunca se desmonta entre
- * pasos) y el texto se escribe al llegar. Tocar la página avanza — el clic
- * acompaña el viaje, no lo corta.
+ * No es un tour de tarjetas: es un VIAJE narrado. Un único velo con una luz de
+ * borde difuminado (SVG + máscara con blur) se desliza de elemento a elemento
+ * con spring; el texto del asistente se ESCRIBE directo sobre el velo oscuro
+ * (máquina de escribir, sin card) y viaja con la luz. Tocar la página avanza —
+ * el clic acompaña el viaje, no lo corta. Al terminar, la página vuelve arriba
+ * del todo: el recorrido no deja al usuario situado en cualquier lado.
  *
  * Implementación propia, sin lib de tours: driver.js/react-joyride posicionan
  * con getBoundingClientRect sin dividir por el zoom global 1.06 → spotlight
@@ -36,22 +38,23 @@ import { rootZoom } from '@/lib/zoom'
  * - Un paso cuyo ancla no está en el DOM (panel que no renderiza sin datos)
  *   se saltea solo — el recorrido funciona con la sección vacía.
  * - Navegar a otra sección desmonta el recorrido por `key`.
- * - IMPORTANTE: la caption se posiciona con left/top que anima framer — nunca
- *   con transform CSS (framer controla `transform` y lo pisa).
+ * - IMPORTANTE: el bloque de narración se posiciona con left/top que anima
+ *   framer — nunca con transform CSS (framer controla `transform` y lo pisa).
  */
 
 type Rect = { top: number; left: number; width: number; height: number }
 
 /** Margen de la luz alrededor del elemento señalado. */
 const PAD = 6
-/** Ancho de la caption del asistente (px, en espacio zoomeado). */
-const CAP_W = 352
-/** Alto estimado de la caption para decidir arriba/abajo antes de medirla. */
-const CAP_H_EST = 200
+/** Ancho del bloque de narración (px, en espacio zoomeado). */
+const CAP_W = 380
+/** Alto inicial estimado del bloque hasta que el ResizeObserver lo mide. */
+const CAP_H_EST = 190
 const MARGEN = 16
-/** Color del velo que atenúa lo que no es el paso actual. */
-const VELO = 'rgba(13, 24, 17, 0.55)'
-/** Spring compartido del viaje: la luz, el halo y la caption se mueven juntos. */
+/** Color del velo. Más oscuro que un velo de modal: el texto blanco se narra
+ *  directo encima y necesita contraste. */
+const VELO = 'rgba(11, 20, 15, 0.68)'
+/** Spring compartido del viaje: la luz y la narración se mueven juntas. */
 const VIAJE = { type: 'spring', stiffness: 190, damping: 27 } as const
 
 function medirAncla(ancla: string): Rect | null {
@@ -116,6 +119,12 @@ function GuiaSeccion({
   const cerrar = React.useCallback(() => {
     setIdx(null)
     marcarGuiaVista(seccion, userId)
+    // Devolver la página arriba del todo: el recorrido scrolleó buscando
+    // anclas y no debe dejar al usuario situado en cualquier lado.
+    document
+      .querySelector('main')
+      ?.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [seccion, userId])
 
   // Navegación salteando pasos cuyo ancla no existe (sección vacía).
@@ -217,7 +226,7 @@ function GuiaSeccion({
   )
 }
 
-/** La escena del recorrido: velo con luz viajera + caption del asistente. */
+/** La escena del recorrido: velo con luz viajera + narración escrita encima. */
 function Escena({
   guia,
   paso,
@@ -237,8 +246,20 @@ function Escena({
   const vw = window.innerWidth / z
   const vh = window.innerHeight / z
 
+  // Alto REAL del bloque de narración (medido, no estimado): así nunca queda
+  // cortado abajo — el corte de "Saltar" fuera de pantalla venía de estimar.
+  const capRef = React.useRef<HTMLDivElement>(null)
+  const [capH, setCapH] = React.useState(CAP_H_EST)
+  React.useLayoutEffect(() => {
+    const el = capRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setCapH(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Un ancla más grande que la pantalla (ej. el mapa satelital) rompería la
-  // luz: el hueco se RECORTA a lo visible, así el velo y la caption siempre
+  // luz: el hueco se RECORTA a lo visible, así el velo y la narración siempre
   // tienen dónde vivir.
   let hueco: Rect | null = null
   if (rect) {
@@ -251,29 +272,33 @@ function Escena({
     }
   }
 
-  // Destino de la caption. Debajo del elemento si hay lugar; arriba si no; con
-  // un hueco casi a pantalla completa, flota abajo al centro. Sin ancla
-  // (bienvenida): centrada.
+  // Destino de la narración. Debajo del elemento si hay lugar; arriba si no.
+  // Con un hueco casi a pantalla completa cae abajo al centro SOBRE la zona
+  // iluminada → ese caso lleva un scrim para que el texto blanco se lea.
   const ancho = Math.min(CAP_W, vw - MARGEN * 2)
   let capX = (vw - ancho) / 2
-  let capY = Math.max(vh / 2 - 150, MARGEN)
+  let capY = Math.max(vh / 2 - capH / 2 - 40, MARGEN)
+  let sobreLuz = false
   if (hueco) {
     capX = Math.min(
       Math.max(hueco.left + hueco.width / 2 - ancho / 2, MARGEN),
       vw - ancho - MARGEN,
     )
     const abajo = vh - (hueco.top + hueco.height)
-    if (abajo >= CAP_H_EST + MARGEN) {
-      capY = hueco.top + hueco.height + PAD + 16
-    } else if (hueco.top >= CAP_H_EST + MARGEN) {
-      capY = hueco.top - PAD - 16 - CAP_H_EST
+    if (abajo >= capH + MARGEN + 20) {
+      capY = hueco.top + hueco.height + PAD + 20
+    } else if (hueco.top >= capH + MARGEN + 20) {
+      capY = hueco.top - PAD - 20 - capH
     } else {
-      capY = vh - CAP_H_EST - MARGEN
+      capY = vh - capH - MARGEN
+      sobreLuz = true
     }
   }
+  // Pase lo que pase, el bloque queda entero a la vista.
+  capY = Math.min(Math.max(capY, MARGEN), vh - capH - MARGEN)
 
   // La luz: el rect de la máscara. Sin ancla colapsa a un punto sobre la
-  // caption — el velo se cierra suave en vez de cortar a "velo pleno".
+  // narración — el velo se cierra suave en vez de cortar a "velo pleno".
   const luz = hueco
     ? {
         x: hueco.left - PAD,
@@ -301,7 +326,8 @@ function Escena({
       {/* Velo con la luz viajera: máscara SVG cuyo hueco (rect con blur de
           borde) se desliza con spring de un elemento al otro. Nada de 4
           paneles con bordes duros ni box-shadow gigante (Chromium a veces lo
-          omite al componer capas grandes). */}
+          omite al componer capas grandes). La luz difuminada ES el resaltado:
+          sin marcos ni bordes verdes alrededor del elemento. */}
       <svg className="pointer-events-none fixed inset-0 h-full w-full">
         <defs>
           <filter id="guia-pluma" x="-60%" y="-60%" width="220%" height="220%">
@@ -334,24 +360,6 @@ function Escena({
         />
       </svg>
 
-      {/* Halo tenue sobre el elemento señalado (viaja con la luz). */}
-      <motion.div
-        className="pointer-events-none fixed rounded-[18px]"
-        initial={false}
-        animate={{
-          left: luz.x,
-          top: luz.y,
-          width: luz.width,
-          height: luz.height,
-          opacity: hueco ? 1 : 0,
-        }}
-        transition={VIAJE}
-        style={{
-          boxShadow:
-            '0 0 0 1.5px color-mix(in srgb, var(--lima) 55%, transparent), 0 0 44px 6px color-mix(in srgb, var(--lima) 18%, transparent)',
-        }}
-      />
-
       {/* Tocar la página avanza: el clic acompaña el viaje, no lo corta.
           Para salir están "Saltar" y Escape. */}
       <div
@@ -359,107 +367,117 @@ function Escena({
         onClick={() => ir(idx, 1)}
       />
 
-      {/* Caption viajera del asistente: UNA sola burbuja liviana que se
-          desliza con la luz; adentro el contenido del paso hace crossfade y
-          el texto se escribe al llegar. */}
+      {/* Narración viajera: SIN card. El texto se escribe a máquina directo
+          sobre el velo oscuro y viaja con la luz. Solo cuando cae sobre la
+          zona iluminada (hueco gigante) lleva un scrim para leerse. */}
       <motion.div
-        className="pointer-events-auto fixed"
+        ref={capRef}
+        className={cn(
+          'pointer-events-auto fixed',
+          sobreLuz &&
+            'rounded-[20px] bg-[rgba(11,20,15,0.78)] p-5 backdrop-blur-md',
+        )}
         style={{ width: ancho }}
-        initial={{ opacity: 0, scale: 0.97, left: capX, top: capY }}
-        animate={{ opacity: 1, scale: 1, left: capX, top: capY }}
+        initial={{ opacity: 0, left: capX, top: capY }}
+        animate={{ opacity: 1, left: capX, top: capY }}
         transition={VIAJE}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="rounded-[20px] bg-white/95 p-5 shadow-[0_18px_60px_rgba(10,20,14,0.32)] ring-1 ring-black/5 backdrop-blur-xl">
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.28, delay: 0.05 }}
-          >
-            <div className="flex items-start gap-3">
-              <Orbe />
-              <div className="min-w-0 flex-1 pt-0.5">
-                <h2 className="font-heading text-[16.5px] font-bold leading-snug text-ink">
-                  {paso.titulo}
-                </h2>
-                <TextoStream texto={paso.texto} />
+        <motion.div
+          key={idx}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.28, delay: 0.05 }}
+        >
+          <div className="flex items-start gap-3">
+            <Orbe />
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h2
+                className="font-heading text-[19px] font-bold leading-snug text-white"
+                style={{ textShadow: '0 2px 18px rgba(0,0,0,0.5)' }}
+              >
+                {paso.titulo}
+              </h2>
+              <TextoStream
+                texto={paso.texto}
+                className="text-white/85"
+                style={{ textShadow: '0 1px 14px rgba(0,0,0,0.5)' }}
+              />
 
-                {/* Acción del paso: el asistente no solo señala — abre el
-                    formulario o dispara la herramienta ahí mismo. */}
-                {paso.accion && (
-                  <motion.button
-                    type="button"
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                    onClick={() => {
-                      const destino = paso.accion!.click
-                      cerrar()
-                      setTimeout(() => {
-                        const el = document.querySelector<HTMLElement>(
-                          `[data-guia="${destino}"]`,
-                        )
-                        if (!el) return
-                        const btn =
-                          el.tagName === 'BUTTON'
-                            ? el
-                            : (el.querySelector<HTMLElement>('button, a') ?? el)
-                        btn.click()
-                      }, 60)
-                    }}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-field-deep px-3.5 py-2 text-[13px] font-bold text-white shadow-[0_2px_10px_rgba(11,88,55,0.35)] transition-opacity hover:opacity-90"
-                  >
-                    <Sparkles className="size-3.5" />
-                    {paso.accion.label}
-                  </motion.button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Hilo de progreso: se va llenando a lo largo del viaje. */}
-          <div className="mt-4 h-[2.5px] overflow-hidden rounded-full bg-black/[0.06]">
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-field via-lima to-sky"
-              initial={false}
-              animate={{
-                width: `${(nroActual / Math.max(visibles.length, 1)) * 100}%`,
-              }}
-              transition={{ type: 'spring', stiffness: 140, damping: 26 }}
-            />
-          </div>
-
-          <div className="mt-2.5 flex items-center justify-between">
-            {/* "Saltar", no "Salir": el sidebar ya tiene un "Salir" (cerrar
-                sesión) y la colisión confunde — acá solo se salta el tour. */}
-            <button
-              type="button"
-              onClick={cerrar}
-              className="text-[12.5px] font-medium text-faint transition-colors hover:text-ink"
-            >
-              Saltar
-            </button>
-            <div className="flex items-center gap-1">
-              {!esPrimero && (
-                <button
+              {/* Acción del paso: el asistente no solo señala — abre el
+                  formulario o dispara la herramienta ahí mismo. */}
+              {paso.accion && (
+                <motion.button
                   type="button"
-                  onClick={() => ir(idx, -1)}
-                  aria-label="Paso anterior"
-                  className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  onClick={() => {
+                    const destino = paso.accion!.click
+                    cerrar()
+                    setTimeout(() => {
+                      const el = document.querySelector<HTMLElement>(
+                        `[data-guia="${destino}"]`,
+                      )
+                      if (!el) return
+                      const btn =
+                        el.tagName === 'BUTTON'
+                          ? el
+                          : (el.querySelector<HTMLElement>('button, a') ?? el)
+                      btn.click()
+                    }, 60)
+                  }}
+                  className="mt-3.5 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-field-deep shadow-[0_4px_18px_rgba(0,0,0,0.35)] transition-opacity hover:opacity-90"
                 >
-                  <ChevronLeft className="size-4" />
-                </button>
+                  <Sparkles className="size-3.5" />
+                  {paso.accion.label}
+                </motion.button>
               )}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Hilo de progreso: se va llenando a lo largo del viaje. */}
+        <div className="ml-11 mt-4 h-[2px] overflow-hidden rounded-full bg-white/15">
+          <motion.div
+            className="h-full rounded-full bg-gradient-to-r from-field via-lima to-sky"
+            initial={false}
+            animate={{
+              width: `${(nroActual / Math.max(visibles.length, 1)) * 100}%`,
+            }}
+            transition={{ type: 'spring', stiffness: 140, damping: 26 }}
+          />
+        </div>
+
+        <div className="ml-11 mt-2.5 flex items-center justify-between">
+          {/* "Saltar", no "Salir": el sidebar ya tiene un "Salir" (cerrar
+              sesión) y la colisión confunde — acá solo se salta el tour. */}
+          <button
+            type="button"
+            onClick={cerrar}
+            className="text-[12.5px] font-medium text-white/55 transition-colors hover:text-white"
+          >
+            Saltar
+          </button>
+          <div className="flex items-center gap-1">
+            {!esPrimero && (
               <button
                 type="button"
-                autoFocus
-                onClick={() => (esUltimo ? cerrar() : ir(idx, 1))}
-                className="rounded-full px-3.5 py-1.5 text-[13.5px] font-bold text-field-deep transition-colors hover:bg-field-deep/10"
+                onClick={() => ir(idx, -1)}
+                aria-label="Paso anterior"
+                className="flex size-7 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
               >
-                {esUltimo ? 'Listo' : 'Seguir →'}
+                <ChevronLeft className="size-4" />
               </button>
-            </div>
+            )}
+            <button
+              type="button"
+              autoFocus
+              onClick={() => (esUltimo ? cerrar() : ir(idx, 1))}
+              className="rounded-full px-3.5 py-1.5 text-[13.5px] font-bold text-white transition-colors hover:bg-white/10"
+            >
+              {esUltimo ? 'Listo' : 'Seguir →'}
+            </button>
           </div>
         </div>
       </motion.div>
@@ -488,32 +506,68 @@ export function Orbe() {
   )
 }
 
-/** El texto del paso se ESCRIBE palabra por palabra, como un asistente que
- *  responde en vivo. Solo opacidad (cero reflow); respeta reduced-motion vía
- *  el MotionConfig del overlay. Lo usa también el panel. */
-export function TextoStream({ texto }: { texto: string }) {
-  const palabras = texto.split(' ')
+/** El texto del paso se ESCRIBE carácter por carácter, máquina de escribir
+ *  con cursor, como un asistente que narra en vivo. Solo opacidad (cero
+ *  reflow: el texto completo reserva su lugar desde el arranque); respeta
+ *  reduced-motion vía el MotionConfig del overlay. Lo usa también el panel. */
+export function TextoStream({
+  texto,
+  className,
+  style,
+}: {
+  texto: string
+  className?: string
+  style?: React.CSSProperties
+}) {
+  const chars = React.useMemo(() => [...texto], [texto])
+  // El cursor parpadea mientras "escribe" y desaparece al terminar. El reset
+  // ante texto nuevo es ajuste de estado DURANTE el render (patrón de React
+  // para "state from props"), no un setState sincrónico en un effect.
+  const [escribiendo, setEscribiendo] = React.useState(true)
+  const [prevChars, setPrevChars] = React.useState(chars)
+  if (prevChars !== chars) {
+    setPrevChars(chars)
+    setEscribiendo(true)
+  }
+  React.useEffect(() => {
+    const durMs = (0.15 + chars.length * 0.011) * 1000 + 250
+    const t = setTimeout(() => setEscribiendo(false), durMs)
+    return () => clearTimeout(t)
+  }, [chars])
   return (
     <motion.p
       initial="oculto"
       animate="visible"
       variants={{
-        visible: { transition: { staggerChildren: 0.026, delayChildren: 0.12 } },
+        visible: { transition: { staggerChildren: 0.011, delayChildren: 0.15 } },
       }}
-      className="mt-1 text-[14px] leading-relaxed text-muted-foreground"
+      className={cn(
+        'mt-1 text-[14.5px] leading-relaxed',
+        className ?? 'text-muted-foreground',
+      )}
+      style={style}
     >
-      {palabras.map((p, i) => (
+      {chars.map((c, i) => (
         <motion.span
           key={i}
           variants={{
             oculto: { opacity: 0 },
-            visible: { opacity: 1, transition: { duration: 0.14 } },
+            visible: { opacity: 1, transition: { duration: 0.01 } },
           }}
         >
-          {p}
-          {i < palabras.length - 1 ? ' ' : ''}
+          {c}
         </motion.span>
       ))}
+      {escribiendo && (
+        <motion.span
+          aria-hidden
+          className="ml-0.5 inline-block"
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+        >
+          ▍
+        </motion.span>
+      )}
     </motion.p>
   )
 }
