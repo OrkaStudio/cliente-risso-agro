@@ -396,7 +396,11 @@ function Recorrida({
       )}
 
       {conCroquis ? (
-        <Croquis potreros={r.potreros} onAbrir={setAbierto} />
+        <Croquis
+          potreros={r.potreros}
+          colorHex={r.colorCampo(r.meta!.campo_id).hex}
+          onAbrir={setAbierto}
+        />
       ) : (
         <ListaPotreros r={r} onAbrir={setAbierto} />
       )}
@@ -634,6 +638,7 @@ function ListaPotreros({
   r: ReturnType<typeof useRecorrida>
   onAbrir: (id: string) => void
 }) {
+  const hex = r.meta ? r.colorCampo(r.meta.campo_id).hex : 'var(--c-ok)'
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-3">
       <div className="c-hazard mb-3 flex items-start gap-2.5 rounded-xl border px-3 py-2.5">
@@ -654,9 +659,10 @@ function ListaPotreros({
               className={cn(
                 'c-hard-sm flex h-16 items-center gap-3 rounded-xl border px-4 text-left',
                 hecho
-                  ? 'border-transparent bg-[var(--c-ok)] text-white'
+                  ? 'border-transparent text-white'
                   : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]',
               )}
+              style={hecho ? { background: hex } : undefined}
             >
               <span className="c-display flex-1 truncate text-[19px]">{p.nombre}</span>
               {hecho ? (

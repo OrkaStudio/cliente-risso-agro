@@ -128,6 +128,21 @@ function polo(pts: XY[]): { x: number; y: number; r: number } {
 /** Mínimo táctil (px). Debajo de esto, el potrero sale a un pin. */
 const TAP_MIN = 44
 
+/** Margen (unidades de viewBox) alrededor del campo: da lugar a los pines de
+ *  los potreros chicos en el fondo, sin que se recorten. */
+const MARGEN = 10
+
+/** Texto legible (tinta o blanco) sobre un color de relleno, según su brillo.
+ *  El amarillo del campo A necesita texto oscuro; el azul, texto blanco. */
+function textoSobre(hex: string): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return lum > 0.62 ? '#131b16' : '#ffffff'
+}
+
 /**
  * Ubica el pin de un potrero chico: prueba 12 direcciones alrededor de su polo
  * y elige la que cae en espacio libre — fuera de todos los polígonos y lejos
@@ -140,6 +155,9 @@ function ubicarPin(
   radio: number,
   poligonos: XY[][],
   ocupados: { x: number; y: number }[],
+  /** Límites del viewBox visible: el pin (círculo de `radio`) no puede salirse
+   *  o queda RECORTADO en el borde de la pantalla. */
+  limite: { minX: number; maxX: number; minY: number; maxY: number },
 ): { x: number; y: number } {
   let mejor = { x: origen.x + dist, y: origen.y, score: -Infinity }
   // Varias distancias: con una sola, si el potrero está rodeado, el pin cae
@@ -150,7 +168,14 @@ function ubicarPin(
       const x = origen.x + Math.cos(a) * dist * k
       const y = origen.y + Math.sin(a) * dist * k
       let score = -k * 6 // a igualdad de condiciones, el pin cerca del potrero
-      // Tapar otro potrero es lo peor: le esconde el número al vecino.
+      // Salirse de la pantalla es lo peor: el pin queda cortado.
+      if (
+        x < limite.minX + radio || x > limite.maxX - radio ||
+        y < limite.minY + radio || y > limite.maxY - radio
+      ) {
+        score -= 500
+      }
+      // Tapar otro potrero: le esconde el número al vecino.
       for (const poly of poligonos) {
         if (distanciaAlBorde(x, y, poly) > -radio * 0.5) score -= 260
       }
@@ -162,7 +187,12 @@ function ubicarPin(
       if (score > mejor.score) mejor = { x, y, score }
     }
   }
-  return { x: mejor.x, y: mejor.y }
+  // Red de seguridad: aunque el mejor haya quedado al borde, se clampa para que
+  // el pin entero entre en el viewBox — nunca recortado.
+  return {
+    x: Math.max(limite.minX + radio, Math.min(limite.maxX - radio, mejor.x)),
+    y: Math.max(limite.minY + radio, Math.min(limite.maxY - radio, mejor.y)),
+  }
 }
 
 type EstadoGPS =
@@ -173,12 +203,17 @@ type EstadoGPS =
 
 export function Croquis({
   potreros,
+  colorHex,
   onAbrir,
 }: {
   potreros: RecPotrero[]
+  /** Color IDENTIDAD del campo: el potrero recorrido se pinta de ESTE color
+   *  (no verde), así cada campo tiene su croquis distinto y no todo homogéneo. */
+  colorHex: string
   /** Abrir el parte de un potrero (la hoja la monta la página). */
   onAbrir: (potreroId: string) => void
 }) {
+  const textoHecho = textoSobre(colorHex)
   const [gps, setGps] = useState<EstadoGPS>({ k: 'idle' })
   // Medimos el dibujo REAL en píxeles: sin eso no se puede saber si un potrero
   // llega al mínimo táctil (el viewBox es relativo al tamaño del campo).
@@ -232,9 +267,13 @@ export function Croquis({
   // El polígono sigue siendo tocable; el pin es el target confiable.
   const escalaPx =
     proy && box.w > 0
-      ? Math.min(box.w / (proy.vw + 6), box.h / (proy.vh + 6))
+      ? Math.min(box.w / (proy.vw + MARGEN * 2), box.h / (proy.vh + MARGEN * 2))
       : 0
   const pinR = escalaPx > 0 ? TAP_MIN / 2 / escalaPx : 0
+  // Límites del viewBox visible (para que ningún pin se recorte).
+  const limite = proy
+    ? { minX: -MARGEN, maxX: proy.vw + MARGEN, minY: -MARGEN, maxY: proy.vh + MARGEN }
+    : { minX: 0, maxX: 0, minY: 0, maxY: 0 }
 
   type Capa = {
     p: RecPotrero
@@ -258,7 +297,7 @@ export function Croquis({
     // Los pines se colocan después, esquivando las etiquetas ya asentadas.
     for (const c of capas) {
       if (!c.chico) continue
-      c.pin = ubicarPin({ x: c.x, y: c.y }, c.r + pinR * 1.6, pinR, polys, ocupados)
+      c.pin = ubicarPin({ x: c.x, y: c.y }, c.r + pinR * 1.6, pinR, polys, ocupados, limite)
       ocupados.push(c.pin)
     }
   }
@@ -275,7 +314,7 @@ export function Croquis({
       >
         {aXY && proy ? (
           <svg
-            viewBox={`-3 -3 ${proy.vw + 6} ${proy.vh + 6}`}
+            viewBox={`${-MARGEN} ${-MARGEN} ${proy.vw + MARGEN * 2} ${proy.vh + MARGEN * 2}`}
             preserveAspectRatio="xMidYMid meet"
             className="h-full w-full"
             role="img"
@@ -302,9 +341,10 @@ export function Croquis({
                 >
                   <path
                     d={d}
-                    // Alto contraste para el sol: el hecho se LLENA de verde,
-                    // el pendiente queda blanco. Se lee de reojo, sin enfocar.
-                    fill={hecho ? 'var(--c-ok)' : '#ffffff'}
+                    // Recorrido = LLENO del color del campo (identidad); pendiente
+                    // = blanco. Cada campo tiene su croquis con su color, no todo
+                    // verde homogéneo.
+                    fill={hecho ? colorHex : '#ffffff'}
                     stroke={acaEstoy ? 'var(--c-warn)' : '#5a6659'}
                     strokeWidth={acaEstoy ? 1.6 : 0.7}
                     strokeLinejoin="round"
@@ -321,8 +361,8 @@ export function Croquis({
                         className="c-mono"
                         fontSize={fs}
                         fontWeight={800}
-                        fill={hecho ? '#fff' : 'var(--c-ink)'}
-                        stroke={hecho ? 'var(--c-ok)' : '#fff'}
+                        fill={hecho ? textoHecho : 'var(--c-ink)'}
+                        stroke={hecho ? colorHex : '#fff'}
                         strokeWidth={fs * 0.16}
                         paintOrder="stroke"
                         style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
@@ -333,7 +373,7 @@ export function Croquis({
                         <path
                           d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
                           fill="none"
-                          stroke="#fff"
+                          stroke={textoHecho}
                           strokeWidth={fs * 0.16}
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -375,7 +415,7 @@ export function Croquis({
                     cx={pin.x}
                     cy={pin.y}
                     r={pinR}
-                    fill={hecho ? 'var(--c-ok)' : '#ffffff'}
+                    fill={hecho ? colorHex : '#ffffff'}
                     stroke={pisando?.id === p.id ? 'var(--c-warn)' : '#3c463b'}
                     strokeWidth={pinR * 0.11}
                   />
@@ -387,7 +427,7 @@ export function Croquis({
                     className="c-mono"
                     fontSize={fs}
                     fontWeight={800}
-                    fill={hecho ? '#fff' : 'var(--c-ink)'}
+                    fill={hecho ? textoHecho : 'var(--c-ink)'}
                     style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
                   >
                     {p.nombre}
@@ -396,7 +436,7 @@ export function Croquis({
                     <path
                       d={`M${pin.x - pinR * 0.3},${pin.y + pinR * 0.42} l${pinR * 0.22},${pinR * 0.22} l${pinR * 0.44},${-pinR * 0.46}`}
                       fill="none"
-                      stroke="#fff"
+                      stroke={textoHecho}
                       strokeWidth={pinR * 0.13}
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -437,10 +477,14 @@ export function Croquis({
                   onClick={() => onAbrir(p.id)}
                   className={cn(
                     'c-display flex h-11 items-center gap-1.5 rounded-lg border px-3 text-[15px]',
-                    p.hecho === 1
-                      ? 'border-transparent bg-[var(--c-ok)] text-white'
-                      : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]',
+                    p.hecho !== 1 &&
+                      'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)]',
                   )}
+                  style={
+                    p.hecho === 1
+                      ? { background: colorHex, color: textoHecho, borderColor: 'transparent' }
+                      : undefined
+                  }
                 >
                   {p.hecho === 1 && <Check className="size-4" strokeWidth={3} />}
                   {p.nombre}
