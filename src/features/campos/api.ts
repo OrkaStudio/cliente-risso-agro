@@ -236,14 +236,14 @@ export async function crearPotrero(input: {
 
 export async function actualizarPotrero(input: {
   id: string
-  nombre: string
   estadoCiclo: EstadoCiclo
   hectareas?: number | null
 }): Promise<void> {
+  // El `nombre` es INMUTABLE: lo asigna el sistema (letra del campo + número) y
+  // no se edita. Por eso este update no lo toca.
   const { error } = await supabase
     .from('potrero')
     .update({
-      nombre: input.nombre.trim(),
       estado_ciclo: input.estadoCiclo,
       hectareas: input.hectareas ?? null,
     })

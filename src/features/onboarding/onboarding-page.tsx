@@ -17,7 +17,10 @@ type TipoCampo = Database['public']['Enums']['tipo_campo']
 
 const PASOS = ['Tu empresa', 'Tu campo', 'Tus potreros'] as const
 
-type FilaPotrero = { nombre: string; hectareas: string }
+// El nombre del potrero NO se edita: lo asigna el sistema (letra del campo +
+// número). En el onboarding el campo es el 1º → letra A; el número es la
+// posición (1A, 2A, 3A…). El productor solo pone las hectáreas.
+type FilaPotrero = { hectareas: string }
 
 /**
  * Onboarding post-registro: empresa → primer campo → potreros → listo.
@@ -48,12 +51,7 @@ export function OnboardingPage() {
   const [hectareas, setHectareas] = useState('')
   const [campoId, setCampoId] = useState<string | null>(null)
   // Paso 3 — potreros
-  // El campo del onboarding es SIEMPRE el primero de la empresa → letra A. Se
-  // pre-sugiere el nombre (1A, 2A…) editable, para que quede prolijo por defecto
-  // sin que el productor tenga que inventar la nomenclatura.
-  const [filas, setFilas] = useState<FilaPotrero[]>([
-    { nombre: '1A', hectareas: '' },
-  ])
+  const [filas, setFilas] = useState<FilaPotrero[]>([{ hectareas: '' }])
   const [terminado, setTerminado] = useState(false)
 
   // Si ya pertenece a una empresa y no la creó en este wizard, no va acá.
@@ -117,25 +115,25 @@ export function OnboardingPage() {
     e.preventDefault()
     setError(null)
     if (!empresaId || !campoId) return
-    const validas = filas
-      .map((f) => ({ nombre: f.nombre.trim(), hectareas: f.hectareas.trim() }))
-      .filter((f) => f.nombre.length > 0)
-    for (const f of validas) {
-      const ha = f.hectareas === '' ? null : Number(f.hectareas)
-      if (ha !== null && (!Number.isFinite(ha) || ha < 0)) {
-        setError(`Las hectáreas de "${f.nombre}" tienen que ser un número.`)
+    for (let i = 0; i < filas.length; i++) {
+      const ha = filas[i].hectareas.trim()
+      const n = ha === '' ? null : Number(ha)
+      if (n !== null && (!Number.isFinite(n) || n < 0)) {
+        setError(`Las hectáreas del potrero ${i + 1}A tienen que ser un número.`)
         return
       }
     }
     setOcupado(true)
     try {
-      for (const f of validas) {
+      // El nombre lo pone el sistema (trigger en la DB): letra del campo +
+      // número. Se manda uno de referencia por si el trigger no estuviera.
+      for (let i = 0; i < filas.length; i++) {
         await crearPotrero({
           empresaId,
           campoId,
-          nombre: f.nombre,
+          nombre: `${i + 1}A`,
           estadoCiclo: 'ganadero',
-          hectareas: f.hectareas === '' ? null : Number(f.hectareas),
+          hectareas: filas[i].hectareas.trim() === '' ? null : Number(filas[i].hectareas),
         })
       }
       setTerminado(true)
@@ -358,23 +356,16 @@ export function OnboardingPage() {
                 <div className="mt-6 grid gap-2.5">
                   {filas.map((fila, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                      {/* Nombre FIJO, asignado por el sistema (no editable): la
+                          letra es la del campo y el número va por orden. */}
+                      <span className="flex h-9 w-16 shrink-0 items-center justify-center gap-1 rounded-lg bg-secondary text-[15px] font-bold text-ink">
+                        <MapPin className="size-3.5 text-muted-foreground" />
+                        {i + 1}A
+                      </span>
                       <Input
-                        aria-label={`Nombre del potrero ${i + 1}`}
-                        value={fila.nombre}
-                        onChange={(e) =>
-                          setFilas((fs) =>
-                            fs.map((f, j) =>
-                              j === i ? { ...f, nombre: e.target.value } : f,
-                            ),
-                          )
-                        }
-                        placeholder={`Ej: ${i + 1}A`}
-                      />
-                      <Input
-                        aria-label={`Hectáreas del potrero ${i + 1}`}
+                        aria-label={`Hectáreas del potrero ${i + 1}A`}
                         inputMode="decimal"
-                        className="w-24"
+                        className="flex-1"
                         value={fila.hectareas}
                         onChange={(e) =>
                           setFilas((fs) =>
@@ -383,13 +374,13 @@ export function OnboardingPage() {
                             ),
                           )
                         }
-                        placeholder="ha"
+                        placeholder="Hectáreas (opcional)"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label={`Quitar potrero ${i + 1}`}
+                        aria-label={`Quitar potrero ${i + 1}A`}
                         disabled={filas.length === 1}
                         onClick={() =>
                           setFilas((fs) => fs.filter((_, j) => j !== i))
@@ -405,16 +396,7 @@ export function OnboardingPage() {
                   variant="outline"
                   size="sm"
                   className="mt-3"
-                  onClick={() =>
-                    setFilas((fs) => {
-                      // Siguiente número disponible en la letra A del campo.
-                      const nums = fs
-                        .map((f) => parseInt(f.nombre.match(/^(\d+)/)?.[1] ?? '', 10))
-                        .filter((n) => Number.isFinite(n))
-                      const sig = (nums.length ? Math.max(...nums) : 0) + 1
-                      return [...fs, { nombre: `${sig}A`, hectareas: '' }]
-                    })
-                  }
+                  onClick={() => setFilas((fs) => [...fs, { hectareas: '' }])}
                 >
                   <Plus className="size-4" /> Otro potrero
                 </Button>

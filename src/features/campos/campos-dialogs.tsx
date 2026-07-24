@@ -158,7 +158,7 @@ export function PotreroFormDialog({
 }) {
   const editing = !!potrero
   const [open, setOpen] = useState(false)
-  const [nombre, setNombre] = useState(potrero?.nombre ?? '')
+  const nombre = potrero?.nombre ?? ''
   const [estadoCiclo, setEstadoCiclo] = useState(
     potrero?.estado_ciclo ?? 'ganadero',
   )
@@ -173,24 +173,20 @@ export function PotreroFormDialog({
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!nombre.trim()) {
-      setError('Ingresá el nombre del potrero')
-      return
-    }
     try {
       if (editing) {
         await actualizar.mutateAsync({
           id: potrero.id,
-          nombre,
           estadoCiclo,
           hectareas: parseHa(hectareas),
         })
         toast.success('Potrero actualizado')
       } else {
+        // El nombre lo asigna el sistema (trigger): letra del campo + número.
         await crear.mutateAsync({
           empresaId,
           campoId,
-          nombre,
+          nombre: '',
           estadoCiclo,
           hectareas: parseHa(hectareas),
         })
@@ -224,14 +220,19 @@ export function PotreroFormDialog({
           </Button>
         }
       >
+        {/* El nombre lo asigna el sistema (letra del campo + número) y no se
+            edita: en editar se muestra fijo; en crear, un aviso. */}
         <motion.div variants={formItem} className="grid gap-2">
-          <Label htmlFor="potrero-nombre">Nombre</Label>
-          <Input
-            id="potrero-nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            autoFocus
-          />
+          <Label>Nombre</Label>
+          {editing ? (
+            <div className="flex h-10 items-center rounded-lg border border-border bg-secondary px-3 text-[15px] font-bold text-ink">
+              {nombre}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-border bg-secondary/50 px-3 py-2 text-[13px] text-muted-foreground">
+              Se asigna solo: la letra del campo + el siguiente número.
+            </p>
+          )}
         </motion.div>
         <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
