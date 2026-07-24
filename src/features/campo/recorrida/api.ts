@@ -7,7 +7,13 @@ export type ElectricoEstado = Database['public']['Enums']['electrico_estado']
 export type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 export type CultivoEstado = Database['public']['Enums']['cultivo_obs_estado']
 
-export type CampoRec = { id: string; nombre: string; empresa_id: string }
+export type CampoRec = {
+  id: string
+  nombre: string
+  empresa_id: string
+  /** Índice de color/letra estable (por orden de creación). Ver colorDeCampo. */
+  color_idx: number
+}
 /** [lat, lng] — mismo formato que potrero.poligono (JSONB). */
 export type LatLng = [number, number]
 /** Última observación conocida del potrero (para "igual que la última vez"). */
@@ -75,7 +81,7 @@ export async function fetchRefs(): Promise<{
   potreros: (PotreroRec & { campo_id: string })[]
 }> {
   const [camposRes, potrerosRes, stockRes, obsRes] = await Promise.all([
-    supabase.from('campo').select('id, nombre, empresa_id').order('nombre'),
+    supabase.from('campo').select('id, nombre, empresa_id, color_idx').order('nombre'),
     supabase
       .from('potrero')
       .select('id, nombre, estado_ciclo, campo_id, poligono')
@@ -114,7 +120,12 @@ export async function fetchRefs(): Promise<{
     })
   }
   return {
-    campos: camposRes.data ?? [],
+    campos: (camposRes.data ?? []).map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      empresa_id: c.empresa_id,
+      color_idx: c.color_idx ?? 0,
+    })),
     potreros: (potrerosRes.data ?? []).map((p) => ({
       id: p.id,
       nombre: p.nombre,

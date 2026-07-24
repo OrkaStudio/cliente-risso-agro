@@ -471,9 +471,8 @@ export function useRecorrida() {
   // campo = mismo color en los dos modos: reconocible y armonioso.
   const colorCampo = useCallback(
     (campoId: string) => {
-      const cs = refs?.campos ?? []
-      const i = cs.findIndex((c) => c.id === campoId)
-      return colorDeCampo(i < 0 ? 0 : i, cs[i]?.nombre ?? '')
+      const c = (refs?.campos ?? []).find((x) => x.id === campoId)
+      return colorDeCampo(c?.color_idx ?? 0)
     },
     [refs],
   )

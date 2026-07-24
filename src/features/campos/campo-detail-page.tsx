@@ -620,6 +620,7 @@ export function CampoDetailPage() {
                 empresa_id: empresaId,
                 created_at: '',
                 contorno: null,
+                color_idx: null,
               }}
               triggerLabel="Editar campo"
               triggerVariant="outline"

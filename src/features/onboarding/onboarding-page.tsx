@@ -48,8 +48,11 @@ export function OnboardingPage() {
   const [hectareas, setHectareas] = useState('')
   const [campoId, setCampoId] = useState<string | null>(null)
   // Paso 3 — potreros
+  // El campo del onboarding es SIEMPRE el primero de la empresa → letra A. Se
+  // pre-sugiere el nombre (1A, 2A…) editable, para que quede prolijo por defecto
+  // sin que el productor tenga que inventar la nomenclatura.
   const [filas, setFilas] = useState<FilaPotrero[]>([
-    { nombre: '', hectareas: '' },
+    { nombre: '1A', hectareas: '' },
   ])
   const [terminado, setTerminado] = useState(false)
 
@@ -403,7 +406,14 @@ export function OnboardingPage() {
                   size="sm"
                   className="mt-3"
                   onClick={() =>
-                    setFilas((fs) => [...fs, { nombre: '', hectareas: '' }])
+                    setFilas((fs) => {
+                      // Siguiente número disponible en la letra A del campo.
+                      const nums = fs
+                        .map((f) => parseInt(f.nombre.match(/^(\d+)/)?.[1] ?? '', 10))
+                        .filter((n) => Number.isFinite(n))
+                      const sig = (nums.length ? Math.max(...nums) : 0) + 1
+                      return [...fs, { nombre: `${sig}A`, hectareas: '' }]
+                    })
                   }
                 >
                   <Plus className="size-4" /> Otro potrero

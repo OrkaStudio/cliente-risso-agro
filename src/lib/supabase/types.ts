@@ -93,6 +93,7 @@ export type Database = {
       }
       campo: {
         Row: {
+          color_idx: number | null
           contorno: Json | null
           created_at: string
           empresa_id: string
@@ -102,6 +103,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_campo"]
         }
         Insert: {
+          color_idx?: number | null
           contorno?: Json | null
           created_at?: string
           empresa_id: string
@@ -111,6 +113,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["tipo_campo"]
         }
         Update: {
+          color_idx?: number | null
           contorno?: Json | null
           created_at?: string
           empresa_id?: string

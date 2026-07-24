@@ -25,6 +25,8 @@ export type CampoConPotreros = {
   nombre: string
   tipo: TipoCampo
   hectareas: number | null
+  /** Índice de color/letra estable (por orden de creación). Ver colorDeCampo. */
+  color_idx: number
   potreros: PotreroCardData[]
   totalCabezas: number
   /** Superficie sumada de los potreros (ha). */
@@ -46,7 +48,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
     { data: stock, error: eS },
     { data: animales, error: eA },
   ] = await Promise.all([
-    supabase.from('campo').select('id, nombre, tipo, hectareas').order('nombre'),
+    supabase.from('campo').select('id, nombre, tipo, hectareas, color_idx').order('nombre'),
     supabase
       .from('potrero')
       .select(
@@ -110,6 +112,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
       nombre: c.nombre,
       tipo: c.tipo,
       hectareas: c.hectareas,
+      color_idx: c.color_idx ?? 0,
       potreros: ps,
       totalCabezas: ps.reduce((s, p) => s + p.cabezas, 0),
       totalHa: ps.reduce((s, p) => s + (p.hectareas ?? 0), 0),

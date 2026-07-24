@@ -87,13 +87,13 @@ function Kpi({
 }
 
 /** Construye el CampoVM (identidad real + color) para los componentes del mapa. */
-function vmDe(c: CampoConPotreros, index: number): CampoVM {
+function vmDe(c: CampoConPotreros): CampoVM {
   return {
     id: c.id,
     nombre: c.nombre,
     tipo: c.tipo,
     hectareas: c.hectareas,
-    color: colorDeCampo(index, c.nombre),
+    color: colorDeCampo(c.color_idx),
   }
 }
 
@@ -126,8 +126,8 @@ function SinDibujarAviso({ campo }: { campo: CampoConPotreros }) {
 }
 
 /* ===== Vista LISTA: un bloque por campo con tarjetas de potrero ===== */
-function CampoBloque({ campo, index }: { campo: CampoConPotreros; index: number }) {
-  const color = colorDeCampo(index, campo.nombre)
+function CampoBloque({ campo }: { campo: CampoConPotreros }) {
+  const color = colorDeCampo(campo.color_idx)
   return (
     <section className="rounded-[14px] border border-border bg-card p-6 shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -569,7 +569,7 @@ export function LotesPage() {
       ) : vista === 'mapa' ? (
         <MapaVista campos={campos} />
       ) : (
-        campos.map((c, i) => <CampoBloque key={c.id} campo={c} index={i} />)
+        campos.map((c) => <CampoBloque key={c.id} campo={c} />)
       )}
     </div>
   )
