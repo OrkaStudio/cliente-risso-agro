@@ -98,10 +98,17 @@ export function CampoInicioPage() {
             await r.activar(a.recorridaId)
             navigate('/campo/recorrida')
           }}
-          className="c-hard flex items-center gap-3.5 rounded-2xl border-2 border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)] px-4 py-5 text-left active:scale-[0.99]"
+          // Acento con el color IDENTIDAD del campo (mismo que Modo Oficina):
+          // borde izquierdo grueso + chip con la letra. El campo se reconoce por
+          // su color de un vistazo, igual que en el mapa de Oficina.
+          className="c-hard flex items-center gap-3.5 rounded-2xl border-2 border-l-[6px] bg-[var(--c-panel)] px-4 py-5 text-left active:scale-[0.99]"
+          style={{ borderColor: a.color.hex }}
         >
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--c-ok)] text-white shadow-[0_2px_8px_rgba(11,88,55,0.3)]">
-            <Footprints className="size-7" strokeWidth={2} />
+          <span
+            className="c-display flex size-14 shrink-0 items-center justify-center rounded-2xl text-[24px] text-white shadow-[0_2px_8px_rgba(16,30,20,0.22)]"
+            style={{ background: a.color.hex }}
+          >
+            {a.color.letra}
           </span>
           <span className="min-w-0 flex-1">
             <span className="c-display block truncate text-[20px] text-[var(--c-ink)]">
@@ -114,7 +121,7 @@ export function CampoInicioPage() {
               <CLabel className="!text-[11px]">potreros hechos</CLabel>
             </span>
           </span>
-          <ChevronRight className="size-6 shrink-0 text-[var(--c-ok-deep)]" />
+          <ChevronRight className="size-6 shrink-0 text-[var(--c-faint)]" />
         </button>
       ))}
 

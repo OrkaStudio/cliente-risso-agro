@@ -9,10 +9,8 @@ import {
   CloudRain,
   Droplet,
   Flag,
-  Footprints,
   Hash,
   History,
-  MapPin,
   MessageSquare,
   PencilRuler,
   Minus,
@@ -204,6 +202,7 @@ function SelectorCampo({
       <div className="flex flex-col gap-2.5">
         {r.campos.map((c) => {
           const abierta = abiertasPorCampo.get(c.id)
+          const color = r.colorCampo(c.id)
           return (
             <button
               key={c.id}
@@ -215,30 +214,26 @@ function SelectorCampo({
                 await r.empezar(c)
                 onElegido?.()
               }}
-              className={cn(
-                'c-hard-sm group flex items-center justify-between rounded-2xl border-2 px-4 py-4 text-left disabled:opacity-50',
-                abierta
-                  ? 'border-[var(--c-ok-deep)] bg-[var(--c-ok-soft)]'
-                  : 'border-[var(--c-line-strong)] bg-[var(--c-panel)]',
-              )}
+              className="c-hard-sm group flex items-center justify-between rounded-2xl border-2 border-l-[6px] bg-[var(--c-panel)] px-4 py-4 text-left disabled:opacity-50"
+              style={{ borderColor: color.hex }}
             >
               <span className="flex items-center gap-3">
                 <span
-                  className={cn(
-                    'flex size-11 shrink-0 items-center justify-center rounded-xl text-white',
-                    abierta ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-ink)]',
-                  )}
+                  className="c-display flex size-11 shrink-0 items-center justify-center rounded-xl text-[19px] text-white"
+                  style={{ background: color.hex }}
                 >
-                  {abierta ? <Footprints className="size-6" /> : <MapPin className="size-6" />}
+                  {color.letra}
                 </span>
                 <span className="min-w-0">
                   <span className="c-display block text-[19px] text-[var(--c-ink)]">
                     {c.nombre}
                   </span>
-                  {abierta && (
+                  {abierta ? (
                     <CLabel className="!text-[11px] !text-[var(--c-ok-deep)]">
                       Abierta · {abierta.hechos}/{abierta.total} · seguir
                     </CLabel>
+                  ) : (
+                    <CLabel className="!text-[11px]">Empezar</CLabel>
                   )}
                 </span>
               </span>
@@ -331,6 +326,14 @@ function Recorrida({
           >
             <ChevronLeft className="size-5" strokeWidth={2.5} />
           </button>
+          {/* Chip de color IDENTIDAD del campo (mismo que Modo Oficina): mientras
+              recorrés varios campos, sabés en cuál estás de un vistazo. */}
+          <span
+            className="c-display flex size-9 shrink-0 items-center justify-center rounded-lg text-[16px] text-white"
+            style={{ background: r.colorCampo(r.meta!.campo_id).hex }}
+          >
+            {r.colorCampo(r.meta!.campo_id).letra}
+          </span>
           {/* El progreso ES el disparador del panel: el número que leés
               ("2 de 12") es el que tocás para ver qué falta. Antes había un
               botón ⏱ aparte que decía lo mismo y apretaba el header. */}

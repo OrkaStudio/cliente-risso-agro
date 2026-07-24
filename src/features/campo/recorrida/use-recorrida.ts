@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { recdb, type RecObs, type RecPotrero, type RecSesion } from './db'
 import {
   asegurarRecorridaRemota,
@@ -465,6 +466,18 @@ export function useRecorrida() {
     }
   }, [])
 
+  // Color IDENTIDAD del campo — LA MISMA paleta que Modo Oficina, asignada por
+  // posición en la lista de campos (ambos modos ordenan por nombre). Mismo
+  // campo = mismo color en los dos modos: reconocible y armonioso.
+  const colorCampo = useCallback(
+    (campoId: string) => {
+      const cs = refs?.campos ?? []
+      const i = cs.findIndex((c) => c.id === campoId)
+      return colorDeCampo(i < 0 ? 0 : i, cs[i]?.nombre ?? '')
+    },
+    [refs],
+  )
+
   // ---- Derivados ------------------------------------------------------------
   const todoElOutbox = outbox ?? []
   const delActivo = activaId
@@ -524,6 +537,7 @@ export function useRecorrida() {
         hechos: obsIds.size,
         total: totalCampo,
         esActiva: s.recorrida_id === activaId,
+        color: colorCampo(s.campo_id),
       }
     })
     .sort((a, b) => ordenNatural(a.campoNombre, b.campoNombre))
@@ -551,6 +565,8 @@ export function useRecorrida() {
     total,
     /** Todas las recorridas abiertas (para el hub: pausar/retomar por campo). */
     abiertas,
+    /** Color identidad de un campo (misma paleta que Modo Oficina). */
+    colorCampo,
     sinSubir,
     errores,
     lluviaPendiente,
