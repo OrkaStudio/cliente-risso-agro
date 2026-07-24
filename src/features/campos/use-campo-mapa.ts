@@ -37,17 +37,23 @@ export type CampoColor = { hex: string; nombre: string; letra: string }
 // SIN verde ni marrón (ni sus variantes oliva/teja): se confunden con el pasto
 // y la tierra en el campo, y el verde ya es el color de "hecho" en el croquis.
 // idx 0 (Amarillo) y 1 (Azul) se conservan para no mover Don Gilberto/La Porteña.
+// Colores para MÁXIMA diferencia entre campos — sin verde ni marrón. A-D se
+// mantienen (amarillo, azul, violeta, naranja: ya bien distintos); E-J se
+// eligieron para no repetir familia casi igual (antes había 3 rosas y 3 azules
+// casi idénticos). Se alternan cálido/frío para que campos consecutivos
+// contrasten, y los de la misma familia se separan por brillo (cian claro vs
+// índigo oscuro; violeta vs magenta vs rosa).
 const PALETA: { hex: string; nombre: string }[] = [
   { hex: '#e7b41f', nombre: 'Amarillo' },
   { hex: '#3b7dd8', nombre: 'Azul' },
   { hex: '#7c5cc4', nombre: 'Violeta' },
   { hex: '#e07b39', nombre: 'Naranja' },
-  { hex: '#d84f8c', nombre: 'Rosa' },
-  { hex: '#4a8fb0', nombre: 'Celeste' },
-  { hex: '#5a5f9c', nombre: 'Índigo' },
-  { hex: '#e0685e', nombre: 'Coral' },
-  { hex: '#b83d9e', nombre: 'Fucsia' },
-  { hex: '#2b8fb0', nombre: 'Cian' },
+  { hex: '#d92d2d', nombre: 'Rojo' },
+  { hex: '#17a3bd', nombre: 'Cian' },
+  { hex: '#e24f9e', nombre: 'Rosa' },
+  { hex: '#2e3a8c', nombre: 'Índigo' },
+  { hex: '#b23bb0', nombre: 'Magenta' },
+  { hex: '#79b0e0', nombre: 'Celeste' },
 ]
 /** Letra del campo por su índice: 0→A, 1→B, … Wrappea a AA, AB… por si acaso. */
 function letraDeIndice(i: number): string {
