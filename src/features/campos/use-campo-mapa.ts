@@ -34,19 +34,20 @@ export function usoToEstadoCiclo(uso: Uso, actual: EstadoCiclo): EstadoCiclo {
  * campo A = amarillo = potreros 1A/2A.
  */
 export type CampoColor = { hex: string; nombre: string; letra: string }
+// SIN verde ni marrón (ni sus variantes oliva/teja): se confunden con el pasto
+// y la tierra en el campo, y el verde ya es el color de "hecho" en el croquis.
+// idx 0 (Amarillo) y 1 (Azul) se conservan para no mover Don Gilberto/La Porteña.
 const PALETA: { hex: string; nombre: string }[] = [
   { hex: '#e7b41f', nombre: 'Amarillo' },
   { hex: '#3b7dd8', nombre: 'Azul' },
-  { hex: '#3f9d52', nombre: 'Verde' },
-  { hex: '#8a5a33', nombre: 'Marrón' },
   { hex: '#7c5cc4', nombre: 'Violeta' },
   { hex: '#e07b39', nombre: 'Naranja' },
-  { hex: '#2ba8a0', nombre: 'Turquesa' },
   { hex: '#d84f8c', nombre: 'Rosa' },
   { hex: '#4a8fb0', nombre: 'Celeste' },
-  { hex: '#6f9a2e', nombre: 'Oliva' },
-  { hex: '#b0532e', nombre: 'Teja' },
   { hex: '#5a5f9c', nombre: 'Índigo' },
+  { hex: '#e0685e', nombre: 'Coral' },
+  { hex: '#b83d9e', nombre: 'Fucsia' },
+  { hex: '#2b8fb0', nombre: 'Cian' },
 ]
 /** Letra del campo por su índice: 0→A, 1→B, … Wrappea a AA, AB… por si acaso. */
 function letraDeIndice(i: number): string {
