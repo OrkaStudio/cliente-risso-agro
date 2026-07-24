@@ -347,10 +347,15 @@ function Escena({
           sin marcos ni bordes verdes alrededor del elemento. */}
       <svg className="pointer-events-none fixed inset-0 h-full w-full">
         <defs>
-          {/* Pluma sutil: desenfoque solo en los bordes (Lau prefirió el halo
-              chico, no el resplandor grande). */}
+          {/* Resplandor: halo amplio que irradia desde el elemento. */}
           <filter id="guia-pluma" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="7" />
+            <feGaussianBlur stdDeviation="14" />
+          </filter>
+          {/* Desenfoque chico para el núcleo: el borde del recorte se funde
+              con el velo (nada de corte seco) pero el interior sigue pleno —
+              solo los ~8px del borde se difuminan. */}
+          <filter id="guia-pluma-nucleo" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="4" />
           </filter>
           <mask id="guia-luz">
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
@@ -368,13 +373,14 @@ function Escena({
               }}
               transition={VIAJE}
             />
-            {/* Núcleo sólido: el blur difumina hacia adentro también y en
-                elementos chicos (un botón) el centro quedaba semi-velado,
-                "apagado". Este rect sin blur garantiza el interior 100%
-                despejado; la pluma de arriba queda solo como halo. */}
+            {/* Núcleo: garantiza el interior despejado (el resplandor solo
+                difumina — en anclas chicas el centro quedaba "apagado") pero
+                con un blur chico propio, así su borde se funde con el velo
+                en vez de cortar seco. */}
             <motion.rect
               fill="black"
               rx={14}
+              filter="url(#guia-pluma-nucleo)"
               initial={false}
               animate={{
                 x: luz.x,
