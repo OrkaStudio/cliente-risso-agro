@@ -6,6 +6,8 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Layers,
+  Minus,
+  Plus,
   TriangleAlert,
 } from 'lucide-react'
 import {
@@ -92,6 +94,79 @@ function composTexto(t: TropaDelPotrero): string {
     .sort((a, b) => b.cabezas - a.cabezas)
     .map((c) => `${c.cabezas} ${categoriaNombre(c.categoria, c.cabezas).toLowerCase()}`)
     .join(' · ')
+}
+
+/** Fila de "cuántos se mueven" de una categoría: stepper −/+ que llena el
+ *  ancho, con el máximo disponible y un atajo "Todas". Se puede tipear también.
+ */
+function CantidadRow({
+  label,
+  hay,
+  value,
+  onSet,
+}: {
+  label: string
+  hay: number
+  value: string
+  onSet: (v: string) => void
+}) {
+  const n = parseInt(value || '', 10) || 0
+  const activa = n > 0
+  const setClamp = (x: number) => onSet(String(Math.max(0, Math.min(hay, x))))
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-between gap-3 rounded-xl border px-3 py-2 transition-colors',
+        activa ? 'border-primary/50 bg-field-soft/40' : 'border-border bg-card',
+      )}
+    >
+      <div className="min-w-0">
+        <div className="truncate text-[13.5px] font-semibold text-ink">{label}</div>
+        <div className="text-[11.5px] text-faint">de {hay}</div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center overflow-hidden rounded-lg border border-border bg-card">
+          <button
+            type="button"
+            aria-label="Uno menos"
+            disabled={n <= 0}
+            onClick={() => setClamp(n - 1)}
+            className="flex size-8 items-center justify-center text-ink transition-colors hover:bg-secondary disabled:opacity-30"
+          >
+            <Minus className="size-3.5" />
+          </button>
+          <input
+            inputMode="numeric"
+            value={value}
+            placeholder="0"
+            onChange={(e) => onSet(e.target.value)}
+            className="tnum h-8 w-11 border-x border-border text-center text-[14px] font-semibold text-ink outline-none focus:bg-field-soft/40"
+          />
+          <button
+            type="button"
+            aria-label="Uno más"
+            disabled={n >= hay}
+            onClick={() => setClamp(n + 1)}
+            className="flex size-8 items-center justify-center text-ink transition-colors hover:bg-secondary disabled:opacity-30"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setClamp(hay)}
+          className={cn(
+            'rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-colors',
+            n === hay
+              ? 'bg-field-soft text-field-deep'
+              : 'text-muted-foreground hover:bg-secondary hover:text-ink',
+          )}
+        >
+          Todas
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /** Cómo se agrupan los animales al llegar. 'aparte' conserva su tropa (o los
@@ -399,40 +474,18 @@ export function MoverAnimalesDialog({
               {parcial && (
                 <motion.div variants={formItem} className="grid gap-2">
                   <p className="text-[12px] leading-snug text-muted-foreground">
-                    Anotá cuántos se van de cada categoría (tocá “de&nbsp;N”
-                    para usar todos los de esa categoría).
+                    Anotá cuántos se van de cada categoría.
                   </p>
                   {tropa.composicion.map((c) => (
-                    <div key={c.categoria} className="flex items-center gap-3">
-                      <span className="w-28 shrink-0 text-[13px] font-semibold text-ink">
-                        {categoriaNombre(c.categoria, c.cabezas)}
-                      </span>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={cantidades[c.categoria] ?? ''}
-                        onChange={(e) =>
-                          setCantidades((prev) => ({
-                            ...prev,
-                            [c.categoria]: e.target.value,
-                          }))
-                        }
-                        className="h-9 w-20 text-center"
-                      />
-                      <button
-                        type="button"
-                        title={`Mover ${c.cabezas === 1 ? 'el único' : `los ${c.cabezas}`}`}
-                        onClick={() =>
-                          setCantidades((prev) => ({
-                            ...prev,
-                            [c.categoria]: String(c.cabezas),
-                          }))
-                        }
-                        className="text-[12.5px] text-faint underline-offset-2 transition-colors hover:text-field-deep hover:underline"
-                      >
-                        de {c.cabezas}
-                      </button>
-                    </div>
+                    <CantidadRow
+                      key={c.categoria}
+                      label={categoriaNombre(c.categoria, c.cabezas)}
+                      hay={c.cabezas}
+                      value={cantidades[c.categoria] ?? ''}
+                      onSet={(v) =>
+                        setCantidades((prev) => ({ ...prev, [c.categoria]: v }))
+                      }
+                    />
                   ))}
                   {totalAMover > 0 && (
                     <p className="text-[12.5px] font-semibold text-field-deep">
@@ -462,18 +515,26 @@ export function MoverAnimalesDialog({
                     Está vacío — no hay animales todavía.
                   </p>
                 ) : (
-                  <div className="grid gap-1 rounded-xl bg-secondary/60 px-3 py-2.5">
-                    {contenidoDestino.map((t) => (
+                  <div className="grid gap-2 rounded-xl bg-secondary/60 px-3 py-2.5">
+                    {contenidoDestino.map((t, i) => (
                       <div
                         key={t.loteId ?? 'sueltos'}
-                        className="flex items-baseline justify-between gap-2 text-[12.5px]"
+                        className={cn(i > 0 && 'border-t border-border/60 pt-2')}
                       >
-                        <span className="min-w-0 truncate font-semibold text-ink">
-                          {t.nombre ?? 'Sueltos (sin agrupar)'}
-                        </span>
-                        <span className="tnum shrink-0 text-muted-foreground">
-                          {t.cabezas} cab
-                        </span>
+                        <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
+                          <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-ink">
+                            <Layers className="size-3.5 shrink-0 text-field-deep" />
+                            <span className="truncate">
+                              {t.nombre ?? 'Sueltos (sin agrupar)'}
+                            </span>
+                          </span>
+                          <span className="tnum shrink-0 text-muted-foreground">
+                            {t.cabezas} cab
+                          </span>
+                        </div>
+                        <p className="mt-0.5 pl-5 text-[11.5px] leading-snug text-muted-foreground">
+                          {composTexto(t)}
+                        </p>
                       </div>
                     ))}
                   </div>
