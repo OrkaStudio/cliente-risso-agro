@@ -103,12 +103,20 @@ export function AsistentePanel() {
               animate={{ rotate: 360 }}
               transition={{ duration: 5, ease: 'linear', repeat: Infinity }}
             />
-            {/* Ping suave que invita sin gritar */}
+            {/* Ping suave que invita sin gritar. La opacidad ENTRA y SALE en
+                fade (0→0.3→0): al reiniciar el ciclo no hay salto de 0 a 0.35
+                — ese salto era el "parpadeo brusco" que marcó Lau. */}
             <motion.span
               aria-hidden
               className="absolute inset-0 rounded-full bg-field"
-              animate={{ scale: [1, 1.35], opacity: [0.35, 0] }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeOut' }}
+              animate={{ scale: [1, 1.12, 1.4], opacity: [0, 0.3, 0] }}
+              transition={{
+                duration: 2.6,
+                times: [0, 0.35, 1],
+                repeat: Infinity,
+                repeatDelay: 1.2,
+                ease: 'easeOut',
+              }}
             />
             <span className="absolute inset-[3px] rounded-full bg-field-deep" />
             <Sparkles className="relative size-[22px] text-white" />

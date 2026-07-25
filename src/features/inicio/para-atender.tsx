@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -44,6 +45,8 @@ type Atencion = {
   titulo: string
   /** "1A · La Porteña" (o el campo, para los avisos de recorrida). */
   donde: string
+  /** Nombre del campo, para el filtro. */
+  campo: string
   /** Texto extra (la novedad anotada). */
   detalle?: string
   /** Días desde que se vio. */
@@ -110,7 +113,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
 
     const donde = `${p.nombre} · ${p.campoNombre}`
     const to = `/potrero/${o.potrero_id}`
-    const base = { donde, hace, to }
+    const base = { donde, campo: p.campoNombre, hace, to }
 
     if (o.agua === 'seca')
       items.push({ ...base, key: `${o.potrero_id}-agua`, nivel: 'atender', icon: Droplets, titulo: 'Aguada seca' })
@@ -180,6 +183,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
         icon: Footprints,
         titulo: 'Sin recorridas todavía',
         donde: campoNombre,
+        campo: campoNombre,
         hace: 0,
         sinFecha: true,
         to: '/campos',
@@ -191,6 +195,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
         icon: CalendarClock,
         titulo: `${haceLabel(hace).replace('hace', 'Hace')} sin recorrer`,
         donde: campoNombre,
+        campo: campoNombre,
         hace,
         to: '/campos',
       })
@@ -278,17 +283,74 @@ function AtencionRow({ a, i }: { a: Atencion; i: number }) {
   )
 }
 
+/** Cuántas filas se muestran antes del "Mostrar los N restantes". */
+const FILAS_VISIBLES = 6
+
+/** Chip de filtro del panel (nivel o campo). */
+function ChipFiltro({
+  activo,
+  onClick,
+  clase,
+  children,
+}: {
+  activo: boolean
+  onClick: () => void
+  /** Clases del estado ACTIVO (color según el nivel). */
+  clase: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors',
+        activo
+          ? clase
+          : 'border-border bg-card text-muted-foreground hover:border-faint hover:text-ink',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 /**
  * "Para atender en el campo": traduce las recorridas del Modo Campo a avisos
  * accionables en el Inicio — qué falta (aguadas, pasto, eléctrico), qué
  * prevenir (tratamientos, campos sin recorrer) y las novedades anotadas.
- * Reemplaza a la vieja grilla de potreros (inventario que ya vive en Campos).
+ * Con muchos avisos la lista se filtra por nivel y por campo, y se corta en
+ * FILAS_VISIBLES con "Mostrar los N restantes" — que no sea un chorizo.
  */
 export function ParaAtenderCampo() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['para-atender-campo'],
     queryFn: getParaAtender,
   })
+
+  const [nivel, setNivel] = React.useState<'todos' | Nivel>('todos')
+  const [campo, setCampo] = React.useState<string>('todos')
+  const [verTodo, setVerTodo] = React.useState(false)
+
+  const items = React.useMemo(() => data?.items ?? [], [data])
+  const campos = React.useMemo(
+    () => [...new Set(items.map((a) => a.campo))].sort(),
+    [items],
+  )
+  // Conteos por nivel dentro del campo elegido (los chips cuentan lo que verías).
+  const delCampo = React.useMemo(
+    () => (campo === 'todos' ? items : items.filter((a) => a.campo === campo)),
+    [items, campo],
+  )
+  const conteo = React.useMemo(() => {
+    const c: Record<Nivel, number> = { atender: 0, prevenir: 0, nota: 0 }
+    for (const a of delCampo) c[a.nivel]++
+    return c
+  }, [delCampo])
+  const filtrados =
+    nivel === 'todos' ? delCampo : delCampo.filter((a) => a.nivel === nivel)
+  const visibles = verTodo ? filtrados : filtrados.slice(0, FILAS_VISIBLES)
+  const restantes = filtrados.length - visibles.length
 
   return (
     <Panel
@@ -327,10 +389,91 @@ export function ParaAtenderCampo() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {data.items.map((a, i) => (
-            <AtencionRow key={a.key} a={a} i={i} />
-          ))}
+        <div className="flex flex-col gap-3">
+          {/* Filtros: nivel a la izquierda, campo a la derecha. Solo aparecen
+              cuando la lista lo amerita (pocas filas no piden filtro). */}
+          {items.length > FILAS_VISIBLES && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <ChipFiltro
+                  activo={nivel === 'todos'}
+                  onClick={() => setNivel('todos')}
+                  clase="border-ink bg-ink text-white"
+                >
+                  Todos · {delCampo.length}
+                </ChipFiltro>
+                <ChipFiltro
+                  activo={nivel === 'atender'}
+                  onClick={() => setNivel(nivel === 'atender' ? 'todos' : 'atender')}
+                  clase="border-destructive/30 bg-destructive/10 text-destructive"
+                >
+                  Atender · {conteo.atender}
+                </ChipFiltro>
+                <ChipFiltro
+                  activo={nivel === 'prevenir'}
+                  onClick={() => setNivel(nivel === 'prevenir' ? 'todos' : 'prevenir')}
+                  clase="border-sol-deep/30 bg-sol-soft text-sol-deep"
+                >
+                  Prevenir · {conteo.prevenir}
+                </ChipFiltro>
+                {conteo.nota > 0 && (
+                  <ChipFiltro
+                    activo={nivel === 'nota'}
+                    onClick={() => setNivel(nivel === 'nota' ? 'todos' : 'nota')}
+                    clase="border-sky/30 bg-sky-soft text-sky"
+                  >
+                    Notas · {conteo.nota}
+                  </ChipFiltro>
+                )}
+              </div>
+              {campos.length > 1 && (
+                <select
+                  value={campo}
+                  onChange={(e) => setCampo(e.target.value)}
+                  aria-label="Filtrar por campo"
+                  className="rounded-full border border-border bg-card px-3 py-1 text-[12px] font-semibold text-muted-foreground outline-none transition-colors hover:border-faint focus-visible:ring-2 focus-visible:ring-field-soft"
+                >
+                  <option value="todos">Todos los campos</option>
+                  {campos.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {filtrados.length === 0 ? (
+            <p className="px-1 py-2 text-sm text-muted-foreground">
+              Nada con este filtro.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {visibles.map((a, i) => (
+                <AtencionRow key={a.key} a={a} i={i} />
+              ))}
+            </div>
+          )}
+
+          {restantes > 0 && (
+            <button
+              type="button"
+              onClick={() => setVerTodo(true)}
+              className="rounded-xl border border-dashed border-border py-2 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
+            >
+              Mostrar los {restantes} restantes
+            </button>
+          )}
+          {verTodo && filtrados.length > FILAS_VISIBLES && (
+            <button
+              type="button"
+              onClick={() => setVerTodo(false)}
+              className="rounded-xl border border-dashed border-border py-2 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
+            >
+              Mostrar menos
+            </button>
+          )}
         </div>
       )}
     </Panel>
