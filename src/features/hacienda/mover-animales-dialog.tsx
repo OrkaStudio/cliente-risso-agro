@@ -1,7 +1,13 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { ArrowRight, ArrowRightLeft, TriangleAlert } from 'lucide-react'
+import {
+  ArrowRight,
+  ArrowRightLeft,
+  ChevronDown,
+  Layers,
+  TriangleAlert,
+} from 'lucide-react'
 import {
   useMoverAnimales,
   useTropasDelPotrero,
@@ -76,12 +82,30 @@ function Opcion({
   )
 }
 
+/** Nombre visible de una tropa (los sueltos no son una tropa). */
+const nombreTropa = (t: TropaDelPotrero | null | undefined): string =>
+  t?.nombre ?? 'los sueltos'
+
+/** "30 vacas · 15 terneros" — la composición de una tropa, en criollo. */
+function composTexto(t: TropaDelPotrero): string {
+  return [...t.composicion]
+    .sort((a, b) => b.cabezas - a.cabezas)
+    .map((c) => `${c.cabezas} ${categoriaNombre(c.categoria, c.cabezas).toLowerCase()}`)
+    .join(' · ')
+}
+
+/** Cómo se agrupan los animales al llegar. 'aparte' conserva su tropa (o los
+ *  deja sueltos si venían así); 'juntar'/'otra' los suman a una tropa; 'nueva'
+ *  arma una. */
+type Agrup = 'aparte' | 'juntar' | 'nueva' | 'otra'
+
 /**
  * Confirmación del movimiento elegido EN EL MAPA (origen y destino ya vienen
- * fijos): qué tropa, cuánto se mueve (toda / cantidades por categoría) y a qué
- * tropa llega. La transacción la hace la RPC `mover_animales`; las reglas
- * duras (tropa en un solo campo, cantidades disponibles) viven en Postgres y
- * acá solo se anticipan para no ofrecer opciones inválidas.
+ * fijos). Reencuadrado alrededor de cómo lo piensa el productor: QUÉ se lleva
+ * (con la composición a la vista), QUÉ HAY en el potrero destino, y —solo si el
+ * destino está ocupado— si se juntan con lo que hay o quedan aparte. Lo demás
+ * (tropa nueva, sumar a otra tropa del campo) vive en "más opciones".
+ * La transacción y las reglas duras siguen en la RPC `mover_animales`.
  */
 export function MoverAnimalesDialog({
   empresaId,
@@ -95,20 +119,21 @@ export function MoverAnimalesDialog({
   onOpenChange: (v: boolean) => void
 }) {
   const tropas = useTropasDelPotrero(origen.potreroId)
-  const tropasDestino = useTropasCampo(destino.campoId)
+  const tropasDestinoPotrero = useTropasDelPotrero(destino.potreroId)
+  const tropasCampoDestino = useTropasCampo(destino.campoId)
   const mover = useMoverAnimales()
 
   const crossCampo = origen.campoId !== destino.campoId
 
   // 'sueltos' agrupa a los animales sin tropa (loteId null en la API).
   const [tropaSel, setTropaSel] = useState<string | null>(null)
-  const [modo, setModo] = useState<'todo' | 'cantidades'>('todo')
+  const [parte, setParte] = useState(false)
   const [cantidades, setCantidades] = useState<Record<string, string>>({})
-  const [destinoTropa, setDestinoTropa] = useState<
-    'conservar' | 'existente' | 'nueva'
-  >('conservar')
-  const [destinoLoteId, setDestinoLoteId] = useState('')
+  const [agrupUser, setAgrupUser] = useState<Agrup | null>(null)
+  const [juntarIdUser, setJuntarIdUser] = useState<string | null>(null)
+  const [otraId, setOtraId] = useState('')
   const [nuevoNombre, setNuevoNombre] = useState('')
+  const [verMas, setVerMas] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const lista: TropaDelPotrero[] = useMemo(
@@ -121,18 +146,43 @@ export function MoverAnimalesDialog({
 
   const tropa = lista.find((t) => (t.loteId ?? 'sueltos') === tropaKey) ?? null
   const esSueltos = tropa != null && tropa.loteId === null
-  const parcial = modo === 'cantidades'
+  const parcial = parte
 
-  // Cruzar de campo con una PARTE de la tropa exige tropa destino explícita
-  // (una tropa vive en un solo campo — invariante de la RPC). Si 'conservar'
-  // quedó inválido, cae a la mejor alternativa (derivado, sin efecto).
-  const conservarInvalido = crossCampo && parcial && !esSueltos
-  const destinoSel =
-    conservarInvalido && destinoTropa === 'conservar'
-      ? (tropasDestino.data ?? []).length > 0
-        ? 'existente'
-        : 'nueva'
-      : destinoTropa
+  // ── Qué hay en el potrero destino (fix de "no sabés qué tropas hay") ──
+  const contenidoDestino: TropaDelPotrero[] = useMemo(
+    () => tropasDestinoPotrero.data ?? [],
+    [tropasDestinoPotrero.data],
+  )
+  const destinoVacio = contenidoDestino.length === 0
+  // Tropas con nombre presentes en el destino: son las candidatas a "juntar".
+  const tropasDestino = useMemo(
+    () => contenidoDestino.filter((t) => t.loteId !== null),
+    [contenidoDestino],
+  )
+  const hayTropaDestino = tropasDestino.length > 0
+
+  // Cruzar de campo con una PARTE de una tropa exige tropa destino explícita
+  // (una tropa vive en un solo campo — invariante de la RPC): "aparte" no vale.
+  const aparteInvalido = crossCampo && parcial && !esSueltos
+
+  // Default del agrupamiento: NO destructivo → "aparte" (cada tropa conserva su
+  // identidad). Solo cuando "aparte" es inválido cae a juntar/nueva.
+  const agrupDefault: Agrup = aparteInvalido
+    ? hayTropaDestino
+      ? 'juntar'
+      : 'nueva'
+    : 'aparte'
+  const agrup = agrupUser ?? agrupDefault
+
+  const juntarId = juntarIdUser ?? tropasDestino[0]?.loteId ?? null
+  const juntarTropa = tropasDestino.find((t) => t.loteId === juntarId) ?? null
+
+  // "más opciones": sumar a una tropa del campo que NO esté ya en el destino
+  // (esas ya salen en "juntar") ni sea la de origen.
+  const otrasTropasCampo = (tropasCampoDestino.data ?? []).filter(
+    (t) => t.id !== tropa?.loteId && !tropasDestino.some((d) => d.loteId === t.id),
+  )
+  const otraTropa = otrasTropasCampo.find((t) => t.id === otraId) ?? null
 
   const items: ItemCargaMasiva[] = useMemo(() => {
     if (!tropa) return []
@@ -169,52 +219,58 @@ export function MoverAnimalesDialog({
     return null
   }, [parcial, tropa, items])
 
-  const conservarLabel = esSueltos
-    ? 'Quedan sueltos'
-    : crossCampo
-      ? `Mudar "${tropa?.nombre ?? ''}" a ${destino.campoNombre}`
-      : `Sigue siendo "${tropa?.nombre ?? ''}"`
-
-  const sinTropasDestino = (tropasDestino.data ?? []).length === 0
-
-  // Una línea que explica QUÉ va a pasar con la opción elegida — el productor
-  // no tiene por qué saber qué implica cada botón.
-  const destinoExplicacion =
-    destinoSel === 'existente'
-      ? 'Los animales movidos pasan a formar parte de la tropa que elijas.'
-      : destinoSel === 'nueva'
-        ? `Se arma una tropa nueva en ${destino.campoNombre} con los animales movidos.`
-        : esSueltos
-          ? 'Llegan sin tropa asignada. Los podés agrupar en una tropa cuando quieras.'
-          : crossCampo
-            ? `La tropa entera se muda de campo: pasa a ser de ${destino.campoNombre}.`
-            : parcial
-              ? `Siguen siendo de la misma tropa: "${tropa?.nombre ?? ''}" queda repartida entre los dos potreros.`
-              : `La tropa entera pasa al potrero ${destino.potreroNombre}.`
+  // Una línea que explica QUÉ va a pasar con la opción elegida, en criollo.
+  const explicacion = (() => {
+    if (agrup === 'juntar')
+      return `Se suman a "${nombreTropa(juntarTropa)}" — pasan a ser parte de esa tropa.`
+    if (agrup === 'otra')
+      return `Se suman a "${otraTropa?.nombre ?? '…'}".`
+    if (agrup === 'nueva')
+      return `Se arma una tropa nueva en ${destino.campoNombre} con los que movés.`
+    // aparte
+    if (esSueltos) return 'Llegan sin agrupar, como estaban.'
+    if (crossCampo && !parcial)
+      return `La tropa "${tropa?.nombre ?? ''}" se muda a ${destino.campoNombre}.`
+    if (parcial)
+      return `Siguen en "${tropa?.nombre ?? ''}", ahora repartida entre los dos potreros.`
+    return `La tropa "${tropa?.nombre ?? ''}" pasa al potrero ${destino.potreroNombre}.`
+  })()
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     if (!tropa) {
-      setError('Elegí qué tropa se mueve')
+      setError('Elegí qué se mueve')
       return
     }
     if (parcial && totalAMover === 0) {
-      setError('Ingresá cuántos animales se mueven')
+      setError('Anotá cuántos animales se mueven')
       return
     }
     if (excedido) {
       setError(excedido)
       return
     }
-    if (destinoSel === 'existente' && !destinoLoteId) {
+    if (agrup === 'juntar' && !juntarId) {
+      setError('Elegí con qué tropa se juntan')
+      return
+    }
+    if (agrup === 'otra' && !otraId) {
       setError('Elegí la tropa destino')
       return
     }
-    if (destinoSel === 'nueva' && !nuevoNombre.trim()) {
+    if (agrup === 'nueva' && !nuevoNombre.trim()) {
       setError('Poné el nombre de la tropa nueva')
       return
     }
+    const destinoRPC =
+      agrup === 'juntar' && juntarId
+        ? { loteId: juntarId }
+        : agrup === 'otra' && otraId
+          ? { loteId: otraId }
+          : agrup === 'nueva'
+            ? { nuevoNombre }
+            : undefined
     mover.mutate(
       {
         empresaId,
@@ -222,12 +278,7 @@ export function MoverAnimalesDialog({
         potreroDestinoId: destino.potreroId,
         loteId: tropa.loteId,
         seleccion: parcial ? { items } : { todo: true },
-        destino:
-          destinoSel === 'existente'
-            ? { loteId: destinoLoteId }
-            : destinoSel === 'nueva'
-              ? { nuevoNombre }
-              : undefined,
+        destino: destinoRPC,
       },
       {
         onSuccess: (res) => {
@@ -242,13 +293,15 @@ export function MoverAnimalesDialog({
     )
   }
 
+  const aparteLabel = esSueltos ? 'Quedan sin agrupar' : 'Quedan aparte'
+
   return (
     <FormDialog
       open
       onOpenChange={onOpenChange}
       icon={ArrowRightLeft}
       title="Mover animales"
-      subtitle="Elegí cuántos se mueven y a qué tropa llegan. Todo queda en el historial de cada animal."
+      subtitle="Elegí qué se mueve y cómo se agrupan al llegar. Todo queda en el historial de cada animal."
       onSubmit={onSubmit}
       footer={
         <Button
@@ -273,7 +326,7 @@ export function MoverAnimalesDialog({
         <PuntoChip punto={destino} />
       </motion.div>
 
-      {/* Qué tropa (solo si hay más de una en el potrero) */}
+      {/* ── ¿Qué movés? ── */}
       {tropas.isLoading ? (
         <motion.p variants={formItem} className="text-[13px] text-muted-foreground">
           Cargando la hacienda del potrero…
@@ -284,40 +337,49 @@ export function MoverAnimalesDialog({
         </motion.p>
       ) : (
         <>
-          {lista.length > 1 && (
-            <motion.div variants={formItem}>
-              <span className={formLabel}>Qué tropa se mueve</span>
-              <div className="grid gap-2">
-                {lista.map((t) => {
-                  const key = t.loteId ?? 'sueltos'
-                  const activa = tropaKey === key
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setTropaSel(key)
-                        setCantidades({})
-                      }}
-                      className={cn(
-                        'flex items-baseline justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors',
-                        activa
-                          ? 'border-primary bg-field-soft'
-                          : 'border-border bg-card hover:border-faint',
-                      )}
-                    >
-                      <span className="text-[13.5px] font-bold text-ink">
-                        {t.nombre ?? 'Sueltos (sin tropa)'}
+          <motion.div variants={formItem}>
+            <span className={formLabel}>¿Qué movés?</span>
+            <div className="grid gap-2">
+              {lista.map((t) => {
+                const key = t.loteId ?? 'sueltos'
+                const activa = tropaKey === key
+                const unica = lista.length === 1
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      if (unica) return
+                      setTropaSel(key)
+                      setCantidades({})
+                    }}
+                    className={cn(
+                      'rounded-xl border px-3.5 py-2.5 text-left transition-colors',
+                      activa
+                        ? 'border-primary bg-field-soft'
+                        : 'border-border bg-card hover:border-faint',
+                      unica && 'cursor-default',
+                    )}
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="inline-flex min-w-0 items-center gap-1.5 text-[13.5px] font-bold text-ink">
+                        <Layers className="size-3.5 shrink-0 text-field-deep" />
+                        <span className="truncate">
+                          {t.nombre ?? 'Sueltos (sin agrupar)'}
+                        </span>
                       </span>
                       <span className="tnum shrink-0 text-[13px] font-semibold text-muted-foreground">
                         {t.cabezas} cab
                       </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
+                    </div>
+                    <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                      {composTexto(t)}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          </motion.div>
 
           {tropa && (
             <>
@@ -325,11 +387,11 @@ export function MoverAnimalesDialog({
               <motion.div variants={formItem}>
                 <span className={formLabel}>Cuánto se mueve</span>
                 <div className="flex gap-2">
-                  <Opcion activa={!parcial} onClick={() => setModo('todo')}>
+                  <Opcion activa={!parcial} onClick={() => setParte(false)}>
                     {esSueltos ? 'Todos' : 'Toda la tropa'} · {tropa.cabezas}
                   </Opcion>
-                  <Opcion activa={parcial} onClick={() => setModo('cantidades')}>
-                    Elegir cantidades
+                  <Opcion activa={parcial} onClick={() => setParte(true)}>
+                    Solo una parte
                   </Opcion>
                 </div>
               </motion.div>
@@ -388,78 +450,160 @@ export function MoverAnimalesDialog({
                 </motion.div>
               )}
 
-              {/* A qué tropa llegan */}
+              {/* ── Qué hay en el destino (informativo) ── */}
               <motion.div variants={formItem}>
-                <span className={formLabel}>
-                  Al llegar a {destino.potreroNombre}
-                </span>
-                <div className="flex gap-2">
-                  <Opcion
-                    activa={destinoSel === 'conservar'}
-                    disabled={conservarInvalido}
-                    onClick={() => setDestinoTropa('conservar')}
-                  >
-                    {conservarLabel}
-                  </Opcion>
-                  <Opcion
-                    activa={destinoSel === 'existente'}
-                    disabled={sinTropasDestino}
-                    onClick={() => setDestinoTropa('existente')}
-                  >
-                    Sumar a otra tropa
-                  </Opcion>
-                  <Opcion
-                    activa={destinoSel === 'nueva'}
-                    onClick={() => setDestinoTropa('nueva')}
-                  >
-                    Tropa nueva
-                  </Opcion>
-                </div>
-                {/* Qué implica la opción elegida, en criollo. */}
-                <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
-                  {destinoExplicacion}
-                </p>
-                {sinTropasDestino && (
-                  <p className="mt-1 text-[12px] leading-snug text-faint">
-                    “Sumar a otra tropa” está apagado porque{' '}
-                    {destino.campoNombre} todavía no tiene tropas armadas.
+                <span className={formLabel}>En el potrero {destino.potreroNombre}</span>
+                {tropasDestinoPotrero.isLoading ? (
+                  <p className="text-[12.5px] text-muted-foreground">
+                    Viendo qué hay…
                   </p>
-                )}
-                {conservarInvalido && (
-                  <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
-                    Como movés una parte de la tropa a otro campo, tienen que
-                    sumarse a una tropa de {destino.campoNombre} o formar una
-                    nueva (una tropa no puede quedar partida en dos campos).
+                ) : destinoVacio ? (
+                  <p className="rounded-xl border border-dashed border-border bg-card px-3 py-2 text-[12.5px] text-muted-foreground">
+                    Está vacío — no hay animales todavía.
                   </p>
+                ) : (
+                  <div className="grid gap-1 rounded-xl bg-secondary/60 px-3 py-2.5">
+                    {contenidoDestino.map((t) => (
+                      <div
+                        key={t.loteId ?? 'sueltos'}
+                        className="flex items-baseline justify-between gap-2 text-[12.5px]"
+                      >
+                        <span className="min-w-0 truncate font-semibold text-ink">
+                          {t.nombre ?? 'Sueltos (sin agrupar)'}
+                        </span>
+                        <span className="tnum shrink-0 text-muted-foreground">
+                          {t.cabezas} cab
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </motion.div>
 
-              {destinoSel === 'existente' && (
-                <motion.div variants={formItem}>
-                  <span className={formLabel}>Tropa de {destino.campoNombre}</span>
-                  <Dropdown
-                    value={destinoLoteId}
-                    onChange={setDestinoLoteId}
-                    options={[
-                      { value: '', label: 'Elegí la tropa…' },
-                      ...(tropasDestino.data ?? [])
-                        .filter((t) => t.id !== tropa.loteId)
-                        .map((t) => ({ value: t.id, label: t.nombre })),
-                    ]}
-                  />
-                </motion.div>
-              )}
+              {/* ── Al llegar (agrupamiento) ── */}
+              <motion.div variants={formItem}>
+                <span className={formLabel}>Al llegar</span>
 
-              {destinoSel === 'nueva' && (
-                <motion.div variants={formItem}>
-                  <span className={formLabel}>Nombre de la tropa nueva</span>
-                  <Input
-                    value={nuevoNombre}
-                    onChange={(e) => setNuevoNombre(e.target.value)}
-                    placeholder={`Ej. Tropa ${destino.potreroNombre}`}
+                {/* La pregunta "juntar / aparte" solo aparece cuando el destino
+                    ya tiene una tropa con la que juntarse. */}
+                {hayTropaDestino && (
+                  <>
+                    <div className="flex gap-2">
+                      <Opcion
+                        activa={agrup === 'juntar'}
+                        onClick={() => {
+                          setAgrupUser('juntar')
+                          setVerMas(false)
+                        }}
+                      >
+                        {tropasDestino.length === 1
+                          ? `Se juntan con ${nombreTropa(juntarTropa)}`
+                          : 'Se juntan con…'}
+                      </Opcion>
+                      <Opcion
+                        activa={agrup === 'aparte'}
+                        disabled={aparteInvalido}
+                        onClick={() => {
+                          setAgrupUser('aparte')
+                          setVerMas(false)
+                        }}
+                      >
+                        {aparteLabel}
+                      </Opcion>
+                    </div>
+                    {agrup === 'juntar' && tropasDestino.length > 1 && (
+                      <div className="mt-2">
+                        <Dropdown
+                          value={juntarId ?? ''}
+                          onChange={setJuntarIdUser}
+                          options={tropasDestino.map((t) => ({
+                            value: t.loteId as string,
+                            label: `${t.nombre} · ${t.cabezas} cab`,
+                          }))}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Qué implica lo elegido, en criollo. */}
+                <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                  {explicacion}
+                </p>
+
+                {aparteInvalido && (
+                  <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+                    Como movés una parte a otro campo, tienen que sumarse a una
+                    tropa de {destino.campoNombre} o formar una nueva (una tropa
+                    no puede quedar partida en dos campos).
+                  </p>
+                )}
+
+                {/* Más opciones: tropa nueva / sumar a otra tropa del campo. */}
+                <button
+                  type="button"
+                  onClick={() => setVerMas((v) => !v)}
+                  className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-field-deep transition-colors hover:text-field"
+                >
+                  <ChevronDown
+                    className={cn('size-3.5 transition-transform', verMas && 'rotate-180')}
                   />
-                </motion.div>
-              )}
+                  {verMas ? 'Menos opciones' : 'Más opciones'}
+                </button>
+
+                {verMas && (
+                  <div className="mt-2 grid gap-2 rounded-xl border border-border bg-card p-3">
+                    <button
+                      type="button"
+                      onClick={() => setAgrupUser('nueva')}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-left text-[12.5px] font-semibold transition-colors',
+                        agrup === 'nueva'
+                          ? 'border-primary bg-field-soft text-field-deep'
+                          : 'border-border text-muted-foreground hover:border-faint',
+                      )}
+                    >
+                      Armar una tropa nueva
+                    </button>
+                    {agrup === 'nueva' && (
+                      <Input
+                        value={nuevoNombre}
+                        onChange={(e) => setNuevoNombre(e.target.value)}
+                        placeholder={`Ej. Tropa ${destino.potreroNombre}`}
+                      />
+                    )}
+                    {otrasTropasCampo.length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setAgrupUser('otra')}
+                          className={cn(
+                            'rounded-lg border px-3 py-2 text-left text-[12.5px] font-semibold transition-colors',
+                            agrup === 'otra'
+                              ? 'border-primary bg-field-soft text-field-deep'
+                              : 'border-border text-muted-foreground hover:border-faint',
+                          )}
+                        >
+                          Sumar a otra tropa de {destino.campoNombre}
+                        </button>
+                        {agrup === 'otra' && (
+                          <Dropdown
+                            value={otraId}
+                            onChange={setOtraId}
+                            options={[
+                              { value: '', label: 'Elegí la tropa…' },
+                              ...otrasTropasCampo.map((t) => ({
+                                value: t.id,
+                                label: t.nombre,
+                              })),
+                            ]}
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </motion.div>
             </>
           )}
         </>
