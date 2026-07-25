@@ -73,7 +73,13 @@ export function fillStyleUso(hex: string, uso: Uso): CSSProperties {
  * Glosario para poner DEBAJO del mapa (siempre a la vista). El COLOR identifica
  * al campo; la TEXTURA del relleno dice la actividad del potrero.
  */
-export function ReferenciasPotrero({ campo }: { campo: CampoVM }) {
+export function ReferenciasPotrero({
+  campo,
+  className,
+}: {
+  campo: CampoVM
+  className?: string
+}) {
   const hex = campo.color.hex
   const items: { uso: Uso; sub: string }[] = [
     { uso: 'ganadero', sub: 'puntos' },
@@ -81,7 +87,12 @@ export function ReferenciasPotrero({ campo }: { campo: CampoVM }) {
     { uso: 'vacio', sub: 'hueco' },
   ]
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(16,24,19,0.05)]">
+    <div
+      className={cn(
+        'flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[0_1px_2px_rgba(16,24,19,0.05)]',
+        className,
+      )}
+    >
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-faint">
           Referencias
@@ -385,7 +396,7 @@ export function PotreroSidePanel({
 
   return (
     <>
-    <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-auto lg:w-[300px]">
+    <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-auto lg:w-[300px] lg:self-start">
       <div className="flex items-center gap-2.5 border-b border-border px-4 py-3.5">
         <span
           className="inline-flex size-7 items-center justify-center rounded-lg font-heading text-[13px] font-bold text-white"
