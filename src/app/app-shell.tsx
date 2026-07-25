@@ -235,7 +235,7 @@ export function AppShell() {
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
             burbuja flotante del Asistente (no tapa la última card). */}
         <main className="flex-1 overflow-y-auto">
-          <div className="w-full px-4 pb-24 pt-7 sm:px-6">
+          <div className="w-full px-4 pb-12 pt-7 sm:px-6">
             <Suspense
               fallback={
                 <div className="text-sm text-muted-foreground">Cargando…</div>
