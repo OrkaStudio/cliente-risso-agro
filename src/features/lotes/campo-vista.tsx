@@ -566,8 +566,11 @@ export function CampoVista({
 
   return (
     <div className="flex flex-col gap-3">
-     <div className="flex flex-col gap-3 lg:flex-row">
-      <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-border bg-[#eef1ec] lg:h-[500px] lg:flex-1">
+     {/* Altura FIJA de la fila (mapa + panel) en desktop: el panel scrollea
+         adentro si tiene mucho, así el glosario de abajo queda SIEMPRE en el
+         mismo lugar al cambiar de campo (nada de saltos ni scroll de más). */}
+     <div className="flex flex-col gap-3 lg:h-[500px] lg:flex-row">
+      <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-border bg-[#eef1ec] lg:h-full lg:flex-1">
         {vacio ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
             Este campo todavía no tiene potreros dibujados. Tocá “Editar
