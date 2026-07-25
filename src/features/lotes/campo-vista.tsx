@@ -565,12 +565,13 @@ export function CampoVista({
   const selFeat = selMarker ? FEATURE_MAP[selMarker.type] : null
 
   return (
-    <div className="flex flex-col gap-3">
-     {/* Altura FIJA de la fila (mapa + panel) en desktop: el panel scrollea
-         adentro si tiene mucho, así el glosario de abajo queda SIEMPRE en el
-         mismo lugar al cambiar de campo (nada de saltos ni scroll de más). */}
-     <div className="flex flex-col gap-3 lg:h-[500px] lg:flex-row">
-      <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-border bg-[#eef1ec] lg:h-full lg:flex-1">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+     {/* Mapa (altura fija) + glosario en la columna IZQUIERDA: el glosario
+         queda SIEMPRE pegado al fondo del mapa, sin importar cuánto mida el
+         panel de la derecha, que va a su altura NATURAL (sin scroll). El
+         `items-start` evita que una columna estire a la otra. */}
+     <div className="flex min-w-0 flex-col gap-3 lg:flex-1">
+      <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-border bg-[#eef1ec] lg:h-[500px]">
         {vacio ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
             Este campo todavía no tiene potreros dibujados. Tocá “Editar
@@ -1125,6 +1126,9 @@ export function CampoVista({
           </div>
         )}
       </div>
+      {/* Glosario: pegado al fondo del mapa, dentro de la columna izquierda. */}
+      <ReferenciasPotrero campo={campo} />
+     </div>
       <PotreroSidePanel
         info={panelInfo}
         campo={campo}
@@ -1142,8 +1146,6 @@ export function CampoVista({
         }
         edit={editProp}
       />
-     </div>
-      <ReferenciasPotrero campo={campo} />
     </div>
   )
 }

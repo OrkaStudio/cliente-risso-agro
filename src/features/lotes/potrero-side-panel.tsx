@@ -148,7 +148,7 @@ export type MoverPanel = {
 function GuiaMover({ mover, info }: { mover: MoverPanel; info: PotreroInfo | null }) {
   const esOrigen = info?.potreroId === mover.origenPotreroId
   return (
-    <div className="flex flex-1 flex-col gap-3 p-4 lg:min-h-0 lg:overflow-y-auto">
+    <div className="flex flex-1 flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
         <ArrowRightLeft className="size-4 shrink-0 text-field-deep" />
         <span className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
@@ -385,7 +385,7 @@ export function PotreroSidePanel({
 
   return (
     <>
-    <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-full lg:min-h-0 lg:w-[300px]">
+    <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05)] lg:h-auto lg:w-[300px]">
       <div className="flex items-center gap-2.5 border-b border-border px-4 py-3.5">
         <span
           className="inline-flex size-7 items-center justify-center rounded-lg font-heading text-[13px] font-bold text-white"
@@ -407,7 +407,7 @@ export function PotreroSidePanel({
           onClose={() => setEditInfo(null)}
         />
       ) : info ? (
-        <div className="flex flex-1 flex-col gap-3.5 p-4 lg:min-h-0 lg:overflow-y-auto">
+        <div className="flex flex-1 flex-col gap-3.5 p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="font-heading text-[26px] font-bold tracking-[-0.02em] text-ink">
               Potrero {info.numero}
@@ -579,7 +579,7 @@ export function PotreroSidePanel({
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center lg:min-h-0 lg:overflow-y-auto">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
           <MousePointer2 className="size-7 text-faint" />
           <p className="text-[13px] text-muted-foreground">
             Tocá un potrero del mapa para ver su detalle.
