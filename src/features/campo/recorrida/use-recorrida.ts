@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { recdb, type RecObs, type RecPotrero, type RecSesion } from './db'
+import { sembrarRecorrida } from '@/features/campo/seed-offline'
 import {
   asegurarRecorridaRemota,
-  fetchRefs,
   guardarLluvia,
   guardarObservacion,
   pathAudio,
@@ -112,11 +112,11 @@ export function useRecorrida() {
   const [error, setError] = useState<string | null>(null)
   const sincronizarRef = useRef<(() => Promise<void>) | null>(null)
 
-  /** Refresca el cache de campos+potreros (permite arrancar sin señal). */
+  /** Refresca el cache de campos+potreros (permite arrancar sin señal). Reusa
+   *  el sembrado central (misma implementación que el seeding del CampoShell). */
   const cargarRefs = useCallback(async () => {
     try {
-      const { campos, potreros: ps } = await fetchRefs()
-      await recdb.refs.put({ id: 'refs', campos, potreros: ps, updated_at: Date.now() })
+      await sembrarRecorrida()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar los campos')
     }

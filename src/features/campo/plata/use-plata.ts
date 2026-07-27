@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { platadb, type PlataItem } from './db'
+import { sembrarPlata } from '@/features/campo/seed-offline'
 import {
-  fetchRefs,
   insertarMovimiento,
   pathAudioMovimiento,
   subirAudioMovimiento,
@@ -57,16 +57,11 @@ export function usePlata() {
   const refs = refsArr?.[0] ?? null
   const [error, setError] = useState<string | null>(null)
 
-  /** Refresca categorías/campos (cache para operar sin señal). */
+  /** Refresca categorías/campos (cache para operar sin señal). Reusa el
+   *  sembrado central (misma implementación que el seeding del CampoShell). */
   const cargarRefs = useCallback(async () => {
     try {
-      const { categorias, campos } = await fetchRefs()
-      await platadb.refs.put({
-        id: 'refs',
-        categorias,
-        campos,
-        updated_at: Date.now(),
-      })
+      await sembrarPlata()
     } catch (e) {
       setError(
         e instanceof Error ? e.message : 'No se pudieron cargar los datos',

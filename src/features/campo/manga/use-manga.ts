@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { mangadb, type AnimalCache, type OutboxItem } from './db'
+import { sembrarManga } from '@/features/campo/seed-offline'
 import {
   asignarCaravana,
   deshacerCaravana,
-  fetchSinCaravana,
   pathAudioEvento,
   subirAudioEvento,
   type CategoriaAnimal,
@@ -73,26 +73,8 @@ export function useManga() {
     setDescargando(true)
     setError(null)
     try {
-      const { animales: frescos, rfidsEnUso } = await fetchSinCaravana()
-      // Los caravaneados localmente se preservan intactos (no se pisan ni se
-      // pierden); los frescos que ya están hechos acá no se reponen.
-      const locales = await mangadb.animales
-        .where('caravaneado')
-        .equals(1)
-        .toArray()
-      const hechosLocal = new Set(locales.map((a) => a.id))
-      await mangadb.animales.clear()
-      await mangadb.animales.bulkPut([
-        ...locales,
-        ...frescos
-          .filter((a) => !hechosLocal.has(a.id))
-          .map((a) => ({ ...a, caravaneado: 0 as const })),
-      ])
-      await mangadb.refs.put({
-        id: 'rfids',
-        rfids: rfidsEnUso,
-        updated_at: Date.now(),
-      })
+      // Reusa el sembrado central (preserva los caravaneados locales).
+      await sembrarManga()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo descargar la lista')
     } finally {
