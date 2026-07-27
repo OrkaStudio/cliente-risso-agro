@@ -219,11 +219,19 @@ function PanelPotrero({
   const compos = potrero.composicion ?? []
   const col = coloresPorCategoria(compos.map((c) => c.categoria))
   const yaHecho = potrero.hecho === 1
+  const diasRec = yaHecho ? 0 : diasDesde(potrero.ultima?.fecha)
   const antiguedad = yaHecho
     ? 'recorrido hoy'
     : potrero.ultima?.fecha
-      ? haceCuantoTxt(diasDesde(potrero.ultima.fecha))
+      ? haceCuantoTxt(diasRec)
       : 'sin recorrer'
+  // Color del pill: verde (recorrido hoy) · ámbar (sin recorrer o hace >7 días,
+  // pide atención) · neutro (reciente).
+  const tonoAntig = yaHecho
+    ? 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+    : diasRec == null || diasRec > 7
+      ? 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]'
+      : 'bg-[var(--c-sunk)] text-[var(--c-ink-soft)]'
   return (
     <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
       <div className="flex items-start justify-between gap-2">
@@ -234,7 +242,12 @@ function PanelPotrero({
               <span className="c-display truncate text-[18px] text-[var(--c-ink)]">
                 Potrero {potrero.nombre}
               </span>
-              <span className="shrink-0 text-[11.5px] font-semibold text-[var(--c-faint)]">
+              <span
+                className={cn(
+                  'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold',
+                  tonoAntig,
+                )}
+              >
                 {antiguedad}
               </span>
             </div>
@@ -439,6 +452,8 @@ export function Croquis({
               const hecho = p.hecho === 1
               const acaEstoy = pisando?.id === p.id
               const sel = seleccionadoId === p.id
+              // Con un potrero elegido, los demás se atenúan → el seleccionado resalta.
+              const atenuado = seleccionadoId !== null && !sel
               const d =
                 pts.map((q, j) => `${j === 0 ? 'M' : 'L'}${q[0]},${q[1]}`).join(' ') + ' Z'
               const largo = Math.max(2, p.nombre.length)
@@ -451,6 +466,7 @@ export function Croquis({
                   className="cursor-pointer"
                   role="button"
                   aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
+                  style={{ opacity: atenuado ? 0.38 : 1, transition: 'opacity 0.15s' }}
                 >
                   <path
                     d={d}
@@ -462,12 +478,14 @@ export function Croquis({
                     strokeWidth={acaEstoy ? 1.6 : 0.7}
                     strokeLinejoin="round"
                   />
-                  {/* Seleccionado: casing oscuro + anillo blanco → se ve sobre
-                      cualquier relleno (blanco o color del campo). */}
+                  {/* Seleccionado: relleno lima translúcido + casing oscuro +
+                      anillo lima grueso → resalta sobre cualquier fondo (blanco
+                      o color del campo) y contrasta con el resto atenuado. */}
                   {sel && (
                     <>
-                      <path d={d} fill="none" stroke="#0c1c14" strokeOpacity={0.9} strokeWidth={2.6} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
-                      <path d={d} fill="none" stroke="#ffffff" strokeWidth={1.3} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
+                      <path d={d} fill="var(--c-mid)" fillOpacity={0.22} stroke="none" style={{ pointerEvents: 'none' }} />
+                      <path d={d} fill="none" stroke="#0c1c14" strokeOpacity={0.85} strokeWidth={4} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
+                      <path d={d} fill="none" stroke="var(--c-mid)" strokeWidth={2.2} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
                     </>
                   )}
                   {/* El número va adentro solo si el potrero le da lugar; si
@@ -513,6 +531,7 @@ export function Croquis({
               if (!pin) return null
               const hecho = p.hecho === 1
               const sel = seleccionadoId === p.id
+              const atenuado = seleccionadoId !== null && !sel
               const fs = Math.min((pinR * 2.6) / Math.max(2, p.nombre.length), pinR * 0.95)
               return (
                 <g
@@ -521,6 +540,7 @@ export function Croquis({
                   className="cursor-pointer"
                   role="button"
                   aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
+                  style={{ opacity: atenuado ? 0.42 : 1, transition: 'opacity 0.15s' }}
                 >
                   {/* Línea guía: dice a qué potrero pertenece el pin. */}
                   <line
@@ -543,8 +563,8 @@ export function Croquis({
                   />
                   {sel && (
                     <>
-                      <circle cx={pin.x} cy={pin.y} r={pinR} fill="none" stroke="#0c1c14" strokeOpacity={0.9} strokeWidth={pinR * 0.24} style={{ pointerEvents: 'none' }} />
-                      <circle cx={pin.x} cy={pin.y} r={pinR} fill="none" stroke="#ffffff" strokeWidth={pinR * 0.12} style={{ pointerEvents: 'none' }} />
+                      <circle cx={pin.x} cy={pin.y} r={pinR * 1.28} fill="none" stroke="#0c1c14" strokeOpacity={0.85} strokeWidth={pinR * 0.34} style={{ pointerEvents: 'none' }} />
+                      <circle cx={pin.x} cy={pin.y} r={pinR * 1.28} fill="none" stroke="var(--c-mid)" strokeWidth={pinR * 0.18} style={{ pointerEvents: 'none' }} />
                     </>
                   )}
                   <text
