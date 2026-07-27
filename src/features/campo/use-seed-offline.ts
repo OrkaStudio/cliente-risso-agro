@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/features/auth/auth-context'
-import { sembrarOffline } from '@/features/campo/seed-offline'
+import { sembrarOffline, type SeedDetalle } from '@/features/campo/seed-offline'
+export type { FeatureSeed } from '@/features/campo/seed-offline'
 
 /**
  * Prepara el teléfono para el campo: baja TODO el cache offline (recorrida +
@@ -38,6 +39,8 @@ export function useSeedOffline() {
     return v ? Number(v) : null
   })
   const [error, setError] = useState<string | null>(null)
+  // Estado REAL por feature de la última corrida (para el detalle del botón).
+  const [detalle, setDetalle] = useState<SeedDetalle | null>(null)
   // Cerrojo síncrono: los disparadores (login, foreground, botón) pueden
   // solaparse y el setState es asíncrono.
   const corriendo = useRef(false)
@@ -49,6 +52,7 @@ export function useSeedOffline() {
     setError(null)
     try {
       const r = await sembrarOffline()
+      setDetalle(r.detalle)
       if (r.ok) {
         const t = Date.now()
         try {
@@ -85,5 +89,5 @@ export function useSeedOffline() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user, sembrar])
 
-  return { estado, lastOk, error, online, sembrar }
+  return { estado, lastOk, detalle, error, online, sembrar }
 }

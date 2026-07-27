@@ -2,19 +2,15 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   Banknote,
-  Check,
   ClipboardList,
-  CloudOff,
   Home,
   Leaf,
-  LoaderCircle,
   LogOut,
   Footprints,
-  RotateCw,
   Syringe,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
-import { useSeedOffline } from '@/features/campo/use-seed-offline'
+import { EstadoCampo } from '@/features/campo/estado-campo'
 import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
@@ -73,93 +69,6 @@ function SalirDeLaCuenta() {
   )
 }
 
-/**
- * Barra de "listo para el campo": baja TODO el cache offline apenas hay señal
- * (login/apertura) y le dice al productor que ya puede irse sin datos. Se
- * autooculta cuando todo está bien; aparece para preparar, avisar que falta
- * conectar, o si algo falló. Convierte el requisito invisible del seeding en
- * un estado que se ve y en el que se confía.
- */
-function BarraSeed() {
-  const { estado, lastOk, online, sembrar } = useSeedOffline()
-  // Al TRANSICIONAR a 'listo' se muestra el ✓ un rato y se oculta (no molestar).
-  // El disparo es ajuste de estado durante el render (patrón "state from props");
-  // el ocultado va por timer. `okNonce` reinicia el timer si vuelve a 'listo'.
-  const [mostrarOk, setMostrarOk] = useState(false)
-  const [okNonce, setOkNonce] = useState(0)
-  const [prevEstado, setPrevEstado] = useState(estado)
-  if (prevEstado !== estado) {
-    setPrevEstado(estado)
-    if (estado === 'listo') {
-      setMostrarOk(true)
-      setOkNonce((n) => n + 1)
-    }
-  }
-  useEffect(() => {
-    if (!mostrarOk) return
-    const t = setTimeout(() => setMostrarOk(false), 4500)
-    return () => clearTimeout(t)
-  }, [mostrarOk, okNonce])
-
-  const faltaConectar = !online && lastOk == null
-
-  let tono: 'ok' | 'info' | 'warn' | null = null
-  let Icon = Check
-  let texto = ''
-  let reintentar = false
-  if (estado === 'sembrando') {
-    tono = 'info'
-    Icon = LoaderCircle
-    texto = 'Preparando para el campo…'
-  } else if (estado === 'error') {
-    tono = 'warn'
-    Icon = CloudOff
-    texto = 'No se pudo preparar del todo'
-    reintentar = true
-  } else if (faltaConectar) {
-    tono = 'warn'
-    Icon = CloudOff
-    texto = 'Conectate un momento para preparar el campo'
-  } else if (mostrarOk) {
-    tono = 'ok'
-    Icon = Check
-    texto = 'Listo para usar sin señal'
-  }
-  if (!tono) return null
-
-  const clasesTono =
-    tono === 'ok'
-      ? 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
-      : tono === 'warn'
-        ? 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]'
-        : 'bg-[var(--c-sunk)] text-[var(--c-ink-soft)]'
-
-  return (
-    <div
-      className={cn(
-        'flex shrink-0 items-center gap-2 px-4 py-2 text-[13px] font-semibold',
-        clasesTono,
-      )}
-    >
-      <Icon
-        className={cn('size-4 shrink-0', estado === 'sembrando' && 'animate-spin')}
-        strokeWidth={2.4}
-      />
-      <span className="min-w-0 flex-1 truncate">{texto}</span>
-      {reintentar && (
-        <button
-          type="button"
-          onClick={() => void sembrar()}
-          className="flex shrink-0 items-center gap-1 rounded-full border border-current/30 px-2.5 py-1 text-[12px]"
-        >
-          <RotateCw className="size-3.5" strokeWidth={2.4} />
-          Reintentar
-        </button>
-      )}
-    </div>
-  )
-}
-
 export function CampoShell() {
   // Precarga los chunks de las secciones en reposo → el salto a Recorrida/
   // Manga/Plata/Historial es instantáneo (sin flash de "Cargando…").
@@ -198,8 +107,9 @@ export function CampoShell() {
         <SalirDeLaCuenta />
       </header>
 
-      {/* Preparación offline: baja todo apenas hay señal + estado visible. */}
-      <BarraSeed />
+      {/* Preparación offline: baja todo apenas hay señal + botón vivo con el
+          estado ("Listo para el campo") persistente y expandible. */}
+      <EstadoCampo />
 
       {/* Contenido — caja acotada (min-h-0 para que el flex hijo pueda encoger).
           Cada página se estructura como app: header fijo + región scrolleable

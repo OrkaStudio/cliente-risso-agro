@@ -105,6 +105,18 @@
   color: var(--c-warn-deep) !important;
 }
 
+/* Punto "vivo" del estado listo: un anillo que respira hacia afuera y se
+   apaga (calmo, ~2,4s), no un titileo. Señala "al día" sin gritar. */
+@keyframes c-breathe {
+  0%   { transform: scale(1);   opacity: 0.5; }
+  70%  { transform: scale(2.1); opacity: 0; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+.c-breathe { animation: c-breathe 2.4s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .c-breathe { animation: none; }
+}
+
 /* Aparición de confirmación (ticker "último") */
 @keyframes c-stamp {
   0% { transform: scale(0.97); opacity: 0.5; }

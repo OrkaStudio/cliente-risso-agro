@@ -67,25 +67,44 @@ export function sembrarPlata(): Promise<void> {
   })
 }
 
-export type SeedResultado = { ok: boolean; parcial: boolean; error?: string }
+export type FeatureSeed = 'ok' | 'fallo'
+export type SeedDetalle = {
+  recorrida: FeatureSeed
+  manga: FeatureSeed
+  plata: FeatureSeed
+}
+export type SeedResultado = {
+  ok: boolean
+  parcial: boolean
+  detalle: SeedDetalle
+  error?: string
+}
 
 /**
  * Baja TODO en paralelo. Si algo falla, sigue con lo demás y reporta `parcial`
- * (así una parte cacheada no se pierde por otra que falló).
+ * (así una parte cacheada no se pierde por otra que falló). Devuelve el estado
+ * REAL por feature (`detalle`) para que la UI muestre qué quedó guardado.
  */
 export async function sembrarOffline(): Promise<SeedResultado> {
-  const rs = await Promise.allSettled([
+  const [rec, man, pla] = await Promise.allSettled([
     sembrarRecorrida(),
     sembrarManga(),
     sembrarPlata(),
   ])
-  const fallos = rs.filter(
+  const est = (r: PromiseSettledResult<void>): FeatureSeed =>
+    r.status === 'fulfilled' ? 'ok' : 'fallo'
+  const detalle: SeedDetalle = {
+    recorrida: est(rec),
+    manga: est(man),
+    plata: est(pla),
+  }
+  const fallos = [rec, man, pla].filter(
     (r): r is PromiseRejectedResult => r.status === 'rejected',
   )
-  if (fallos.length === 0) return { ok: true, parcial: false }
+  if (fallos.length === 0) return { ok: true, parcial: false, detalle }
   const error =
     fallos[0].reason instanceof Error
       ? fallos[0].reason.message
       : 'No se pudo preparar todo'
-  return { ok: false, parcial: fallos.length < rs.length, error }
+  return { ok: false, parcial: fallos.length < 3, detalle, error }
 }
