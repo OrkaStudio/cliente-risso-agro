@@ -1,5 +1,6 @@
-import { Suspense, type ReactNode, useState } from 'react'
+import { Suspense, type ReactNode, useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { prefetch, prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
 import {
   BarChart3,
   Beef,
@@ -100,6 +101,10 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('side-collapsed') === '1',
   )
+
+  // Precarga los chunks de las secciones en reposo → navegar entre Hacienda/
+  // Campos/Analítica/Agenda es instantáneo (sin flash de "Cargando…").
+  useEffect(() => prefetchEnReposo(Object.values(CHUNKS_OFICINA)), [])
   const toggle = () =>
     setCollapsed((c) => {
       localStorage.setItem('side-collapsed', c ? '0' : '1')
@@ -158,6 +163,10 @@ export function AppShell() {
               to={to}
               end={end}
               title={collapsed ? label : undefined}
+              onMouseEnter={() => {
+                const t = CHUNKS_OFICINA[to]
+                if (t) prefetch(t)
+              }}
               className={({ isActive }) =>
                 cn(
                   'relative flex items-center gap-3 rounded-[10px] py-2.5 text-sm font-medium transition-colors',

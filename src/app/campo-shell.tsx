@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { useSeedOffline } from '@/features/campo/use-seed-offline'
+import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
@@ -160,6 +161,9 @@ function BarraSeed() {
 }
 
 export function CampoShell() {
+  // Precarga los chunks de las secciones en reposo → el salto a Recorrida/
+  // Manga/Plata/Historial es instantáneo (sin flash de "Cargando…").
+  useEffect(() => prefetchEnReposo(Object.values(CHUNKS_CAMPO)), [])
 
   return (
     <div className="campo flex h-full flex-col overflow-hidden">
@@ -178,6 +182,7 @@ export function CampoShell() {
         </div>
         <NavLink
           to="/campo/historial"
+          onPointerDown={() => prefetch(CHUNKS_CAMPO['/campo/historial'])}
           className={({ isActive }) =>
             cn(
               'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors',
@@ -227,6 +232,10 @@ export function CampoShell() {
               key={to}
               to={to}
               end={end}
+              onPointerDown={() => {
+                const t = CHUNKS_CAMPO[to]
+                if (t) prefetch(t)
+              }}
               className={({ isActive }) =>
                 cn(
                   'flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors',
