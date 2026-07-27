@@ -270,6 +270,9 @@ function Recorrida({
 }) {
   const navigate = useNavigate()
   const [abierto, setAbierto] = useState<string | null>(null)
+  // Potrero seleccionado en el croquis: muestra su panel (animales, distribución)
+  // sin entrar todavía al parte.
+  const [seleccionado, setSeleccionado] = useState<string | null>(null)
   const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [panelAbierto, setPanelAbierto] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
@@ -399,7 +402,13 @@ function Recorrida({
         <Croquis
           potreros={r.potreros}
           colorHex={r.colorCampo(r.meta!.campo_id).hex}
-          onAbrir={setAbierto}
+          campoNombre={r.meta!.campo_nombre}
+          seleccionadoId={seleccionado}
+          onSeleccionar={setSeleccionado}
+          onAbrir={(id) => {
+            setSeleccionado(null)
+            setAbierto(id)
+          }}
         />
       ) : (
         <ListaPotreros r={r} onAbrir={setAbierto} />

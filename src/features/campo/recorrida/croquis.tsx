@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Crosshair, LoaderCircle } from 'lucide-react'
+import { ArrowRight, Check, Crosshair, LoaderCircle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { categoriaNombre, coloresPorCategoria } from '@/features/hacienda/labels'
 import type { RecPotrero } from './db'
+import { diasDesde, haceCuantoTxt } from './api'
 import { CLabel } from '../ui'
 
 /**
@@ -195,6 +197,99 @@ function ubicarPin(
   }
 }
 
+/**
+ * Panel del potrero seleccionado: cuántos animales hay y su distribución, hace
+ * cuánto se recorrió, y el botón para entrar a recorrerlo. Vive en la zona del
+ * pulgar (reemplaza "¿Dónde estoy?" mientras hay uno elegido). Todo sale del
+ * cache offline (composición de la última sincronización con señal).
+ */
+function PanelPotrero({
+  potrero,
+  campoNombre,
+  colorHex,
+  onAbrir,
+  onCerrar,
+}: {
+  potrero: RecPotrero
+  campoNombre: string
+  colorHex: string
+  onAbrir: (id: string) => void
+  onCerrar: () => void
+}) {
+  const compos = potrero.composicion ?? []
+  const col = coloresPorCategoria(compos.map((c) => c.categoria))
+  const yaHecho = potrero.hecho === 1
+  const antiguedad = yaHecho
+    ? 'Recorrido hoy'
+    : potrero.ultima?.fecha
+      ? `Recorrido ${haceCuantoTxt(diasDesde(potrero.ultima.fecha))}`
+      : 'Sin recorrer'
+  return (
+    <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="size-3 shrink-0 rounded-full" style={{ background: colorHex }} />
+          <div className="min-w-0 leading-tight">
+            <div className="c-display truncate text-[18px] text-[var(--c-ink)]">
+              Potrero {potrero.nombre}
+            </div>
+            <CLabel className="!text-[11px]">{campoNombre}</CLabel>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onCerrar}
+          aria-label="Cerrar"
+          className="-mr-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--c-faint)]"
+        >
+          <X className="size-5" />
+        </button>
+      </div>
+
+      {potrero.cabezas > 0 ? (
+        <>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="c-mono text-[26px] font-extrabold leading-none text-[var(--c-ink)]">
+              {potrero.cabezas}
+            </span>
+            <CLabel className="!text-[12px]">cabezas</CLabel>
+          </div>
+          {compos.length > 0 && (
+            <div className="mt-2 grid max-h-[26vh] gap-1.5 overflow-y-auto rounded-xl bg-[var(--c-sunk)] px-3 py-2">
+              {compos.map((c) => (
+                <div key={c.categoria} className="flex items-center gap-2 text-[13.5px]">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: col[c.categoria] }} />
+                  <span className="min-w-0 truncate text-[var(--c-ink)]">
+                    {categoriaNombre(c.categoria, c.cabezas)}
+                  </span>
+                  <span className="c-mono ml-auto shrink-0 font-semibold text-[var(--c-ink)]">
+                    {c.cabezas}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <CLabel className="mt-2 block !text-[12.5px]">
+          Sin animales cargados en este potrero.
+        </CLabel>
+      )}
+
+      <CLabel className="mt-2 block !text-[11.5px]">{antiguedad}</CLabel>
+
+      <button
+        type="button"
+        onClick={() => onAbrir(potrero.id)}
+        className="c-display c-hard mt-2.5 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
+      >
+        {yaHecho ? 'Ver / editar este potrero' : 'Recorrer este potrero'}
+        <ArrowRight className="size-5" strokeWidth={2.5} />
+      </button>
+    </div>
+  )
+}
+
 type EstadoGPS =
   | { k: 'idle' }
   | { k: 'buscando' }
@@ -204,16 +299,27 @@ type EstadoGPS =
 export function Croquis({
   potreros,
   colorHex,
+  campoNombre,
+  seleccionadoId,
+  onSeleccionar,
   onAbrir,
 }: {
   potreros: RecPotrero[]
   /** Color IDENTIDAD del campo: el potrero recorrido se pinta de ESTE color
    *  (no verde), así cada campo tiene su croquis distinto y no todo homogéneo. */
   colorHex: string
-  /** Abrir el parte de un potrero (la hoja la monta la página). */
+  campoNombre: string
+  /** Potrero seleccionado (muestra su panel abajo). null = ninguno. */
+  seleccionadoId: string | null
+  /** Tocar un potrero en el mapa lo SELECCIONA (abre el panel), no el parte. */
+  onSeleccionar: (potreroId: string | null) => void
+  /** Abrir el parte de un potrero (desde el panel o el atajo del GPS). */
   onAbrir: (potreroId: string) => void
 }) {
   const textoHecho = textoSobre(colorHex)
+  const seleccionado = seleccionadoId
+    ? (potreros.find((p) => p.id === seleccionadoId) ?? null)
+    : null
   const [gps, setGps] = useState<EstadoGPS>({ k: 'idle' })
   // Medimos el dibujo REAL en píxeles: sin eso no se puede saber si un potrero
   // llega al mínimo táctil (el viewBox es relativo al tamaño del campo).
@@ -316,7 +422,10 @@ export function Croquis({
           <svg
             viewBox={`${-MARGEN} ${-MARGEN} ${proy.vw + MARGEN * 2} ${proy.vh + MARGEN * 2}`}
             preserveAspectRatio="xMidYMid meet"
-            className="h-full w-full"
+            // Absoluta: el contenedor es `relative`. Así la SVG NO aporta altura
+            // intrínseca (del aspect del viewBox) — si no, le pone un piso al
+            // dibujo y el flex no lo puede encoger para dejar lugar al panel.
+            className="absolute inset-0 h-full w-full"
             role="img"
             aria-label="Croquis del campo — tocá un potrero para cargarlo"
           >
@@ -326,6 +435,7 @@ export function Croquis({
             {capas.map(({ p, pts, x, y, r, chico }) => {
               const hecho = p.hecho === 1
               const acaEstoy = pisando?.id === p.id
+              const sel = seleccionadoId === p.id
               const d =
                 pts.map((q, j) => `${j === 0 ? 'M' : 'L'}${q[0]},${q[1]}`).join(' ') + ' Z'
               const largo = Math.max(2, p.nombre.length)
@@ -334,7 +444,7 @@ export function Croquis({
               return (
                 <g
                   key={p.id}
-                  onClick={() => onAbrir(p.id)}
+                  onClick={() => onSeleccionar(p.id)}
                   className="cursor-pointer"
                   role="button"
                   aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
@@ -349,6 +459,14 @@ export function Croquis({
                     strokeWidth={acaEstoy ? 1.6 : 0.7}
                     strokeLinejoin="round"
                   />
+                  {/* Seleccionado: casing oscuro + anillo blanco → se ve sobre
+                      cualquier relleno (blanco o color del campo). */}
+                  {sel && (
+                    <>
+                      <path d={d} fill="none" stroke="#0c1c14" strokeOpacity={0.9} strokeWidth={2.6} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
+                      <path d={d} fill="none" stroke="#ffffff" strokeWidth={1.3} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
+                    </>
+                  )}
                   {/* El número va adentro solo si el potrero le da lugar; si
                       no, se dibuja en el pin (abajo) y acá no va nada. */}
                   {!chico && (
@@ -391,11 +509,12 @@ export function Croquis({
             {capas.map(({ p, x, y, pin }) => {
               if (!pin) return null
               const hecho = p.hecho === 1
+              const sel = seleccionadoId === p.id
               const fs = Math.min((pinR * 2.6) / Math.max(2, p.nombre.length), pinR * 0.95)
               return (
                 <g
                   key={`pin-${p.id}`}
-                  onClick={() => onAbrir(p.id)}
+                  onClick={() => onSeleccionar(p.id)}
                   className="cursor-pointer"
                   role="button"
                   aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
@@ -419,6 +538,12 @@ export function Croquis({
                     stroke={pisando?.id === p.id ? 'var(--c-warn)' : '#3c463b'}
                     strokeWidth={pinR * 0.11}
                   />
+                  {sel && (
+                    <>
+                      <circle cx={pin.x} cy={pin.y} r={pinR} fill="none" stroke="#0c1c14" strokeOpacity={0.9} strokeWidth={pinR * 0.24} style={{ pointerEvents: 'none' }} />
+                      <circle cx={pin.x} cy={pin.y} r={pinR} fill="none" stroke="#ffffff" strokeWidth={pinR * 0.12} style={{ pointerEvents: 'none' }} />
+                    </>
+                  )}
                   <text
                     x={pin.x}
                     y={hecho ? pin.y - pinR * 0.22 : pin.y}
@@ -474,7 +599,7 @@ export function Croquis({
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => onAbrir(p.id)}
+                  onClick={() => onSeleccionar(p.id)}
                   className={cn(
                     'c-display flex h-11 items-center gap-1.5 rounded-lg border px-3 text-[15px]',
                     p.hecho !== 1 &&
@@ -495,7 +620,16 @@ export function Croquis({
         )}
       </div>
 
-      {/* ===== Zona del pulgar: ubicarse y el atajo del potrero que pisa ===== */}
+      {/* ===== Zona del pulgar: panel del potrero elegido, o ubicarse ===== */}
+      {seleccionado ? (
+        <PanelPotrero
+          potrero={seleccionado}
+          campoNombre={campoNombre}
+          colorHex={colorHex}
+          onAbrir={onAbrir}
+          onCerrar={() => onSeleccionar(null)}
+        />
+      ) : (
       <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
         {pisando ? (
           // El camino más corto posible: frenó, está adentro, un toque y carga.
@@ -537,6 +671,7 @@ export function Croquis({
           </CLabel>
         )}
       </div>
+      )}
     </div>
   )
 }

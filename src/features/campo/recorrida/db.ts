@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie'
 import type {
   AguaEstado,
   CampoRec,
+  CompoItem,
   CultivoEstado,
   ElectricoEstado,
   EstadoCiclo,
@@ -65,6 +66,9 @@ export type RecPotrero = {
   nombre: string
   estado_ciclo: EstadoCiclo
   cabezas: number
+  /** Composición por categoría (última sincronización). Puede faltar en un
+   *  cache viejo previo a esta feature → tratar como [] al leer. */
+  composicion?: CompoItem[]
   /** Polígono [lat,lng][] (si Oficina lo dibujó) — croquis del campo. */
   poligono: [number, number][] | null
   /** Última observación conocida ("igual que la última vez"). */

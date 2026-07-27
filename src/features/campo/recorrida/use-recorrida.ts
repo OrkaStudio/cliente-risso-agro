@@ -496,6 +496,7 @@ export function useRecorrida() {
     nombre: p.nombre,
     estado_ciclo: p.estado_ciclo,
     cabezas: p.cabezas,
+    composicion: p.composicion ?? [],
     poligono: p.poligono,
     ultima: p.ultima,
     eliminado: 0,

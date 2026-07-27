@@ -6,6 +6,11 @@ export type AguaEstado = Database['public']['Enums']['agua_estado']
 export type ElectricoEstado = Database['public']['Enums']['electrico_estado']
 export type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 export type CultivoEstado = Database['public']['Enums']['cultivo_obs_estado']
+export type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
+
+/** Una categoría presente en el potrero y cuántas cabezas. Cacheado offline
+ *  para mostrar la composición al tocar un potrero en el croquis, sin señal. */
+export type CompoItem = { categoria: CategoriaAnimal; cabezas: number }
 
 export type CampoRec = {
   id: string
@@ -33,6 +38,8 @@ export type PotreroRec = {
   nombre: string
   estado_ciclo: EstadoCiclo
   cabezas: number
+  /** Composición por categoría (de la última sincronización con señal). */
+  composicion: CompoItem[]
   /** Polígono del potrero (si se dibujó en Oficina) — alimenta el croquis. */
   poligono: LatLng[] | null
   /** Última observación registrada (de cualquier recorrida anterior). */
@@ -80,7 +87,7 @@ export async function fetchRefs(): Promise<{
   campos: CampoRec[]
   potreros: (PotreroRec & { campo_id: string })[]
 }> {
-  const [camposRes, potrerosRes, stockRes, obsRes] = await Promise.all([
+  const [camposRes, potrerosRes, stockRes, obsRes, animalesRes] = await Promise.all([
     // Orden por color_idx = orden de la letra (A, B, C…): la lista de campos
     // queda coherente con las letras de sus potreros en toda la app.
     supabase.from('campo').select('id, nombre, empresa_id, color_idx').order('color_idx'),
@@ -97,15 +104,34 @@ export async function fetchRefs(): Promise<{
       )
       .order('created_at', { ascending: false })
       .limit(1000),
+    // Animales activos (potrero + categoría) → composición por potrero, para
+    // mostrar el desglose al tocar un potrero en el croquis SIN señal.
+    supabase
+      .from('v_animal_con_caravana')
+      .select('potrero_id, categoria')
+      .eq('estado', 'activo'),
   ])
   if (camposRes.error) throw camposRes.error
   if (potrerosRes.error) throw potrerosRes.error
   if (stockRes.error) throw stockRes.error
   if (obsRes.error) throw obsRes.error
+  if (animalesRes.error) throw animalesRes.error
 
   const cab = new Map(
     (stockRes.data ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
   )
+  // Composición por potrero: categoría → cabezas, ordenada de mayor a menor.
+  const composPorPotrero = new Map<string, Map<CategoriaAnimal, number>>()
+  for (const a of animalesRes.data ?? []) {
+    if (!a.potrero_id || !a.categoria) continue
+    const m = composPorPotrero.get(a.potrero_id) ?? new Map<CategoriaAnimal, number>()
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    composPorPotrero.set(a.potrero_id, m)
+  }
+  const composDe = (potreroId: string): CompoItem[] =>
+    [...(composPorPotrero.get(potreroId)?.entries() ?? [])]
+      .map(([categoria, cabezas]) => ({ categoria, cabezas }))
+      .sort((x, y) => y.cabezas - x.cabezas)
   // Primera aparición por potrero = la más reciente (vienen ordenadas desc).
   const ultimas = new Map<string, UltimaObs>()
   for (const o of obsRes.data ?? []) {
@@ -134,6 +160,7 @@ export async function fetchRefs(): Promise<{
       estado_ciclo: p.estado_ciclo,
       campo_id: p.campo_id,
       cabezas: cab.get(p.id) ?? 0,
+      composicion: composDe(p.id),
       poligono: (p.poligono as LatLng[] | null) ?? null,
       ultima: ultimas.get(p.id) ?? null,
     })),
