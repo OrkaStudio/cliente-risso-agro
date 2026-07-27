@@ -107,8 +107,9 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     await page.goto('/')
 
     // Guard de empresa sin red → NO rebota a /onboarding: usa la última
-    // membresía conocida y un móvil cae al Modo Campo.
-    await expect(page).toHaveURL(/\/campo\//)
+    // membresía conocida y un móvil cae al Modo Campo. El landing por estado
+    // (commit 7d78253) manda al hub `/campo` pelado, no a una sub-ruta.
+    await expect(page).toHaveURL(/\/campo(?:\/|$)/)
     await expect(page.getByRole('link', { name: 'Recorrida' })).toBeVisible()
 
     // La Recorrida (offline-first, Dexie) abre sin red.
@@ -150,8 +151,9 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     await page.goto('/')
 
     // El refresh del token falla por red → la sesión persistida vale igual
-    // (RLS es la barrera real; las escrituras van al outbox).
-    await expect(page).toHaveURL(/\/campo\//, { timeout: 20_000 })
+    // (RLS es la barrera real; las escrituras van al outbox). Aterriza en el
+    // hub `/campo` pelado (landing por estado), no en una sub-ruta.
+    await expect(page).toHaveURL(/\/campo(?:\/|$)/, { timeout: 20_000 })
     await expect(page.getByRole('link', { name: 'Recorrida' })).toBeVisible()
 
     await context.close()
