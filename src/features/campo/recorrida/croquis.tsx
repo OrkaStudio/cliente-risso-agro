@@ -220,18 +220,23 @@ function PanelPotrero({
   const col = coloresPorCategoria(compos.map((c) => c.categoria))
   const yaHecho = potrero.hecho === 1
   const antiguedad = yaHecho
-    ? 'Recorrido hoy'
+    ? 'recorrido hoy'
     : potrero.ultima?.fecha
-      ? `Recorrido ${haceCuantoTxt(diasDesde(potrero.ultima.fecha))}`
-      : 'Sin recorrer'
+      ? haceCuantoTxt(diasDesde(potrero.ultima.fecha))
+      : 'sin recorrer'
   return (
     <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="size-3 shrink-0 rounded-full" style={{ background: colorHex }} />
           <div className="min-w-0 leading-tight">
-            <div className="c-display truncate text-[18px] text-[var(--c-ink)]">
-              Potrero {potrero.nombre}
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="c-display truncate text-[18px] text-[var(--c-ink)]">
+                Potrero {potrero.nombre}
+              </span>
+              <span className="shrink-0 text-[11.5px] font-semibold text-[var(--c-faint)]">
+                {antiguedad}
+              </span>
             </div>
             <CLabel className="!text-[11px]">{campoNombre}</CLabel>
           </div>
@@ -275,8 +280,6 @@ function PanelPotrero({
           Sin animales cargados en este potrero.
         </CLabel>
       )}
-
-      <CLabel className="mt-2 block !text-[11.5px]">{antiguedad}</CLabel>
 
       <button
         type="button"
