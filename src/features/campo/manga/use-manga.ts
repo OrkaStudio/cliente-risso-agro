@@ -163,11 +163,15 @@ export function useManga() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animales === undefined])
 
-  // Al volver la señal: subir lo pendiente Y re-bajar la lista (cerrar el hueco
-  // de un cache viejo). Diferido, fuera del cuerpo síncrono del effect.
+  // Al montar / volver la señal: SOLO sincronizar (subir lo pendiente). NO se
+  // re-baja la lista acá: eso lo hace el seeder central del CampoShell (al
+  // login/apertura), y `descargar` hace clear()+bulkPut → la lista parpadeaba
+  // (vacía→llena) cada vez que se entraba a Manga = la "doble carga". El cache
+  // ya viene sembrado; si por una carrera estuviera vacío, la red de seguridad
+  // de abajo lo baja. Diferido, fuera del cuerpo síncrono del effect.
   useEffect(() => {
     if (!online) return
-    const t = setTimeout(() => void refrescar(), 0)
+    const t = setTimeout(() => void sincronizar(), 0)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online])
