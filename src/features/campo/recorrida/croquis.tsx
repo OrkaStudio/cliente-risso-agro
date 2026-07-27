@@ -146,6 +146,49 @@ function textoSobre(hex: string): string {
 }
 
 /**
+ * Ubica el pin de una ASTILLA: prueba direcciones alrededor de su polo y elige
+ * la que cae en espacio libre — fuera de todos los polígonos y lejos de las
+ * otras etiquetas. Solo se usa para potreros diminutos (que ni con letra
+ * mínima ni con el dedo entran); el resto se etiqueta en su lugar.
+ */
+function ubicarPin(
+  origen: { x: number; y: number },
+  dist: number,
+  radio: number,
+  poligonos: XY[][],
+  ocupados: { x: number; y: number }[],
+  limite: { minX: number; maxX: number; minY: number; maxY: number },
+): { x: number; y: number } {
+  let mejor = { x: origen.x + dist, y: origen.y, score: -Infinity }
+  for (const k of [1, 1.5, 2.1, 2.9]) {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2
+      const x = origen.x + Math.cos(a) * dist * k
+      const y = origen.y + Math.sin(a) * dist * k
+      let score = -k * 6
+      if (
+        x < limite.minX + radio || x > limite.maxX - radio ||
+        y < limite.minY + radio || y > limite.maxY - radio
+      ) {
+        score -= 500
+      }
+      for (const poly of poligonos) {
+        if (distanciaAlBorde(x, y, poly) > -radio * 0.5) score -= 260
+      }
+      for (const o of ocupados) {
+        const d = Math.hypot(x - o.x, y - o.y)
+        if (d < radio * 2.4) score -= (radio * 2.4 - d) * 25
+      }
+      if (score > mejor.score) mejor = { x, y, score }
+    }
+  }
+  return {
+    x: Math.max(limite.minX + radio, Math.min(limite.maxX - radio, mejor.x)),
+    y: Math.max(limite.minY + radio, Math.min(limite.maxY - radio, mejor.y)),
+  }
+}
+
+/**
  * Panel del potrero seleccionado: cuántos animales hay y su distribución, hace
  * cuánto se recorrió, y el botón para entrar a recorrerlo. Vive en la zona del
  * pulgar (reemplaza "¿Dónde estoy?" mientras hay uno elegido). Todo sale del
@@ -330,12 +373,13 @@ export function Croquis({
       ? potreros.find((p) => p.id === gps.potreroId)
       : null
 
-  // ---- Etiquetas SIEMPRE en el lugar ---------------------------------------
+  // ---- Etiquetas en el lugar, con pin SOLO para las astillas ----------------
   // El número va SOBRE cada potrero (en su centro-más-adentro). Nada de pines
-  // flotantes con línea guía: con muchos potreros chicos (La Porteña) eso se
-  // volvía una nube de globos imposible de asociar a su forma. Los chicos igual
-  // muestran su número (tamaño mínimo legible, aunque desborde un poco) y traen
-  // una zona de tap invisible más grande, centrada en el potrero.
+  // flotantes en masa: con muchos potreros chicos (La Porteña) eso era una nube
+  // de globos imposible de asociar a su forma. Los chicos muestran su número en
+  // el lugar (tamaño mínimo legible) + zona de tap agrandada. SOLO las ASTILLAS
+  // —tan diminutas que ni con letra mínima ni con el dedo entran— van a un pin
+  // con línea guía: son una o dos por campo, así que no arman nube.
   const escalaPx =
     proy && box.w > 0
       ? Math.min(box.w / (proy.vw + MARGEN * 2), box.h / (proy.vh + MARGEN * 2))
@@ -345,6 +389,13 @@ export function Croquis({
   const minLabelVB = escalaPx > 0 ? MIN_LABEL_PX / escalaPx : 0
   // Radio de la zona de tap invisible de un potrero chico (target cómodo).
   const hitR = escalaPx > 0 ? TAP_MIN / 2 / escalaPx : 0
+  // Astilla: por debajo de esto (px en pantalla) va a pin. Umbral BAJO → casi
+  // todo se etiqueta en el lugar; solo las diminutas de verdad usan el pin.
+  const ASTILLA_PX = 24
+  const pinR = escalaPx > 0 ? TAP_MIN / 2 / escalaPx : 0
+  const limite = proy
+    ? { minX: -MARGEN, maxX: proy.vw + MARGEN, minY: -MARGEN, maxY: proy.vh + MARGEN }
+    : { minX: 0, maxX: 0, minY: 0, maxY: 0 }
 
   type Capa = {
     p: RecPotrero
@@ -353,15 +404,26 @@ export function Croquis({
     y: number
     r: number
     chico: boolean
+    astilla: boolean
+    pin: { x: number; y: number } | null
   }
   const capas: Capa[] = []
   if (aXY) {
     const polys = conPoligono.map((p) => p.poligono!.map(aXY))
+    const ocupados: { x: number; y: number }[] = []
     conPoligono.forEach((p, i) => {
       const { x, y, r } = polo(polys[i])
-      const chico = escalaPx > 0 && r * 2 * escalaPx < TAP_MIN
-      capas.push({ p, pts: polys[i], x, y, r, chico })
+      const dim = r * 2 * escalaPx
+      const chico = escalaPx > 0 && dim < TAP_MIN
+      const astilla = escalaPx > 0 && dim < ASTILLA_PX
+      capas.push({ p, pts: polys[i], x, y, r, chico, astilla, pin: null })
+      if (!astilla) ocupados.push({ x, y })
     })
+    for (const c of capas) {
+      if (!c.astilla) continue
+      c.pin = ubicarPin({ x: c.x, y: c.y }, c.r + pinR * 1.6, pinR, polys, ocupados, limite)
+      ocupados.push(c.pin)
+    }
   }
 
   return (
@@ -388,7 +450,7 @@ export function Croquis({
             {/* 1) Los polígonos. Dos estados y nada más: pendiente (blanco) y
                    hecho de hoy (verde + tilde). La antigüedad ya NO vive acá —
                    satura el mapa, que se mira de reojo; vive en su panel. */}
-            {capas.map(({ p, pts, x, y, r, chico }) => {
+            {capas.map(({ p, pts, x, y, r, chico, astilla }) => {
               const hecho = p.hecho === 1
               const acaEstoy = pisando?.id === p.id
               const sel = seleccionadoId === p.id
@@ -430,37 +492,108 @@ export function Croquis({
                       <path d={d} fill="none" stroke="var(--c-mid)" strokeWidth={2.2} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
                     </>
                   )}
-                  {/* Zona de tap invisible sobre el número: agranda el target de
-                      los chicos (guante/sol) sin ensuciar el dibujo, centrada en
-                      su potrero — sin robarle demasiado a los vecinos. */}
-                  {chico && (
-                    <circle cx={x} cy={y} r={Math.min(hitR, fs * 1.6)} fill="transparent" />
+                  {/* Astilla → el número va en su pin (abajo); acá, nada. El
+                      resto se etiqueta en el lugar. */}
+                  {!astilla && (
+                    <>
+                      {/* Zona de tap invisible sobre el número: agranda el target
+                          de los chicos (guante/sol), centrada en su potrero. */}
+                      {chico && (
+                        <circle cx={x} cy={y} r={Math.min(hitR, fs * 1.6)} fill="transparent" />
+                      )}
+                      <text
+                        x={x}
+                        y={conTilde ? y - fs * 0.3 : y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        className="c-mono"
+                        fontSize={fs}
+                        fontWeight={800}
+                        fill={hecho ? textoHecho : 'var(--c-ink)'}
+                        stroke={hecho ? colorHex : '#fff'}
+                        strokeWidth={fs * 0.16}
+                        paintOrder="stroke"
+                        style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
+                      >
+                        {p.nombre}
+                      </text>
+                      {conTilde && (
+                        <path
+                          d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
+                          fill="none"
+                          stroke={textoHecho}
+                          strokeWidth={fs * 0.16}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ pointerEvents: 'none' }}
+                        />
+                      )}
+                    </>
                   )}
-                  {/* El número, SIEMPRE sobre su potrero. En los chicos entra con
-                      tamaño mínimo legible (puede desbordar la forma, pero queda
-                      anclado a ella — nada de globos ni líneas guía). */}
+                </g>
+              )
+            })}
+
+            {/* Pines de las ASTILLAS: ENCIMA de todo. Cada uno mide 44px real y
+                lleva su línea guía al potrero. Son pocas (1-2 por campo). */}
+            {capas.map(({ p, x, y, pin }) => {
+              if (!pin) return null
+              const hecho = p.hecho === 1
+              const sel = seleccionadoId === p.id
+              const atenuado = seleccionadoId !== null && !sel
+              const fs = Math.min((pinR * 2.6) / Math.max(2, p.nombre.length), pinR * 0.95)
+              return (
+                <g
+                  key={`pin-${p.id}`}
+                  onClick={() => onSeleccionar(p.id)}
+                  className="cursor-pointer"
+                  role="button"
+                  aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
+                  style={{ opacity: atenuado ? 0.42 : 1, transition: 'opacity 0.15s' }}
+                >
+                  <line
+                    x1={x}
+                    y1={y}
+                    x2={pin.x}
+                    y2={pin.y}
+                    stroke="#3c463b"
+                    strokeWidth={pinR * 0.09}
+                    strokeDasharray={`${pinR * 0.18} ${pinR * 0.14}`}
+                  />
+                  <circle cx={x} cy={y} r={pinR * 0.13} fill="#3c463b" />
+                  <circle
+                    cx={pin.x}
+                    cy={pin.y}
+                    r={pinR}
+                    fill={hecho ? colorHex : '#ffffff'}
+                    stroke={pisando?.id === p.id ? 'var(--c-warn)' : '#3c463b'}
+                    strokeWidth={pinR * 0.11}
+                  />
+                  {sel && (
+                    <>
+                      <circle cx={pin.x} cy={pin.y} r={pinR * 1.28} fill="none" stroke="#0c1c14" strokeOpacity={0.85} strokeWidth={pinR * 0.34} style={{ pointerEvents: 'none' }} />
+                      <circle cx={pin.x} cy={pin.y} r={pinR * 1.28} fill="none" stroke="var(--c-mid)" strokeWidth={pinR * 0.18} style={{ pointerEvents: 'none' }} />
+                    </>
+                  )}
                   <text
-                    x={x}
-                    y={conTilde ? y - fs * 0.3 : y}
+                    x={pin.x}
+                    y={hecho ? pin.y - pinR * 0.22 : pin.y}
                     textAnchor="middle"
                     dominantBaseline="central"
                     className="c-mono"
                     fontSize={fs}
                     fontWeight={800}
                     fill={hecho ? textoHecho : 'var(--c-ink)'}
-                    stroke={hecho ? colorHex : '#fff'}
-                    strokeWidth={fs * 0.16}
-                    paintOrder="stroke"
                     style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
                   >
                     {p.nombre}
                   </text>
-                  {conTilde && (
+                  {hecho && (
                     <path
-                      d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
+                      d={`M${pin.x - pinR * 0.3},${pin.y + pinR * 0.42} l${pinR * 0.22},${pinR * 0.22} l${pinR * 0.44},${-pinR * 0.46}`}
                       fill="none"
                       stroke={textoHecho}
-                      strokeWidth={fs * 0.16}
+                      strokeWidth={pinR * 0.13}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       style={{ pointerEvents: 'none' }}
