@@ -146,58 +146,6 @@ function textoSobre(hex: string): string {
 }
 
 /**
- * Ubica el pin de un potrero chico: prueba 12 direcciones alrededor de su polo
- * y elige la que cae en espacio libre — fuera de todos los polígonos y lejos
- * de las otras etiquetas. Así el target grande no se come al vecino, que es
- * exactamente lo que había que evitar.
- */
-function ubicarPin(
-  origen: { x: number; y: number },
-  dist: number,
-  radio: number,
-  poligonos: XY[][],
-  ocupados: { x: number; y: number }[],
-  /** Límites del viewBox visible: el pin (círculo de `radio`) no puede salirse
-   *  o queda RECORTADO en el borde de la pantalla. */
-  limite: { minX: number; maxX: number; minY: number; maxY: number },
-): { x: number; y: number } {
-  let mejor = { x: origen.x + dist, y: origen.y, score: -Infinity }
-  // Varias distancias: con una sola, si el potrero está rodeado, el pin cae
-  // igual encima de un vecino. Estirando el brazo llega al fondo libre.
-  for (const k of [1, 1.5, 2.1, 2.9]) {
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2
-      const x = origen.x + Math.cos(a) * dist * k
-      const y = origen.y + Math.sin(a) * dist * k
-      let score = -k * 6 // a igualdad de condiciones, el pin cerca del potrero
-      // Salirse de la pantalla es lo peor: el pin queda cortado.
-      if (
-        x < limite.minX + radio || x > limite.maxX - radio ||
-        y < limite.minY + radio || y > limite.maxY - radio
-      ) {
-        score -= 500
-      }
-      // Tapar otro potrero: le esconde el número al vecino.
-      for (const poly of poligonos) {
-        if (distanciaAlBorde(x, y, poly) > -radio * 0.5) score -= 260
-      }
-      // Y penaliza acercarse a etiquetas/pines ya colocados.
-      for (const o of ocupados) {
-        const d = Math.hypot(x - o.x, y - o.y)
-        if (d < radio * 2.4) score -= (radio * 2.4 - d) * 25
-      }
-      if (score > mejor.score) mejor = { x, y, score }
-    }
-  }
-  // Red de seguridad: aunque el mejor haya quedado al borde, se clampa para que
-  // el pin entero entre en el viewBox — nunca recortado.
-  return {
-    x: Math.max(limite.minX + radio, Math.min(limite.maxX - radio, mejor.x)),
-    y: Math.max(limite.minY + radio, Math.min(limite.maxY - radio, mejor.y)),
-  }
-}
-
-/**
  * Panel del potrero seleccionado: cuántos animales hay y su distribución, hace
  * cuánto se recorrió, y el botón para entrar a recorrerlo. Vive en la zona del
  * pulgar (reemplaza "¿Dónde estoy?" mientras hay uno elegido). Todo sale del
@@ -382,20 +330,21 @@ export function Croquis({
       ? potreros.find((p) => p.id === gps.potreroId)
       : null
 
-  // ---- Reparto etiqueta interna vs pin -------------------------------------
-  // Un potrero astilla (12A en La Porteña) no tiene ni superficie para el
-  // número ni superficie para el dedo. En vez de seguir achicando la letra, se
-  // lo saca a un PIN de 44px anclado con línea guía, ubicado en espacio libre.
-  // El polígono sigue siendo tocable; el pin es el target confiable.
+  // ---- Etiquetas SIEMPRE en el lugar ---------------------------------------
+  // El número va SOBRE cada potrero (en su centro-más-adentro). Nada de pines
+  // flotantes con línea guía: con muchos potreros chicos (La Porteña) eso se
+  // volvía una nube de globos imposible de asociar a su forma. Los chicos igual
+  // muestran su número (tamaño mínimo legible, aunque desborde un poco) y traen
+  // una zona de tap invisible más grande, centrada en el potrero.
   const escalaPx =
     proy && box.w > 0
       ? Math.min(box.w / (proy.vw + MARGEN * 2), box.h / (proy.vh + MARGEN * 2))
       : 0
-  const pinR = escalaPx > 0 ? TAP_MIN / 2 / escalaPx : 0
-  // Límites del viewBox visible (para que ningún pin se recorte).
-  const limite = proy
-    ? { minX: -MARGEN, maxX: proy.vw + MARGEN, minY: -MARGEN, maxY: proy.vh + MARGEN }
-    : { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+  // Alto mínimo del número EN PANTALLA (px) → unidades de viewBox.
+  const MIN_LABEL_PX = 13
+  const minLabelVB = escalaPx > 0 ? MIN_LABEL_PX / escalaPx : 0
+  // Radio de la zona de tap invisible de un potrero chico (target cómodo).
+  const hitR = escalaPx > 0 ? TAP_MIN / 2 / escalaPx : 0
 
   type Capa = {
     p: RecPotrero
@@ -404,24 +353,15 @@ export function Croquis({
     y: number
     r: number
     chico: boolean
-    pin: { x: number; y: number } | null
   }
   const capas: Capa[] = []
   if (aXY) {
     const polys = conPoligono.map((p) => p.poligono!.map(aXY))
-    const ocupados: { x: number; y: number }[] = []
     conPoligono.forEach((p, i) => {
       const { x, y, r } = polo(polys[i])
       const chico = escalaPx > 0 && r * 2 * escalaPx < TAP_MIN
-      capas.push({ p, pts: polys[i], x, y, r, chico, pin: null })
-      if (!chico) ocupados.push({ x, y })
+      capas.push({ p, pts: polys[i], x, y, r, chico })
     })
-    // Los pines se colocan después, esquivando las etiquetas ya asentadas.
-    for (const c of capas) {
-      if (!c.chico) continue
-      c.pin = ubicarPin({ x: c.x, y: c.y }, c.r + pinR * 1.6, pinR, polys, ocupados, limite)
-      ocupados.push(c.pin)
-    }
   }
 
   return (
@@ -457,7 +397,9 @@ export function Croquis({
               const d =
                 pts.map((q, j) => `${j === 0 ? 'M' : 'L'}${q[0]},${q[1]}`).join(' ') + ' Z'
               const largo = Math.max(2, p.nombre.length)
-              const fs = Math.min(r * 1.15, (r * 3.1) / largo, 9)
+              const fsFit = Math.min(r * 1.15, (r * 3.1) / largo, 9)
+              // Chico: piso de tamaño legible (aunque el número desborde su forma).
+              const fs = chico ? Math.max(fsFit, minLabelVB) : fsFit
               const conTilde = hecho && fs >= 3.4
               return (
                 <g
@@ -488,104 +430,37 @@ export function Croquis({
                       <path d={d} fill="none" stroke="var(--c-mid)" strokeWidth={2.2} strokeLinejoin="round" style={{ pointerEvents: 'none' }} />
                     </>
                   )}
-                  {/* El número va adentro solo si el potrero le da lugar; si
-                      no, se dibuja en el pin (abajo) y acá no va nada. */}
-                  {!chico && (
-                    <>
-                      <text
-                        x={x}
-                        y={conTilde ? y - fs * 0.3 : y}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        className="c-mono"
-                        fontSize={fs}
-                        fontWeight={800}
-                        fill={hecho ? textoHecho : 'var(--c-ink)'}
-                        stroke={hecho ? colorHex : '#fff'}
-                        strokeWidth={fs * 0.16}
-                        paintOrder="stroke"
-                        style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
-                      >
-                        {p.nombre}
-                      </text>
-                      {conTilde && (
-                        <path
-                          d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
-                          fill="none"
-                          stroke={textoHecho}
-                          strokeWidth={fs * 0.16}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ pointerEvents: 'none' }}
-                        />
-                      )}
-                    </>
+                  {/* Zona de tap invisible sobre el número: agranda el target de
+                      los chicos (guante/sol) sin ensuciar el dibujo, centrada en
+                      su potrero — sin robarle demasiado a los vecinos. */}
+                  {chico && (
+                    <circle cx={x} cy={y} r={Math.min(hitR, fs * 1.6)} fill="transparent" />
                   )}
-                </g>
-              )
-            })}
-
-            {/* 2) Los pines de los potreros chicos, ENCIMA de todo para que
-                   ningún vecino los tape. Cada uno mide 44px de verdad. */}
-            {capas.map(({ p, x, y, pin }) => {
-              if (!pin) return null
-              const hecho = p.hecho === 1
-              const sel = seleccionadoId === p.id
-              const atenuado = seleccionadoId !== null && !sel
-              const fs = Math.min((pinR * 2.6) / Math.max(2, p.nombre.length), pinR * 0.95)
-              return (
-                <g
-                  key={`pin-${p.id}`}
-                  onClick={() => onSeleccionar(p.id)}
-                  className="cursor-pointer"
-                  role="button"
-                  aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
-                  style={{ opacity: atenuado ? 0.42 : 1, transition: 'opacity 0.15s' }}
-                >
-                  {/* Línea guía: dice a qué potrero pertenece el pin. */}
-                  <line
-                    x1={x}
-                    y1={y}
-                    x2={pin.x}
-                    y2={pin.y}
-                    stroke="#3c463b"
-                    strokeWidth={pinR * 0.09}
-                    strokeDasharray={`${pinR * 0.18} ${pinR * 0.14}`}
-                  />
-                  <circle cx={x} cy={y} r={pinR * 0.13} fill="#3c463b" />
-                  <circle
-                    cx={pin.x}
-                    cy={pin.y}
-                    r={pinR}
-                    fill={hecho ? colorHex : '#ffffff'}
-                    stroke={pisando?.id === p.id ? 'var(--c-warn)' : '#3c463b'}
-                    strokeWidth={pinR * 0.11}
-                  />
-                  {sel && (
-                    <>
-                      <circle cx={pin.x} cy={pin.y} r={pinR * 1.28} fill="none" stroke="#0c1c14" strokeOpacity={0.85} strokeWidth={pinR * 0.34} style={{ pointerEvents: 'none' }} />
-                      <circle cx={pin.x} cy={pin.y} r={pinR * 1.28} fill="none" stroke="var(--c-mid)" strokeWidth={pinR * 0.18} style={{ pointerEvents: 'none' }} />
-                    </>
-                  )}
+                  {/* El número, SIEMPRE sobre su potrero. En los chicos entra con
+                      tamaño mínimo legible (puede desbordar la forma, pero queda
+                      anclado a ella — nada de globos ni líneas guía). */}
                   <text
-                    x={pin.x}
-                    y={hecho ? pin.y - pinR * 0.22 : pin.y}
+                    x={x}
+                    y={conTilde ? y - fs * 0.3 : y}
                     textAnchor="middle"
                     dominantBaseline="central"
                     className="c-mono"
                     fontSize={fs}
                     fontWeight={800}
                     fill={hecho ? textoHecho : 'var(--c-ink)'}
+                    stroke={hecho ? colorHex : '#fff'}
+                    strokeWidth={fs * 0.16}
+                    paintOrder="stroke"
                     style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
                   >
                     {p.nombre}
                   </text>
-                  {hecho && (
+                  {conTilde && (
                     <path
-                      d={`M${pin.x - pinR * 0.3},${pin.y + pinR * 0.42} l${pinR * 0.22},${pinR * 0.22} l${pinR * 0.44},${-pinR * 0.46}`}
+                      d={`M${x - fs * 0.34},${y + fs * 0.5} l${fs * 0.26},${fs * 0.26} l${fs * 0.5},${-fs * 0.52}`}
                       fill="none"
                       stroke={textoHecho}
-                      strokeWidth={pinR * 0.13}
+                      strokeWidth={fs * 0.16}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       style={{ pointerEvents: 'none' }}
