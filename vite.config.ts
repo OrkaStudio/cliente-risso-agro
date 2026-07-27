@@ -96,6 +96,13 @@ export default defineConfig({
           // que quede en su chunk propio, NO en el vendor que carga en cada
           // página (si no, "L is not defined" rompe toda la app en prod).
           if (id.includes('@geoman-io')) return
+          // Leaflet (base) + Turf: SOLO los usa el editor de potreros de Oficina
+          // (campo-mapa-real, ruta lazy). Antes caían en el `vendor` eager y se
+          // descargaban/parseaban en CADA arranque —incluido el Modo Campo, que
+          // jamás toca ese mapa—. En su propio chunk quedan lazy: ~185 kB menos
+          // en el arranque de toda la app. (El @geoman-io ya salió arriba.)
+          if (/[\\/]node_modules[\\/]leaflet[\\/]/.test(id) || id.includes('@turf'))
+            return 'map-vendor'
           return 'vendor'
         },
       },

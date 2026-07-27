@@ -17,32 +17,54 @@ import { platadb } from './plata/db'
  * hooks de cada feature (useRecorrida/useManga/usePlata) las reutilizan.
  */
 
+/**
+ * Single-flight por feature: si un sembrado ya está EN VUELO, la segunda
+ * llamada reusa la misma promesa en vez de disparar otro fetch. Deduplica los
+ * dos disparos que ocurren al abrir el Modo Campo (el seeder central del shell
+ * + el auto-seed del hook de la página). No afecta un refresco manual posterior
+ * (para entonces el vuelo ya terminó y se limpió).
+ */
+const enVuelo = new Map<string, Promise<void>>()
+function unSoloVuelo(key: string, fn: () => Promise<void>): Promise<void> {
+  const existente = enVuelo.get(key)
+  if (existente) return existente
+  const p = fn().finally(() => enVuelo.delete(key))
+  enVuelo.set(key, p)
+  return p
+}
+
 /** Campos + potreros (con stock y composición) de la recorrida. */
-export async function sembrarRecorrida(): Promise<void> {
-  const { campos, potreros } = await fetchRecorridaRefs()
-  await recdb.refs.put({ id: 'refs', campos, potreros, updated_at: Date.now() })
+export function sembrarRecorrida(): Promise<void> {
+  return unSoloVuelo('recorrida', async () => {
+    const { campos, potreros } = await fetchRecorridaRefs()
+    await recdb.refs.put({ id: 'refs', campos, potreros, updated_at: Date.now() })
+  })
 }
 
 /** Animales sin caravana + RFIDs en uso, para la manga. Preserva los que ya se
  *  caravanearon en el teléfono (subidos o no): no se pisan ni se pierden. */
-export async function sembrarManga(): Promise<void> {
-  const { animales: frescos, rfidsEnUso } = await fetchSinCaravana()
-  const locales = await mangadb.animales.where('caravaneado').equals(1).toArray()
-  const hechosLocal = new Set(locales.map((a) => a.id))
-  await mangadb.animales.clear()
-  await mangadb.animales.bulkPut([
-    ...locales,
-    ...frescos
-      .filter((a) => !hechosLocal.has(a.id))
-      .map((a) => ({ ...a, caravaneado: 0 as const })),
-  ])
-  await mangadb.refs.put({ id: 'rfids', rfids: rfidsEnUso, updated_at: Date.now() })
+export function sembrarManga(): Promise<void> {
+  return unSoloVuelo('manga', async () => {
+    const { animales: frescos, rfidsEnUso } = await fetchSinCaravana()
+    const locales = await mangadb.animales.where('caravaneado').equals(1).toArray()
+    const hechosLocal = new Set(locales.map((a) => a.id))
+    await mangadb.animales.clear()
+    await mangadb.animales.bulkPut([
+      ...locales,
+      ...frescos
+        .filter((a) => !hechosLocal.has(a.id))
+        .map((a) => ({ ...a, caravaneado: 0 as const })),
+    ])
+    await mangadb.refs.put({ id: 'rfids', rfids: rfidsEnUso, updated_at: Date.now() })
+  })
 }
 
 /** Categorías + campos para cargar plata sin señal. */
-export async function sembrarPlata(): Promise<void> {
-  const { categorias, campos } = await fetchPlataRefs()
-  await platadb.refs.put({ id: 'refs', categorias, campos, updated_at: Date.now() })
+export function sembrarPlata(): Promise<void> {
+  return unSoloVuelo('plata', async () => {
+    const { categorias, campos } = await fetchPlataRefs()
+    await platadb.refs.put({ id: 'refs', categorias, campos, updated_at: Date.now() })
+  })
 }
 
 export type SeedResultado = { ok: boolean; parcial: boolean; error?: string }
