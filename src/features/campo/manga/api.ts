@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { normalizarRfid } from './rfid'
 
 export type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
 
@@ -53,8 +54,12 @@ export async function fetchSinCaravana(): Promise<{
       lote_id: a.lote_id,
       lote_nombre: a.lote_id ? (lotes.get(a.lote_id) ?? null) : null,
     }))
+  // Se comparan NORMALIZADOS: el mismo animal leído por dos bastones distintos
+  // puede venir con o sin separadores. Normalizar de los dos lados es lo que
+  // hace que el duplicado se detecte igual. Sobre dígitos limpios (lo que hay
+  // cargado hoy) normalizar es identidad → no invalida nada de lo existente.
   const rfidsEnUso = (caravanasRes.data ?? []).map((c) =>
-    c.numero_rfid.trim().toLowerCase(),
+    normalizarRfid(c.numero_rfid),
   )
   return { animales, rfidsEnUso }
 }

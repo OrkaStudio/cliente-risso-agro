@@ -8,6 +8,7 @@ import {
   Footprints,
   PencilRuler,
   RefreshCw,
+  ScanLine,
   Syringe,
   Trash2,
 } from 'lucide-react'
@@ -169,6 +170,16 @@ export function CampoInicioPage() {
           {hayAbiertas && ' — la recorrida te espera'}.
         </span>
         <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
+      </Link>
+
+      {/* Herramienta de laboratorio, no una tarea del campo: probar un bastón
+          RFID antes de comprarlo. Va discreta y al pie a propósito. */}
+      <Link
+        to="/campo/lector"
+        className="flex items-center gap-2 self-center py-1 text-[12px] text-[var(--c-ink-soft)] underline underline-offset-2"
+      >
+        <ScanLine className="size-3.5" />
+        Probar un lector de caravana
       </Link>
 
       {/* Lo que el servidor RECHAZÓ no se descarta nunca en silencio: se

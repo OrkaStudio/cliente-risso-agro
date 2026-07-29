@@ -9,6 +9,7 @@ import {
   subirAudioEvento,
   type CategoriaAnimal,
 } from './api'
+import { normalizarRfid } from './rfid'
 
 export type Scope =
   | { kind: 'todos' }
@@ -229,7 +230,10 @@ export function useManga() {
       }
       await mangadb.outbox.add({
         animal_id: animalId,
-        rfid: datos.rfid.trim(),
+        // Se guarda NORMALIZADO: es la forma canónica del número, para que el
+        // mismo animal leído con otro bastón (o mañana con otro modelo) sea el
+        // mismo registro y no un duplicado silencioso.
+        rfid: normalizarRfid(datos.rfid),
         visual: datos.visual?.trim() || null,
         categoria: datos.categoria,
         nota: datos.nota?.trim() || null,
@@ -272,10 +276,11 @@ export function useManga() {
   // (cache de la última descarga) → el duplicado avisa al toque, aún offline,
   // en vez de fallar recién al sincronizar.
   const rfidsUsados = new Set([
-    ...listaOutbox
-      .filter((o) => o.estado !== 'error')
-      .map((o) => o.rfid.trim().toLowerCase()),
-    ...(refsArr?.[0]?.rfids ?? []),
+    ...listaOutbox.filter((o) => o.estado !== 'error').map((o) => normalizarRfid(o.rfid)),
+    // Los del cache ya vienen normalizados de `fetchSinCaravana`; se vuelve a
+    // pasar por normalizar para que un cache viejo (guardado antes de este
+    // cambio) también compare bien, sin obligar a re-descargar la lista.
+    ...(refsArr?.[0]?.rfids ?? []).map(normalizarRfid),
   ])
   // Último caravaneo activo (para el "deshacer" y la confirmación).
   const ultimo: OutboxItem | null =

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -20,7 +20,28 @@ import {
 import { cn } from '@/lib/utils'
 import { useManga, type AsignacionLocal } from './manga/use-manga'
 import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
+import { normalizarRfid } from './manga/rfid'
+import { useScanner } from './manga/use-scanner'
 import { CChip, CLabel, CSheet, NotaVoz } from './ui'
+
+// Preferencia por lector, no por sesión: una vez que se sabe si el bastón manda
+// Enter, la elección vale para siempre. Se guarda local (no es dato de negocio).
+const CLAVE_AUTO = 'risso.manga.auto-confirmar'
+
+function useAutoConfirmar(): [boolean, (v: boolean) => void] {
+  // Default PRENDIDO a propósito: hasta hoy el Enter siempre asignó, y la manga
+  // está en uso real. Apagarlo por defecto le cambiaría el flujo al productor
+  // sin avisarle. El toggle existe para APAGARLO si el bastón que se compre
+  // resulta mandar Enter de más.
+  const [valor, setValor] = useState(
+    () => (localStorage.getItem(CLAVE_AUTO) ?? '1') === '1',
+  )
+  const set = useCallback((v: boolean) => {
+    setValor(v)
+    localStorage.setItem(CLAVE_AUTO, v ? '1' : '0')
+  }, [])
+  return [valor, set]
+}
 
 // Observaciones rápidas de manga: lo que se VE del animal, un toque con
 // guantes. Preñada/Vacía son excluyentes (estado reproductivo).
@@ -232,29 +253,51 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
   const [abrirNota, setAbrirNota] = useState(false)
   const [abrirCategoria, setAbrirCategoria] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [rescatada, setRescatada] = useState(false)
+  const [autoConfirmar, setAutoConfirmar] = useAutoConfirmar()
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Aviso instantáneo (sin esperar al sync): RFID ya usado en la sesión O en
-  // cualquier animal del rodeo (cache de vigentes).
-  const repetido = rfid.trim() !== '' && rfidsUsados.has(rfid.trim().toLowerCase())
+  // cualquier animal del rodeo (cache de vigentes). Se compara NORMALIZADO —
+  // el mismo número con o sin separadores es la misma caravana.
+  const repetido = rfid.trim() !== '' && rfidsUsados.has(normalizarRfid(rfid))
 
-  const asignar = () => {
-    if (!rfid.trim()) {
+  const asignar = (rfidOverride?: string) => {
+    const valor = rfidOverride ?? rfid
+    if (!valor.trim()) {
       setAviso('Escaneá o escribí el RFID')
       return
     }
-    if (repetido) {
+    if (rfidsUsados.has(normalizarRfid(valor))) {
       setAviso('Ese RFID ya está en uso en otro animal')
       return
     }
     const nota = [...notas, notaLibre.trim()].filter(Boolean).join(' · ')
     onAsignar({
-      rfid,
+      rfid: valor,
       visual: visual || undefined,
       categoria,
       nota: nota || undefined,
       audio,
     })
   }
+
+  // Red de seguridad del bastón: si una lectura entra con el cursor FUERA del
+  // campo (pasa todo el tiempo en la manga — se toca una categoría, se abre una
+  // hoja, el teléfono se destraba), el teclado Bluetooth escribe al vacío y la
+  // caravana se pierde sin que nadie se entere. Acá la agarramos igual, la
+  // ponemos en el campo y avisamos que fue rescatada.
+  useScanner({
+    onLectura: (l) => {
+      if (!l.esEscaneo || l.focoEnObjetivo) return // el input ya la recibió solo
+      setRfid(l.crudo)
+      setAviso(null)
+      setRescatada(true)
+      inputRef.current?.focus()
+      if ('vibrate' in navigator) navigator.vibrate(50)
+      if (autoConfirmar && l.terminador === 'enter') asignar(l.crudo)
+    },
+  })
 
   const toggleNota = (n: string) => {
     setNotas((prev) => {
@@ -313,15 +356,23 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
               )}
             />
             <input
+              ref={inputRef}
+              // Marca para el capturador: si el foco está acá, la lectura ya
+              // entró sola y no hay que rescatarla (evita escribirla dos veces).
+              data-scan-target
               value={rfid}
               onChange={(e) => {
                 setRfid(e.target.value)
                 if (aviso) setAviso(null)
+                if (rescatada) setRescatada(false)
               }}
               onKeyDown={(e) => {
+                // El Enter del bastón solo confirma si está activado el
+                // auto-confirmar. Hay lectores que lo mandan siempre: sin este
+                // freno, cada lectura asigna sola antes de tocar la categoría.
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  asignar()
+                  if (autoConfirmar) asignar()
                 }
               }}
               inputMode="numeric"
@@ -336,14 +387,46 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
               <AlertTriangle className="size-3.5" />
               {aviso}
             </p>
+          ) : repetido ? (
+            <p className="c-label mt-1 flex items-center gap-1 !text-[12px] !text-[var(--c-warn)]">
+              <AlertTriangle className="size-3.5" />
+              Ese RFID ya está en uso
+            </p>
           ) : (
-            repetido && (
-              <p className="c-label mt-1 flex items-center gap-1 !text-[12px] !text-[var(--c-warn)]">
-                <AlertTriangle className="size-3.5" />
-                Ese RFID ya está en uso
+            rescatada && (
+              <p className="c-label mt-1 flex items-center gap-1 !text-[12px] !text-[var(--c-ok-deep)]">
+                <Check className="size-3.5" />
+                Lectura tomada con el cursor afuera — la agarramos igual
               </p>
             )
           )}
+
+          {/* Auto-confirmar: depende del bastón. Hay lectores que mandan Enter
+              y otros que no — se prueba en /campo/lector y se deja fijo acá. */}
+          <button
+            type="button"
+            onClick={() => setAutoConfirmar(!autoConfirmar)}
+            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-[var(--c-line)] bg-[var(--c-panel)] px-2.5 py-2 text-left"
+          >
+            <span
+              className={cn(
+                'flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
+                autoConfirmar
+                  ? 'border-[var(--c-ok)] bg-[var(--c-ok)]'
+                  : 'border-[var(--c-line-strong)]',
+              )}
+            >
+              {autoConfirmar && <Check className="size-3.5 text-white" strokeWidth={3.5} />}
+            </span>
+            <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-[var(--c-ink-soft)]">
+              Confirmar solo al escanear
+              <span className="c-label block !text-[10.5px]">
+                {autoConfirmar
+                  ? 'Escaneás y pasa al siguiente animal'
+                  : 'Confirmás con el botón de abajo'}
+              </span>
+            </span>
+          </button>
         </div>
 
         {/* Visual: con sugerencia correlativa (+1 de la última) */}
@@ -410,7 +493,7 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
       <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-3.5 pt-3">
         <button
           type="button"
-          onClick={asignar}
+          onClick={() => asignar()}
           className="c-display c-hard flex h-15 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent bg-[var(--c-ok)] text-[19px] text-white"
         >
           <Check className="size-6" strokeWidth={2.5} />

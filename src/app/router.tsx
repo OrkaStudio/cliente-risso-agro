@@ -61,6 +61,11 @@ const MangaPage = lazy(() =>
     default: m.MangaPage,
   })),
 )
+const LectorPage = lazy(() =>
+  import('@/features/campo/lector-page').then((m) => ({
+    default: m.LectorPage,
+  })),
+)
 const RecorridaPage = lazy(() =>
   import('@/features/campo/recorrida-page').then((m) => ({
     default: m.RecorridaPage,
@@ -136,6 +141,9 @@ export const router = createBrowserRouter([
                 children: [
                   { path: 'campo', element: <CampoInicioPage /> },
                   { path: 'campo/manga', element: <MangaPage /> },
+                  // Laboratorio: probar un bastón RFID antes de comprarlo.
+                  // Fuera de la nav (no es una tarea del campo, es una prueba).
+                  { path: 'campo/lector', element: <LectorPage /> },
                   { path: 'campo/recorrida', element: <RecorridaPage /> },
                   { path: 'campo/plata', element: <PlataPage /> },
                   { path: 'campo/historial', element: <HistorialPage /> },
