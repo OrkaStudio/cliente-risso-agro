@@ -52,9 +52,10 @@ export function MovimientoSheet({
   const [loteId, setLoteId] = useState<string | null>(
     tropas.length === 1 ? tropas[0].id : null,
   )
-  /** Cuántos se lleva de cada categoría. Arranca en TODO. */
+  /** Cuántos se lleva de cada categoría. Arranca VACÍO: la hoja no supone nada,
+   *  igual que la de nacimientos. Un toque distraído no puede llevarse la tropa
+   *  entera — para eso hay que pedirlo. */
   const [llevar, setLlevar] = useState<Map<CategoriaAnimal, number>>(new Map())
-  const [tocado, setTocado] = useState(false)
 
   if (!origen || !destino) return null
 
@@ -62,33 +63,36 @@ export function MovimientoSheet({
   const compo = tropa?.composicion ?? origen.composicion ?? []
   const col = coloresPorCategoria(compo.map((c) => c.categoria))
 
-  // Sin tocar nada, se lleva todo: la tabla arranca vacía y cada categoría vale
-  // su total. Así no hay que sembrar estado al abrir ni al cambiar de tropa.
-  const cuanto = (c: CategoriaAnimal, total: number): number =>
-    tocado ? (llevar.get(c) ?? total) : total
+  const cuanto = (c: CategoriaAnimal): number => llevar.get(c) ?? 0
 
   const setCuanto = (c: CategoriaAnimal, n: number) => {
     tap()
     const m = new Map(llevar)
-    if (!tocado) for (const x of compo) m.set(x.categoria, x.cabezas)
     m.set(c, n)
     setLlevar(m)
-    setTocado(true)
   }
 
+  /** Atajo del caso más común: se abrió la portera y pasó todo. */
+  const llevarTodo = () => {
+    tap()
+    setLlevar(new Map(compo.map((c) => [c.categoria, c.cabezas])))
+  }
+  const yaEstaTodo =
+    compo.length > 0 && compo.every((c) => cuanto(c.categoria) === c.cabezas)
+
   const movidos: CantidadPorCategoria[] = compo
-    .map((c) => ({ categoria: c.categoria, cantidad: cuanto(c.categoria, c.cabezas) }))
+    .map((c) => ({ categoria: c.categoria, cantidad: cuanto(c.categoria) }))
     .filter((m) => m.cantidad > 0)
   const total = movidos.reduce((s, m) => s + m.cantidad, 0)
 
   // Modo DERIVADO: el más robusto que describa fielmente lo que eligió.
   const modo: ModoMovimiento = (() => {
     const parcialEnAlguna = compo.some((c) => {
-      const n = cuanto(c.categoria, c.cabezas)
+      const n = cuanto(c.categoria)
       return n > 0 && n < c.cabezas
     })
     if (parcialEnAlguna) return 'cantidades'
-    const todasEnteras = compo.every((c) => cuanto(c.categoria, c.cabezas) > 0)
+    const todasEnteras = compo.every((c) => cuanto(c.categoria) > 0)
     return todasEnteras ? 'todo' : 'categorias'
   })()
 
@@ -168,7 +172,6 @@ export function MovimientoSheet({
                     // Cambiar de tropa reinicia la selección: los números de la
                     // anterior no significan nada acá.
                     setLlevar(new Map())
-                    setTocado(false)
                   }}
                 />
               ))}
@@ -178,6 +181,21 @@ export function MovimientoSheet({
 
         <div className="c-rise" style={{ animationDelay: '60ms' }}>
           <CLabel className="mb-2 !text-[12px]">Qué se lleva</CLabel>
+          {compo.length > 0 && (
+            <button
+              type="button"
+              onClick={llevarTodo}
+              disabled={yaEstaTodo}
+              className={cn(
+                'c-display mb-2 flex h-11 w-full items-center justify-center rounded-xl border-2 text-[15px] transition-colors',
+                yaEstaTodo
+                  ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+                  : 'border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] active:scale-[0.99]',
+              )}
+            >
+              {yaEstaTodo ? 'Se lleva toda la tropa' : 'Llevar toda la tropa'}
+            </button>
+          )}
           {compo.length === 0 ? (
             <p className="rounded-xl border-2 border-dashed border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3.5 py-3 text-[14px] text-[var(--c-ink-soft)]">
               Este potrero no tiene animales cargados.
@@ -190,7 +208,7 @@ export function MovimientoSheet({
                   nombre={categoriaNombre(c.categoria, c.cabezas)}
                   color={col[c.categoria]}
                   total={c.cabezas}
-                  valor={cuanto(c.categoria, c.cabezas)}
+                  valor={cuanto(c.categoria)}
                   onCambiar={(n) => setCuanto(c.categoria, n)}
                 />
               ))}
@@ -251,10 +269,13 @@ function FilaCategoria({
           className={cn('size-3 shrink-0 rounded-full', !va && 'opacity-35')}
           style={{ background: color }}
         />
+        {/* Sin tachado: la hoja arranca en cero y nada fue "sacado" todavía —
+            tachar de entrada se lee como si estuviera todo prohibido. El estado
+            lo llevan el número y el verde. */}
         <span
           className={cn(
             'c-display truncate text-[16px]',
-            va ? 'text-[var(--c-ink)]' : 'text-[var(--c-ink-soft)] line-through',
+            va ? 'text-[var(--c-ink)]' : 'text-[var(--c-ink-soft)]',
           )}
         >
           {nombre}
