@@ -1303,8 +1303,11 @@ export type Database = {
       }
       mover_animales: {
         Args: {
+          p_alta_id?: string
           p_animal_ids?: string[]
+          p_contexto?: Json
           p_empresa_id: string
+          p_fecha?: string
           p_items?: Json
           p_lote_destino?: string
           p_lote_id?: string
@@ -1312,6 +1315,7 @@ export type Database = {
           p_potrero_destino: string
           p_potrero_origen?: string
           p_todo?: boolean
+          p_tolerante?: boolean
         }
         Returns: Json
       }

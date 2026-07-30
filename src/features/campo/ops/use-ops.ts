@@ -10,6 +10,7 @@ import {
   type OpNacimiento,
   type OpMovimiento,
   type CantidadPorCategoria,
+  type ModoMovimiento,
 } from './db'
 import { subirNacimiento, subirMovimiento } from './api'
 
@@ -57,10 +58,9 @@ export type MovimientoInput = {
   potreroDestinoNombre: string
   loteId: string | null
   loteNombre: string | null
-  /** Composición que se lleva (snapshot al declarar). */
+  /** Composición que se lleva (snapshot al declarar, siempre con números). */
   movidos: CantidadPorCategoria[]
-  /** true = la tropa entera. El server mueve lo que haya (robusto sin señal). */
-  todo: boolean
+  modo: ModoMovimiento
   fecha: string
   recorridaId: string | null
 }
@@ -161,7 +161,7 @@ export function useOps() {
         lote_id: input.loteId,
         lote_nombre: input.loteNombre,
         movidos: input.movidos,
-        todo: input.todo,
+        modo: input.modo,
         fecha: input.fecha,
         recorrida_id: input.recorridaId ?? undefined,
         estado: 'pendiente',

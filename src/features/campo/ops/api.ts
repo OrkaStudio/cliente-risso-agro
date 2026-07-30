@@ -42,27 +42,45 @@ export async function subirNacimiento(op: OpNacimiento): Promise<void> {
 }
 
 /**
- * Sube un movimiento declarado en el campo: la tropa pasa de un potrero a otro.
+ * Sube un movimiento declarado en el campo.
  *
- * Va en modo `p_todo` (tropa entera) cuando se declaró así — que es el default
- * del campo y el único robusto sin señal: el server mueve LO QUE HAYA. El modo
- * por cantidad (`p_items`) levanta excepción si el número no coincide, y un
- * movimiento rechazado cuando los animales ya cruzaron el alambre deja la
- * realidad y la base divergentes.
+ * El modo define qué se le pide al server, y de eso depende que la declaración
+ * sobreviva a un cache viejo:
+ *
+ *  · `todo`       → `p_todo`: mueve LO QUE HAYA en el potrero.
+ *  · `categorias` → `p_items` con cantidad NULL: todas las de esa categoría.
+ *                   Igual de robusto, porque el "todas" lo resuelve el server.
+ *  · `cantidades` → `p_items` con números + `p_tolerante`: mueve lo que haya e
+ *                   informa la diferencia en vez de rechazar. Sin tolerancia,
+ *                   pedir 40 habiendo 38 aborta el movimiento entero — y los
+ *                   animales ya cruzaron el alambre horas o días antes.
  *
  * `p_alta_id` acá importa incluso más que en el nacimiento: reintentar un
  * movimiento no duplicaba, pero FALLABA ("No hay animales para mover", porque
  * ya se movieron) y la cola marcaba como error una operación exitosa.
  */
 export async function subirMovimiento(op: OpMovimiento): Promise<void> {
+  const seleccion =
+    op.modo === 'todo'
+      ? { p_todo: true }
+      : op.modo === 'categorias'
+        ? {
+            p_items: op.movidos.map((m) => ({
+              categoria: m.categoria,
+              cantidad: null,
+            })),
+          }
+        : {
+            p_items: op.movidos.filter((m) => m.cantidad > 0),
+            p_tolerante: true,
+          }
+
   const { error } = await supabase.rpc('mover_animales', {
     p_empresa_id: op.empresa_id,
     p_potrero_destino: op.potrero_destino_id,
     p_potrero_origen: op.potrero_origen_id,
     p_lote_id: op.lote_id ?? undefined,
-    ...(op.todo
-      ? { p_todo: true }
-      : { p_items: op.movidos.filter((m) => m.cantidad > 0) }),
+    ...seleccion,
     p_alta_id: op.cliente_id,
     p_fecha: op.fecha ?? undefined,
     p_contexto: {
@@ -70,6 +88,7 @@ export async function subirMovimiento(op: OpMovimiento): Promise<void> {
       origen_ui: 'recorrida',
       recorrida_id: op.recorrida_id ?? null,
       lote_nombre: op.lote_nombre,
+      modo: op.modo,
       declarado_at: new Date(op.created_at).toISOString(),
     },
   })

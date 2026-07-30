@@ -45,24 +45,37 @@ export type OpNacimiento = {
   created_at: number
 }
 
-/** Cuántos de cada categoría se llevan / se anotan. */
+/** Cuántos de cada categoría se llevan / se anotan. Siempre un número: es el
+ *  SNAPSHOT local, el que permite derivar el esperado sin señal. Lo que viaja
+ *  al server puede ser otra cosa (ver `ModoMovimiento`). */
 export type CantidadPorCategoria = {
   categoria: CategoriaAnimal
   cantidad: number
 }
 
 /**
+ * Cómo se declaró el movimiento. Define qué se le pide al server — y de eso
+ * depende que un movimiento declarado sin señal sobreviva o se rechace.
+ *
+ * · `todo`        la tropa entera. El server mueve LO QUE HAYA.
+ * · `categorias`  "se fueron los terneros" — todas las de esas categorías.
+ *                 Parado en la portera nadie cuenta: mira qué tipo de animal
+ *                 pasa. El server resuelve el "todas", así que es tan robusto
+ *                 como `todo`: no hay número que tenga que coincidir.
+ * · `cantidades`  "se fueron 40 vaquillonas". Único modo con un número que
+ *                 puede no coincidir → viaja TOLERANTE (mueve lo que haya e
+ *                 informa la diferencia). Rechazarlo, cuando los animales ya
+ *                 cruzaron el alambre, dejaría la realidad y la base
+ *                 divergentes sin nadie ahí para arreglarlo.
+ */
+export type ModoMovimiento = 'todo' | 'categorias' | 'cantidades'
+
+/**
  * Movimiento declarado en el campo: la tropa pasa de un potrero a otro. A
  * diferencia del nacimiento toca DOS potreros con signo opuesto.
  *
- * `todo` = se llevó la tropa entera (RPC en modo `p_todo`). Es el modo por
- * defecto del campo y el único robusto sin señal: el server mueve LO QUE HAYA
- * en el potrero, mientras que el modo por cantidad levanta excepción si el
- * número no coincide ("Pediste mover 50 de vaca pero hay 47") — y un movimiento
- * rechazado, cuando los animales ya cruzaron el alambre de verdad, deja la
- * realidad y la base divergentes sin nadie ahí para arreglarlo.
- *
- * `movidos` es un SNAPSHOT de la composición al declarar: es lo que permite
+ * El modo (ver `ModoMovimiento`) define qué se le pide al server. `movidos` es
+ * siempre un SNAPSHOT de la composición al declarar: es lo que permite
  * derivar el esperado de los dos potreros sin conexión. Si el server termina
  * moviendo otra cantidad (porque algo cambió), el delta desaparece al
  * sincronizar y las existencias reales mandan.
@@ -78,8 +91,9 @@ export type OpMovimiento = {
   /** Tropa que se mueve (null = animales sueltos del potrero). */
   lote_id: string | null
   lote_nombre: string | null
+  /** Snapshot de lo que se lleva (siempre con números, para el delta local). */
   movidos: CantidadPorCategoria[]
-  todo: boolean
+  modo: ModoMovimiento
   /** Fecha REAL del hecho (la de la recorrida), no la de la sincronización. */
   fecha?: string
   recorrida_id?: string
