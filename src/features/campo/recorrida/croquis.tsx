@@ -206,6 +206,7 @@ function PanelPotrero({
   nacidos,
   nacidosPorCategoria,
   onAnotar,
+  onMover,
   onAbrir,
   onCerrar,
 }: {
@@ -218,6 +219,8 @@ function PanelPotrero({
   nacidosPorCategoria?: Map<CategoriaAnimal, number>
   /** Anotar un nacimiento en este potrero. Ausente = feature apagada. */
   onAnotar?: (id: string) => void
+  /** Arrancar un movimiento desde este potrero. Ausente = feature apagada. */
+  onMover?: (id: string) => void
   onAbrir: (id: string) => void
   onCerrar: () => void
 }) {
@@ -367,6 +370,17 @@ function PanelPotrero({
           Nació un animal
         </button>
       )}
+
+      {/* Mover sólo tiene sentido si hay algo que mover. */}
+      {onMover && potrero.cabezas > 0 && (
+        <button
+          type="button"
+          onClick={() => onMover(potrero.id)}
+          className="c-display mt-2 flex h-12 w-full items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[15px] text-[var(--c-ink)] active:scale-[0.99]"
+        >
+          Mover animales
+        </button>
+      )}
     </div>
   )
 }
@@ -386,6 +400,10 @@ export function Croquis({
   categoriasPendientesDe,
   onSeleccionar,
   onAnotarNacimiento,
+  onMoverAnimales,
+  moviendoDesde,
+  onElegirDestino,
+  onCancelarMovimiento,
   onAbrir,
 }: {
   potreros: RecPotrero[]
@@ -403,10 +421,24 @@ export function Croquis({
   onSeleccionar: (potreroId: string | null) => void
   /** Anotar un nacimiento en el potrero del panel. Ausente = feature apagada. */
   onAnotarNacimiento?: (potreroId: string) => void
+  /** Arrancar un movimiento desde un potrero (abre el modo destino). */
+  onMoverAnimales?: (potreroId: string) => void
+  /** Potrero origen mientras se elige destino. null = modo normal. */
+  moviendoDesde?: string | null
+  onElegirDestino?: (potreroId: string) => void
+  onCancelarMovimiento?: () => void
   /** Abrir el parte de un potrero (desde el panel o el atajo del GPS). */
   onAbrir: (potreroId: string) => void
 }) {
   const textoHecho = textoSobre(colorHex)
+  const eligiendoDestino = moviendoDesde != null
+  // En modo destino el toque significa otra cosa: elige a dónde van, no abre el
+  // panel. El origen no es tocable (mover al mismo potrero no existe).
+  const tocarPotrero = (id: string) => {
+    if (!eligiendoDestino) return onSeleccionar(id)
+    if (id === moviendoDesde) return
+    onElegirDestino?.(id)
+  }
   const seleccionado = seleccionadoId
     ? (potreros.find((p) => p.id === seleccionadoId) ?? null)
     : null
@@ -539,6 +571,10 @@ export function Croquis({
               const sel = seleccionadoId === p.id
               // Con un potrero elegido, los demás se atenúan → el seleccionado resalta.
               const atenuado = seleccionadoId !== null && !sel
+              // Eligiendo destino: el ORIGEN se marca y se apaga. Sin esto los
+              // dos potreros se ven igual y tocar el origen no hace nada sin
+              // explicar por qué.
+              const esOrigen = eligiendoDestino && moviendoDesde === p.id
               const d =
                 pts.map((q, j) => `${j === 0 ? 'M' : 'L'}${q[0]},${q[1]}`).join(' ') + ' Z'
               const largo = Math.max(2, p.nombre.length)
@@ -549,11 +585,20 @@ export function Croquis({
               return (
                 <g
                   key={p.id}
-                  onClick={() => onSeleccionar(p.id)}
-                  className="cursor-pointer"
+                  onClick={() => tocarPotrero(p.id)}
+                  className={esOrigen ? 'cursor-default' : 'cursor-pointer'}
                   role="button"
-                  aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
-                  style={{ opacity: atenuado ? 0.38 : 1, transition: 'opacity 0.15s' }}
+                  aria-label={
+                    esOrigen
+                      ? `${p.nombre} — salen de acá`
+                      : eligiendoDestino
+                        ? `Mover a ${p.nombre}`
+                        : `${p.nombre}${hecho ? ' — ya cargado' : ''}`
+                  }
+                  style={{
+                    opacity: esOrigen ? 0.5 : atenuado ? 0.38 : 1,
+                    transition: 'opacity 0.15s',
+                  }}
                 >
                   <path
                     d={d}
@@ -565,6 +610,28 @@ export function Croquis({
                     strokeWidth={acaEstoy ? 1.6 : 0.7}
                     strokeLinejoin="round"
                   />
+                  {/* Origen del movimiento: borde punteado — "de acá salen". */}
+                  {esOrigen && (
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="var(--c-ok-deep)"
+                      strokeWidth={1.4}
+                      strokeDasharray="3 2"
+                      strokeLinejoin="round"
+                    />
+                  )}
+                  {/* Candidatos a destino: casing verde, "tocame". */}
+                  {eligiendoDestino && !esOrigen && (
+                    <path
+                      d={d}
+                      fill="var(--c-ok)"
+                      fillOpacity={0.14}
+                      stroke="var(--c-ok)"
+                      strokeWidth={1.4}
+                      strokeLinejoin="round"
+                    />
+                  )}
                   {/* Seleccionado: relleno lima translúcido + casing oscuro +
                       anillo lima grueso → resalta sobre cualquier fondo (blanco
                       o color del campo) y contrasta con el resto atenuado. */}
@@ -628,7 +695,7 @@ export function Croquis({
               return (
                 <g
                   key={`pin-${p.id}`}
-                  onClick={() => onSeleccionar(p.id)}
+                  onClick={() => tocarPotrero(p.id)}
                   className="cursor-pointer"
                   role="button"
                   aria-label={`${p.nombre}${hecho ? ' — ya cargado' : ''}`}
@@ -713,7 +780,7 @@ export function Croquis({
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => onSeleccionar(p.id)}
+                  onClick={() => tocarPotrero(p.id)}
                   className={cn(
                     'c-display flex h-11 items-center gap-1.5 rounded-lg border px-3 text-[15px]',
                     p.hecho !== 1 &&
@@ -734,8 +801,29 @@ export function Croquis({
         )}
       </div>
 
-      {/* ===== Zona del pulgar: panel del potrero elegido, o ubicarse ===== */}
-      {seleccionado ? (
+      {/* ===== Zona del pulgar: guía de destino, panel, o ubicarse ===== */}
+      {eligiendoDestino ? (
+        <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
+          <div className="c-hard-sm flex items-center gap-3 rounded-xl border-2 border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3.5 py-3">
+            <div className="min-w-0 flex-1">
+              <span className="c-display block truncate text-[16px] leading-tight text-[var(--c-ink)]">
+                ¿A qué potrero van?
+              </span>
+              <span className="block truncate text-[12.5px] text-[var(--c-ink-soft)]">
+                Tocalo en el croquis · salen del{' '}
+                {potreros.find((x) => x.id === moviendoDesde)?.nombre ?? ''}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onCancelarMovimiento?.()}
+              className="c-display shrink-0 rounded-lg border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 py-2 text-[14px] text-[var(--c-ink)] active:scale-95"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : seleccionado ? (
         <PanelPotrero
           potrero={seleccionado}
           campoNombre={campoNombre}
@@ -743,6 +831,7 @@ export function Croquis({
           nacidos={nacidosPendientesDe?.(seleccionado.id) ?? 0}
           nacidosPorCategoria={categoriasPendientesDe?.(seleccionado.id)}
           onAnotar={onAnotarNacimiento}
+          onMover={onMoverAnimales}
           onAbrir={onAbrir}
           onCerrar={() => onSeleccionar(null)}
         />

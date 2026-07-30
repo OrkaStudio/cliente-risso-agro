@@ -37,6 +37,7 @@ import type {
 import { CChip, CLabel, CSegBtn, CSheet, NotaVoz, type Tono } from './ui'
 import { useOps } from './ops/use-ops'
 import { NacimientoSheet } from './ops/nacimiento-sheet'
+import { MovimientoSheet } from './ops/movimiento-sheet'
 
 const PASTO: { value: PastoEstado; label: string; tono: Tono }[] = [
   { value: 'abundante', label: 'Abund.', tono: 'ok' },
@@ -278,6 +279,10 @@ function Recorrida({
   const [seleccionado, setSeleccionado] = useState<string | null>(null)
   // Potrero con la hoja de "nació un animal" abierta (null = cerrada).
   const [anotarPotrero, setAnotarPotrero] = useState<string | null>(null)
+  // Movimiento en dos pasos: se elige el origen en el panel y el destino
+  // tocándolo en el croquis. Con los dos, se abre la hoja de confirmación.
+  const [movOrigen, setMovOrigen] = useState<string | null>(null)
+  const [movDestino, setMovDestino] = useState<string | null>(null)
   const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [panelAbierto, setPanelAbierto] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
@@ -409,6 +414,18 @@ function Recorrida({
           colorHex={r.colorCampo(r.meta!.campo_id).hex}
           campoNombre={r.meta!.campo_nombre}
           seleccionadoId={seleccionado}
+          moviendoDesde={movOrigen}
+          onMoverAnimales={(id) => {
+            setMovOrigen(id)
+            // El panel del origen se cierra: la pantalla pasa a ser "elegí a
+            // dónde van", sin nada más compitiendo por el toque.
+            setSeleccionado(null)
+          }}
+          onElegirDestino={setMovDestino}
+          onCancelarMovimiento={() => {
+            setMovOrigen(null)
+            setMovDestino(null)
+          }}
           nacidosPendientesDe={ops.nacidosPendientesDe}
           categoriasPendientesDe={ops.categoriasPendientesDe}
           onSeleccionar={setSeleccionado}
@@ -473,6 +490,37 @@ function Recorrida({
       />
 
       {/* key por potrero → estado fresco (sexo/cantidad/tropa) en cada apertura. */}
+      <MovimientoSheet
+        key={`${movOrigen ?? ''}-${movDestino ?? ''}`}
+        open={movOrigen != null && movDestino != null}
+        origen={r.potreros.find((p) => p.id === movOrigen) ?? null}
+        destino={r.potreros.find((p) => p.id === movDestino) ?? null}
+        campoNombre={r.meta?.campo_nombre ?? ''}
+        colorHex={r.meta ? r.colorCampo(r.meta.campo_id).hex : 'var(--c-ok)'}
+        onClose={() => setMovDestino(null)}
+        onGuardar={(m) => {
+          const origen = r.potreros.find((p) => p.id === movOrigen)
+          const destino = r.potreros.find((p) => p.id === movDestino)
+          if (origen && destino && r.meta) {
+            void ops.registrarMovimiento({
+              empresaId: r.meta.empresa_id,
+              potreroOrigenId: origen.id,
+              potreroOrigenNombre: origen.nombre,
+              potreroDestinoId: destino.id,
+              potreroDestinoNombre: destino.nombre,
+              loteId: m.loteId,
+              loteNombre: m.loteNombre,
+              movidos: m.movidos,
+              modo: m.modo,
+              fecha: r.meta.fecha,
+              recorridaId: r.meta.recorrida_id,
+            })
+          }
+          setMovOrigen(null)
+          setMovDestino(null)
+        }}
+      />
+
       <NacimientoSheet
         key={anotarPotrero ?? 'cerrada'}
         open={anotarPotrero != null}
