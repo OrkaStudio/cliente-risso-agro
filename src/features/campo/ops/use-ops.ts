@@ -5,10 +5,13 @@ import {
   opsdb,
   deltaPorPotrero,
   deltaCategoriasPorPotrero,
+  potrerosDe,
   type OpItem,
   type OpNacimiento,
+  type OpMovimiento,
+  type CantidadPorCategoria,
 } from './db'
-import { subirNacimiento } from './api'
+import { subirNacimiento, subirMovimiento } from './api'
 
 // Cola de operaciones de hacienda del campo. Mismo patrón probado que la manga
 // (append-only) y la recorrida: derivar la UI de Dexie con useLiveQuery y
@@ -46,6 +49,22 @@ export type NacimientoInput = {
   recorridaId: string | null
 }
 
+export type MovimientoInput = {
+  empresaId: string
+  potreroOrigenId: string
+  potreroOrigenNombre: string
+  potreroDestinoId: string
+  potreroDestinoNombre: string
+  loteId: string | null
+  loteNombre: string | null
+  /** Composición que se lleva (snapshot al declarar). */
+  movidos: CantidadPorCategoria[]
+  /** true = la tropa entera. El server mueve lo que haya (robusto sin señal). */
+  todo: boolean
+  fecha: string
+  recorridaId: string | null
+}
+
 export function useOps() {
   const online = useOnline()
   const itemsArr = useLiveQuery(() => opsdb.outbox.toArray(), [])
@@ -73,6 +92,7 @@ export function useOps() {
           for (const op of pend) {
             try {
               if (op.tipo === 'nacimiento') await subirNacimiento(op)
+              else if (op.tipo === 'movimiento') await subirMovimiento(op)
               await opsdb.outbox.update(op.cliente_id, {
                 estado: 'sincronizada',
                 error: null,
@@ -128,6 +148,32 @@ export function useOps() {
     [sincronizar],
   )
 
+  const registrarMovimiento = useCallback(
+    async (input: MovimientoInput) => {
+      const op: OpMovimiento = {
+        cliente_id: crypto.randomUUID(),
+        tipo: 'movimiento',
+        empresa_id: input.empresaId,
+        potrero_origen_id: input.potreroOrigenId,
+        potrero_origen_nombre: input.potreroOrigenNombre,
+        potrero_destino_id: input.potreroDestinoId,
+        potrero_destino_nombre: input.potreroDestinoNombre,
+        lote_id: input.loteId,
+        lote_nombre: input.loteNombre,
+        movidos: input.movidos,
+        todo: input.todo,
+        fecha: input.fecha,
+        recorrida_id: input.recorridaId ?? undefined,
+        estado: 'pendiente',
+        error: null,
+        created_at: Date.now(),
+      }
+      await opsdb.outbox.add(op)
+      void sincronizar()
+    },
+    [sincronizar],
+  )
+
   /** Descarta las operaciones que el servidor rechazó (acción explícita). */
   const descartarErrores = useCallback(async () => {
     const errs = await opsdb.outbox.where('estado').equals('error').toArray()
@@ -141,8 +187,12 @@ export function useOps() {
   const categoriasPendientesDe = (
     potreroId: string,
   ): Map<CategoriaAnimal, number> => deltaCats.get(potreroId) ?? new Map()
+  // Un movimiento toca DOS potreros, así que "las de este potrero" no puede
+  // mirar un solo campo.
   const noSincronizadas = (potreroId: string): OpItem[] =>
-    items.filter((i) => i.potrero_id === potreroId && i.estado !== 'sincronizada')
+    items.filter(
+      (i) => i.estado !== 'sincronizada' && potrerosDe(i).includes(potreroId),
+    )
   /** Cabezas recién anotadas (sin subir) por potrero — para el chip de feedback. */
   const nacidosPendientesDe = (potreroId: string): number =>
     noSincronizadas(potreroId)
@@ -159,6 +209,7 @@ export function useOps() {
     nacidosPendientesDe,
     categoriasPendientesDe,
     registrarNacimiento,
+    registrarMovimiento,
     sincronizar,
     descartarErrores,
   }

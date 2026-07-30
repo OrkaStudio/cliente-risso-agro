@@ -228,13 +228,18 @@ function PanelPotrero({
     const base = potrero.composicion ?? []
     const pend = nacidosPorCategoria
     if (!pend || pend.size === 0) return base
-    const salida = base.map((c) => ({
-      ...c,
-      cabezas: c.cabezas + (pend.get(c.categoria) ?? 0),
-    }))
+    // El delta viene CON SIGNO (un movimiento resta en el origen): se pisa en 0
+    // si el cache quedó viejo, y una categoría que se vació desaparece de la
+    // lista en vez de quedar en cero.
+    const salida = base
+      .map((c) => ({
+        ...c,
+        cabezas: Math.max(0, c.cabezas + (pend.get(c.categoria) ?? 0)),
+      }))
+      .filter((c) => c.cabezas > 0)
     // Categorías que el potrero todavía no tenía y aparecen por lo anotado.
     for (const [categoria, cabezas] of pend) {
-      if (!base.some((c) => c.categoria === categoria)) {
+      if (cabezas > 0 && !base.some((c) => c.categoria === categoria)) {
         salida.push({ categoria, cabezas })
       }
     }

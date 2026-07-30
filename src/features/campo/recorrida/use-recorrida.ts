@@ -502,8 +502,10 @@ export function useRecorrida() {
     campo_id: activoCampoId!,
     nombre: p.nombre,
     estado_ciclo: p.estado_ciclo,
-    // Esperado derivado: server + operaciones locales sin subir.
-    cabezas: p.cabezas + (deltaOps.get(p.id) ?? 0),
+    // Esperado derivado: server ± operaciones locales sin subir. Con signo
+    // (un movimiento resta en el origen) el resultado puede dar negativo si el
+    // cache quedó viejo — se pisa en 0 antes que mostrar "-3 cabezas".
+    cabezas: Math.max(0, p.cabezas + (deltaOps.get(p.id) ?? 0)),
     composicion: p.composicion ?? [],
     tropas: p.tropas ?? [],
     poligono: p.poligono,

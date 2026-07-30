@@ -45,21 +45,95 @@ export type OpNacimiento = {
   created_at: number
 }
 
-export type OpItem = OpNacimiento
+/** Cuántos de cada categoría se llevan / se anotan. */
+export type CantidadPorCategoria = {
+  categoria: CategoriaAnimal
+  cantidad: number
+}
+
+/**
+ * Movimiento declarado en el campo: la tropa pasa de un potrero a otro. A
+ * diferencia del nacimiento toca DOS potreros con signo opuesto.
+ *
+ * `todo` = se llevó la tropa entera (RPC en modo `p_todo`). Es el modo por
+ * defecto del campo y el único robusto sin señal: el server mueve LO QUE HAYA
+ * en el potrero, mientras que el modo por cantidad levanta excepción si el
+ * número no coincide ("Pediste mover 50 de vaca pero hay 47") — y un movimiento
+ * rechazado, cuando los animales ya cruzaron el alambre de verdad, deja la
+ * realidad y la base divergentes sin nadie ahí para arreglarlo.
+ *
+ * `movidos` es un SNAPSHOT de la composición al declarar: es lo que permite
+ * derivar el esperado de los dos potreros sin conexión. Si el server termina
+ * moviendo otra cantidad (porque algo cambió), el delta desaparece al
+ * sincronizar y las existencias reales mandan.
+ */
+export type OpMovimiento = {
+  cliente_id: string
+  tipo: 'movimiento'
+  empresa_id: string
+  potrero_origen_id: string
+  potrero_origen_nombre: string
+  potrero_destino_id: string
+  potrero_destino_nombre: string
+  /** Tropa que se mueve (null = animales sueltos del potrero). */
+  lote_id: string | null
+  lote_nombre: string | null
+  movidos: CantidadPorCategoria[]
+  todo: boolean
+  /** Fecha REAL del hecho (la de la recorrida), no la de la sincronización. */
+  fecha?: string
+  recorrida_id?: string
+  estado: OpEstado
+  error: string | null
+  created_at: number
+}
+
+export type OpItem = OpNacimiento | OpMovimiento
+
+/** Un efecto con SIGNO sobre un potrero y una categoría. */
+type Efecto = {
+  potreroId: string
+  categoria: CategoriaAnimal
+  delta: number
+}
+
+/**
+ * Efectos con signo de UNA operación. Única fuente de verdad de "qué le hace
+ * esta operación al campo": las dos funciones de delta la comparten, así no
+ * pueden desincronizarse cuando se sumen bajas en Fase 3.
+ */
+function efectosDe(it: OpItem): Efecto[] {
+  if (it.tipo === 'nacimiento') {
+    return [
+      { potreroId: it.potrero_id, categoria: it.categoria, delta: it.cantidad },
+    ]
+  }
+  // Movimiento: resta en el origen y suma en el destino, categoría por categoría.
+  return it.movidos.flatMap((m) => [
+    { potreroId: it.potrero_origen_id, categoria: m.categoria, delta: -m.cantidad },
+    { potreroId: it.potrero_destino_id, categoria: m.categoria, delta: m.cantidad },
+  ])
+}
+
+/** Los potreros que una operación toca (uno el nacimiento, dos el movimiento). */
+export function potrerosDe(it: OpItem): string[] {
+  return it.tipo === 'nacimiento'
+    ? [it.potrero_id]
+    : [it.potrero_origen_id, it.potrero_destino_id]
+}
 
 /**
  * Efecto NETO por potrero de las operaciones que todavía no sincronizaron.
  * Es la base del "esperado derivado" (doctrina #5: existencias del server ±
  * pendientes) — nunca un cache mutado, así un refresh de refs no puede pisar lo
  * declarado ni una operación declarada reaparece como discrepancia.
- * Nacimiento suma; bajas/movimientos se sumarán con signo en Fase 2/3.
  */
 export function deltaPorPotrero(items: OpItem[]): Map<string, number> {
   const m = new Map<string, number>()
   for (const it of items) {
     if (it.estado === 'sincronizada') continue
-    if (it.tipo === 'nacimiento') {
-      m.set(it.potrero_id, (m.get(it.potrero_id) ?? 0) + it.cantidad)
+    for (const e of efectosDe(it)) {
+      m.set(e.potreroId, (m.get(e.potreroId) ?? 0) + e.delta)
     }
   }
   return m
@@ -77,10 +151,10 @@ export function deltaCategoriasPorPotrero(
   const m = new Map<string, Map<CategoriaAnimal, number>>()
   for (const it of items) {
     if (it.estado === 'sincronizada') continue
-    if (it.tipo === 'nacimiento') {
-      const porCat = m.get(it.potrero_id) ?? new Map<CategoriaAnimal, number>()
-      porCat.set(it.categoria, (porCat.get(it.categoria) ?? 0) + it.cantidad)
-      m.set(it.potrero_id, porCat)
+    for (const e of efectosDe(it)) {
+      const porCat = m.get(e.potreroId) ?? new Map<CategoriaAnimal, number>()
+      porCat.set(e.categoria, (porCat.get(e.categoria) ?? 0) + e.delta)
+      m.set(e.potreroId, porCat)
     }
   }
   return m

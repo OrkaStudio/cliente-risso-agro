@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
-import type { OpNacimiento } from './db'
+import type { OpMovimiento, OpNacimiento } from './db'
 
 /**
  * Sube un nacimiento: crea el/los animal/es en el potrero (sin caravana, origen
@@ -34,6 +34,41 @@ export async function subirNacimiento(op: OpNacimiento): Promise<void> {
       origen_ui: 'recorrida',
       recorrida_id: op.recorrida_id ?? null,
       potrero_nombre: op.potrero_nombre,
+      lote_nombre: op.lote_nombre,
+      declarado_at: new Date(op.created_at).toISOString(),
+    },
+  })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Sube un movimiento declarado en el campo: la tropa pasa de un potrero a otro.
+ *
+ * Va en modo `p_todo` (tropa entera) cuando se declaró así — que es el default
+ * del campo y el único robusto sin señal: el server mueve LO QUE HAYA. El modo
+ * por cantidad (`p_items`) levanta excepción si el número no coincide, y un
+ * movimiento rechazado cuando los animales ya cruzaron el alambre deja la
+ * realidad y la base divergentes.
+ *
+ * `p_alta_id` acá importa incluso más que en el nacimiento: reintentar un
+ * movimiento no duplicaba, pero FALLABA ("No hay animales para mover", porque
+ * ya se movieron) y la cola marcaba como error una operación exitosa.
+ */
+export async function subirMovimiento(op: OpMovimiento): Promise<void> {
+  const { error } = await supabase.rpc('mover_animales', {
+    p_empresa_id: op.empresa_id,
+    p_potrero_destino: op.potrero_destino_id,
+    p_potrero_origen: op.potrero_origen_id,
+    p_lote_id: op.lote_id ?? undefined,
+    ...(op.todo
+      ? { p_todo: true }
+      : { p_items: op.movidos.filter((m) => m.cantidad > 0) }),
+    p_alta_id: op.cliente_id,
+    p_fecha: op.fecha ?? undefined,
+    p_contexto: {
+      tipo: 'movimiento',
+      origen_ui: 'recorrida',
+      recorrida_id: op.recorrida_id ?? null,
       lote_nombre: op.lote_nombre,
       declarado_at: new Date(op.created_at).toISOString(),
     },
