@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   CalendarClock,
+  CirclePlus,
   CheckCircle2,
   Droplets,
   Footprints,
@@ -14,6 +15,7 @@ import {
   Wheat,
   Zap,
 } from 'lucide-react'
+import { categoriaNombre } from '@/features/hacienda/labels'
 import { supabase } from '@/lib/supabase/client'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
@@ -27,6 +29,9 @@ const RECORRER_CADA_DIAS = 7
 /* El conteo se compara contra el stock de HOY: solo vale muy fresco (si pasaron
  * días pudo haber movimientos de hacienda y la comparación miente). */
 const CONTEO_VIGENTE_DIAS = 3
+/* Nacimientos anotados en la recorrida: el aviso vive hasta que se caravanean
+ * en la manga, pero no para siempre. Dos semanas es lo que tarda una marcada. */
+const NACIMIENTO_VIGENTE_DIAS = 14
 
 const MS_DIA = 86400000
 const diasDesde = (fecha: string): number => {
@@ -67,7 +72,7 @@ type ParaAtenderData = {
  * la traduce a avisos accionables: qué falta, qué prevenir, qué atender.
  */
 async function getParaAtender(): Promise<ParaAtenderData> {
-  const [obsRes, recRes, potRes, stockRes] = await Promise.all([
+  const [obsRes, recRes, potRes, stockRes, nacRes] = await Promise.all([
     supabase
       .from('observacion_potrero')
       .select(
@@ -78,11 +83,21 @@ async function getParaAtender(): Promise<ParaAtenderData> {
     supabase.from('recorrida').select('campo_id, fecha').order('fecha', { ascending: false }),
     supabase.from('potrero').select('id, nombre, campo:campo(id, nombre)'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
+    // Nacimientos declarados en el campo: el evento 'alta' que dejó la
+    // recorrida (`origen_ui`), con la categoría real del animal creado.
+    supabase
+      .from('evento')
+      .select('fecha, datos, animal:animal_id(categoria, potrero_id)')
+      .eq('tipo', 'alta')
+      .contains('datos', { origen_ui: 'recorrida' })
+      .order('fecha', { ascending: false })
+      .limit(500),
   ])
   if (obsRes.error) throw new Error(obsRes.error.message)
   if (recRes.error) throw new Error(recRes.error.message)
   if (potRes.error) throw new Error(potRes.error.message)
   if (stockRes.error) throw new Error(stockRes.error.message)
+  if (nacRes.error) throw new Error(nacRes.error.message)
 
   const potreros = new Map(
     (potRes.data ?? []).map((p) => {
@@ -161,6 +176,45 @@ async function getParaAtender(): Promise<ParaAtenderData> {
         titulo: 'Novedad anotada',
         detalle: o.novedad.trim(),
       })
+  }
+
+  // ── Nacimientos anotados en el campo ──
+  // Agrupados por potrero y día: al padre le importa "el lunes nacieron 3 en el
+  // 11B", no tres filas sueltas. Es nivel `nota` porque no hay nada roto — pero
+  // sí queda algo por hacer: esos terneros están SIN CARAVANA esperando la manga.
+  const porPotreroDia = new Map<
+    string,
+    { potreroId: string; fecha: string; cats: Map<string, number> }
+  >()
+  for (const ev of nacRes.data ?? []) {
+    const animal = ev.animal as { categoria: string; potrero_id: string | null } | null
+    if (!animal?.potrero_id) continue
+    if (diasDesde(ev.fecha) > NACIMIENTO_VIGENTE_DIAS) continue
+    const k = `${animal.potrero_id}-${ev.fecha}`
+    const g =
+      porPotreroDia.get(k) ??
+      { potreroId: animal.potrero_id, fecha: ev.fecha, cats: new Map<string, number>() }
+    g.cats.set(animal.categoria, (g.cats.get(animal.categoria) ?? 0) + 1)
+    porPotreroDia.set(k, g)
+  }
+  for (const g of porPotreroDia.values()) {
+    const p = potreros.get(g.potreroId)
+    if (!p) continue
+    const total = [...g.cats.values()].reduce((a, b) => a + b, 0)
+    const detalle = [...g.cats.entries()]
+      .map(([cat, n]) => `${n} ${categoriaNombre(cat as never, n).toLocaleLowerCase('es')}`)
+      .join(' y ')
+    items.push({
+      key: `${g.potreroId}-nac-${g.fecha}`,
+      nivel: 'nota',
+      icon: CirclePlus,
+      titulo: total === 1 ? 'Nació un animal' : `Nacieron ${total} animales`,
+      donde: `${p.nombre} · ${p.campoNombre}`,
+      campo: p.campoNombre,
+      detalle: `${detalle} — sin caravana`,
+      hace: diasDesde(g.fecha),
+      to: `/potrero/${g.potreroId}`,
+    })
   }
 
   // ── Avisos por campo: hace cuánto no se recorre ──
