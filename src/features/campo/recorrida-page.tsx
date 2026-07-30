@@ -35,6 +35,8 @@ import type {
   UltimaObs,
 } from './recorrida/api'
 import { CChip, CLabel, CSegBtn, CSheet, NotaVoz, type Tono } from './ui'
+import { useOps } from './ops/use-ops'
+import { NacimientoSheet } from './ops/nacimiento-sheet'
 
 const PASTO: { value: PastoEstado; label: string; tono: Tono }[] = [
   { value: 'abundante', label: 'Abund.', tono: 'ok' },
@@ -269,10 +271,13 @@ function Recorrida({
   onCierre: () => void
 }) {
   const navigate = useNavigate()
+  const ops = useOps()
   const [abierto, setAbierto] = useState<string | null>(null)
   // Potrero seleccionado en el croquis: muestra su panel (animales, distribución)
   // sin entrar todavía al parte.
   const [seleccionado, setSeleccionado] = useState<string | null>(null)
+  // Potrero con la hoja de "nació un animal" abierta (null = cerrada).
+  const [anotarPotrero, setAnotarPotrero] = useState<string | null>(null)
   const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [panelAbierto, setPanelAbierto] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
@@ -404,7 +409,10 @@ function Recorrida({
           colorHex={r.colorCampo(r.meta!.campo_id).hex}
           campoNombre={r.meta!.campo_nombre}
           seleccionadoId={seleccionado}
+          nacidosPendientesDe={ops.nacidosPendientesDe}
+          categoriasPendientesDe={ops.categoriasPendientesDe}
           onSeleccionar={setSeleccionado}
+          onAnotarNacimiento={setAnotarPotrero}
           onAbrir={(id) => {
             setSeleccionado(null)
             setAbierto(id)
@@ -461,6 +469,44 @@ function Recorrida({
         onGuardar={(mm) => {
           void r.setLluvia(mm)
           setLluviaAbierta(false)
+        }}
+      />
+
+      {/* key por potrero → estado fresco (sexo/cantidad/tropa) en cada apertura. */}
+      <NacimientoSheet
+        key={anotarPotrero ?? 'cerrada'}
+        open={anotarPotrero != null}
+        potrero={
+          anotarPotrero
+            ? (r.potreros.find((p) => p.id === anotarPotrero) ?? null)
+            : null
+        }
+        campoNombre={r.meta?.campo_nombre ?? ''}
+        colorHex={r.meta ? r.colorCampo(r.meta.campo_id).hex : 'var(--c-ok)'}
+        onClose={() => setAnotarPotrero(null)}
+        onGuardar={(n) => {
+          const pot = r.potreros.find((p) => p.id === anotarPotrero)
+          if (pot && r.meta) {
+            // Una operación POR CATEGORÍA: cada una viaja con su propia clave
+            // de idempotencia, así un reintento parcial no duplica la otra.
+            for (const nac of n.nacimientos) {
+              void ops.registrarNacimiento({
+                empresaId: r.meta.empresa_id,
+                potreroId: pot.id,
+                potreroNombre: pot.nombre,
+                loteId: n.loteId,
+                loteNombre: n.loteNombre,
+                categoria: nac.categoria,
+                cantidad: nac.cantidad,
+                // La fecha del HECHO es la de la recorrida: si esto se anotó
+                // sin señal y drena tres días después, el ternero igual queda
+                // fechado el día que nació.
+                fecha: r.meta.fecha,
+                recorridaId: r.meta.recorrida_id,
+              })
+            }
+          }
+          setAnotarPotrero(null)
         }}
       />
     </div>

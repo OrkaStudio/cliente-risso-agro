@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, Crosshair, LoaderCircle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { categoriaNombre, coloresPorCategoria } from '@/features/hacienda/labels'
+import {
+  categoriaNombre,
+  coloresPorCategoria,
+  SERIE_COLORS,
+} from '@/features/hacienda/labels'
+import type { CategoriaAnimal } from './api'
 import type { RecPotrero } from './db'
 import { diasDesde, haceCuantoTxt } from './api'
 import { CLabel } from '../ui'
@@ -198,17 +203,64 @@ function PanelPotrero({
   potrero,
   campoNombre,
   colorHex,
+  nacidos,
+  nacidosPorCategoria,
+  onAnotar,
   onAbrir,
   onCerrar,
 }: {
   potrero: RecPotrero
   campoNombre: string
   colorHex: string
+  /** Nacimientos anotados y todavía sin subir (feedback local). */
+  nacidos: number
+  /** Esos mismos nacimientos, abiertos por categoría. */
+  nacidosPorCategoria?: Map<CategoriaAnimal, number>
+  /** Anotar un nacimiento en este potrero. Ausente = feature apagada. */
+  onAnotar?: (id: string) => void
   onAbrir: (id: string) => void
   onCerrar: () => void
 }) {
-  const compos = potrero.composicion ?? []
-  const col = coloresPorCategoria(compos.map((c) => c.categoria))
+  // Composición DERIVADA: la del server más lo anotado y todavía sin subir.
+  // Si el total de arriba suma los pendientes, el desglose tiene que sumarlos
+  // también — un potrero que dice 69 arriba y 66 abajo no le sirve a nadie.
+  const compos = useMemo(() => {
+    const base = potrero.composicion ?? []
+    const pend = nacidosPorCategoria
+    if (!pend || pend.size === 0) return base
+    const salida = base.map((c) => ({
+      ...c,
+      cabezas: c.cabezas + (pend.get(c.categoria) ?? 0),
+    }))
+    // Categorías que el potrero todavía no tenía y aparecen por lo anotado.
+    for (const [categoria, cabezas] of pend) {
+      if (!base.some((c) => c.categoria === categoria)) {
+        salida.push({ categoria, cabezas })
+      }
+    }
+    return salida
+  }, [potrero.composicion, nacidosPorCategoria])
+  // Los colores salen de la composición DEL SERVER, no de la derivada: como
+  // `coloresPorCategoria` asigna por posición y ternero/ternera caen en el medio
+  // del orden canónico, calcularlos sobre la derivada hacía que Toros y Terneras
+  // cambiaran de color justo al confirmar. Una categoría nueva toma el primer
+  // color libre y las que ya estaban no se mueven.
+  const col = useMemo(() => {
+    const base = potrero.composicion ?? []
+    const mapa = coloresPorCategoria(base.map((c) => c.categoria))
+    const usados = new Set(base.map((c) => mapa[c.categoria]))
+    let i = 0
+    for (const c of compos) {
+      if (mapa[c.categoria]) continue
+      const libres = SERIE_COLORS.filter((x) => !usados.has(x))
+      const elegido =
+        libres.length > 0 ? libres[0] : SERIE_COLORS[i % SERIE_COLORS.length]
+      mapa[c.categoria] = elegido
+      usados.add(elegido)
+      i++
+    }
+    return mapa
+  }, [potrero.composicion, compos])
   const yaHecho = potrero.hecho === 1
   const diasRec = yaHecho ? 0 : diasDesde(potrero.ultima?.fecha)
   const antiguedad = yaHecho
@@ -262,6 +314,11 @@ function PanelPotrero({
               {potrero.cabezas}
             </span>
             <CLabel className="!text-[12px]">cabezas</CLabel>
+            {nacidos > 0 && (
+              <span className="ml-auto shrink-0 rounded-full bg-[var(--c-ok-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--c-ok-deep)]">
+                +{nacidos} recién anotado{nacidos > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           {compos.length > 0 && (
             <div className="mt-2 grid max-h-[26vh] gap-1.5 overflow-y-auto rounded-xl bg-[var(--c-sunk)] px-3 py-2">
@@ -293,6 +350,18 @@ function PanelPotrero({
         {yaHecho ? 'Ver / editar este potrero' : 'Recorrer este potrero'}
         <ArrowRight className="size-5" strokeWidth={2.5} />
       </button>
+
+      {/* Anotar lo que cambió en este potrero. Fase 1: solo nacimientos; en
+          Fase 2/3 este botón abre los 3 verbos (Nació · Se murió · Mover). */}
+      {onAnotar && (
+        <button
+          type="button"
+          onClick={() => onAnotar(potrero.id)}
+          className="c-display mt-2 flex h-12 w-full items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[15px] text-[var(--c-ink)] active:scale-[0.99]"
+        >
+          Nació un animal
+        </button>
+      )}
     </div>
   )
 }
@@ -308,7 +377,10 @@ export function Croquis({
   colorHex,
   campoNombre,
   seleccionadoId,
+  nacidosPendientesDe,
+  categoriasPendientesDe,
   onSeleccionar,
+  onAnotarNacimiento,
   onAbrir,
 }: {
   potreros: RecPotrero[]
@@ -318,8 +390,14 @@ export function Croquis({
   campoNombre: string
   /** Potrero seleccionado (muestra su panel abajo). null = ninguno. */
   seleccionadoId: string | null
+  /** Nacimientos anotados sin subir, por potrero (feedback local en el panel). */
+  nacidosPendientesDe?: (potreroId: string) => number
+  /** Esos nacimientos abiertos por categoría (desglose derivado del panel). */
+  categoriasPendientesDe?: (potreroId: string) => Map<CategoriaAnimal, number>
   /** Tocar un potrero en el mapa lo SELECCIONA (abre el panel), no el parte. */
   onSeleccionar: (potreroId: string | null) => void
+  /** Anotar un nacimiento en el potrero del panel. Ausente = feature apagada. */
+  onAnotarNacimiento?: (potreroId: string) => void
   /** Abrir el parte de un potrero (desde el panel o el atajo del GPS). */
   onAbrir: (potreroId: string) => void
 }) {
@@ -657,6 +735,9 @@ export function Croquis({
           potrero={seleccionado}
           campoNombre={campoNombre}
           colorHex={colorHex}
+          nacidos={nacidosPendientesDe?.(seleccionado.id) ?? 0}
+          nacidosPorCategoria={categoriasPendientesDe?.(seleccionado.id)}
+          onAnotar={onAnotarNacimiento}
           onAbrir={onAbrir}
           onCerrar={() => onSeleccionar(null)}
         />

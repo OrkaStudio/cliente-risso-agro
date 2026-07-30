@@ -1,7 +1,3 @@
-// ⚠️ GENERADO — no editar a mano.
-// Regenerar tras cada migración: mcp Supabase generate_typescript_types →
-// pegar acá → commitear junto a la migración. (Lección 2026-04-orka-supabase-tipos-post-migracion)
-
 export type Json =
   | string
   | number
@@ -892,6 +888,38 @@ export type Database = {
           },
         ]
       }
+      operacion_campo: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          empresa_id: string
+          resultado: Json
+          tipo: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          empresa_id: string
+          resultado?: Json
+          tipo: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          empresa_id?: string
+          resultado?: Json
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operacion_campo_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       potrero: {
         Row: {
           aprovechamiento:
@@ -1240,7 +1268,10 @@ export type Database = {
       }
       crear_animales_masivo: {
         Args: {
+          p_alta_id?: string
+          p_contexto?: Json
           p_empresa_id: string
+          p_fecha?: string
           p_items?: Json
           p_lote_id?: string
           p_origen?: string
@@ -1534,6 +1565,14 @@ export const Constants = {
         "otro",
       ],
       pasto_estado: ["abundante", "normal", "escaso", "pelado"],
+      proposito_lote: [
+        "cria",
+        "recria",
+        "invernada",
+        "reproductores",
+        "consumo",
+        "general",
+      ],
       sexo_animal: ["macho", "hembra"],
       tipo_campo: ["propio", "alquilado"],
       tipo_evento: [

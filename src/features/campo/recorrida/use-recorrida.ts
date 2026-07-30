@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { recdb, type RecObs, type RecPotrero, type RecSesion } from './db'
+import { opsdb, deltaPorPotrero } from '@/features/campo/ops/db'
 import { sembrarRecorrida } from '@/features/campo/seed-offline'
 import {
   asegurarRecorridaRemota,
@@ -101,6 +102,12 @@ export function useRecorrida() {
   const sesiones = useLiveQuery(() => recdb.recorridas.toArray(), [])
   const outbox = useLiveQuery(() => recdb.outbox.toArray(), [])
   const refsArr = useLiveQuery(() => recdb.refs.toArray(), [])
+  // Operaciones de hacienda pendientes (nacimientos, etc.) → esperado DERIVADO:
+  // las cabezas mostradas son las del server MÁS lo declarado y no subido. Así
+  // un nacimiento anotado sin señal se ve al instante y no reaparece como
+  // discrepancia (doctrina #5 del spec).
+  const opsArr = useLiveQuery(() => opsdb.outbox.toArray(), [])
+  const deltaOps = deltaPorPotrero(opsArr ?? [])
   const activaId = punteroArr?.[0]?.recorrida_id ?? null
   const meta =
     (activaId ? (sesiones ?? []).find((s) => s.recorrida_id === activaId) : null) ??
@@ -495,8 +502,10 @@ export function useRecorrida() {
     campo_id: activoCampoId!,
     nombre: p.nombre,
     estado_ciclo: p.estado_ciclo,
-    cabezas: p.cabezas,
+    // Esperado derivado: server + operaciones locales sin subir.
+    cabezas: p.cabezas + (deltaOps.get(p.id) ?? 0),
     composicion: p.composicion ?? [],
+    tropas: p.tropas ?? [],
     poligono: p.poligono,
     ultima: p.ultima,
     eliminado: 0,

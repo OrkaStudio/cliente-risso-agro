@@ -12,6 +12,16 @@ export type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
  *  para mostrar la composición al tocar un potrero en el croquis, sin señal. */
 export type CompoItem = { categoria: CategoriaAnimal; cabezas: number }
 
+/** Una TROPA (lote) presente en el potrero, con su composición — para elegir a
+ *  qué tropa entra un nacimiento sin señal (auto si es una sola, elegir con
+ *  composición si hay varias). Solo tropas CON animales en el potrero. */
+export type TropaRec = {
+  id: string
+  nombre: string
+  cabezas: number
+  composicion: CompoItem[]
+}
+
 export type CampoRec = {
   id: string
   nombre: string
@@ -40,6 +50,8 @@ export type PotreroRec = {
   cabezas: number
   /** Composición por categoría (de la última sincronización con señal). */
   composicion: CompoItem[]
+  /** Tropas con animales en el potrero (para asignar un nacimiento offline). */
+  tropas: TropaRec[]
   /** Polígono del potrero (si se dibujó en Oficina) — alimenta el croquis. */
   poligono: LatLng[] | null
   /** Última observación registrada (de cualquier recorrida anterior). */
@@ -87,7 +99,8 @@ export async function fetchRefs(): Promise<{
   campos: CampoRec[]
   potreros: (PotreroRec & { campo_id: string })[]
 }> {
-  const [camposRes, potrerosRes, stockRes, obsRes, animalesRes] = await Promise.all([
+  const [camposRes, potrerosRes, stockRes, obsRes, animalesRes, lotesRes] =
+    await Promise.all([
     // Orden por color_idx = orden de la letra (A, B, C…): la lista de campos
     // queda coherente con las letras de sus potreros en toda la app.
     supabase.from('campo').select('id, nombre, empresa_id, color_idx').order('color_idx'),
@@ -104,18 +117,22 @@ export async function fetchRefs(): Promise<{
       )
       .order('created_at', { ascending: false })
       .limit(1000),
-    // Animales activos (potrero + categoría) → composición por potrero, para
-    // mostrar el desglose al tocar un potrero en el croquis SIN señal.
+    // Animales activos (potrero + categoría + tropa) → composición por potrero
+    // Y por tropa, para mostrar el desglose y elegir tropa de un nacimiento SIN
+    // señal al tocar un potrero en el croquis.
     supabase
       .from('v_animal_con_caravana')
-      .select('potrero_id, categoria')
+      .select('potrero_id, categoria, lote_id')
       .eq('estado', 'activo'),
+    // Nombres de tropas (lote) → etiquetar la selección de tropa del nacimiento.
+    supabase.from('lote').select('id, nombre'),
   ])
   if (camposRes.error) throw camposRes.error
   if (potrerosRes.error) throw potrerosRes.error
   if (stockRes.error) throw stockRes.error
   if (obsRes.error) throw obsRes.error
   if (animalesRes.error) throw animalesRes.error
+  if (lotesRes.error) throw lotesRes.error
 
   const cab = new Map(
     (stockRes.data ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
@@ -132,6 +149,37 @@ export async function fetchRefs(): Promise<{
     [...(composPorPotrero.get(potreroId)?.entries() ?? [])]
       .map(([categoria, cabezas]) => ({ categoria, cabezas }))
       .sort((x, y) => y.cabezas - x.cabezas)
+  // Composición por (potrero, tropa): categoría → cabezas, solo tropas con
+  // animales en el potrero. Alimenta la selección de tropa del nacimiento.
+  const nombreLote = new Map((lotesRes.data ?? []).map((l) => [l.id, l.nombre]))
+  const tropasPorPotrero = new Map<
+    string,
+    Map<string, Map<CategoriaAnimal, number>>
+  >()
+  for (const a of animalesRes.data ?? []) {
+    if (!a.potrero_id || !a.categoria || !a.lote_id) continue
+    const porLote =
+      tropasPorPotrero.get(a.potrero_id) ??
+      new Map<string, Map<CategoriaAnimal, number>>()
+    const comp = porLote.get(a.lote_id) ?? new Map<CategoriaAnimal, number>()
+    comp.set(a.categoria, (comp.get(a.categoria) ?? 0) + 1)
+    porLote.set(a.lote_id, comp)
+    tropasPorPotrero.set(a.potrero_id, porLote)
+  }
+  const tropasDe = (potreroId: string): TropaRec[] =>
+    [...(tropasPorPotrero.get(potreroId)?.entries() ?? [])]
+      .map(([loteId, comp]) => {
+        const composicion = [...comp.entries()]
+          .map(([categoria, cabezas]) => ({ categoria, cabezas }))
+          .sort((x, y) => y.cabezas - x.cabezas)
+        return {
+          id: loteId,
+          nombre: nombreLote.get(loteId) ?? 'Tropa',
+          cabezas: composicion.reduce((s, c) => s + c.cabezas, 0),
+          composicion,
+        }
+      })
+      .sort((a, b) => b.cabezas - a.cabezas)
   // Primera aparición por potrero = la más reciente (vienen ordenadas desc).
   const ultimas = new Map<string, UltimaObs>()
   for (const o of obsRes.data ?? []) {
@@ -161,6 +209,7 @@ export async function fetchRefs(): Promise<{
       campo_id: p.campo_id,
       cabezas: cab.get(p.id) ?? 0,
       composicion: composDe(p.id),
+      tropas: tropasDe(p.id),
       poligono: (p.poligono as LatLng[] | null) ?? null,
       ultima: ultimas.get(p.id) ?? null,
     })),

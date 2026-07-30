@@ -169,15 +169,29 @@ export function CNumpad({
 export function CSheet({
   open,
   title,
+  header,
+  footer,
   onClose,
   children,
 }: {
   open: boolean
   title: string
+  /** Encabezado propio en lugar de la etiqueta de `title` (que sigue usándose
+   *  como nombre accesible). Para hojas donde importa QUÉ se está tocando. */
+  header?: ReactNode
+  /** Acción principal fija al pie: queda SIEMPRE bajo el pulgar y el contenido
+   *  scrollea detrás. Sin esto, una hoja larga esconde su propio botón. */
+  footer?: ReactNode
   onClose: () => void
   children: ReactNode
 }) {
   if (!open) return null
+  const encabezado = (
+    <>
+      <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-[var(--c-line-strong)]" />
+      {header ?? <CLabel className="mb-3 !text-[11px]">{title}</CLabel>}
+    </>
+  )
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end">
       <button
@@ -186,11 +200,22 @@ export function CSheet({
         onClick={onClose}
         className="c-sheet-back absolute inset-0 bg-[var(--c-ink)]/40"
       />
-      <div className="c-sheet-panel relative max-h-[82%] overflow-y-auto rounded-t-2xl border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-6 pt-3 shadow-[0_-8px_30px_rgba(16,30,20,0.18)]">
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--c-line-strong)]" />
-        <CLabel className="mb-3 !text-[11px]">{title}</CLabel>
-        {children}
-      </div>
+      {/* Con pie fijo el panel deja de ser el scroller: scrollea sólo el
+          cuerpo, así el botón no se monta encima del contenido ni se va. */}
+      {footer ? (
+        // Más alto que la variante sin pie: el botón fijo se come 68px y el
+        // contenido no puede quedar cortado por eso.
+        <div className="c-sheet-panel relative flex max-h-[92%] flex-col rounded-t-2xl border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-6 pt-3 shadow-[0_-8px_30px_rgba(16,30,20,0.18)]">
+          {encabezado}
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          <div className="shrink-0 pt-3">{footer}</div>
+        </div>
+      ) : (
+        <div className="c-sheet-panel relative max-h-[82%] overflow-y-auto rounded-t-2xl border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-6 pt-3 shadow-[0_-8px_30px_rgba(16,30,20,0.18)]">
+          {encabezado}
+          {children}
+        </div>
+      )}
     </div>
   )
 }

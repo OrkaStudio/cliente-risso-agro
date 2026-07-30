@@ -8,6 +8,7 @@ import type {
   EstadoCiclo,
   PastoEstado,
   PotreroRec,
+  TropaRec,
   UltimaObs,
 } from './api'
 
@@ -69,6 +70,9 @@ export type RecPotrero = {
   /** Composición por categoría (última sincronización). Puede faltar en un
    *  cache viejo previo a esta feature → tratar como [] al leer. */
   composicion?: CompoItem[]
+  /** Tropas con animales en el potrero (para asignar un nacimiento). Puede
+   *  faltar en un cache viejo → tratar como [] al leer. */
+  tropas?: TropaRec[]
   /** Polígono [lat,lng][] (si Oficina lo dibujó) — croquis del campo. */
   poligono: [number, number][] | null
   /** Última observación conocida ("igual que la última vez"). */
