@@ -371,16 +371,31 @@ function PanelPotrero({
         </button>
       )}
 
-      {/* Mover sólo tiene sentido si hay algo que mover. */}
-      {onMover && potrero.cabezas > 0 && (
-        <button
-          type="button"
-          onClick={() => onMover(potrero.id)}
-          className="c-display mt-2 flex h-12 w-full items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[15px] text-[var(--c-ink)] active:scale-[0.99]"
-        >
-          Mover animales
-        </button>
-      )}
+      {/* Mover sólo tiene sentido si hay algo que mover — y si sabemos EN QUÉ
+          TROPA está. Con un cache anterior a la feature de tropas (`undefined`,
+          distinto de `[]` = sueltos de verdad) el movimiento apuntaría a los
+          animales sin tropa y movería cero, fallando recién al sincronizar,
+          lejos del teléfono. Mejor no ofrecerlo y decir por qué.
+
+          A diferencia del nacimiento, que con cache viejo igual se anota (queda
+          sin tropa y se asigna después): una cría no registrada se pierde, un
+          movimiento mal declarado ensucia el rodeo. */}
+      {onMover &&
+        potrero.cabezas > 0 &&
+        (potrero.tropas === undefined ? (
+          <p className="mt-2 rounded-xl border-2 border-dashed border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3.5 py-3 text-center text-[13.5px] text-[var(--c-ink-soft)]">
+            Para mover animales, entrá una vez con señal — falta bajar las tropas
+            de este campo.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onMover(potrero.id)}
+            className="c-display mt-2 flex h-12 w-full items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[15px] text-[var(--c-ink)] active:scale-[0.99]"
+          >
+            Mover animales
+          </button>
+        ))}
     </div>
   )
 }

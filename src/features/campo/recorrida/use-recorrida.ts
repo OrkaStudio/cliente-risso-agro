@@ -507,7 +507,12 @@ export function useRecorrida() {
     // cache quedó viejo — se pisa en 0 antes que mostrar "-3 cabezas".
     cabezas: Math.max(0, p.cabezas + (deltaOps.get(p.id) ?? 0)),
     composicion: p.composicion ?? [],
-    tropas: p.tropas ?? [],
+    // Se pasa TAL CUAL, sin caer a []: `undefined` significa "cache anterior a
+    // la feature de tropas" y `[]` significa "no hay tropas, los animales están
+    // sueltos". Aplastar el primero en el segundo hacía que el Modo Campo
+    // ofreciera mover una tropa que no conoce — y el movimiento terminaba
+    // apuntando a los animales SIN tropa, moviendo cero.
+    tropas: p.tropas,
     poligono: p.poligono,
     ultima: p.ultima,
     eliminado: 0,
