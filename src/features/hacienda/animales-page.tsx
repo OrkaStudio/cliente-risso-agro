@@ -1,5 +1,5 @@
 import { useMemo, useState, type ComponentType } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -105,7 +105,12 @@ export function AnimalesPage() {
   const [estF, setEstF] = useState<Estado>('activo')
   const [potF, setPotF] = useState<string | null>(null)
   const [campoF, setCampoF] = useState<string | null>(null)
-  const [soloSinCaravana, setSoloSinCaravana] = useState(false)
+  // Se puede llegar acá desde el Inicio con el filtro puesto: el aviso de
+  // nacimientos linkea a "los que están esperando caravana".
+  const [sp] = useSearchParams()
+  const [soloSinCaravana, setSoloSinCaravana] = useState(
+    () => sp.get('sinCaravana') === '1',
+  )
   const [senalF, setSenalF] = useState<Senal | null>(null)
   const [view, setView] = useState<'tabla' | 'potrero'>('tabla')
 

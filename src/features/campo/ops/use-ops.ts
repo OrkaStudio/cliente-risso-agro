@@ -46,8 +46,6 @@ export type NacimientoInput = {
   loteNombre: string | null
   categoria: CategoriaAnimal
   cantidad: number
-  /** Fecha de la recorrida (el hecho), no la de la sincronización. */
-  fecha: string
   recorridaId: string | null
 }
 
@@ -62,8 +60,24 @@ export type MovimientoInput = {
   /** Composición que se lleva (snapshot al declarar, siempre con números). */
   movidos: CantidadPorCategoria[]
   modo: ModoMovimiento
-  fecha: string
   recorridaId: string | null
+}
+
+/**
+ * Fecha del HECHO = el día en que se declaró, en hora local del teléfono.
+ *
+ * No es la fecha de la recorrida: una recorrida puede quedar abierta días, y
+ * entonces todo lo anotado quedaba fechado el día que se abrió (un ternero
+ * nacido hoy aparecía como "hace 8 días"). Tampoco es la de la sincronización:
+ * anotado sin señal el lunes y drenado el jueves tiene que quedar el lunes.
+ * Se deriva acá, del `created_at` de la propia operación, para que no haya
+ * forma de pasarla mal desde afuera.
+ */
+function fechaDelHecho(ms: number): string {
+  const d = new Date(ms)
+  const mm = `${d.getMonth() + 1}`.padStart(2, '0')
+  const dd = `${d.getDate()}`.padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 export function useOps() {
@@ -144,6 +158,7 @@ export function useOps() {
 
   const registrarNacimiento = useCallback(
     async (input: NacimientoInput) => {
+      const ahora = Date.now()
       const op: OpNacimiento = {
         cliente_id: crypto.randomUUID(),
         tipo: 'nacimiento',
@@ -154,11 +169,11 @@ export function useOps() {
         lote_nombre: input.loteNombre,
         categoria: input.categoria,
         cantidad: input.cantidad,
-        fecha: input.fecha,
+        fecha: fechaDelHecho(ahora),
         recorrida_id: input.recorridaId ?? undefined,
         estado: 'pendiente',
         error: null,
-        created_at: Date.now(),
+        created_at: ahora,
       }
       await opsdb.outbox.add(op)
       void sincronizar()
@@ -168,6 +183,7 @@ export function useOps() {
 
   const registrarMovimiento = useCallback(
     async (input: MovimientoInput) => {
+      const ahora = Date.now()
       const op: OpMovimiento = {
         cliente_id: crypto.randomUUID(),
         tipo: 'movimiento',
@@ -180,11 +196,11 @@ export function useOps() {
         lote_nombre: input.loteNombre,
         movidos: input.movidos,
         modo: input.modo,
-        fecha: input.fecha,
+        fecha: fechaDelHecho(ahora),
         recorrida_id: input.recorridaId ?? undefined,
         estado: 'pendiente',
         error: null,
-        created_at: Date.now(),
+        created_at: ahora,
       }
       await opsdb.outbox.add(op)
       void sincronizar()

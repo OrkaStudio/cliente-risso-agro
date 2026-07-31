@@ -68,8 +68,11 @@ type Nacimientos = {
   total: number
   /** "2 terneros y 1 ternera" */
   detalle: string
-  hace: number
-  to: string
+  /** Fecha EXACTA del hecho, dd/mm. Un "hace N días" acá era engañoso: la
+   *  fecha viene del campo y envejece sola en pantalla. */
+  fecha: string
+  /** Para ordenar por recencia. */
+  orden: string
 }
 
 type ParaAtenderData = {
@@ -214,6 +217,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
   for (const g of porPotreroDia.values()) {
     const p = potreros.get(g.potreroId)
     if (!p) continue
+    const [yy, mm, dd] = g.fecha.split('-')
     nacimientos.push({
       key: `${g.potreroId}-nac-${g.fecha}`,
       potrero: p.nombre,
@@ -222,11 +226,11 @@ async function getParaAtender(): Promise<ParaAtenderData> {
       detalle: [...g.cats.entries()]
         .map(([cat, n]) => `${n} ${categoriaNombre(cat as never, n).toLocaleLowerCase('es')}`)
         .join(' y '),
-      hace: diasDesde(g.fecha),
-      to: `/potrero/${g.potreroId}`,
+      fecha: `${dd}/${mm}/${yy.slice(2)}`,
+      orden: g.fecha,
     })
   }
-  nacimientos.sort((a, b) => a.hace - b.hace)
+  nacimientos.sort((a, b) => b.orden.localeCompare(a.orden))
 
   // ── Avisos por campo: hace cuánto no se recorre ──
   const ultimaPorCampo = new Map<string, string>()
@@ -423,32 +427,36 @@ export function ParaAtenderCampo() {
       title="Para atender en el campo"
       info="Lo que dejaron las últimas recorridas: aguadas y pasto al límite, eléctrico cortado, animales en tratamiento, conteos que no cierran y campos sin recorrer. Tocá un aviso para ir al potrero."
     >
-      {/* Novedades del campo: van ARRIBA y fuera de la lista de avisos. En la
-          lista quedaban últimas (nivel `nota`) y cortadas por FILAS_VISIBLES:
-          técnicamente estaban, en la práctica no se veían. */}
+      {/* Novedades del campo. Fuera de la lista de avisos: ahí quedaban últimas
+          (nivel `nota`) y cortadas por FILAS_VISIBLES, o sea invisibles.
+          Sin link por fila: llevar al potrero no aportaba nada — el nacimiento
+          ya está contado en su stock. La única acción real que deja una cría es
+          CARAVANEARLA, así que ese es el único link. */}
       {!isLoading && !error && (data?.nacimientos.length ?? 0) > 0 && (
-        <div className="mb-3 flex flex-col gap-1.5 rounded-xl border border-field/30 bg-field/5 px-4 py-3">
+        <div className="mb-3 rounded-xl border border-field/25 bg-field/[0.04] px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-field">
             Nacimientos anotados en el campo
           </p>
-          {data!.nacimientos.map((n) => (
-            <Link
-              key={n.key}
-              to={n.to}
-              className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink hover:underline"
-            >
-              <span className="font-semibold">
-                {n.total} {n.total === 1 ? 'animal' : 'animales'}
-              </span>
-              <span className="text-faint">en</span>
-              <span className="font-medium">
-                {n.potrero} · {n.campo}
-              </span>
-              <span className="text-xs text-faint">
-                {n.detalle} — sin caravana · {haceLabel(n.hace)}
-              </span>
-            </Link>
-          ))}
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {data!.nacimientos.map((n) => (
+              <li key={n.key} className="flex items-baseline gap-2.5 text-sm">
+                <span className="tnum shrink-0 text-base font-bold text-ink">
+                  {n.total}
+                </span>
+                <span className="min-w-0 flex-1 text-ink">
+                  {n.detalle}
+                  <span className="text-faint"> · {n.potrero}</span>
+                </span>
+                <span className="tnum shrink-0 text-xs text-faint">{n.fecha}</span>
+              </li>
+            ))}
+          </ul>
+          <Link
+            to="/hacienda?sinCaravana=1"
+            className="mt-2.5 inline-block text-xs font-semibold text-field hover:underline"
+          >
+            Están sin caravana — ver los que faltan caravanear →
+          </Link>
         </div>
       )}
 

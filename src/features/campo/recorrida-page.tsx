@@ -21,6 +21,7 @@ import {
   Wifi,
   Zap,
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { estadoCicloLabel } from '@/features/campos/labels'
 import { cn } from '@/lib/utils'
 import { useRecorrida, type RecPotrero } from './recorrida/use-recorrida'
@@ -428,13 +429,27 @@ function Recorrida({
         </button>
       )}
 
-      {/* Confirmación de lo último anotado (nacimiento o movimiento). */}
-      {confirmado && (
-        <div className="c-rise flex h-12 shrink-0 items-center justify-center gap-2 border-b border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3 text-[14.5px] font-semibold text-[var(--c-ok-deep)]">
-          <Check className="size-[18px] shrink-0" strokeWidth={3} />
-          <span className="truncate">{confirmado}</span>
-        </div>
-      )}
+      {/* Confirmación de lo último anotado (nacimiento o movimiento).
+          Entra y sale con spring ABRIENDO ALTURA, así el croquis se corre solo
+          en vez de saltar. `MotionConfig reducedMotion="user"` (global) la
+          apaga para quien pidió menos movimiento. */}
+      <AnimatePresence initial={false}>
+        {confirmado && (
+          <motion.div
+            key="confirmacion"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 48, opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 340, damping: 32, mass: 0.7 }}
+            className="shrink-0 overflow-hidden border-b border-[var(--c-ok)]/60 bg-[var(--c-ok-soft)]"
+          >
+            <div className="flex h-12 items-center justify-center gap-2 px-3 text-[14.5px] font-semibold text-[var(--c-ok-deep)]">
+              <Check className="size-[18px] shrink-0" strokeWidth={3} />
+              <span className="truncate">{confirmado}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {conCroquis ? (
         <Croquis
@@ -540,7 +555,6 @@ function Recorrida({
               loteNombre: m.loteNombre,
               movidos: m.movidos,
               modo: m.modo,
-              fecha: r.meta.fecha,
               recorridaId: r.meta.recorrida_id,
             })
             const cuantos = m.movidos.reduce((t, x) => t + x.cantidad, 0)
@@ -578,10 +592,6 @@ function Recorrida({
                 loteNombre: n.loteNombre,
                 categoria: nac.categoria,
                 cantidad: nac.cantidad,
-                // La fecha del HECHO es la de la recorrida: si esto se anotó
-                // sin señal y drena tres días después, el ternero igual queda
-                // fechado el día que nació.
-                fecha: r.meta.fecha,
                 recorridaId: r.meta.recorrida_id,
               })
             }

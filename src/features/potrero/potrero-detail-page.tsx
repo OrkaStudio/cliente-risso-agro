@@ -50,15 +50,23 @@ function fmtCompact(n: number): string {
   return `${sign}$${abs}`
 }
 
-function edad(fechaNacimiento: string | null): string {
-  if (!fechaNacimiento) return '—'
-  const meses = Math.floor(
-    (Date.now() - new Date(fechaNacimiento).getTime()) /
-      (1000 * 60 * 60 * 24 * 30.44),
-  )
-  if (meses < 1) return '< 1 mes'
-  if (meses < 24) return `${meses} m`
-  return `${Math.floor(meses / 12)} a`
+/**
+ * Nacimiento: la FECHA EXACTA, más la edad como apoyo.
+ *
+ * Antes mostraba sólo un bucket ("< 1 mes", "8 m"). Para un animal nacido en el
+ * campo esa aproximación tapa el dato que sí sirve —el día en que nació, que es
+ * el que manda el destete— y encima envejece: el mismo animal decía cosas
+ * distintas según cuándo mirabas, sin poder cotejar contra nada.
+ */
+function nacimiento(fechaNacimiento: string | null): { fecha: string; edad: string } {
+  if (!fechaNacimiento) return { fecha: '—', edad: '' }
+  const [y, m, d] = fechaNacimiento.split('-').map(Number)
+  const fecha = `${`${d}`.padStart(2, '0')}/${`${m}`.padStart(2, '0')}/${`${y}`.slice(2)}`
+  const dias = Math.floor((Date.now() - new Date(y, m - 1, d).getTime()) / 86400000)
+  const meses = Math.floor(dias / 30.44)
+  const edad =
+    dias < 31 ? `${dias} d` : meses < 24 ? `${meses} m` : `${Math.floor(meses / 12)} a`
+  return { fecha, edad }
 }
 
 /* ===== KPI ===== */
@@ -528,7 +536,7 @@ export function PotreroDetailPage() {
               <tr className="border-b border-border text-left text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
                 <th className="pb-2.5 pr-3 font-bold">Caravana</th>
                 <th className="pb-2.5 pr-3 font-bold">Categoría</th>
-                <th className="pb-2.5 text-right font-bold">Edad</th>
+                <th className="pb-2.5 text-right font-bold">Nacimiento</th>
               </tr>
             </thead>
             <tbody>
@@ -549,8 +557,20 @@ export function PotreroDetailPage() {
                       {categoriaLabel[a.categoria]}
                     </span>
                   </td>
-                  <td className="tnum py-2.5 text-right text-sm text-muted-foreground">
-                    {edad(a.fechaNacimiento)}
+                  <td className="tnum py-2.5 text-right text-sm">
+                    {(() => {
+                      const n = nacimiento(a.fechaNacimiento)
+                      return (
+                        <>
+                          <span className="text-ink">{n.fecha}</span>
+                          {n.edad && (
+                            <span className="ml-1.5 text-muted-foreground">
+                              {n.edad}
+                            </span>
+                          )}
+                        </>
+                      )
+                    })()}
                   </td>
                 </tr>
               ))}
