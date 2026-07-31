@@ -13,6 +13,7 @@ import {
   type ModoMovimiento,
 } from './db'
 import { subirNacimiento, subirMovimiento } from './api'
+import { sembrarRecorrida } from '../seed-offline'
 
 // Cola de operaciones de hacienda del campo. Mismo patrón probado que la manga
 // (append-only) y la recorrida: derivar la UI de Dexie con useLiveQuery y
@@ -82,6 +83,8 @@ export function useOps() {
       return
     }
     const loop = async () => {
+      // ¿Alguna operación llegó realmente al servidor en esta pasada?
+      let subioAlgo = false
       try {
         do {
           rerun = false
@@ -97,6 +100,7 @@ export function useOps() {
                 estado: 'sincronizada',
                 error: null,
               })
+              subioAlgo = true
             } catch (e) {
               await opsdb.outbox.update(op.cliente_id, {
                 estado: 'error',
@@ -105,6 +109,20 @@ export function useOps() {
             }
           }
         } while (rerun)
+
+        // Al sincronizar, la operación deja de contar como pendiente y su delta
+        // desaparece — pero el cache de refs sigue teniendo las existencias de
+        // ANTES. Sin este refresco el potrero mostraba 46, sincronizaba y
+        // volvía a 45, quedando mal hasta recargar la app. Se refresca a lo
+        // último, cuando ya no queda nada por subir.
+        if (subioAlgo) {
+          try {
+            await sembrarRecorrida()
+          } catch {
+            // Sin señal o con el server caído el cache queda viejo, no roto:
+            // el próximo sembrado (o el siguiente drenado) lo pone al día.
+          }
+        }
       } finally {
         draining = false
         drainPromise = null

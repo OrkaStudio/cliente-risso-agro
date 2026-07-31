@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -38,6 +38,7 @@ import { CChip, CLabel, CSegBtn, CSheet, NotaVoz, type Tono } from './ui'
 import { useOps } from './ops/use-ops'
 import { NacimientoSheet } from './ops/nacimiento-sheet'
 import { MovimientoSheet } from './ops/movimiento-sheet'
+import { categoriaNombre } from '@/features/hacienda/labels'
 
 const PASTO: { value: PastoEstado; label: string; tono: Tono }[] = [
   { value: 'abundante', label: 'Abund.', tono: 'ok' },
@@ -283,6 +284,25 @@ function Recorrida({
   // tocándolo en el croquis. Con los dos, se abre la hoja de confirmación.
   const [movOrigen, setMovOrigen] = useState<string | null>(null)
   const [movDestino, setMovDestino] = useState<string | null>(null)
+  /**
+   * Confirmación de lo último anotado. Sin esto la hoja se cerraba y no pasaba
+   * NADA visible — sobre todo al mover, donde ni siquiera queda el chip de
+   * "recién anotados". Va donde la barra de lluvia: ancho completo y a la
+   * altura de los ojos, no un toast en una esquina.
+   */
+  const [confirmado, setConfirmado] = useState<string | null>(null)
+  const timerConfirma = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const avisar = useCallback((texto: string) => {
+    if (timerConfirma.current) clearTimeout(timerConfirma.current)
+    setConfirmado(texto)
+    timerConfirma.current = setTimeout(() => setConfirmado(null), 5000)
+  }, [])
+  useEffect(
+    () => () => {
+      if (timerConfirma.current) clearTimeout(timerConfirma.current)
+    },
+    [],
+  )
   const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [panelAbierto, setPanelAbierto] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
@@ -408,6 +428,14 @@ function Recorrida({
         </button>
       )}
 
+      {/* Confirmación de lo último anotado (nacimiento o movimiento). */}
+      {confirmado && (
+        <div className="c-rise flex h-12 shrink-0 items-center justify-center gap-2 border-b border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3 text-[14.5px] font-semibold text-[var(--c-ok-deep)]">
+          <Check className="size-[18px] shrink-0" strokeWidth={3} />
+          <span className="truncate">{confirmado}</span>
+        </div>
+      )}
+
       {conCroquis ? (
         <Croquis
           potreros={r.potreros}
@@ -515,6 +543,10 @@ function Recorrida({
               fecha: r.meta.fecha,
               recorridaId: r.meta.recorrida_id,
             })
+            const cuantos = m.movidos.reduce((t, x) => t + x.cantidad, 0)
+            avisar(
+              `${cuantos} ${cuantos === 1 ? 'animal' : 'animales'} de ${origen.nombre} a ${destino.nombre}`,
+            )
           }
           setMovOrigen(null)
           setMovDestino(null)
@@ -553,6 +585,17 @@ function Recorrida({
                 recorridaId: r.meta.recorrida_id,
               })
             }
+            avisar(
+              `Anotado en ${pot.nombre}: ${n.nacimientos
+                .map(
+                  (x) =>
+                    `${x.cantidad} ${categoriaNombre(
+                      x.categoria,
+                      x.cantidad,
+                    ).toLocaleLowerCase('es')}`,
+                )
+                .join(' y ')}`,
+            )
           }
           setAnotarPotrero(null)
         }}
