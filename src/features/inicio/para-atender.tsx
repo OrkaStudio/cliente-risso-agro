@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   CalendarClock,
-  CirclePlus,
   CheckCircle2,
   Droplets,
   Footprints,
@@ -61,8 +60,23 @@ type Atencion = {
   to: string
 }
 
+/** Un día de nacimientos en un potrero. NO es un aviso: es una novedad. */
+type Nacimientos = {
+  key: string
+  potrero: string
+  campo: string
+  total: number
+  /** "2 terneros y 1 ternera" */
+  detalle: string
+  hace: number
+  to: string
+}
+
 type ParaAtenderData = {
   items: Atencion[]
+  /** Aparte de los avisos: en la lista ordenada por urgencia quedaban últimos
+   *  y cortados, o sea invisibles. Un nacimiento no compite con "aguada seca". */
+  nacimientos: Nacimientos[]
   /** Días desde la última recorrida de la empresa (null = nunca hubo). */
   ultimaRecorridaHace: number | null
 }
@@ -179,9 +193,8 @@ async function getParaAtender(): Promise<ParaAtenderData> {
   }
 
   // ── Nacimientos anotados en el campo ──
-  // Agrupados por potrero y día: al padre le importa "el lunes nacieron 3 en el
-  // 11B", no tres filas sueltas. Es nivel `nota` porque no hay nada roto — pero
-  // sí queda algo por hacer: esos terneros están SIN CARAVANA esperando la manga.
+  // Agrupados por potrero y día: al productor le importa "el lunes nacieron 3
+  // en el 11B", no tres filas sueltas. Van APARTE de los avisos.
   const porPotreroDia = new Map<
     string,
     { potreroId: string; fecha: string; cats: Map<string, number> }
@@ -197,25 +210,23 @@ async function getParaAtender(): Promise<ParaAtenderData> {
     g.cats.set(animal.categoria, (g.cats.get(animal.categoria) ?? 0) + 1)
     porPotreroDia.set(k, g)
   }
+  const nacimientos: Nacimientos[] = []
   for (const g of porPotreroDia.values()) {
     const p = potreros.get(g.potreroId)
     if (!p) continue
-    const total = [...g.cats.values()].reduce((a, b) => a + b, 0)
-    const detalle = [...g.cats.entries()]
-      .map(([cat, n]) => `${n} ${categoriaNombre(cat as never, n).toLocaleLowerCase('es')}`)
-      .join(' y ')
-    items.push({
+    nacimientos.push({
       key: `${g.potreroId}-nac-${g.fecha}`,
-      nivel: 'nota',
-      icon: CirclePlus,
-      titulo: total === 1 ? 'Nació un animal' : `Nacieron ${total} animales`,
-      donde: `${p.nombre} · ${p.campoNombre}`,
+      potrero: p.nombre,
       campo: p.campoNombre,
-      detalle: `${detalle} — sin caravana`,
+      total: [...g.cats.values()].reduce((a, b) => a + b, 0),
+      detalle: [...g.cats.entries()]
+        .map(([cat, n]) => `${n} ${categoriaNombre(cat as never, n).toLocaleLowerCase('es')}`)
+        .join(' y '),
       hace: diasDesde(g.fecha),
       to: `/potrero/${g.potreroId}`,
     })
   }
+  nacimientos.sort((a, b) => a.hace - b.hace)
 
   // ── Avisos por campo: hace cuánto no se recorre ──
   const ultimaPorCampo = new Map<string, string>()
@@ -262,6 +273,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
   const fechas = (recRes.data ?? []).map((r) => r.fecha)
   return {
     items,
+    nacimientos,
     ultimaRecorridaHace: fechas.length ? diasDesde(fechas[0]) : null,
   }
 }
@@ -411,6 +423,35 @@ export function ParaAtenderCampo() {
       title="Para atender en el campo"
       info="Lo que dejaron las últimas recorridas: aguadas y pasto al límite, eléctrico cortado, animales en tratamiento, conteos que no cierran y campos sin recorrer. Tocá un aviso para ir al potrero."
     >
+      {/* Novedades del campo: van ARRIBA y fuera de la lista de avisos. En la
+          lista quedaban últimas (nivel `nota`) y cortadas por FILAS_VISIBLES:
+          técnicamente estaban, en la práctica no se veían. */}
+      {!isLoading && !error && (data?.nacimientos.length ?? 0) > 0 && (
+        <div className="mb-3 flex flex-col gap-1.5 rounded-xl border border-field/30 bg-field/5 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-field">
+            Nacimientos anotados en el campo
+          </p>
+          {data!.nacimientos.map((n) => (
+            <Link
+              key={n.key}
+              to={n.to}
+              className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink hover:underline"
+            >
+              <span className="font-semibold">
+                {n.total} {n.total === 1 ? 'animal' : 'animales'}
+              </span>
+              <span className="text-faint">en</span>
+              <span className="font-medium">
+                {n.potrero} · {n.campo}
+              </span>
+              <span className="text-xs text-faint">
+                {n.detalle} — sin caravana · {haceLabel(n.hace)}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
       ) : error ? (
