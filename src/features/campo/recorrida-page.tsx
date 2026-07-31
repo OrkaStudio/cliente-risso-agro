@@ -429,27 +429,33 @@ function Recorrida({
         </button>
       )}
 
-      {/* Confirmación de lo último anotado (nacimiento o movimiento).
-          Entra y sale con spring ABRIENDO ALTURA, así el croquis se corre solo
-          en vez de saltar. `MotionConfig reducedMotion="user"` (global) la
-          apaga para quien pidió menos movimiento. */}
-      <AnimatePresence initial={false}>
-        {confirmado && (
-          <motion.div
-            key="confirmacion"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 48, opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 340, damping: 32, mass: 0.7 }}
-            className="c-sweep relative shrink-0 overflow-hidden border-b border-[var(--c-ok)]/60 bg-[var(--c-ok-soft)]"
-          >
-            <div className="flex h-12 items-center justify-center gap-2 px-3 text-[14.5px] font-semibold text-[var(--c-ok-deep)]">
-              <Check className="size-[18px] shrink-0" strokeWidth={3} />
-              <span className="truncate">{confirmado}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* El croquis y su panel viven en un contenedor RELATIVO: la confirmación
+          flota adentro sin ocupar lugar. Antes abría altura y el contenedor se
+          achicaba, así que el SVG se reescalaba y los potreros se agrandaban y
+          achicaban solos — se veía como un defecto. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <AnimatePresence initial={false}>
+          {confirmado && (
+            <motion.div
+              key="confirmacion"
+              initial={{ y: -14, opacity: 0, scale: 0.96 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -10, opacity: 0, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.6 }}
+              className="pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center"
+            >
+              <div className="c-sweep relative flex max-w-full items-center gap-2 overflow-hidden rounded-full border border-[var(--c-ok)]/45 bg-[var(--c-panel)] px-4 py-2.5 shadow-[0_6px_22px_rgba(16,30,20,0.18)]">
+                <Check
+                  className="size-[17px] shrink-0 text-[var(--c-ok-deep)]"
+                  strokeWidth={3}
+                />
+                <span className="truncate text-[14px] font-semibold text-[var(--c-ink)]">
+                  {confirmado}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       {conCroquis ? (
         <Croquis
@@ -481,6 +487,7 @@ function Recorrida({
       ) : (
         <ListaPotreros r={r} onAbrir={setAbierto} />
       )}
+      </div>
 
       {/* Panel de atrasados: lista, no informe. Cada fila lleva DIRECTO al
           parte de ese potrero — es un atajo de navegación hacia lo que falta. */}
