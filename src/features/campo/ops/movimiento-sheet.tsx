@@ -290,13 +290,15 @@ function ExtremoPotrero({
 }
 
 /**
- * Una categoría. EN REPOSO es una línea limpia: qué es y cuántas hay. Los
- * controles aparecen sólo cuando entra al movimiento — con tres categorías en
- * cero, tres contadores apagados se leían como manchas y no como "todavía no
- * elegiste nada".
+ * Una categoría: cuántas se lleva SOBRE cuántas hay, siempre a la vista.
  *
- * Tocar la fila la mete entera ("se van las vacas", el gesto real) o la saca.
- * El −/+ queda para ajustar, que es lo excepcional.
+ * La fracción resuelve la ambigüedad que tenía el número solo: antes valía dos
+ * cosas distintas según el estado (en reposo el stock, elegida lo que se
+ * llevaba), así que un "27" no decía si eran las que había o las que iban.
+ *
+ * Arranca en 0 y se suma: la hoja no supone nada. Tocar el NOMBRE se lleva la
+ * categoría entera —el gesto de "se van los terneros", que si no serían nueve
+ * toques— y volver a tocarlo la saca.
  */
 function FilaCategoria({
   nombre,
@@ -312,43 +314,24 @@ function FilaCategoria({
   onCambiar: (n: number) => void
 }) {
   const va = valor > 0
-
-  // En reposo la fila ENTERA es un solo botón: un toque en cualquier lado la
-  // mete. Dos botones con la misma etiqueta ("Incluir Vacas") era ambiguo para
-  // el dedo y para un lector de pantalla.
-  if (!va) {
-    return (
-      <button
-        type="button"
-        onClick={() => onCambiar(total)}
-        aria-label={`Incluir ${nombre}`}
-        className="c-hard-sm flex w-full items-center gap-2.5 rounded-xl border-2 border-[var(--c-line)] bg-[var(--c-panel)] px-3.5 py-3 text-left transition-colors active:scale-[0.99]"
-      >
-        <span
-          className="size-3.5 shrink-0 rounded-full opacity-45"
-          style={{ background: color }}
-        />
-        <span className="c-display min-w-0 flex-1 truncate text-[19px] leading-tight text-[var(--c-ink)]">
-          {nombre}
-        </span>
-        <span className="c-mono shrink-0 text-[26px] font-bold leading-none tabular-nums text-[var(--c-ink)]">
-          {total}
-        </span>
-      </button>
-    )
-  }
-
   return (
-    <div className="c-hard-sm flex items-center gap-2 rounded-xl border-2 border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3 py-2 transition-colors">
+    <div
+      className={cn(
+        'c-hard-sm flex items-center gap-1.5 rounded-xl border-2 px-2.5 py-2 transition-colors',
+        va
+          ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)]'
+          : 'border-[var(--c-line)] bg-[var(--c-panel)]',
+      )}
+    >
       <button
         type="button"
-        onClick={() => onCambiar(0)}
-        aria-label={`Sacar ${nombre}`}
-        className="flex min-w-0 flex-1 items-center gap-2.5 py-2 text-left"
+        onClick={() => onCambiar(va ? 0 : total)}
+        aria-label={va ? `Sacar ${nombre}` : `Llevar todas las ${nombre}`}
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left"
       >
         <span
           className="size-3.5 shrink-0 rounded-full"
-          style={{ background: color }}
+          style={{ background: color, opacity: va ? 1 : 0.5 }}
         />
         <span className="c-display min-w-0 truncate text-[19px] leading-tight text-[var(--c-ink)]">
           {nombre}
@@ -357,33 +340,40 @@ function FilaCategoria({
 
       <button
         type="button"
+        disabled={valor === 0}
         onClick={() => onCambiar(Math.max(0, valor - 1))}
         aria-label={`Restar ${nombre}`}
-        className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90"
+        className="flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-20 disabled:active:scale-100"
       >
-        <Minus className="size-6" strokeWidth={2.5} />
+        <Minus className="size-5" strokeWidth={2.5} />
       </button>
-      <span className="flex w-[54px] shrink-0 flex-col items-center">
+
+      {/* Lo que se lleva SOBRE lo que hay. */}
+      <span className="flex shrink-0 items-baseline justify-center gap-px">
         <span
           key={valor}
-          className="c-mono c-stamp text-[30px] font-extrabold leading-none tabular-nums text-[var(--c-ok-deep)]"
+          className={cn(
+            'c-mono c-stamp text-[28px] font-extrabold leading-none tabular-nums',
+            // El cero va en tinta suave SÓLIDA, no en opacidad: al 35% se leía
+            // como una mancha y no como un número.
+            va ? 'text-[var(--c-ok-deep)]' : 'text-[var(--c-ink-soft)]',
+          )}
         >
           {valor}
         </span>
-        {valor < total && (
-          <span className="c-mono text-[11px] leading-tight text-[var(--c-ink-soft)]">
-            de {total}
-          </span>
-        )}
+        <span className="c-mono text-[15px] font-semibold leading-none text-[var(--c-ink-soft)]">
+          /{total}
+        </span>
       </span>
+
       <button
         type="button"
         disabled={valor >= total}
         onClick={() => onCambiar(Math.min(total, valor + 1))}
         aria-label={`Sumar ${nombre}`}
-        className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-25 disabled:active:scale-100"
+        className="flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-20 disabled:active:scale-100"
       >
-        <Plus className="size-6" strokeWidth={2.5} />
+        <Plus className="size-5" strokeWidth={2.5} />
       </button>
     </div>
   )
