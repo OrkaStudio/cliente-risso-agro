@@ -9,7 +9,7 @@ import {
 import type { CategoriaAnimal } from './api'
 import type { RecPotrero } from './db'
 import { diasDesde, haceCuantoTxt } from './api'
-import { CLabel } from '../ui'
+import { CLabel, NumeroVivo } from '../ui'
 
 /**
  * Croquis del campo: los potreros con su FORMA REAL (polígonos que Oficina
@@ -318,9 +318,10 @@ function PanelPotrero({
       {potrero.cabezas > 0 ? (
         <>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="c-mono text-[26px] font-extrabold leading-none text-[var(--c-ink)]">
-              {potrero.cabezas}
-            </span>
+            <NumeroVivo
+              valor={potrero.cabezas}
+              className="c-mono text-[26px] font-extrabold leading-none text-[var(--c-ink)]"
+            />
             <CLabel className="!text-[12px]">cabezas</CLabel>
             {nacidos > 0 && (
               <span className="ml-auto shrink-0 rounded-full bg-[var(--c-ok-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--c-ok-deep)]">

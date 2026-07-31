@@ -1,3 +1,4 @@
+import { animate, useReducedMotion } from 'framer-motion'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Delete, Mic, Square, Trash2 as TrashIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -320,4 +321,47 @@ export function NotaVoz({
       )}
     </div>
   )
+}
+
+/**
+ * Un número que se MUEVE hasta su valor nuevo en vez de saltar.
+ *
+ * Las cabezas de un potrero son el dato que el productor mira, y cuando anota
+ * algo cambian: verlas correr de 45 a 46 hace que el sistema se sienta vivo y
+ * que el cambio sea imposible de perderse. Saltar de golpe es lo que hace que
+ * uno dude de si pasó algo.
+ *
+ * Resorte corto (no rebota) y respeta prefers-reduced-motion: con la
+ * preferencia puesta, el número aparece directo en su valor.
+ */
+export function NumeroVivo({
+  valor,
+  className,
+}: {
+  valor: number
+  className?: string
+}) {
+  const reducido = useReducedMotion()
+  const [mostrado, setMostrado] = useState(valor)
+  const anterior = useRef(valor)
+
+  useEffect(() => {
+    if (reducido || anterior.current === valor) {
+      anterior.current = valor
+      setMostrado(valor)
+      return
+    }
+    const desde = anterior.current
+    anterior.current = valor
+    const controles = animate(desde, valor, {
+      type: 'spring',
+      stiffness: 190,
+      damping: 26,
+      mass: 0.6,
+      onUpdate: (v) => setMostrado(Math.round(v)),
+    })
+    return () => controles.stop()
+  }, [valor, reducido])
+
+  return <span className={className}>{mostrado}</span>
 }

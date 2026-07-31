@@ -441,7 +441,7 @@ function Recorrida({
             animate={{ height: 48, opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 340, damping: 32, mass: 0.7 }}
-            className="shrink-0 overflow-hidden border-b border-[var(--c-ok)]/60 bg-[var(--c-ok-soft)]"
+            className="c-sweep relative shrink-0 overflow-hidden border-b border-[var(--c-ok)]/60 bg-[var(--c-ok-soft)]"
           >
             <div className="flex h-12 items-center justify-center gap-2 px-3 text-[14.5px] font-semibold text-[var(--c-ok-deep)]">
               <Check className="size-[18px] shrink-0" strokeWidth={3} />
