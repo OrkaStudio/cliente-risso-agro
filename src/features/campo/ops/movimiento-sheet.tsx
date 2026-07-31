@@ -141,6 +141,19 @@ export function MovimientoSheet({
         </div>
       }
       footer={
+        <>
+          {/* Qué se le va a pedir al server, en criollo. Va en el PIE porque
+              describe lo que hace el botón — y porque en el cuerpo, con las
+              filas grandes, quedaba cortada abajo del pliegue. */}
+          {total > 0 && (
+            <p className="mb-2 text-center text-[13.5px] text-[var(--c-ink-soft)]">
+              {modo === 'todo'
+                ? 'Se mueve la tropa entera.'
+                : modo === 'categorias'
+                  ? 'Se mueven todas las de esas categorías.'
+                  : 'Si hay menos, se mueve lo que haya.'}
+            </p>
+          )}
         <button
           type="button"
           disabled={!listo}
@@ -157,6 +170,7 @@ export function MovimientoSheet({
             'Elegí qué se lleva'
           )}
         </button>
+        </>
       }
       onClose={onClose}
     >
@@ -187,9 +201,9 @@ export function MovimientoSheet({
           {/* Cuánto hay para llevar: sin esto elige a ciegas — no sabe si en el
               potrero hay 5 vacas o 200. */}
           {compo.length > 0 && (
-            <p className="mb-2 text-[13px] text-[var(--c-ink-soft)]">
+            <p className="mb-2.5 text-[15px] text-[var(--c-ink-soft)]">
               En el {origen.nombre} hay{' '}
-              <span className="c-mono font-semibold text-[var(--c-ink)]">
+              <span className="c-mono text-[17px] font-bold text-[var(--c-ink)]">
                 {disponible}
               </span>{' '}
               {disponible === 1 ? 'cabeza' : 'cabezas'}
@@ -229,17 +243,6 @@ export function MovimientoSheet({
               ))}
             </div>
           )}
-          {/* Qué se le va a pedir al server, en criollo. El productor no elige
-              el modo, pero sí merece saber qué se declara. */}
-          {total > 0 && (
-            <p className="mt-2 text-[13px] text-[var(--c-ink-soft)]">
-              {modo === 'todo'
-                ? 'Se mueve la tropa entera.'
-                : modo === 'categorias'
-                  ? 'Se mueven todas las de esas categorías.'
-                  : 'Se mueve esa cantidad; si en el campo hay menos, se mueve lo que haya.'}
-            </p>
-          )}
         </div>
       </div>
     </CSheet>
@@ -268,7 +271,7 @@ function FilaCategoria({
   return (
     <div
       className={cn(
-        'c-hard-sm flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-colors',
+        'c-hard-sm flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 transition-colors',
         va
           ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)]'
           : 'border-[var(--c-line)] bg-[var(--c-panel)]',
@@ -290,16 +293,20 @@ function FilaCategoria({
         <span className="flex min-w-0 flex-col">
           <span
             className={cn(
-              'c-display truncate text-[16px] leading-tight',
+              'c-display truncate text-[18px] leading-tight',
               va ? 'text-[var(--c-ink)]' : 'text-[var(--c-ink-soft)]',
             )}
           >
             {nombre}
           </span>
-          {/* Cuántas hay de ESTA categoría. Siempre visible: es contra lo que
-              elige, no un detalle que aparece recién al tocar. */}
-          <span className="text-[11.5px] text-[var(--c-ink-soft)]">
-            hay <span className="c-mono font-semibold">{total}</span>
+          {/* Cuántas hay de ESTA categoría. Es contra lo que elige, así que va
+              legible a un brazo de distancia y con el sol de frente: número en
+              tinta plena, no un gris chico al pie. */}
+          <span className="text-[14px] leading-tight text-[var(--c-ink-soft)]">
+            hay{' '}
+            <span className="c-mono text-[16px] font-bold text-[var(--c-ink)]">
+              {total}
+            </span>
           </span>
         </span>
       </button>
@@ -308,14 +315,14 @@ function FilaCategoria({
         disabled={valor === 0}
         onClick={() => onCambiar(Math.max(0, valor - 1))}
         aria-label={`Restar ${nombre}`}
-        className="flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-25 disabled:active:scale-100"
+        className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-25 disabled:active:scale-100"
       >
-        <Minus className="size-5" strokeWidth={2.5} />
+        <Minus className="size-6" strokeWidth={2.5} />
       </button>
       <span
         key={valor}
         className={cn(
-          'c-mono c-stamp w-[46px] shrink-0 text-center text-[24px] font-extrabold leading-none tabular-nums',
+          'c-mono c-stamp w-[52px] shrink-0 text-center text-[30px] font-extrabold leading-none tabular-nums',
           va ? 'text-[var(--c-ok-deep)]' : 'text-[var(--c-ink)]/30',
         )}
       >
@@ -326,9 +333,9 @@ function FilaCategoria({
         disabled={valor >= total}
         onClick={() => onCambiar(Math.min(total, valor + 1))}
         aria-label={`Sumar ${nombre}`}
-        className="flex size-11 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-25 disabled:active:scale-100"
+        className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-25 disabled:active:scale-100"
       >
-        <Plus className="size-5" strokeWidth={2.5} />
+        <Plus className="size-6" strokeWidth={2.5} />
       </button>
     </div>
   )
