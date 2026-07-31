@@ -80,6 +80,9 @@ export function MovimientoSheet({
   const yaEstaTodo =
     compo.length > 0 && compo.every((c) => cuanto(c.categoria) === c.cabezas)
 
+  /** Lo que HAY para llevar (del potrero, o de la tropa elegida). */
+  const disponible = compo.reduce((s, c) => s + c.cabezas, 0)
+
   const movidos: CantidadPorCategoria[] = compo
     .map((c) => ({ categoria: c.categoria, cantidad: cuanto(c.categoria) }))
     .filter((m) => m.cantidad > 0)
@@ -180,7 +183,19 @@ export function MovimientoSheet({
         )}
 
         <div className="c-rise" style={{ animationDelay: '60ms' }}>
-          <CLabel className="mb-2 !text-[12px]">Qué se lleva</CLabel>
+          <CLabel className="mb-1 !text-[12px]">Qué se lleva</CLabel>
+          {/* Cuánto hay para llevar: sin esto elige a ciegas — no sabe si en el
+              potrero hay 5 vacas o 200. */}
+          {compo.length > 0 && (
+            <p className="mb-2 text-[13px] text-[var(--c-ink-soft)]">
+              En el {origen.nombre} hay{' '}
+              <span className="c-mono font-semibold text-[var(--c-ink)]">
+                {disponible}
+              </span>{' '}
+              {disponible === 1 ? 'cabeza' : 'cabezas'}
+              {tropa ? ` en ${tropa.nombre}` : ''}
+            </p>
+          )}
           {compo.length > 0 && (
             <button
               type="button"
@@ -272,19 +287,21 @@ function FilaCategoria({
         {/* Sin tachado: la hoja arranca en cero y nada fue "sacado" todavía —
             tachar de entrada se lee como si estuviera todo prohibido. El estado
             lo llevan el número y el verde. */}
-        <span
-          className={cn(
-            'c-display truncate text-[16px]',
-            va ? 'text-[var(--c-ink)]' : 'text-[var(--c-ink-soft)]',
-          )}
-        >
-          {nombre}
-        </span>
-        {va && valor < total && (
-          <span className="c-mono shrink-0 text-[11px] text-[var(--c-ink-soft)]">
-            de {total}
+        <span className="flex min-w-0 flex-col">
+          <span
+            className={cn(
+              'c-display truncate text-[16px] leading-tight',
+              va ? 'text-[var(--c-ink)]' : 'text-[var(--c-ink-soft)]',
+            )}
+          >
+            {nombre}
           </span>
-        )}
+          {/* Cuántas hay de ESTA categoría. Siempre visible: es contra lo que
+              elige, no un detalle que aparece recién al tocar. */}
+          <span className="text-[11.5px] text-[var(--c-ink-soft)]">
+            hay <span className="c-mono font-semibold">{total}</span>
+          </span>
+        </span>
       </button>
       <button
         type="button"
