@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Minus, Plus } from 'lucide-react'
+import { ArrowRight, Check, Minus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { categoriaNombre, coloresPorCategoria } from '@/features/hacienda/labels'
 import type { CategoriaAnimal, TropaRec } from '../recorrida/api'
@@ -118,26 +118,31 @@ export function MovimientoSheet({
       open={open}
       title={`Mover a Potrero ${destino.nombre}`}
       header={
-        <div className="mb-3 flex flex-col items-center gap-0.5 border-b border-[var(--c-line)] pb-2.5">
-          <CLabel className="!text-[11px]">
-            Del {origen.nombre} se mueven a
-          </CLabel>
-          <div className="flex max-w-full items-center gap-2">
-            <span
-              className="size-3 shrink-0 rounded-full"
-              style={{ background: colorHex }}
+        // Desde → hasta, de un golpe. Antes eran tres renglones de texto
+        // ("DEL 3D SE MUEVEN A" / "Potrero 4D" / "Está vacío · Los Pampas")
+        // para decir algo que se entiende mejor mirándolo.
+        <div className="mb-3 border-b border-[var(--c-line)] pb-3">
+          <div className="flex items-center gap-2">
+            <ExtremoPotrero
+              rotulo="Desde"
+              nombre={origen.nombre}
+              detalle={`${disponible} cab.`}
             />
-            <span className="c-display truncate text-[22px] leading-tight text-[var(--c-ink)]">
-              Potrero {destino.nombre}
-            </span>
+            <ArrowRight
+              className="size-7 shrink-0 text-[var(--c-ink-soft)]"
+              strokeWidth={2.5}
+            />
+            <ExtremoPotrero
+              rotulo="Hasta"
+              nombre={destino.nombre}
+              detalle={destino.cabezas > 0 ? `${destino.cabezas} cab.` : 'vacío'}
+              destacado
+              colorHex={colorHex}
+            />
           </div>
-          <span className="max-w-full truncate text-[12.5px] text-[var(--c-ink-soft)]">
-            {destino.cabezas > 0
-              ? `Ya hay ${destino.cabezas} ${destino.cabezas === 1 ? 'cabeza' : 'cabezas'}`
-              : 'Está vacío'}
-            {' · '}
+          <p className="mt-1.5 text-center text-[12.5px] text-[var(--c-ink-soft)]">
             {campoNombre}
-          </span>
+          </p>
         </div>
       }
       footer={
@@ -197,19 +202,7 @@ export function MovimientoSheet({
         )}
 
         <div className="c-rise" style={{ animationDelay: '60ms' }}>
-          <CLabel className="mb-1 !text-[12px]">Qué se lleva</CLabel>
-          {/* Cuánto hay para llevar: sin esto elige a ciegas — no sabe si en el
-              potrero hay 5 vacas o 200. */}
-          {compo.length > 0 && (
-            <p className="mb-2 text-[15px] text-[var(--c-ink-soft)]">
-              En el {origen.nombre} hay{' '}
-              <span className="c-mono text-[17px] font-bold text-[var(--c-ink)]">
-                {disponible}
-              </span>{' '}
-              {disponible === 1 ? 'cabeza' : 'cabezas'}
-              {tropa ? ` en ${tropa.nombre}` : ''}
-            </p>
-          )}
+          <CLabel className="mb-2 !text-[12px]">Qué se lleva</CLabel>
           {compo.length > 0 && (
             <button
               type="button"
@@ -254,6 +247,57 @@ export function MovimientoSheet({
  * vuelve a meter): es el gesto de "los terneros no van". El −/+ es para el caso
  * raro de llevarse una parte.
  */
+/** Un extremo del movimiento (origen o destino) en el encabezado. */
+function ExtremoPotrero({
+  rotulo,
+  nombre,
+  detalle,
+  destacado,
+  colorHex,
+}: {
+  rotulo: string
+  nombre: string
+  detalle: string
+  destacado?: boolean
+  colorHex?: string
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-1 flex-col items-center rounded-xl border-2 px-2 py-2',
+        destacado
+          ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)]'
+          : 'border-[var(--c-line)] bg-[var(--c-sunk)]',
+      )}
+    >
+      <CLabel className="!text-[10.5px]">{rotulo}</CLabel>
+      <div className="flex max-w-full items-center gap-1.5">
+        {destacado && colorHex && (
+          <span
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ background: colorHex }}
+          />
+        )}
+        <span className="c-display truncate text-[24px] leading-tight text-[var(--c-ink)]">
+          {nombre}
+        </span>
+      </div>
+      <span className="c-mono truncate text-[12.5px] text-[var(--c-ink-soft)]">
+        {detalle}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Una categoría. EN REPOSO es una línea limpia: qué es y cuántas hay. Los
+ * controles aparecen sólo cuando entra al movimiento — con tres categorías en
+ * cero, tres contadores apagados se leían como manchas y no como "todavía no
+ * elegiste nada".
+ *
+ * Tocar la fila la mete entera ("se van las vacas", el gesto real) o la saca.
+ * El −/+ queda para ajustar, que es lo excepcional.
+ */
 function FilaCategoria({
   nombre,
   color,
@@ -268,74 +312,79 @@ function FilaCategoria({
   onCambiar: (n: number) => void
 }) {
   const va = valor > 0
-  return (
-    <div
-      className={cn(
-        'c-hard-sm rounded-xl border-2 px-3 py-1.5 transition-colors',
-        va
-          ? 'border-[var(--c-ok)] bg-[var(--c-ok-soft)]'
-          : 'border-[var(--c-line)] bg-[var(--c-panel)]',
-      )}
-    >
-      {/* Arriba, EN PARALELO: qué categoría es y cuántas hay. En una sola línea
-          con los controles no entraba — "Vaquillonas" se cortaba en "Vaq…", y
-          el nombre es justamente lo que le dice qué está moviendo. Los
-          controles bajan y de paso quedan más grandes. */}
+
+  // En reposo la fila ENTERA es un solo botón: un toque en cualquier lado la
+  // mete. Dos botones con la misma etiqueta ("Incluir Vacas") era ambiguo para
+  // el dedo y para un lector de pantalla.
+  if (!va) {
+    return (
       <button
         type="button"
-        onClick={() => onCambiar(va ? 0 : total)}
-        aria-label={va ? `Sacar ${nombre}` : `Incluir ${nombre}`}
-        className="flex w-full items-baseline gap-2 py-0.5 text-left"
+        onClick={() => onCambiar(total)}
+        aria-label={`Incluir ${nombre}`}
+        className="c-hard-sm flex w-full items-center gap-2.5 rounded-xl border-2 border-[var(--c-line)] bg-[var(--c-panel)] px-3.5 py-3 text-left transition-colors active:scale-[0.99]"
       >
         <span
-          className="size-3 shrink-0 self-center rounded-full"
-          style={{ background: color, opacity: va ? 1 : 0.4 }}
+          className="size-3.5 shrink-0 rounded-full opacity-45"
+          style={{ background: color }}
         />
-        <span
-          className={cn(
-            'c-display min-w-0 truncate text-[19px] leading-tight',
-            va ? 'text-[var(--c-ink)]' : 'text-[var(--c-ink-soft)]',
-          )}
-        >
+        <span className="c-display min-w-0 flex-1 truncate text-[19px] leading-tight text-[var(--c-ink)]">
           {nombre}
         </span>
-        <span className="ml-auto shrink-0 text-[14px] leading-tight text-[var(--c-ink-soft)]">
-          hay{' '}
-          <span className="c-mono text-[17px] font-bold text-[var(--c-ink)]">
-            {total}
-          </span>
+        <span className="c-mono shrink-0 text-[26px] font-bold leading-none tabular-nums text-[var(--c-ink)]">
+          {total}
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <div className="c-hard-sm flex items-center gap-2 rounded-xl border-2 border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3 py-2 transition-colors">
+      <button
+        type="button"
+        onClick={() => onCambiar(0)}
+        aria-label={`Sacar ${nombre}`}
+        className="flex min-w-0 flex-1 items-center gap-2.5 py-2 text-left"
+      >
+        <span
+          className="size-3.5 shrink-0 rounded-full"
+          style={{ background: color }}
+        />
+        <span className="c-display min-w-0 truncate text-[19px] leading-tight text-[var(--c-ink)]">
+          {nombre}
         </span>
       </button>
 
-      <div className="mt-1 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={valor === 0}
-          onClick={() => onCambiar(Math.max(0, valor - 1))}
-          aria-label={`Restar ${nombre}`}
-          className="flex size-14 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-95 disabled:opacity-25 disabled:active:scale-100"
-        >
-          <Minus className="size-7" strokeWidth={2.5} />
-        </button>
+      <button
+        type="button"
+        onClick={() => onCambiar(Math.max(0, valor - 1))}
+        aria-label={`Restar ${nombre}`}
+        className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90"
+      >
+        <Minus className="size-6" strokeWidth={2.5} />
+      </button>
+      <span className="flex w-[54px] shrink-0 flex-col items-center">
         <span
           key={valor}
-          className={cn(
-            'c-mono c-stamp min-w-0 flex-1 text-center text-[36px] font-extrabold leading-none tabular-nums',
-            va ? 'text-[var(--c-ok-deep)]' : 'text-[var(--c-ink)]/30',
-          )}
+          className="c-mono c-stamp text-[30px] font-extrabold leading-none tabular-nums text-[var(--c-ok-deep)]"
         >
           {valor}
         </span>
-        <button
-          type="button"
-          disabled={valor >= total}
-          onClick={() => onCambiar(Math.min(total, valor + 1))}
-          aria-label={`Sumar ${nombre}`}
-          className="flex size-14 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-95 disabled:opacity-25 disabled:active:scale-100"
-        >
-          <Plus className="size-7" strokeWidth={2.5} />
-        </button>
-      </div>
+        {valor < total && (
+          <span className="c-mono text-[11px] leading-tight text-[var(--c-ink-soft)]">
+            de {total}
+          </span>
+        )}
+      </span>
+      <button
+        type="button"
+        disabled={valor >= total}
+        onClick={() => onCambiar(Math.min(total, valor + 1))}
+        aria-label={`Sumar ${nombre}`}
+        className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[var(--c-ink)] transition-transform active:scale-90 disabled:opacity-25 disabled:active:scale-100"
+      >
+        <Plus className="size-6" strokeWidth={2.5} />
+      </button>
     </div>
   )
 }
