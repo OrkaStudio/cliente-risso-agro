@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowRight, Check, Crosshair, LoaderCircle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -284,7 +284,7 @@ function PanelPotrero({
       ? 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]'
       : 'bg-[var(--c-sunk)] text-[var(--c-ink-soft)]'
   return (
-    <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+    <div className="max-h-[52vh] shrink-0 overflow-y-auto border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="size-3 shrink-0 rounded-full" style={{ background: colorHex }} />
@@ -421,6 +421,7 @@ export function Croquis({
   onElegirDestino,
   onCancelarMovimiento,
   onAbrir,
+  panel,
 }: {
   potreros: RecPotrero[]
   /** Color IDENTIDAD del campo: el potrero recorrido se pinta de ESTE color
@@ -443,8 +444,19 @@ export function Croquis({
   moviendoDesde?: string | null
   onElegirDestino?: (potreroId: string) => void
   onCancelarMovimiento?: () => void
-  /** Abrir el parte de un potrero (desde el panel o el atajo del GPS). */
-  onAbrir: (potreroId: string) => void
+  /** Abrir el parte de un potrero (desde el panel o el atajo del GPS).
+   *  Ausente = el croquis no es la Recorrida (p. ej. la Manga): no se ofrece
+   *  "cargar el parte" ni el atajo del GPS que lleva ahí. */
+  onAbrir?: (potreroId: string) => void
+  /**
+   * Panel propio para la zona del pulgar cuando hay un potrero seleccionado.
+   * Ausente = el panel de la Recorrida (estado, antigüedad, Recorrer…).
+   *
+   * Existe para que la Manga use EL MISMO dibujo — polígonos reales, foco,
+   * astillas con pin, GPS, todo offline — con sus propias acciones abajo, sin
+   * duplicar 300 líneas de SVG que después se desincronizan.
+   */
+  panel?: (potrero: RecPotrero) => ReactNode
 }) {
   const textoHecho = textoSobre(colorHex)
   const eligiendoDestino = moviendoDesde != null
@@ -563,9 +575,15 @@ export function Croquis({
       {/* Fondo de TIERRA, no del color de las tarjetas: antes el potrero
           (#ffffff) y la superficie (#f2f4ef) diferían un 3% y el croquis se
           leía como una maraña de líneas sin figura contra fondo. */}
+      {/* PISO del dibujo. Sin él, un panel alto (composición + acciones) dejaba
+          el mapa en ~160px: con el campo entero metido ahí, cada potrero medía
+          menos que el mínimo táctil, TODOS pasaban a pin y los pines se
+          amontonaban unos sobre otros — el croquis dejaba de ser un croquis.
+          El mapa ES la Recorrida: si algo tiene que ceder, es el panel, que
+          scrollea. */}
       <div
         ref={boxRef}
-        className="relative min-h-0 flex-1 overflow-hidden bg-[#cbd3c4] p-1.5"
+        className="relative min-h-[38vh] flex-1 overflow-hidden bg-[#cbd3c4] p-1.5"
       >
         {aXY && proy ? (
           <svg
@@ -840,20 +858,24 @@ export function Croquis({
           </div>
         </div>
       ) : seleccionado ? (
-        <PanelPotrero
-          potrero={seleccionado}
-          campoNombre={campoNombre}
-          colorHex={colorHex}
-          nacidos={nacidosPendientesDe?.(seleccionado.id) ?? 0}
-          nacidosPorCategoria={categoriasPendientesDe?.(seleccionado.id)}
-          onAnotar={onAnotarNacimiento}
-          onMover={onMoverAnimales}
-          onAbrir={onAbrir}
-          onCerrar={() => onSeleccionar(null)}
-        />
+        panel ? (
+          panel(seleccionado)
+        ) : (
+          <PanelPotrero
+            potrero={seleccionado}
+            campoNombre={campoNombre}
+            colorHex={colorHex}
+            nacidos={nacidosPendientesDe?.(seleccionado.id) ?? 0}
+            nacidosPorCategoria={categoriasPendientesDe?.(seleccionado.id)}
+            onAnotar={onAnotarNacimiento}
+            onMover={onMoverAnimales}
+            onAbrir={onAbrir ?? (() => {})}
+            onCerrar={() => onSeleccionar(null)}
+          />
+        )
       ) : (
       <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
-        {pisando ? (
+        {pisando && onAbrir ? (
           // El camino más corto posible: frenó, está adentro, un toque y carga.
           <button
             type="button"

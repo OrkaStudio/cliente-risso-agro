@@ -5,7 +5,8 @@ import { defineConfig } from '@playwright/test'
 //   pnpm build && pnpm test:e2e:offline
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'offline.spec.ts',
+  // Los dos corren contra el build real y sin red (Dexie + service worker).
+  testMatch: /(offline|manga)\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {

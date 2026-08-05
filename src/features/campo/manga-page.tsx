@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertTriangle,
   Check,
@@ -9,8 +9,8 @@ import {
   RotateCcw,
   ScanLine,
   Wifi,
+  X,
 } from 'lucide-react'
-import { Dropdown } from '@/components/ui/dropdown'
 import {
   categoriaLabel,
   categoriasPorEspecie,
@@ -19,6 +19,15 @@ import {
 } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import { useManga, type AsignacionLocal } from './manga/use-manga'
+import { actividadPorClave, type ClaveActividad } from './manga/actividades'
+import { ElegirActividad } from './manga/elegir-actividad'
+import { ElegirOrigen, type Origen } from './manga/elegir-origen'
+import { PrearmarVacuna, type DatosVacuna } from './manga/prearmar-vacuna'
+import { Trabajar } from './manga/trabajar'
+import { PrearmarSalidas } from './manga/prearmar-salidas'
+import { Paso } from './manga/ui-manga'
+import type { ModoSalida, PlanSalidas } from './manga/salidas'
+import type { SesionTrabajo } from './manga/use-trabajos'
 import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
 import { normalizarRfid } from './manga/rfid'
 import { useScanner } from './manga/use-scanner'
@@ -48,18 +57,231 @@ function useAutoConfirmar(): [boolean, (v: boolean) => void] {
 const OBSERVACIONES = ['Preñada', 'Vacía', 'Renga', 'Lastimada', 'Flaca', 'Apartar'] as const
 const EXCLUYENTES: Record<string, string> = { 'Preñada': 'Vacía', 'Vacía': 'Preñada' }
 
+/**
+ * La manga, en tres pasos: qué se hace → de dónde salen → a trabajar.
+ *
+ * El orden no es caprichoso. La actividad va primera porque decide todo lo que
+ * sigue (qué se prearma, qué pide cada escaneo, cómo se ve la pantalla de
+ * trabajo). El origen va segundo y se elige SOBRE EL CROQUIS: el productor
+ * conoce la forma de su campo y el número de la tranquera, no en qué potrero
+ * quedó "Lote 1" — un nombre que además se repite entre campos.
+ */
 export function MangaPage() {
   const m = useManga()
+  const [paso, setPaso] = useState<
+    'actividad' | 'origen' | 'prearmar' | 'salidas' | 'trabajo'
+  >('actividad')
+  const [elegidas, setElegidas] = useState<Set<ClaveActividad>>(new Set())
+  const [origen, setOrigen] = useState<Origen | null>(null)
+  const [vacuna, setVacuna] = useState<DatosVacuna | null>(null)
+  const [plan, setPlan] = useState<PlanSalidas | null>(null)
 
+  const titulo = [...elegidas]
+    .map((c) => actividadPorClave.get(c)?.nombre ?? c)
+    .join(' + ')
+  // Caravanear va por su propio camino: es el único que CREA identidad, así que
+  // no busca al animal sino que se la pone al siguiente de la cola.
+  const esCaravaneo = elegidas.has('caravanear')
+  const necesitaVacuna = elegidas.has('vacunar')
+  // Destetar y apartar SEPARAN: necesitan saber qué sale por cada lado del
+  // cepo antes de que entre el primer animal.
+  const necesitaSalidas =
+    elegidas.has('destetar') || elegidas.has('apartar') || elegidas.has('tacto')
+  // De dónde va a salir el lado de cada animal durante el trabajo.
+  const modoSalida: ModoSalida = elegidas.has('tacto')
+    ? 'resultado' // el toque de preñada/vacía ya decide: no se pregunta dos veces
+    : elegidas.has('destetar')
+      ? 'categoria' // la caravana ya dice si es madre o cría
+      : 'libre' // aparte por criterio propio: el lado dura hasta mover la puerta
+  // Estable entre renders: es la entrada de `useTrabajos`, que la usa como
+  // dependencia del capturador del bastón.
+  const sesion = useMemo(() => sesionDe(elegidas, vacuna, origen), [elegidas, vacuna, origen])
+
+  const contenido = () => {
+  if (paso === 'actividad') {
+    return (
+      <ElegirActividad
+        elegidas={elegidas}
+        onToggle={(c) =>
+          setElegidas((prev) => {
+            const next = new Set(prev)
+            if (next.has(c)) next.delete(c)
+            else next.add(c)
+            return next
+          })
+        }
+        onSeguir={() => setPaso('origen')}
+      />
+    )
+  }
+
+  if (paso === 'origen') {
+    return (
+      <ElegirOrigen
+        titulo={titulo}
+        onVolver={() => setPaso('actividad')}
+        onListo={(o) => {
+          setOrigen(o)
+          // El alcance de la cola sale del croquis: la tropa si el potrero
+          // tiene una elegida, el potrero entero si los animales están sueltos.
+          m.setScope(
+            o.loteId
+              ? { kind: 'lote', id: o.loteId, nombre: o.loteNombre ?? '' }
+              : { kind: 'potrero', id: o.potreroId, nombre: o.potreroNombre },
+          )
+          setPaso(
+            necesitaVacuna ? 'prearmar' : necesitaSalidas ? 'salidas' : 'trabajo',
+          )
+        }}
+      />
+    )
+  }
+
+  if (paso === 'prearmar') {
+    return (
+      <PrearmarVacuna
+        onVolver={() => setPaso('origen')}
+        onListo={(d) => {
+          setVacuna(d)
+          setPaso(necesitaSalidas ? 'salidas' : 'trabajo')
+        }}
+      />
+    )
+  }
+
+  if (paso === 'salidas') {
+    return (
+      <PrearmarSalidas
+        titulo={titulo}
+        presentes={origen?.categorias ?? []}
+        potreros={origen?.potrerosDelCampo ?? []}
+        campoNombre={origen?.campoNombre ?? ''}
+        campoColor={origen?.campoColor ?? '#178a55'}
+        origenId={origen?.potreroId ?? ''}
+        esDestete={elegidas.has('destetar')}
+        modo={modoSalida}
+        onVolver={() => setPaso('origen')}
+        onListo={(p) => {
+          setPlan(p)
+          setPaso('trabajo')
+        }}
+      />
+    )
+  }
+
+  if (esCaravaneo) {
+    return (
+      <Caravaneo
+        m={m}
+        origen={origen}
+        onVolver={() => {
+          m.setScope(null)
+          setPaso('origen')
+        }}
+      />
+    )
+  }
+
+  return (
+    <Trabajar
+      titulo={titulo}
+      subtitulo={origen?.loteNombre ?? origen?.campoNombre ?? 'En la manga'}
+      potreroNombre={origen?.potreroNombre ?? ''}
+      total={origen?.cabezas ?? 0}
+      sesion={sesion}
+      plan={plan ?? undefined}
+      onVolver={() => setPaso('origen')}
+    />
+  )
+  }
+
+  // Los cuatro pasos se sienten UNA pantalla que avanza: entra desde abajo con
+  // un resorte corto. Nada de fades largos — en el campo la animación confirma
+  // que algo pasó, no se hace notar.
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <Paso k={esCaravaneo && paso === 'trabajo' ? 'caravaneo' : paso}>
+        {contenido()}
+      </Paso>
+    </AnimatePresence>
+  )
+}
+
+/**
+ * Traduce las actividades elegidas a la sesión que consume `useTrabajos`: qué
+ * eventos registrar por animal y con qué `datos`.
+ *
+ * Un escaneo puede generar VARIOS eventos —vacunar y destetar en la misma
+ * pasada son dos hechos distintos en el historial del animal, no uno— y por eso
+ * los tipos son una lista.
+ */
+function sesionDe(
+  elegidas: Set<ClaveActividad>,
+  vacuna: DatosVacuna | null,
+  origen: Origen | null,
+): SesionTrabajo {
+  const tipos: string[] = []
+  const datosPorTipo: Record<string, Record<string, unknown>> = {}
+  const soloCategorias = new Set<string>()
+
+  for (const clave of elegidas) {
+    const a = actividadPorClave.get(clave)
+    if (!a) continue
+    for (const c of a.soloCategorias ?? []) soloCategorias.add(c)
+
+    if (clave === 'vacunar') {
+      tipos.push('sanidad')
+      datosPorTipo.sanidad = {
+        tratamiento: vacuna?.vacuna ?? null,
+        producto: vacuna?.producto ?? null,
+        veterinario: vacuna?.veterinario ?? null,
+        // `retiro_hasta` es el nombre que ya leen las señales de Hacienda: el
+        // banner rojo de retiro sanitario se enciende solo con esto.
+        retiro_hasta: vacuna?.retiroHasta ?? null,
+        origen_ui: 'manga',
+      }
+    } else if (clave === 'destetar') {
+      tipos.push('destete')
+      datosPorTipo.destete = { origen_ui: 'manga' }
+    } else if (clave === 'yerra') {
+      tipos.push('castracion')
+      datosPorTipo.castracion = { trabajo: 'yerra', origen_ui: 'manga' }
+    } else if (clave === 'tacto') {
+      tipos.push('tacto')
+      // `resultado` lo completa el toque en la manga, no el prearmado.
+      datosPorTipo.tacto = { origen_ui: 'manga' }
+    }
+  }
+
+  return {
+    tipos,
+    datosPorTipo,
+    soloCategorias: [...soloCategorias],
+    fecha: new Date().toISOString().slice(0, 10),
+    // El tacto no se puede prearmar: el resultado sale del animal que tenés
+    // adelante, así que el registro espera al toque.
+    diferido: elegidas.has('tacto'),
+    // En la yerra el ternero suele pasar por la manga por PRIMERA vez: la
+    // caravana no existe porque se la están poniendo en ese momento.
+    altaSiDesconocido: elegidas.has('yerra') || elegidas.has('caravanear'),
+    potreroId: origen?.potreroId ?? null,
+    loteId: origen?.loteId ?? null,
+  }
+}
+
+/** Pantalla de trabajo del caravaneo (la única actividad construida hoy). */
+function Caravaneo({
+  m,
+  origen,
+  onVolver,
+}: {
+  m: ReturnType<typeof useManga>
+  origen: Origen | null
+  onVolver: () => void
+}) {
   if (m.cargando) {
     return <p className="c-label p-8 text-center !text-[13px]">Cargando manga…</p>
   }
-
-  // Sugerencia de caravana visual: la última numérica + 1 (correlativas).
-  const visualSugerido =
-    m.ultimo?.visual && /^\d+$/.test(m.ultimo.visual)
-      ? String(Number(m.ultimo.visual) + 1)
-      : null
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
@@ -95,24 +317,23 @@ export function MangaPage() {
         </div>
 
         <div className="flex items-end gap-3">
-          <div className="min-w-0 flex-1">
-            <Dropdown
-              block
-              ariaLabel="Alcance"
-              value={
-                m.scope.kind === 'todos' ? 'todos' : `${m.scope.kind}:${m.scope.id}`
-              }
-              onChange={(key) => {
-                const opt = m.scopeOptions.find((o) => o.key === key)
-                if (opt) m.setScope(opt.scope)
-              }}
-              options={m.scopeOptions.map((o) => ({
-                value: o.key,
-                label: `${o.label} · ${o.pendientes}`,
-              }))}
-              className="h-11"
-            />
-          </div>
+          {/* De dónde salen: ya quedó decidido en el croquis, así que acá es
+              contexto —no un selector—. Tocarlo vuelve al dibujo. */}
+          <button
+            type="button"
+            onClick={onVolver}
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          >
+            <span className="min-w-0">
+              <span className="c-display block truncate text-[16px] text-[var(--c-ink)]">
+                {origen ? `Potrero ${origen.potreroNombre}` : 'Manga'}
+              </span>
+              <CLabel className="block truncate !text-[10px]">
+                {origen?.loteNombre ?? origen?.campoNombre ?? 'Elegir'}
+              </CLabel>
+            </span>
+            <ChevronDown className="size-4 shrink-0 text-[var(--c-faint)]" />
+          </button>
           <div className="flex shrink-0 items-end gap-3 pb-0.5">
             <div className="text-right leading-none">
               <span className="c-mono block text-[32px] font-bold text-[var(--c-ink)]">
@@ -191,11 +412,13 @@ export function MangaPage() {
           key={m.actual.id}
           animal={m.actual}
           rfidsUsados={m.rfidsUsados}
-          visualSugerido={visualSugerido}
           onAsignar={(datos) => {
             // Confirmación háptica al asignar; el sello visual lo da "Último".
             if ('vibrate' in navigator) navigator.vibrate(50)
-            void m.asignar(m.actual!.id, datos)
+            // El animal lo elige el hook (cabeza de cola, tomada de forma
+            // síncrona): pasarle `actual.id` desde acá era lo que permitía
+            // que dos lecturas rápidas apuntaran al mismo animal.
+            void m.asignar(datos)
           }}
         />
       ) : m.sinLista && !m.online ? (
@@ -230,22 +453,19 @@ export function MangaPage() {
     </div>
   )
 }
-
 type AnimalFormProps = {
   animal: AnimalSinCaravana
   rfidsUsados: Set<string>
-  visualSugerido: string | null
   onAsignar: (datos: AsignacionLocal) => void
 }
 
 /**
  * Form de un animal (keyado por id → arranca fresco). El RFID es el héroe (el
- * bastón teclea acá); categoría por hoja de botones grandes, visual con
- * sugerencia +1, notas por chips. El botón Asignar vive en el footer fijo.
+ * bastón teclea acá); categoría por hoja de botones grandes, notas por chips.
+ * El botón Asignar vive en el footer fijo.
  */
-function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFormProps) {
+function AnimalForm({ animal, rfidsUsados, onAsignar }: AnimalFormProps) {
   const [rfid, setRfid] = useState('')
-  const [visual, setVisual] = useState('')
   const [categoria, setCategoria] = useState<CategoriaAnimal>(animal.categoria)
   const [notas, setNotas] = useState<Set<string>>(new Set())
   const [notaLibre, setNotaLibre] = useState('')
@@ -268,14 +488,22 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
       setAviso('Escaneá o escribí el RFID')
       return
     }
-    if (rfidsUsados.has(normalizarRfid(valor))) {
+    const limpio = normalizarRfid(valor)
+    // Red de seguridad contra dos lecturas pegadas en el mismo campo: una
+    // caravana ISO tiene 15 dígitos y nada legítimo llega a 20. Sin esto el
+    // número concatenado se guarda igual — no lo agarra el chequeo de
+    // duplicados, porque como número no existe en ninguna parte.
+    if (limpio.length > 20) {
+      setAviso('Parecen dos lecturas pegadas — borrá el campo y escaneá de nuevo')
+      return
+    }
+    if (rfidsUsados.has(limpio)) {
       setAviso('Ese RFID ya está en uso en otro animal')
       return
     }
     const nota = [...notas, notaLibre.trim()].filter(Boolean).join(' · ')
     onAsignar({
       rfid: valor,
-      visual: visual || undefined,
       categoria,
       nota: nota || undefined,
       audio,
@@ -381,6 +609,25 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
               placeholder="Escaneá…"
               className="c-mono h-16 min-w-0 flex-1 bg-transparent text-[24px] font-bold text-[var(--c-ink)] outline-none placeholder:text-[18px] placeholder:text-[var(--c-faint)]"
             />
+            {/* Borrar. Con el bastón emparejado iOS no muestra el teclado en
+                pantalla y el bastón no manda backspace: sin este botón, un
+                campo con basura (dos lecturas pegadas) deja la manga trabada,
+                sin ninguna forma de vaciarlo. */}
+            {rfid !== '' && (
+              <button
+                type="button"
+                aria-label="Borrar la lectura"
+                onClick={() => {
+                  setRfid('')
+                  setAviso(null)
+                  setRescatada(false)
+                  inputRef.current?.focus()
+                }}
+                className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-[var(--c-faint)]"
+              >
+                <X className="size-6" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
           {aviso ? (
             <p className="c-label mt-1 flex items-center gap-1 !text-[12px] !text-[var(--c-bad)]">
@@ -429,28 +676,11 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
           </button>
         </div>
 
-        {/* Visual: con sugerencia correlativa (+1 de la última) */}
-        <div>
-          <CLabel className="mb-1.5">Caravana visual · opcional</CLabel>
-          <div className="flex gap-1.5">
-            <input
-              value={visual}
-              onChange={(e) => setVisual(e.target.value)}
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="N°"
-              className="c-mono h-12 w-28 rounded-lg border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 text-[18px] font-bold text-[var(--c-ink)] outline-none focus:border-[var(--c-ok)]"
-            />
-            {visualSugerido && visual !== visualSugerido && (
-              <CChip
-                label={`¿${visualSugerido}?`}
-                selected={false}
-                onClick={() => setVisual(visualSugerido)}
-                className="c-mono"
-              />
-            )}
-          </div>
-        </div>
+        {/* Sin campo de caravana visual: en Risso se pone SOLO la electrónica
+            (decisión de Lau, 03/08). El número corto no se carga a mano, así
+            que el campo era un hueco muerto en el medio del flujo — y con el
+            bastón emparejado ni siquiera había teclado para llenarlo. El
+            soporte sigue en la RPC y en el outbox para Oficina. */}
 
         {/* Observación rápida: grilla SIEMPRE visible (nada de scroll para
             encontrar el botón — "¿está renga? toco Renga y sigo") */}
@@ -507,8 +737,10 @@ function AnimalForm({ animal, rfidsUsados, visualSugerido, onAsignar }: AnimalFo
         title="Categoría del animal"
         onClose={() => setAbrirCategoria(false)}
       >
+        {/* Solo BOVINOS: son los únicos que llevan caravana. Ofrecer ovejas o
+            yeguas acá sería ofrecer un trabajo que la manga no puede hacer. */}
         <div className="flex flex-col gap-3">
-          {(Object.keys(categoriasPorEspecie) as Especie[]).map((especie) => (
+          {(['bovino'] as Especie[]).map((especie) => (
             <div key={especie}>
               <CLabel className="mb-1.5">{especieLabel[especie]}</CLabel>
               <div className="grid grid-cols-3 gap-1.5">

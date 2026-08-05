@@ -16,7 +16,16 @@ export type Scope =
   | { kind: 'lote'; id: string; nombre: string }
   | { kind: 'potrero'; id: string; nombre: string }
 
-export type ScopeOption = { key: string; label: string; scope: Scope; pendientes: number }
+export type ScopeOption = {
+  key: string
+  label: string
+  /** Desambiguador: dónde están esos animales. Los nombres de tropa se repiten
+   *  entre campos ("Lote 1" existe en La Porteña, Los Pampas y DOS veces en
+   *  Toimil), así que la etiqueta sola no alcanza para elegir. */
+  detalle: string | null
+  scope: Scope
+  pendientes: number
+}
 
 export type AsignacionLocal = {
   rfid: string
@@ -31,6 +40,19 @@ function enScope(a: AnimalCache, s: Scope): boolean {
   if (s.kind === 'lote') return a.lote_id === s.id
   return a.potrero_id === s.id
 }
+
+/**
+ * Qué se está caravaneando. `null` = todavía no se eligió: la manga NO sirve
+ * ningún animal hasta que se elija.
+ *
+ * Por qué obligatorio: el animal a caravanear se toma de la cabeza de la cola
+ * (nadie lo elige de a uno — con guantes eso sería un toque más por cabeza).
+ * Eso vale sólo si la cola es la tropa que está pasando por la manga. Con el
+ * alcance en "todos", la cabeza de la cola es un animal cualquiera del rodeo y
+ * la caravana física termina anotada contra un animal de otro potrero. Pasó de
+ * verdad el 01/08: dos lecturas seguidas cayeron en 11B y 10B.
+ */
+export type ScopeElegido = Scope | null
 
 /** Estado online reactivo (navigator.onLine + eventos). */
 function useOnline(): boolean {
@@ -55,7 +77,7 @@ export function useManga() {
   const animales = useLiveQuery(() => mangadb.animales.toArray(), [])
   const outbox = useLiveQuery(() => mangadb.outbox.toArray(), [])
   const refsArr = useLiveQuery(() => mangadb.refs.toArray(), [])
-  const [scope, setScope] = useState<Scope>({ kind: 'todos' })
+  const [scope, setScope] = useState<ScopeElegido>(null)
   const [descargando, setDescargando] = useState(false)
   const [sincronizando, setSincronizando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +86,39 @@ export function useManga() {
   // setState es asíncrono. Un ref se lee/escribe sincrónicamente.
   const descargandoRef = useRef(false)
   const sincronizandoRef = useRef(false)
+
+  /**
+   * Animales ya tomados por un caravaneo de ESTE tirón, antes de que Dexie
+   * propague el `caravaneado: 1` de vuelta por la live query.
+   *
+   * El bug que cierra: `asignar` es asíncrono (dos awaits a Dexie) y la lista
+   * de pendientes viene de `useLiveQuery`. Con el bastón en auto-confirmar, la
+   * segunda lectura entra ANTES de que la primera haya propagado → las dos
+   * apuntan a la misma cabeza de cola. La segunda muere en el sync contra
+   * `uq_caravana_vigente_por_animal` y ese animal nunca se caravanea. Un ref se
+   * lee y escribe sincrónicamente, así que la segunda lectura ya lo ve tomado
+   * y agarra el siguiente. Mismo patrón que los cerrojos de arriba
+   * (lecciones/2026-07-02-risso-agro-outbox-single-row-serializacion).
+   */
+  const tomadosRef = useRef<Set<string>>(new Set())
+  // Espejo en estado del ref de arriba. Hacen falta los dos: el ref se lee
+  // sincrónicamente dentro de `asignar` (que es donde se decide el animal), y
+  // el estado es lo que el render puede mirar — acceder al ref durante el
+  // render rompe con rendering concurrente. Además el setState es lo que hace
+  // avanzar la cabeza de cola YA: el form se remonta por `key={actual.id}`, y
+  // sin ese remonte el input conserva el RFID anterior y la lectura siguiente
+  // se le APPENDEA (un número de 30 dígitos que encima pasa el chequeo de
+  // duplicados, porque como caravana no existe en ninguna parte).
+  const [tomados, setTomados] = useState<ReadonlySet<string>>(() => new Set())
+  /** Pendientes del alcance, para que `asignar` elija la cabeza de cola sin
+   *  depender del closure del handler. Se refresca en un effect, no en render. */
+  const pendientesRef = useRef<AnimalCache[]>([])
+
+  /** Devuelve un animal a la cola (falló el sync, o se deshizo el caravaneo). */
+  const liberar = useCallback((animalId: string) => {
+    tomadosRef.current.delete(animalId)
+    setTomados(new Set(tomadosRef.current))
+  }, [])
 
   /** Descarga la lista desde Supabase y la cachea local. Conserva los animales
    *  caravaneados en el teléfono (subidos o no) para que "Listos" no parpadee
@@ -134,6 +189,7 @@ export function useManga() {
             error: msg,
           })
           // el animal vuelve a estar disponible para re-caravanear
+          liberar(item.animal_id) // si no, el filtro local lo sigue ocultando
           await mangadb.animales.update(item.animal_id, { caravaneado: 0 })
         }
       }
@@ -141,7 +197,7 @@ export function useManga() {
       setSincronizando(false)
       sincronizandoRef.current = false
     }
-  }, [])
+  }, [liberar])
 
   /** Puesta al día completa, SECUENCIADA para que no se pisen: primero empuja
    *  lo cargado offline (sincronizar) y recién después baja el estado fresco
@@ -212,14 +268,25 @@ export function useManga() {
       }
     }
     await mangadb.outbox.delete(item.local_id!)
+    liberar(item.animal_id) // vuelve a la cabeza de la cola
     await mangadb.animales.update(item.animal_id, { caravaneado: 0 })
-  }, [])
+  }, [liberar])
 
   /** Asigna caravana al animal (local): encola + lo saca de "quedan" + sincroniza.
    *  Si el animal tenía un intento fallido (error), se limpia: el error viejo
    *  no queda colgado en el panel una vez corregido. */
   const asignar = useCallback(
-    async (animalId: string, datos: AsignacionLocal) => {
+    async (datos: AsignacionLocal) => {
+      // El animal lo elige ESTA función, sincrónicamente, y no la pantalla:
+      // que la UI mandara `actual.id` era justamente lo que permitía que dos
+      // lecturas rápidas apuntaran al mismo animal.
+      const animal = pendientesRef.current.find((a) => !tomadosRef.current.has(a.id))
+      if (!animal) return null
+      const animalId = animal.id
+      tomadosRef.current.add(animalId)
+      // La cabeza de cola cambia YA: el form se remonta y el input queda limpio.
+      setTomados(new Set(tomadosRef.current))
+
       const fallidos = await mangadb.outbox
         .where('animal_id')
         .equals(animalId)
@@ -247,6 +314,7 @@ export function useManga() {
       })
       await mangadb.animales.update(animalId, { caravaneado: 1 })
       void sincronizar()
+      return animal
     },
     [sincronizar],
   )
@@ -256,19 +324,30 @@ export function useManga() {
   const listaOutbox = outbox ?? []
   const cargando = animales === undefined || descargando
 
-  const pendientesScope = listaAnimales.filter(
-    (a) => a.caravaneado === 0 && enScope(a, scope),
-  )
+  // Sin alcance elegido no hay cola: la manga no sirve ningún animal todavía.
+  // `tomadosRef` saca los que ya se encolaron en este tirón aunque Dexie no
+  // haya propagado — es lo que hace que dos lecturas seguidas caigan en dos
+  // animales distintos y no en el mismo.
+  const pendientesScope = scope
+    ? listaAnimales.filter(
+        (a) => a.caravaneado === 0 && !tomados.has(a.id) && enScope(a, scope),
+      )
+    : []
   const actual = pendientesScope[0] ?? null
+  // Se refresca después del commit, no durante el render. Para cuando entra la
+  // lectura siguiente del bastón (otro tick del event loop) ya está al día.
+  useEffect(() => {
+    pendientesRef.current = pendientesScope
+  })
   const quedan = pendientesScope.length
   const listo = listaAnimales.filter((a) => a.caravaneado === 1).length
   const sinSincronizar = listaOutbox.filter((o) => o.estado === 'pendiente').length
   const errores = listaOutbox.filter((o) => o.estado === 'error')
 
   // Progreso dentro del alcance elegido (para la barra).
-  const listoScope = listaAnimales.filter(
-    (a) => a.caravaneado === 1 && enScope(a, scope),
-  ).length
+  const listoScope = scope
+    ? listaAnimales.filter((a) => a.caravaneado === 1 && enScope(a, scope)).length
+    : 0
   const totalScope = listoScope + quedan
   const progreso = totalScope > 0 ? listoScope / totalScope : 0
 
@@ -288,17 +367,12 @@ export function useManga() {
       .filter((o) => o.estado === 'pendiente' || o.estado === 'sincronizada')
       .sort((a, b) => b.created_at - a.created_at)[0] ?? null
 
-  // Opciones de alcance (Todos + lotes + potreros presentes en la lista)
+  // Opciones de alcance. Las tropas y potreros van PRIMERO y "todo el rodeo"
+  // último: es el que reintroduce el problema de caravanear contra un animal de
+  // otro lado, así que se elige a propósito, no por venir arriba de la lista.
   const scopeOptions: ScopeOption[] = (() => {
     const disponibles = listaAnimales.filter((a) => a.caravaneado === 0)
-    const opts: ScopeOption[] = [
-      {
-        key: 'todos',
-        label: 'Todos',
-        scope: { kind: 'todos' },
-        pendientes: disponibles.length,
-      },
-    ]
+    const opts: ScopeOption[] = []
     const lotes = new Map<string, string>()
     const potreros = new Map<string, string>()
     for (const a of disponibles) {
@@ -306,21 +380,40 @@ export function useManga() {
       if (a.potrero_id) potreros.set(a.potrero_id, a.potrero_nombre ?? 'Potrero')
     }
     for (const [id, nombre] of lotes) {
+      const suyos = disponibles.filter((a) => a.lote_id === id)
+      // En qué potreros está parada esta tropa: es lo que la distingue de otra
+      // que se llama igual. Se ordena natural (1B antes que 11B).
+      const donde = [...new Set(suyos.map((a) => a.potrero_nombre).filter(Boolean))]
+        .sort((a, b) =>
+          String(a).localeCompare(String(b), 'es', { numeric: true }),
+        )
+        .join(' · ')
       opts.push({
         key: `lote:${id}`,
         label: `Tropa ${nombre}`,
+        detalle: donde || 'sin potrero',
         scope: { kind: 'lote', id, nombre },
-        pendientes: disponibles.filter((a) => a.lote_id === id).length,
+        pendientes: suyos.length,
       })
     }
     for (const [id, nombre] of potreros) {
+      const suyos = disponibles.filter((a) => a.potrero_id === id)
+      const tropas = [...new Set(suyos.map((a) => a.lote_nombre).filter(Boolean))]
       opts.push({
         key: `potrero:${id}`,
-        label: nombre,
+        label: `Potrero ${nombre}`,
+        detalle: tropas.length > 0 ? tropas.join(' · ') : 'sueltos',
         scope: { kind: 'potrero', id, nombre },
-        pendientes: disponibles.filter((a) => a.potrero_id === id).length,
+        pendientes: suyos.length,
       })
     }
+    opts.push({
+      key: 'todos',
+      label: 'Todo el rodeo',
+      detalle: null,
+      scope: { kind: 'todos' },
+      pendientes: disponibles.length,
+    })
     return opts
   })()
 

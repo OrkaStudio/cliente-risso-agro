@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import { normalizarRfid } from './rfid'
+import type { AnimalRodeo } from './db'
 
 export type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
 
@@ -169,4 +170,107 @@ export async function deshacerCaravana(
       nota: `Caravaneo deshecho (RFID ${rfid})`,
     })
   }
+}
+
+// ===========================================================================
+// TRABAJOS sobre animales YA caravaneados (vacunar, destetar, yerra, tacto).
+//
+// No hay migración: los tipos `sanidad | destete | castracion | tacto` ya
+// existen en el enum `tipo_evento` y `evento.datos` ya es JSONB. Lo único que
+// hacía falta era el cache RFID→animal para que el bastón IDENTIFIQUE sin
+// señal, en vez de crear identidad como hace el caravaneo.
+// ===========================================================================
+
+/**
+ * Rodeo caravaneado: RFID normalizado → animal. Es el índice que convierte una
+ * lectura del bastón en un animal concreto, offline.
+ */
+export async function fetchRodeo(): Promise<AnimalRodeo[]> {
+  const [caravanasRes, animalesRes] = await Promise.all([
+    supabase.from('caravana').select('animal_id, numero_rfid').eq('vigente', true),
+    supabase
+      .from('animal')
+      .select('id, empresa_id, categoria, potrero_id, lote_id')
+      .eq('estado', 'activo'),
+  ])
+  if (caravanasRes.error) throw caravanasRes.error
+  if (animalesRes.error) throw animalesRes.error
+
+  const porId = new Map((animalesRes.data ?? []).map((a) => [a.id, a]))
+  const filas: AnimalRodeo[] = []
+  for (const c of caravanasRes.data ?? []) {
+    const a = porId.get(c.animal_id)
+    if (!a) continue // caravana de un animal dado de baja: no entra a la manga
+    filas.push({
+      // Normalizado de los dos lados: el mismo animal leído con otro bastón
+      // tiene que caer en la misma clave o el lookup falla en silencio.
+      rfid: normalizarRfid(c.numero_rfid),
+      animal_id: a.id,
+      empresa_id: a.empresa_id,
+      categoria: a.categoria,
+      potrero_id: a.potrero_id,
+      lote_id: a.lote_id,
+    })
+  }
+  return filas
+}
+
+export type EventoTrabajo = {
+  id: string
+  animalId: string
+  empresaId: string
+  tipo: string
+  datos: Record<string, unknown>
+  fecha: string
+}
+
+/**
+ * Sube UN trabajo. El `id` lo pone el cliente, así que un reintento después de
+ * un ACK perdido choca contra la PK — y eso es exactamente el éxito: el evento
+ * ya está. Se traga ese error a propósito; cualquier otro sí sube.
+ */
+export async function subirEventoTrabajo(e: EventoTrabajo): Promise<void> {
+  const { error } = await supabase.from('evento').insert({
+    id: e.id,
+    empresa_id: e.empresaId,
+    animal_id: e.animalId,
+    tipo: e.tipo as Database['public']['Enums']['tipo_evento'],
+    fecha: e.fecha,
+    datos: e.datos as Database['public']['Tables']['evento']['Insert']['datos'],
+  })
+  if (!error) return
+  // 23505 = unique_violation sobre la PK: ya lo habíamos registrado.
+  if (error.code === '23505') return
+  throw error
+}
+
+/**
+ * Manda al destino a los animales que salieron por un lado.
+ *
+ * A un potrero se mueve DE VERDAD, y para eso se usa la RPC `mover_animales`
+ * con `p_animal_ids` — que ya es transaccional, mantiene `lote_potrero`
+ * coherente y deja el evento de movimiento. Se llama por tanda y no por animal:
+ * en una manga de 200 cabezas, 200 llamadas serían 200 viajes de red.
+ *
+ * `p_alta_id` hace el reintento inofensivo: si el ACK se pierde en el campo, la
+ * segunda llamada devuelve el resultado guardado en vez de fallar.
+ */
+export async function moverAlDestino(input: {
+  altaId: string
+  empresaId: string
+  potreroDestino: string
+  animalIds: string[]
+  fecha: string
+  contexto: Record<string, unknown>
+}): Promise<void> {
+  if (input.animalIds.length === 0) return
+  const { error } = await supabase.rpc('mover_animales', {
+    p_empresa_id: input.empresaId,
+    p_potrero_destino: input.potreroDestino,
+    p_animal_ids: input.animalIds,
+    p_alta_id: input.altaId,
+    p_fecha: input.fecha,
+    p_contexto: input.contexto as never,
+  })
+  if (error) throw error
 }
