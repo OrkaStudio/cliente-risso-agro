@@ -395,6 +395,16 @@ const RODEO = [
     potrero_id: 'p1',
     lote_id: 'l1',
   },
+  // Un toro: no es madre ni cría, así que un destete no lo contempla. Es el
+  // testigo del animal que cae FUERA del plan de salidas.
+  {
+    rfid: '032010010414567',
+    animal_id: 'r3',
+    empresa_id: EMPRESA,
+    categoria: 'toro',
+    potrero_id: 'p1',
+    lote_id: 'l1',
+  },
 ]
 
 async function sembrarRodeo(page: Page) {
@@ -426,6 +436,27 @@ async function leerTrabajos(page: Page) {
         all.onerror = () => reject(all.error)
       },
     )
+  })
+}
+
+/** Lee el aparte: a qué grupo fue cada animal y qué falta ejecutar. */
+async function leerApartes(page: Page) {
+  return page.evaluate(async () => {
+    const db = await abrirManga()
+    if (!db) return []
+    return new Promise<
+      {
+        animal_id: string
+        salida_id: string
+        destino_k: string
+        potrero_destino_id: string | null
+        estado: string
+      }[]
+    >((resolve, reject) => {
+      const all = db.transaction('apartes', 'readonly').objectStore('apartes').getAll()
+      all.onsuccess = () => resolve(all.result)
+      all.onerror = () => reject(all.error)
+    })
   })
 }
 
@@ -502,56 +533,75 @@ test.describe('manga — trabajos sobre animales caravaneados', () => {
     await page.getByRole('button', { name: '11B', exact: true }).click()
     await page.getByRole('button', { name: /^Empezar/ }).click()
 
-    // Prearmado: se carga UNA vez y vale para toda la sesión.
+    // Prearmado: se carga UNA vez y vale para toda la sesión. En la manga se
+    // aplican VARIAS vacunas en la misma pasada (meter el rodeo es caro), así
+    // que se marcan todas y cada una queda como un hecho propio.
     await expect(page.getByText('¿Qué se aplica?')).toBeVisible()
-    await page.getByRole('button', { name: 'Aftosa' }).click()
+    await page.getByRole('button', { name: 'Brucelosis' }).click()
     await page.getByPlaceholder('Quién lo aplica').fill('Dr. Gómez')
     await page.getByRole('button', { name: '30 d', exact: true }).click()
-    await page.getByRole('button', { name: /Empezar a vacunar/ }).click()
+    await page.getByRole('button', { name: /Empezar con 2 vacunas/ }).click()
 
-    // Destetar SEPARA: hay que decir qué sale por cada lado del cepo. En un
-    // destete el mapeo viene propuesto (madres a un lado, crías al otro).
-    await expect(page.getByText('¿Qué sale por dónde?')).toBeVisible()
-    // El destino de cada lado se toca en el CROQUIS, no en una lista.
-    await page.getByRole('button', { name: /Izquierda/ }).first().click()
+    // Destetar SEPARA. Los grupos se nombran por lo que ES el animal —no por
+    // la puerta— y en un destete vienen propuestos (madres de un lado, crías
+    // del otro): con vaquillonas y terneros presentes, "Vaquillona" y "Ternero".
+    await expect(page.getByText('Qué sale y a dónde va')).toBeVisible()
+    await expect(page.getByTestId('grupo-nombre')).toHaveText([
+      'Vaquillona',
+      'Ternero',
+    ])
+    // El destino se pide POR GRUPO ("a dónde van las vaquillonas"), y el
+    // potrero se toca en el CROQUIS, no en una lista.
+    await page.getByRole('button', { name: 'A dónde van Vaquillona' }).click()
     await expect(page.getByText('A otro potrero')).toBeVisible()
     await page.getByText('A otro potrero').click()
     await page.getByRole('button', { name: '9B', exact: true }).click()
     await page.getByRole('button', { name: 'Van acá' }).click()
-    await expect(page.getByText('Potrero 9B')).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'A dónde van Vaquillona' }),
+    ).toContainText('Potrero 9B')
 
     await page.getByRole('button', { name: /^Empezar$/ }).click()
 
     await expect(page.getByText('Podés guardar el teléfono')).toBeVisible()
 
-    // Una lectura: dos hechos distintos en el historial del animal.
+    // Una lectura: TRES hechos distintos en el historial del animal — las dos
+    // vacunas y el destete. Antes esto era imposible: `datosPorTipo` era un
+    // mapa por tipo y la segunda `sanidad` pisaba a la primera.
     await escanearEnElMismoTick(page, ['032010010414565'])
     await expect
       .poll(async () => (await leerTrabajos(page)).length, { timeout: 10_000 })
-      .toBe(2)
+      .toBe(3)
     // El número de caravana queda a la vista, agrupado para leerse de un golpe.
     await expect(page.getByText('032 0100 1041 4565')).toBeVisible()
-    // El destino sale de la categoría: vaquillona = madre → izquierda.
-    await expect(page.getByText('IZQ', { exact: true })).toBeVisible()
+    // La puerta por la que sale se ENCIENDE y dice qué es el animal. El lado
+    // ya lo dicen su posición, su flecha y su color.
+    await expect(page.getByTestId('cartel-hero')).toHaveText('Vaquillona')
 
     const t = await leerTrabajos(page)
-    expect(t.map((x) => x.tipo).sort()).toEqual(['destete', 'sanidad'])
+    expect(t.map((x) => x.tipo).sort()).toEqual(['destete', 'sanidad', 'sanidad'])
     expect(t.every((x) => x.animal_id === 'r1')).toBe(true)
-    const sanidad = t.find((x) => x.tipo === 'sanidad')!
-    expect(sanidad.datos.tratamiento).toBe('Aftosa')
-    expect(sanidad.datos.veterinario).toBe('Dr. Gómez')
+    // Las dos vacunas quedan por separado y se pueden leer una y otra.
+    const sanidades = t.filter((x) => x.tipo === 'sanidad')
+    expect(sanidades.map((x) => x.datos.tratamiento).sort()).toEqual([
+      'Aftosa',
+      'Brucelosis',
+    ])
+    expect(sanidades.every((x) => x.datos.veterinario === 'Dr. Gómez')).toBe(true)
     // El retiro queda como FECHA, que es lo que después enciende el aviso.
-    expect(typeof sanidad.datos.retiro_hasta).toBe('string')
+    expect(sanidades.every((x) => typeof x.datos.retiro_hasta === 'string')).toBe(
+      true,
+    )
 
     // Repetir el mismo animal no vuelve a anotarlo.
     await escanearEnElMismoTick(page, ['032010010414565'])
     await expect(page.getByText('Ya lo hiciste', { exact: false })).toBeVisible()
-    expect((await leerTrabajos(page)).length).toBe(2)
+    expect((await leerTrabajos(page)).length).toBe(3)
 
     // Una caravana que no es del rodeo avisa en vez de registrar cualquier cosa.
     await escanearEnElMismoTick(page, ['032999999999999'])
     await expect(page.getByText('no es de tus animales')).toBeVisible()
-    expect((await leerTrabajos(page)).length).toBe(2)
+    expect((await leerTrabajos(page)).length).toBe(3)
 
     // Cierre: la única lectura tranquila del día.
     await page.getByRole('button', { name: 'Terminar' }).last().click()
@@ -575,8 +625,10 @@ test.describe('manga — trabajos sobre animales caravaneados', () => {
     await page.getByRole('button', { name: '11B', exact: true }).click()
     await page.getByRole('button', { name: /^Empezar/ }).click()
 
-    // El prearmado del tacto no pregunta por categoría: el lado sale del toque.
-    await expect(page.getByText('¿Qué sale por dónde?')).toBeVisible()
+    // El prearmado del tacto no pregunta por categoría: los grupos SON los dos
+    // resultados, y el toque decide cuál.
+    await expect(page.getByText('Qué sale y a dónde va')).toBeVisible()
+    await expect(page.getByTestId('grupo-nombre')).toHaveText(['Preñada', 'Vacía'])
     await page.getByRole('button', { name: /^Empezar$/ }).click()
 
     // Esperar a que la pantalla de trabajo monte el capturador del bastón: si
@@ -585,11 +637,12 @@ test.describe('manga — trabajos sobre animales caravaneados', () => {
 
     // Escanear IDENTIFICA pero todavía no registra: falta el resultado.
     await escanearEnElMismoTick(page, ['032010010414565'])
-    await expect(page.getByRole('button', { name: /Preñada/ })).toBeVisible()
+    await expect(page.getByText('Tocá por dónde sale')).toBeVisible()
     expect((await leerTrabajos(page)).length).toBe(0)
 
-    // El toque cierra el hecho y manda al lado de una sola vez.
-    await page.getByRole('button', { name: /Vacía/ }).click()
+    // El toque cierra el hecho y manda al lado de una sola vez. Se toca LA
+    // PUERTA: el resultado y la salida son el mismo gesto.
+    await page.getByRole('button', { name: /^Vacía —/ }).click()
     await expect
       .poll(async () => (await leerTrabajos(page)).length, { timeout: 10_000 })
       .toBe(1)
@@ -597,8 +650,164 @@ test.describe('manga — trabajos sobre animales caravaneados', () => {
     const t = await leerTrabajos(page)
     expect(t[0].tipo).toBe('tacto')
     expect(t[0].datos.resultado).toBe('vacia')
-    // "Vacía" está mapeada a la derecha: el cartel lo tiene que decir.
-    await expect(page.getByText('DER', { exact: true })).toBeVisible()
+    // La puerta encendida repite el RESULTADO, que es lo que le pasó al animal.
+    await expect(page.getByTestId('cartel-hero')).toHaveText('Vacía')
+
+    await context.close()
+  })
+})
+
+test.describe('manga — apartar', () => {
+  test('apartar solo: los grupos salen de las categorías y el aparte se REGISTRA', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: MOVIL })
+    const page = await context.newPage()
+    await prepararManga(page)
+    await sembrarRodeo(page)
+    await context.setOffline(true)
+
+    await page.goto('/campo/manga')
+    await page.getByRole('button', { name: /Apartar/ }).click()
+    await page.getByRole('button', { name: /Elegir los animales/ }).click()
+    await page.getByRole('button', { name: '11B', exact: true }).click()
+    await page.getByRole('button', { name: /^Empezar/ }).click()
+
+    // Apartar suelto es el único sin semántica propia: el productor elige con
+    // qué criterio separa y de ahí salen los botones. Todo en UNA pantalla:
+    // el interruptor arriba y lo que decide abajo, sin ir y volver.
+    await expect(page.getByText('¿Qué apartás?')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Por categoría/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    // Vienen todas marcadas: lo normal es separar todo lo que hay.
+    await expect(page.getByRole('button', { name: 'Vaquillona' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await page.getByRole('button', { name: /^Seguir$/ }).click()
+
+    // Los grupos son las categorías presentes, con su nombre.
+    await expect(page.getByTestId('grupo-nombre')).toHaveText([
+      'Vaquillona',
+      'Ternero',
+    ])
+
+    // Las vaquillonas se van al 9B; los terneros vuelven al potrero.
+    await page.getByRole('button', { name: 'A dónde van Vaquillona' }).click()
+    await page.getByText('A otro potrero').click()
+    await page.getByRole('button', { name: '9B', exact: true }).click()
+    await page.getByRole('button', { name: 'Van acá' }).click()
+    await expect(
+      page.getByRole('button', { name: 'A dónde van Vaquillona' }),
+    ).toContainText('Potrero 9B')
+
+    await page.getByRole('button', { name: /^Empezar$/ }).click()
+    await expect(page.getByText('Podés guardar el teléfono')).toBeVisible()
+
+    // r1 es vaquillona → cae en el grupo que va al 9B.
+    await escanearEnElMismoTick(page, ['032010010414565'])
+    await expect
+      .poll(async () => (await leerApartes(page)).length, { timeout: 10_000 })
+      .toBe(1)
+
+    const [ap] = await leerApartes(page)
+    expect(ap.animal_id).toBe('r1')
+    expect(ap.destino_k).toBe('potrero')
+    expect(ap.potrero_destino_id).toBe('p3')
+    // Pendiente = todavía hay que moverlo de verdad contra el servidor.
+    expect(ap.estado).toBe('pendiente')
+
+    // Apartar NO genera ningún `evento`: al animal solo le cambia el potrero.
+    expect((await leerTrabajos(page)).length).toBe(0)
+
+    // Y sin embargo el progreso avanza. Es la regresión que importa: hasta
+    // ahora un aparte suelto dejaba el contador clavado en 0 y nunca detectaba
+    // un repetido, porque lo hecho se medía SOLO en eventos.
+    await expect(page.getByTestId('listos')).toHaveText('1')
+    await escanearEnElMismoTick(page, ['032010010414565'])
+    await expect(page.getByText('Ya lo hiciste', { exact: false })).toBeVisible()
+    expect((await leerApartes(page)).length).toBe(1)
+
+    await context.close()
+  })
+
+  test('venta y "quedan en la manga" dejan rastro; volver al potrero no', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: MOVIL })
+    const page = await context.newPage()
+    await prepararManga(page)
+    await sembrarRodeo(page)
+    await context.setOffline(true)
+
+    await page.goto('/campo/manga')
+    await page.getByRole('button', { name: /Apartar/ }).click()
+    await page.getByRole('button', { name: /Elegir los animales/ }).click()
+    await page.getByRole('button', { name: '11B', exact: true }).click()
+    await page.getByRole('button', { name: /^Empezar/ }).click()
+    await page.getByRole('button', { name: /^Seguir$/ }).click()
+
+    // Vaquillonas a venta; terneros vuelven al potrero (el default).
+    await page.getByRole('button', { name: 'A dónde van Vaquillona' }).click()
+    await page.getByText('Se venden').click()
+
+    await page.getByRole('button', { name: /^Empezar$/ }).click()
+    await expect(page.getByText('Podés guardar el teléfono')).toBeVisible()
+
+    await escanearEnElMismoTick(page, ['032010010414565'])
+    await expect
+      .poll(async () => (await leerApartes(page)).length, { timeout: 10_000 })
+      .toBe(1)
+
+    const [venta] = await leerApartes(page)
+    expect(venta.destino_k).toBe('venta')
+    // No hay nada que mover: la marca de venta viaja como evento, no por acá.
+    expect(venta.estado).toBe('sincronizada')
+
+    // Apartar para vender NO da de baja al animal —sigue vivo y en el campo—
+    // pero sí deja constancia en su ficha.
+    const t = await leerTrabajos(page)
+    expect(t.length).toBe(1)
+    expect(t[0].tipo).toBe('nota')
+    expect(t[0].datos.motivo).toBe('aparte')
+    expect(t[0].datos.destino).toBe('venta')
+
+    // El ternero vuelve al potrero: no le pasó nada, no se escribe nada.
+    await escanearEnElMismoTick(page, ['032010010414566'])
+    await expect
+      .poll(async () => (await leerApartes(page)).length, { timeout: 10_000 })
+      .toBe(2)
+    const queda = (await leerApartes(page)).find((a) => a.animal_id === 'r2')!
+    expect(queda.destino_k).toBe('queda')
+    expect((await leerTrabajos(page)).length).toBe(1)
+
+    await context.close()
+  })
+
+  test('una categoría fuera del plan avisa en vez de quedarse muda', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: MOVIL })
+    const page = await context.newPage()
+    await prepararManga(page)
+    await sembrarRodeo(page)
+    await context.setOffline(true)
+
+    await page.goto('/campo/manga')
+    await page.getByRole('button', { name: /Destetar/ }).click()
+    await page.getByRole('button', { name: /Elegir los animales/ }).click()
+    await page.getByRole('button', { name: '11B', exact: true }).click()
+    await page.getByRole('button', { name: /^Empezar/ }).click()
+    await page.getByRole('button', { name: /^Empezar$/ }).click()
+    await expect(page.getByText('Podés guardar el teléfono')).toBeVisible()
+
+    // r3 es un TORO: no es madre ni cría, así que el destete no lo contempla.
+    // Antes la pantalla no cambiaba y parecía que la app no había reaccionado.
+    await escanearEnElMismoTick(page, ['032010010414567'])
+    await expect(page.getByText('no está en el plan')).toBeVisible()
+    expect((await leerApartes(page)).length).toBe(0)
 
     await context.close()
   })
@@ -722,6 +931,91 @@ test.describe('manga — alcance y escaneo rápido', () => {
 
     const cola = await leerOutbox(page)
     expect(cola[0].animal_id).toBe('z9')
+
+    await context.close()
+  })
+})
+
+test.describe('layout — nada recortado en el teléfono', () => {
+  /**
+   * Regresión del recorte de abajo. La causa fue medir alturas en `vh` dentro
+   * de contenedores que NO son el viewport (`main` mide ~666 de 844) y que
+   * además arrastran el `html{zoom:1.06}` de la casa, que infla las unidades de
+   * viewport un 6% y no los porcentajes. Sumado a hijos flex sin `shrink-0`,
+   * el contenido se comprimía y el `overflow-hidden` lo cortaba: los botones
+   * principales quedaban fuera de la pantalla, inalcanzables incluso
+   * scrolleando.
+   *
+   * El test no mira píxeles bonitos: verifica el invariante duro —lo que se
+   * toca está DENTRO de la caja que lo contiene, y ninguna caja esconde
+   * contenido propio—.
+   */
+  const dentroDeMain = async (page: Page, sel: ReturnType<Page['locator']>) => {
+    const boton = await sel.boundingBox()
+    const main = await page.locator('main').boundingBox()
+    expect(boton, 'el botón no está en el DOM').not.toBeNull()
+    expect(main).not.toBeNull()
+    return boton!.y + boton!.height - (main!.y + main!.height)
+  }
+
+  test('elegir origen: "Empezar" entero, aun con el panel largo', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: MOVIL })
+    const page = await context.newPage()
+    await prepararManga(page)
+    await context.setOffline(true)
+
+    await page.goto('/campo/manga')
+    await page.getByRole('button', { name: /Caravanear/ }).click()
+    await page.getByRole('button', { name: /Elegir los animales/ }).click()
+
+    // 10B es el caso feo: DOS tropas hacen el panel más alto.
+    await page.getByRole('button', { name: '10B', exact: true }).click()
+    await expect(page.getByText('Tropas en este potrero')).toBeVisible()
+    const sobra = await dentroDeMain(
+      page,
+      page.getByRole('button', { name: /^Empezar con/ }),
+    )
+    expect(sobra, 'el botón se sale de la pantalla').toBeLessThanOrEqual(0)
+
+    await context.close()
+  })
+
+  test('prearmado: la tarjeta del grupo no se come la fila del lado', async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: MOVIL })
+    const page = await context.newPage()
+    await prepararManga(page)
+    await sembrarRodeo(page)
+    await context.setOffline(true)
+
+    await page.goto('/campo/manga')
+    await page.getByRole('button', { name: /Destetar/ }).click()
+    await page.getByRole('button', { name: /Elegir los animales/ }).click()
+    await page.getByRole('button', { name: '11B', exact: true }).click()
+    await page.getByRole('button', { name: /^Empezar/ }).click()
+    await expect(page.getByText('Qué sale y a dónde va')).toBeVisible()
+
+    // Ninguna caja con `overflow-hidden` puede esconder contenido propio: si
+    // `scrollHeight > clientHeight` y no scrollea, eso es contenido perdido.
+    const recortes = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="grupo-nombre"]')]
+        .map((n) => n.closest('div[class*="rounded-2xl"]') as HTMLElement)
+        .map((c) => ({
+          alto: c.getBoundingClientRect().height,
+          contenido: c.scrollHeight,
+        })),
+    )
+    expect(recortes.length).toBeGreaterThan(0)
+    for (const r of recortes) expect(r.alto).toBeGreaterThanOrEqual(r.contenido)
+
+    // Y los tres chips del lado tienen que estar, con tamaño táctil.
+    const chips = page.getByRole('button', { name: /Izquierda|Derecha|De frente/ })
+    await expect(chips.first()).toBeVisible()
+    const caja = await chips.first().boundingBox()
+    expect(caja!.height).toBeGreaterThanOrEqual(44)
 
     await context.close()
   })

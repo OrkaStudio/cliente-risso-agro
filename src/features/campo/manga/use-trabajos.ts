@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { mangadb, type AnimalRodeo } from './db'
-import { fetchRodeo, subirEventoTrabajo } from './api'
+import { mangadb, type AnimalRodeo, type AparteItem } from './db'
+import { fetchRodeo, moverAlDestino, subirEventoTrabajo } from './api'
 import { normalizarRfid } from './rfid'
+import type { Salida } from './salidas'
 
 /**
  * Sesión de TRABAJO: el bastón identifica a un animal que ya tiene caravana y
@@ -26,11 +27,24 @@ export type ResultadoEscaneo =
   | { k: 'desconocido'; rfid: string }
   | { k: 'otraCategoria'; animal: AnimalRodeo }
 
+/**
+ * Un hecho a registrar por animal. Es una LISTA y no un mapa por tipo porque
+ * un mismo tipo puede repetirse en la misma pasada: aplicar aftosa y
+ * brucelosis son dos `sanidad` con datos distintos, no uno.
+ */
+export type EventoSesion = {
+  /** Único en la sesión: `sanidad#0`, `sanidad#1`, `destete#0`… */
+  clave: string
+  /** Valor del enum `tipo_evento`. */
+  tipo: string
+  /** `evento.datos` ya armado en el prearmado. */
+  datos: Record<string, unknown>
+}
+
 export type SesionTrabajo = {
-  /** Tipos de `evento` a registrar por animal (uno por actividad elegida). */
-  tipos: string[]
-  /** `evento.datos` por tipo, ya armado en el prearmado. */
-  datosPorTipo: Record<string, Record<string, unknown>>
+  /** Qué registrar por animal. Uno por actividad, o varios si la actividad
+   *  produce más de un hecho (varias vacunas en una pasada). */
+  eventos: EventoSesion[]
   /** Categorías admitidas (unión de las actividades). Vacío = cualquiera. */
   soloCategorias: string[]
   /** Fecha del hecho — la de hoy salvo que se declare otra. */
@@ -52,11 +66,23 @@ export type SesionTrabajo = {
   /** Potrero/tropa del alcance: de ahí sale el animal al que se da el alta. */
   potreroId?: string | null
   loteId?: string | null
+  /** Identifica la pasada de hoy: acota el conteo y el drenado del aparte. */
+  sesionId: string
+  /**
+   * La sesión reparte animales en grupos. Cambia qué cuenta como "ya hecho":
+   * en un aparte suelto no hay ningún `evento` que registrar —al animal solo le
+   * cambia el potrero— así que el animal está hecho cuando cayó en un grupo.
+   */
+  conAparte?: boolean
 }
 
 export function useTrabajos(sesion: SesionTrabajo) {
   const rodeo = useLiveQuery(() => mangadb.rodeo.toArray(), [])
   const hechos = useLiveQuery(() => mangadb.trabajos.toArray(), [])
+  const apartes = useLiveQuery(
+    () => mangadb.apartes.where('sesion_id').equals(sesion.sesionId).toArray(),
+    [sesion.sesionId],
+  )
   const [bajando, setBajando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ultimo, setUltimo] = useState<ResultadoEscaneo | null>(null)
@@ -71,15 +97,88 @@ export function useTrabajos(sesion: SesionTrabajo) {
     [rodeo],
   )
 
-  /** Ya trabajados en ESTA sesión (por animal + tipo), para no repetir. */
+  const claves = useMemo(
+    () => sesion.eventos.map((e) => e.clave),
+    [sesion.eventos],
+  )
+
+  /** Ya trabajados en ESTA sesión (por animal + hecho), para no repetir. */
   const yaHechos = useMemo(
     () =>
       new Set(
         (hechos ?? [])
-          .filter((h) => sesion.tipos.includes(h.tipo))
-          .map((h) => `${h.animal_id}|${h.tipo}`),
+          .filter((h) => h.clave != null && claves.includes(h.clave))
+          .map((h) => `${h.animal_id}|${h.clave}`),
       ),
-    [hechos, sesion.tipos],
+    [hechos, claves],
+  )
+
+  /** Animales que ya cayeron en un grupo del aparte en esta pasada. */
+  const yaApartados = useMemo(
+    () => new Set((apartes ?? []).map((a) => a.animal_id)),
+    [apartes],
+  )
+
+  /**
+   * Lo hecho en ESTE tick, antes de que Dexie propague.
+   *
+   * `useLiveQuery` es asíncrono: dos lecturas del bastón en la misma tarea de
+   * JS ven el set viejo y las dos pasan el chequeo de repetido. Es exactamente
+   * la carrera que TASK-052 encontró en el caravaneo —dos lecturas cayendo
+   * sobre el mismo animal— y acá reaparece por el otro lado: el mismo animal
+   * anotado dos veces. El ref se escribe en el acto y decide; la live query lo
+   * alcanza un instante después y lo confirma.
+   */
+  const listosRef = useRef({ eventos: new Set<string>(), apartados: new Set<string>() })
+
+  // Sesión nueva = pizarra limpia: si no, los animales de la pasada anterior
+  // seguirían contando como hechos.
+  useEffect(() => {
+    listosRef.current = { eventos: new Set(), apartados: new Set() }
+  }, [sesion.sesionId])
+
+  useEffect(() => {
+    for (const h of hechos ?? []) {
+      if (h.clave) listosRef.current.eventos.add(`${h.animal_id}|${h.clave}`)
+    }
+  }, [hechos])
+
+  useEffect(() => {
+    for (const a of apartes ?? []) listosRef.current.apartados.add(a.animal_id)
+  }, [apartes])
+
+  /**
+   * Un animal está listo cuando se le hizo TODO lo de la sesión. Con `tipos`
+   * vacío —un aparte suelto— la parte de eventos es trivialmente cierta y lo
+   * que decide es haber caído en un grupo.
+   *
+   * Esta versión mira SOLO lo persistido, y por eso es la que cuenta el
+   * progreso en pantalla: el contador tiene que decir lo que de verdad quedó
+   * guardado, no lo que está en camino.
+   */
+  const estaListoPersistido = useCallback(
+    (animalId: string) =>
+      claves.every((k) => yaHechos.has(`${animalId}|${k}`)) &&
+      (!sesion.conAparte || yaApartados.has(animalId)),
+    [claves, sesion.conAparte, yaHechos, yaApartados],
+  )
+
+  /**
+   * La misma pregunta, pero sumando lo reservado en este tick. Es la que
+   * decide el "ya lo hiciste" del bastón, donde llegar tarde significa anotar
+   * al mismo animal dos veces. Sólo se llama desde el handler del escaneo.
+   */
+  const estaListoAhora = useCallback(
+    (animalId: string) =>
+      claves.every(
+        (k) =>
+          yaHechos.has(`${animalId}|${k}`) ||
+          listosRef.current.eventos.has(`${animalId}|${k}`),
+      ) &&
+      (!sesion.conAparte ||
+        yaApartados.has(animalId) ||
+        listosRef.current.apartados.has(animalId)),
+    [claves, sesion.conAparte, yaHechos, yaApartados],
   )
 
   const bajarRodeo = useCallback(async () => {
@@ -100,15 +199,82 @@ export function useTrabajos(sesion: SesionTrabajo) {
     }
   }, [])
 
-  /** Drena la cola de trabajos. Un fallo marca ese ítem y sigue con el resto:
-   *  una lectura mala no puede frenar las otras 199. */
+  /**
+   * Manda al destino a los animales que salieron por cada grupo.
+   *
+   * Sube POR TANDA, no de a uno: en una manga de 200 cabezas, 200 llamadas
+   * serían 200 viajes de red con el teléfono colgado de una antena rural.
+   *
+   * La idempotencia es por tanda y no por grupo. `mover_animales` devuelve el
+   * resultado guardado cuando ve un `p_alta_id` repetido, así que reusar el
+   * `alta_id` de una tanda anterior dejaría AFUERA a los animales escaneados
+   * después —la RPC contestaría el resultado viejo, sin mover a nadie y sin
+   * fallar—. Por eso el `alta_id` se asigna al drenar, se persiste ANTES de
+   * llamar, y sólo se reusa para reintentar esa misma tanda.
+   */
+  const drenarApartes = useCallback(async () => {
+    const pendientes = await mangadb.apartes
+      .where('estado')
+      .anyOf('pendiente', 'error')
+      .toArray()
+    const mueven = pendientes.filter(
+      (a) => a.destino_k === 'potrero' && a.potrero_destino_id,
+    )
+    if (mueven.length === 0) return
+
+    const tandas = new Map<string, AparteItem[]>()
+    for (const a of mueven) {
+      const clave = a.alta_id ?? `nuevo|${a.potrero_destino_id}`
+      const previa = tandas.get(clave)
+      if (previa) previa.push(a)
+      else tandas.set(clave, [a])
+    }
+
+    for (const items of tandas.values()) {
+      const cabeza = items[0]
+      const altaId = cabeza.alta_id ?? crypto.randomUUID()
+      if (!cabeza.alta_id) {
+        for (const it of items) await mangadb.apartes.update(it.id, { alta_id: altaId })
+      }
+      try {
+        const animal = await mangadb.rodeo
+          .where('animal_id')
+          .equals(cabeza.animal_id)
+          .first()
+        await moverAlDestino({
+          altaId,
+          empresaId: animal?.empresa_id ?? '',
+          potreroDestino: cabeza.potrero_destino_id!,
+          animalIds: [...new Set(items.map((i) => i.animal_id))],
+          fecha: cabeza.fecha,
+          contexto: {
+            origen_ui: 'manga',
+            grupo: cabeza.etiqueta,
+            salida_id: cabeza.salida_id,
+          },
+        })
+        for (const it of items) {
+          await mangadb.apartes.update(it.id, { estado: 'sincronizada', error: null })
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'No se pudo mover'
+        for (const it of items) {
+          await mangadb.apartes.update(it.id, { estado: 'error', error: msg })
+        }
+      }
+    }
+  }, [])
+
+  /** Drena las dos colas. Un fallo marca ese ítem y sigue con el resto: una
+   *  lectura mala no puede frenar las otras 199. */
   const sincronizar = useCallback(async () => {
     if (!navigator.onLine || drenandoRef.current) return
     drenandoRef.current = true
     try {
+      // `error` también entra: si no, el botón "reintentar" no reintenta nada.
       const pendientes = await mangadb.trabajos
         .where('estado')
-        .equals('pendiente')
+        .anyOf('pendiente', 'error')
         .toArray()
       for (const t of pendientes) {
         try {
@@ -129,10 +295,11 @@ export function useTrabajos(sesion: SesionTrabajo) {
           })
         }
       }
+      await drenarApartes()
     } finally {
       drenandoRef.current = false
     }
-  }, [])
+  }, [drenarApartes])
 
   // Cache vacío y con señal → bajarlo. Sin esto la manga no puede identificar
   // a nadie, y el aviso "entrá una vez con señal" llega tarde.
@@ -167,14 +334,20 @@ export function useTrabajos(sesion: SesionTrabajo) {
       extra: Record<string, unknown>,
     ) => {
       const ahora = Date.now()
+      // Antes del primer `await`: así una segunda lectura del mismo animal en
+      // este mismo tick ya lo ve anotado.
+      for (const e of sesion.eventos) {
+        listosRef.current.eventos.add(`${animal.animal_id}|${e.clave}`)
+      }
       await mangadb.trabajos.bulkPut(
-        sesion.tipos.map((tipo, i) => ({
+        sesion.eventos.map((e, i) => ({
           // UUID de cliente: es el `evento.id`, y el reintento choca por PK.
           id: crypto.randomUUID(),
           animal_id: animal.animal_id,
           rfid,
-          tipo,
-          datos: { ...(sesion.datosPorTipo[tipo] ?? {}), ...extra },
+          clave: e.clave,
+          tipo: e.tipo,
+          datos: { ...e.datos, ...extra },
           fecha: sesion.fecha,
           estado: 'pendiente' as const,
           error: null,
@@ -247,6 +420,71 @@ export function useTrabajos(sesion: SesionTrabajo) {
     [registrar],
   )
 
+  /**
+   * Anota que este animal salió por este grupo, y deja encaminado lo que el
+   * destino implique.
+   *
+   * Cada destino tiene una consecuencia distinta y son de naturalezas que no se
+   * mezclan:
+   *   · potrero → se mueve DE VERDAD (queda pendiente para la tanda).
+   *   · venta   → queda MARCADO, no dado de baja: el animal sigue vivo y en el
+   *               campo hasta que se venda de verdad, y esa baja se hace en
+   *               Oficina con su precio. Darlo de baja acá sacaría del stock a
+   *               un animal que todavía está pastando.
+   *   · manga   → encerrado, se resuelve después. No hay potrero al que
+   *               moverlo, así que no cambia stock.
+   *   · queda   → vuelve de donde vino: no pasó nada y no se escribe nada.
+   */
+  const apartar = useCallback(
+    async (animal: AnimalRodeo, salida: Salida) => {
+      const d = salida.destino
+      const mueve = d.k === 'potrero'
+      listosRef.current.apartados.add(animal.animal_id)
+      await mangadb.apartes.put({
+        id: crypto.randomUUID(),
+        sesion_id: sesion.sesionId,
+        animal_id: animal.animal_id,
+        rfid: animal.rfid,
+        salida_id: salida.id,
+        etiqueta: salida.etiqueta,
+        destino_k: d.k,
+        potrero_destino_id: d.k === 'potrero' ? d.id : null,
+        potrero_destino_nombre: d.k === 'potrero' ? d.nombre : null,
+        fecha: sesion.fecha,
+        alta_id: null,
+        // Sólo el movimiento tiene algo que mandar al servidor por esta cola.
+        estado: mueve ? 'pendiente' : 'sincronizada',
+        error: null,
+        created_at: Date.now(),
+      })
+
+      // Venta y manga sí dejan rastro en la ficha del animal, y viajan por la
+      // cola de eventos que ya está probada en el campo.
+      if (d.k === 'venta' || d.k === 'manga') {
+        await mangadb.trabajos.put({
+          id: crypto.randomUUID(),
+          animal_id: animal.animal_id,
+          rfid: animal.rfid,
+          // La nota del aparte NO lleva `clave`: no es un hecho de la sesión
+          // que haya que cumplir por animal, es la constancia de a dónde fue.
+          tipo: 'nota',
+          datos: {
+            motivo: 'aparte',
+            destino: d.k,
+            grupo: salida.etiqueta,
+            origen_ui: 'manga',
+          },
+          fecha: sesion.fecha,
+          estado: 'pendiente',
+          error: null,
+          created_at: Date.now(),
+        })
+      }
+      void sincronizar()
+    },
+    [sesion.sesionId, sesion.fecha, sincronizar],
+  )
+
   const escanear = useCallback(
     async (crudo: string): Promise<ResultadoEscaneo> => {
       const rfid = normalizarRfid(crudo)
@@ -268,7 +506,7 @@ export function useTrabajos(sesion: SesionTrabajo) {
       // Repetido: el mismo animal ya pasó por esta sesión. No es un error del
       // productor —en la manga se lee dos veces sin querer— pero registrarlo
       // otra vez ensuciaría el historial, que es append-only.
-      if (sesion.tipos.every((t) => yaHechos.has(`${animal.animal_id}|${t}`))) {
+      if (estaListoAhora(animal.animal_id)) {
         const r: ResultadoEscaneo = { k: 'repetido', animal }
         setUltimo(r)
         return r
@@ -290,21 +528,42 @@ export function useTrabajos(sesion: SesionTrabajo) {
         return r
       }
 
+      // El aparte se aplica apenas vuelve este escaneo, pero eso pasa un tick
+      // más tarde. Se RESERVA el animal ya: si no, dos lecturas seguidas del
+      // mismo bicho lo meterían dos veces en el grupo. (El tacto no reserva: su
+      // aparte lo cierra un toque humano, donde no hay carrera posible — y
+      // avisar "ya lo hiciste" antes de contestar sería mentira.)
+      if (sesion.conAparte) listosRef.current.apartados.add(animal.animal_id)
+
       await registrar(animal, rfid, {})
       const r: ResultadoEscaneo = {
         k: 'ok',
         animal,
-        total: yaHechos.size / Math.max(1, sesion.tipos.length) + 1,
+        total: yaHechos.size / Math.max(1, claves.length) + 1,
       }
       setUltimo(r)
       return r
     },
-    [porRfid, yaHechos, sesion, registrar, darAlta],
+    [porRfid, yaHechos, claves, estaListoAhora, sesion, registrar, darAlta],
   )
 
-  const lista = hechos ?? []
-  const deLaSesion = lista.filter((h) => sesion.tipos.includes(h.tipo))
-  const animalesTocados = new Set(deLaSesion.map((h) => h.animal_id)).size
+  const trabajosLista = hechos ?? []
+  const apartesLista = apartes ?? []
+  // Progreso = animales a los que ya se les hizo TODO lo de la pasada. Se
+  // cuenta con la misma regla que decide el "repetido": si divergieran, el
+  // contador diría una cosa y el aviso del bastón otra.
+  const candidatos = new Set([
+    ...trabajosLista
+      .filter((h) => h.clave != null && claves.includes(h.clave))
+      .map((h) => h.animal_id),
+    ...apartesLista.map((a) => a.animal_id),
+  ])
+  const animalesTocados = [...candidatos].filter(estaListoPersistido).length
+  // Lo que falta subir se cuenta sobre las DOS colas y sin filtrar por tipo:
+  // una nota de aparte que no sube es tan pendiente como un tacto que no sube,
+  // y el productor necesita verla antes de irse del campo.
+  const pendiente = (e: string) => e === 'pendiente'
+  const fallado = (e: string) => e === 'error'
 
   return {
     cargando: rodeo === undefined,
@@ -316,10 +575,15 @@ export function useTrabajos(sesion: SesionTrabajo) {
     sincronizar,
     escanear,
     completar,
+    apartar,
     ultimo,
     /** Cuántos animales distintos se trabajaron en esta sesión. */
     hechos: animalesTocados,
-    sinSubir: deLaSesion.filter((h) => h.estado === 'pendiente').length,
-    conError: deLaSesion.filter((h) => h.estado === 'error').length,
+    sinSubir:
+      trabajosLista.filter((h) => pendiente(h.estado)).length +
+      apartesLista.filter((a) => pendiente(a.estado)).length,
+    conError:
+      trabajosLista.filter((h) => fallado(h.estado)).length +
+      apartesLista.filter((a) => fallado(a.estado)).length,
   }
 }

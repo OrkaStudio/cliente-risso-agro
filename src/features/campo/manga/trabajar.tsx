@@ -13,16 +13,13 @@ import { cn } from '@/lib/utils'
 import { categoriaLabel } from '@/features/hacienda/labels'
 import { CLabel } from '../ui'
 import { useScanner } from './use-scanner'
+import { Puertas } from './puertas'
 import {
-  RESULTADOS_TACTO,
-  colorLado,
-  destinoLabel,
-  ladoCorto,
-  ladoDe,
-  ladoLabel,
-  salidaDe,
-  type Lado,
+  ordenarPorLado,
+  salidaDeCategoria,
+  salidaPorId,
   type PlanSalidas,
+  type Salida,
 } from './salidas'
 import { useTrabajos, type ResultadoEscaneo, type SesionTrabajo } from './use-trabajos'
 import { CerrarTrabajo } from './cerrar-trabajo'
@@ -32,10 +29,10 @@ import { CerrarTrabajo } from './cerrar-trabajo'
  * productor ya usa: barra de instrumento arriba, el número de caravana como
  * héroe, y abajo lo que pida el trabajo del día.
  *
- * Lo único que cambia entre trabajos es esa zona de abajo:
- *   · cero toques  → el cartel del lado (o nada, si no se aparta)
- *   · tacto        → los dos botones del resultado
- *   · aparte libre → el selector de lado, que queda puesto
+ * Lo que cambia entre trabajos es esa zona de abajo, y lo que NO cambia es el
+ * idioma: todo lo que se toca o se lee dice **qué es el animal** —Vaquillona,
+ * Preñada, Gordos— y nunca por dónde está la puerta. El lado viaja al lado del
+ * nombre, con su flecha y su color, para ejecutarlo sin tener que traducirlo.
  *
  * El requisito duro sigue siendo que **el teléfono no se mira**: una mano tiene
  * el bastón y la otra está ocupada. Por eso lo que confirma es la vibración, y
@@ -58,6 +55,10 @@ function agrupar(rfid: string): string {
     ? rfid.replace(/(\d{3})(\d{4})(\d{4})(\d{4})/, '$1 $2 $3 $4')
     : rfid
 }
+
+/** Lo resuelto para el animal que acaba de pasar: a qué grupo cayó y cómo
+ *  llamarlo en el cartel. */
+type Resuelto = { salida: Salida; hero: string }
 
 export function Trabajar({
   titulo,
@@ -82,17 +83,22 @@ export function Trabajar({
   const [online, setOnline] = useState(() => navigator.onLine)
   const [aviso, setAviso] = useState<ResultadoEscaneo | null>(null)
   const [rfid, setRfid] = useState<string | null>(null)
-  const [lado, setLado] = useState<Lado | null>(null)
-  // Cuántos salieron por cada lado. Es el control del trabajo: en un destete,
+  const [resuelto, setResuelto] = useState<Resuelto | null>(null)
+  // La categoría del animal no está en el plan. Sin esto la app no muestra
+  // nada y parece colgada — con el teléfono guardado, el error se descubre
+  // cuando el rodeo ya está mal repartido.
+  const [sinGrupo, setSinGrupo] = useState<string | null>(null)
+  // Cuántos salieron por cada grupo. Es el control del trabajo: en un destete,
   // madres y crías tienen que cerrar parejo.
-  const [porLado, setPorLado] = useState<Partial<Record<Lado, number>>>({})
-  // Modo libre: el lado lo pone el operario y DURA hasta que mueva la puerta.
-  const [ladoFijo, setLadoFijo] = useState<Lado>('izq')
+  const [porSalida, setPorSalida] = useState<Record<string, number>>({})
+  // Modo libre: el grupo lo pone el operario y DURA hasta que mueva la puerta.
+  const [grupoFijo, setGrupoFijo] = useState<string>(
+    () => plan?.salidas[0]?.id ?? '',
+  )
   // Modo resultado: el animal ya está identificado y espera el toque.
   const [esperando, setEsperando] = useState<ResultadoEscaneo | null>(null)
   const [cerrando, setCerrando] = useState(false)
   const limpiar = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const salida = lado && plan ? salidaDe(plan, lado) : null
 
   useEffect(() => {
     const on = () => setOnline(true)
@@ -105,6 +111,17 @@ export function Trabajar({
     }
   }, [])
 
+  /** Deja al animal en un grupo: lo anota, lo cuenta y lo muestra. */
+  const mandarA = async (
+    animal: ResultadoEscaneo & { k: 'ok' | 'alta' },
+    salida: Salida,
+    hero: string,
+  ) => {
+    await t.apartar(animal.animal, salida)
+    setPorSalida((p) => ({ ...p, [salida.id]: (p[salida.id] ?? 0) + 1 }))
+    setResuelto({ salida, hero })
+  }
+
   // El bastón teclea a nivel documento: acá no hay ningún campo que enfocar,
   // así que TODA lectura entra por este camino.
   useScanner({
@@ -115,24 +132,31 @@ export function Trabajar({
         if ('vibrate' in navigator) navigator.vibrate(VIBRA[r.k])
         setAviso(r)
         setRfid(r.k === 'desconocido' ? r.rfid : r.animal.rfid)
+        setSinGrupo(null)
 
-        // El lado sale de tres lugares distintos según el trabajo — y en dos de
-        // los tres no hay que tocar nada.
+        // El grupo sale de tres lugares distintos según el trabajo — y en dos
+        // de los tres no hay que tocar nada.
         if ((r.k === 'ok' || r.k === 'alta') && plan) {
           if (plan.modo === 'categoria') {
-            const l2 = ladoDe(plan, r.animal.categoria)
-            setLado(l2)
-            if (l2) setPorLado((p) => ({ ...p, [l2]: (p[l2] ?? 0) + 1 }))
+            const s = salidaDeCategoria(plan, r.animal.categoria)
+            if (s) {
+              await mandarA(r, s, categoriaLabel[r.animal.categoria])
+            } else {
+              // Categoría fuera del plan: se avisa fuerte y NO se cuenta.
+              if ('vibrate' in navigator) navigator.vibrate(260)
+              setResuelto(null)
+              setSinGrupo(categoriaLabel[r.animal.categoria])
+            }
           } else if (plan.modo === 'libre') {
-            setLado(ladoFijo)
-            setPorLado((p) => ({ ...p, [ladoFijo]: (p[ladoFijo] ?? 0) + 1 }))
+            const s = salidaPorId(plan, grupoFijo)
+            if (s) await mandarA(r, s, s.etiqueta)
           } else {
             // Resultado: no se resuelve hasta que el operario toque.
             setEsperando(r)
-            setLado(null)
+            setResuelto(null)
           }
         } else if (r.k !== 'ok' && r.k !== 'alta') {
-          setLado(null)
+          setResuelto(null)
         }
 
         if (limpiar.current) clearTimeout(limpiar.current)
@@ -144,14 +168,23 @@ export function Trabajar({
     },
   })
 
-  /** El toque del tacto: registra el resultado Y manda al lado. Un solo gesto. */
-  const responder = async (clave: string) => {
+  /**
+   * El toque del tacto. Ahora se toca LA PUERTA, no un botón aparte: el mismo
+   * gesto dice el resultado y manda al animal, que es como se trabaja —el
+   * resultado del tacto ES el criterio del aparte—.
+   */
+  const responderPorSalida = async (salidaId: string) => {
     if (!esperando || esperando.k !== 'ok' || !plan) return
-    const l2 = plan.porResultado?.[clave] ?? null
+    const s = salidaPorId(plan, salidaId)
+    if (!s) return
+    // Del grupo se vuelve a la respuesta: el plan mapea resultado → grupo.
+    const clave = Object.entries(plan.porResultado ?? {}).find(
+      ([, id]) => id === salidaId,
+    )?.[0]
+    if (!clave) return
     await t.completar(esperando.animal, { resultado: clave })
     if ('vibrate' in navigator) navigator.vibrate(40)
-    setLado(l2)
-    if (l2) setPorLado((p) => ({ ...p, [l2]: (p[l2] ?? 0) + 1 }))
+    await mandarA(esperando, s, s.etiqueta)
     setEsperando(null)
   }
 
@@ -161,7 +194,7 @@ export function Trabajar({
         titulo={titulo}
         hechos={t.hechos}
         total={total}
-        porLado={porLado}
+        porSalida={porSalida}
         plan={plan}
         sinSubir={t.sinSubir}
         conError={t.conError}
@@ -203,6 +236,7 @@ export function Trabajar({
   const progreso = total > 0 ? t.hechos / total : 0
   const esperandoToque = plan?.modo === 'resultado' && esperando?.k === 'ok'
   const bien = aviso?.k === 'ok' || aviso?.k === 'alta'
+  const salidasEnOrden = plan ? ordenarPorLado(plan.salidas) : []
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
@@ -255,7 +289,10 @@ export function Trabajar({
               <CLabel className="mt-0.5">quedan</CLabel>
             </div>
             <div className="text-right leading-none">
-              <span className="c-mono block text-[32px] font-bold text-[var(--c-ok-deep)]">
+              <span
+                data-testid="listos"
+                className="c-mono block text-[32px] font-bold text-[var(--c-ok-deep)]"
+              >
                 {t.hechos}
               </span>
               <CLabel className="mt-0.5 !text-[var(--c-ok-deep)]">listos</CLabel>
@@ -273,13 +310,13 @@ export function Trabajar({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3.5">
-        <div className="c-display truncate text-[17px] text-[var(--c-ink)]">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
+        <div className="c-display shrink-0 truncate text-[17px] text-[var(--c-ink)]">
           {titulo}
         </div>
 
         {/* ===== El número de caravana: el héroe, igual que en el caravaneo ===== */}
-        <div>
+        <div className="shrink-0">
           <CLabel className="mb-1.5">Caravana RFID · escaneá con el bastón</CLabel>
           <div
             className={cn(
@@ -360,121 +397,37 @@ export function Trabajar({
           </p>
         </div>
 
-        {/* ===== Lo que pide el trabajo del día ===== */}
-
-        {/* Tacto: dos botones grandes. El toque registra y aparta a la vez. */}
-        {esperandoToque && (
-          <div className="grid grid-cols-2 gap-2.5">
-            {RESULTADOS_TACTO.map((r, i) => {
-              const l2: Lado = i === 0 ? 'izq' : 'der'
-              const c = colorLado[l2]
-              return (
-                <motion.button
-                  key={r.clave}
-                  type="button"
-                  onClick={() => void responder(r.clave)}
-                  whileTap={{ scale: 0.97 }}
-                  className="c-display flex h-28 flex-col items-center justify-center gap-1 rounded-2xl border-4 text-[21px]"
-                  style={{ borderColor: c.borde, color: c.tinta }}
-                >
-                  {r.label}
-                  <span className="text-[10px] font-bold uppercase tracking-wide opacity-70">
-                    {ladoLabel[l2]}
-                  </span>
-                </motion.button>
-              )
-            })}
+        {/* La categoría no está en el plan: sin este aviso la pantalla no
+            cambia y parece que la app no reaccionó al escaneo. */}
+        {sinGrupo && (
+          <div className="shrink-0 rounded-2xl border-2 border-[var(--c-bad)]/70 bg-[var(--c-bad-soft)] px-4 py-3">
+            <p className="c-display text-[15.5px] text-[var(--c-bad)]">
+              {sinGrupo} no está en el plan
+            </p>
+            <p className="mt-0.5 text-[12.5px] leading-snug text-[var(--c-bad)]">
+              No le asignaste grupo, así que no se apartó ni se contó.
+            </p>
           </div>
         )}
 
-        {/* Cero toques con aparte: el cartel del lado es lo único que hay que
-            ejecutar, y se lee de reojo desde el cepo. */}
-        {!esperandoToque && lado && salida && (
-          <motion.div
-            key={`${t.hechos}-${lado}`}
-            initial={{ scale: 0.94, opacity: 0.6 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 340, damping: 24 }}
-            className="flex flex-col items-center justify-center gap-0.5 rounded-2xl border-4 py-6"
-            style={{
-              borderColor: colorLado[lado].borde,
-              backgroundColor: colorLado[lado].fondo,
-            }}
-          >
-            <span
-              className="c-display text-[50px] leading-none tracking-tight"
-              style={{ color: colorLado[lado].tinta }}
-            >
-              {ladoCorto[lado]}
-            </span>
-            <span
-              className="text-[13.5px] font-bold"
-              style={{ color: colorLado[lado].tinta }}
-            >
-              {destinoLabel(salida.destino)}
-            </span>
-          </motion.div>
-        )}
-
-        {/* Aparte libre: el lado queda puesto. Se toca al mover la puerta. */}
-        {plan?.modo === 'libre' && (
-          <div>
-            <CLabel className="mb-1.5 block">¿Por dónde salen ahora?</CLabel>
-            <div className="flex gap-2">
-              {plan.salidas.map((s2) => {
-                const c = colorLado[s2.lado]
-                const on = ladoFijo === s2.lado
-                return (
-                  <motion.button
-                    key={s2.lado}
-                    type="button"
-                    onClick={() => setLadoFijo(s2.lado)}
-                    whileTap={{ scale: 0.97 }}
-                    className="c-display flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border-2 py-3 text-[15px]"
-                    style={
-                      on
-                        ? {
-                            borderColor: c.borde,
-                            backgroundColor: c.fondo,
-                            color: c.tinta,
-                          }
-                        : {
-                            borderColor: 'var(--c-line-strong)',
-                            color: 'var(--c-ink-soft)',
-                          }
-                    }
-                  >
-                    {ladoLabel[s2.lado]}
-                    <span className="text-[10px] font-bold opacity-70">
-                      {destinoLabel(s2.destino)}
-                    </span>
-                  </motion.button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Un contador por salida: si al final no cierran, algo se escapó. */}
-        {plan && plan.salidas.length > 0 && (
-          <div className="flex gap-2">
-            {plan.salidas.map((s2) => (
-              <div
-                key={s2.lado}
-                className="flex-1 rounded-xl border bg-[var(--c-panel)] px-2 py-2 text-center"
-                style={{ borderColor: colorLado[s2.lado].borde }}
-              >
-                <span className="c-mono block text-[20px] font-bold text-[var(--c-ink)]">
-                  {porLado[s2.lado] ?? 0}
-                </span>
-                <span
-                  className="block truncate text-[10px] font-bold uppercase tracking-wide"
-                  style={{ color: colorLado[s2.lado].tinta }}
-                >
-                  {ladoLabel[s2.lado]}
-                </span>
-              </div>
-            ))}
+        {/* ===== Las puertas del cepo ===== */}
+        {salidasEnOrden.length > 0 && (
+          <div className="flex min-h-[236px] flex-1 flex-col">
+            <Puertas
+              salidas={salidasEnOrden}
+              porSalida={porSalida}
+              encendida={resuelto?.salida.id ?? null}
+              heroEncendida={resuelto?.hero}
+              activa={plan?.modo === 'libre' ? grupoFijo : null}
+              pidiendoToque={esperandoToque}
+              onElegir={
+                plan?.modo === 'libre'
+                  ? (s) => setGrupoFijo(s.id)
+                  : esperandoToque
+                    ? (s) => void responderPorSalida(s.id)
+                    : undefined
+              }
+            />
           </div>
         )}
 

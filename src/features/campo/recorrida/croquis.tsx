@@ -283,8 +283,11 @@ function PanelPotrero({
     : diasRec == null || diasRec > 7
       ? 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]'
       : 'bg-[var(--c-sunk)] text-[var(--c-ink-soft)]'
+  // El ALTO del panel NO se declara acá: lo pone la zona del pulgar del croquis
+  // (`ZONA_PULGAR`), que es la única que conoce el contenedor real. Ver la nota
+  // de layout arriba de `Croquis`.
   return (
-    <div className="max-h-[52vh] shrink-0 overflow-y-auto border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+    <div className="border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="size-3 shrink-0 rounded-full" style={{ background: colorHex }} />
@@ -329,8 +332,12 @@ function PanelPotrero({
               </span>
             )}
           </div>
+          {/* Tope en PX, no en vh: el panel entero ya scrollea contra su
+              contenedor; esto sólo evita que un potrero con muchas categorías
+              empuje los botones fuera de la vista. Un scroll anidado medido en
+              viewport encima de uno medido en contenedor no cierra nunca. */}
           {compos.length > 0 && (
-            <div className="mt-2 grid max-h-[26vh] gap-1.5 overflow-y-auto rounded-xl bg-[var(--c-sunk)] px-3 py-2">
+            <div className="mt-2 grid max-h-[180px] gap-1.5 overflow-y-auto rounded-xl bg-[var(--c-sunk)] px-3 py-2">
               {compos.map((c) => (
                 <div key={c.categoria} className="flex items-center gap-2 text-[13.5px]">
                   <span className="size-2.5 shrink-0 rounded-full" style={{ background: col[c.categoria] }} />
@@ -351,14 +358,22 @@ function PanelPotrero({
         </CLabel>
       )}
 
-      <button
-        type="button"
-        onClick={() => onAbrir(potrero.id)}
-        className="c-display c-hard mt-2.5 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
-      >
-        {yaHecho ? 'Ver / editar este potrero' : 'Recorrer este potrero'}
-        <ArrowRight className="size-5" strokeWidth={2.5} />
-      </button>
+      {/* La ACCIÓN PRINCIPAL va pegada al piso del panel (`sticky bottom-0`):
+          cuando la composición es larga el panel scrollea, y sin esto el
+          productor veía media franja verde y tenía que adivinar que había que
+          arrastrar. Se despega sola al llegar al final del scroll, así los
+          botones de abajo aparecen en su lugar y el orden no cambia. El
+          `-mx-4 px-4` la hace full-bleed para tapar lo que pasa por detrás. */}
+      <div className="sticky bottom-0 -mx-4 mt-2.5 bg-[var(--c-panel)] px-4 pb-0.5 pt-1.5">
+        <button
+          type="button"
+          onClick={() => onAbrir(potrero.id)}
+          className="c-display c-hard flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[16px] text-white"
+        >
+          {yaHecho ? 'Ver / editar este potrero' : 'Recorrer este potrero'}
+          <ArrowRight className="size-5" strokeWidth={2.5} />
+        </button>
+      </div>
 
       {/* Anotar lo que cambió en este potrero. Fase 1: solo nacimientos; en
           Fase 2/3 este botón abre los 3 verbos (Nació · Se murió · Mover). */}
@@ -400,6 +415,42 @@ function PanelPotrero({
     </div>
   )
 }
+
+/**
+ * CONVENCIÓN DE ALTO DEL CROQUIS — leer antes de tocar cualquier alto acá.
+ *
+ * El croquis vive DENTRO de `main` del Modo Campo, que no es el viewport: le
+ * restan el header, la barra de estado offline y la nav inferior (y, en la
+ * Recorrida, su propio header y la barra de lluvia). Medido a 390×844, `main`
+ * son 666px y el contenedor del croquis en la Recorrida, 550px — el 65% del
+ * viewport.
+ *
+ * Por eso NINGÚN alto de este componente (ni de los paneles que le pasan) se
+ * expresa en `vh`. Dos motivos, los dos medidos:
+ *   1. `vh` mide el viewport, no el contenedor → 38vh + 52vh = 90vh no entra
+ *      en 550px y lo que sobra lo recorta el `overflow-hidden` de `main`: el
+ *      botón principal del panel quedaba cortado o directamente afuera.
+ *   2. `html { zoom: 1.06 }` (index.css) escala los porcentajes pero NO las
+ *      unidades de viewport → cada `vh` rendereaba un 6% más grande de lo
+ *      declarado. La propia index.css ya documenta esta trampa.
+ *
+ * La regla: PISO del mapa + TECHO del panel = 100% del contenedor, en %.
+ *   · mapa  → `min-h-[60%]` + `flex-1` (crece si el panel es corto).
+ *   · panel → `max-h-[40%]` + `overflow-y-auto` (scrollea, nunca se recorta).
+ * Nunca suman más de 100% → nada se desborda, y el mapa conserva un piso real
+ * para que los potreros no caigan bajo el mínimo táctil y se degraden a pines
+ * (lección 2026-08-05 del croquis sin piso).
+ *
+ * Los paneles que llegan por la prop `panel` NO declaran su alto: lo pone esta
+ * zona. Si un panel trae su propio `max-h-*`/`overflow`, es código muerto.
+ *
+ * Y como el panel scrollea, su ACCIÓN PRINCIPAL (Recorrer / Empezar / Van acá)
+ * va en un `sticky bottom-0 -mx-4 px-4 bg-[var(--c-panel)]`: queda entera a la
+ * vista con el panel corto y con el panel largo, y se despega sola al final del
+ * scroll (no cambia el orden de los botones). Un botón medio tapado contra el
+ * borde se lee como "cortado" aunque el panel sí scrollee.
+ */
+const ZONA_PULGAR = 'max-h-[40%] shrink-0 overflow-y-auto overscroll-contain'
 
 type EstadoGPS =
   | { k: 'idle' }
@@ -575,15 +626,15 @@ export function Croquis({
       {/* Fondo de TIERRA, no del color de las tarjetas: antes el potrero
           (#ffffff) y la superficie (#f2f4ef) diferían un 3% y el croquis se
           leía como una maraña de líneas sin figura contra fondo. */}
-      {/* PISO del dibujo. Sin él, un panel alto (composición + acciones) dejaba
-          el mapa en ~160px: con el campo entero metido ahí, cada potrero medía
-          menos que el mínimo táctil, TODOS pasaban a pin y los pines se
-          amontonaban unos sobre otros — el croquis dejaba de ser un croquis.
-          El mapa ES la Recorrida: si algo tiene que ceder, es el panel, que
-          scrollea. */}
+      {/* PISO del dibujo, en % DEL CONTENEDOR (ver ZONA_PULGAR arriba). Sin él,
+          un panel alto (composición + acciones) dejaba el mapa en ~160px: con
+          el campo entero metido ahí, cada potrero medía menos que el mínimo
+          táctil, TODOS pasaban a pin y los pines se amontonaban unos sobre
+          otros — el croquis dejaba de ser un croquis. El mapa ES la Recorrida:
+          si algo tiene que ceder, es el panel, que scrollea. */}
       <div
         ref={boxRef}
-        className="relative min-h-[38vh] flex-1 overflow-hidden bg-[#cbd3c4] p-1.5"
+        className="relative min-h-[60%] flex-1 overflow-hidden bg-[#cbd3c4] p-1.5"
       >
         {aXY && proy ? (
           <svg
@@ -835,9 +886,13 @@ export function Croquis({
         )}
       </div>
 
-      {/* ===== Zona del pulgar: guía de destino, panel, o ubicarse ===== */}
+      {/* ===== Zona del pulgar: guía de destino, panel, o ubicarse =====
+          UNA sola caja para los tres estados: acá vive el techo (40% del
+          contenedor) y el scroll. Los paneles de adentro —los de este archivo y
+          los que llegan por la prop `panel`— sólo aportan su contenido. */}
+      <div className={ZONA_PULGAR}>
       {eligiendoDestino ? (
-        <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
+        <div className="border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
           <div className="c-hard-sm flex items-center gap-3 rounded-xl border-2 border-[var(--c-ok)] bg-[var(--c-ok-soft)] px-3.5 py-3">
             <div className="min-w-0 flex-1">
               <span className="c-display block truncate text-[16px] leading-tight text-[var(--c-ink)]">
@@ -874,7 +929,7 @@ export function Croquis({
           />
         )
       ) : (
-      <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
+      <div className="border-t border-[var(--c-line)] bg-[var(--c-bg)] px-3 py-2.5">
         {pisando && onAbrir ? (
           // El camino más corto posible: frenó, está adentro, un toque y carga.
           <button
@@ -916,6 +971,7 @@ export function Croquis({
         )}
       </div>
       )}
+      </div>
     </div>
   )
 }

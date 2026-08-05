@@ -1,7 +1,37 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, DollarSign, MapPin, Undo2, Warehouse } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { CLabel } from '../ui'
+import type { Destino } from './salidas'
+
+/**
+ * El destino, como SÍMBOLO.
+ *
+ * Los cuatro finales posibles son de naturalezas distintas y el productor los
+ * distingue de un vistazo por la forma antes que por la palabra: plata para lo
+ * que se vende, chincheta para el potrero al que van, galpón para lo que queda
+ * encerrado, y la vuelta para lo que no se mueve. Es el doble check de que el
+ * plan que armó es el que está corriendo — durante el trabajo nadie se pone a
+ * leer.
+ */
+export function IconoDestino({
+  destino,
+  className,
+}: {
+  destino: Destino
+  className?: string
+}) {
+  const Icono =
+    destino.k === 'venta'
+      ? DollarSign
+      : destino.k === 'potrero'
+        ? MapPin
+        : destino.k === 'manga'
+          ? Warehouse
+          : Undo2
+  return <Icono className={cn('size-4 shrink-0', className)} strokeWidth={2.4} />
+}
 
 /**
  * Piezas compartidas del flujo de manga. Existen para que los cuatro pasos se
@@ -85,7 +115,7 @@ export function OpcionDestino({
       type="button"
       onClick={onClick}
       whileTap={{ scale: 0.985 }}
-      className="flex items-center gap-3.5 rounded-2xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 py-3.5 text-left"
+      className="flex shrink-0 items-center gap-3.5 rounded-2xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 py-3.5 text-left"
     >
       <span
         className="flex size-11 shrink-0 items-center justify-center rounded-xl"

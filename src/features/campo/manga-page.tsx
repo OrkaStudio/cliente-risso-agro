@@ -27,7 +27,7 @@ import { Trabajar } from './manga/trabajar'
 import { PrearmarSalidas } from './manga/prearmar-salidas'
 import { Paso } from './manga/ui-manga'
 import type { ModoSalida, PlanSalidas } from './manga/salidas'
-import type { SesionTrabajo } from './manga/use-trabajos'
+import type { EventoSesion, SesionTrabajo } from './manga/use-trabajos'
 import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
 import { normalizarRfid } from './manga/rfid'
 import { useScanner } from './manga/use-scanner'
@@ -75,6 +75,10 @@ export function MangaPage() {
   const [origen, setOrigen] = useState<Origen | null>(null)
   const [vacuna, setVacuna] = useState<DatosVacuna | null>(null)
   const [plan, setPlan] = useState<PlanSalidas | null>(null)
+  // Identifica la pasada. Se renueva al elegir un origen nuevo: el conteo y el
+  // drenado del aparte se acotan a ella, así que arrastrarla de una pasada a
+  // otra haría que los animales de ayer contaran como hechos hoy.
+  const [sesionId, setSesionId] = useState(() => crypto.randomUUID())
 
   const titulo = [...elegidas]
     .map((c) => actividadPorClave.get(c)?.nombre ?? c)
@@ -95,7 +99,10 @@ export function MangaPage() {
       : 'libre' // aparte por criterio propio: el lado dura hasta mover la puerta
   // Estable entre renders: es la entrada de `useTrabajos`, que la usa como
   // dependencia del capturador del bastón.
-  const sesion = useMemo(() => sesionDe(elegidas, vacuna, origen), [elegidas, vacuna, origen])
+  const sesion = useMemo(
+    () => sesionDe(elegidas, vacuna, origen, sesionId, necesitaSalidas),
+    [elegidas, vacuna, origen, sesionId, necesitaSalidas],
+  )
 
   const contenido = () => {
   if (paso === 'actividad') {
@@ -122,6 +129,7 @@ export function MangaPage() {
         onVolver={() => setPaso('actividad')}
         onListo={(o) => {
           setOrigen(o)
+          setSesionId(crypto.randomUUID())
           // El alcance de la cola sale del croquis: la tropa si el potrero
           // tiene una elegida, el potrero entero si los animales están sueltos.
           m.setScope(
@@ -212,17 +220,26 @@ export function MangaPage() {
  * eventos registrar por animal y con qué `datos`.
  *
  * Un escaneo puede generar VARIOS eventos —vacunar y destetar en la misma
- * pasada son dos hechos distintos en el historial del animal, no uno— y por eso
- * los tipos son una lista.
+ * pasada son dos hechos distintos en el historial del animal, no uno— y una
+ * sola actividad puede generar varios del MISMO tipo: aplicar aftosa y
+ * brucelosis juntas son dos `sanidad`. Por eso es una lista con clave propia y
+ * no un mapa por tipo.
  */
 function sesionDe(
   elegidas: Set<ClaveActividad>,
   vacuna: DatosVacuna | null,
   origen: Origen | null,
+  sesionId: string,
+  conAparte: boolean,
 ): SesionTrabajo {
-  const tipos: string[] = []
-  const datosPorTipo: Record<string, Record<string, unknown>> = {}
+  const eventos: EventoSesion[] = []
   const soloCategorias = new Set<string>()
+  const agregar = (tipo: string, datos: Record<string, unknown>) =>
+    eventos.push({
+      clave: `${tipo}#${eventos.filter((e) => e.tipo === tipo).length}`,
+      tipo,
+      datos,
+    })
 
   for (const clave of elegidas) {
     const a = actividadPorClave.get(clave)
@@ -230,32 +247,31 @@ function sesionDe(
     for (const c of a.soloCategorias ?? []) soloCategorias.add(c)
 
     if (clave === 'vacunar') {
-      tipos.push('sanidad')
-      datosPorTipo.sanidad = {
-        tratamiento: vacuna?.vacuna ?? null,
-        producto: vacuna?.producto ?? null,
-        veterinario: vacuna?.veterinario ?? null,
-        // `retiro_hasta` es el nombre que ya leen las señales de Hacienda: el
-        // banner rojo de retiro sanitario se enciende solo con esto.
-        retiro_hasta: vacuna?.retiroHasta ?? null,
-        origen_ui: 'manga',
+      // Una por vacuna: en la ficha del animal tienen que poder leerse por
+      // separado ("¿qué le pusiste?"), y el retiro de una no es el de la otra.
+      for (const nombre of vacuna?.vacunas ?? []) {
+        agregar('sanidad', {
+          tratamiento: nombre,
+          producto: vacuna?.producto ?? null,
+          veterinario: vacuna?.veterinario ?? null,
+          // `retiro_hasta` es el nombre que ya leen las señales de Hacienda: el
+          // banner rojo de retiro sanitario se enciende solo con esto.
+          retiro_hasta: vacuna?.retiroHasta ?? null,
+          origen_ui: 'manga',
+        })
       }
     } else if (clave === 'destetar') {
-      tipos.push('destete')
-      datosPorTipo.destete = { origen_ui: 'manga' }
+      agregar('destete', { origen_ui: 'manga' })
     } else if (clave === 'yerra') {
-      tipos.push('castracion')
-      datosPorTipo.castracion = { trabajo: 'yerra', origen_ui: 'manga' }
+      agregar('castracion', { trabajo: 'yerra', origen_ui: 'manga' })
     } else if (clave === 'tacto') {
-      tipos.push('tacto')
       // `resultado` lo completa el toque en la manga, no el prearmado.
-      datosPorTipo.tacto = { origen_ui: 'manga' }
+      agregar('tacto', { origen_ui: 'manga' })
     }
   }
 
   return {
-    tipos,
-    datosPorTipo,
+    eventos,
     soloCategorias: [...soloCategorias],
     fecha: new Date().toISOString().slice(0, 10),
     // El tacto no se puede prearmar: el resultado sale del animal que tenés
@@ -266,6 +282,11 @@ function sesionDe(
     altaSiDesconocido: elegidas.has('yerra') || elegidas.has('caravanear'),
     potreroId: origen?.potreroId ?? null,
     loteId: origen?.loteId ?? null,
+    sesionId,
+    // Apartar suelto no genera ningún `evento` —al animal solo le cambia el
+    // potrero— así que sin esto el progreso se quedaría en cero y los
+    // repetidos no se detectarían.
+    conAparte,
   }
 }
 

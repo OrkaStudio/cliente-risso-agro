@@ -49,7 +49,9 @@ function recordar(nombre: string) {
 }
 
 export type DatosVacuna = {
-  vacuna: string
+  /** Todo lo que se aplica en la misma pasada. Cada una queda como un hecho
+   *  propio en el historial del animal: son productos distintos. */
+  vacunas: string[]
   producto: string | null
   veterinario: string | null
   /** Días de retiro. 0 = el producto no tiene. */
@@ -66,7 +68,7 @@ export function PrearmarVacuna({
   onListo: (d: DatosVacuna) => void
   onVolver: () => void
 }) {
-  const [vacuna, setVacuna] = useState<string>(VACUNAS[0])
+  const [vacunas, setVacunas] = useState<string[]>([VACUNAS[0]])
   const [producto, setProducto] = useState('')
   const [vete, setVete] = useState('')
   const [retiro, setRetiro] = useState<number>(0)
@@ -79,7 +81,7 @@ export function PrearmarVacuna({
         ? new Date(Date.now() + retiro * 86_400_000).toISOString().slice(0, 10)
         : null
     onListo({
-      vacuna,
+      vacunas,
       producto: producto.trim() || null,
       veterinario: vete.trim() || null,
       retiroDias: retiro,
@@ -93,17 +95,27 @@ export function PrearmarVacuna({
 
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
         <div>
-          <CLabel className="mb-1.5 block">¿Qué se aplica?</CLabel>
+          <CLabel className="mb-1.5 block">
+            ¿Qué se aplica? — podés marcar varias
+          </CLabel>
           {/* Tarjetas y no chips: es la decisión más importante de la pantalla
-              y tiene que reconocerse de un vistazo, no leerse. */}
+              y tiene que reconocerse de un vistazo, no leerse. En la manga se
+              aplican varias cosas en la misma pasada —meter el rodeo es caro—
+              así que se marcan todas y cada una queda como un hecho propio. */}
           <div className="grid grid-cols-2 gap-2">
             {VACUNAS.map((v) => {
-              const on = vacuna === v
+              const on = vacunas.includes(v)
               return (
                 <motion.button
                   key={v}
                   type="button"
-                  onClick={() => setVacuna(v)}
+                  onClick={() =>
+                    setVacunas((prev) =>
+                      prev.includes(v)
+                        ? prev.filter((x) => x !== v)
+                        : [...prev, v],
+                    )
+                  }
                   whileTap={{ scale: 0.97 }}
                   aria-pressed={on}
                   className={cn(
@@ -128,12 +140,9 @@ export function PrearmarVacuna({
                     {v}
                   </span>
                   {on && (
-                    <motion.span
-                      layoutId="vacuna-tilde"
-                      className="flex size-5 shrink-0 items-center justify-center rounded-md bg-[var(--c-ok)]"
-                    >
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-[var(--c-ok)]">
                       <Check className="size-3.5 text-white" strokeWidth={3.5} />
-                    </motion.span>
+                    </span>
                   )}
                 </motion.button>
               )
@@ -210,11 +219,17 @@ export function PrearmarVacuna({
             {retiro > 0
               ? `No se pueden vender por ${retiro} días. La web avisa si querés antes.`
               : 'Días de espera antes de faena. Está en el prospecto.'}
+            {vacunas.length > 1 &&
+              ' Poné el más largo de los que apliques hoy.'}
           </p>
         </div>
       </div>
 
-      <Seguir onClick={confirmar}>Empezar a vacunar</Seguir>
+      <Seguir onClick={confirmar} disabled={vacunas.length === 0}>
+        {vacunas.length > 1
+          ? `Empezar con ${vacunas.length} vacunas`
+          : 'Empezar a vacunar'}
+      </Seguir>
     </div>
   )
 }

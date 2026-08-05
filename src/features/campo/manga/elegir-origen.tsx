@@ -80,7 +80,10 @@ export function ElegirOrigen({
     const bovinos = sinCompo ? p.cabezas : cabezasBovinas(compo)
 
     return (
-      <div className="max-h-[52vh] shrink-0 overflow-y-auto border-t border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 pb-4 pt-3.5 shadow-[0_-5px_18px_-10px_rgba(0,0,0,.2)]">
+      // El alto/scroll de este panel los pone la zona del pulgar del Croquis
+      // (`ZONA_PULGAR`, croquis.tsx): es la única que conoce el contenedor real.
+      // Declararlo acá en `vh` era lo que recortaba el botón "Empezar".
+      <div className="border-t border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 pb-4 pt-3.5 shadow-[0_-5px_18px_-10px_rgba(0,0,0,.2)]">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="c-display truncate text-[20px] text-[var(--c-ink)]">
@@ -154,33 +157,39 @@ export function ElegirOrigen({
           </p>
         )}
 
-        <button
-          type="button"
-          disabled={bovinos === 0}
-          onClick={() =>
-            onListo({
-              potreroId: p.id,
-              potreroNombre: p.nombre,
-              campoNombre: o.campo?.nombre ?? '',
-              loteId: elegida?.id ?? null,
-              loteNombre: elegida?.nombre ?? null,
-              cabezas: bovinos,
-              // De la tropa elegida si hay varias; si no, del potrero entero.
-              categorias: [...new Set(soloBovinos(compo).map((c) => c.categoria))],
-              // TODOS los potreros: el croquis se muestra entero para poder
-              // ubicarse. El de origen va marcado, no escondido.
-              potrerosDelCampo: o.potreros,
-              campoColor: o.campo?.colorHex ?? '#178a55',
-            })
-          }
-          className="c-display c-hard mt-3.5 flex h-14 w-full items-center justify-center rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white disabled:opacity-40"
-        >
-          {bovinos === 0
-            ? 'Acá no hay bovinos'
-            : varias && elegida
-              ? `Empezar con ${elegida.nombre}`
-              : 'Empezar'}
-        </button>
+        {/* Acción principal pegada al piso del panel — misma convención que el
+            panel de la Recorrida (ver `ZONA_PULGAR` en croquis.tsx): con
+            composición + tropas el panel scrollea y "Empezar" tiene que seguir
+            entero a la vista, no medio cortado contra el borde. */}
+        <div className="sticky bottom-0 -mx-4 mt-3.5 bg-[var(--c-panel)] px-4 pb-0.5 pt-1.5">
+          <button
+            type="button"
+            disabled={bovinos === 0}
+            onClick={() =>
+              onListo({
+                potreroId: p.id,
+                potreroNombre: p.nombre,
+                campoNombre: o.campo?.nombre ?? '',
+                loteId: elegida?.id ?? null,
+                loteNombre: elegida?.nombre ?? null,
+                cabezas: bovinos,
+                // De la tropa elegida si hay varias; si no, del potrero entero.
+                categorias: [...new Set(soloBovinos(compo).map((c) => c.categoria))],
+                // TODOS los potreros: el croquis se muestra entero para poder
+                // ubicarse. El de origen va marcado, no escondido.
+                potrerosDelCampo: o.potreros,
+                campoColor: o.campo?.colorHex ?? '#178a55',
+              })
+            }
+            className="c-display c-hard flex h-14 w-full items-center justify-center rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white disabled:opacity-40"
+          >
+            {bovinos === 0
+              ? 'Acá no hay bovinos'
+              : varias && elegida
+                ? `Empezar con ${elegida.nombre}`
+                : 'Empezar'}
+          </button>
+        </div>
       </div>
     )
   }

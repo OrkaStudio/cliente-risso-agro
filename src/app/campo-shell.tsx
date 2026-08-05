@@ -10,7 +10,8 @@ import {
   Syringe,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
-import { EstadoCampo } from '@/features/campo/estado-campo'
+import { AvisoEstadoCampo, ChipEstadoCampo } from '@/features/campo/estado-campo'
+import { useSeedOffline } from '@/features/campo/use-seed-offline'
 import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
@@ -74,27 +75,40 @@ export function CampoShell() {
   // Manga/Plata/Historial es instantáneo (sin flash de "Cargando…").
   useEffect(() => prefetchEnReposo(Object.values(CHUNKS_CAMPO)), [])
 
+  // Una sola instancia de la preparación offline para todo el Modo Campo. El
+  // chip del header y el cajón de detalle son dos vistas del mismo estado, así
+  // que vive acá y no adentro de ninguno de los dos.
+  const seed = useSeedOffline()
+  const [detalleAbierto, setDetalleAbierto] = useState(false)
+
   return (
     <div className="campo flex h-full flex-col overflow-hidden">
       {/* Header — placa de máquina */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-[var(--c-line)] bg-sidebar px-4 py-2.5 text-sidebar-foreground">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-primary">
-          <Leaf className="size-5 text-white" strokeWidth={2} />
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-line)] bg-sidebar px-3 py-2.5 text-sidebar-foreground">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-primary">
+          <Leaf className="size-[18px] text-white" strokeWidth={2} />
         </div>
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="c-display truncate text-[16px] text-white">
+        {/* Sólo el nombre. "Modo Campo" lo dice la nav de abajo con más fuerza
+            que un subtítulo, y a 390px —con el zoom 1.06 encima— esa segunda
+            línea le comía el ancho al nombre hasta dejarlo en "Riss…". */}
+        <div className="min-w-0 flex-1">
+          <span className="c-display block truncate text-[16px] leading-none text-white">
             {MARCA}
-          </div>
-          <div className="c-label truncate !text-sidebar-foreground/60">
-            Modo Campo
-          </div>
+          </span>
         </div>
+        <ChipEstadoCampo
+          estado={seed.estado}
+          lastOk={seed.lastOk}
+          online={seed.online}
+          abierto={detalleAbierto}
+          onToggle={() => setDetalleAbierto((v) => !v)}
+        />
         <NavLink
           to="/campo/historial"
           onPointerDown={() => prefetch(CHUNKS_CAMPO['/campo/historial'])}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors',
+              'flex h-11 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-semibold transition-colors',
               isActive
                 ? 'bg-white/[0.12] text-white'
                 : 'text-sidebar-foreground/60 hover:bg-white/[0.07] hover:text-white',
@@ -107,9 +121,16 @@ export function CampoShell() {
         <SalirDeLaCuenta />
       </header>
 
-      {/* Preparación offline: baja todo apenas hay señal + botón vivo con el
-          estado ("Listo para el campo") persistente y expandible. */}
-      <EstadoCampo />
+      {/* Sólo lo que pide atención se lleva una franja del alto; el estado
+          "listo" vive como punto en el header. Acá baja además su detalle. */}
+      <AvisoEstadoCampo
+        estado={seed.estado}
+        lastOk={seed.lastOk}
+        detalle={seed.detalle}
+        online={seed.online}
+        sembrar={() => void seed.sembrar()}
+        abierto={detalleAbierto}
+      />
 
       {/* Contenido — caja acotada (min-h-0 para que el flex hijo pueda encoger).
           Cada página se estructura como app: header fijo + región scrolleable

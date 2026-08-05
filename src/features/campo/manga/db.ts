@@ -68,6 +68,16 @@ export type TrabajoItem = {
   id: string
   animal_id: string
   rfid: string
+  /**
+   * Qué hecho de la sesión es éste, único dentro de la pasada (`sanidad#0`,
+   * `sanidad#1`, `destete#0`…).
+   *
+   * No alcanza con `tipo`: en una vacunación se aplican varias vacunas de una,
+   * y son varios `sanidad` DISTINTOS sobre el mismo animal. Sin esta clave, el
+   * chequeo de "ya lo hiciste" daba por cumplida la segunda vacuna apenas se
+   * anotaba la primera, y el animal se iba sin la otra.
+   */
+  clave?: string
   /** Valor del enum `tipo_evento`: sanidad | destete | castracion | tacto… */
   tipo: string
   /** `evento.datos` ya armado (producto, veterinario, resultado…). */
@@ -79,12 +89,57 @@ export type TrabajoItem = {
   created_at: number
 }
 
+/**
+ * A qué grupo del aparte fue a parar cada animal.
+ *
+ * Existe por dos razones que se sostienen solas. La primera es que el destino
+ * tiene que EJECUTARSE: mandar la tropa al 6B es una llamada a `mover_animales`
+ * con la lista de animales, y esa lista no se puede armar si nadie anotó quién
+ * salió por dónde. La segunda es el conteo: un aparte suelto no genera ningún
+ * `evento` —no le pasó nada al animal más que cambiar de potrero— y sin esta
+ * tabla el progreso se quedaba en cero y los repetidos no se detectaban.
+ *
+ * Vive separada de `trabajos` porque su drenado es de otra naturaleza: los
+ * trabajos suben de a uno (un `evento` por animal) y el aparte sube POR TANDA
+ * (una llamada por grupo, con todos los animales juntos).
+ */
+export type AparteItem = {
+  /** UUID de cliente. */
+  id: string
+  /** Sesión de trabajo: acota el conteo y el drenado a la pasada de hoy. */
+  sesion_id: string
+  animal_id: string
+  rfid: string
+  /** `salida.id` del plan. */
+  salida_id: string
+  /** Snapshot del nombre del grupo: el plan vive en React y muere al salir. */
+  etiqueta: string
+  destino_k: 'potrero' | 'venta' | 'manga' | 'queda'
+  potrero_destino_id: string | null
+  potrero_destino_nombre: string | null
+  fecha: string
+  /**
+   * Lote de drenado. Todos los animales que se suben en la MISMA llamada
+   * comparten `alta_id`, y por eso el reintento es inofensivo: `mover_animales`
+   * devuelve el resultado guardado en vez de mover de nuevo.
+   *
+   * Se asigna al drenar y no antes: si se reusara el `alta_id` de una tanda
+   * anterior, los animales escaneados después quedarían fuera del movimiento
+   * —la RPC devolvería el resultado viejo y nadie se enteraría—.
+   */
+  alta_id: string | null
+  estado: EstadoOutbox
+  error: string | null
+  created_at: number
+}
+
 class MangaDB extends Dexie {
   animales!: Table<AnimalCache, string>
   outbox!: Table<OutboxItem, number>
   refs!: Table<RfidsCache, string>
   rodeo!: Table<AnimalRodeo, string>
   trabajos!: Table<TrabajoItem, string>
+  apartes!: Table<AparteItem, string>
 
   constructor() {
     super('risso-manga')
@@ -104,6 +159,11 @@ class MangaDB extends Dexie {
     this.version(3).stores({
       rodeo: 'rfid, animal_id, potrero_id, lote_id',
       trabajos: 'id, animal_id, estado, tipo',
+    })
+    // v4: el APARTE. Tabla nueva, aditiva: no toca `trabajos` ni `outbox`, que
+    // están en uso real en el campo.
+    this.version(4).stores({
+      apartes: 'id, sesion_id, animal_id, estado, salida_id',
     })
   }
 }

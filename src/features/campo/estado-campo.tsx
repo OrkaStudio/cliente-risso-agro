@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react'
 import {
   Banknote,
   Check,
-  ChevronDown,
   CloudOff,
   Footprints,
   LoaderCircle,
@@ -11,18 +10,30 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { useSeedOffline } from '@/features/campo/use-seed-offline'
+import type { SeedDetalle } from '@/features/campo/seed-offline'
+import type { SeedEstado } from '@/features/campo/use-seed-offline'
 import { cn } from '@/lib/utils'
 
 /**
- * Estado "listo para el campo" — el botón vivo bajo el header del Modo Campo.
+ * Estado "listo para el campo".
  *
  * Antes esto era una barra que mostraba el ✓ de éxito 4,5s y desaparecía: una
- * vez ido, nada le confirmaba al productor que podía irse sin señal. Ahora es
- * PERSISTENTE: un pill calmo ("Listo para el campo · hace X") con un punto que
- * respira, y al tocarlo se despliega el detalle de qué quedó guardado
- * (Recorrida / Manga / Plata) + "Actualizar ahora" + estado de señal. Los otros
- * estados (preparando / conectate / falló) siguen siendo una barra simple.
+ * vez ido, nada le confirmaba al productor que podía irse sin señal. Se volvió
+ * PERSISTENTE, y así se quedó — pero ocupaba una franja entera del alto en
+ * TODAS las pantallas del Modo Campo, que es el recurso más escaso del
+ * teléfono (la manga ya arranca con header + barra + instrumento antes de
+ * mostrar nada).
+ *
+ * Reparto actual, por lo que cada estado necesita:
+ *
+ *  · **listo** (el 99% del tiempo) → `ChipEstadoCampo`, un punto que respira en
+ *    el header. Sigue estando SIEMPRE a la vista —esa era la razón de ser— pero
+ *    no le cobra una fila a la pantalla. Al tocarlo baja el detalle completo.
+ *  · **preparando / sin preparar / falló** → `AvisoEstadoCampo`, la barra ancha
+ *    de siempre. Son transitorios y accionables: ahí la fila se gana.
+ *
+ * El estado vive en el `CampoShell`, que tiene la única instancia de
+ * `useSeedOffline` para todo el Modo Campo; estos componentes solo pintan.
  */
 
 function formatHace(ms: number): string {
@@ -55,6 +66,14 @@ const ITEMS = [
   { key: 'plata', label: 'Plata', desc: 'Categorías y gastos', Icon: Banknote },
 ] as const
 
+export type EstadoCampoProps = {
+  estado: SeedEstado
+  lastOk: number | null
+  detalle: SeedDetalle | null
+  online: boolean
+  sembrar: () => void
+}
+
 /** Barra simple para los estados que no son "listo" (preparando / aviso). */
 function Barra({ tono, children }: { tono: 'info' | 'warn'; children: ReactNode }) {
   return (
@@ -71,11 +90,73 @@ function Barra({ tono, children }: { tono: 'info' | 'warn'; children: ReactNode 
   )
 }
 
-export function EstadoCampo() {
-  const { estado, lastOk, detalle, online, sembrar } = useSeedOffline()
-  const [abierto, setAbierto] = useState(false)
-  const hace = useHaceCuanto(lastOk)
+/**
+ * El punto vivo del header. Sólo existe cuando el teléfono YA está listo: es la
+ * confirmación calma de que se puede salir sin señal.
+ *
+ * Va sobre el fondo oscuro del header, así que tiene su propia paleta — el
+ * verde de la barra clara no se lee ahí.
+ */
+export function ChipEstadoCampo({
+  estado,
+  lastOk,
+  online,
+  abierto,
+  onToggle,
+}: Pick<EstadoCampoProps, 'estado' | 'lastOk' | 'online'> & {
+  abierto: boolean
+  onToggle: () => void
+}) {
+  const listo = lastOk != null
+  if (!listo || estado === 'sembrando') return null
 
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={abierto}
+      aria-label={
+        online
+          ? 'Listo para el campo — ver detalle'
+          : 'Listo para el campo, sin señal — ver detalle'
+      }
+      className={cn(
+        'flex h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 transition-colors',
+        abierto ? 'bg-white/[0.14]' : 'hover:bg-white/[0.07]',
+      )}
+    >
+      <span className="relative flex size-2.5 shrink-0 items-center justify-center">
+        <span
+          className={cn(
+            'c-breathe absolute inline-flex size-full rounded-full',
+            online ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-warn)]',
+          )}
+        />
+        <span
+          className={cn(
+            'relative inline-flex size-2 rounded-full',
+            online ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-warn)]',
+          )}
+        />
+      </span>
+      <span className="text-[12.5px] font-semibold text-white/85">Listo</span>
+    </button>
+  )
+}
+
+/**
+ * La barra ancha, ahora solo para lo que pide atención, + el cajón de detalle
+ * que despliega el chip. Va debajo del header.
+ */
+export function AvisoEstadoCampo({
+  estado,
+  lastOk,
+  detalle,
+  online,
+  sembrar,
+  abierto,
+}: EstadoCampoProps & { abierto: boolean }) {
+  const hace = useHaceCuanto(lastOk)
   const listo = lastOk != null
 
   if (estado === 'sembrando') {
@@ -93,7 +174,7 @@ export function EstadoCampo() {
         <span className="min-w-0 flex-1 truncate">No se pudo preparar del todo</span>
         <button
           type="button"
-          onClick={() => void sembrar()}
+          onClick={sembrar}
           disabled={!online}
           className="flex shrink-0 items-center gap-1 rounded-full border border-current/30 px-2.5 py-1 text-[12px] disabled:opacity-50"
         >
@@ -113,102 +194,70 @@ export function EstadoCampo() {
       </Barra>
     )
   }
-  if (!listo) return null // idle inicial: nada que mostrar todavía
+  if (!listo || !abierto) return null
 
-  // --- Botón vivo "Listo para el campo" (persistente + expandible) ---
   return (
-    <div className="shrink-0">
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        aria-expanded={abierto}
-        className="flex w-full items-center gap-2.5 bg-[var(--c-ok-soft)] px-4 py-2 text-left text-[var(--c-ok-deep)] transition-colors active:bg-[var(--c-mid-soft)]"
-      >
-        <span className="relative flex size-2.5 shrink-0 items-center justify-center">
-          <span className="c-breathe absolute inline-flex size-full rounded-full bg-[var(--c-ok)]" />
-          <span className="relative inline-flex size-2 rounded-full bg-[var(--c-ok)]" />
+    <div className="c-rise shrink-0 border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
+      <p className="c-label !normal-case !tracking-normal !text-[11px] !font-medium !text-[var(--c-faint)]">
+        Guardado en el teléfono · actualizado {hace}
+      </p>
+
+      <ul className="mt-2 space-y-1.5">
+        {ITEMS.map(({ key, label, desc, Icon }) => {
+          const ok = (detalle?.[key] ?? 'ok') === 'ok'
+          return (
+            <li key={key} className="flex items-center gap-2.5">
+              <span
+                className={cn(
+                  'flex size-6 shrink-0 items-center justify-center rounded-lg',
+                  ok
+                    ? 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+                    : 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]',
+                )}
+              >
+                {ok ? (
+                  <Check className="size-3.5" strokeWidth={3} />
+                ) : (
+                  <CloudOff className="size-3.5" strokeWidth={2.4} />
+                )}
+              </span>
+              <Icon className="size-4 shrink-0 text-[var(--c-ink-soft)]" strokeWidth={2} />
+              <span className="text-[13px] font-semibold text-[var(--c-ink)]">{label}</span>
+              <span className="ml-auto text-[11.5px] font-medium text-[var(--c-faint)]">
+                {desc}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+
+      <div className="mt-3 flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={sembrar}
+          disabled={!online}
+          className={cn(
+            'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
+            online
+              ? 'c-hard-sm bg-[var(--c-ok)] text-white'
+              : 'bg-[var(--c-sunk)] text-[var(--c-faint)]',
+          )}
+        >
+          <RotateCw className="size-3.5" strokeWidth={2.4} />
+          Actualizar ahora
+        </button>
+        <span className="flex items-center gap-1 text-[11.5px] font-medium text-[var(--c-faint)]">
+          {online ? (
+            <>
+              <Wifi className="size-3.5" strokeWidth={2.2} /> con señal
+            </>
+          ) : (
+            <>
+              <WifiOff className="size-3.5" strokeWidth={2.2} /> sin señal
+            </>
+          )}
         </span>
-        <span className="text-[13px] font-bold">Listo para el campo</span>
-        {!online && (
-          <span className="c-label rounded-full bg-white/70 px-1.5 py-0.5 !text-[9.5px] !text-[var(--c-ok-deep)]">
-            sin señal
-          </span>
-        )}
-        <span className="ml-auto flex items-center gap-1.5">
-          <span className="c-mono text-[11.5px] font-semibold text-[var(--c-ok-deep)]/70">
-            {hace}
-          </span>
-          <ChevronDown
-            className={cn('size-4 transition-transform duration-200', abierto && 'rotate-180')}
-            strokeWidth={2.4}
-          />
-        </span>
-      </button>
-
-      {abierto && (
-        <div className="c-rise border-t border-[var(--c-line)] bg-[var(--c-panel)] px-4 pb-3 pt-2.5">
-          <p className="c-label !normal-case !tracking-normal !text-[11px] !font-medium !text-[var(--c-faint)]">
-            Guardado en el teléfono · actualizado {hace}
-          </p>
-
-          <ul className="mt-2 space-y-1.5">
-            {ITEMS.map(({ key, label, desc, Icon }) => {
-              const ok = (detalle?.[key] ?? 'ok') === 'ok'
-              return (
-                <li key={key} className="flex items-center gap-2.5">
-                  <span
-                    className={cn(
-                      'flex size-6 shrink-0 items-center justify-center rounded-lg',
-                      ok
-                        ? 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
-                        : 'bg-[var(--c-warn-soft)] text-[var(--c-warn-deep)]',
-                    )}
-                  >
-                    {ok ? (
-                      <Check className="size-3.5" strokeWidth={3} />
-                    ) : (
-                      <CloudOff className="size-3.5" strokeWidth={2.4} />
-                    )}
-                  </span>
-                  <Icon className="size-4 shrink-0 text-[var(--c-ink-soft)]" strokeWidth={2} />
-                  <span className="text-[13px] font-semibold text-[var(--c-ink)]">{label}</span>
-                  <span className="ml-auto text-[11.5px] font-medium text-[var(--c-faint)]">
-                    {desc}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-
-          <div className="mt-3 flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => void sembrar()}
-              disabled={!online}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
-                online
-                  ? 'c-hard-sm bg-[var(--c-ok)] text-white'
-                  : 'bg-[var(--c-sunk)] text-[var(--c-faint)]',
-              )}
-            >
-              <RotateCw className="size-3.5" strokeWidth={2.4} />
-              Actualizar ahora
-            </button>
-            <span className="flex items-center gap-1 text-[11.5px] font-medium text-[var(--c-faint)]">
-              {online ? (
-                <>
-                  <Wifi className="size-3.5" strokeWidth={2.2} /> con señal
-                </>
-              ) : (
-                <>
-                  <WifiOff className="size-3.5" strokeWidth={2.2} /> sin señal
-                </>
-              )}
-            </span>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }

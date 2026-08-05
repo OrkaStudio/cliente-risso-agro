@@ -1,8 +1,14 @@
 import { motion } from 'framer-motion'
 import { Check, CloudOff, RefreshCw } from 'lucide-react'
 import { CLabel } from '../ui'
-import { Seguir } from './ui-manga'
-import { colorLado, ladoLabel, destinoLabel, type PlanSalidas, type Lado } from './salidas'
+import { IconoDestino, Seguir } from './ui-manga'
+import {
+  colorLado,
+  destinoLabel,
+  ladoFlecha,
+  ordenarPorLado,
+  type PlanSalidas,
+} from './salidas'
 
 /**
  * Cierre del trabajo: qué quedó hecho.
@@ -18,7 +24,7 @@ export function CerrarTrabajo({
   titulo,
   hechos,
   total,
-  porLado,
+  porSalida,
   plan,
   sinSubir,
   conError,
@@ -29,7 +35,8 @@ export function CerrarTrabajo({
   titulo: string
   hechos: number
   total: number
-  porLado: Partial<Record<Lado, number>>
+  /** `salida.id` → cuántos salieron por ahí. */
+  porSalida: Record<string, number>
   plan?: PlanSalidas
   sinSubir: number
   conError: number
@@ -77,23 +84,33 @@ export function CerrarTrabajo({
             className="flex w-full flex-col gap-1.5"
           >
             <CLabel className="mb-0.5">Cómo salieron</CLabel>
-            {plan.salidas.map((s) => (
+            {ordenarPorLado(plan.salidas).map((s) => (
               <div
-                key={s.lado}
-                className="flex items-center gap-3 rounded-xl border-2 bg-[var(--c-panel)] px-3.5 py-2.5"
+                key={s.id}
+                className="flex items-center gap-2.5 rounded-xl border-2 bg-[var(--c-panel)] px-3.5 py-2.5"
                 style={{ borderColor: colorLado[s.lado].borde }}
               >
                 <span
-                  className="c-display shrink-0 text-[14px]"
+                  className="c-display shrink-0 text-[16px] leading-none"
                   style={{ color: colorLado[s.lado].tinta }}
+                  aria-hidden
                 >
-                  {ladoLabel[s.lado]}
+                  {ladoFlecha[s.lado]}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--c-ink-soft)]">
-                  {destinoLabel(s.destino)}
+                <span className="min-w-0 flex-1">
+                  <span
+                    className="c-display block truncate text-[14.5px]"
+                    style={{ color: colorLado[s.lado].tinta }}
+                  >
+                    {s.etiqueta}
+                  </span>
+                  <span className="flex items-center gap-1 truncate text-[12px] text-[var(--c-ink-soft)]">
+                    <IconoDestino destino={s.destino} className="size-3.5" />
+                    <span className="truncate">{destinoLabel(s.destino)}</span>
+                  </span>
                 </span>
                 <span className="c-mono shrink-0 text-[20px] font-bold text-[var(--c-ink)]">
-                  {porLado[s.lado] ?? 0}
+                  {porSalida[s.id] ?? 0}
                 </span>
               </div>
             ))}
