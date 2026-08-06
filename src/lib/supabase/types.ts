@@ -437,6 +437,77 @@ export type Database = {
           },
         ]
       }
+      labor_potrero: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          cultivo: string | null
+          empresa_id: string
+          fecha: string
+          id: string
+          kg_cosechados: number | null
+          movimiento_id: string | null
+          nota: string | null
+          potrero_id: string
+          tipo: Database["public"]["Enums"]["tipo_labor"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          cultivo?: string | null
+          empresa_id: string
+          fecha: string
+          id?: string
+          kg_cosechados?: number | null
+          movimiento_id?: string | null
+          nota?: string | null
+          potrero_id: string
+          tipo: Database["public"]["Enums"]["tipo_labor"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          cultivo?: string | null
+          empresa_id?: string
+          fecha?: string
+          id?: string
+          kg_cosechados?: number | null
+          movimiento_id?: string | null
+          nota?: string | null
+          potrero_id?: string
+          tipo?: Database["public"]["Enums"]["tipo_labor"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labor_potrero_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labor_potrero_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "movimiento_financiero"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labor_potrero_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "v_pendientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labor_potrero_potrero_id_fkey"
+            columns: ["potrero_id"]
+            isOneToOne: false
+            referencedRelation: "potrero"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lluvia: {
         Row: {
           campo_id: string
@@ -1319,6 +1390,20 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_labor: {
+        Args: {
+          p_categoria_id?: string
+          p_cultivo?: string
+          p_empresa_id: string
+          p_fecha: string
+          p_kg?: number
+          p_monto?: number
+          p_nota?: string
+          p_potrero_id: string
+          p_tipo: Database["public"]["Enums"]["tipo_labor"]
+        }
+        Returns: string
+      }
     }
     Enums: {
       actividad_movimiento: "cria" | "invernada" | "agricultura" | "estructura"
@@ -1391,6 +1476,13 @@ export type Database = {
         | "nota"
         | "caravana_asignada"
       tipo_infraestructura: "molino" | "laguna" | "tranquera" | "manga"
+      tipo_labor:
+        | "laboreo"
+        | "siembra"
+        | "fertilizacion"
+        | "fumigacion"
+        | "corte_forraje"
+        | "cosecha"
       tipo_movimiento: "ingreso" | "gasto"
     }
     CompositeTypes: {
@@ -1595,6 +1687,14 @@ export const Constants = {
         "caravana_asignada",
       ],
       tipo_infraestructura: ["molino", "laguna", "tranquera", "manga"],
+      tipo_labor: [
+        "laboreo",
+        "siembra",
+        "fertilizacion",
+        "fumigacion",
+        "corte_forraje",
+        "cosecha",
+      ],
       tipo_movimiento: ["ingreso", "gasto"],
     },
   },

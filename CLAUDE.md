@@ -48,7 +48,8 @@ Al no haber servidor (Server Actions), el cliente habla directo con Postgres:
 - **Code-splitting:** el bundle inicial supera 500 kB (warning de Vite). Dividir con `import()` dinámico cuando crezca.
 - **Build iOS:** requiere macOS/Xcode o CI con runner Mac (Lau desarrolla en Windows). Las plataformas `ios/` y `android/` no están agregadas todavía (gitignoreadas).
 - **Operaciones de Hacienda = RPCs transaccionales** (`SECURITY INVOKER`, RLS del usuario): `crear_animal`, `cambiar_caravana`, `dar_baja_animal`. Las multi-tabla (alta, cambio de caravana, baja) son atómicas. `registrar_evento` es un insert directo (append-only). Migración `hacienda_rpcs`.
-- **Verificación E2E:** golden path verificado a nivel datos (RLS + vistas) **y** en navegador real (`pnpm test:e2e`, Playwright — login → alta → ficha → stock). Credenciales seed: `orka.arg@gmail.com` / `RissoAgro.2026` (empresa "Risso Agro", campo "Don Gilberto" con 3 potreros). El test toma las credenciales de `E2E_EMAIL`/`E2E_PASSWORD`.
+- **Verificación E2E:** golden path verificado a nivel datos (RLS + vistas) **y** en navegador real (`pnpm test:e2e`, Playwright — login → alta → ficha → stock). Credenciales: `orka.arg@gmail.com` / `SanMartin364` → empresa **"Orka Pruebas"** (4 campos, 24 potreros con polígonos reales, 186 cabezas; Don Gilberto con 3 potreros). El test toma las credenciales de `E2E_EMAIL`/`E2E_PASSWORD`.
+  > ⚠️ **Los tests NO corren contra "Risso Agro"**: desde el 06/08 esa empresa es del productor (`rissodaniel23@gmail.com`) y quedó vacía a propósito para que cargue él. Escribirle desde un test sería ensuciarle los datos. Ver [[TASK-056]].
 - **Auth — leaked password protection:** desactivado (advisor de Supabase). Activar en el dashboard (Auth → Password security, HaveIBeenPwned). Toggle de consola, no código.
 
 ## Flujo de trabajo
