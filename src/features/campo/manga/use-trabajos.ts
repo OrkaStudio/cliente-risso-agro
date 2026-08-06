@@ -249,6 +249,7 @@ export function useTrabajos(sesion: SesionTrabajo) {
           fecha: cabeza.fecha,
           contexto: {
             origen_ui: 'manga',
+            sesion_id: cabeza.sesion_id,
             grupo: cabeza.etiqueta,
             salida_id: cabeza.salida_id,
           },
@@ -347,7 +348,9 @@ export function useTrabajos(sesion: SesionTrabajo) {
           rfid,
           clave: e.clave,
           tipo: e.tipo,
-          datos: { ...e.datos, ...extra },
+          // `sesion_id` viaja en los datos para que el Historial pueda
+          // agrupar la PASADA exacta y no tenga que adivinar por fecha+tipo.
+          datos: { ...e.datos, sesion_id: sesion.sesionId, ...extra },
           fecha: sesion.fecha,
           estado: 'pendiente' as const,
           error: null,
