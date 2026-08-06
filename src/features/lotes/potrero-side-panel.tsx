@@ -1,9 +1,13 @@
 // Exporta el componente + helpers (USO/tipos) del mismo módulo (patrón del repo).
 /* eslint-disable react-refresh/only-export-components */
+import { CargarLaborDialog } from '@/features/potrero/cargar-labor-dialog'
+import { laborPorTipo, rinde } from '@/features/potrero/labores'
+import { useLabores } from '@/features/potrero/hooks'
 import { USO } from '@/features/campos/labels'
 import { useMemo, useState, type CSSProperties } from 'react'
 import {
   ArrowRight,
+  Combine,
   ArrowRightLeft,
   Beef,
   Layers,
@@ -371,6 +375,7 @@ export function PotreroSidePanel({
   // el formulario está abierto.
   const [editInfo, setEditInfo] = useState<PotreroInfo | null>(null)
   const [cargaInfo, setCargaInfo] = useState<PotreroInfo | null>(null)
+  const [laborInfo, setLaborInfo] = useState<PotreroInfo | null>(null)
   const [verTropas, setVerTropas] = useState(false)
   // Tropas del potrero activo (cacheado por potrero; el hover no re-consulta).
   const tropas = useTropasDelPotrero(info?.potreroId ?? null)
@@ -522,10 +527,12 @@ export function PotreroSidePanel({
                 {info.ha} ha
               </Dato>
             )}
-            {info.uso === 'agricola' && info.cultivo && (
-              <Dato icon={Sprout} label="Cultivo">
-                {info.cultivo}
-              </Dato>
+            {info.uso === 'agricola' && (
+              <LaboresDelPotrero
+                potreroId={info.potreroId}
+                cultivo={info.cultivo ?? null}
+                ha={info.ha ?? null}
+              />
             )}
             {info.features && info.features.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -546,12 +553,27 @@ export function PotreroSidePanel({
           </div>
 
           <div className="mt-auto grid gap-2">
-            {/* Carga de animales / lote directo a ESTE potrero (ya elegido en el
-                mapa) → el diálogo abre con el destino fijo. */}
+            {/* En un potrero agrícola la acción principal es la labor. "Cargar
+                animales" NO desaparece —el verdeo se siembra para pastorearlo—
+                pero pasa a segundo plano. */}
+            {info.uso === 'agricola' && (
+              <button
+                type="button"
+                onClick={() => setLaborInfo(info)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-field py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(16,30,20,0.18)] transition-colors hover:bg-field-deep"
+              >
+                <Sprout className="size-4" />
+                Cargar labor
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setCargaInfo(info)}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-field py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(16,30,20,0.18)] transition-colors hover:bg-field-deep"
+              className={
+                info.uso === 'agricola'
+                  ? 'flex w-full items-center justify-center gap-1.5 rounded-xl bg-field-soft py-2.5 text-[13px] font-semibold text-field-deep transition-colors hover:bg-field-soft/70'
+                  : 'flex w-full items-center justify-center gap-1.5 rounded-xl bg-field py-2.5 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(16,30,20,0.18)] transition-colors hover:bg-field-deep'
+              }
             >
               <Layers className="size-4" />
               Cargar animales
@@ -618,6 +640,95 @@ export function PotreroSidePanel({
         }}
       />
     )}
+
+    {laborInfo && (
+      <CargarLaborDialog
+        open
+        onOpenChange={(v) => {
+          if (!v) setLaborInfo(null)
+        }}
+        potreroId={laborInfo.potreroId}
+        potreroNombre={laborInfo.numero}
+      />
+    )}
+    </>
+  )
+}
+
+/**
+ * La campaña del potrero: qué hay sembrado y las últimas labores.
+ *
+ * Es el equivalente agrícola del resumen ganadero (cabezas + composición). Sin
+ * esto, un potrero agrícola sólo mostraba el nombre del cultivo y no había
+ * forma de saber qué se le hizo ni cuánto costó.
+ */
+function LaboresDelPotrero({
+  potreroId,
+  cultivo,
+  ha,
+}: {
+  potreroId: string
+  cultivo: string | null
+  ha: number | null
+}) {
+  const labores = useLabores(potreroId)
+  const items = labores.data ?? []
+  const ultimaCosecha = items.find((l) => l.tipo === 'cosecha')
+  const kgHa = rinde(ultimaCosecha?.kgCosechados ?? null, ha)
+
+  return (
+    <>
+      {cultivo && (
+        <Dato icon={Sprout} label="Cultivo">
+          {cultivo}
+        </Dato>
+      )}
+
+      {/* Los kilos se guardan siempre; el rinde aparece sólo si hay superficie.
+          Nunca se inventa un rinde sobre hectáreas que no están cargadas. */}
+      {ultimaCosecha?.kgCosechados != null && (
+        <Dato icon={Combine} label="Última cosecha">
+          {ultimaCosecha.kgCosechados.toLocaleString('es-AR')} kg
+          {kgHa != null ? (
+            <span className="text-muted-foreground"> · {kgHa.toLocaleString('es-AR')} kg/ha</span>
+          ) : (
+            <span className="text-muted-foreground"> · cargá las ha para ver el rinde</span>
+          )}
+        </Dato>
+      )}
+
+      {items.length > 0 ? (
+        <div className="grid gap-1 pt-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
+            Últimas labores
+          </span>
+          {items.slice(0, 4).map((l) => {
+            const def = laborPorTipo.get(l.tipo)
+            const Icon = def?.Icon ?? Sprout
+            return (
+              <div key={l.id} className="flex items-center gap-2 text-[12.5px]">
+                <Icon className="size-3.5 shrink-0 text-field-deep" />
+                <span className="font-semibold text-ink">{def?.label ?? l.tipo}</span>
+                <span className="text-muted-foreground">
+                  {l.fecha.slice(8, 10)}/{l.fecha.slice(5, 7)}
+                </span>
+                {l.monto != null && (
+                  <span className="ml-auto tnum text-muted-foreground">
+                    ${Math.round(l.monto).toLocaleString('es-AR')}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        !labores.isLoading && (
+          <p className="text-[12.5px] text-muted-foreground">
+            Todavía no cargaste ninguna labor. Empezá por la siembra y el potrero
+            va a contar su campaña solo.
+          </p>
+        )
+      )}
     </>
   )
 }

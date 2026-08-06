@@ -119,3 +119,67 @@ export async function getPotreroDetalle(
   }
 }
 
+
+// ===== Labores agrícolas =====
+
+export type LaborRow = {
+  id: string
+  tipo: Database['public']['Enums']['tipo_labor']
+  fecha: string
+  nota: string | null
+  cultivo: string | null
+  kgCosechados: number | null
+  monto: number | null
+}
+
+/** Las labores de un potrero, de la más nueva a la más vieja. */
+export async function listarLabores(potreroId: string): Promise<LaborRow[]> {
+  const { data, error } = await supabase
+    .from('labor_potrero')
+    .select('id, tipo, fecha, nota, cultivo, kg_cosechados, movimiento:movimiento_id(monto)')
+    .eq('potrero_id', potreroId)
+    .order('fecha', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((l) => ({
+    id: l.id,
+    tipo: l.tipo,
+    fecha: l.fecha,
+    nota: l.nota,
+    cultivo: l.cultivo,
+    kgCosechados: l.kg_cosechados,
+    monto: l.movimiento?.monto ?? null,
+  }))
+}
+
+/**
+ * Registra una labor. Va por RPC y no por insert directo porque son hasta tres
+ * escrituras que tienen que pasar juntas: la labor, el gasto (si hay monto) y
+ * el estado del ciclo del potrero.
+ */
+export async function registrarLabor(input: {
+  empresaId: string
+  potreroId: string
+  tipo: Database['public']['Enums']['tipo_labor']
+  fecha: string
+  nota: string | null
+  cultivo: string | null
+  kg: number | null
+  monto: number | null
+  categoriaId: string | null
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('registrar_labor', {
+    p_empresa_id: input.empresaId,
+    p_potrero_id: input.potreroId,
+    p_tipo: input.tipo,
+    p_fecha: input.fecha,
+    // Los tipos generados usan `undefined` para los parámetros con default,
+    // no `null`: mandar null explícito no compila.
+    p_nota: input.nota ?? undefined,
+    p_cultivo: input.cultivo ?? undefined,
+    p_kg: input.kg ?? undefined,
+    p_monto: input.monto ?? undefined,
+    p_categoria_id: input.categoriaId ?? undefined,
+  })
+  if (error) throw new Error(error.message)
+  return data as string
+}
