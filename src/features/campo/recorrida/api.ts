@@ -52,6 +52,15 @@ export type PotreroRec = {
   composicion: CompoItem[]
   /** Tropas con animales en el potrero (para asignar un nacimiento offline). */
   tropas: TropaRec[]
+  /**
+   * Qué hay sembrado, si el potrero es agrícola. Lo escribe la siembra cargada
+   * en Oficina. No confundir con `UltimaObs.cultivo`, que es el ESTADO del
+   * cultivo observado (bien/regular/mal): esto es el nombre de la especie.
+   *
+   * Sin esto la Recorrida preguntaba "¿cómo viene el cultivo?" sin decir cuál
+   * — a ciegas en un campo con varios potreros sembrados.
+   */
+  cultivo_sembrado: string | null
   /** Polígono del potrero (si se dibujó en Oficina) — alimenta el croquis. */
   poligono: LatLng[] | null
   /** Última observación registrada (de cualquier recorrida anterior). */
@@ -106,7 +115,7 @@ export async function fetchRefs(): Promise<{
     supabase.from('campo').select('id, nombre, empresa_id, color_idx').order('color_idx'),
     supabase
       .from('potrero')
-      .select('id, nombre, estado_ciclo, campo_id, poligono')
+      .select('id, nombre, estado_ciclo, campo_id, poligono, cultivo')
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
     // Observaciones recientes → última por potrero ("igual que la última vez").
@@ -207,6 +216,7 @@ export async function fetchRefs(): Promise<{
       nombre: p.nombre,
       estado_ciclo: p.estado_ciclo,
       campo_id: p.campo_id,
+      cultivo_sembrado: p.cultivo ?? null,
       cabezas: cab.get(p.id) ?? 0,
       composicion: composDe(p.id),
       tropas: tropasDe(p.id),

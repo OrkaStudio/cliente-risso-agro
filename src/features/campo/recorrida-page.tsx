@@ -693,6 +693,7 @@ function ParteScreen({
           key={potrero.id}
           cabezas={potrero.cabezas}
           estadoCiclo={potrero.estado_ciclo}
+          cultivoSembrado={potrero.cultivo_sembrado ?? null}
           ultima={potrero.ultima ?? null}
           inicial={obsAForm(r.obsPorPotrero.get(potrero.id))}
           yaEnSesion={yaCargado}
@@ -912,6 +913,7 @@ type CampoEstado = 'pasto' | 'agua' | 'electrico' | 'cultivo' | 'en_tratamiento'
 function PotreroForm({
   cabezas,
   estadoCiclo,
+  cultivoSembrado,
   ultima,
   inicial,
   yaEnSesion,
@@ -921,6 +923,8 @@ function PotreroForm({
 }: {
   cabezas: number
   estadoCiclo: EstadoCiclo
+  /** Qué se sembró, si el potrero es agrícola (lo escribe la siembra en Oficina). */
+  cultivoSembrado: string | null
   ultima: UltimaObs | null
   inicial: Form
   /** true = ya se cargó en ESTA recorrida (no proponemos, editamos lo cargado). */
@@ -1055,7 +1059,11 @@ function PotreroForm({
 
       {agricola ? (
         <div>
-          <SeccionLabel icon={Sprout}>Cultivo · ¿cómo viene?</SeccionLabel>
+          <SeccionLabel icon={Sprout}>
+            {cultivoSembrado
+              ? `${cultivoSembrado} · ¿cómo viene?`
+              : 'Cultivo · ¿cómo viene?'}
+          </SeccionLabel>
           <div className="grid grid-cols-3 gap-1.5">
             {CULTIVO.map((o) => (
               <CSegBtn

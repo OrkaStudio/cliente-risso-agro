@@ -73,6 +73,15 @@ export type RecPotrero = {
   /** Tropas con animales en el potrero (para asignar un nacimiento). Puede
    *  faltar en un cache viejo → tratar como [] al leer. */
   tropas?: TropaRec[]
+  /**
+   * Qué hay sembrado, si el potrero es agrícola (lo escribe la siembra cargada
+   * en Oficina). Opcional: un cache anterior a esta feature no lo tiene, y un
+   * cache viejo no puede romper la Recorrida — se trata como null al leer.
+   *
+   * No confundir con `UltimaObs.cultivo`, que es el ESTADO observado del
+   * cultivo (bien/regular/mal). Esto es el nombre de la especie.
+   */
+  cultivo_sembrado?: string | null
   /** Polígono [lat,lng][] (si Oficina lo dibujó) — croquis del campo. */
   poligono: [number, number][] | null
   /** Última observación conocida ("igual que la última vez"). */
