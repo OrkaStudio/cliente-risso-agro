@@ -16,7 +16,7 @@ import type { CampoConPotreros, LoteReparto } from '@/features/campos/api'
 import { CampoFormDialog, PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
-import { estadoCicloColor, estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
+import { USO, tipoCampoLabel } from '@/features/campos/labels'
 import {
   coloresPorCategoria,
   categoriaNombre,
@@ -32,13 +32,7 @@ import type { Database } from '@/lib/supabase/types'
 import type { MovimientoConDetalle } from '@/features/analitica/api'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
-type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 
-const USO_LABEL: Record<Uso, string> = {
-  ganadero: 'Ganadero',
-  agricola: 'Agrícola',
-  vacio: 'Sin uso',
-}
 const USO_COLOR: Record<Uso, string> = {
   ganadero: 'var(--field)',
   agricola: 'var(--sol)',
@@ -168,24 +162,21 @@ function ComposicionRodeo({ campo }: { campo: CampoConPotreros }) {
 /* ===== Uso del suelo (hectáreas por uso) + estados de ciclo ===== */
 function UsoDelSuelo({ campo }: { campo: CampoConPotreros }) {
   const haPorUso: Record<Uso, number> = { ganadero: 0, agricola: 0, vacio: 0 }
-  const conteoEstado = new Map<EstadoCiclo, number>()
   let sinSuperficie = 0
   for (const p of campo.potreros) {
     const u = usoDeEstado(p.estadoCiclo)
     if (p.hectareas != null && p.hectareas > 0) haPorUso[u] += p.hectareas
     else sinSuperficie++
-    conteoEstado.set(p.estadoCiclo, (conteoEstado.get(p.estadoCiclo) ?? 0) + 1)
   }
   const items = (['ganadero', 'agricola', 'vacio'] as Uso[])
     .map((u) => ({
       key: u,
-      label: USO_LABEL[u],
+      label: USO[u].label,
       value: Math.round(haPorUso[u]),
       color: USO_COLOR[u],
     }))
     .filter((it) => it.value > 0)
   const totalHa = items.reduce((s, c) => s + c.value, 0)
-  const estados = [...conteoEstado.entries()].sort((a, b) => b[1] - a[1])
 
   return (
     <Panel
@@ -209,32 +200,9 @@ function UsoDelSuelo({ campo }: { campo: CampoConPotreros }) {
         </>
       )}
 
-      {estados.length > 0 && (
-        <div className="mt-5 border-t border-border/60 pt-4">
-          <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
-            Estado de los potreros
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {estados.map(([estado, n]) => (
-              <span
-                key={estado}
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
-                style={{
-                  color: estadoCicloColor[estado],
-                  background: `color-mix(in srgb, ${estadoCicloColor[estado]} 14%, transparent)`,
-                }}
-              >
-                <span
-                  className="size-1.5 rounded-full"
-                  style={{ background: estadoCicloColor[estado] }}
-                />
-                {estadoCicloLabel[estado]}
-                <span className="tnum">{n}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Acá vivía "Estado de los potreros", que repetía en siete estados lo
+          que "Uso del suelo" ya dice en tres, justo arriba. Era la misma
+          información contada dos veces con dos vocabularios distintos. */}
     </Panel>
   )
 }

@@ -119,27 +119,3 @@ export async function getPotreroDetalle(
   }
 }
 
-/** Actualiza la campaña agrícola del potrero (carga manual). */
-export async function actualizarCultivo(input: {
-  id: string
-  cultivo: string | null
-  variedad: string | null
-  fechaSiembra: string | null
-  fechaCosechaEstimada: string | null
-  destino: Destino | null
-  aprovechamiento: Aprovechamiento | null
-}): Promise<void> {
-  const { error } = await supabase
-    .from('potrero')
-    .update({
-      cultivo: input.cultivo,
-      variedad: input.variedad,
-      fecha_siembra: input.fechaSiembra,
-      fecha_cosecha_estimada: input.fechaCosechaEstimada,
-      destino: input.destino,
-      // El aprovechamiento solo aplica a forraje (consumo).
-      aprovechamiento: input.destino === 'consumo' ? input.aprovechamiento : null,
-    })
-    .eq('id', input.id)
-  if (error) throw new Error(error.message)
-}

@@ -10,7 +10,8 @@ import {
   useCrearCampo,
   useCrearPotrero,
 } from '@/features/campos/hooks'
-import { estadoCicloLabel, tipoCampoLabel } from '@/features/campos/labels'
+import { USO, tipoCampoLabel } from '@/features/campos/labels'
+import { usoDeEstado, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -252,17 +253,35 @@ export function PotreroFormDialog({
         </motion.div>
         <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
-            <Label>Estado del ciclo</Label>
-            <Dropdown
-              block
-              ariaLabel="Estado del ciclo"
-              value={estadoCiclo}
-              onChange={(v) => setEstadoCiclo(v as Potrero['estado_ciclo'])}
-              options={Constants.public.Enums.estado_ciclo_potrero.map((s) => ({
-                value: s,
-                label: estadoCicloLabel[s],
-              }))}
-            />
+            <Label>Uso</Label>
+            {/* Los mismos tres de todo el resto de la app. Antes acá se
+                ofrecían los siete estados crudos de la base y el potrero
+                terminaba mostrándose distinto en el mapa que en su diálogo. */}
+            <div className="flex gap-1.5">
+              {(['ganadero', 'agricola', 'vacio'] as Uso[]).map((u) => {
+                const on = usoDeEstado(estadoCiclo) === u
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setEstadoCiclo(usoToEstadoCiclo(u, estadoCiclo))}
+                    className="h-11 flex-1 rounded-lg border-2 text-[13px] font-semibold transition-colors"
+                    style={
+                      on
+                        ? {
+                            borderColor: USO[u].color,
+                            backgroundColor: `color-mix(in srgb, ${USO[u].color} 14%, transparent)`,
+                            color: USO[u].color,
+                          }
+                        : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }
+                    }
+                  >
+                    {USO[u].label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="potrero-ha">Hectáreas (opcional)</Label>

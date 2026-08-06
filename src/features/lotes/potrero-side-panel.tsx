@@ -1,5 +1,6 @@
 // Exporta el componente + helpers (USO/tipos) del mismo módulo (patrón del repo).
 /* eslint-disable react-refresh/only-export-components */
+import { USO } from '@/features/campos/labels'
 import { useMemo, useState, type CSSProperties } from 'react'
 import {
   ArrowRight,
@@ -40,11 +41,9 @@ export type { Uso }
  * mapa). Fuente única: la usan el mapa (relleno y pill), el mapa de edición y el
  * glosario, para que todo diga lo mismo.
  */
-export const USO: Record<Uso, { label: string; color: string }> = {
-  ganadero: { label: 'Ganadero', color: '#3f9d52' }, // verde
-  agricola: { label: 'Agrícola', color: '#c6871a' }, // ámbar
-  vacio: { label: 'Vacío', color: '#7d8a93' }, // gris
-}
+// Fuente única en `campos/labels`; se reexporta porque media app la
+// importa desde acá (patrón del repo: componente + helpers del módulo).
+export { USO }
 
 /**
  * Estilo del swatch del glosario — replica el relleno del mapa: base con el

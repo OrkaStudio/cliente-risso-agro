@@ -22,7 +22,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { estadoCicloLabel } from '@/features/campos/labels'
+import { USO } from '@/features/campos/labels'
+import { usoDeEstado } from '@/features/campos/use-campo-mapa'
 import { cn } from '@/lib/utils'
 import { useRecorrida, type RecPotrero } from './recorrida/use-recorrida'
 import { Croquis } from './recorrida/croquis'
@@ -640,7 +641,7 @@ function ParteScreen({
 }) {
   const cicloTxt = potrero.eliminado
     ? 'Ya no existe en Oficina — tu observación se conserva'
-    : estadoCicloLabel[potrero.estado_ciclo]
+    : USO[usoDeEstado(potrero.estado_ciclo)].label
   const obs = r.obsPorPotrero.get(potrero.id)
   const yaCargado = obs != null
 

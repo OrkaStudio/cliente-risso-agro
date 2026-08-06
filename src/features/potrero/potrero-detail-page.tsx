@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Beef,
@@ -6,18 +6,14 @@ import {
   LandPlot,
   Layers,
   Scale,
-  Sprout,
   TrendingUp,
 } from 'lucide-react'
 import { coloresPorCategoria, categoriaLabel } from '@/features/hacienda/labels'
 import { ComposicionView } from '@/features/hacienda/composicion-view'
 import { CargaMasivaDialog } from '@/features/hacienda/carga-masiva-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  estadoCicloColor,
-  estadoCicloLabel,
-  tipoCampoLabel,
-} from '@/features/campos/labels'
+import { USO, tipoCampoLabel } from '@/features/campos/labels'
+import { usoDeEstado } from '@/features/campos/use-campo-mapa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { CargarDialog } from '@/features/analitica/cargar-dialog'
@@ -30,7 +26,6 @@ import {
 } from '@/features/analitica/compute'
 import { usePotreroDetalle } from '@/features/potrero/hooks'
 import type { PotreroDetalle } from '@/features/potrero/api'
-import { CultivoDialog } from '@/features/potrero/cultivo-dialog'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 
@@ -183,53 +178,6 @@ function StockCategoria({ d }: { d: PotreroDetalle }) {
 }
 
 /* ===== Campaña agrícola (cultivo + fechas, carga manual) ===== */
-function CampoStat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-faint">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold text-ink">{children}</div>
-    </div>
-  )
-}
-
-function CampanaAgricola({ d }: { d: PotreroDetalle }) {
-  const tiene = Boolean(
-    d.cultivo || d.fechaSiembra || d.fechaCosechaEstimada || d.variedad,
-  )
-  return (
-    <Panel
-      title="Campaña agrícola"
-      action={
-        <CultivoDialog potrero={d} triggerLabel={tiene ? 'Editar' : '+ Cargar'} />
-      }
-    >
-      {tiene ? (
-        <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
-          <CampoStat label="Cultivo">
-            <span className="inline-flex items-center gap-2">
-              <Sprout className="size-[18px] text-field" />
-              {d.cultivo ?? '—'}
-            </span>
-          </CampoStat>
-          {d.variedad && <CampoStat label="Variedad">{d.variedad}</CampoStat>}
-          <CampoStat label="Siembra">
-            <span className="tnum">{fmtFecha(d.fechaSiembra) ?? '—'}</span>
-          </CampoStat>
-          <CampoStat label="Cosecha estimada">
-            <span className="tnum">{fmtFecha(d.fechaCosechaEstimada) ?? '—'}</span>
-          </CampoStat>
-        </div>
-      ) : (
-        <p className="py-1 text-sm text-muted-foreground">
-          Sin campaña cargada. Cargá el cultivo, la variedad y las fechas de
-          siembra y cosecha.
-        </p>
-      )}
-    </Panel>
-  )
-}
 
 export function PotreroDetailPage() {
   const { id = '' } = useParams()
@@ -308,15 +256,15 @@ export function PotreroDetailPage() {
             <span
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-heading text-[12px] font-bold"
               style={{
-                color: estadoCicloColor[data.estadoCiclo],
-                background: `color-mix(in srgb, ${estadoCicloColor[data.estadoCiclo]} 14%, transparent)`,
+                color: USO[usoDeEstado(data.estadoCiclo)].color,
+                background: `color-mix(in srgb, ${USO[usoDeEstado(data.estadoCiclo)].color} 14%, transparent)`,
               }}
             >
               <span
                 className="size-1.5 rounded-full"
-                style={{ background: estadoCicloColor[data.estadoCiclo] }}
+                style={{ background: USO[usoDeEstado(data.estadoCiclo)].color }}
               />
-              {estadoCicloLabel[data.estadoCiclo]}
+              {USO[usoDeEstado(data.estadoCiclo)].label}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -518,7 +466,6 @@ export function PotreroDetailPage() {
       </Panel>
 
       {/* Campaña agrícola */}
-      <CampanaAgricola d={data} />
 
       {/* Stock + animales */}
       <Panel title="Stock por categoría" sub={`${data.totalCabezas} cabezas`}>

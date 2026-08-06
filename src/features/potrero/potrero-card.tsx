@@ -5,7 +5,8 @@ import { Beef, LandPlot, Leaf, Sprout, Tractor, Wheat } from 'lucide-react'
 import { Contador } from '@/components/contador'
 import type { Database } from '@/lib/supabase/types'
 import { coloresPorCategoria, categoriaNombre } from '@/features/hacienda/labels'
-import { estadoCicloColor, estadoCicloLabel } from '@/features/campos/labels'
+import { USO } from '@/features/campos/labels'
+import { usoDeEstado } from '@/features/campos/use-campo-mapa'
 
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
 
@@ -79,7 +80,8 @@ function densidadLabel(d: number): string {
 export function PotreroCard({ p }: { p: PotreroCardData }) {
   const densidad =
     p.hectareas && p.hectareas > 0 ? p.cabezas / p.hectareas : null
-  const color = estadoCicloColor[p.estadoCiclo]
+  const uso = usoDeEstado(p.estadoCiclo)
+  const color = USO[uso].color
   const totalComp = p.porCategoria.reduce((s, c) => s + c.cabezas, 0)
   const colores = coloresPorCategoria(p.porCategoria.map((c) => c.categoria))
   const conHacienda = p.cabezas > 0 && totalComp > 0
@@ -107,7 +109,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
           }}
         >
           <span className="size-1.5 rounded-full" style={{ background: color }} />
-          {estadoCicloLabel[p.estadoCiclo]}
+          {USO[uso].label}
         </span>
       </div>
 
@@ -176,7 +178,7 @@ export function PotreroCard({ p }: { p: PotreroCardData }) {
             </span>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">
-                {p.cultivo ?? estadoCicloLabel[p.estadoCiclo]}
+                {p.cultivo ?? USO[uso].label}
               </div>
               <div className="text-xs text-faint">sin hacienda</div>
             </div>
