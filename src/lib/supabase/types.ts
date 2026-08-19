@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -644,6 +644,64 @@ export type Database = {
           },
           {
             foreignKeyName: "lote_potrero_potrero_id_fkey"
+            columns: ["potrero_id"]
+            isOneToOne: false
+            referencedRelation: "potrero"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marca_senal: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          estado: Database["public"]["Enums"]["estado_marca"]
+          id: string
+          nota: string | null
+          observacion_id: string
+          potrero_id: string
+          tipo_senal: Database["public"]["Enums"]["tipo_senal"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          estado: Database["public"]["Enums"]["estado_marca"]
+          id?: string
+          nota?: string | null
+          observacion_id: string
+          potrero_id: string
+          tipo_senal: Database["public"]["Enums"]["tipo_senal"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          estado?: Database["public"]["Enums"]["estado_marca"]
+          id?: string
+          nota?: string | null
+          observacion_id?: string
+          potrero_id?: string
+          tipo_senal?: Database["public"]["Enums"]["tipo_senal"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marca_senal_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marca_senal_observacion_id_fkey"
+            columns: ["observacion_id"]
+            isOneToOne: false
+            referencedRelation: "observacion_potrero"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marca_senal_potrero_id_fkey"
             columns: ["potrero_id"]
             isOneToOne: false
             referencedRelation: "potrero"
@@ -1372,6 +1430,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      marcar_senal: {
+        Args: {
+          p_empresa_id: string
+          p_estado: Database["public"]["Enums"]["estado_marca"]
+          p_nota?: string
+          p_observacion_id: string
+          p_potrero_id: string
+          p_tipo: Database["public"]["Enums"]["tipo_senal"]
+        }
+        Returns: string
+      }
       mover_animales: {
         Args: {
           p_alta_id?: string
@@ -1443,6 +1512,7 @@ export type Database = {
         | "cultivo"
         | "cosecha"
         | "rastrojo"
+      estado_marca: "resuelto" | "sigue"
       estado_movimiento: "pendiente" | "liquidado" | "anulado"
       fuente_lluvia: "manual" | "open_meteo"
       medio_pago:
@@ -1484,6 +1554,14 @@ export type Database = {
         | "corte_forraje"
         | "cosecha"
       tipo_movimiento: "ingreso" | "gasto"
+      tipo_senal:
+        | "agua"
+        | "pasto"
+        | "electrico"
+        | "cultivo"
+        | "conteo"
+        | "tratamiento"
+        | "novedad"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1651,6 +1729,7 @@ export const Constants = {
         "cosecha",
         "rastrojo",
       ],
+      estado_marca: ["resuelto", "sigue"],
       estado_movimiento: ["pendiente", "liquidado", "anulado"],
       fuente_lluvia: ["manual", "open_meteo"],
       medio_pago: [
@@ -1696,6 +1775,15 @@ export const Constants = {
         "cosecha",
       ],
       tipo_movimiento: ["ingreso", "gasto"],
+      tipo_senal: [
+        "agua",
+        "pasto",
+        "electrico",
+        "cultivo",
+        "conteo",
+        "tratamiento",
+        "novedad",
+      ],
     },
   },
 } as const

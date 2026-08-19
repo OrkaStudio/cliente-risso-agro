@@ -1,357 +1,287 @@
 import * as React from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  CalendarClock,
-  CheckCircle2,
-  Droplets,
-  Footprints,
-  HeartPulse,
-  ListChecks,
-  Sprout,
-  StickyNote,
-  Wheat,
-  Zap,
-} from 'lucide-react'
-import { categoriaNombre } from '@/features/hacienda/labels'
-import { supabase } from '@/lib/supabase/client'
+import { CalendarClock, Check, CheckCircle2, ChevronDown, Footprints, RotateCw } from 'lucide-react'
+
+type Estado = 'resuelto' | 'sigue'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
+import { nivelUI } from '@/features/inicio/para-atender-ui'
+import { useEmpresa } from '@/features/empresa/use-empresa'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  invalidarAvisos,
+  useDeshacerMarca,
+  useMarcarSenal,
+} from '@/features/inicio/marcar-senal'
+import {
+  type Aviso,
+  type Nivel,
+  type PotreroAtencion,
+  haceLabel,
+  useParaAtender,
+} from '@/features/inicio/para-atender-api'
 
-/* Umbrales de la sección (ajustables): una observación más vieja que esto ya
- * no es "estado actual" (el aviso pasa a ser "hace N días sin recorrer");
- * las novedades son notas de diario y caducan antes. */
-const OBS_VIGENTE_DIAS = 30
-const NOVEDAD_VIGENTE_DIAS = 14
-const RECORRER_CADA_DIAS = 7
-/* El conteo se compara contra el stock de HOY: solo vale muy fresco (si pasaron
- * días pudo haber movimientos de hacienda y la comparación miente). */
-const CONTEO_VIGENTE_DIAS = 3
-/* Nacimientos anotados en la recorrida: el aviso vive hasta que se caravanean
- * en la manga, pero no para siempre. Dos semanas es lo que tarda una marcada. */
-const NACIMIENTO_VIGENTE_DIAS = 14
 
-const MS_DIA = 86400000
-const diasDesde = (fecha: string): number => {
-  const [y, m, d] = fecha.split('-').map(Number)
-  return Math.max(0, Math.round((Date.now() - new Date(y, m - 1, d).getTime()) / MS_DIA))
-}
-const haceLabel = (d: number): string =>
-  d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`
+const fmtNum = new Intl.NumberFormat('es-AR')
 
-type Nivel = 'atender' | 'prevenir' | 'nota'
-
-type Atencion = {
-  key: string
-  nivel: Nivel
-  icon: typeof Droplets
-  titulo: string
-  /** "1A · La Porteña" (o el campo, para los avisos de recorrida). */
-  donde: string
-  /** Nombre del campo, para el filtro. */
-  campo: string
-  /** Texto extra (la novedad anotada). */
-  detalle?: string
-  /** Días desde que se vio. */
-  hace: number
-  /** Aviso sin fecha propia (ej: campo nunca recorrido) — el chip no muestra "hoy". */
-  sinFecha?: boolean
-  to: string
-}
-
-/** Un día de nacimientos en un potrero. NO es un aviso: es una novedad. */
-type Nacimientos = {
-  key: string
-  potrero: string
-  campo: string
-  total: number
-  /** "2 terneros y 1 ternera" */
-  detalle: string
-  /** Fecha EXACTA del hecho, dd/mm. Un "hace N días" acá era engañoso: la
-   *  fecha viene del campo y envejece sola en pantalla. */
-  fecha: string
-  /** Para ordenar por recencia. */
-  orden: string
-}
-
-type ParaAtenderData = {
-  items: Atencion[]
-  /** Aparte de los avisos: en la lista ordenada por urgencia quedaban últimos
-   *  y cortados, o sea invisibles. Un nacimiento no compite con "aguada seca". */
-  nacimientos: Nacimientos[]
-  /** Días desde la última recorrida de la empresa (null = nunca hubo). */
-  ultimaRecorridaHace: number | null
+/**
+ * Una fila = un potrero, con sus señales adentro. El ícono, el color y la
+ * posición los pone la señal más grave; las demás se listan al lado para que
+ * se vea de un saque todo lo que hay que hacer en ese viaje.
+ */
+/**
+ * Botón de decisión, con el lenguaje del Modo Campo (`CSegBtn` de la manga):
+ * dos opciones parejas con borde marcado, que se RELLENAN con su tono cuando se
+ * eligen. No es "acción principal + escape": son dos declaraciones con el mismo
+ * rango, y el productor tiene que ver cuál eligió.
+ */
+function DecisionBtn({
+  tono,
+  icon: Icon,
+  label,
+  elegido,
+  apagado,
+  disabled,
+  onClick,
+}: {
+  tono: 'ok' | 'warn'
+  icon: typeof Check
+  label: string
+  elegido: boolean
+  apagado: boolean
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={elegido}
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-[11.5px] font-bold transition-all active:scale-[0.97] disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft',
+        elegido
+          ? tono === 'ok'
+            ? 'border-field bg-field text-white shadow-[0_1px_3px_rgba(16,30,20,0.12)]'
+            : 'border-sol-deep bg-sol-deep text-white shadow-[0_1px_3px_rgba(16,30,20,0.12)]'
+          : apagado
+            ? 'border-border/60 bg-card text-faint opacity-50'
+            : tono === 'ok'
+              ? 'border-border bg-card text-ink hover:border-field/60 hover:bg-field/[0.06]'
+              : 'border-border bg-card text-ink hover:border-sol-deep/50 hover:bg-sol-soft',
+      )}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </button>
+  )
 }
 
 /**
- * Junta la última observación de cada potrero (recorridas del Modo Campo) y
- * la traduce a avisos accionables: qué falta, qué prevenir, qué atender.
+ * Las señales de un potrero, cada una con su declaración.
+ *
+ * Va POR SEÑAL y no por fila: un potrero con aguada seca, eléctrico cortado y
+ * pasto pelado no puede apagarse entero porque arreglaste la bomba.
+ *
+ * Marcar NO recarga la lista al instante: si el aviso desapareciera en el
+ * momento, el productor no vería confirmación de nada — la fila se esfuma y
+ * queda la duda de si se guardó. En vez de eso el botón elegido queda relleno,
+ * con un "Deshacer" al lado, y la lista se actualiza cuando cierra el potrero.
  */
-async function getParaAtender(): Promise<ParaAtenderData> {
-  const [obsRes, recRes, potRes, stockRes, nacRes] = await Promise.all([
-    supabase
-      .from('observacion_potrero')
-      .select(
-        'potrero_id, pasto, agua, electrico, conteo, en_tratamiento, novedad, cultivo, created_at, recorrida:recorrida_id(fecha)',
-      )
-      .order('created_at', { ascending: false })
-      .limit(1000),
-    supabase.from('recorrida').select('campo_id, fecha').order('fecha', { ascending: false }),
-    supabase.from('potrero').select('id, nombre, campo:campo(id, nombre)'),
-    supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
-    // Nacimientos declarados en el campo: el evento 'alta' que dejó la
-    // recorrida (`origen_ui`), con la categoría real del animal creado.
-    supabase
-      .from('evento')
-      .select('fecha, datos, animal:animal_id(categoria, potrero_id)')
-      .eq('tipo', 'alta')
-      .contains('datos', { origen_ui: 'recorrida' })
-      .order('fecha', { ascending: false })
-      .limit(500),
-  ])
-  if (obsRes.error) throw new Error(obsRes.error.message)
-  if (recRes.error) throw new Error(recRes.error.message)
-  if (potRes.error) throw new Error(potRes.error.message)
-  if (stockRes.error) throw new Error(stockRes.error.message)
-  if (nacRes.error) throw new Error(nacRes.error.message)
+function SenalesDelPotrero({ p, empresaId }: { p: PotreroAtencion; empresaId: string }) {
+  const qc = useQueryClient()
+  const marcar = useMarcarSenal()
+  const deshacer = useDeshacerMarca()
+  const [hechas, setHechas] = React.useState<Record<string, { id: string; estado: Estado }>>({})
+  const [enCurso, setEnCurso] = React.useState<string | null>(null)
 
-  const potreros = new Map(
-    (potRes.data ?? []).map((p) => {
-      const campo = p.campo as { id: string; nombre: string } | null
-      return [
-        p.id,
-        { nombre: p.nombre, campoId: campo?.id ?? '', campoNombre: campo?.nombre ?? '' },
-      ]
-    }),
-  )
-  const stock = new Map(
-    (stockRes.data ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
-  )
+  /* Al cerrar el potrero (o irse del Inicio) recién ahí se refresca: lo marcado
+   * ya se vio confirmado y se pudo deshacer. */
+  React.useEffect(() => () => invalidarAvisos(qc, p.key), [qc, p.key])
 
-  const items: Atencion[] = []
-
-  // ── Avisos por potrero: la última observación conocida de cada uno ──
-  const vistos = new Set<string>()
-  for (const o of obsRes.data ?? []) {
-    if (vistos.has(o.potrero_id)) continue
-    vistos.add(o.potrero_id)
-
-    const p = potreros.get(o.potrero_id)
-    if (!p) continue
-    const fecha = o.recorrida?.fecha ?? o.created_at.slice(0, 10)
-    const hace = diasDesde(fecha)
-    if (hace > OBS_VIGENTE_DIAS) continue // ya no es estado actual
-
-    const donde = `${p.nombre} · ${p.campoNombre}`
-    const to = `/potrero/${o.potrero_id}`
-    const base = { donde, campo: p.campoNombre, hace, to }
-
-    if (o.agua === 'seca')
-      items.push({ ...base, key: `${o.potrero_id}-agua`, nivel: 'atender', icon: Droplets, titulo: 'Aguada seca' })
-    else if (o.agua === 'baja')
-      items.push({ ...base, key: `${o.potrero_id}-agua`, nivel: 'prevenir', icon: Droplets, titulo: 'Aguada baja' })
-
-    if (o.pasto === 'pelado')
-      items.push({ ...base, key: `${o.potrero_id}-pasto`, nivel: 'atender', icon: Sprout, titulo: 'Potrero pelado' })
-    else if (o.pasto === 'escaso')
-      items.push({ ...base, key: `${o.potrero_id}-pasto`, nivel: 'prevenir', icon: Sprout, titulo: 'Pasto escaso' })
-
-    if (o.electrico === 'cortado')
-      items.push({ ...base, key: `${o.potrero_id}-elec`, nivel: 'atender', icon: Zap, titulo: 'Eléctrico cortado' })
-
-    if (o.cultivo === 'mal')
-      items.push({ ...base, key: `${o.potrero_id}-cult`, nivel: 'atender', icon: Wheat, titulo: 'Cultivo mal' })
-    else if (o.cultivo === 'regular')
-      items.push({ ...base, key: `${o.potrero_id}-cult`, nivel: 'prevenir', icon: Wheat, titulo: 'Cultivo regular' })
-
-    if (o.en_tratamiento)
-      items.push({ ...base, key: `${o.potrero_id}-trat`, nivel: 'prevenir', icon: HeartPulse, titulo: 'Animales en tratamiento' })
-
-    const esperadas = stock.get(o.potrero_id) ?? 0
-    if (
-      o.conteo != null &&
-      o.conteo > 0 &&
-      esperadas > 0 &&
-      o.conteo < esperadas &&
-      hace <= CONTEO_VIGENTE_DIAS
+  const declarar = (a: Aviso, estado: Estado) => {
+    if (hechas[a.key]) return
+    setEnCurso(a.key)
+    marcar.mutate(
+      { empresaId, potreroId: p.key, observacionId: p.observacionId, tipo: a.tipo, estado },
+      {
+        onSuccess: (id) => setHechas((h) => ({ ...h, [a.key]: { id, estado } })),
+        onSettled: () => setEnCurso(null),
+      },
     )
-      items.push({
-        ...base,
-        key: `${o.potrero_id}-conteo`,
-        nivel: 'atender',
-        icon: ListChecks,
-        titulo: `Conteo bajo: ${o.conteo} de ${esperadas}`,
-      })
-
-    if (o.novedad?.trim() && hace <= NOVEDAD_VIGENTE_DIAS)
-      items.push({
-        ...base,
-        key: `${o.potrero_id}-nov`,
-        nivel: 'nota',
-        icon: StickyNote,
-        titulo: 'Novedad anotada',
-        detalle: o.novedad.trim(),
-      })
   }
 
-  // ── Nacimientos anotados en el campo ──
-  // Agrupados por potrero y día: al productor le importa "el lunes nacieron 3
-  // en el 11B", no tres filas sueltas. Van APARTE de los avisos.
-  const porPotreroDia = new Map<
-    string,
-    { potreroId: string; fecha: string; cats: Map<string, number> }
-  >()
-  for (const ev of nacRes.data ?? []) {
-    const animal = ev.animal as { categoria: string; potrero_id: string | null } | null
-    if (!animal?.potrero_id) continue
-    if (diasDesde(ev.fecha) > NACIMIENTO_VIGENTE_DIAS) continue
-    const k = `${animal.potrero_id}-${ev.fecha}`
-    const g =
-      porPotreroDia.get(k) ??
-      { potreroId: animal.potrero_id, fecha: ev.fecha, cats: new Map<string, number>() }
-    g.cats.set(animal.categoria, (g.cats.get(animal.categoria) ?? 0) + 1)
-    porPotreroDia.set(k, g)
-  }
-  const nacimientos: Nacimientos[] = []
-  for (const g of porPotreroDia.values()) {
-    const p = potreros.get(g.potreroId)
-    if (!p) continue
-    const [yy, mm, dd] = g.fecha.split('-')
-    nacimientos.push({
-      key: `${g.potreroId}-nac-${g.fecha}`,
-      potrero: p.nombre,
-      campo: p.campoNombre,
-      total: [...g.cats.values()].reduce((a, b) => a + b, 0),
-      detalle: [...g.cats.entries()]
-        .map(([cat, n]) => `${n} ${categoriaNombre(cat as never, n).toLocaleLowerCase('es')}`)
-        .join(' y '),
-      fecha: `${dd}/${mm}/${yy.slice(2)}`,
-      orden: g.fecha,
+  const anular = (avisoKey: string, id: string) =>
+    deshacer.mutate(id, {
+      onSuccess: () =>
+        setHechas((h) => {
+          const resto = { ...h }
+          delete resto[avisoKey]
+          return resto
+        }),
     })
-  }
-  nacimientos.sort((a, b) => b.orden.localeCompare(a.orden))
 
-  // ── Avisos por campo: hace cuánto no se recorre ──
-  const ultimaPorCampo = new Map<string, string>()
-  for (const r of recRes.data ?? []) {
-    if (r.campo_id && !ultimaPorCampo.has(r.campo_id)) ultimaPorCampo.set(r.campo_id, r.fecha)
-  }
-  // Campos con hacienda (los vacíos no piden recorrida)
-  const camposConHacienda = new Map<string, string>()
-  for (const [id, p] of potreros) {
-    if ((stock.get(id) ?? 0) > 0 && p.campoId) camposConHacienda.set(p.campoId, p.campoNombre)
-  }
-  for (const [campoId, campoNombre] of camposConHacienda) {
-    const ultima = ultimaPorCampo.get(campoId)
-    const hace = ultima ? diasDesde(ultima) : null
-    if (hace == null) {
-      items.push({
-        key: `${campoId}-rec`,
-        nivel: 'prevenir',
-        icon: Footprints,
-        titulo: 'Sin recorridas todavía',
-        donde: campoNombre,
-        campo: campoNombre,
-        hace: 0,
-        sinFecha: true,
-        to: '/campos',
-      })
-    } else if (hace > RECORRER_CADA_DIAS) {
-      items.push({
-        key: `${campoId}-rec`,
-        nivel: 'prevenir',
-        icon: CalendarClock,
-        titulo: `${haceLabel(hace).replace('hace', 'Hace')} sin recorrer`,
-        donde: campoNombre,
-        campo: campoNombre,
-        hace,
-        to: '/campos',
-      })
-    }
-  }
-
-  const peso: Record<Nivel, number> = { atender: 0, prevenir: 1, nota: 2 }
-  items.sort((a, b) => peso[a.nivel] - peso[b.nivel] || a.hace - b.hace)
-
-  const fechas = (recRes.data ?? []).map((r) => r.fecha)
-  return {
-    items,
-    nacimientos,
-    ultimaRecorridaHace: fechas.length ? diasDesde(fechas[0]) : null,
-  }
+  return (
+    <div className="mt-2.5 flex flex-col gap-1 border-t border-border/60 pt-2.5">
+      {p.avisos.map((a) => {
+        const hecha = hechas[a.key]
+        const ocupado = enCurso === a.key
+        return (
+          <motion.div
+            key={a.key}
+            animate={hecha ? { scale: [0.985, 1] } : {}}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className={cn(
+              'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2 transition-colors',
+              hecha
+                ? hecha.estado === 'resuelto'
+                  ? 'bg-field/[0.06]'
+                  : 'bg-sol-soft/60'
+                : 'hover:bg-secondary/50',
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'size-1.5 shrink-0 rounded-full',
+                hecha?.estado === 'resuelto' ? 'bg-field' : nivelUI[a.nivel].punto,
+              )}
+            />
+            <span className="min-w-0 flex-1 text-[12.5px] text-ink">
+              {a.titulo}
+              {/* La novedad SIN su texto no dice nada: "Novedad" no es un aviso,
+                  "Vaca caída" sí. */}
+              {a.detalle && (
+                <span className="text-muted-foreground">
+                  {a.nivel === 'nota' ? ` — “${a.detalle}”` : ` (${a.detalle})`}
+                </span>
+              )}
+              {a.revisadoHace != null && !hecha && (
+                <span className="text-faint"> · revisado {haceLabel(a.revisadoHace)}</span>
+              )}
+            </span>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <DecisionBtn
+                tono="ok"
+                icon={Check}
+                label="Se solucionó"
+                elegido={hecha?.estado === 'resuelto'}
+                apagado={hecha?.estado === 'sigue'}
+                disabled={ocupado || !!hecha}
+                onClick={() => declarar(a, 'resuelto')}
+              />
+              <DecisionBtn
+                tono="warn"
+                icon={RotateCw}
+                label="Sigue igual"
+                elegido={hecha?.estado === 'sigue'}
+                apagado={hecha?.estado === 'resuelto'}
+                disabled={ocupado || !!hecha}
+                onClick={() => declarar(a, 'sigue')}
+              />
+              {hecha && (
+                <button
+                  type="button"
+                  onClick={() => anular(a.key, hecha.id)}
+                  className="rounded px-1.5 py-0.5 text-[11.5px] font-semibold text-muted-foreground underline underline-offset-2 transition-colors hover:text-ink"
+                >
+                  Deshacer
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )
+      })}
+      {(marcar.isError || deshacer.isError) && (
+        <p className="px-2 pt-1 text-[11.5px] text-destructive">
+          No se pudo guardar: {((marcar.error ?? deshacer.error) as Error).message}
+        </p>
+      )}
+    </div>
+  )
 }
 
-const nivelUI: Record<Nivel, { icono: string; chip: string; label: string }> = {
-  atender: {
-    icono: 'bg-destructive/10 text-destructive',
-    chip: 'bg-destructive/10 text-destructive',
-    label: 'Atender',
-  },
-  prevenir: {
-    icono: 'bg-sol-soft text-sol-deep',
-    chip: 'bg-sol-soft text-sol-deep',
-    label: 'Prevenir',
-  },
-  nota: {
-    icono: 'bg-sky-soft text-sky',
-    chip: 'bg-secondary text-muted-foreground',
-    label: 'Nota',
-  },
-}
-
-function AtencionRow({ a, i }: { a: Atencion; i: number }) {
-  const ui = nivelUI[a.nivel]
-  const Icon = a.icon
+function PotreroRow({
+  p,
+  i,
+  abierta,
+  onToggle,
+  empresaId,
+}: {
+  p: PotreroAtencion
+  i: number
+  abierta: boolean
+  onToggle: () => void
+  empresaId: string
+}) {
+  const ui = nivelUI[p.nivel]
+  const Icon = p.avisos[0].icon
+  const nota = p.avisos.find((a) => a.nivel === 'nota' && a.detalle)
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3, ease: 'easeOut' }}
+      className={cn(
+        'rounded-xl border bg-card px-3.5 py-3 transition-all',
+        abierta ? 'border-faint shadow-[0_6px_18px_rgba(16,24,19,0.08)]' : 'border-border/70',
+      )}
     >
-      <Link
-        to={a.to}
-        className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 transition-all hover:-translate-y-px hover:border-faint hover:shadow-[0_6px_18px_rgba(16,24,19,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={abierta}
+        className="flex w-full items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
       >
-        <span
-          className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-xl',
-            ui.icono,
-          )}
-        >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
           <Icon className="size-[18px]" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <span className="truncate text-[13.5px] font-semibold text-ink">
-              {a.titulo}
-            </span>
-            <span className="shrink-0 text-[12px] font-medium text-faint">
-              {a.donde}
-            </span>
+            <span className="truncate text-[13.5px] font-semibold text-ink">{p.potrero}</span>
+            <span className="truncate text-[12px] font-medium text-faint">{p.campo}</span>
+            {p.cabezas > 0 && (
+              <span className="tnum shrink-0 text-[12px] font-semibold text-muted-foreground">
+                {fmtNum.format(p.cabezas)} {p.cabezas === 1 ? 'animal' : 'animales'}
+              </span>
+            )}
           </div>
-          {a.detalle && (
-            <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
-              “{a.detalle}”
+          <div className="mt-1 text-[12px] text-ink">
+            {p.avisos.map((a, n) => (
+              <React.Fragment key={a.key}>
+                {n > 0 && <span aria-hidden className="px-1.5 text-faint">·</span>}
+                {a.titulo}
+                {a.detalle && a.nivel !== 'nota' && (
+                  <span className="text-faint"> ({a.detalle})</span>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+          {/* Abierta, la novedad ya se lee completa en su propia fila con sus
+              botones: repetirla acá era decir dos veces lo mismo. */}
+          {nota?.detalle && !abierta && (
+            <div className="mt-1 truncate text-[12px] text-muted-foreground">
+              “{nota.detalle}”
             </div>
           )}
         </div>
-        <span
-          className={cn(
-            'tnum shrink-0 rounded-md px-2 py-1 text-[11px] font-bold',
-            ui.chip,
-          )}
-        >
-          {a.sinFecha
-            ? ui.label
-            : a.nivel === 'nota' || a.titulo.startsWith('Hace')
-              ? haceLabel(a.hace)
-              : `${ui.label} · ${haceLabel(a.hace)}`}
+        <span className={cn('tnum shrink-0 rounded-md px-2 py-1 text-[11px] font-bold', ui.chip)}>
+          {ui.label} · {haceLabel(p.hace)}
         </span>
-      </Link>
+        {/* Única pista permanente de que la fila hace algo. */}
+        <ChevronDown
+          aria-hidden
+          className={cn('size-4 shrink-0 text-faint transition-transform', abierta && 'rotate-180')}
+        />
+      </button>
+      {abierta && <SenalesDelPotrero p={p} empresaId={empresaId} />}
     </motion.div>
   )
 }
+
+/** La primera visita abre la primera fila, para que los botones se vean una vez. */
+const BOTONES_VISTOS = 'para-atender-botones-vistos'
 
 /** Cuántas filas se muestran antes del "Mostrar los N restantes". */
 const FILAS_VISIBLES = 6
@@ -387,45 +317,75 @@ function ChipFiltro({
 
 /**
  * "Para atender en el campo": traduce las recorridas del Modo Campo a avisos
- * accionables en el Inicio — qué falta (aguadas, pasto, eléctrico), qué
- * prevenir (tratamientos, campos sin recorrer) y las novedades anotadas.
- * Con muchos avisos la lista se filtra por nivel y por campo, y se corta en
- * FILAS_VISIBLES con "Mostrar los N restantes" — que no sea un chorizo.
+ * accionables en el Inicio, AGRUPADOS POR POTRERO — una fila es un lugar al que
+ * ir, con todo lo que pasa ahí adentro. Ordenados por gravedad de la peor señal,
+ * después por cuántos animales hay en juego, después por lo que lleva más tiempo
+ * sin resolverse. Los campos sin recorrer y los nacimientos van aparte.
  */
 export function ParaAtenderCampo() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['para-atender-campo'],
-    queryFn: getParaAtender,
-  })
+  const { data, isLoading, error } = useParaAtender()
 
+
+  const empresaId = useEmpresa().data?.empresa_id ?? ''
+
+  /* Educar sin explicar: la PRIMERA vez, la primera fila viene abierta y los
+   * botones se muestran solos. Después el chevron alcanza. Un cartel de "tocá
+   * para ver qué podés hacer" sería ruido permanente para algo que se aprende
+   * una vez. Estado (no ref) porque se lee durante el render. */
+  const [abierta, setAbierta] = React.useState<string | null | undefined>(undefined)
+  const [primeraVez] = React.useState(() => {
+    try {
+      return localStorage.getItem(BOTONES_VISTOS) !== '1'
+    } catch {
+      return false
+    }
+  })
   const [nivel, setNivel] = React.useState<'todos' | Nivel>('todos')
   const [campo, setCampo] = React.useState<string>('todos')
   const [verTodo, setVerTodo] = React.useState(false)
 
-  const items = React.useMemo(() => data?.items ?? [], [data])
+  const potreros = React.useMemo(() => data?.potreros ?? [], [data])
+  // El efecto sólo escribe storage: nada de setState acá.
+  React.useEffect(() => {
+    if (!primeraVez || potreros.length === 0) return
+    try {
+      localStorage.setItem(BOTONES_VISTOS, '1')
+    } catch {
+      /* sin storage: se vuelve a mostrar la próxima vez, no es grave */
+    }
+  }, [primeraVez, potreros.length])
+  const abiertaKey =
+    abierta !== undefined ? abierta : primeraVez ? (potreros[0]?.key ?? null) : null
+  const sinRecorrer = React.useMemo(() => data?.sinRecorrer ?? [], [data])
   const campos = React.useMemo(
-    () => [...new Set(items.map((a) => a.campo))].sort(),
-    [items],
+    () =>
+      [...new Set([...potreros.map((p) => p.campo), ...sinRecorrer.map((c) => c.campo)])].sort(),
+    [potreros, sinRecorrer],
   )
-  // Conteos por nivel dentro del campo elegido (los chips cuentan lo que verías).
   const delCampo = React.useMemo(
-    () => (campo === 'todos' ? items : items.filter((a) => a.campo === campo)),
-    [items, campo],
+    () => (campo === 'todos' ? potreros : potreros.filter((p) => p.campo === campo)),
+    [potreros, campo],
   )
+  // Los chips cuentan POTREROS que tienen al menos una señal de ese nivel:
+  // "3 potreros para atender" es la unidad de trabajo, no "7 señales".
   const conteo = React.useMemo(() => {
     const c: Record<Nivel, number> = { atender: 0, prevenir: 0, nota: 0 }
-    for (const a of delCampo) c[a.nivel]++
+    for (const p of delCampo)
+      for (const n of new Set(p.avisos.map((a) => a.nivel))) c[n]++
     return c
   }, [delCampo])
   const filtrados =
-    nivel === 'todos' ? delCampo : delCampo.filter((a) => a.nivel === nivel)
+    nivel === 'todos' ? delCampo : delCampo.filter((p) => p.avisos.some((a) => a.nivel === nivel))
   const visibles = verTodo ? filtrados : filtrados.slice(0, FILAS_VISIBLES)
   const restantes = filtrados.length - visibles.length
+  const sinRecorrerDelCampo =
+    campo === 'todos' ? sinRecorrer : sinRecorrer.filter((c) => c.campo === campo)
+  const hayAlgo = potreros.length > 0 || sinRecorrer.length > 0
 
   return (
     <Panel
       title="Para atender en el campo"
-      info="Lo que dejaron las últimas recorridas: aguadas y pasto al límite, eléctrico cortado, animales en tratamiento, conteos que no cierran y campos sin recorrer. Tocá un aviso para ir al potrero."
+      info="Lo que dejaron las últimas recorridas, agrupado por potrero: aguadas y pasto al límite, eléctrico cortado, animales en tratamiento y conteos que no cierran. Arriba, lo más grave y donde hay más animales en juego. Tocá una fila para ir al potrero."
     >
       {/* Novedades del campo. Fuera de la lista de avisos: ahí quedaban últimas
           (nivel `nota`) y cortadas por FILAS_VISIBLES, o sea invisibles.
@@ -440,9 +400,7 @@ export function ParaAtenderCampo() {
           <ul className="mt-2 flex flex-col gap-1.5">
             {data!.nacimientos.map((n) => (
               <li key={n.key} className="flex items-baseline gap-2.5 text-sm">
-                <span className="tnum shrink-0 text-base font-bold text-ink">
-                  {n.total}
-                </span>
+                <span className="tnum shrink-0 text-base font-bold text-ink">{n.total}</span>
                 <span className="min-w-0 flex-1 text-ink">
                   {n.detalle}
                   <span className="text-faint"> · {n.potrero}</span>
@@ -479,7 +437,7 @@ export function ParaAtenderCampo() {
             </p>
           </div>
         </div>
-      ) : data.items.length === 0 ? (
+      ) : !hayAlgo ? (
         <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4">
           <CheckCircle2 className="size-6 shrink-0 text-field/70" />
           <div>
@@ -495,7 +453,7 @@ export function ParaAtenderCampo() {
         <div className="flex flex-col gap-3">
           {/* Filtros: nivel a la izquierda, campo a la derecha. Solo aparecen
               cuando la lista lo amerita (pocas filas no piden filtro). */}
-          {items.length > FILAS_VISIBLES && (
+          {potreros.length > FILAS_VISIBLES && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 <ChipFiltro
@@ -548,13 +506,22 @@ export function ParaAtenderCampo() {
           )}
 
           {filtrados.length === 0 ? (
-            <p className="px-1 py-2 text-sm text-muted-foreground">
-              Nada con este filtro.
-            </p>
+            /* Sólo es "no hay resultados" si hay algo que filtrar: sin potreros
+             * con avisos (pero con campos sin recorrer) no hay filtro puesto. */
+            potreros.length > 0 ? (
+              <p className="px-1 py-2 text-sm text-muted-foreground">Nada con este filtro.</p>
+            ) : null
           ) : (
             <div className="flex flex-col gap-2">
-              {visibles.map((a, i) => (
-                <AtencionRow key={a.key} a={a} i={i} />
+              {visibles.map((p, i) => (
+                <PotreroRow
+                  key={p.key}
+                  p={p}
+                  i={i}
+                  empresaId={empresaId}
+                  abierta={abiertaKey === p.key}
+                  onToggle={() => setAbierta((k) => (k === p.key ? null : p.key))}
+                />
               ))}
             </div>
           )}
@@ -576,6 +543,53 @@ export function ParaAtenderCampo() {
             >
               Mostrar menos
             </button>
+          )}
+
+          {/* Campos sin recorrer: no se arreglan yendo a un potrero, así que no
+              compiten con la lista de arriba. */}
+          {sinRecorrerDelCampo.length > 0 && (
+            <div
+              className={cn(
+                'flex flex-col gap-2',
+                // El separador sólo tiene sentido si hay filas arriba de las
+                // que separarse; solo, dejaba una línea suelta y aire muerto.
+                filtrados.length > 0 && 'mt-1 border-t border-border/70 pt-3',
+              )}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-faint">
+                Sin recorrer
+              </p>
+              {sinRecorrerDelCampo.map((c) => (
+                <Link
+                  key={c.key}
+                  to={c.to}
+                  className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-2.5 transition-all hover:-translate-y-px hover:border-faint hover:shadow-[0_6px_18px_rgba(16,24,19,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-soft"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sol-soft text-sol-deep">
+                    {c.hace == null ? (
+                      <Footprints className="size-[18px]" />
+                    ) : (
+                      <CalendarClock className="size-[18px]" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="truncate text-[13.5px] font-semibold text-ink">
+                        {c.campo}
+                      </span>
+                      <span className="tnum shrink-0 text-[12px] font-semibold text-muted-foreground">
+                        {fmtNum.format(c.cabezas)} {c.cabezas === 1 ? 'animal' : 'animales'}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {c.hace == null
+                        ? 'Todavía no se recorrió'
+                        : `${haceLabel(c.hace).replace('hace', 'Hace')} sin recorrer`}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
       )}
