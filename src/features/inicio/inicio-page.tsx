@@ -14,6 +14,7 @@ import { usePanoramaInicio } from '@/features/inicio/hooks'
 import type { CategoriaConteo } from '@/features/inicio/api'
 import { CobrosPagosProximos } from '@/features/inicio/cobros-pagos-proximos'
 import { ParaAtenderCampo } from '@/features/inicio/para-atender'
+import { HoyCabecera } from '@/features/inicio/hoy-cabecera'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { Panel } from '@/components/panel'
 import { PageHeader, Stat } from '@/components/page-header'
@@ -335,6 +336,9 @@ export function InicioPage() {
             <Stat>{data.potreros.length}</Stat> potreros
           </>
         }
+        /* Lo urgente va acá, en el hueco al lado del título: antes vivía al
+           final de la página, debajo del pronóstico del tiempo. */
+        action={<HoyCabecera />}
       />
 
       {/* KPIs — barra instrumental con celdas divididas por hairline */}
@@ -427,7 +431,7 @@ export function InicioPage() {
 
       {/* Para atender en el campo — lo accionable de las últimas recorridas
           (la grilla de potreros vive en Campos, donde está el mapa) */}
-      <div data-guia="inicio-atender">
+      <div id="para-atender" className="scroll-mt-6" data-guia="inicio-atender">
         <ParaAtenderCampo />
       </div>
     </div>

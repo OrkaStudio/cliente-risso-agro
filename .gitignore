@@ -43,3 +43,4 @@ dist-ssr
 
 # Vercel (link local del CLI)
 .vercel
+.env*

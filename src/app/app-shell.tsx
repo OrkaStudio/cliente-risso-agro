@@ -22,6 +22,7 @@ import { useClima, useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
+import { contarHoy, useParaAtender } from '@/features/inicio/para-atender-api'
 
 function fechaHoy(): string {
   const s = new Date().toLocaleDateString('es-AR', {
@@ -98,6 +99,9 @@ export function AppShell() {
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
 
+  /* Una sola consulta compartida con el Inicio (misma queryKey): el contador y la
+   * cabecera "Hoy" no pueden decir números distintos. */
+  const hoy = contarHoy(useParaAtender().data)
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('side-collapsed') === '1',
   )
@@ -190,6 +194,20 @@ export function AppShell() {
                     strokeWidth={1.75}
                   />
                   {!collapsed && <span>{label}</span>}
+                  {/* Señala dónde mirar, no repite el contenido: descartamos una
+                      campanita con panel propio porque duplicaba la verdad en dos
+                      lugares (mismo problema que los cheques antes de la Agenda). */}
+                  {to === '/' && hoy > 0 && (
+                    <span
+                      aria-label={`${hoy} para hoy`}
+                      className={cn(
+                        'tnum ml-auto shrink-0 rounded-full bg-lima px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-ink',
+                        collapsed && 'absolute right-1 top-1 ml-0 px-1',
+                      )}
+                    >
+                      {hoy}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
