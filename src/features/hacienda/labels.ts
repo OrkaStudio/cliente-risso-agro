@@ -111,12 +111,21 @@ export const categoriaColor: Record<Categoria, string> = {
  * de APOYO: la identidad la lleva la etiqueta. 5 hues terrosos distintos; una 6ª
  * categoría recicla lejos y la etiqueta desambigua.
  */
+/* OCHO, no cinco: el bovino solo ya tiene SIETE categorías (vaca, vaquillona,
+ * novillo, ternero, ternera, toro, capón). Con cinco colores, `i % 5` hacía que
+ * la sexta repitiera el color de la primera — en un potrero mixto, Vacas y Toros
+ * salían con el MISMO punto verde y la lista mentía. Ocho cubre cualquier
+ * potrero de una sola especie; sólo un potrero que mezcle bovino + ovino +
+ * equino (9+) puede volver a ciclar. */
 export const SERIE_COLORS = [
   '#178a55', // verde campo
   '#dca01f', // sol (dorado)
   '#2779c4', // cielo
   '#b8442a', // tierra (terracota)
   '#7d4a9c', // ciruela
+  '#0d7d8c', // laguna
+  '#c2185b', // frambuesa
+  '#2f3e9e', // índigo
 ]
 
 /** Orden canónico de TODAS las categorías (bovino → ovino → equino). */

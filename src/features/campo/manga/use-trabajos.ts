@@ -78,6 +78,15 @@ export type SesionTrabajo = {
 
 export function useTrabajos(sesion: SesionTrabajo) {
   const rodeo = useLiveQuery(() => mangadb.rodeo.toArray(), [])
+  /* Marca de que el sembrado YA corrió contra el servidor (lo escribe
+   * `sembrarManga`). Es lo que separa "nunca lo bajaste" de "no hay nada que
+   * bajar": sin esto las dos situaciones se ven igual y el cartel le pide al
+   * productor que descargue algo que no existe.
+   * `undefined` = cargando · `null` = nunca sembró · objeto = ya sembró. */
+  const marcaSembrado = useLiveQuery(
+    () => mangadb.refs.get('rfids').then((r) => r ?? null),
+    [],
+  )
   const hechos = useLiveQuery(() => mangadb.trabajos.toArray(), [])
   const apartes = useLiveQuery(
     () => mangadb.apartes.where('sesion_id').equals(sesion.sesionId).toArray(),
@@ -569,9 +578,12 @@ export function useTrabajos(sesion: SesionTrabajo) {
   const fallado = (e: string) => e === 'error'
 
   return {
-    cargando: rodeo === undefined,
-    /** true = nunca se bajó el rodeo (distinto de "no hay animales"). */
+    cargando: rodeo === undefined || marcaSembrado === undefined,
+    /** true = el cache local está vacío. Puede ser por las dos razones de abajo. */
     sinRodeo: rodeo !== undefined && rodeo.length === 0,
+    /** El sembrado ya corrió y aun así no hay animales: el rodeo está vacío EN
+     *  EL SERVIDOR, no falta descargarlo. Volver a bajar no cambia nada. */
+    rodeoVacioEnServidor: marcaSembrado != null && rodeo?.length === 0,
     bajando,
     error,
     bajarRodeo,

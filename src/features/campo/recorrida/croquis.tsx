@@ -332,22 +332,31 @@ function PanelPotrero({
               </span>
             )}
           </div>
-          {/* Tope en PX, no en vh: el panel entero ya scrollea contra su
-              contenedor; esto sólo evita que un potrero con muchas categorías
-              empuje los botones fuera de la vista. Un scroll anidado medido en
-              viewport encima de uno medido en contenedor no cierra nunca. */}
+          {/* FICHAS, no lista. Una fila por categoría gastaba ~30px cada una:
+              seis categorías eran 180px de panel para un dato que se lee de un
+              vistazo, y encima traía scroll PROPIO adentro de un panel que ya
+              scrollea. En fichas que envuelven, las mismas seis entran en dos
+              renglones. El número va primero y grande porque es lo que se
+              busca; la categoría, al lado. */}
           {compos.length > 0 && (
-            <div className="mt-2 grid max-h-[180px] gap-1.5 overflow-y-auto rounded-xl bg-[var(--c-sunk)] px-3 py-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {compos.map((c) => (
-                <div key={c.categoria} className="flex items-center gap-2 text-[13.5px]">
-                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: col[c.categoria] }} />
-                  <span className="min-w-0 truncate text-[var(--c-ink)]">
-                    {categoriaNombre(c.categoria, c.cabezas)}
-                  </span>
-                  <span className="c-mono ml-auto shrink-0 font-semibold text-[var(--c-ink)]">
+                <span
+                  key={c.categoria}
+                  className="flex items-center gap-1.5 rounded-lg bg-[var(--c-sunk)] py-1 pl-2 pr-2.5"
+                >
+                  <span
+                    aria-hidden
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ background: col[c.categoria] }}
+                  />
+                  <span className="c-mono text-[15px] font-bold leading-none text-[var(--c-ink)]">
                     {c.cabezas}
                   </span>
-                </div>
+                  <span className="text-[13px] leading-none text-[var(--c-ink-soft)]">
+                    {categoriaNombre(c.categoria, c.cabezas)}
+                  </span>
+                </span>
               ))}
             </div>
           )}
@@ -364,7 +373,15 @@ function PanelPotrero({
           arrastrar. Se despega sola al llegar al final del scroll, así los
           botones de abajo aparecen en su lugar y el orden no cambia. El
           `-mx-4 px-4` la hace full-bleed para tapar lo que pasa por detrás. */}
-      <div className="sticky bottom-0 -mx-4 mt-2.5 bg-[var(--c-panel)] px-4 pb-0.5 pt-1.5">
+      {/* El sticky flota SOBRE el contenido, así que el contenido necesita
+          colchón: sin esto la última ficha quedaba PARTIDA AL MEDIO por el
+          botón y la anterior tapada del todo — se leía como "cortado" aunque el
+          panel sí scrolleara. El degradado avisa que abajo sigue habiendo algo. */}
+      <div
+        aria-hidden
+        className="pointer-events-none -mx-4 -mb-1 h-4 bg-gradient-to-b from-transparent to-[var(--c-panel)]"
+      />
+      <div className="sticky bottom-0 -mx-4 bg-[var(--c-panel)] px-4 pb-0.5 pt-1.5">
         <button
           type="button"
           onClick={() => onAbrir(potrero.id)}

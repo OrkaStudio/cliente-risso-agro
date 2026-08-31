@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
+  Beef,
   AlertTriangle,
   Check,
   ChevronDown,
@@ -209,6 +211,35 @@ export function Trabajar({
     return <p className="c-label p-8 text-center !text-[13px]">Cargando el rodeo…</p>
   }
 
+  /* DOS situaciones distintas que antes decían lo mismo.
+   *
+   * Si el sembrado ya corrió y aun así no hay animales, el rodeo está vacío EN
+   * EL SERVIDOR: pedirle "bajar ahora" es mandarlo a descargar algo que no
+   * existe — toca, no pasa nada, y parece que la app está rota. Le pasa a
+   * cualquiera que todavía no cargó su hacienda. */
+  if (t.rodeoVacioEnServidor) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+        <Beef className="size-10 text-[var(--c-faint)]" />
+        <p className="c-display text-[16px] text-[var(--c-ink)]">
+          Todavía no hay animales cargados
+        </p>
+        <p className="text-[13.5px] text-[var(--c-ink-soft)]">
+          La manga trabaja sobre los animales que ya están en el sistema. Cargalos
+          desde la computadora, en Hacienda, o anotá los nacimientos acá en la
+          Recorrida.
+        </p>
+        <Link
+          to="/campo/recorrida"
+          className="c-display mt-1 text-[14px] uppercase text-[var(--c-ok-deep)] underline underline-offset-4"
+        >
+          Ir a la Recorrida
+        </Link>
+      </div>
+    )
+  }
+
+  /* Y esta es la de verdad: nunca se sembró (nunca entró con señal). */
   if (t.sinRodeo) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
@@ -228,6 +259,11 @@ export function Trabajar({
         >
           {t.bajando ? 'Bajando…' : 'Bajar ahora'}
         </button>
+        {!online && (
+          <p className="text-[12.5px] text-[var(--c-warn-deep)]">
+            Estás sin señal: conectate un momento y volvé.
+          </p>
+        )}
       </div>
     )
   }
