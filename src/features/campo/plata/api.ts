@@ -87,7 +87,7 @@ export async function fetchRefs(): Promise<{
 }
 
 /** Path del comprobante dentro del bucket (RLS por prefijo de empresa). */
-export function pathComprobante(item: PlataItem): string {
+function pathComprobante(item: PlataItem): string {
   return `${item.empresa_id}/${item.id}.jpg`
 }
 

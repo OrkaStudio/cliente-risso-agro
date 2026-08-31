@@ -1,7 +1,4 @@
 import { supabase } from '@/lib/supabase/client'
-import type { Database } from '@/lib/supabase/types'
-
-type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
 
 // ===== Agrupación por semana (registro de "qué se hizo/cargó") =====
 
@@ -192,30 +189,6 @@ export async function fetchHistorialTrabajos(limit = 600): Promise<TrabajoHist[]
 
 // ===== Manga: caravaneos recientes (detalle por animal) =====
 
-export type MangaHist = {
-  id: string
-  rfid: string
-  visual: string | null
-  categoria: CategoriaAnimal | null
-  cargadoEn: string
-}
-
-export async function fetchHistorialManga(limit = 80): Promise<MangaHist[]> {
-  const { data, error } = await supabase
-    .from('caravana')
-    .select('id, numero_rfid, numero_visual, created_at, animal:animal_id(categoria)')
-    .eq('vigente', true)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((c) => ({
-    id: c.id,
-    rfid: c.numero_rfid,
-    visual: c.numero_visual,
-    categoria: c.animal?.categoria ?? null,
-    cargadoEn: c.created_at,
-  }))
-}
 
 // ===== Recorrida: recorridas recientes con conteo de potreros =====
 

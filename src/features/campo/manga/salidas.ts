@@ -30,12 +30,6 @@ export const ladoLabel: Record<Lado, string> = {
   frente: 'De frente',
 }
 
-/** Abreviatura para el cartel grande: se lee de reojo, a un brazo. */
-export const ladoCorto: Record<Lado, string> = {
-  izq: 'IZQ',
-  der: 'DER',
-  frente: 'FRENTE',
-}
 
 /**
  * La flecha es el refuerzo que hace innecesario leer la palabra. Apunta a donde
@@ -72,20 +66,6 @@ export function destinoLabel(d: Destino): string {
   return 'Vuelven al potrero'
 }
 
-/**
- * Versión corta para el cartel del trabajo y los botones del tacto, donde el
- * espacio es del héroe.
- *
- * Va en SINGULAR: ahí se habla del animal que está en el cepo en ese momento,
- * no del grupo. `destinoLabel` es la forma de grupo ("Vuelven al potrero") y se
- * usa en el prearmado y en el resumen, donde el sujeto sí es el conjunto.
- */
-export function destinoCorto(d: Destino): string {
-  if (d.k === 'potrero') return `al ${d.nombre}`
-  if (d.k === 'venta') return 'a venta'
-  if (d.k === 'manga') return 'queda en la manga'
-  return 'vuelve al potrero'
-}
 
 /**
  * Un grupo del aparte: un conjunto de animales con NOMBRE PROPIO, que sale por
@@ -122,15 +102,10 @@ export type PlanSalidas = {
   porResultado?: Record<string, string>
 }
 
-/** Las dos respuestas del tacto. Es la única clasificación por toque hoy. */
-export const RESULTADOS_TACTO = [
-  { clave: 'prenada', label: 'Preñada' },
-  { clave: 'vacia', label: 'Vacía' },
-] as const
 
 /** Categorías que en un destete son MADRE (el resto de las presentes es cría). */
-export const MADRES: CategoriaAnimal[] = ['vaca', 'vaquillona']
-export const CRIAS: CategoriaAnimal[] = ['ternero', 'ternera']
+const MADRES: CategoriaAnimal[] = ['vaca', 'vaquillona']
+const CRIAS: CategoriaAnimal[] = ['ternero', 'ternera']
 
 /**
  * El nombre de un grupo armado por categorías, en el idioma del productor.

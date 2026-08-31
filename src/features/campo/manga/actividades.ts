@@ -107,15 +107,13 @@ export const ACTIVIDADES: Actividad[] = [
 
 export const actividadPorClave = new Map(ACTIVIDADES.map((a) => [a.clave, a]))
 
-/** Tope real de salidas de una manga (dato de campo, no un límite técnico). */
-export const MAX_SALIDAS = 3
 
 /**
  * Las que ya están construidas de punta a punta. El resto se muestra pero
  * avisa que todavía no: es preferible que el productor vea el mapa completo de
  * lo que la manga va a saber hacer, a que la lista crezca sin explicación.
  */
-export const ACTIVIDADES_LISTAS: ReadonlySet<ClaveActividad> = new Set([
+const ACTIVIDADES_LISTAS: ReadonlySet<ClaveActividad> = new Set([
   'caravanear',
   'vacunar',
   'destetar',
