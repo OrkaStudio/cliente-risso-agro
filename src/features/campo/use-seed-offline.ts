@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/features/auth/auth-context'
+import { drenarOffline, type ColaCampo } from '@/features/campo/drenar-offline'
 import { sembrarOffline, type SeedDetalle } from '@/features/campo/seed-offline'
 export type { FeatureSeed } from '@/features/campo/seed-offline'
 
@@ -41,6 +42,8 @@ export function useSeedOffline() {
   const [error, setError] = useState<string | null>(null)
   // Estado REAL por feature de la última corrida (para el detalle del botón).
   const [detalle, setDetalle] = useState<SeedDetalle | null>(null)
+  /** Colas que no pudieron subir en la última pasada. */
+  const [colasFallidas, setColasFallidas] = useState<ColaCampo[]>([])
   // Cerrojo síncrono: los disparadores (login, foreground, botón) pueden
   // solaparse y el setState es asíncrono.
   const corriendo = useRef(false)
@@ -51,6 +54,18 @@ export function useSeedOffline() {
     setEstado('sembrando')
     setError(null)
     try {
+      /* PRIMERO subir, después bajar.
+       *
+       * Antes acá sólo se sembraba, y cada cola subía únicamente mientras su
+       * pantalla estaba montada — de las cuatro, sólo la Recorrida vive en el
+       * Inicio. El productor volvía del campo, abría la app, veía "Listo" y la
+       * manga, los nacimientos y la plata seguían en el teléfono.
+       *
+       * El orden importa: si se sembrara primero, el cache se refrescaría con
+       * la verdad del servidor SIN lo que todavía no subió, y quedaría viejo
+       * hasta el próximo ciclo. */
+      const d = await drenarOffline()
+      setColasFallidas(d.fallaron)
       const r = await sembrarOffline()
       setDetalle(r.detalle)
       if (r.ok) {
@@ -89,5 +104,5 @@ export function useSeedOffline() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user, sembrar])
 
-  return { estado, lastOk, detalle, error, online, sembrar }
+  return { estado, lastOk, detalle, error, online, sembrar, colasFallidas }
 }

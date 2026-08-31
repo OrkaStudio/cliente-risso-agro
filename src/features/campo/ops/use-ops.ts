@@ -80,6 +80,71 @@ function fechaDelHecho(ms: number): string {
   return `${d.getFullYear()}-${mm}-${dd}`
 }
 
+/**
+ * Sube los nacimientos y movimientos anotados en el campo. Vive FUERA del hook
+ * para que el shell pueda drenar sin la Recorrida montada: antes esta cola sólo
+ * subía estando en esa pantalla.
+ */
+export async function drenarOps(onEstado?: (v: boolean) => void): Promise<void> {
+  if (!navigator.onLine) return
+  if (draining) {
+    rerun = true
+    await drainPromise
+    return
+  }
+  const loop = async () => {
+    // ¿Alguna operación llegó realmente al servidor en esta pasada?
+    let subioAlgo = false
+    try {
+      do {
+        rerun = false
+        const pend = await opsdb.outbox
+          .where('estado')
+          .anyOf('pendiente', 'error')
+          .toArray()
+        for (const op of pend) {
+          try {
+            if (op.tipo === 'nacimiento') await subirNacimiento(op)
+            else if (op.tipo === 'movimiento') await subirMovimiento(op)
+            await opsdb.outbox.update(op.cliente_id, {
+              estado: 'sincronizada',
+              error: null,
+            })
+            subioAlgo = true
+          } catch (e) {
+            await opsdb.outbox.update(op.cliente_id, {
+              estado: 'error',
+              error: e instanceof Error ? e.message : 'Error al subir',
+            })
+          }
+        }
+      } while (rerun)
+
+      // Al sincronizar, la operación deja de contar como pendiente y su delta
+      // desaparece — pero el cache de refs sigue teniendo las existencias de
+      // ANTES. Sin este refresco el potrero mostraba 46, sincronizaba y
+      // volvía a 45, quedando mal hasta recargar la app. Se refresca a lo
+      // último, cuando ya no queda nada por subir.
+      if (subioAlgo) {
+        try {
+          await sembrarRecorrida()
+        } catch {
+          // Sin señal o con el server caído el cache queda viejo, no roto:
+          // el próximo sembrado (o el siguiente drenado) lo pone al día.
+        }
+      }
+    } finally {
+      draining = false
+      drainPromise = null
+      onEstado?.(false)
+    }
+  }
+  draining = true
+  onEstado?.(true)
+  drainPromise = loop()
+  await drainPromise
+}
+
 export function useOps() {
   const online = useOnline()
   const itemsArr = useLiveQuery(() => opsdb.outbox.toArray(), [])
@@ -89,65 +154,10 @@ export function useOps() {
   /** Drena la cola: por cada operación pendiente/errónea llama a su RPC. Un
    *  ítem que falla queda `error` y NO frena al resto. Append-only → no hay
    *  snapshot viejo que pisar, así que alcanza con marcar por cliente_id. */
-  const sincronizar = useCallback(async (): Promise<void> => {
-    if (!navigator.onLine) return
-    if (draining) {
-      rerun = true
-      await drainPromise
-      return
-    }
-    const loop = async () => {
-      // ¿Alguna operación llegó realmente al servidor en esta pasada?
-      let subioAlgo = false
-      try {
-        do {
-          rerun = false
-          const pend = await opsdb.outbox
-            .where('estado')
-            .anyOf('pendiente', 'error')
-            .toArray()
-          for (const op of pend) {
-            try {
-              if (op.tipo === 'nacimiento') await subirNacimiento(op)
-              else if (op.tipo === 'movimiento') await subirMovimiento(op)
-              await opsdb.outbox.update(op.cliente_id, {
-                estado: 'sincronizada',
-                error: null,
-              })
-              subioAlgo = true
-            } catch (e) {
-              await opsdb.outbox.update(op.cliente_id, {
-                estado: 'error',
-                error: e instanceof Error ? e.message : 'Error al subir',
-              })
-            }
-          }
-        } while (rerun)
-
-        // Al sincronizar, la operación deja de contar como pendiente y su delta
-        // desaparece — pero el cache de refs sigue teniendo las existencias de
-        // ANTES. Sin este refresco el potrero mostraba 46, sincronizaba y
-        // volvía a 45, quedando mal hasta recargar la app. Se refresca a lo
-        // último, cuando ya no queda nada por subir.
-        if (subioAlgo) {
-          try {
-            await sembrarRecorrida()
-          } catch {
-            // Sin señal o con el server caído el cache queda viejo, no roto:
-            // el próximo sembrado (o el siguiente drenado) lo pone al día.
-          }
-        }
-      } finally {
-        draining = false
-        drainPromise = null
-        setSincronizando(false)
-      }
-    }
-    draining = true
-    setSincronizando(true)
-    drainPromise = loop()
-    await drainPromise
-  }, [])
+  const sincronizar = useCallback(
+    () => drenarOps(setSincronizando),
+    [],
+  )
 
   // Al volver la señal (o al montar con señal): drenar lo que haya quedado.
   useEffect(() => {

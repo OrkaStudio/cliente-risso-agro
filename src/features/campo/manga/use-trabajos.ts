@@ -76,6 +76,102 @@ export type SesionTrabajo = {
   conAparte?: boolean
 }
 
+/** Single-flight compartido: con el drenado central hay dos llamadores
+ *  posibles (la pantalla y el shell) y la bandera tiene que ser una sola. */
+let drenandoTrabajos = false
+
+async function drenarApartes(): Promise<void> {
+  const pendientes = await mangadb.apartes
+    .where('estado')
+    .anyOf('pendiente', 'error')
+    .toArray()
+  const mueven = pendientes.filter(
+    (a) => a.destino_k === 'potrero' && a.potrero_destino_id,
+  )
+  if (mueven.length === 0) return
+
+  const tandas = new Map<string, AparteItem[]>()
+  for (const a of mueven) {
+    const clave = a.alta_id ?? `nuevo|${a.potrero_destino_id}`
+    const previa = tandas.get(clave)
+    if (previa) previa.push(a)
+    else tandas.set(clave, [a])
+  }
+
+  for (const items of tandas.values()) {
+    const cabeza = items[0]
+    const altaId = cabeza.alta_id ?? crypto.randomUUID()
+    if (!cabeza.alta_id) {
+      for (const it of items) await mangadb.apartes.update(it.id, { alta_id: altaId })
+    }
+    try {
+      const animal = await mangadb.rodeo
+        .where('animal_id')
+        .equals(cabeza.animal_id)
+        .first()
+      await moverAlDestino({
+        altaId,
+        empresaId: animal?.empresa_id ?? '',
+        potreroDestino: cabeza.potrero_destino_id!,
+        animalIds: [...new Set(items.map((i) => i.animal_id))],
+        fecha: cabeza.fecha,
+        contexto: {
+          origen_ui: 'manga',
+          sesion_id: cabeza.sesion_id,
+          grupo: cabeza.etiqueta,
+          salida_id: cabeza.salida_id,
+        },
+      })
+      for (const it of items) {
+        await mangadb.apartes.update(it.id, { estado: 'sincronizada', error: null })
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'No se pudo mover'
+      for (const it of items) {
+        await mangadb.apartes.update(it.id, { estado: 'error', error: msg })
+      }
+    }
+  }
+}
+
+/**
+ * Sube los trabajos de la manga y los apartes. Vive FUERA del hook para que el
+ * shell pueda drenar sin la pantalla de la manga montada.
+ */
+export async function drenarTrabajos(): Promise<void> {
+if (!navigator.onLine || drenandoTrabajos) return
+drenandoTrabajos = true
+  try {
+    // `error` también entra: si no, el botón "reintentar" no reintenta nada.
+    const pendientes = await mangadb.trabajos
+      .where('estado')
+      .anyOf('pendiente', 'error')
+      .toArray()
+    for (const t of pendientes) {
+      try {
+        const animal = await mangadb.rodeo.where('animal_id').equals(t.animal_id).first()
+        await subirEventoTrabajo({
+          id: t.id,
+          animalId: t.animal_id,
+          empresaId: animal?.empresa_id ?? '',
+          tipo: t.tipo,
+          datos: t.datos,
+          fecha: t.fecha,
+        })
+        await mangadb.trabajos.update(t.id, { estado: 'sincronizada', error: null })
+      } catch (e) {
+        await mangadb.trabajos.update(t.id, {
+          estado: 'error',
+          error: e instanceof Error ? e.message : 'Error al subir',
+        })
+      }
+    }
+    await drenarApartes()
+  } finally {
+    drenandoTrabajos = false
+  }
+}
+
 export function useTrabajos(sesion: SesionTrabajo) {
   const rodeo = useLiveQuery(() => mangadb.rodeo.toArray(), [])
   /* Marca de que el sembrado YA corrió contra el servidor (lo escribe
@@ -95,7 +191,6 @@ export function useTrabajos(sesion: SesionTrabajo) {
   const [bajando, setBajando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ultimo, setUltimo] = useState<ResultadoEscaneo | null>(null)
-  const drenandoRef = useRef(false)
   const bajandoRef = useRef(false)
 
   /** Índice RFID→animal, en memoria: el lookup pasa a ser O(1) por lectura.
@@ -221,95 +316,11 @@ export function useTrabajos(sesion: SesionTrabajo) {
    * fallar—. Por eso el `alta_id` se asigna al drenar, se persiste ANTES de
    * llamar, y sólo se reusa para reintentar esa misma tanda.
    */
-  const drenarApartes = useCallback(async () => {
-    const pendientes = await mangadb.apartes
-      .where('estado')
-      .anyOf('pendiente', 'error')
-      .toArray()
-    const mueven = pendientes.filter(
-      (a) => a.destino_k === 'potrero' && a.potrero_destino_id,
-    )
-    if (mueven.length === 0) return
 
-    const tandas = new Map<string, AparteItem[]>()
-    for (const a of mueven) {
-      const clave = a.alta_id ?? `nuevo|${a.potrero_destino_id}`
-      const previa = tandas.get(clave)
-      if (previa) previa.push(a)
-      else tandas.set(clave, [a])
-    }
-
-    for (const items of tandas.values()) {
-      const cabeza = items[0]
-      const altaId = cabeza.alta_id ?? crypto.randomUUID()
-      if (!cabeza.alta_id) {
-        for (const it of items) await mangadb.apartes.update(it.id, { alta_id: altaId })
-      }
-      try {
-        const animal = await mangadb.rodeo
-          .where('animal_id')
-          .equals(cabeza.animal_id)
-          .first()
-        await moverAlDestino({
-          altaId,
-          empresaId: animal?.empresa_id ?? '',
-          potreroDestino: cabeza.potrero_destino_id!,
-          animalIds: [...new Set(items.map((i) => i.animal_id))],
-          fecha: cabeza.fecha,
-          contexto: {
-            origen_ui: 'manga',
-            sesion_id: cabeza.sesion_id,
-            grupo: cabeza.etiqueta,
-            salida_id: cabeza.salida_id,
-          },
-        })
-        for (const it of items) {
-          await mangadb.apartes.update(it.id, { estado: 'sincronizada', error: null })
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'No se pudo mover'
-        for (const it of items) {
-          await mangadb.apartes.update(it.id, { estado: 'error', error: msg })
-        }
-      }
-    }
-  }, [])
 
   /** Drena las dos colas. Un fallo marca ese ítem y sigue con el resto: una
    *  lectura mala no puede frenar las otras 199. */
-  const sincronizar = useCallback(async () => {
-    if (!navigator.onLine || drenandoRef.current) return
-    drenandoRef.current = true
-    try {
-      // `error` también entra: si no, el botón "reintentar" no reintenta nada.
-      const pendientes = await mangadb.trabajos
-        .where('estado')
-        .anyOf('pendiente', 'error')
-        .toArray()
-      for (const t of pendientes) {
-        try {
-          const animal = await mangadb.rodeo.where('animal_id').equals(t.animal_id).first()
-          await subirEventoTrabajo({
-            id: t.id,
-            animalId: t.animal_id,
-            empresaId: animal?.empresa_id ?? '',
-            tipo: t.tipo,
-            datos: t.datos,
-            fecha: t.fecha,
-          })
-          await mangadb.trabajos.update(t.id, { estado: 'sincronizada', error: null })
-        } catch (e) {
-          await mangadb.trabajos.update(t.id, {
-            estado: 'error',
-            error: e instanceof Error ? e.message : 'Error al subir',
-          })
-        }
-      }
-      await drenarApartes()
-    } finally {
-      drenandoRef.current = false
-    }
-  }, [drenarApartes])
+  const sincronizar = useCallback(() => drenarTrabajos(), [])
 
   // Cache vacío y con señal → bajarlo. Sin esto la manga no puede identificar
   // a nadie, y el aviso "entrá una vez con señal" llega tarde.

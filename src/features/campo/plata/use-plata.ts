@@ -47,6 +47,68 @@ function useOnline(): boolean {
   return online
 }
 
+/**
+ * Sube lo que quedó en la cola de Plata. Vive FUERA del hook para que el shell
+ * pueda drenar sin tener la pantalla de Plata montada: antes esta cola sólo
+ * subía si el productor entraba a Plata, así que volvía del campo, veía
+ * "Listo" y los gastos quedaban en el teléfono.
+ */
+export async function drenarPlata(): Promise<void> {
+  if (!navigator.onLine) return
+  if (draining) {
+    rerun = true
+    await drainPromise
+    return
+  }
+  const loop = async () => {
+    try {
+      do {
+        rerun = false
+        const pendientes = await platadb.outbox
+          .where('estado')
+          .equals('pendiente')
+          .toArray()
+        for (const item of pendientes) {
+          try {
+            if (item.foto && !item.foto_subida) {
+              await subirFoto(item)
+              await platadb.outbox.update(item.id, { foto_subida: 1 })
+            }
+            let audioPath = item.audio_path
+            if (item.audio && !item.audio_subido) {
+              await subirAudioMovimiento(item)
+              audioPath = pathAudioMovimiento(item)
+              await platadb.outbox.update(item.id, {
+                audio_subido: 1,
+                audio_path: audioPath,
+              })
+            }
+            await insertarMovimiento({ ...item, audio_path: audioPath })
+            // Subido: soltamos los Blobs para no acumular en el teléfono.
+            await platadb.outbox.update(item.id, {
+              estado: 'sincronizada',
+              error: null,
+              foto: null,
+              audio: null,
+            })
+          } catch (e) {
+            await platadb.outbox.update(item.id, {
+              estado: 'error',
+              error: e instanceof Error ? e.message : 'Error al subir',
+            })
+          }
+        }
+      } while (rerun)
+    } finally {
+      draining = false
+      drainPromise = null
+    }
+  }
+  draining = true
+  drainPromise = loop()
+  await drainPromise
+}
+
 export function usePlata() {
   const online = useOnline()
   const refsArr = useLiveQuery(() => platadb.refs.toArray(), [])
@@ -71,61 +133,7 @@ export function usePlata() {
 
   // Drena la cola: foto primero (idempotente), después el insert (id de
   // cliente → reintentar no duplica). Un ítem con error no frena el resto.
-  const sincronizar = useCallback(async (): Promise<void> => {
-    if (!navigator.onLine) return
-    if (draining) {
-      rerun = true
-      await drainPromise
-      return
-    }
-    const loop = async () => {
-      try {
-        do {
-          rerun = false
-          const pendientes = await platadb.outbox
-            .where('estado')
-            .equals('pendiente')
-            .toArray()
-          for (const item of pendientes) {
-            try {
-              if (item.foto && !item.foto_subida) {
-                await subirFoto(item)
-                await platadb.outbox.update(item.id, { foto_subida: 1 })
-              }
-              let audioPath = item.audio_path
-              if (item.audio && !item.audio_subido) {
-                await subirAudioMovimiento(item)
-                audioPath = pathAudioMovimiento(item)
-                await platadb.outbox.update(item.id, {
-                  audio_subido: 1,
-                  audio_path: audioPath,
-                })
-              }
-              await insertarMovimiento({ ...item, audio_path: audioPath })
-              // Subido: soltamos los Blobs para no acumular en el teléfono.
-              await platadb.outbox.update(item.id, {
-                estado: 'sincronizada',
-                error: null,
-                foto: null,
-                audio: null,
-              })
-            } catch (e) {
-              await platadb.outbox.update(item.id, {
-                estado: 'error',
-                error: e instanceof Error ? e.message : 'Error al subir',
-              })
-            }
-          }
-        } while (rerun)
-      } finally {
-        draining = false
-        drainPromise = null
-      }
-    }
-    draining = true
-    drainPromise = loop()
-    await drainPromise
-  }, [])
+  const sincronizar = useCallback(() => drenarPlata(), [])
 
   // Refresca refs al entrar con señal (diferido: lint react-hooks).
   useEffect(() => {

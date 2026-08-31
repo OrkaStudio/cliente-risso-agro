@@ -95,6 +95,144 @@ const hoyISO = () => new Date().toISOString().slice(0, 10)
 const ordenNatural = (a: string, b: string) =>
   a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' })
 
+/**
+ * Sube las observaciones de la recorrida. Vive FUERA del hook para que el
+ * drenado central del shell pueda llamarla desde cualquier pantalla.
+ */
+export async function drenarRecorrida(onEstado?: (v: boolean) => void): Promise<void> {
+  if (!navigator.onLine) return
+  if (draining) {
+    rerun = true
+    await drainPromise
+    return
+  }
+  const loop = async () => {
+    try {
+      do {
+        rerun = false
+        const todas = await recdb.recorridas.toArray()
+        for (const s0 of todas) {
+          let s = s0
+          if (!(await debeAlgo(s))) {
+            await cerrarSiCorresponde(s.recorrida_id)
+            continue
+          }
+
+          // Paso 0: la fila `recorrida` tiene que existir en el server antes
+          // de subir observaciones (FK). Si se arrancó offline, acá se crea —
+          // o se adopta la de (campo, fecha) si otro dispositivo la abrió.
+          if (!s.remota) {
+            try {
+              const idRemoto = await asegurarRecorridaRemota(s)
+              if (idRemoto !== s.recorrida_id) {
+                const viejoId = s.recorrida_id
+                const filas = await recdb.outbox
+                  .where('recorrida_id')
+                  .equals(viejoId)
+                  .toArray()
+                await recdb.transaction(
+                  'rw',
+                  recdb.meta,
+                  recdb.recorridas,
+                  recdb.outbox,
+                  async () => {
+                    await recdb.recorridas.delete(viejoId)
+                    await recdb.recorridas.put({ ...s, recorrida_id: idRemoto, remota: 1 })
+                    await recdb.outbox.where('recorrida_id').equals(viejoId).delete()
+                    await recdb.outbox.bulkPut(
+                      filas.map((f) => ({ ...f, recorrida_id: idRemoto })),
+                    )
+                    const p = await recdb.meta.get('actual')
+                    if (p?.recorrida_id === viejoId) {
+                      await recdb.meta.put({ id: 'actual', recorrida_id: idRemoto })
+                    }
+                  },
+                )
+                s = { ...s, recorrida_id: idRemoto, remota: 1 }
+              } else {
+                await recdb.recorridas.update(s.recorrida_id, { remota: 1 })
+                s = { ...s, remota: 1 }
+              }
+            } catch {
+              continue
+            }
+          }
+
+          const pend = (await pendientesDe(s.recorrida_id)).filter(
+            (o) => o.estado === 'pendiente',
+          )
+          for (const it of pend) {
+            const snap = it.updated_at
+            try {
+              let audioPath = it.audio_path
+              if (it.audio && !it.audio_subido) {
+                audioPath = pathAudio(s.empresa_id, s.recorrida_id, it.potrero_id, it.audio.type)
+                await subirAudio(audioPath, it.audio)
+                await recdb.outbox.update([s.recorrida_id, it.potrero_id], {
+                  audio_subido: 1,
+                  audio_path: audioPath,
+                })
+              }
+              await guardarObservacion({
+                recorridaId: s.recorrida_id,
+                empresaId: s.empresa_id,
+                obs: {
+                  potrero_id: it.potrero_id,
+                  pasto: it.pasto,
+                  agua: it.agua,
+                  electrico: it.electrico,
+                  conteo: it.conteo,
+                  en_tratamiento: it.en_tratamiento,
+                  novedad: it.novedad,
+                  cultivo: it.cultivo,
+                  audio_url: audioPath,
+                },
+              })
+              const actual = await recdb.outbox.get([s.recorrida_id, it.potrero_id])
+              if (actual && actual.updated_at === snap) {
+                await recdb.outbox.update([s.recorrida_id, it.potrero_id], {
+                  estado: 'sincronizada',
+                  error: null,
+                  audio: null,
+                })
+              }
+            } catch (e) {
+              await recdb.outbox.update([s.recorrida_id, it.potrero_id], {
+                estado: 'error',
+                error: e instanceof Error ? e.message : 'Error al subir',
+              })
+            }
+          }
+
+          const sL = await recdb.recorridas.get(s.recorrida_id)
+          if (sL && sL.lluvia_mm != null && !sL.lluvia_ok) {
+            try {
+              await guardarLluvia({
+                campoId: sL.campo_id,
+                empresaId: sL.empresa_id,
+                mm: sL.lluvia_mm,
+              })
+              await recdb.recorridas.update(sL.recorrida_id, { lluvia_ok: 1 })
+            } catch {
+              /* reintenta */
+            }
+          }
+
+          await cerrarSiCorresponde(s.recorrida_id)
+        }
+      } while (rerun)
+    } finally {
+      draining = false
+      drainPromise = null
+      onEstado?.(false)
+    }
+  }
+  draining = true
+  onEstado?.(true)
+  drainPromise = loop()
+  await drainPromise
+}
+
 export function useRecorrida() {
   const online = useOnline()
   // Con toArray() distinguimos "cargando" (undefined) de "vacío" ([]).
@@ -198,139 +336,10 @@ export function useRecorrida() {
    * Drena TODAS las recorridas con algo pendiente — no solo la activa. Eso es
    * lo que permite tener varios campos abiertos sin dejar huérfano a ninguno.
    */
-  const sincronizar = useCallback(async (): Promise<void> => {
-    if (!navigator.onLine) return
-    if (draining) {
-      rerun = true
-      await drainPromise
-      return
-    }
-    const loop = async () => {
-      try {
-        do {
-          rerun = false
-          const todas = await recdb.recorridas.toArray()
-          for (const s0 of todas) {
-            let s = s0
-            if (!(await debeAlgo(s))) {
-              await cerrarSiCorresponde(s.recorrida_id)
-              continue
-            }
-
-            // Paso 0: la fila `recorrida` tiene que existir en el server antes
-            // de subir observaciones (FK). Si se arrancó offline, acá se crea —
-            // o se adopta la de (campo, fecha) si otro dispositivo la abrió.
-            if (!s.remota) {
-              try {
-                const idRemoto = await asegurarRecorridaRemota(s)
-                if (idRemoto !== s.recorrida_id) {
-                  const viejoId = s.recorrida_id
-                  const filas = await recdb.outbox
-                    .where('recorrida_id')
-                    .equals(viejoId)
-                    .toArray()
-                  await recdb.transaction(
-                    'rw',
-                    recdb.meta,
-                    recdb.recorridas,
-                    recdb.outbox,
-                    async () => {
-                      await recdb.recorridas.delete(viejoId)
-                      await recdb.recorridas.put({ ...s, recorrida_id: idRemoto, remota: 1 })
-                      await recdb.outbox.where('recorrida_id').equals(viejoId).delete()
-                      await recdb.outbox.bulkPut(
-                        filas.map((f) => ({ ...f, recorrida_id: idRemoto })),
-                      )
-                      const p = await recdb.meta.get('actual')
-                      if (p?.recorrida_id === viejoId) {
-                        await recdb.meta.put({ id: 'actual', recorrida_id: idRemoto })
-                      }
-                    },
-                  )
-                  s = { ...s, recorrida_id: idRemoto, remota: 1 }
-                } else {
-                  await recdb.recorridas.update(s.recorrida_id, { remota: 1 })
-                  s = { ...s, remota: 1 }
-                }
-              } catch {
-                continue
-              }
-            }
-
-            const pend = (await pendientesDe(s.recorrida_id)).filter(
-              (o) => o.estado === 'pendiente',
-            )
-            for (const it of pend) {
-              const snap = it.updated_at
-              try {
-                let audioPath = it.audio_path
-                if (it.audio && !it.audio_subido) {
-                  audioPath = pathAudio(s.empresa_id, s.recorrida_id, it.potrero_id, it.audio.type)
-                  await subirAudio(audioPath, it.audio)
-                  await recdb.outbox.update([s.recorrida_id, it.potrero_id], {
-                    audio_subido: 1,
-                    audio_path: audioPath,
-                  })
-                }
-                await guardarObservacion({
-                  recorridaId: s.recorrida_id,
-                  empresaId: s.empresa_id,
-                  obs: {
-                    potrero_id: it.potrero_id,
-                    pasto: it.pasto,
-                    agua: it.agua,
-                    electrico: it.electrico,
-                    conteo: it.conteo,
-                    en_tratamiento: it.en_tratamiento,
-                    novedad: it.novedad,
-                    cultivo: it.cultivo,
-                    audio_url: audioPath,
-                  },
-                })
-                const actual = await recdb.outbox.get([s.recorrida_id, it.potrero_id])
-                if (actual && actual.updated_at === snap) {
-                  await recdb.outbox.update([s.recorrida_id, it.potrero_id], {
-                    estado: 'sincronizada',
-                    error: null,
-                    audio: null,
-                  })
-                }
-              } catch (e) {
-                await recdb.outbox.update([s.recorrida_id, it.potrero_id], {
-                  estado: 'error',
-                  error: e instanceof Error ? e.message : 'Error al subir',
-                })
-              }
-            }
-
-            const sL = await recdb.recorridas.get(s.recorrida_id)
-            if (sL && sL.lluvia_mm != null && !sL.lluvia_ok) {
-              try {
-                await guardarLluvia({
-                  campoId: sL.campo_id,
-                  empresaId: sL.empresa_id,
-                  mm: sL.lluvia_mm,
-                })
-                await recdb.recorridas.update(sL.recorrida_id, { lluvia_ok: 1 })
-              } catch {
-                /* reintenta */
-              }
-            }
-
-            await cerrarSiCorresponde(s.recorrida_id)
-          }
-        } while (rerun)
-      } finally {
-        draining = false
-        drainPromise = null
-        setSincronizando(false)
-      }
-    }
-    draining = true
-    setSincronizando(true)
-    drainPromise = loop()
-    await drainPromise
-  }, [])
+  const sincronizar = useCallback(
+    () => drenarRecorrida(setSincronizando),
+    [],
+  )
 
   useEffect(() => {
     sincronizarRef.current = sincronizar

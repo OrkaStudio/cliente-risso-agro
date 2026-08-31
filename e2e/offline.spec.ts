@@ -158,4 +158,108 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
 
     await context.close()
   })
+
+  test('lo cargado en Plata sube desde el Inicio, sin abrir Plata', async ({
+    browser,
+  }) => {
+    /* El drenado estaba atado a la pantalla de cada feature: la cola de Plata
+     * sólo subía si el productor entraba a Plata. Volvía del campo, abría la
+     * app —que cae en Inicio—, veía "Listo" y el gasto seguía en el teléfono.
+     * Este test fija el contrato del drenado central: alcanza con abrir la app.
+     */
+    const context = await browser.newContext({ viewport: MOVIL })
+    const page = await context.newPage()
+
+    const insertados: string[] = []
+    /* OJO con el orden: `route` matchea en orden INVERSO de registro, así que el
+     * genérico va PRIMERO y el específico al final — si no, el genérico se come
+     * el POST que este test necesita observar (lección route-gotchas #1). */
+    await context.route(/supabase\.co\/(rest|auth|storage)\//, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: '[]',
+      }),
+    )
+    /* Sin membresía el guard manda a /onboarding y el shell del campo nunca
+     * monta — por lo tanto nunca drena. `maybeSingle()` espera un objeto. */
+    await context.route(/supabase\.co\/rest\/v1\/miembro_empresa/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify(membresiaFabricada),
+      }),
+    )
+    await context.route(/supabase\.co\/rest\/v1\/movimiento_financiero/, (route) => {
+      if (route.request().method() === 'POST') insertados.push(route.request().url())
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: '[]',
+      })
+    })
+
+    await calentarServiceWorker(page)
+    await page.evaluate(
+      ([authKey, sesion, membKey, memb]) => {
+        localStorage.setItem(authKey as string, JSON.stringify(sesion))
+        localStorage.setItem(membKey as string, JSON.stringify(memb))
+      },
+      [AUTH_KEY, sesionFabricada({ vencida: false }), MEMBRESIA_KEY, membresiaFabricada],
+    )
+
+    /* Dexie crea el esquema recién cuando la app abre esa feature: se pasa una
+     * vez por Plata (con la cola VACÍA, así que no sube nada) y se sale. A
+     * partir de acá la pantalla de Plata queda desmontada. */
+    await page.goto('/campo/plata')
+    await page.waitForTimeout(1500)
+    await page.goto('/campo')
+
+    // Un gasto pendiente en la cola, como si lo hubiera cargado sin señal.
+    await page.evaluate(async () => {
+      const abrir = () =>
+        new Promise<IDBDatabase>((resolve, reject) => {
+          const req = indexedDB.open('risso-plata')
+          req.onsuccess = () => resolve(req.result)
+          req.onerror = () => reject(req.error)
+        })
+      const db = await abrir()
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('outbox', 'readwrite')
+        tx.objectStore('outbox').put({
+          id: '00000000-0000-4000-8000-0000000000aa',
+          empresa_id: '00000000-0000-4000-8000-000000000003',
+          campo_id: '00000000-0000-4000-8000-000000000004',
+          tipo: 'gasto',
+          monto: 1234,
+          categoria_id: '00000000-0000-4000-8000-000000000005',
+          categoria_nombre: 'Gasoil',
+          fecha: '2026-08-31',
+          descripcion: null,
+          medio_pago: 'efectivo',
+          audio: null,
+          audio_path: null,
+          audio_subido: 0,
+          foto: null,
+          foto_subida: 0,
+          estado: 'pendiente',
+          error: null,
+          created_at: Date.now(),
+        })
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      })
+    })
+
+    // Se reabre el INICIO: el ciclo del shell corre de nuevo y tiene que
+    // drenar, con la pantalla de Plata desmontada.
+    await page.goto('/campo')
+    await expect.poll(() => insertados.length, { timeout: 20_000 }).toBeGreaterThan(0)
+    expect(page.url()).not.toContain('/campo/plata')
+
+    await context.close()
+  })
 })

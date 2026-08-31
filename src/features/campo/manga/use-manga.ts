@@ -70,6 +70,78 @@ function useOnline(): boolean {
   return online
 }
 
+/** Single-flight del drenado de caravaneo (antes era un ref del hook: con el
+ *  drenado central hay dos llamadores posibles y la bandera tiene que ser una
+ *  sola, compartida). */
+let drenando = false
+
+/**
+ * Sube las caravanas asignadas offline. Vive FUERA del hook para que el shell
+ * pueda drenar sin la pantalla de la manga montada.
+ */
+export async function drenarCaravaneo(opts?: {
+  onEstado?: (v: boolean) => void
+  /** Devuelve el animal al filtro local si su subida falló. Sólo lo pasa la
+   *  pantalla de la manga; el drenado central no tiene filtro que corregir. */
+  onFallo?: (animalId: string) => void
+}): Promise<void> {
+  if (!navigator.onLine || drenando) return
+  drenando = true
+    opts?.onEstado?.(true)
+  try {
+    const pendientes = await mangadb.outbox
+      .where('estado')
+      .equals('pendiente')
+      .toArray()
+    for (const item of pendientes) {
+      try {
+        // Nota de voz: sube antes del evento (el registro apunta al path).
+        let audioPath = item.audio_path
+        if (item.audio && !item.audio_subido && item.audio_id) {
+          const animal = await mangadb.animales.get(item.animal_id)
+          if (animal) {
+            audioPath = pathAudioEvento(
+              animal.empresa_id,
+              item.audio_id,
+              item.audio.type,
+            )
+            await subirAudioEvento(audioPath, item.audio)
+            await mangadb.outbox.update(item.local_id!, {
+              audio_subido: 1,
+              audio_path: audioPath,
+            })
+          }
+        }
+        await asignarCaravana({
+          animalId: item.animal_id,
+          rfid: item.rfid,
+          visual: item.visual,
+          categoria: item.categoria,
+          nota: item.nota,
+          audioUrl: audioPath,
+        })
+        await mangadb.outbox.update(item.local_id!, {
+          estado: 'sincronizada',
+          error: null,
+          audio: null, // ya está en storage; no acumular blobs
+        })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Error al sincronizar'
+        await mangadb.outbox.update(item.local_id!, {
+          estado: 'error',
+          error: msg,
+        })
+        // el animal vuelve a estar disponible para re-caravanear
+        opts?.onFallo?.(item.animal_id) // si no, el filtro local lo sigue ocultando
+        await mangadb.animales.update(item.animal_id, { caravaneado: 0 })
+      }
+    }
+  } finally {
+    opts?.onEstado?.(false)
+    drenando = false
+  }
+}
+
 export function useManga() {
   const online = useOnline()
   // La UI refleja Dexie en vivo (useLiveQuery): cualquier escritura en la cola
@@ -85,7 +157,6 @@ export function useManga() {
   // carga inicial) pueden solaparse; el guard de estado no alcanza porque el
   // setState es asíncrono. Un ref se lee/escribe sincrónicamente.
   const descargandoRef = useRef(false)
-  const sincronizandoRef = useRef(false)
 
   /**
    * Animales ya tomados por un caravaneo de ESTE tirón, antes de que Dexie
@@ -141,63 +212,10 @@ export function useManga() {
 
   // Drena la cola: por cada pendiente llama al RPC; conflicto marca ese ítem y
   // sigue (no frena el resto). El animal que falló vuelve a "quedan" para corregir.
-  const sincronizar = useCallback(async () => {
-    if (!navigator.onLine || sincronizandoRef.current) return
-    sincronizandoRef.current = true
-    setSincronizando(true)
-    try {
-      const pendientes = await mangadb.outbox
-        .where('estado')
-        .equals('pendiente')
-        .toArray()
-      for (const item of pendientes) {
-        try {
-          // Nota de voz: sube antes del evento (el registro apunta al path).
-          let audioPath = item.audio_path
-          if (item.audio && !item.audio_subido && item.audio_id) {
-            const animal = await mangadb.animales.get(item.animal_id)
-            if (animal) {
-              audioPath = pathAudioEvento(
-                animal.empresa_id,
-                item.audio_id,
-                item.audio.type,
-              )
-              await subirAudioEvento(audioPath, item.audio)
-              await mangadb.outbox.update(item.local_id!, {
-                audio_subido: 1,
-                audio_path: audioPath,
-              })
-            }
-          }
-          await asignarCaravana({
-            animalId: item.animal_id,
-            rfid: item.rfid,
-            visual: item.visual,
-            categoria: item.categoria,
-            nota: item.nota,
-            audioUrl: audioPath,
-          })
-          await mangadb.outbox.update(item.local_id!, {
-            estado: 'sincronizada',
-            error: null,
-            audio: null, // ya está en storage; no acumular blobs
-          })
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : 'Error al sincronizar'
-          await mangadb.outbox.update(item.local_id!, {
-            estado: 'error',
-            error: msg,
-          })
-          // el animal vuelve a estar disponible para re-caravanear
-          liberar(item.animal_id) // si no, el filtro local lo sigue ocultando
-          await mangadb.animales.update(item.animal_id, { caravaneado: 0 })
-        }
-      }
-    } finally {
-      setSincronizando(false)
-      sincronizandoRef.current = false
-    }
-  }, [liberar])
+  const sincronizar = useCallback(
+    () => drenarCaravaneo({ onEstado: setSincronizando, onFallo: liberar }),
+    [liberar],
+  )
 
   /** Puesta al día completa, SECUENCIADA para que no se pisen: primero empuja
    *  lo cargado offline (sincronizar) y recién después baja el estado fresco
