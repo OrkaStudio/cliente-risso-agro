@@ -2,7 +2,6 @@ import { type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { AuthScene } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
-import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
 
 /**
  * Shell de las pantallas de auth: escena ambiental a la izquierda (solo
@@ -51,12 +50,6 @@ export function AuthLayout({
               <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
                 {children}
               </div>
-              {/* El pie con la versión sólo en escritorio: en el teléfono la
-                  escena queda limpia. */}
-              <p className="mt-5 hidden text-center text-xs text-muted-foreground/80 lg:block">
-                {MARCA} · {MARCA_TAGLINE}
-                <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
-              </p>
             </div>
           </div>
         </div>
@@ -90,11 +83,14 @@ export function AuthHeading({
   icono: Icono,
   titulo,
   subtitulo,
+  subtituloSoloEscritorio = false,
 }: {
   /** Ícono de lo que hace la pantalla (entrar, crear cuenta, recuperar…). */
   icono: LucideIcon
   titulo: ReactNode
   subtitulo?: ReactNode
+  /** En el teléfono el subtítulo no entra (registro): se muestra desde sm. */
+  subtituloSoloEscritorio?: boolean
 }) {
   return (
     <div>
@@ -107,7 +103,10 @@ export function AuthHeading({
         </div>
       </Reveal>
       {subtitulo && (
-        <Reveal delay={0.08} className="mt-2">
+        <Reveal
+          delay={0.08}
+          className={subtituloSoloEscritorio ? 'mt-2 hidden sm:block' : 'mt-2'}
+        >
           <p className="text-sm leading-relaxed text-muted-foreground">{subtitulo}</p>
         </Reveal>
       )}

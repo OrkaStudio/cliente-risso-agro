@@ -72,7 +72,11 @@ export function AuthScene({
             key={i}
             className="absolute left-1/2 top-1/2 rounded-full border border-accent/40"
             style={{ width: sol, height: sol, x: '-50%', y: '-50%' }}
-            initial={false}
+            // initial EXPLÍCITO igual al primer keyframe. Con `initial={false}`
+            // framer arranca en el ÚLTIMO keyframe (opacity 0, scale 3.4) y en
+            // el build de producción se queda ahí: nunca anima. En `vite dev`
+            // parecía andar porque StrictMode monta dos veces.
+            initial={{ scale: 1, opacity: 0 }}
             // La opacidad entra y sale en fade (0 → 0.5 → 0): si la onda
             // reaparece de golpe al reiniciar el loop, titila como un error.
             animate={{ scale: [1, 3.4], opacity: [0, 0.5, 0] }}

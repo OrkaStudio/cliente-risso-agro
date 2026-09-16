@@ -162,7 +162,12 @@ export function SignupPage() {
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
-            <AuthHeading icono={Sprout} titulo="Creá tu cuenta" />
+            <AuthHeading
+              icono={Sprout}
+              titulo="Creá tu cuenta"
+              subtitulo="Te lleva un minuto. Con tu celular y tu email vas a poder recuperar el acceso cuando haga falta."
+              subtituloSoloEscritorio
+            />
 
             <form onSubmit={onSubmit} className="mt-4 grid gap-2.5 sm:mt-5 sm:gap-3.5" noValidate>
               <Reveal delay={0.14}>

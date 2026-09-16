@@ -9,6 +9,10 @@ import { AuthProvider } from '@/features/auth/auth-context'
 import { router } from '@/app/router'
 import { Toaster } from '@/components/ui/sonner'
 
+// Commit del build, invisible: se lee con `document.documentElement.dataset.build`
+// (DevTools) para saber qué versión tiene un teléfono con la PWA cacheada.
+document.documentElement.dataset.build = __BUILD_SHA__
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
