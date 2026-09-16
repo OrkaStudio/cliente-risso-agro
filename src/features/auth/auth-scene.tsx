@@ -35,7 +35,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo'
         className="absolute inset-0"
         style={{
           background: compacta
-            ? 'radial-gradient(90% 34% at 88% 17%, rgba(217,138,24,0.30) 0%, rgba(217,138,24,0.10) 34%, transparent 66%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)'
+            ? 'radial-gradient(90% 34% at 88% 14%, rgba(217,138,24,0.30) 0%, rgba(217,138,24,0.10) 34%, transparent 66%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)'
             : 'radial-gradient(135% 95% at 66% 76%, rgba(217,138,24,0.32) 0%, rgba(217,138,24,0.12) 34%, transparent 68%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)',
         }}
       />
@@ -55,8 +55,8 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo'
         className={
           compacta
             ? // Sol asomando detrás de la esquina superior derecha de la
-              // tarjeta (que arranca en top 150px): la mitad queda tapada.
-              'absolute right-[68px] top-[150px] translate-x-1/2 -translate-y-1/2'
+              // tarjeta (que arranca en top 118px): la mitad queda tapada.
+              'absolute right-[68px] top-[118px] translate-x-1/2 -translate-y-1/2'
             : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
       >
@@ -212,7 +212,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo'
             </span>
             <span className="font-heading text-[15px] font-bold">{MARCA}</span>
           </div>
-          <p className="mt-4 max-w-[260px] font-heading text-[19px] font-semibold leading-snug tracking-tight">
+          <p className="mt-3 max-w-[260px] font-heading text-[19px] font-semibold leading-snug tracking-tight">
             Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
             <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
             <span className="text-[#e9b45f]">números</span> — en una sola app.

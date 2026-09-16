@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { DoorOpen } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -59,6 +60,7 @@ export function LoginPage() {
   return (
     <AuthLayout>
       <AuthHeading
+        icono={DoorOpen}
         titulo="Entrá a tu campo"
         subtitulo="Tus animales, tus potreros y tu plata, donde los dejaste."
       />

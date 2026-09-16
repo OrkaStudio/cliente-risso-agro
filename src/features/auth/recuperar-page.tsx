@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MailCheck } from 'lucide-react'
+import {MailCheck, KeyRound} from 'lucide-react'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -86,6 +86,7 @@ export function RecuperarPage() {
   return (
     <AuthLayout>
       <AuthHeading
+        icono={KeyRound}
         titulo="Recuperá tu acceso"
         subtitulo="Te mandamos un link al email para elegir una contraseña nueva."
       />

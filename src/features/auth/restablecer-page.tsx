@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ShieldCheck } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -49,6 +50,7 @@ export function RestablecerPage() {
   return (
     <AuthLayout>
       <AuthHeading
+        icono={ShieldCheck}
         titulo="Elegí una contraseña nueva"
         subtitulo={`Para ${user?.email ?? 'tu cuenta'}. Después entrás directo.`}
       />

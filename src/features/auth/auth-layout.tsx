@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Leaf } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { AuthScene } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
 import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
@@ -15,13 +15,17 @@ import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
  */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="grid h-full lg:grid-cols-[1.15fr_1fr]">
+    // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
+    // que mide el contenido. Sin eso la columna crece con el formulario, el
+    // overflow-hidden de html/body esconde el resto y NO se puede scrollear
+    // (a 748px de alto el botón de Continuar quedaba afuera, sin scroll).
+    <div className="grid h-full grid-rows-[minmax(0,1fr)] lg:grid-cols-[1.15fr_1fr]">
       {/* La sombra ancha y suave hacia la derecha funde el borde entre la
           escena oscura y el panel porcelana (sin línea a cuchillo). */}
       <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
         <AuthScene />
       </div>
-      <div className="relative h-full">
+      <div className="relative min-h-0 h-full">
         {/* Móvil: la escena es el fondo de TODA la pantalla y no se desplaza
             con el formulario: frase arriba, sol y lomas abajo del todo. En
             escritorio la escena es el panel izquierdo. */}
@@ -34,23 +38,18 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
               al abrir el teclado la pantalla se achica y una tarjeta centrada
               se re-centra de golpe (el "sacudón"). */}
-          <div className="flex flex-1 items-start justify-center px-5 pt-[150px] pb-10 sm:items-center sm:p-10">
+          <div className="flex flex-1 items-start justify-center px-5 pt-[118px] pb-6 sm:items-center sm:p-10">
             <div className="w-full max-w-[430px]">
               <div className="auth-forms rounded-[20px] border border-border bg-card p-6 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
                 {children}
               </div>
-              <p className="mt-5 hidden text-center text-xs text-muted-foreground/80 lg:block">
+              <p className="mt-5 text-center text-xs text-white/60 lg:text-muted-foreground/80">
                 {MARCA} · {MARCA_TAGLINE}
                 <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
               </p>
             </div>
           </div>
         </div>
-        {/* Móvil: el pie va fijo al borde de la escena, sobre el alambrado,
-            así no se cruza con el sol ni con la tarjeta. */}
-        <p className="pointer-events-none absolute inset-x-0 bottom-2.5 text-center text-[11px] text-white/55 lg:hidden">
-          {MARCA} · {MARCA_TAGLINE} · {__BUILD_SHA__}
-        </p>
       </div>
     </div>
   )
@@ -73,15 +72,17 @@ export function ErrorCampo({ mensaje }: { mensaje?: string | null }) {
 }
 
 /**
- * Encabezado de cada pantalla de auth: el chip de marca (mismo sello que el
- * sidebar) en la misma fila que el título; el subtítulo abajo, a todo el
- * ancho, alineado al margen del formulario. En móvil el chip no va — la
- * banda superior ya lleva la marca.
+ * Encabezado de cada pantalla de auth: un ícono de lo que hace la pantalla
+ * en la misma fila que el título (la marca ya está en la escena de al lado /
+ * de fondo); el subtítulo abajo, a todo el ancho, alineado al formulario.
  */
 export function AuthHeading({
+  icono: Icono,
   titulo,
   subtitulo,
 }: {
+  /** Ícono de lo que hace la pantalla (entrar, crear cuenta, recuperar…). */
+  icono: LucideIcon
   titulo: ReactNode
   subtitulo: ReactNode
 }) {
@@ -89,8 +90,8 @@ export function AuthHeading({
     <div>
       <Reveal>
         <div className="flex items-center gap-3">
-          <span className="hidden size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] lg:flex">
-            <Leaf className="size-[18px] text-white" strokeWidth={1.75} />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
+            <Icono className="size-[18px]" strokeWidth={1.75} />
           </span>
           <h1 className="text-2xl leading-9 font-bold tracking-tight">{titulo}</h1>
         </div>

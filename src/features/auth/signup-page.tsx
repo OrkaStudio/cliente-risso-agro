@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AtSign, MailCheck } from 'lucide-react'
+import { AtSign, ClipboardCheck, MailCheck, Sprout } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth, YA_REGISTRADO } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -156,6 +156,7 @@ export function SignupPage() {
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
             <AuthHeading
+              icono={Sprout}
               titulo="Creá tu cuenta"
               subtitulo="Te lleva un minuto. Con tu celular y tu email vas a poder recuperar el acceso cuando haga falta."
             />
@@ -343,6 +344,7 @@ function RevisarContacto({
   return (
     <div>
       <AuthHeading
+        icono={ClipboardCheck}
         titulo={`Ya casi, ${datos.nombre}`}
         subtitulo="Confirmá que estén bien y listo."
       />
