@@ -158,10 +158,10 @@ export function SignupPage() {
             <AuthHeading
               icono={Sprout}
               titulo="Creá tu cuenta"
-              subtitulo="Te lleva un minuto. Con tu celular y tu email vas a poder recuperar el acceso cuando haga falta."
+              subtitulo="Un minuto. Revisá bien celular y email."
             />
 
-            <form onSubmit={onSubmit} className="mt-6 grid gap-3.5" noValidate>
+            <form onSubmit={onSubmit} className="mt-5 grid gap-3 sm:mt-6 sm:gap-3.5" noValidate>
               <Reveal delay={0.14}>
                 <div className="grid grid-cols-2 items-start gap-3">
                   <div className="grid gap-1.5">

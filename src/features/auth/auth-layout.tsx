@@ -26,27 +26,30 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         <AuthScene />
       </div>
       <div className="relative min-h-0 h-full">
-        {/* Móvil: la escena es el fondo de TODA la pantalla y no se desplaza
-            con el formulario: frase arriba, sol y lomas abajo del todo. En
-            escritorio la escena es el panel izquierdo. */}
-        <div className="absolute inset-0 lg:hidden">
-          <AuthScene variante="fondo" />
-        </div>
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
             vista, el desplazamiento es un deslizamiento, no un salto. */}
-        <div className="relative flex h-full flex-col overflow-y-auto scroll-smooth">
-          {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
-              al abrir el teclado la pantalla se achica y una tarjeta centrada
-              se re-centra de golpe (el "sacudón"). */}
-          <div className="flex flex-1 items-start justify-center px-5 pt-[118px] pb-6 sm:items-center sm:p-10">
-            <div className="w-full max-w-[430px]">
-              <div className="auth-forms rounded-[20px] border border-border bg-card p-6 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
-                {children}
+        <div className="flex h-full flex-col overflow-y-auto scroll-smooth">
+          {/* min-h-full + relative: la escena de fondo cubre TODO el contenido
+              (no sólo la primera pantalla) y se desplaza con él — frase y sol
+              se van hacia arriba junto con la tarjeta, las lomas quedan al
+              final. Nada se monta sobre nada. */}
+          <div className="relative flex min-h-full shrink-0 flex-col">
+            <div className="absolute inset-0 lg:hidden">
+              <AuthScene variante="fondo" />
+            </div>
+            {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
+                al abrir el teclado la pantalla se achica y una tarjeta centrada
+                se re-centra de golpe (el "sacudón"). */}
+            <div className="relative flex flex-1 items-start justify-center px-5 pt-[96px] pb-3 sm:items-center sm:p-10">
+              <div className="w-full max-w-[430px]">
+                <div className="auth-forms rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
+                  {children}
+                </div>
+                <p className="mt-3 text-center text-xs text-white/60 lg:text-muted-foreground/80">
+                  {MARCA} · {MARCA_TAGLINE}
+                  <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
+                </p>
               </div>
-              <p className="mt-5 text-center text-xs text-white/60 lg:text-muted-foreground/80">
-                {MARCA} · {MARCA_TAGLINE}
-                <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
-              </p>
             </div>
           </div>
         </div>
