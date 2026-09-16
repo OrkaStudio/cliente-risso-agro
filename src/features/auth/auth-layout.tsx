@@ -47,7 +47,7 @@ export function AuthLayout({
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
-            <div className="relative flex flex-1 flex-col items-center px-5 pt-[116px] pb-3 sm:justify-center sm:p-10">
+            <div className="relative flex flex-1 flex-col items-center px-5 pt-[132px] pb-3 sm:justify-center sm:p-10">
               <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
                 {children}
               </div>
