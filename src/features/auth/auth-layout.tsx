@@ -40,16 +40,16 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
-            <div className="relative flex flex-1 items-start justify-center px-5 pt-[96px] pb-3 sm:items-center sm:p-10">
-              <div className="w-full max-w-[430px]">
-                <div className="auth-forms rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
-                  {children}
-                </div>
-                <p className="mt-3 text-center text-xs text-white/60 lg:text-muted-foreground/80">
-                  {MARCA} · {MARCA_TAGLINE}
-                  <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
-                </p>
+            <div className="relative flex flex-1 flex-col items-center px-5 pt-[116px] pb-3 sm:justify-center sm:p-10">
+              <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
+                {children}
               </div>
+              {/* Móvil: el pie baja al final de la pantalla (sobre el alambrado)
+                  cuando sobra lugar, y queda bajo la tarjeta cuando no. */}
+              <p className="mt-auto pt-3 text-center text-xs text-white/60 sm:mt-5 sm:pt-0 lg:text-muted-foreground/80">
+                {MARCA} · {MARCA_TAGLINE}
+                <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
+              </p>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function AuthHeading({
   /** Ícono de lo que hace la pantalla (entrar, crear cuenta, recuperar…). */
   icono: LucideIcon
   titulo: ReactNode
-  subtitulo: ReactNode
+  subtitulo?: ReactNode
 }) {
   return (
     <div>
@@ -99,9 +99,11 @@ export function AuthHeading({
           <h1 className="text-2xl leading-9 font-bold tracking-tight">{titulo}</h1>
         </div>
       </Reveal>
-      <Reveal delay={0.08} className="mt-2">
-        <p className="text-sm leading-relaxed text-muted-foreground">{subtitulo}</p>
-      </Reveal>
+      {subtitulo && (
+        <Reveal delay={0.08} className="mt-2">
+          <p className="text-sm leading-relaxed text-muted-foreground">{subtitulo}</p>
+        </Reveal>
+      )}
     </div>
   )
 }
