@@ -56,6 +56,8 @@ export function SignupPage() {
   // celular son por donde lo vamos a contactar: se muestran grandes antes de
   // crear la cuenta, como hace WhatsApp con el número.
   const [revisando, setRevisando] = useState<Datos | null>(null)
+  // true después de pasar por la revisión: la vuelta al form sí se desliza.
+  const [yaRevisado, setYaRevisado] = useState(false)
   // Email al que se mandó el link de confirmación (cambia la pantalla).
   // Sólo pasa si Supabase tiene "Confirm email" prendido.
   const [confirmarEn, setConfirmarEn] = useState<string | null>(null)
@@ -89,6 +91,7 @@ export function SignupPage() {
       return
     }
     setErrores({})
+    setYaRevisado(true)
     setRevisando(parsed.data)
   }
 
@@ -131,7 +134,7 @@ export function SignupPage() {
 
   return (
     <AuthLayout>
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait">
         {revisando ? (
           <motion.div
             key="revisar"
@@ -150,7 +153,11 @@ export function SignupPage() {
         ) : (
           <motion.div
             key="form"
-            initial={{ opacity: 0, x: -24 }}
+            // Al montar la página el formulario no se desliza (el Reveal de
+            // cada campo hace la entrada, como en las demás pantallas); sólo
+            // al VOLVER desde la revisión. `initial={false}` en AnimatePresence
+            // haría lo mismo pero se propaga y apaga el Reveal de los hijos.
+            initial={yaRevisado ? { opacity: 0, x: -24 } : { opacity: 1, x: 0 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
