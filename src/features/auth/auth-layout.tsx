@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { Leaf } from 'lucide-react'
 import { AuthScene } from '@/features/auth/auth-scene'
+import { Reveal } from '@/features/auth/reveal'
 import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
 
 /**
@@ -31,10 +32,6 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         <div className="flex flex-1 items-center justify-center p-5 sm:p-10">
           <div className="w-full max-w-[430px]">
             <div className="auth-forms rounded-[20px] border border-border bg-card p-6 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
-              {/* Chip de marca: mismo sello que el sidebar de la app */}
-              <div className="mb-7 hidden size-11 items-center justify-center rounded-[11px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] lg:flex">
-                <Leaf className="size-5 text-white" strokeWidth={1.75} />
-              </div>
               {children}
             </div>
             <p className="mt-5 text-center text-xs text-muted-foreground/80">
@@ -43,6 +40,42 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * El botón principal de cada pantalla de auth: más alto y con más peso que
+ * el estándar de la app — acá es la única acción y se toca con el pulgar.
+ */
+export const BOTON_PRINCIPAL = 'h-11 w-full text-[15px] font-semibold'
+
+/**
+ * Encabezado de cada pantalla de auth: el chip de marca (mismo sello que el
+ * sidebar) en la misma fila que el título; el subtítulo abajo, a todo el
+ * ancho, alineado al margen del formulario. En móvil el chip no va — la
+ * banda superior ya lleva la marca.
+ */
+export function AuthHeading({
+  titulo,
+  subtitulo,
+}: {
+  titulo: ReactNode
+  subtitulo: ReactNode
+}) {
+  return (
+    <div>
+      <Reveal>
+        <div className="flex items-center gap-3">
+          <span className="hidden size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] lg:flex">
+            <Leaf className="size-[18px] text-white" strokeWidth={1.75} />
+          </span>
+          <h1 className="text-2xl leading-9 font-bold tracking-tight">{titulo}</h1>
+        </div>
+      </Reveal>
+      <Reveal delay={0.08} className="mt-2">
+        <p className="text-sm leading-relaxed text-muted-foreground">{subtitulo}</p>
+      </Reveal>
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import { type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { cn } from '@/lib/utils'
 
 /**
  * Reveal escalonado para las pantallas de auth: el contenido sube mientras
@@ -17,9 +16,14 @@ export function Reveal({
   delay?: number
   className?: string
 }) {
+  // `className` va en el motion.div, que es el padre real de los children:
+  // un `grid gap-2` tiene que separar label e input, no envolver al bloque.
   return (
-    <div className={cn('relative overflow-hidden', className)}>
+    // -m-1 p-1: 4px de holgura para que el anillo de foco (2px + 2px de
+    // offset) del último input del bloque no quede recortado por el overflow.
+    <div className="relative -m-1 overflow-hidden p-1">
       <motion.div
+        className={className}
         initial={{ opacity: 0, y: 22 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: delay + 0.18, ease: 'easeOut' }}

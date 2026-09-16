@@ -27,9 +27,24 @@ type AuthState = {
     password: string
     nombre: string
     apellido: string
+    /**
+     * E.164 (`+549…`), ya normalizado por `normalizarCelularAR`. Va a
+     * user_metadata; cuando haya proveedor de WhatsApp/SMS se promueve a
+     * teléfono de la cuenta (auth.users.phone) para el ingreso por código.
+     */
+    celular: string
   }) => Promise<{ error: string | null; needsConfirmation: boolean }>
+  /** Manda el mail con link a `/restablecer`. Siempre "ok" (no revela si existe). */
+  resetPassword: (email: string) => Promise<{ error: string | null }>
+  /** Cambia la contraseña del usuario logueado (tras el link de recuperación). */
+  updatePassword: (password: string) => Promise<{ error: string | null }>
+  /** Reenvía el mail de confirmación (sólo si Supabase la exige). */
+  resendConfirmation: (email: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
 }
+
+/** Mismo texto venga de donde venga; el registro lo reconoce para ofrecer salida. */
+export const YA_REGISTRADO = 'Ya hay una cuenta con este email.'
 
 /** Los mensajes de GoTrue vienen en inglés; traducimos los que el usuario ve seguido. */
 function traducirErrorAuth(message: string): string {
@@ -39,11 +54,15 @@ function traducirErrorAuth(message: string): string {
   if (m.includes('email not confirmed'))
     return 'Tu email todavía no está confirmado. Revisá tu casilla.'
   if (m.includes('user already registered') || m.includes('already been registered'))
-    return 'Ya existe una cuenta con ese email. Probá iniciar sesión.'
+    return YA_REGISTRADO
   if (m.includes('password should be at least'))
     return 'La contraseña es demasiado corta.'
   if (m.includes('rate limit') || m.includes('too many requests'))
     return 'Demasiados intentos. Esperá un momento y volvé a probar.'
+  if (m.includes('same password') || m.includes('different from the old'))
+    return 'La contraseña nueva tiene que ser distinta a la anterior.'
+  if (m.includes('auth session missing'))
+    return 'El link venció o ya se usó. Pedí uno nuevo.'
   return message
 }
 
@@ -83,6 +102,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       if (next) setSession(next)
+      // Link de "olvidé mi contraseña" abierto en cualquier ruta (p. ej. si la
+      // URL de redirect no está en la lista blanca de Supabase y cayó en la
+      // raíz): llevamos al formulario de contraseña nueva igual. Recarga
+      // completa a propósito — la sesión ya quedó en storage y este provider
+      // no ve el router.
+      if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/restablecer') {
+        window.location.replace('/restablecer')
+      }
     })
 
     return () => sub.subscription.unsubscribe()
@@ -100,15 +127,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         return { error: error ? traducirErrorAuth(error.message) : null }
       },
-      async signUp({ email, password, nombre, apellido }) {
+      async signUp({ email, password, nombre, apellido, celular }) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            // El link de confirmación vuelve a la app; detectSessionInUrl
-            // levanta la sesión y el guard de empresa manda al onboarding.
+            // Si Supabase exige confirmar el email, el link vuelve a la app;
+            // detectSessionInUrl levanta la sesión y el guard manda al onboarding.
             emailRedirectTo: window.location.origin,
-            data: { nombre: nombre.trim(), apellido: apellido.trim() },
+            data: { nombre: nombre.trim(), apellido: apellido.trim(), celular },
           },
         })
         if (error)
@@ -116,7 +143,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             error: traducirErrorAuth(error.message),
             needsConfirmation: false,
           }
+        // Con "Confirm email" prendido, Supabase responde OK aunque el email
+        // ya tenga cuenta (para no revelar quién está registrado) y deja la
+        // pista en `identities: []`. Para nosotros un email = una cuenta, y
+        // el productor tiene que enterarse acá, no en "revisá tu correo".
+        if (data.user && data.user.identities?.length === 0)
+          return { error: YA_REGISTRADO, needsConfirmation: false }
         return { error: null, needsConfirmation: data.session === null }
+      },
+      async resetPassword(email) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/restablecer`,
+        })
+        return { error: error ? traducirErrorAuth(error.message) : null }
+      },
+      async updatePassword(password) {
+        const { error } = await supabase.auth.updateUser({ password })
+        return { error: error ? traducirErrorAuth(error.message) : null }
+      },
+      async resendConfirmation(email) {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+          options: { emailRedirectTo: window.location.origin },
+        })
+        return { error: error ? traducirErrorAuth(error.message) : null }
       },
       async signOut() {
         await supabase.auth.signOut()

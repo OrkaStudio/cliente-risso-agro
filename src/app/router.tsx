@@ -5,6 +5,8 @@ import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { LoginPage } from '@/features/auth/login-page'
 import { SignupPage } from '@/features/auth/signup-page'
+import { RecuperarPage } from '@/features/auth/recuperar-page'
+import { RestablecerPage } from '@/features/auth/restablecer-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { RequireEmpresa } from '@/features/auth/require-empresa'
 import { AppShell } from '@/app/app-shell'
@@ -97,8 +99,17 @@ export const router = createBrowserRouter([
     element: <SignupPage />,
   },
   {
+    path: '/recuperar',
+    element: <RecuperarPage />,
+  },
+  {
     element: <ProtectedRoute />,
     children: [
+      {
+        // Llega con la sesión del link de recuperación; elige contraseña nueva.
+        path: '/restablecer',
+        element: <RestablecerPage />,
+      },
       {
         // Recién registrado, sin empresa todavía: arma la suya acá.
         path: '/onboarding',

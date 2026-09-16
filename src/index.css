@@ -478,9 +478,38 @@
 /* Foco en los formularios de auth/onboarding: borde verde + anillo SEPARADO
    (outline con offset). El anillo pegado al borde se veía recortado en las
    esquinas redondeadas; despegado 2px respira y las puntas quedan suaves. */
+/* Placeholders más apagados en auth: el ejemplo ("2923-456789") no tiene que
+   parecer un valor cargado, o el productor lo deja como está. */
+.auth-forms input::placeholder {
+  color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
 .auth-forms input:focus-visible {
   border-color: var(--ring);
   outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent);
   outline-offset: 2px;
   box-shadow: none;
+}
+/* Con error, el foco también es rojo: el primer campo inválido recibe foco
+   automático y no tiene que parecer válido por estar enfocado. */
+.auth-forms input[aria-invalid='true']:focus-visible,
+.auth-forms .celular-grupo:has(input[aria-invalid='true']):focus-within {
+  border-color: var(--destructive);
+  outline-color: color-mix(in srgb, var(--destructive) 35%, transparent);
+}
+/* Contraseña sin gestor (registro): type=text enmascarado. Ver PasswordInput. */
+.password-mask {
+  -webkit-text-security: disc;
+}
+/* Celular: el anillo lo dibuja el grupo (prefijo +54 9 + input) como una
+   sola pieza; el input adentro no marca nada propio. */
+.auth-forms .celular-grupo:focus-within {
+  border-color: var(--ring);
+  outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent);
+  outline-offset: 2px;
+}
+.auth-forms .celular-grupo input:focus-visible,
+.auth-forms .celular-grupo input[aria-invalid='true'] {
+  outline: none;
+  box-shadow: none;
+  border-color: transparent;
 }
