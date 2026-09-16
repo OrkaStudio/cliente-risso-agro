@@ -41,6 +41,7 @@ Al no haber servidor (Server Actions), el cliente habla directo con Postgres:
 - No agregar deps fuera del stack de arriba sin justificar.
 - Verificar con **`pnpm build`** (no sólo `tsc`) antes de pushear — el build real es el que manda.
 - No commitear sin `/post` para registrar en el cerebro.
+- **Cadena de altura (mordió cuatro veces):** `html/body/#root` son `height:100%` + `overflow:hidden`, así que el scroll vive SIEMPRE en un contenedor interno. Todo contenedor con `overflow-y-auto` dentro de `h-full` necesita la fila/ítem acotado — `grid-rows-[minmax(0,1fr)]` en grids, `min-h-0` en ítems flex que scrollean, `shrink-0` en los que no deben encogerse. Y verificar con `scrollHeight` vs `clientHeight` en Playwright, no a ojo: el contenido recortado en silencio se ve "bien". Lecciones: `2026-07-02-…scroll-mobile-shell-flexbox`, `2026-09-01-…flex-shrink-recorta-en-silencio`, TASK-059.
 
 ## Pendientes técnicos conocidos (no perder)
 
