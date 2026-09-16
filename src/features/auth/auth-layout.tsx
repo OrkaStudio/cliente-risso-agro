@@ -24,18 +24,16 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
           vista, el desplazamiento es un deslizamiento, no un salto. */}
       <div className="flex h-full flex-col overflow-y-auto scroll-smooth">
-        {/* Banda de marca, solo cuando la escena no se ve */}
-        <div className="flex items-center gap-2.5 border-b border-border bg-sidebar px-5 py-3 text-sidebar-foreground lg:hidden">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-white">
-            <Leaf className="size-4" strokeWidth={1.75} />
-          </span>
-          <span className="font-heading text-[15px] font-bold">{MARCA}</span>
+        {/* Móvil: la misma escena como cabecera, y la tarjeta montada sobre
+            su horizonte (ver -mt abajo). En escritorio la escena es el panel. */}
+        <div className="shrink-0 lg:hidden">
+          <AuthScene variante="cabecera" />
         </div>
         {/* En móvil la tarjeta va ARRIBA, no centrada: al abrir el teclado la
             pantalla se achica y una tarjeta centrada se re-centra de golpe
             (el "sacudón"). Anclada arriba, sólo se desplaza lo justo. */}
-        <div className="flex flex-1 items-start justify-center p-5 pt-6 sm:items-center sm:p-10">
-          <div className="w-full max-w-[430px]">
+        <div className="flex flex-1 items-start justify-center p-5 pt-0 sm:items-center sm:p-10 lg:pt-10">
+          <div className="relative -mt-8 w-full max-w-[430px] sm:mt-0">
             <div className="auth-forms rounded-[20px] border border-border bg-card p-6 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
               {children}
             </div>

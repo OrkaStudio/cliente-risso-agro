@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { Leaf } from 'lucide-react'
 import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
 
 /** Tinta de las siluetas (molino, alambrado): casi negro verdoso. */
@@ -12,11 +13,19 @@ const TINTA = '#071609'
  * paleta de la app (verde profundo del sidebar, sol #d98a18). Decorativa:
  * `aria-hidden`, sin interacción.
  */
-export function AuthScene() {
+export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'cabecera' }) {
+  const compacta = variante === 'cabecera'
+  const sol = compacta ? 52 : 90
   return (
     <div
       aria-hidden
-      className="relative flex h-full flex-col overflow-hidden bg-sidebar p-10 text-sidebar-foreground"
+      className={
+        compacta
+          ? // Cabecera de móvil: la misma escena, apretada. Padding abajo
+            // generoso porque la tarjeta se monta sobre el borde inferior.
+            'relative flex h-[216px] flex-col overflow-hidden bg-sidebar px-5 pt-5 pb-12 text-sidebar-foreground'
+          : 'relative flex h-full flex-col overflow-hidden bg-sidebar p-10 text-sidebar-foreground'
+      }
     >
       {/* Cielo: resplandor del amanecer detrás del horizonte */}
       <div
@@ -38,12 +47,18 @@ export function AuthScene() {
       />
 
       {/* Sol + ondas expansivas sobre el horizonte */}
-      <div className="absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2">
+      <div
+        className={
+          compacta
+            ? 'absolute left-[80%] top-[58%] -translate-x-1/2 -translate-y-1/2'
+            : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
+        }
+      >
         {[0, 1, 2, 3].map((i) => (
           <motion.span
             key={i}
             className="absolute left-1/2 top-1/2 rounded-full border border-accent/40"
-            style={{ width: 90, height: 90, x: '-50%', y: '-50%' }}
+            style={{ width: sol, height: sol, x: '-50%', y: '-50%' }}
             initial={false}
             // La opacidad entra y sale en fade (0 → 0.5 → 0): si la onda
             // reaparece de golpe al reiniciar el loop, titila como un error.
@@ -66,11 +81,13 @@ export function AuthScene() {
         <motion.span
           className="absolute left-1/2 top-1/2 block rounded-full bg-accent"
           style={{
-            width: 90,
-            height: 90,
+            width: sol,
+            height: sol,
             x: '-50%',
             y: '-50%',
-            boxShadow: '0 0 80px 24px rgba(217,138,24,0.35)',
+            boxShadow: compacta
+              ? '0 0 48px 14px rgba(217,138,24,0.35)'
+              : '0 0 80px 24px rgba(217,138,24,0.35)',
           }}
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -80,7 +97,11 @@ export function AuthScene() {
 
       {/* Horizonte: lomadas + molino (aspas girando) */}
       <svg
-        className="absolute inset-x-0 bottom-0 h-[42%] w-full"
+        className={
+          compacta
+            ? 'absolute inset-x-0 bottom-0 h-[50%] w-full'
+            : 'absolute inset-x-0 bottom-0 h-[42%] w-full'
+        }
         viewBox="0 0 800 340"
         preserveAspectRatio="xMidYMax slice"
       >
@@ -104,7 +125,11 @@ export function AuthScene() {
             (rotación SVG nativa alrededor de (0,0): framer-motion calcula
             mal el transform-origin dentro de un SVG y la rueda se separaba
             de la torre). */}
-        <g transform="translate(248 94) scale(1.3)" stroke={TINTA} fill="none">
+        <g
+          transform={compacta ? 'translate(248 182) scale(0.95)' : 'translate(248 94) scale(1.3)'}
+          stroke={TINTA}
+          fill="none"
+        >
           {/* Veleta: barral largo + aleta fina tipo timón */}
           <line x1="0" y1="0" x2="50" y2="4" strokeWidth="2.6" />
           <path
@@ -168,23 +193,45 @@ export function AuthScene() {
       </svg>
 
       {/* Marca + mensaje */}
-      <motion.div
-        className="relative"
-        initial={{ opacity: 0, y: -14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: 'easeOut' }}
-      >
-        <p className="font-heading text-2xl font-bold tracking-tight">
-          {MARCA}
-        </p>
-        <p className="mt-1 text-sm text-sidebar-foreground/70">
-          {MARCA_TAGLINE}
-        </p>
-      </motion.div>
+      {compacta ? (
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-white">
+              <Leaf className="size-4" strokeWidth={1.75} />
+            </span>
+            <span className="font-heading text-[15px] font-bold">{MARCA}</span>
+          </div>
+          <p className="mt-4 max-w-[260px] font-heading text-[19px] font-semibold leading-snug tracking-tight">
+            Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
+            <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
+            <span className="text-[#e9b45f]">números</span> — en una sola app.
+          </p>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, y: -14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+        >
+          <p className="font-heading text-2xl font-bold tracking-tight">
+            {MARCA}
+          </p>
+          <p className="mt-1 text-sm text-sidebar-foreground/70">
+            {MARCA_TAGLINE}
+          </p>
+        </motion.div>
+      )}
 
       {/* El mensaje va arriba, debajo de la marca: el horizonte (molino,
           alambrado) queda despejado abajo. Las tres patas del producto
           van en ámbar (el color del sol de la escena). */}
+      {!compacta && (
       <motion.div
         className="relative mt-14 max-w-md"
         initial={{ opacity: 0, y: 16 }}
@@ -201,6 +248,7 @@ export function AuthScene() {
           para el productor, no para el contador.
         </p>
       </motion.div>
+      )}
     </div>
   )
 }
