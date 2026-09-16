@@ -50,6 +50,16 @@ export function AuthLayout({ children }: { children: ReactNode }) {
  */
 export const BOTON_PRINCIPAL = 'h-11 w-full text-[15px] font-semibold'
 
+/** Mensaje corto bajo un campo. Ocupa lugar sólo cuando hay algo que decir. */
+export function ErrorCampo({ mensaje }: { mensaje?: string | null }) {
+  if (!mensaje) return null
+  return (
+    <p className="text-xs text-destructive" role="alert">
+      {mensaje}
+    </p>
+  )
+}
+
 /**
  * Encabezado de cada pantalla de auth: el chip de marca (mismo sello que el
  * sidebar) en la misma fila que el título; el subtítulo abajo, a todo el

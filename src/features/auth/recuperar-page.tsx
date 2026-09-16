@@ -4,13 +4,15 @@ import { motion } from 'framer-motion'
 import { MailCheck } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
-import { AuthHeading, AuthLayout, BOTON_PRINCIPAL } from '@/features/auth/auth-layout'
+import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-const pedido = z.object({ email: z.string().email('Email inválido') })
+const pedido = z.object({
+  email: z.string().trim().min(1, 'Falta el email').email('Parece que falta algo en el email'),
+})
 
 /**
  * "Olvidé mi contraseña": pide el email y manda el link a `/restablecer`.
@@ -97,17 +99,16 @@ export function RecuperarPage() {
             autoComplete="email"
             placeholder="vos@campo.com.ar"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setError(null)
+            }}
+            aria-invalid={!!error}
             autoFocus
             required
           />
+          <ErrorCampo mensaje={error} />
         </Reveal>
-
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
 
         <Reveal delay={0.24} className="mt-2">
           <Button type="submit" disabled={submitting} className={BOTON_PRINCIPAL}>

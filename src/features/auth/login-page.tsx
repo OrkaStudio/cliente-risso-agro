@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
-import { AuthHeading, AuthLayout, BOTON_PRINCIPAL } from '@/features/auth/auth-layout'
+import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
 import { PasswordInput } from '@/features/auth/password-input'
 import { Reveal } from '@/features/auth/reveal'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 const credenciales = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Ingresá la contraseña'),
+  email: z.string().trim().min(1, 'Falta el email').email('Parece que falta algo en el email'),
+  password: z.string().min(1, 'Falta la contraseña'),
 })
 
 export function LoginPage() {
@@ -20,7 +20,9 @@ export function LoginPage() {
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  // Errores por campo. El de credenciales ("email o contraseña incorrectos")
+  // no sabe cuál de los dos falló: pinta los dos y el texto va bajo la contraseña.
+  const [errores, setErrores] = useState<{ email?: string; password?: string; ambos?: boolean }>({})
   const [submitting, setSubmitting] = useState(false)
 
   // A dónde volver tras loguear (si el guard nos mandó acá desde otra ruta).
@@ -28,11 +30,17 @@ export function LoginPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(null)
+    setErrores({})
 
     const parsed = credenciales.safeParse({ email, password })
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos')
+      const porCampo: typeof errores = {}
+      for (const issue of parsed.error.issues) {
+        const campo = issue.path[0] as 'email' | 'password'
+        porCampo[campo] ??= issue.message
+      }
+      setErrores(porCampo)
+      document.getElementById(porCampo.email ? 'email' : 'password')?.focus()
       return
     }
 
@@ -41,7 +49,7 @@ export function LoginPage() {
     setSubmitting(false)
 
     if (error) {
-      setError(error)
+      setErrores({ password: error, ambos: true })
       return
     }
     navigate(from, { replace: true })
@@ -63,9 +71,14 @@ export function LoginPage() {
             autoComplete="email"
             placeholder="vos@campo.com.ar"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setErrores({})
+            }}
+            aria-invalid={!!errores.email || errores.ambos}
             required
           />
+          <ErrorCampo mensaje={errores.email} />
         </Reveal>
         <Reveal delay={0.24} className="grid gap-1.5">
           <div className="flex h-6 items-center justify-between">
@@ -83,16 +96,15 @@ export function LoginPage() {
             id="password"
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setErrores({})
+            }}
+            aria-invalid={!!errores.password}
             required
           />
+          <ErrorCampo mensaje={errores.password} />
         </Reveal>
-
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
 
         <Reveal delay={0.32} className="mt-2">
           <Button type="submit" disabled={submitting} className={BOTON_PRINCIPAL}>

@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
-import { AuthHeading, AuthLayout, BOTON_PRINCIPAL } from '@/features/auth/auth-layout'
+import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
 import { PasswordInput } from '@/features/auth/password-input'
 import { Reveal } from '@/features/auth/reveal'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
 const nueva = z.object({
-  password: z.string().min(8, 'La contraseña necesita al menos 8 caracteres'),
+  password: z.string().min(8, 'Con 8 caracteres o más alcanza'),
 })
 
 /**
@@ -61,17 +61,18 @@ export function RestablecerPage() {
             autoComplete="new-password"
             placeholder="Mínimo 8 caracteres"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setError(null)
+            }}
+            aria-invalid={!!error}
             autoFocus
             required
           />
+          {/* Tanto la validación local (corta) como la de Supabase (igual a
+              la anterior) hablan de este campo: van abajo de él, en rojo. */}
+          <ErrorCampo mensaje={error} />
         </Reveal>
-
-        {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
 
         <Reveal delay={0.24} className="mt-2">
           <Button type="submit" disabled={submitting} className={BOTON_PRINCIPAL}>

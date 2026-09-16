@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AtSign, MailCheck } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth, YA_REGISTRADO } from '@/features/auth/auth-context'
-import { AuthHeading, AuthLayout, BOTON_PRINCIPAL } from '@/features/auth/auth-layout'
+import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
 import { CelularInput } from '@/features/auth/celular-input'
 import { PasswordInput } from '@/features/auth/password-input'
 import { Reveal } from '@/features/auth/reveal'
@@ -393,16 +393,6 @@ function IconoCampo({ icono: Icono }: { icono: typeof AtSign }) {
     >
       <Icono className="size-4" strokeWidth={1.5} />
     </span>
-  )
-}
-
-/** Mensaje corto bajo el campo. Ocupa lugar sólo cuando hay algo que decir. */
-function ErrorCampo({ mensaje }: { mensaje?: string }) {
-  if (!mensaje) return null
-  return (
-    <p className="text-xs text-destructive" role="alert">
-      {mensaje}
-    </p>
   )
 }
 
