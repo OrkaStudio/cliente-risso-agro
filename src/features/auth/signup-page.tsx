@@ -5,6 +5,7 @@ import { AtSign, MailCheck } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth, YA_REGISTRADO } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
+import { enfocarSuave } from '@/features/auth/enfocar'
 import { CelularInput } from '@/features/auth/celular-input'
 import { PasswordInput } from '@/features/auth/password-input'
 import { Reveal } from '@/features/auth/reveal'
@@ -84,7 +85,7 @@ export function SignupPage() {
       setErrores(porCampo)
       // Foco al primero que falta, en el orden del formulario.
       const primero = ORDEN.find((c) => porCampo[c])
-      if (primero) document.getElementById(primero)?.focus()
+      if (primero) enfocarSuave(primero)
       return
     }
     setErrores({})

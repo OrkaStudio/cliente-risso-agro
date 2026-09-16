@@ -6,6 +6,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Commit corto del build (Vercel lo expone en el build). Se muestra al pie de
+  // las pantallas de auth: con la PWA, saber QUÉ versión tiene el teléfono
+  // ahorra adivinar si el service worker ya actualizó.
+  define: {
+    __BUILD_SHA__: JSON.stringify(
+      (process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev').slice(0, 7),
+    ),
+  },
   plugins: [
     react(),
     tailwindcss(),

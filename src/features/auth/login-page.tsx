@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
+import { enfocarSuave } from '@/features/auth/enfocar'
 import { PasswordInput } from '@/features/auth/password-input'
 import { Reveal } from '@/features/auth/reveal'
 import { Button } from '@/components/ui/button'
@@ -40,7 +41,7 @@ export function LoginPage() {
         porCampo[campo] ??= issue.message
       }
       setErrores(porCampo)
-      document.getElementById(porCampo.email ? 'email' : 'password')?.focus()
+      enfocarSuave(porCampo.email ? 'email' : 'password')
       return
     }
 

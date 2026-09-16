@@ -8,3 +8,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** Commit corto del build (ver `define` en vite.config.ts). 'dev' en local. */
+declare const __BUILD_SHA__: string
