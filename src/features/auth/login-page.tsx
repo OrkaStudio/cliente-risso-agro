@@ -58,7 +58,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout solAnimado>
       <AuthHeading
         icono={DoorOpen}
         titulo="Entrá a tu campo"

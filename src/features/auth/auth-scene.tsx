@@ -18,8 +18,16 @@ const TINTA = '#071609'
  * es TODA la pantalla (cielo y frase arriba, lomas y molino abajo del todo) y
  * la tarjeta del formulario flota encima.
  */
-export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo' }) {
+export function AuthScene({
+  variante = 'panel',
+  solAnimado = true,
+}: {
+  variante?: 'panel' | 'fondo'
+  /** Ondas del sol. En escritorio siempre; en el teléfono sólo donde se pida. */
+  solAnimado?: boolean
+}) {
   const compacta = variante === 'fondo'
+  const ondas = !compacta || solAnimado
   const sol = compacta ? 70 : 90
   return (
     <div
@@ -59,7 +67,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo'
             : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
       >
-        {[0, 1, 2, 3].map((i) => (
+        {ondas && [0, 1, 2, 3].map((i) => (
           <motion.span
             key={i}
             className="absolute left-1/2 top-1/2 rounded-full border border-accent/40"

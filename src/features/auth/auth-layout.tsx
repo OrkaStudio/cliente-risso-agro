@@ -13,7 +13,14 @@ import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
  * Altura por porcentaje (no unidades de viewport) por el zoom global 1.06 —
  * ver lección de gotchas del zoom.
  */
-export function AuthLayout({ children }: { children: ReactNode }) {
+export function AuthLayout({
+  children,
+  solAnimado = false,
+}: {
+  children: ReactNode
+  /** Ondas del sol en el teléfono (en escritorio siempre van). */
+  solAnimado?: boolean
+}) {
   return (
     // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
     // que mide el contenido. Sin eso la columna crece con el formulario, el
@@ -35,7 +42,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
               final. Nada se monta sobre nada. */}
           <div className="relative flex min-h-full shrink-0 flex-col">
             <div className="absolute inset-0 lg:hidden">
-              <AuthScene variante="fondo" />
+              <AuthScene variante="fondo" solAnimado={solAnimado} />
             </div>
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
@@ -44,9 +51,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
               <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
                 {children}
               </div>
-              {/* Móvil: el pie baja al final de la pantalla (sobre el alambrado)
-                  cuando sobra lugar, y queda bajo la tarjeta cuando no. */}
-              <p className="mt-auto pt-3 text-center text-xs text-white/60 sm:mt-5 sm:pt-0 lg:text-muted-foreground/80">
+              {/* El pie con la versión sólo en escritorio: en el teléfono la
+                  escena queda limpia. */}
+              <p className="mt-5 hidden text-center text-xs text-muted-foreground/80 lg:block">
                 {MARCA} · {MARCA_TAGLINE}
                 <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
               </p>
