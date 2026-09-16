@@ -20,7 +20,7 @@ const TINTA = '#071609'
  */
 export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo' }) {
   const compacta = variante === 'fondo'
-  const sol = compacta ? 52 : 90
+  const sol = compacta ? 76 : 90
   return (
     <div
       aria-hidden
@@ -35,7 +35,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo'
         className="absolute inset-0"
         style={{
           background: compacta
-            ? 'radial-gradient(120% 40% at 76% 78%, rgba(217,138,24,0.30) 0%, rgba(217,138,24,0.10) 34%, transparent 66%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)'
+            ? 'radial-gradient(90% 34% at 88% 17%, rgba(217,138,24,0.30) 0%, rgba(217,138,24,0.10) 34%, transparent 66%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)'
             : 'radial-gradient(135% 95% at 66% 76%, rgba(217,138,24,0.32) 0%, rgba(217,138,24,0.12) 34%, transparent 68%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)',
         }}
       />
@@ -54,7 +54,9 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo'
       <div
         className={
           compacta
-            ? 'absolute left-[76%] bottom-[24%] -translate-x-1/2 translate-y-1/3'
+            ? // Sol asomando detrás de la esquina superior derecha de la
+              // tarjeta (que arranca en top 150px): la mitad queda tapada.
+              'absolute right-[68px] top-[150px] translate-x-1/2 -translate-y-1/2'
             : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
       >
