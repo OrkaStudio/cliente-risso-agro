@@ -13,17 +13,20 @@ const TINTA = '#071609'
  * paleta de la app (verde profundo del sidebar, sol #d98a18). Decorativa:
  * `aria-hidden`, sin interacción.
  */
-export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'cabecera' }) {
-  const compacta = variante === 'cabecera'
+/**
+ * `panel`: columna izquierda de escritorio. `fondo`: en el teléfono la escena
+ * es TODA la pantalla (cielo y frase arriba, lomas y molino abajo del todo) y
+ * la tarjeta del formulario flota encima.
+ */
+export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'fondo' }) {
+  const compacta = variante === 'fondo'
   const sol = compacta ? 52 : 90
   return (
     <div
       aria-hidden
       className={
         compacta
-          ? // Cabecera de móvil: la misma escena, apretada. Padding abajo
-            // generoso porque la tarjeta se monta sobre el borde inferior.
-            'relative flex h-[216px] flex-col overflow-hidden bg-sidebar px-5 pt-5 pb-12 text-sidebar-foreground'
+          ? 'relative flex h-full flex-col overflow-hidden bg-sidebar px-5 pt-5 text-sidebar-foreground'
           : 'relative flex h-full flex-col overflow-hidden bg-sidebar p-10 text-sidebar-foreground'
       }
     >
@@ -31,8 +34,9 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'cabece
       <div
         className="absolute inset-0"
         style={{
-          background:
-            'radial-gradient(135% 95% at 66% 76%, rgba(217,138,24,0.32) 0%, rgba(217,138,24,0.12) 34%, transparent 68%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)',
+          background: compacta
+            ? 'radial-gradient(120% 40% at 76% 78%, rgba(217,138,24,0.30) 0%, rgba(217,138,24,0.10) 34%, transparent 66%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)'
+            : 'radial-gradient(135% 95% at 66% 76%, rgba(217,138,24,0.32) 0%, rgba(217,138,24,0.12) 34%, transparent 68%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)',
         }}
       />
 
@@ -50,7 +54,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'cabece
       <div
         className={
           compacta
-            ? 'absolute left-[80%] top-[58%] -translate-x-1/2 -translate-y-1/2'
+            ? 'absolute left-[76%] bottom-[24%] -translate-x-1/2 translate-y-1/3'
             : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
       >
@@ -99,7 +103,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'cabece
       <svg
         className={
           compacta
-            ? 'absolute inset-x-0 bottom-0 h-[50%] w-full'
+            ? 'absolute inset-x-0 bottom-0 h-[24%] min-h-[150px] w-full'
             : 'absolute inset-x-0 bottom-0 h-[42%] w-full'
         }
         viewBox="0 0 800 340"
@@ -126,7 +130,7 @@ export function AuthScene({ variante = 'panel' }: { variante?: 'panel' | 'cabece
             mal el transform-origin dentro de un SVG y la rueda se separaba
             de la torre). */}
         <g
-          transform={compacta ? 'translate(248 182) scale(0.95)' : 'translate(248 94) scale(1.3)'}
+          transform="translate(248 94) scale(1.3)"
           stroke={TINTA}
           fill="none"
         >

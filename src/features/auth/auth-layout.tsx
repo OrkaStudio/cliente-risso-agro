@@ -21,28 +21,36 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
         <AuthScene />
       </div>
-      {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
-          vista, el desplazamiento es un deslizamiento, no un salto. */}
-      <div className="flex h-full flex-col overflow-y-auto scroll-smooth">
-        {/* Móvil: la misma escena como cabecera, y la tarjeta montada sobre
-            su horizonte (ver -mt abajo). En escritorio la escena es el panel. */}
-        <div className="shrink-0 lg:hidden">
-          <AuthScene variante="cabecera" />
+      <div className="relative h-full">
+        {/* Móvil: la escena es el fondo de TODA la pantalla y no se desplaza
+            con el formulario: frase arriba, sol y lomas abajo del todo. En
+            escritorio la escena es el panel izquierdo. */}
+        <div className="absolute inset-0 lg:hidden">
+          <AuthScene variante="fondo" />
         </div>
-        {/* En móvil la tarjeta va ARRIBA, no centrada: al abrir el teclado la
-            pantalla se achica y una tarjeta centrada se re-centra de golpe
-            (el "sacudón"). Anclada arriba, sólo se desplaza lo justo. */}
-        <div className="flex flex-1 items-start justify-center p-5 pt-0 sm:items-center sm:p-10 lg:pt-10">
-          <div className="relative -mt-8 w-full max-w-[430px] sm:mt-0">
-            <div className="auth-forms rounded-[20px] border border-border bg-card p-6 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
-              {children}
+        {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
+            vista, el desplazamiento es un deslizamiento, no un salto. */}
+        <div className="relative flex h-full flex-col overflow-y-auto scroll-smooth">
+          {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
+              al abrir el teclado la pantalla se achica y una tarjeta centrada
+              se re-centra de golpe (el "sacudón"). */}
+          <div className="flex flex-1 items-start justify-center px-5 pt-[150px] pb-10 sm:items-center sm:p-10">
+            <div className="w-full max-w-[430px]">
+              <div className="auth-forms rounded-[20px] border border-border bg-card p-6 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
+                {children}
+              </div>
+              <p className="mt-5 hidden text-center text-xs text-muted-foreground/80 lg:block">
+                {MARCA} · {MARCA_TAGLINE}
+                <span className="ml-1.5 opacity-70">· {__BUILD_SHA__}</span>
+              </p>
             </div>
-            <p className="mt-5 text-center text-xs text-muted-foreground/80">
-              {MARCA} · {MARCA_TAGLINE}
-              <span className="ml-1.5 text-muted-foreground/50">· {__BUILD_SHA__}</span>
-            </p>
           </div>
         </div>
+        {/* Móvil: el pie va fijo al borde de la escena, sobre el alambrado,
+            así no se cruza con el sol ni con la tarjeta. */}
+        <p className="pointer-events-none absolute inset-x-0 bottom-2.5 text-center text-[11px] text-white/55 lg:hidden">
+          {MARCA} · {MARCA_TAGLINE} · {__BUILD_SHA__}
+        </p>
       </div>
     </div>
   )
