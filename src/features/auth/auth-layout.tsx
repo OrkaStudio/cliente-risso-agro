@@ -15,10 +15,13 @@ import { Reveal } from '@/features/auth/reveal'
 export function AuthLayout({
   children,
   solAnimado = false,
+  escena,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
   solAnimado?: boolean
+  /** Contenido de la escena en lugar de la frase de marketing. */
+  escena?: ReactNode
 }) {
   return (
     // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
@@ -29,7 +32,7 @@ export function AuthLayout({
       {/* La sombra ancha y suave hacia la derecha funde el borde entre la
           escena oscura y el panel porcelana (sin línea a cuchillo). */}
       <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
-        <AuthScene />
+        <AuthScene mensaje={escena} />
       </div>
       <div className="relative min-h-0 h-full">
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
@@ -41,7 +44,7 @@ export function AuthLayout({
               final. Nada se monta sobre nada. */}
           <div className="relative flex min-h-full shrink-0 flex-col">
             <div className="absolute inset-0 lg:hidden">
-              <AuthScene variante="fondo" solAnimado={solAnimado} />
+              <AuthScene variante="fondo" solAnimado={solAnimado} mensaje={escena} />
             </div>
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada

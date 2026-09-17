@@ -8,6 +8,26 @@ export const tipoCampoLabel: Record<TipoCampo, string> = {
   alquilado: 'Alquilado',
 }
 
+type ActividadCampo = Database['public']['Enums']['actividad_campo']
+
+/** Qué se hace en el campo. Es por campo: uno puede ser ganadero y otro agrícola. */
+export const actividadLabel: Record<ActividadCampo, string> = {
+  ganadera: 'Ganadera',
+  agricola: 'Agrícola',
+  mixta: 'Mixta',
+}
+
+/**
+ * Con qué estado nacen los potreros según la actividad del campo: en un
+ * campo agrícola arrancan en descanso (el primer estado del ciclo agrícola);
+ * ganadero o mixto, en ganadero. Se cambia después por potrero.
+ */
+export function estadoInicialPorActividad(
+  a: ActividadCampo | null | undefined,
+): Database['public']['Enums']['estado_ciclo_potrero'] {
+  return a === 'agricola' ? 'descanso' : 'ganadero'
+}
+
 /**
  * El vocabulario ÚNICO de qué se hace en un potrero: ganadero, agrícola o
  * vacío. Tres estados, en todos lados.

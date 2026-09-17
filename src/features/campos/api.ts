@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import type {
   Database,
+  Json,
   TablesInsert,
   TablesUpdate,
 } from '@/lib/supabase/types'
@@ -20,11 +21,27 @@ export type Lote = Database['public']['Tables']['lote']['Row']
 /** Anillo geográfico como array de [lat, lng] (columna jsonb). */
 export type LatLng = [number, number]
 
+export type ActividadCampo = Database['public']['Enums']['actividad_campo']
+
+/**
+ * Dónde ESTÁ el campo (no dónde vive el dueño). `localidad`/`provincia` son
+ * lo que el productor eligió; `lat`/`lon` el centro para el clima — con
+ * contorno, su centroide (más exacto); si no, la localidad geocodificada.
+ */
+export type UbicacionCampo = {
+  provincia: string | null
+  localidad: string | null
+  lat: number | null
+  lon: number | null
+}
+
 export type CampoConPotreros = {
   id: string
   nombre: string
   tipo: TipoCampo
   hectareas: number | null
+  actividad: ActividadCampo | null
+  ubicacion: UbicacionCampo
   /** Índice de color/letra estable (por orden de creación). Ver colorDeCampo. */
   color_idx: number
   potreros: PotreroCardData[]
@@ -50,7 +67,10 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
   ] = await Promise.all([
     // Orden por color_idx = orden de la letra (A, B, C…), coherente con las
     // letras de los potreros (Toimil=C va antes que Los Pampas=D).
-    supabase.from('campo').select('id, nombre, tipo, hectareas, color_idx').order('color_idx'),
+    supabase
+      .from('campo')
+      .select('id, nombre, tipo, hectareas, color_idx, actividad, provincia, localidad, lat, lon')
+      .order('color_idx'),
     supabase
       .from('potrero')
       .select(
@@ -114,6 +134,13 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
       nombre: c.nombre,
       tipo: c.tipo,
       hectareas: c.hectareas,
+      actividad: c.actividad,
+      ubicacion: {
+        provincia: c.provincia,
+        localidad: c.localidad,
+        lat: c.lat,
+        lon: c.lon,
+      },
       color_idx: c.color_idx ?? 0,
       potreros: ps,
       totalCabezas: ps.reduce((s, p) => s + p.cabezas, 0),
@@ -150,6 +177,8 @@ export async function crearCampo(input: {
   nombre: string
   tipo: TipoCampo
   hectareas?: number | null
+  actividad?: ActividadCampo | null
+  ubicacion?: Partial<UbicacionCampo>
 }): Promise<string> {
   const { data, error } = await supabase
     .from('campo')
@@ -158,6 +187,11 @@ export async function crearCampo(input: {
       nombre: input.nombre.trim(),
       tipo: input.tipo,
       hectareas: input.hectareas ?? null,
+      actividad: input.actividad ?? null,
+      provincia: input.ubicacion?.provincia ?? null,
+      localidad: input.ubicacion?.localidad ?? null,
+      lat: input.ubicacion?.lat ?? null,
+      lon: input.ubicacion?.lon ?? null,
     })
     .select('id')
     .single()
@@ -170,6 +204,8 @@ export async function actualizarCampo(input: {
   nombre: string
   tipo: TipoCampo
   hectareas?: number | null
+  actividad?: ActividadCampo | null
+  ubicacion?: Partial<UbicacionCampo>
 }): Promise<void> {
   const { error } = await supabase
     .from('campo')
@@ -177,6 +213,16 @@ export async function actualizarCampo(input: {
       nombre: input.nombre.trim(),
       tipo: input.tipo,
       hectareas: input.hectareas ?? null,
+      actividad: input.actividad ?? null,
+      // La ubicación sólo se pisa si vino: editar el nombre no borra el clima.
+      ...(input.ubicacion
+        ? {
+            provincia: input.ubicacion.provincia ?? null,
+            localidad: input.ubicacion.localidad ?? null,
+            lat: input.ubicacion.lat ?? null,
+            lon: input.ubicacion.lon ?? null,
+          }
+        : {}),
     })
     .eq('id', input.id)
   if (error) throw new Error(error.message)
@@ -322,7 +368,11 @@ export async function setCampoContorno(
 ): Promise<void> {
   const { error } = await supabase
     .from('campo')
-    .update({ contorno })
+    .update({
+      contorno,
+      // El contorno manda sobre la localidad: el clima pasa al centro real.
+      ...(centroDelCampo({ lat: null, lon: null, contorno }) ?? {}),
+    })
     .eq('id', campoId)
   if (error) throw new Error(error.message)
 }
@@ -517,4 +567,25 @@ export async function asignarAnimalesALote(
     .update({ lote_id: loteId })
     .in('id', animalIds)
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Centro del campo para el pronóstico: el centroide del contorno si lo tiene
+ * (más exacto, y es lo que la migración backfilleó), si no la localidad
+ * geocodificada (lat/lon), si no nada — y el clima pide cargar la ubicación.
+ */
+export function centroDelCampo(campo: {
+  lat: number | null
+  lon: number | null
+  contorno?: LatLng[] | Json | null
+}): { lat: number; lon: number } | null {
+  const c = campo.contorno
+  if (Array.isArray(c) && c.length >= 3) {
+    const pts = c as LatLng[]
+    const lat = pts.reduce((s, p) => s + p[0], 0) / pts.length
+    const lon = pts.reduce((s, p) => s + p[1], 0) / pts.length
+    if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon }
+  }
+  if (campo.lat != null && campo.lon != null) return { lat: campo.lat, lon: campo.lon }
+  return null
 }

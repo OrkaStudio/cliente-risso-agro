@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { Leaf } from 'lucide-react'
 import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
@@ -21,10 +22,13 @@ const TINTA = '#071609'
 export function AuthScene({
   variante = 'panel',
   solAnimado = true,
+  mensaje,
 }: {
   variante?: 'panel' | 'fondo'
   /** Ondas del sol. En escritorio siempre; en el teléfono sólo donde se pida. */
   solAnimado?: boolean
+  /** Reemplaza la frase de las tres patas (el onboarding pone acá su mapa). */
+  mensaje?: ReactNode
 }) {
   const compacta = variante === 'fondo'
   const ondas = !compacta || solAnimado
@@ -223,11 +227,13 @@ export function AuthScene({
             </span>
             <span className="font-heading text-sm font-bold">{MARCA}</span>
           </div>
-          <p className="mt-3 max-w-[300px] font-heading text-[22px] font-semibold leading-tight tracking-tight">
-            Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
-            <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
-            <span className="text-[#e9b45f]">números</span> — en una sola app.
-          </p>
+          {mensaje ?? (
+            <p className="mt-3 max-w-[300px] font-heading text-[22px] font-semibold leading-tight tracking-tight">
+              Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
+              <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
+              <span className="text-[#e9b45f]">números</span> — en una sola app.
+            </p>
+          )}
         </motion.div>
       ) : (
         <motion.div
@@ -255,6 +261,7 @@ export function AuthScene({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}
       >
+        {mensaje ?? (<>
         <p className="font-heading text-[32px] font-semibold leading-snug tracking-tight">
           Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
           <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
@@ -264,6 +271,7 @@ export function AuthScene({
           Recorridas sin señal, caravanas electrónicas, plata al día. Hecho
           para el productor, no para el contador.
         </p>
+        </>)}
       </motion.div>
       )}
     </div>

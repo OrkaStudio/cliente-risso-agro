@@ -1,6 +1,7 @@
 import { Droplets, Snowflake } from 'lucide-react'
-import { CAMPO_PRINCIPAL } from '@/features/cotizaciones/api'
+import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { usePronostico } from '@/features/cotizaciones/hooks'
+import { Dropdown } from '@/components/ui/dropdown'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { Panel } from '@/components/panel'
 
@@ -15,13 +16,24 @@ function diaCorto(fecha: string, primero: boolean): string {
 /** Pronóstico de 7 días del campo (Open-Meteo). Para planificar la semana:
  *  lluvia, heladas y temperaturas. Si la fuente falla, no muestra nada. */
 export function PronosticoPanel() {
-  const pron = usePronostico()
-  if (!pron.data || pron.data.length === 0) return null
+  const { opciones, actual, elegir } = useCampoClima()
+  const pron = usePronostico(actual?.ubicacion ?? null)
+  if (!actual || !pron.data || pron.data.length === 0) return null
 
   return (
     <Panel
       title="Pronóstico 7 días"
-      sub={CAMPO_PRINCIPAL.nombre}
+      sub={opciones.length > 1 ? undefined : actual.nombre}
+      action={
+        opciones.length > 1 ? (
+          <Dropdown
+            ariaLabel="Campo del pronóstico"
+            value={actual.id}
+            onChange={elegir}
+            options={opciones.map((o) => ({ value: o.id, label: o.nombre }))}
+          />
+        ) : undefined
+      }
     >
       <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-7">
         {pron.data.map((d, i) => (
