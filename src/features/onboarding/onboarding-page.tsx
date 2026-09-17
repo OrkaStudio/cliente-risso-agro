@@ -16,6 +16,7 @@ import {
   Plus,
   Snowflake,
   Trash2,
+  Wheat,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/features/auth/auth-context'
@@ -79,12 +80,16 @@ type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
  * escena lo dibuja en vivo. Cada paso avisa con cada tecla.
  */
 type Borrador = {
-  campo: { nombre: string; hectareas: number | null }
+  campo: { nombre: string; hectareas: number | null; actividad: ActividadCampo | null }
   potreros: { nombre: string; hectareas: number | null }[]
   /** Por potrero, cabezas por especie: el croquis las dibuja distinto. */
   cabezas: Record<string, CabezasPorEspecie>
 }
-const BORRADOR_VACIO: Borrador = { campo: { nombre: '', hectareas: null }, potreros: [], cabezas: {} }
+const BORRADOR_VACIO: Borrador = {
+  campo: { nombre: '', hectareas: null, actividad: null },
+  potreros: [],
+  cabezas: {},
+}
 
 /**
  * Onboarding post-registro: empresa → por cada campo (datos · potreros ·
@@ -520,7 +525,7 @@ function PasoCampo({
             value={nombre}
             onChange={(e) => {
               setNombre(e.target.value)
-              onBorrador({ nombre: e.target.value.trim(), hectareas: numeroDe(hectareas) })
+              onBorrador({ nombre: e.target.value.trim(), hectareas: numeroDe(hectareas), actividad })
               setErrores((x) => ({ ...x, nombre: undefined }))
             }}
             placeholder="Ej: Don Gilberto"
@@ -539,6 +544,7 @@ function PasoCampo({
                 type="button"
                 onClick={() => {
                   setActividad(a)
+                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(hectareas), actividad: a })
                   setErrores((x) => ({ ...x, actividad: undefined }))
                 }}
                 className={cn(
@@ -613,7 +619,7 @@ function PasoCampo({
                 value={hectareas}
                 onChange={(e) => {
                   setHectareas(e.target.value)
-                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(e.target.value) })
+                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(e.target.value), actividad })
                   setErrores((x) => ({ ...x, hectareas: undefined }))
                 }}
                 placeholder="Según el título"
@@ -1257,11 +1263,18 @@ function EscenaCroquis({
   // Qué dibuja el croquis según la etapa.
   const croquis: CampoCroquis =
     etapa === 'campo'
-      ? { nombre: borrador.campo.nombre, hectareas: borrador.campo.hectareas, potreros: [], estado: 'campo' }
+      ? {
+          nombre: borrador.campo.nombre,
+          hectareas: borrador.campo.hectareas,
+          actividad: borrador.campo.actividad,
+          potreros: [],
+          estado: 'campo',
+        }
       : etapa === 'potreros' && campoActual
         ? {
             nombre: campoActual.nombre,
             hectareas: campoActual.hectareas,
+            actividad: campoActual.actividad,
             potreros: borrador.potreros.map((p, i) => ({
               clave: `${i}`,
               nombre: p.nombre,
@@ -1274,6 +1287,7 @@ function EscenaCroquis({
           ? {
               nombre: campoActual.nombre,
               hectareas: campoActual.hectareas,
+              actividad: campoActual.actividad,
               potreros: campoActual.potreros.map((p) => ({
                 clave: p.id,
                 nombre: p.nombre,
@@ -1286,6 +1300,7 @@ function EscenaCroquis({
             ? {
                 nombre: ultimo.nombre,
                 hectareas: ultimo.hectareas,
+                actividad: ultimo.actividad,
                 potreros: ultimo.potreros.map((p) => ({
                   clave: p.id,
                   nombre: p.nombre,
@@ -1294,12 +1309,12 @@ function EscenaCroquis({
                 })),
                 estado: 'hecho',
               }
-            : { nombre: '', hectareas: null, potreros: [], estado: 'vacio' }
+            : { nombre: '', hectareas: null, actividad: null, potreros: [], estado: 'vacio' }
 
   const partes: { etapa: Etapa; nombre: string }[] = [
     { etapa: 'campo', nombre: 'Datos' },
     { etapa: 'potreros', nombre: 'Potreros' },
-    ...(campoActual?.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
+    ...(croquis.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
   ]
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
   const cabezasCroquis = croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0)
@@ -1321,6 +1336,7 @@ function EscenaCroquis({
             <span className="font-semibold">
               {croquis.nombre || (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
             </span>
+            <ChipActividad actividad={croquis.actividad} />
             <span className="flex items-center gap-2.5 text-[13px]">
               {partes.map((p, i) => {
                 const hecha = i < indiceParte
@@ -1347,6 +1363,7 @@ function EscenaCroquis({
         ) : ultimo ? (
           <>
             <span className="font-semibold">{ultimo.nombre}</span>
+            <ChipActividad actividad={ultimo.actividad} />
             <span className="text-[13px] text-sidebar-foreground/70">
               {ha(ultimo.hectareas)} ha
               {ultimo.potreros.length > 0
@@ -1413,3 +1430,20 @@ function EscenaCroquis({
   )
 }
 
+/** Qué se hace en el campo, con su ícono: aparece apenas lo elige y queda. */
+function ChipActividad({ actividad }: { actividad: ActividadCampo | null }) {
+  if (!actividad) return null
+  return (
+    <motion.span
+      key={actividad}
+      initial={{ opacity: 0, scale: 0.85 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+      className="inline-flex items-center gap-1 self-center rounded-full border border-[#e9b45f]/40 bg-[#e9b45f]/10 px-2 py-0.5 text-[11px] font-semibold text-[#e9b45f]"
+    >
+      {actividad !== 'agricola' && <Beef className="size-3" strokeWidth={2} />}
+      {actividad !== 'ganadera' && <Wheat className="size-3" strokeWidth={2} />}
+      {actividadLabel[actividad]}
+    </motion.span>
+  )
+}

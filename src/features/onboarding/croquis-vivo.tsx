@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import type { ActividadCampo } from '@/features/campos/api'
 import type { Especie } from '@/features/hacienda/labels'
 import {
   ESTILO_ESPECIE,
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils'
  */
 
 const ORDEN_ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+const ACTIVIDAD_NOMBRE: Record<ActividadCampo, string> = { ganadera: 'Ganadera', agricola: 'Agrícola', mixta: 'Mixta' }
 
 /** La marca de una especie, centrada en (0,0). Se usa en el croquis y en la leyenda. */
 export function MarcaEspecie({ especie }: { especie: Especie }) {
@@ -33,6 +35,8 @@ export function MarcaEspecie({ especie }: { especie: Especie }) {
 export type CampoCroquis = {
   nombre: string
   hectareas: number | null
+  /** Qué se hace en el campo: cambia la textura de los potreros. */
+  actividad: ActividadCampo | null
   potreros: PotreroCroquis[]
   /** Qué se está dibujando ahora: cambia el acento del croquis. */
   estado: 'vacio' | 'campo' | 'potreros' | 'hacienda' | 'hecho'
@@ -129,6 +133,15 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         <pattern id="croquis-rayado" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="8" className="stroke-sidebar-foreground/25" strokeWidth="1.5" />
         </pattern>
+        {/* Surcos: la textura del potrero agrícola. */}
+        <pattern id="croquis-surcos" width="9" height="9" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="4.5" x2="9" y2="4.5" stroke="#e9b45f" strokeOpacity="0.5" strokeWidth="1.2" strokeDasharray="5 2" />
+        </pattern>
+        {/* Pasto: matas cortas para el potrero ganadero. */}
+        <pattern id="croquis-pasto" width="12" height="12" patternUnits="userSpaceOnUse">
+          <path d="M2 10 l1.5 -3 M4 10 l0 -3.5 M6 10 l-1.5 -3" className="stroke-primary" strokeOpacity="0.8" strokeWidth="1" fill="none" />
+          <path d="M8 5 l1.5 -3 M10 5 l0 -3.5" className="stroke-primary" strokeOpacity="0.6" strokeWidth="1" fill="none" />
+        </pattern>
       </defs>
 
       {/* El contorno del campo. Punteado mientras se arma; firme cuando cierra. */}
@@ -166,19 +179,42 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                   rx={6}
                   className={cn(
                     'stroke-sidebar-foreground/70',
-                    t > 0 ? 'fill-primary/30' : 'fill-primary/15',
+                    campo.actividad === 'agricola'
+                      ? 'fill-[#e9b45f]/10'
+                      : t > 0
+                        ? 'fill-primary/30'
+                        : 'fill-primary/15',
                   )}
                   strokeWidth={1.25}
                   initial={{ x: r.x + r.w / 2, y: r.y + r.h / 2, width: 0, height: 0 }}
                   animate={{ x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                 />
+                {/* La textura de la actividad, encima del fondo y debajo de la hacienda. */}
+                {campo.actividad && (
+                  <motion.rect
+                    rx={6}
+                    fill={`url(#${campo.actividad === 'agricola' ? 'croquis-surcos' : 'croquis-pasto'})`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: campo.actividad === 'mixta' ? 0.55 : 1, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                  />
+                )}
+                {campo.actividad === 'mixta' && (
+                  <motion.rect
+                    rx={6}
+                    fill="url(#croquis-surcos)"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.3, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                  />
+                )}
                 <motion.g
                   initial={false}
                   animate={{ x: r.x + 8, y: r.y + 16 }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                 >
-                  <text className="fill-sidebar-foreground font-semibold" fontSize={chico ? 10 : 12}>
+                  <text className="fill-sidebar-foreground font-semibold" fontSize={chico ? 10 : 12} style={{ paintOrder: 'stroke' }} stroke="var(--sidebar)" strokeWidth={3} strokeLinejoin="round">
                     {p.nombre}
                     {!chico && p.hectareas ? (
                       <tspan className="fill-sidebar-foreground/60 font-normal" fontSize={10}>
@@ -193,6 +229,10 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                       textAnchor="end"
                       className="fill-sidebar-foreground font-semibold tabular-nums"
                       fontSize={11}
+                      style={{ paintOrder: 'stroke' }}
+                      stroke="var(--sidebar)"
+                      strokeWidth={3}
+                      strokeLinejoin="round"
                     >
                       {t}
                     </text>
@@ -267,7 +307,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           >
             {campo.nombre || 'Tu campo'}
           </text>
-          {campo.hectareas ? (
+          {campo.hectareas || campo.actividad ? (
             <text
               x={ANCHO / 2}
               y={ALTO / 2 + 16}
@@ -275,7 +315,14 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
               className="fill-[#e9b45f] font-semibold tabular-nums"
               fontSize={13}
             >
-              {campo.hectareas.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ha
+              {[
+                campo.actividad ? ACTIVIDAD_NOMBRE[campo.actividad] : null,
+                campo.hectareas
+                  ? `${campo.hectareas.toLocaleString('es-AR', { maximumFractionDigits: 2 })} ha`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </text>
           ) : null}
         </g>
