@@ -37,7 +37,6 @@ import {
   type Especie,
 } from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
-import { Dropdown } from '@/components/ui/dropdown'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Constants, type Database } from '@/lib/supabase/types'
@@ -458,7 +457,7 @@ function PasoCampo({
       <AuthHeading
         icono={LandPlot}
         titulo={primero ? 'Tu primer campo' : 'Otro campo'}
-        subtitulo="Cómo se llama, qué se hace y dónde está. Lo demás lo completás después."
+        subtitulo="Cómo se llama, qué se hace y dónde está. Los datos que no tengas a mano, los completás después."
       />
       <form onSubmit={guardar} className="mt-5 grid gap-3.5" noValidate>
         <Reveal delay={0.14} className="grid gap-1.5">
@@ -561,7 +560,7 @@ function PasoCampo({
                   setHectareas(e.target.value)
                   setErrores((x) => ({ ...x, hectareas: undefined }))
                 }}
-                placeholder="Si las sabés"
+                placeholder="Según el título"
                 aria-invalid={!!errores.hectareas}
               />
               <ErrorCampo mensaje={errores.hectareas} />
@@ -599,28 +598,60 @@ function PasoPotreros({
 }) {
   const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
   const [error, setError] = useState<string | null>(null)
+  // Sólo se avisa una vez que faltan hectáreas; la segunda vez, sigue.
+  const [avisadoFaltan, setAvisadoFaltan] = useState(false)
+
+  const haDe = (f: FilaPotrero) => (f.hectareas.trim() === '' ? null : Number(f.hectareas))
+  const conHa = filas.filter((f) => haDe(f) !== null && Number.isFinite(haDe(f)!))
+  const sumaHa = conHa.reduce((s, f) => s + (haDe(f) ?? 0), 0)
+  const sinHa = filas.length - conHa.length
+  const totalCampo = campo.hectareas
+  // Control contra las hectáreas del campo: acompaña, y frena sólo si se pasa.
+  const excede = totalCampo != null && sumaHa > totalCampo * 1.02
+  const faltan = totalCampo != null ? Math.max(0, Math.round((totalCampo - sumaHa) * 10) / 10) : null
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    const numeros = new Set<string>()
     for (const f of filas) {
-      if (!f.numero.trim()) {
-        setError('Cada potrero necesita un número.')
+      const n = f.numero.trim()
+      if (!n) {
+        setError('Cada potrero necesita su número.')
         return
       }
-      const ha = f.hectareas.trim()
-      const n = ha === '' ? null : Number(ha)
-      if (n !== null && (!Number.isFinite(n) || n < 0)) {
-        setError(`Las hectáreas del potrero ${f.numero} tienen que ser un número.`)
+      if (numeros.has(n)) {
+        setError(`El potrero ${n} está dos veces.`)
         return
       }
+      numeros.add(n)
+      const ha = haDe(f)
+      if (ha !== null && (!Number.isFinite(ha) || ha <= 0)) {
+        setError(`Las hectáreas del potrero ${n} tienen que ser un número mayor que cero.`)
+        return
+      }
+    }
+    if (excede) {
+      setError(
+        `Los potreros suman ${sumaHa} ha y el campo tiene ${totalCampo}. Revisá las hectáreas antes de seguir.`,
+      )
+      return
+    }
+    // Faltan hectáreas para llegar al campo y todas las filas tienen dato:
+    // probablemente hay potreros sin cargar. Se avisa una vez.
+    if (faltan !== null && faltan > 0 && sinHa === 0 && !avisadoFaltan) {
+      setAvisadoFaltan(true)
+      setError(
+        `Los potreros suman ${sumaHa} ha; al campo le faltan ${faltan}. Si hay más potreros, agregalos. Si está bien así, tocá Guardar de nuevo.`,
+      )
+      return
     }
     setOcupado(true)
     try {
       const creados: CampoCargado['potreros'] = []
       // Se manda sólo el número; la DB le pone la letra del campo.
       for (const f of filas) {
-        const hectareas = f.hectareas.trim() === '' ? null : Number(f.hectareas)
+        const hectareas = haDe(f)
         const id = await crearPotrero({
           empresaId,
           campoId: campo.id,
@@ -643,7 +674,11 @@ function PasoPotreros({
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
-        subtitulo="Los que te acuerdes; si ahora no, después es un minuto desde Campos."
+        subtitulo={
+          totalCampo
+            ? `Número y hectáreas de cada uno. Entre todos tienen que sumar las ${totalCampo} ha del campo.`
+            : 'Número y hectáreas de cada uno, como figuran en el plano o en el alambrado.'
+        }
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-2.5">
@@ -655,25 +690,27 @@ function PasoPotreros({
                 inputMode="numeric"
                 className="w-16"
                 value={fila.numero}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setError(null)
                   setFilas((fs) =>
                     fs.map((f, j) =>
                       j === i ? { ...f, numero: e.target.value.replace(/\D/g, '') } : f,
                     ),
                   )
-                }
+                }}
               />
               <Input
                 aria-label={`Hectáreas del potrero ${i + 1}`}
                 inputMode="decimal"
                 className="flex-1"
                 value={fila.hectareas}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setError(null)
                   setFilas((fs) =>
                     fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
                   )
-                }
-                placeholder="Hectáreas (si las sabés)"
+                }}
+                placeholder="Hectáreas"
               />
               <Button
                 type="button"
@@ -688,30 +725,68 @@ function PasoPotreros({
             </div>
           ))}
         </Reveal>
-        <Reveal delay={0.2} className="mt-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setFilas((fs) => {
-                const nums = fs
-                  .map((f) => parseInt(f.numero, 10))
-                  .filter((n) => Number.isFinite(n))
-                const sig = (nums.length ? Math.max(...nums) : 0) + 1
-                return [...fs, { numero: String(sig), hectareas: '' }]
-              })
-            }
-          >
-            <Plus className="size-4" /> Otro potrero
-          </Button>
+
+        {/* Suma en vivo contra el campo: el acompañamiento, no el látigo. */}
+        <Reveal delay={0.18} className="mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setFilas((fs) => {
+                  const nums = fs
+                    .map((f) => parseInt(f.numero, 10))
+                    .filter((n) => Number.isFinite(n))
+                  const sig = (nums.length ? Math.max(...nums) : 0) + 1
+                  return [...fs, { numero: String(sig), hectareas: '' }]
+                })
+              }
+            >
+              <Plus className="size-4" /> Otro potrero
+            </Button>
+            {totalCampo ? (
+              <p
+                className={cn(
+                  'text-xs tabular-nums',
+                  excede ? 'font-medium text-destructive' : 'text-muted-foreground',
+                )}
+              >
+                {sumaHa} de {totalCampo} ha
+                {excede
+                  ? ' · se pasan'
+                  : faltan && faltan > 0
+                    ? ` · faltan ${faltan}`
+                    : sumaHa > 0
+                      ? ' · completo'
+                      : ''}
+              </p>
+            ) : sumaHa > 0 ? (
+              <p className="text-xs tabular-nums text-muted-foreground">{sumaHa} ha en total</p>
+            ) : null}
+          </div>
+          {totalCampo ? (
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
+              <div
+                className={cn('h-full rounded-full transition-all', excede ? 'bg-destructive' : 'bg-primary')}
+                style={{ width: `${Math.min(100, (sumaHa / totalCampo) * 100)}%` }}
+              />
+            </div>
+          ) : null}
+          {sinHa > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {sinHa === 1 ? 'Un potrero sin hectáreas' : `${sinHa} potreros sin hectáreas`}: quedan
+              como "completar después" y los cargás desde Campos.
+            </p>
+          )}
         </Reveal>
+
         {error && (
           <p className="mt-3 text-xs text-destructive" role="alert">
             {error}
           </p>
         )}
-        <Reveal delay={0.26} className="mt-5 grid gap-2">
+        <Reveal delay={0.24} className="mt-5 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
             {ocupado
               ? 'Guardando…'
@@ -724,7 +799,7 @@ function PasoPotreros({
             disabled={ocupado}
             onClick={() => onListo([])}
           >
-            Los cargo después
+            Los completo después
           </Button>
         </Reveal>
       </form>
@@ -733,10 +808,15 @@ function PasoPotreros({
 }
 
 // ---------------------------------------------------------------------
-// Paso: su hacienda, más o menos
+// Paso: su hacienda, potrero por potrero
 // ---------------------------------------------------------------------
 
 const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+type Cantidades = Partial<Record<Categoria, string>>
+
+function totalDe(c: Cantidades | undefined): number {
+  return Object.values(c ?? {}).reduce((s, v) => s + (parseInt(v ?? '', 10) || 0), 0)
+}
 
 function PasoHacienda({
   empresaId,
@@ -751,38 +831,41 @@ function PasoHacienda({
   setOcupado: (v: boolean) => void
   onListo: (cabezas: number) => void
 }) {
-  const [cantidades, setCantidades] = useState<Partial<Record<Categoria, string>>>({})
-  // Bovinos a la vista; ovinos/equinos plegados: en la cría pampeana el
-  // 90 % de las veces no hacen falta.
-  const [especiesAbiertas, setEspeciesAbiertas] = useState<Especie[]>(['bovino'])
-  const [potreroId, setPotreroId] = useState(campo.potreros[0]?.id ?? '')
+  // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar.
+  const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>({})
+  const [abierto, setAbierto] = useState<string | null>(campo.potreros[0]?.id ?? null)
+  const [especies, setEspecies] = useState<Record<string, Especie[]>>({})
   const [error, setError] = useState<string | null>(null)
 
-  const items = (Object.entries(cantidades) as [Categoria, string][])
-    .map(([categoria, v]) => ({ categoria, cantidad: parseInt(v, 10) || 0 }))
-    .filter((x) => x.cantidad > 0)
-  const total = items.reduce((s, x) => s + x.cantidad, 0)
-  const potrero = campo.potreros.find((p) => p.id === potreroId)
+  const total = campo.potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
+  const potrerosConHacienda = campo.potreros.filter((p) => totalDe(porPotrero[p.id]) > 0).length
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
     setError(null)
     if (total === 0) {
-      setError('Poné al menos una cantidad, o tocá "La cargo después".')
+      setError('Cargá las cabezas de al menos un potrero, o tocá "La completo después".')
       return
     }
     setOcupado(true)
-    const { error } = await supabase.rpc('crear_animales_masivo', {
-      p_empresa_id: empresaId,
-      p_potrero_id: potreroId || undefined,
-      p_items: items,
-      p_origen: 'onboarding',
-    })
-    setOcupado(false)
-    if (error) {
-      setError(error.message)
-      return
+    for (const p of campo.potreros) {
+      const items = (Object.entries(porPotrero[p.id] ?? {}) as [Categoria, string][])
+        .map(([categoria, v]) => ({ categoria, cantidad: parseInt(v, 10) || 0 }))
+        .filter((x) => x.cantidad > 0)
+      if (items.length === 0) continue
+      const { error } = await supabase.rpc('crear_animales_masivo', {
+        p_empresa_id: empresaId,
+        p_potrero_id: p.id,
+        p_items: items,
+        p_origen: 'onboarding',
+      })
+      if (error) {
+        setOcupado(false)
+        setError(`Potrero ${p.nombre}: ${error.message}`)
+        return
+      }
     }
+    setOcupado(false)
     onListo(total)
   }
 
@@ -790,47 +873,88 @@ function PasoHacienda({
     <>
       <AuthHeading
         icono={Beef}
-        titulo={`¿Qué hay en ${campo.nombre}, más o menos?`}
-        subtitulo="Redondeá, o dejalo para después: se carga en un minuto desde Hacienda."
+        titulo={`La hacienda de ${campo.nombre}`}
+        subtitulo="Cabezas por categoría, en el potrero donde están hoy. Lo que no tengas a mano, lo completás después desde Hacienda."
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
-        <Reveal delay={0.14} className="grid gap-4">
-          {ESPECIES.map((esp) => {
-            const abierta = especiesAbiertas.includes(esp)
+        <Reveal delay={0.14} className="divide-y divide-border rounded-lg border border-border">
+          {campo.potreros.map((p) => {
+            const cant = porPotrero[p.id] ?? {}
+            const t = totalDe(cant)
+            const esAbierto = abierto === p.id
+            const esp = especies[p.id] ?? ['bovino']
             return (
-              <div key={esp}>
-                {esp !== 'bovino' && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEspeciesAbiertas((xs) =>
-                        abierta ? xs.filter((x) => x !== esp) : [...xs, esp],
-                      )
-                    }
-                    className="mb-2 text-xs font-medium text-primary underline-offset-4 hover:underline"
+              <div key={p.id}>
+                {/* Cabecera del potrero: nombre · ha · cabezas cargadas. Tocar abre. */}
+                <button
+                  type="button"
+                  onClick={() => setAbierto(esAbierto ? null : p.id)}
+                  aria-expanded={esAbierto}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left"
+                >
+                  <span
+                    className={cn(
+                      'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
+                      t > 0 ? 'border-primary bg-primary text-white' : 'border-border text-muted-foreground',
+                    )}
                   >
-                    {abierta ? `Sin ${especieLabel[esp].toLowerCase()}s` : `+ ${especieLabel[esp]}s`}
-                  </button>
-                )}
-                {abierta && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {categoriasPorEspecie[esp].map((c) => (
-                      <label key={c} className="grid gap-1">
-                        <span className="text-xs text-muted-foreground">{categoriaLabel[c]}</span>
-                        <Input
-                          inputMode="numeric"
-                          value={cantidades[c] ?? ''}
-                          onChange={(e) =>
-                            setCantidades((x) => ({
-                              ...x,
-                              [c]: e.target.value.replace(/\D/g, ''),
-                            }))
-                          }
-                          placeholder="0"
-                          className="tabular-nums"
-                        />
-                      </label>
-                    ))}
+                    {t > 0 ? <Check className="size-3.5" strokeWidth={3} /> : p.nombre.replace(/[A-Z]$/, '')}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-sm font-medium">Potrero {p.nombre}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      {p.hectareas ? `${p.hectareas} ha` : ''}
+                    </span>
+                  </span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {t > 0 ? `${t} ${t === 1 ? 'cabeza' : 'cabezas'}` : esAbierto ? '' : 'sin cargar'}
+                  </span>
+                </button>
+                {esAbierto && (
+                  <div className="px-3.5 pb-3.5">
+                    {ESPECIES.map((e) => {
+                      const on = esp.includes(e)
+                      return (
+                        <div key={e} className={cn(e !== 'bovino' && 'mt-2')}>
+                          {e !== 'bovino' && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEspecies((x) => ({
+                                  ...x,
+                                  [p.id]: on ? esp.filter((y) => y !== e) : [...esp, e],
+                                }))
+                              }
+                              className="mb-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                            >
+                              {on ? `Sin ${especieLabel[e].toLowerCase()}s` : `+ ${especieLabel[e]}s`}
+                            </button>
+                          )}
+                          {on && (
+                            <div className="grid grid-cols-3 gap-2">
+                              {categoriasPorEspecie[e].map((c) => (
+                                <label key={c} className="grid gap-1">
+                                  <span className="text-xs text-muted-foreground">{categoriaLabel[c]}</span>
+                                  <Input
+                                    inputMode="numeric"
+                                    value={cant[c] ?? ''}
+                                    onChange={(ev) => {
+                                      setError(null)
+                                      setPorPotrero((x) => ({
+                                        ...x,
+                                        [p.id]: { ...(x[p.id] ?? {}), [c]: ev.target.value.replace(/\D/g, '') },
+                                      }))
+                                    }}
+                                    placeholder="0"
+                                    className="tabular-nums"
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -838,25 +962,12 @@ function PasoHacienda({
           })}
         </Reveal>
 
-        {campo.potreros.length > 1 && (
-          <Reveal delay={0.2} className="mt-4 grid gap-1.5">
-            <Label>¿En qué potrero están ahora?</Label>
-            <Dropdown
-              block
-              ariaLabel="Potrero donde está la hacienda"
-              value={potreroId}
-              onChange={setPotreroId}
-              options={campo.potreros.map((p) => ({ value: p.id, label: p.nombre }))}
-            />
-          </Reveal>
-        )}
-
-        {/* Dónde quedan, dicho con todas las letras. */}
-        <Reveal delay={0.24} className="mt-3">
-          <p className="text-xs text-muted-foreground">
+        {/* Total del campo, dicho con todas las letras. */}
+        <Reveal delay={0.2} className="mt-3">
+          <p className="text-xs tabular-nums text-muted-foreground">
             {total > 0
-              ? `${total} ${total === 1 ? 'animal queda' : 'animales quedan'} en ${campo.nombre}${potrero ? `, potrero ${potrero.nombre}` : ''}. Después los movés desde el mapa o la manga.`
-              : `Quedan en ${campo.nombre}${potrero ? `, potrero ${potrero.nombre}` : ''}. Después los movés desde el mapa o la manga.`}
+              ? `${total} ${total === 1 ? 'cabeza' : 'cabezas'} en ${campo.nombre}, en ${potrerosConHacienda} ${potrerosConHacienda === 1 ? 'potrero' : 'potreros'}. Después las movés desde el mapa o la manga.`
+              : `Todavía no cargaste hacienda en ${campo.nombre}.`}
           </p>
         </Reveal>
 
@@ -865,13 +976,13 @@ function PasoHacienda({
             {error}
           </p>
         )}
-        <Reveal delay={0.28} className="mt-5 grid gap-2">
+        <Reveal delay={0.24} className="mt-5 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
             {ocupado
               ? 'Guardando…'
               : total > 0
                 ? `Guardar ${total} ${categoriaNombreGenerico(total)}`
-                : 'Guardar mi hacienda'}
+                : 'Guardar la hacienda'}
           </Button>
           <Button
             type="button"
@@ -880,7 +991,7 @@ function PasoHacienda({
             disabled={ocupado}
             onClick={() => onListo(0)}
           >
-            La cargo después
+            La completo después
           </Button>
         </Reveal>
       </form>
