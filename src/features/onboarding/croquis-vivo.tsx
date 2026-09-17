@@ -1,4 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import type { Especie } from '@/features/hacienda/labels'
+import {
+  ESTILO_ESPECIE,
+  totalCabezas,
+  type CabezasPorEspecie,
+  type PotreroCroquis,
+} from '@/features/onboarding/especies-croquis'
 import { cn } from '@/lib/utils'
 
 /**
@@ -13,11 +20,14 @@ import { cn } from '@/lib/utils'
  * lo que falta asignar queda rayado.
  */
 
-export type PotreroCroquis = {
-  clave: string
-  nombre: string
-  hectareas: number | null
-  cabezas: number
+const ORDEN_ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+
+/** La marca de una especie, centrada en (0,0). Se usa en el croquis y en la leyenda. */
+export function MarcaEspecie({ especie }: { especie: Especie }) {
+  const color = ESTILO_ESPECIE[especie].color
+  if (especie === 'equino') return <path d="M0 -3.4 L3.4 0 L0 3.4 L-3.4 0 Z" fill={color} />
+  if (especie === 'ovino') return <circle r={2.4} fill={color} />
+  return <circle r={2.9} fill={color} />
 }
 
 export type CampoCroquis = {
@@ -61,18 +71,26 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
   return { ...repartir(a, ra), ...repartir(b, rb) }
 }
 
-/** Un punto cada 5 cabezas (mínimo 1), hasta lo que entra en el potrero. */
-function puntos(r: Rect, cabezas: number): { cx: number; cy: number }[] {
-  if (cabezas <= 0) return []
+/**
+ * Un punto cada 5 cabezas (mínimo 1 por especie), en el orden vacunos →
+ * ovinos → equinos, hasta lo que entra en el potrero.
+ */
+function puntos(r: Rect, cabezas: CabezasPorEspecie): { cx: number; cy: number; especie: Especie }[] {
   const paso = 9
   const x0 = r.x + 8
   const y0 = r.y + 24 // debajo de la etiqueta
   const cols = Math.max(0, Math.floor((r.w - 16) / paso))
   const filas = Math.max(0, Math.floor((r.h - 30) / paso))
-  const n = Math.min(Math.max(1, Math.ceil(cabezas / 5)), cols * filas)
-  const out: { cx: number; cy: number }[] = []
-  for (let i = 0; i < n; i++) {
-    out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3 })
+  const capacidad = cols * filas
+  const out: { cx: number; cy: number; especie: Especie }[] = []
+  for (const e of ORDEN_ESPECIES) {
+    const n = cabezas[e] ?? 0
+    if (n <= 0) continue
+    for (let k = 0; k < Math.max(1, Math.ceil(n / 5)); k++) {
+      const i = out.length
+      if (i >= capacidad) return out
+      out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3, especie: e })
+    }
   }
   return out
 }
@@ -88,7 +106,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
   const items = conHa.map((p) => ({ clave: p.clave, area: p.hectareas ?? 0 }))
   if (faltan > 0.05 && conHa.length > 0) items.push({ clave: '__resto', area: faltan })
   const rects = repartir(items, interior)
-  const cabezas = campo.potreros.reduce((s, p) => s + p.cabezas, 0)
+  const cabezas = campo.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0)
 
   const acento = excede
     ? 'stroke-destructive'
@@ -134,6 +152,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           .map((p) => {
             const r = rects[p.clave]!
             const pts = puntos(r, p.cabezas)
+            const t = totalCabezas(p.cabezas)
             const chico = r.w < 70 || r.h < 40
             return (
               <motion.g
@@ -147,7 +166,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                   rx={6}
                   className={cn(
                     'stroke-sidebar-foreground/70',
-                    p.cabezas > 0 ? 'fill-primary/30' : 'fill-primary/15',
+                    t > 0 ? 'fill-primary/30' : 'fill-primary/15',
                   )}
                   strokeWidth={1.25}
                   initial={{ x: r.x + r.w / 2, y: r.y + r.h / 2, width: 0, height: 0 }}
@@ -168,29 +187,26 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                       </tspan>
                     ) : null}
                   </text>
-                  {p.cabezas > 0 && !chico && (
+                  {t > 0 && !chico && (
                     <text
                       x={Math.max(0, r.w - 16)}
                       textAnchor="end"
-                      className="fill-[#e9b45f] font-semibold tabular-nums"
+                      className="fill-sidebar-foreground font-semibold tabular-nums"
                       fontSize={11}
                     >
-                      {p.cabezas}
+                      {t}
                     </text>
                   )}
                 </motion.g>
                 {pts.map((pt, i) => (
-                  <motion.circle
-                    key={i}
-                    cx={pt.cx}
-                    cy={pt.cy}
-                    r={2.6}
-                    className="fill-[#e9b45f]"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 0.95 }}
+                  <motion.g
+                    key={`${pt.especie}-${i}`}
+                    initial={{ scale: 0, opacity: 0, x: pt.cx, y: pt.cy }}
+                    animate={{ scale: 1, opacity: 0.95, x: pt.cx, y: pt.cy }}
                     transition={{ type: 'spring', stiffness: 500, damping: 22, delay: Math.min(i, 24) * 0.02 }}
-                    style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-                  />
+                  >
+                    <MarcaEspecie especie={pt.especie} />
+                  </motion.g>
                 ))}
               </motion.g>
             )

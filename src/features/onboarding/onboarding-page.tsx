@@ -29,7 +29,12 @@ import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
-import { CroquisVivo, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
+import { CroquisVivo, MarcaEspecie, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
+import {
+  ESTILO_ESPECIE,
+  totalCabezas,
+  type CabezasPorEspecie,
+} from '@/features/onboarding/especies-croquis'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
@@ -37,6 +42,7 @@ import {
   categoriaLabel,
   categoriasPorEspecie,
   especieLabel,
+  especiePorCategoria,
   type Especie,
 } from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
@@ -58,7 +64,7 @@ type CampoCargado = {
   lat: number
   lon: number
   hectareas: number
-  potreros: { id: string; nombre: string; hectareas: number | null; cabezas: number }[]
+  potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorEspecie }[]
   cabezas: number
 }
 
@@ -75,7 +81,8 @@ type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
 type Borrador = {
   campo: { nombre: string; hectareas: number | null }
   potreros: { nombre: string; hectareas: number | null }[]
-  cabezas: Record<string, number>
+  /** Por potrero, cabezas por especie: el croquis las dibuja distinto. */
+  cabezas: Record<string, CabezasPorEspecie>
 }
 const BORRADOR_VACIO: Borrador = { campo: { nombre: '', hectareas: null }, potreros: [], cabezas: {} }
 
@@ -289,7 +296,7 @@ export function OnboardingPage() {
                   {
                     ...campoActual,
                     cabezas,
-                    potreros: campoActual.potreros.map((p) => ({ ...p, cabezas: porPotrero[p.id] ?? 0 })),
+                    potreros: campoActual.potreros.map((p) => ({ ...p, cabezas: porPotrero[p.id] ?? {} })),
                   },
                 ])
                 setCampoActual(null)
@@ -402,7 +409,7 @@ export function OnboardingPage() {
               </div>
             </div>
             <div className="mt-4 grid gap-2">
-              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos/${primero.id}`)}>
+              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos?campo=${primero.id}`)}>
                 Ir a dibujar mis potreros
               </Button>
               <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
@@ -721,7 +728,7 @@ function PasoPotreros({
           estadoCiclo: estadoInicialPorActividad(campo.actividad),
           hectareas,
         })
-        creados.push({ id, nombre, hectareas, cabezas: 0 })
+        creados.push({ id, nombre, hectareas, cabezas: {} })
       }
       onListo(creados)
     } catch (err) {
@@ -917,6 +924,18 @@ function totalDe(c: Cantidades | undefined): number {
   return Object.values(c ?? {}).reduce((s, v) => s + (parseInt(v ?? '', 10) || 0), 0)
 }
 
+function porEspecieDe(c: Cantidades | undefined): CabezasPorEspecie {
+  const out: CabezasPorEspecie = {}
+  for (const [cat, v] of Object.entries(c ?? {}) as [Categoria, string][]) {
+    const n = parseInt(v, 10) || 0
+    if (n > 0) {
+      const e = especiePorCategoria[cat]
+      out[e] = (out[e] ?? 0) + n
+    }
+  }
+  return out
+}
+
 function PasoHacienda({
   empresaId,
   campo,
@@ -929,8 +948,8 @@ function PasoHacienda({
   campo: CampoCargado
   ocupado: boolean
   setOcupado: (v: boolean) => void
-  onBorrador: (cabezas: Record<string, number>) => void
-  onListo: (cabezas: number, porPotrero: Record<string, number>) => void
+  onBorrador: (cabezas: Record<string, CabezasPorEspecie>) => void
+  onListo: (cabezas: number, porPotrero: Record<string, CabezasPorEspecie>) => void
 }) {
   const potreros = campo.potreros
   // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
@@ -963,7 +982,7 @@ function PasoHacienda({
       irA(indice + 1)
       return
     }
-    const totales = Object.fromEntries(potreros.map((p) => [p.id, totalDe(porPotrero[p.id])]))
+    const totales = Object.fromEntries(potreros.map((p) => [p.id, porEspecieDe(porPotrero[p.id])]))
     if (total === 0) {
       onListo(0, totales)
       return
@@ -1098,7 +1117,7 @@ function PasoHacienda({
                               }
                               setPorPotrero(next)
                               onBorrador(
-                                Object.fromEntries(potreros.map((p) => [p.id, totalDe(next[p.id])])),
+                                Object.fromEntries(potreros.map((p) => [p.id, porEspecieDe(next[p.id])])),
                               )
                             }}
                             placeholder="0"
@@ -1247,7 +1266,7 @@ function EscenaCroquis({
               clave: `${i}`,
               nombre: p.nombre,
               hectareas: p.hectareas,
-              cabezas: 0,
+              cabezas: {},
             })),
             estado: 'potreros',
           }
@@ -1259,7 +1278,7 @@ function EscenaCroquis({
                 clave: p.id,
                 nombre: p.nombre,
                 hectareas: p.hectareas,
-                cabezas: borrador.cabezas[p.id] ?? 0,
+                cabezas: borrador.cabezas[p.id] ?? {},
               })),
               estado: 'hacienda',
             }
@@ -1283,7 +1302,8 @@ function EscenaCroquis({
     ...(campoActual?.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
   ]
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
-  const cabezasCroquis = croquis.potreros.reduce((s, p) => s + p.cabezas, 0)
+  const cabezasCroquis = croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0)
+  const especiesCroquis = ESPECIES.filter((e) => croquis.potreros.some((p) => (p.cabezas[e] ?? 0) > 0))
   const potrerosConHa = croquis.potreros.filter((p) => p.hectareas).length
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
@@ -1342,15 +1362,35 @@ function EscenaCroquis({
       </div>
 
       {/* Lo que lleva cargado, en una línea bajo el croquis. */}
-      <p className="mt-2 min-h-5 text-[13px] text-sidebar-foreground/70">
-        {nPotreros > 0 ? `${nPotreros} ${nPotreros === 1 ? 'potrero' : 'potreros'}` : ''}
-        {cabezasCroquis > 0 && (
-          <>
-            {nPotreros > 0 ? ' · ' : ''}
-            <span className="font-semibold tabular-nums text-[#e9b45f]">{cabezasCroquis} cabezas</span>
-          </>
+      <div className="mt-2 min-h-5 text-[13px] text-sidebar-foreground/70">
+        <p>
+          {nPotreros > 0 ? `${nPotreros} ${nPotreros === 1 ? 'potrero' : 'potreros'}` : ''}
+          {cabezasCroquis > 0 && (
+            <>
+              {nPotreros > 0 ? ' · ' : ''}
+              <span className="font-semibold tabular-nums text-sidebar-foreground">
+                {cabezasCroquis} cabezas
+              </span>
+            </>
+          )}
+        </p>
+        {/* Leyenda: sólo las especies que hay. */}
+        {especiesCroquis.length > 0 && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            {especiesCroquis.map((e) => {
+              const n = croquis.potreros.reduce((s, p) => s + (p.cabezas[e] ?? 0), 0)
+              return (
+                <span key={e} className="inline-flex items-center gap-1.5 tabular-nums">
+                  <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
+                    <MarcaEspecie especie={e} />
+                  </svg>
+                  <span style={{ color: ESTILO_ESPECIE[e].color }}>{n}</span> {ESTILO_ESPECIE[e].nombre}
+                </span>
+              )
+            })}
+          </p>
         )}
-      </p>
+      </div>
 
       {/* Los campos ya terminados, cuando no son el que se ve. */}
       {anteriores.length > 0 && (

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowUpRight,
   Beef,
@@ -176,7 +176,12 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
   const empresaId = empresa.data?.empresa_id ?? ''
 
   const vms = campos.map(vmDe)
-  const [campoId, setCampoId] = useState(vms[0]?.id ?? '')
+  // ?campo=<id>: el onboarding manda acá con el campo recién creado.
+  const [params] = useSearchParams()
+  const pedido = params.get('campo')
+  const [campoId, setCampoId] = useState(
+    (pedido && vms.some((c) => c.id === pedido) ? pedido : vms[0]?.id) ?? '',
+  )
   const [ver, setVer] = useState(0)
   const [marcandoContorno, setMarcandoContorno] = useState(false)
   const vm = vms.find((c) => c.id === campoId) ?? vms[0]
