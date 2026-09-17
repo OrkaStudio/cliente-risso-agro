@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  ArrowRight,
   Beef,
   Building2,
   Check,
@@ -54,7 +55,7 @@ type CampoCargado = {
   localidad: string
   lat: number
   lon: number
-  hectareas: number | null
+  hectareas: number
   potreros: { id: string; nombre: string; hectareas: number | null }[]
   cabezas: number
 }
@@ -336,16 +337,18 @@ export function OnboardingPage() {
               </div>
               <ul className="divide-y divide-border border-t border-border text-sm">
                 {campos.map((c) => (
-                  <li key={c.id} className="flex items-baseline gap-2 px-3.5 py-2">
-                    <LandPlot className="size-4 shrink-0 self-center text-primary/80" strokeWidth={1.75} />
-                    <span className="font-medium">{c.nombre}</span>
-                    <span className="min-w-0 truncate text-xs text-muted-foreground">
-                      {c.potreros.length > 0
-                        ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`
-                        : 'sin potreros todavía'}
-                      {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
-                      {c.hectareas ? ` · ${c.hectareas} ha` : ''}
-                    </span>
+                  <li key={c.id} className="flex items-center gap-2.5 px-3.5 py-2">
+                    <LandPlot className="size-4 shrink-0 text-primary/80" strokeWidth={1.75} />
+                    <div className="min-w-0">
+                      <p className="font-medium">{c.nombre}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {ha(c.hectareas)} ha
+                        {c.potreros.length > 0
+                          ? ` · ${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`
+                          : ' · sin potreros todavía'}
+                        {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
+                      </p>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -413,11 +416,12 @@ function PasoCampo({
     if (n.length < 2) errs.nombre = 'Falta el nombre'
     if (!actividad) errs.actividad = 'Elegí qué se hace en este campo'
     if (!localidad) errs.localidad = 'Elegí la localidad de la lista'
-    const ha = hectareas.trim() === '' ? null : Number(hectareas)
-    if (ha !== null && (!Number.isFinite(ha) || ha < 0))
-      errs.hectareas = 'Tiene que ser un número'
+    // Obligatorias: de acá sale la cuenta de los potreros.
+    const ha = numeroDe(hectareas)
+    if (ha === null) errs.hectareas = 'Necesitamos las hectáreas'
+    else if (!Number.isFinite(ha) || ha <= 0) errs.hectareas = 'Un número mayor que cero'
     setErrores(errs)
-    if (Object.keys(errs).length || !actividad || !localidad) return
+    if (Object.keys(errs).length || !actividad || !localidad || ha === null) return
 
     setOcupado(true)
     try {
@@ -457,7 +461,7 @@ function PasoCampo({
       <AuthHeading
         icono={LandPlot}
         titulo={primero ? 'Tu primer campo' : 'Otro campo'}
-        subtitulo="Cómo se llama, qué se hace y dónde está. Los datos que no tengas a mano, los completás después."
+        subtitulo="Cómo se llama, qué se hace, dónde está y cuántas hectáreas tiene."
       />
       <form onSubmit={guardar} className="mt-5 grid gap-3.5" noValidate>
         <Reveal delay={0.14} className="grid gap-1.5">
@@ -511,6 +515,7 @@ function PasoCampo({
               setLocalidad(l)
               setErrores((x) => ({ ...x, localidad: undefined }))
             }}
+            onEscribir={() => setErrores((x) => ({ ...x, localidad: undefined }))}
             invalido={!!errores.localidad}
           />
           {errores.localidad ? (
@@ -525,7 +530,7 @@ function PasoCampo({
 
         <Reveal delay={0.26}>
           <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
+            <div className="grid content-start gap-1.5">
               <Label>Tenencia</Label>
               <div className="grid grid-cols-2 gap-1.5">
                 {(
@@ -550,7 +555,7 @@ function PasoCampo({
                 ))}
               </div>
             </div>
-            <div className="grid gap-1.5">
+            <div className="grid content-start gap-1.5">
               <Label htmlFor="hectareas">Hectáreas</Label>
               <Input
                 id="hectareas"
@@ -598,68 +603,61 @@ function PasoPotreros({
 }) {
   const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
   const [error, setError] = useState<string | null>(null)
-  // Sólo se avisa una vez que faltan hectáreas; la segunda vez, sigue.
-  const [avisadoFaltan, setAvisadoFaltan] = useState(false)
 
-  const haDe = (f: FilaPotrero) => (f.hectareas.trim() === '' ? null : Number(f.hectareas))
-  const conHa = filas.filter((f) => haDe(f) !== null && Number.isFinite(haDe(f)!))
-  const sumaHa = conHa.reduce((s, f) => s + (haDe(f) ?? 0), 0)
-  const sinHa = filas.length - conHa.length
+  // La regla es una sola: los potreros suman EXACTAMENTE las hectáreas del
+  // campo. Ni "más o menos" ni potreros sin hectáreas — es su negocio. Quien
+  // no tiene el dato a mano salta el paso entero con "después", nunca a
+  // medias.
   const totalCampo = campo.hectareas
-  // Control contra las hectáreas del campo: acompaña, y frena sólo si se pasa.
-  const excede = totalCampo != null && sumaHa > totalCampo * 1.02
-  const faltan = totalCampo != null ? Math.max(0, Math.round((totalCampo - sumaHa) * 10) / 10) : null
+  const filasValidas = filas.every((f) => {
+    const ha = haDe(f)
+    return f.numero.trim() !== '' && ha !== null && Number.isFinite(ha) && ha > 0
+  })
+  const sumaHa = redondear1(
+    filas.reduce((s, f) => {
+      const ha = haDe(f)
+      return s + (ha !== null && Number.isFinite(ha) && ha > 0 ? ha : 0)
+    }, 0),
+  )
+  const diferencia = redondear1(totalCampo - sumaHa)
+  const excede = diferencia < -0.05
+  const completo = filasValidas && Math.abs(diferencia) < 0.05
+  const numeros = filas.map((f) => f.numero.trim())
+  const repetido = numeros.find((n, i) => n !== '' && numeros.indexOf(n) !== i)
+  const listo = completo && !repetido
+
+  // Qué falta, dicho en una línea al lado de la barra.
+  const estado = repetido
+    ? `El potrero ${repetido} está dos veces`
+    : completo
+      ? '¡Completo!'
+      : excede
+        ? `Se pasan ${ha(redondear1(-diferencia))} ha`
+        : sumaHa === 0
+          ? 'Las hectáreas de cada potrero'
+          : filasValidas
+            ? `Faltan ${ha(diferencia)} ha`
+            : `Faltan ${ha(diferencia)} ha · hay potreros sin hectáreas`
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
+    if (!listo) return
     setError(null)
-    const numeros = new Set<string>()
-    for (const f of filas) {
-      const n = f.numero.trim()
-      if (!n) {
-        setError('Cada potrero necesita su número.')
-        return
-      }
-      if (numeros.has(n)) {
-        setError(`El potrero ${n} está dos veces.`)
-        return
-      }
-      numeros.add(n)
-      const ha = haDe(f)
-      if (ha !== null && (!Number.isFinite(ha) || ha <= 0)) {
-        setError(`Las hectáreas del potrero ${n} tienen que ser un número mayor que cero.`)
-        return
-      }
-    }
-    if (excede) {
-      setError(
-        `Los potreros suman ${sumaHa} ha y el campo tiene ${totalCampo}. Revisá las hectáreas antes de seguir.`,
-      )
-      return
-    }
-    // Faltan hectáreas para llegar al campo y todas las filas tienen dato:
-    // probablemente hay potreros sin cargar. Se avisa una vez.
-    if (faltan !== null && faltan > 0 && sinHa === 0 && !avisadoFaltan) {
-      setAvisadoFaltan(true)
-      setError(
-        `Los potreros suman ${sumaHa} ha; al campo le faltan ${faltan}. Si hay más potreros, agregalos. Si está bien así, tocá Guardar de nuevo.`,
-      )
-      return
-    }
     setOcupado(true)
     try {
       const creados: CampoCargado['potreros'] = []
       // Se manda sólo el número; la DB le pone la letra del campo.
       for (const f of filas) {
         const hectareas = haDe(f)
+        const nombre = `${f.numero.trim()}A`
         const id = await crearPotrero({
           empresaId,
           campoId: campo.id,
-          nombre: `${f.numero.trim()}A`,
+          nombre,
           estadoCiclo: estadoInicialPorActividad(campo.actividad),
           hectareas,
         })
-        creados.push({ id, nombre: `${f.numero.trim()}A`, hectareas })
+        creados.push({ id, nombre, hectareas })
       }
       onListo(creados)
     } catch (err) {
@@ -674,111 +672,129 @@ function PasoPotreros({
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
-        subtitulo={
-          totalCampo
-            ? `Número y hectáreas de cada uno. Entre todos tienen que sumar las ${totalCampo} ha del campo.`
-            : 'Número y hectáreas de cada uno, como figuran en el plano o en el alambrado.'
-        }
+        subtitulo={`Número y hectáreas de cada uno. Entre todos tienen que sumar las ${ha(totalCampo)} ha del campo.`}
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-2.5">
-          {filas.map((fila, i) => (
-            <div key={i} className="flex items-center gap-2">
-              {/* Número editable; la letra la pone el campo. */}
-              <Input
-                aria-label={`Número del potrero ${i + 1}`}
-                inputMode="numeric"
-                className="w-16"
-                value={fila.numero}
-                onChange={(e) => {
-                  setError(null)
-                  setFilas((fs) =>
-                    fs.map((f, j) =>
-                      j === i ? { ...f, numero: e.target.value.replace(/\D/g, '') } : f,
-                    ),
-                  )
-                }}
-              />
-              <Input
-                aria-label={`Hectáreas del potrero ${i + 1}`}
-                inputMode="decimal"
-                className="flex-1"
-                value={fila.hectareas}
-                onChange={(e) => {
-                  setError(null)
-                  setFilas((fs) =>
-                    fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
-                  )
-                }}
-                placeholder="Hectáreas"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Quitar potrero ${i + 1}`}
-                disabled={filas.length === 1}
-                onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
+          {filas.map((fila, i) => {
+            const ha = haDe(fila)
+            const filaOk = ha !== null && Number.isFinite(ha) && ha > 0
+            return (
+              <div key={i} className="flex items-center gap-2">
+                {/* Número editable; la letra la pone el campo. */}
+                <Input
+                  aria-label={`Número del potrero ${i + 1}`}
+                  inputMode="numeric"
+                  className="w-16 text-center tabular-nums"
+                  value={fila.numero}
+                  onChange={(e) => {
+                    setError(null)
+                    setFilas((fs) =>
+                      fs.map((f, j) =>
+                        j === i ? { ...f, numero: e.target.value.replace(/\D/g, '') } : f,
+                      ),
+                    )
+                  }}
+                />
+                <div className="relative flex-1">
+                  <Input
+                    aria-label={`Hectáreas del potrero ${i + 1}`}
+                    inputMode="decimal"
+                    className="pr-16 tabular-nums"
+                    value={fila.hectareas}
+                    // Sólo la fila nueva monta con foco: la primera al entrar,
+                    // y cada "Otro potrero" después.
+                    autoFocus
+                    onChange={(e) => {
+                      setError(null)
+                      setFilas((fs) =>
+                        fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
+                      )
+                    }}
+                    placeholder="Hectáreas"
+                  />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'pointer-events-none absolute inset-y-0 right-3 flex items-center gap-1 text-xs',
+                      filaOk ? 'text-primary' : 'text-muted-foreground/55',
+                    )}
+                  >
+                    ha
+                    {filaOk && <Check className="size-3.5" strokeWidth={2.5} />}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Quitar potrero ${i + 1}`}
+                  disabled={filas.length === 1}
+                  onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            )
+          })}
         </Reveal>
 
-        {/* Suma en vivo contra el campo: el acompañamiento, no el látigo. */}
         <Reveal delay={0.18} className="mt-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setFilas((fs) => {
-                  const nums = fs
-                    .map((f) => parseInt(f.numero, 10))
-                    .filter((n) => Number.isFinite(n))
-                  const sig = (nums.length ? Math.max(...nums) : 0) + 1
-                  return [...fs, { numero: String(sig), hectareas: '' }]
-                })
-              }
-            >
-              <Plus className="size-4" /> Otro potrero
-            </Button>
-            {totalCampo ? (
-              <p
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setFilas((fs) => {
+                const nums = fs.map((f) => parseInt(f.numero, 10)).filter((n) => Number.isFinite(n))
+                const sig = (nums.length ? Math.max(...nums) : 0) + 1
+                return [...fs, { numero: String(sig), hectareas: '' }]
+              })
+            }
+          >
+            <Plus className="size-4" /> Otro potrero
+          </Button>
+        </Reveal>
+
+        {/* La cuenta, en vivo: la barra se completa y el botón se enciende. */}
+        <Reveal delay={0.22} className="mt-4">
+          <div
+            className={cn(
+              'rounded-lg border px-3.5 py-3 transition-colors',
+              completo && !repetido
+                ? 'border-primary/50 bg-primary/5'
+                : excede || repetido
+                  ? 'border-destructive/40 bg-destructive/5'
+                  : 'border-border',
+            )}
+          >
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-semibold tabular-nums">
+                {ha(sumaHa)} <span className="font-normal text-muted-foreground">de {ha(totalCampo)} ha</span>
+              </span>
+              <span
                 className={cn(
-                  'text-xs tabular-nums',
-                  excede ? 'font-medium text-destructive' : 'text-muted-foreground',
+                  'inline-flex items-center gap-1 font-medium tabular-nums',
+                  completo && !repetido
+                    ? 'text-primary'
+                    : excede || repetido
+                      ? 'text-destructive'
+                      : 'text-muted-foreground',
                 )}
               >
-                {sumaHa} de {totalCampo} ha
-                {excede
-                  ? ' · se pasan'
-                  : faltan && faltan > 0
-                    ? ` · faltan ${faltan}`
-                    : sumaHa > 0
-                      ? ' · completo'
-                      : ''}
-              </p>
-            ) : sumaHa > 0 ? (
-              <p className="text-xs tabular-nums text-muted-foreground">{sumaHa} ha en total</p>
-            ) : null}
-          </div>
-          {totalCampo ? (
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
-              <div
-                className={cn('h-full rounded-full transition-all', excede ? 'bg-destructive' : 'bg-primary')}
-                style={{ width: `${Math.min(100, (sumaHa / totalCampo) * 100)}%` }}
+                {completo && !repetido && <Check className="size-3.5" strokeWidth={3} />}
+                {estado}
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
+              <motion.div
+                className={cn('h-full rounded-full', excede || repetido ? 'bg-destructive' : 'bg-primary')}
+                initial={false}
+                animate={{ width: `${Math.min(100, (sumaHa / totalCampo) * 100)}%` }}
+                transition={{ type: 'spring', stiffness: 220, damping: 28 }}
               />
             </div>
-          ) : null}
-          {sinHa > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {sinHa === 1 ? 'Un potrero sin hectáreas' : `${sinHa} potreros sin hectáreas`}: quedan
-              como "completar después" y los cargás desde Campos.
-            </p>
-          )}
+          </div>
         </Reveal>
 
         {error && (
@@ -786,8 +802,8 @@ function PasoPotreros({
             {error}
           </p>
         )}
-        <Reveal delay={0.24} className="mt-5 grid gap-2">
-          <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
+        <Reveal delay={0.26} className="mt-5 grid gap-2">
+          <Button type="submit" disabled={ocupado || !listo} className={BOTON_PRINCIPAL}>
             {ocupado
               ? 'Guardando…'
               : `Guardar ${filas.length === 1 ? 'el potrero' : `los ${filas.length} potreros`}`}
@@ -807,8 +823,27 @@ function PasoPotreros({
   )
 }
 
+/** "100,5" también vale: acá se escribe con coma. */
+function numeroDe(texto: string): number | null {
+  const t = texto.trim().replace(',', '.')
+  return t === '' ? null : Number(t)
+}
+
+function haDe(f: FilaPotrero): number | null {
+  return numeroDe(f.hectareas)
+}
+
+function redondear1(n: number): number {
+  return Math.round(n * 10) / 10
+}
+
+/** 420,5 — con coma, como se escribe acá. */
+function ha(n: number): string {
+  return n.toLocaleString('es-AR', { maximumFractionDigits: 2 })
+}
+
 // ---------------------------------------------------------------------
-// Paso: su hacienda, potrero por potrero
+// Paso: su hacienda, un potrero por vez
 // ---------------------------------------------------------------------
 
 const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
@@ -831,24 +866,44 @@ function PasoHacienda({
   setOcupado: (v: boolean) => void
   onListo: (cabezas: number) => void
 }) {
-  // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar.
+  const potreros = campo.potreros
+  // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
+  // recorre un potrero por vez — fichas arriba, el activo abajo — y se
+  // guarda todo junto al final.
   const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>({})
-  const [abierto, setAbierto] = useState<string | null>(campo.potreros[0]?.id ?? null)
   const [especies, setEspecies] = useState<Record<string, Especie[]>>({})
+  const [indice, setIndice] = useState(0)
+  const [vistos, setVistos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const total = campo.potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
-  const potrerosConHacienda = campo.potreros.filter((p) => totalDe(porPotrero[p.id]) > 0).length
+  const actual = potreros[indice]!
+  const cantActual = porPotrero[actual.id] ?? {}
+  const totalActual = totalDe(cantActual)
+  const total = potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
+  const esUltimo = indice === potreros.length - 1
+  const especiesActual = especies[actual.id] ?? ['bovino']
+
+  function irA(i: number) {
+    setVistos((v) => (v.includes(actual.id) ? v : [...v, actual.id]))
+    setIndice(i)
+    setError(null)
+  }
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
-    setError(null)
-    if (total === 0) {
-      setError('Cargá las cabezas de al menos un potrero, o tocá "La completo después".')
+    // Enter o el botón: en un potrero intermedio pasa al siguiente; en el
+    // último guarda todo.
+    if (!esUltimo) {
+      irA(indice + 1)
       return
     }
+    if (total === 0) {
+      onListo(0)
+      return
+    }
+    setError(null)
     setOcupado(true)
-    for (const p of campo.potreros) {
+    for (const p of potreros) {
       const items = (Object.entries(porPotrero[p.id] ?? {}) as [Categoria, string][])
         .map(([categoria, v]) => ({ categoria, cantidad: parseInt(v, 10) || 0 }))
         .filter((x) => x.cantidad > 0)
@@ -874,101 +929,148 @@ function PasoHacienda({
       <AuthHeading
         icono={Beef}
         titulo={`La hacienda de ${campo.nombre}`}
-        subtitulo="Cabezas por categoría, en el potrero donde están hoy. Lo que no tengas a mano, lo completás después desde Hacienda."
+        subtitulo="Un potrero por vez: cuántas cabezas hay hoy en cada uno. Si está vacío, pasás al siguiente."
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
-        <Reveal delay={0.14} className="divide-y divide-border rounded-lg border border-border">
-          {campo.potreros.map((p) => {
-            const cant = porPotrero[p.id] ?? {}
-            const t = totalDe(cant)
-            const esAbierto = abierto === p.id
-            const esp = especies[p.id] ?? ['bovino']
-            return (
-              <div key={p.id}>
-                {/* Cabecera del potrero: nombre · ha · cabezas cargadas. Tocar abre. */}
+        {/* Las fichas: dónde estoy, qué hice, cuánto llevo. */}
+        <Reveal delay={0.14}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Potrero {indice + 1} de {potreros.length}
+            </p>
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={total}
+                initial={{ scale: 1.25, opacity: 0.6 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold tabular-nums text-primary"
+              >
+                <Beef className="size-3.5" strokeWidth={2} />
+                {total} {total === 1 ? 'cabeza' : 'cabezas'}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {potreros.map((p, i) => {
+              const t = totalDe(porPotrero[p.id])
+              const visto = vistos.includes(p.id)
+              const activo = i === indice
+              return (
                 <button
+                  key={p.id}
                   type="button"
-                  onClick={() => setAbierto(esAbierto ? null : p.id)}
-                  aria-expanded={esAbierto}
-                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left"
+                  onClick={() => irA(i)}
+                  aria-current={activo ? 'step' : undefined}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors',
+                    activo
+                      ? 'border-primary bg-primary text-white'
+                      : visto
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-ring',
+                  )}
                 >
-                  <span
-                    className={cn(
-                      'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
-                      t > 0 ? 'border-primary bg-primary text-white' : 'border-border text-muted-foreground',
-                    )}
-                  >
-                    {t > 0 ? <Check className="size-3.5" strokeWidth={3} /> : p.nombre.replace(/[A-Z]$/, '')}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="text-sm font-medium">Potrero {p.nombre}</span>
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      {p.hectareas ? `${p.hectareas} ha` : ''}
+                  {visto && !activo && <Check className="size-3" strokeWidth={3} />}
+                  {p.nombre}
+                  {t > 0 && (
+                    <span className={cn('font-medium tabular-nums', activo ? 'text-white/80' : 'text-primary/80')}>
+                      · {t}
                     </span>
-                  </span>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {t > 0 ? `${t} ${t === 1 ? 'cabeza' : 'cabezas'}` : esAbierto ? '' : 'sin cargar'}
-                  </span>
+                  )}
                 </button>
-                {esAbierto && (
-                  <div className="px-3.5 pb-3.5">
-                    {ESPECIES.map((e) => {
-                      const on = esp.includes(e)
-                      return (
-                        <div key={e} className={cn(e !== 'bovino' && 'mt-2')}>
-                          {e !== 'bovino' && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEspecies((x) => ({
-                                  ...x,
-                                  [p.id]: on ? esp.filter((y) => y !== e) : [...esp, e],
-                                }))
-                              }
-                              className="mb-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
-                            >
-                              {on ? `Sin ${especieLabel[e].toLowerCase()}s` : `+ ${especieLabel[e]}s`}
-                            </button>
-                          )}
-                          {on && (
-                            <div className="grid grid-cols-3 gap-2">
-                              {categoriasPorEspecie[e].map((c) => (
-                                <label key={c} className="grid gap-1">
-                                  <span className="text-xs text-muted-foreground">{categoriaLabel[c]}</span>
-                                  <Input
-                                    inputMode="numeric"
-                                    value={cant[c] ?? ''}
-                                    onChange={(ev) => {
-                                      setError(null)
-                                      setPorPotrero((x) => ({
-                                        ...x,
-                                        [p.id]: { ...(x[p.id] ?? {}), [c]: ev.target.value.replace(/\D/g, '') },
-                                      }))
-                                    }}
-                                    placeholder="0"
-                                    className="tabular-nums"
-                                  />
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </Reveal>
 
-        {/* Total del campo, dicho con todas las letras. */}
-        <Reveal delay={0.2} className="mt-3">
-          <p className="text-xs tabular-nums text-muted-foreground">
-            {total > 0
-              ? `${total} ${total === 1 ? 'cabeza' : 'cabezas'} en ${campo.nombre}, en ${potrerosConHacienda} ${potrerosConHacienda === 1 ? 'potrero' : 'potreros'}. Después las movés desde el mapa o la manga.`
-              : `Todavía no cargaste hacienda en ${campo.nombre}.`}
-          </p>
+        {/* El potrero activo. Entra desde la derecha, como pasar una hoja. */}
+        <Reveal delay={0.18} className="mt-3">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={actual.id}
+              initial={{ opacity: 0, x: 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -18 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="rounded-lg border border-border px-3.5 py-3"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-[15px] font-semibold">
+                  Potrero {actual.nombre}
+                  {actual.hectareas ? (
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">{ha(actual.hectareas)} ha</span>
+                  ) : null}
+                </p>
+                <p className={cn('text-xs tabular-nums', totalActual > 0 ? 'font-medium text-primary' : 'text-muted-foreground')}>
+                  {totalActual > 0 ? `${totalActual} ${totalActual === 1 ? 'cabeza' : 'cabezas'} acá` : 'Todavía vacío'}
+                </p>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {ESPECIES.filter((e) => especiesActual.includes(e)).map((e) => (
+                  <div key={e}>
+                    {e !== 'bovino' && (
+                      <p className="mb-1.5 text-xs font-semibold text-foreground">{especieLabel[e]}s</p>
+                    )}
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {categoriasPorEspecie[e].map((c, k) => (
+                        <label key={c} className="grid gap-1">
+                          <span className="truncate text-xs text-muted-foreground">{categoriaLabel[c]}</span>
+                          <Input
+                            inputMode="numeric"
+                            value={cantActual[c] ?? ''}
+                            autoFocus={e === 'bovino' && k === 0}
+                            onChange={(ev) => {
+                              setError(null)
+                              setPorPotrero((x) => ({
+                                ...x,
+                                [actual.id]: {
+                                  ...(x[actual.id] ?? {}),
+                                  [c]: ev.target.value.replace(/\D/g, ''),
+                                },
+                              }))
+                            }}
+                            placeholder="0"
+                            className="px-2.5 tabular-nums"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {/* Otras especies: se suman (o se quitan) con un toque. */}
+                <div className="flex flex-wrap gap-1.5">
+                  {ESPECIES.filter((e) => e !== 'bovino').map((e) => {
+                    const on = especiesActual.includes(e)
+                    return (
+                      <button
+                        key={e}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setEspecies((x) => ({
+                            ...x,
+                            [actual.id]: on
+                              ? especiesActual.filter((y) => y !== e)
+                              : [...especiesActual, e],
+                          }))
+                        }
+                        className={cn(
+                          'inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
+                          on
+                            ? 'border-primary/40 bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:border-ring',
+                        )}
+                      >
+                        {on ? <Check className="size-3" strokeWidth={3} /> : <Plus className="size-3" strokeWidth={2.5} />}
+                        {especieLabel[e]}s
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </Reveal>
 
         {error && (
@@ -976,18 +1078,25 @@ function PasoHacienda({
             {error}
           </p>
         )}
-        <Reveal delay={0.24} className="mt-5 grid gap-2">
+        <Reveal delay={0.22} className="mt-5 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
-            {ocupado
-              ? 'Guardando…'
-              : total > 0
-                ? `Guardar ${total} ${categoriaNombreGenerico(total)}`
-                : 'Guardar la hacienda'}
+            {ocupado ? (
+              'Guardando…'
+            ) : !esUltimo ? (
+              <>
+                {totalActual > 0 ? 'Listo, siguiente potrero' : 'Está vacío, siguiente'}
+                <ArrowRight className="size-4" />
+              </>
+            ) : total > 0 ? (
+              `Guardar ${total} ${total === 1 ? 'cabeza' : 'cabezas'}`
+            ) : (
+              'Terminar sin hacienda'
+            )}
           </Button>
           <Button
             type="button"
-            variant="outline"
-            className="h-11 w-full text-[15px] font-medium"
+            variant="ghost"
+            className="w-full text-muted-foreground"
             disabled={ocupado}
             onClick={() => onListo(0)}
           >
@@ -997,10 +1106,6 @@ function PasoHacienda({
       </form>
     </>
   )
-}
-
-function categoriaNombreGenerico(n: number): string {
-  return n === 1 ? 'cabeza' : 'cabezas'
 }
 
 // ---------------------------------------------------------------------
@@ -1057,8 +1162,13 @@ function MapaDelViaje({
 }) {
   const empresaHecha = etapa !== 'empresa'
   const enCampo = etapa === 'campo' || etapa === 'potreros' || etapa === 'hacienda'
-  const subEtiqueta =
-    etapa === 'campo' ? 'Datos' : etapa === 'potreros' ? 'Potreros' : etapa === 'hacienda' ? 'Hacienda' : ''
+  // Las tres partes del campo en curso, con su tilde a medida que avanza.
+  const partes: { etapa: Etapa; nombre: string }[] = [
+    { etapa: 'campo', nombre: 'Datos' },
+    { etapa: 'potreros', nombre: 'Potreros' },
+    ...(campoActual?.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
+  ]
+  const indiceParte = partes.findIndex((p) => p.etapa === etapa)
 
   return (
     <div>
@@ -1069,26 +1179,60 @@ function MapaDelViaje({
         Unos minutos y estás adentro.
       </p>
       <ol className="mt-6 grid gap-2.5 lg:mt-8 lg:gap-3">
-        <Hito hecho={empresaHecha} enCurso={!empresaHecha}>
-          {empresaHecha && empresa ? empresa : 'Tu empresa'}
-        </Hito>
-        {campos.map((c) => (
-          <Hito key={c.id} hecho>
-            {c.nombre}
-            <span className="ml-1.5 text-[13px] font-normal text-sidebar-foreground/60">
-              {c.potreros.length > 0 ? `· ${c.potreros.length} potreros` : ''}
-              {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
-            </span>
+        <li>
+          <Hito hecho={empresaHecha} enCurso={!empresaHecha}>
+            {empresaHecha && empresa ? empresa : 'Tu empresa'}
           </Hito>
+        </li>
+        {campos.map((c) => (
+          <li key={c.id} className="grid gap-0.5">
+            <Hito hecho>{c.nombre}</Hito>
+            <p className="ml-10 text-[13px] text-sidebar-foreground/60">
+              {ha(c.hectareas)} ha
+              {c.potreros.length > 0
+                ? ` · ${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`
+                : ''}
+              {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
+            </p>
+          </li>
         ))}
         {enCampo && (
-          <Hito enCurso>
-            {campoActual?.nombre ?? (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
-            <span className="ml-1.5 text-[13px] font-normal text-[#e9b45f]/80">· {subEtiqueta}</span>
-          </Hito>
+          <li className="grid gap-0.5">
+            <Hito enCurso>
+              {campoActual?.nombre ?? (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
+            </Hito>
+            <div className="ml-10 flex items-center gap-3 text-[13px]">
+              {partes.map((p, i) => {
+                const hecha = i < indiceParte
+                const enCurso = i === indiceParte
+                return (
+                  <span
+                    key={p.etapa}
+                    className={cn(
+                      'inline-flex items-center gap-1 transition-colors',
+                      hecha && 'text-sidebar-foreground/80',
+                      enCurso && 'font-semibold text-[#e9b45f]',
+                      !hecha && !enCurso && 'text-sidebar-foreground/40',
+                    )}
+                  >
+                    {hecha ? <Check className="size-3 text-primary" strokeWidth={3} /> : null}
+                    {p.nombre}
+                  </span>
+                )
+              })}
+            </div>
+          </li>
         )}
-        {etapa === 'otro' && <Hito enCurso>¿Otro campo?</Hito>}
-        {etapa === 'fin' && <Hito hecho>Listo</Hito>}
+        {etapa === 'otro' && (
+          <li>
+            <Hito enCurso>¿Otro campo?</Hito>
+          </li>
+        )}
+        {etapa === 'fin' && (
+          <li>
+            <Hito hecho>Listo</Hito>
+          </li>
+        )}
       </ol>
     </div>
   )
@@ -1104,7 +1248,7 @@ function Hito({
   children: ReactNode
 }) {
   return (
-    <li
+    <div
       className={cn(
         'flex items-center gap-3 text-[15px] transition-colors',
         hecho && 'text-sidebar-foreground',
@@ -1123,6 +1267,6 @@ function Hito({
         {hecho ? <Check className="size-3.5" strokeWidth={3} /> : enCurso ? '•' : ''}
       </span>
       <span className="min-w-0 truncate">{children}</span>
-    </li>
+    </div>
   )
 }

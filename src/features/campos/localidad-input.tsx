@@ -17,12 +17,15 @@ export function LocalidadInput({
   id,
   value,
   onChange,
+  onEscribir,
   invalido = false,
   autoFocus,
 }: {
   id?: string
   value: Localidad | null
   onChange: (l: Localidad | null) => void
+  /** Se escribió algo: el formulario limpia su error aunque todavía no haya elección. */
+  onEscribir?: () => void
   invalido?: boolean
   autoFocus?: boolean
 }) {
@@ -99,6 +102,7 @@ export function LocalidadInput({
           aria-autocomplete="list"
           onChange={(e) => {
             setTexto(e.target.value)
+            onEscribir?.()
             if (value) onChange(null)
           }}
           onFocus={() => sugerencias.length > 0 && setAbierto(true)}
