@@ -7,9 +7,12 @@ import {
   Building2,
   Check,
   CheckCircle2,
+  Droplets,
   Grid2x2,
   LandPlot,
+  PencilRuler,
   Plus,
+  Snowflake,
   Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
@@ -25,6 +28,8 @@ import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { useClima } from '@/features/cotizaciones/hooks'
+import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import {
   categoriaLabel,
   categoriasPorEspecie,
@@ -48,6 +53,8 @@ type CampoCargado = {
   nombre: string
   actividad: ActividadCampo
   localidad: string
+  lat: number
+  lon: number
   hectareas: number | null
   potreros: { id: string; nombre: string; hectareas: number | null }[]
   cabezas: number
@@ -93,6 +100,13 @@ export function OnboardingPage() {
   // Campos ya cargados + el que se está cargando
   const [campos, setCampos] = useState<CampoCargado[]>([])
   const [campoActual, setCampoActual] = useState<CampoCargado | null>(null)
+  // El aha del día 0: al terminar, la app ya sabe el clima de SU campo.
+  const primero = campos[0]
+  const clima = useClima(
+    etapa === 'fin' && primero
+      ? { nombre: primero.nombre, lat: primero.lat, lon: primero.lon }
+      : null,
+  )
 
   // Si ya pertenece a una empresa y no la creó en este wizard, no va acá.
   if (!isLoading && membresia && !empresaId) {
@@ -276,7 +290,7 @@ export function OnboardingPage() {
           </Paso>
         )}
 
-        {etapa === 'fin' && (
+        {etapa === 'fin' && primero && (
           <Paso key="fin">
             <div className="text-center">
               <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -284,35 +298,73 @@ export function OnboardingPage() {
               </span>
               <h1 className="mt-5 text-2xl font-bold tracking-tight">¡Listo, {empresa}!</h1>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Esto es lo que armaste. Lo que sigue es traer el contorno de cada
-                campo y dibujar los potreros — desde <strong>Campos</strong>, con
-                pantalla grande.
+                La app ya sabe de tu campo.
               </p>
             </div>
-            {/* Lo que acaba de construir, campo por campo: es SU obra. */}
-            <ul className="mt-6 divide-y divide-border rounded-lg border border-border text-sm">
-              {campos.map((c) => (
-                <li key={c.id} className="px-3.5 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <LandPlot className="size-4 shrink-0 text-primary/80" strokeWidth={1.75} />
+
+            {/* Valor ya, no promesa: el clima de SU campo hoy, y lo que cargó. */}
+            <div className="mt-6 rounded-lg border border-border">
+              <div className="flex items-center gap-3 px-3.5 py-3">
+                {clima.data ? (
+                  <>
+                    <WmoIcon code={clima.data.code} className="size-8 shrink-0 text-accent" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground">
+                        Hoy en {primero.nombre} · {primero.localidad}
+                      </p>
+                      <p className="text-[15px] font-semibold">
+                        {clima.data.temp}°{' '}
+                        <span className="font-normal text-muted-foreground">
+                          {clima.data.max}° / {clima.data.min}° · {clima.data.descripcion}
+                        </span>
+                      </p>
+                    </div>
+                    {clima.data.helada ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-sky/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky">
+                        <Snowflake className="size-3" /> Helada
+                      </span>
+                    ) : clima.data.lluviaProb >= 30 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-sky">
+                        <Droplets className="size-3.5" /> {clima.data.lluviaProb}%
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {clima.isLoading ? 'Buscando el clima de tu campo…' : `Tu campo en ${primero.localidad}.`}
+                  </p>
+                )}
+              </div>
+              <ul className="divide-y divide-border border-t border-border text-sm">
+                {campos.map((c) => (
+                  <li key={c.id} className="flex items-baseline gap-2 px-3.5 py-2">
+                    <LandPlot className="size-4 shrink-0 self-center text-primary/80" strokeWidth={1.75} />
                     <span className="font-medium">{c.nombre}</span>
-                    <span className="text-xs text-muted-foreground">
-                      · {actividadLabel[c.actividad]} · {c.localidad}
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {c.potreros.length > 0
+                        ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`
+                        : 'sin potreros todavía'}
+                      {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
                       {c.hectareas ? ` · ${c.hectareas} ha` : ''}
                     </span>
-                  </div>
-                  <p className="mt-0.5 pl-6 text-xs text-muted-foreground">
-                    {c.potreros.length === 0
-                      ? 'Potreros: los cargás después'
-                      : `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`}
-                    {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-6 grid gap-2">
-              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos/${campos[0]?.id ?? ''}`)}>
-                Ir a mis campos
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* UN solo siguiente paso, nombrado y con su costo en tiempo. */}
+            <div className="mt-5 flex items-start gap-3 rounded-lg bg-primary/5 px-3.5 py-3">
+              <PencilRuler className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
+              <div className="text-sm">
+                <p className="font-medium">Lo que sigue: dibujar los potreros sobre el satélite</p>
+                <p className="text-xs text-muted-foreground">
+                  Cinco minutos, en la compu. Elegís cada potrero de la lista y lo marcás.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2">
+              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos/${primero.id}`)}>
+                Ir a dibujar mis potreros
               </Button>
               <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
                 Ver el inicio
@@ -388,6 +440,8 @@ function PasoCampo({
         nombre: n,
         actividad,
         localidad: localidad.nombre,
+        lat: localidad.lat,
+        lon: localidad.lon,
         hectareas: ha,
         potreros: [],
         cabezas: 0,
@@ -589,7 +643,7 @@ function PasoPotreros({
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
-        subtitulo="Cargá los que te acuerdes. Cuando los dibujes en el mapa vas a elegir cuál estás marcando de esta misma lista."
+        subtitulo="Los que te acuerdes; si ahora no, después es un minuto desde Campos."
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-2.5">
@@ -665,8 +719,8 @@ function PasoPotreros({
           </Button>
           <Button
             type="button"
-            variant="ghost"
-            className="w-full text-muted-foreground"
+            variant="outline"
+            className="h-11 w-full text-[15px] font-medium"
             disabled={ocupado}
             onClick={() => onListo([])}
           >
@@ -737,7 +791,7 @@ function PasoHacienda({
       <AuthHeading
         icono={Beef}
         titulo={`¿Qué hay en ${campo.nombre}, más o menos?`}
-        subtitulo="Redondeá. Después ajustás animal por animal desde la manga."
+        subtitulo="Redondeá, o dejalo para después: se carga en un minuto desde Hacienda."
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-4">
@@ -821,8 +875,8 @@ function PasoHacienda({
           </Button>
           <Button
             type="button"
-            variant="ghost"
-            className="w-full text-muted-foreground"
+            variant="outline"
+            className="h-11 w-full text-[15px] font-medium"
             disabled={ocupado}
             onClick={() => onListo(0)}
           >
