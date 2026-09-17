@@ -99,6 +99,19 @@ function puntos(r: Rect, cabezas: CabezasPorEspecie): { cx: number; cy: number; 
   return out
 }
 
+/** Un rectángulo con el patrón de la actividad, que sigue al potrero al moverse. */
+function Textura({ r, patron }: { r: Rect; patron: string }) {
+  return (
+    <motion.rect
+      rx={6}
+      fill={`url(#${patron})`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
+      transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+    />
+  )
+}
+
 export function CroquisVivo({ campo, className }: { campo: CampoCroquis; className?: string }) {
   const { estado } = campo
   const interior: Rect = { x: MARGEN, y: MARGEN, w: ANCHO - MARGEN * 2, h: ALTO - MARGEN * 2 }
@@ -136,11 +149,6 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         {/* Surcos: la textura del potrero agrícola. */}
         <pattern id="croquis-surcos" width="9" height="9" patternUnits="userSpaceOnUse">
           <line x1="0" y1="4.5" x2="9" y2="4.5" stroke="#e9b45f" strokeOpacity="0.5" strokeWidth="1.2" strokeDasharray="5 2" />
-        </pattern>
-        {/* Pasto: matas cortas para el potrero ganadero. */}
-        <pattern id="croquis-pasto" width="12" height="12" patternUnits="userSpaceOnUse">
-          <path d="M2 10 l1.5 -3 M4 10 l0 -3.5 M6 10 l-1.5 -3" className="stroke-primary" strokeOpacity="0.8" strokeWidth="1" fill="none" />
-          <path d="M8 5 l1.5 -3 M10 5 l0 -3.5" className="stroke-primary" strokeOpacity="0.6" strokeWidth="1" fill="none" />
         </pattern>
       </defs>
 
@@ -183,7 +191,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                       ? 'fill-[#e9b45f]/10'
                       : t > 0
                         ? 'fill-primary/30'
-                        : 'fill-primary/15',
+                        : 'fill-primary/20',
                   )}
                   strokeWidth={1.25}
                   initial={{ x: r.x + r.w / 2, y: r.y + r.h / 2, width: 0, height: 0 }}
@@ -191,23 +199,39 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                 />
                 {/* La textura de la actividad, encima del fondo y debajo de la hacienda. */}
-                {campo.actividad && (
-                  <motion.rect
-                    rx={6}
-                    fill={`url(#${campo.actividad === 'agricola' ? 'croquis-surcos' : 'croquis-pasto'})`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: campo.actividad === 'mixta' ? 0.55 : 1, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                  />
-                )}
+                {/* Ganadera: el verde liso ES el pasto; la hacienda son los puntos. */}
+                {campo.actividad === 'agricola' && <Textura r={r} patron="croquis-surcos" />}
                 {campo.actividad === 'mixta' && (
-                  <motion.rect
-                    rx={6}
-                    fill="url(#croquis-surcos)"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.3, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                  />
+                  <>
+                    {/* Mixta: verde arriba de la diagonal, sembrado abajo. */}
+                    <clipPath id={`mixta-${p.clave}`}>
+                      <motion.path
+                        initial={false}
+                        animate={{
+                          d: `M${r.x + 2} ${r.y + r.h - 2} L${r.x + r.w - 2} ${r.y + 2} L${r.x + r.w - 2} ${r.y + r.h - 2} Z`,
+                        }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                      />
+                    </clipPath>
+                    <g clipPath={`url(#mixta-${p.clave})`}>
+                      <motion.rect
+                        rx={6}
+                        className="fill-[#e9b45f]/20"
+                        initial={false}
+                        animate={{ x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                      />
+                      <Textura r={r} patron="croquis-surcos" />
+                    </g>
+                    <motion.line
+                      className="stroke-sidebar-foreground/45"
+                      strokeWidth={1}
+                      strokeDasharray="3 3"
+                      initial={false}
+                      animate={{ x1: r.x + 2, y1: r.y + r.h - 2, x2: r.x + r.w - 2, y2: r.y + 2 }}
+                      transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                    />
+                  </>
                 )}
                 <motion.g
                   initial={false}
