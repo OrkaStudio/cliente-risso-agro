@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { AuthScene } from '@/features/auth/auth-scene'
+import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
 
 /**
@@ -44,12 +44,16 @@ export function AuthLayout({
               final. Nada se monta sobre nada. */}
           <div className="relative flex min-h-full shrink-0 flex-col">
             <div className="absolute inset-0 lg:hidden">
-              <AuthScene variante="fondo" solAnimado={solAnimado} mensaje={escena} />
+              <AuthScene variante="fondo" solAnimado={solAnimado} />
+            </div>
+            {/* Teléfono: marca + mensaje EN EL FLUJO, arriba de la tarjeta. */}
+            <div className="relative lg:hidden">
+              <MensajeEscenaMovil mensaje={escena} />
             </div>
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
-            <div className="relative flex flex-1 flex-col items-center px-5 pt-[132px] pb-3 sm:justify-center sm:p-10">
+            <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:p-10">
               <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
                 {children}
               </div>

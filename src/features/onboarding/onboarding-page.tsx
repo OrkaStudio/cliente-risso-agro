@@ -498,10 +498,7 @@ function PasoCampo({
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="hectareas">
-                Hectáreas{' '}
-                <span className="font-normal text-muted-foreground">(si las sabés)</span>
-              </Label>
+              <Label htmlFor="hectareas">Hectáreas</Label>
               <Input
                 id="hectareas"
                 inputMode="decimal"
@@ -510,7 +507,7 @@ function PasoCampo({
                   setHectareas(e.target.value)
                   setErrores((x) => ({ ...x, hectareas: undefined }))
                 }}
-                placeholder="Ej: 420"
+                placeholder="Si las sabés"
                 aria-invalid={!!errores.hectareas}
               />
               <ErrorCampo mensaje={errores.hectareas} />
@@ -762,7 +759,7 @@ function PasoHacienda({
                   </button>
                 )}
                 {abierta && (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-3 gap-2">
                     {categoriasPorEspecie[esp].map((c) => (
                       <label key={c} className="grid gap-1">
                         <span className="text-xs text-muted-foreground">{categoriaLabel[c]}</span>

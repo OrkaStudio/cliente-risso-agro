@@ -213,29 +213,10 @@ export function AuthScene({
         </g>
       </svg>
 
-      {/* Marca + mensaje */}
-      {compacta ? (
-        <motion.div
-          className="relative"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        >
-          <div className="flex items-center gap-2">
-            <span className="flex size-6 items-center justify-center rounded-md bg-primary text-white">
-              <Leaf className="size-3.5" strokeWidth={1.75} />
-            </span>
-            <span className="font-heading text-sm font-bold">{MARCA}</span>
-          </div>
-          {mensaje ?? (
-            <p className="mt-3 max-w-[300px] font-heading text-[22px] font-semibold leading-tight tracking-tight">
-              Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
-              <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
-              <span className="text-[#e9b45f]">números</span> — en una sola app.
-            </p>
-          )}
-        </motion.div>
-      ) : (
+      {/* Marca + mensaje. En 'fondo' (teléfono) el mensaje NO va acá: lo
+          dibuja AuthLayout en el flujo, arriba de la tarjeta, para que la
+          tarjeta nunca lo tape (ver MensajeEscenaMovil). */}
+      {!compacta && (
         <motion.div
           className="relative"
           initial={{ opacity: 0, y: -14 }}
@@ -275,5 +256,35 @@ export function AuthScene({
       </motion.div>
       )}
     </div>
+  )
+}
+
+/**
+ * Marca + mensaje para el teléfono, en el flujo de la página (no dentro de
+ * la escena): la tarjeta va debajo, nunca encima, tenga el mensaje el alto
+ * que tenga (la frase de auth o el mapa del viaje del onboarding).
+ */
+export function MensajeEscenaMovil({ mensaje }: { mensaje?: ReactNode }) {
+  return (
+    <motion.div
+      className="relative px-5 pt-4 text-sidebar-foreground"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex size-6 items-center justify-center rounded-md bg-primary text-white">
+          <Leaf className="size-3.5" strokeWidth={1.75} />
+        </span>
+        <span className="font-heading text-sm font-bold">{MARCA}</span>
+      </div>
+      {mensaje ?? (
+        <p className="mt-3 max-w-[300px] font-heading text-[22px] font-semibold leading-tight tracking-tight">
+          Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
+          <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
+          <span className="text-[#e9b45f]">números</span> — en una sola app.
+        </p>
+      )}
+    </motion.div>
   )
 }
