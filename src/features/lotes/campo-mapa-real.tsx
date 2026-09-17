@@ -11,6 +11,12 @@ if (typeof window !== 'undefined')
   (window as unknown as { L: typeof L }).L = L
 await import('@geoman-io/leaflet-geoman-free')
 import { toast } from 'sonner'
+import {
+  atribucionGoogle,
+  googleTilesDisponible,
+  sesionGoogle,
+  urlTilesGoogle,
+} from '@/lib/google-tiles'
 import intersect from '@turf/intersect'
 import area from '@turf/area'
 import { featureCollection, polygon as turfPolygon } from '@turf/helpers'
@@ -140,21 +146,86 @@ export function CampoMapaReal({
     })
     mapRef.current = map
 
-    // maxNativeZoom 17: Esri no tiene imagen más fina en la pampa (Pehuajó,
-    // Pardo…) y de 18 en adelante sirve un placeholder gris "Map data not yet
-    // available". Con el tope, Leaflet agranda la de 17 (borrosa, pero campo)
-    // hasta el zoom 19 que necesita el dibujo fino.
-    L.tileLayer(IMAGERY, { maxZoom: 19, maxNativeZoom: 17, attribution: '© Esri' }).addTo(map)
+    // ---------- capas base ----------
+    // Esri arranca siempre (gratis, sin clave). maxNativeZoom 17: en la pampa
+    // (Pehuajó, Pardo…) no tiene imagen más fina y de 18 en adelante sirve un
+    // placeholder gris "Map data not yet available"; con el tope, Leaflet
+    // agranda la de 17 (borrosa, pero campo) hasta el 19 del dibujo fino.
+    const esriImagen = L.tileLayer(IMAGERY, {
+      maxZoom: 19,
+      maxNativeZoom: 17,
+      attribution: '© Esri',
+    }).addTo(map)
     // Caminos/rutas (overlay transparente) → referencia y orientación.
-    L.tileLayer(ROADS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.95 }).addTo(map)
+    const esriCaminos = L.tileLayer(ROADS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.95 }).addTo(map)
     let labels: L.TileLayer | null = L.tileLayer(LABELS, {
       maxZoom: 19,
       maxNativeZoom: 17,
       opacity: 0.9,
     }).addTo(map)
-    // La atribución "© Esri" es condición de la licencia de la imagen: se
-    // achica al mínimo (sin el link ni la bandera de Leaflet), no se quita.
+    let labelsUrl = LABELS
+    let labelsOpts: L.TileLayerOptions = { maxZoom: 19, maxNativeZoom: 17, opacity: 0.9 }
+    // La atribución es condición de la licencia de la imagen (Esri o Google):
+    // se achica al mínimo (sin el link ni la bandera de Leaflet), no se quita.
     map.attributionControl.setPrefix(false)
+
+    // Google Map Tiles (si hay clave): mejor imagen en el campo argentino
+    // (zoom 19–20, vuelos recientes) y la que el productor ya conoce. Se pide
+    // la sesión y, si llega, reemplaza a Esri; si no, Esri queda. La
+    // atribución de la zona visible la exige Google: se refresca al moverse.
+    let vivo = true
+    let googleLogo: L.Control | null = null
+    void (async () => {
+      if (!googleTilesDisponible()) return
+      const [sat, ov] = await Promise.all([sesionGoogle('satellite'), sesionGoogle('overlay')])
+      if (!vivo || !sat) return
+      const gImagen = L.tileLayer(urlTilesGoogle(sat), {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        attribution: 'Google',
+      })
+      gImagen.on('load', () => {
+        // Recién cuando Google tiene tiles en pantalla, Esri se retira.
+        if (map.hasLayer(esriImagen)) map.removeLayer(esriImagen)
+      })
+      gImagen.addTo(map)
+      if (ov) {
+        const gOverlay = L.tileLayer(urlTilesGoogle(ov), { maxZoom: 21, maxNativeZoom: 20, opacity: 0.95 })
+        gOverlay.addTo(map)
+        map.removeLayer(esriCaminos)
+        if (labels && map.hasLayer(labels)) map.removeLayer(labels)
+        labels = null
+        // El botón "Aa" pasa a prender/apagar el overlay de Google.
+        labelsUrl = urlTilesGoogle(ov)
+        labelsOpts = { maxZoom: 21, maxNativeZoom: 20, opacity: 0.95 }
+        labels = gOverlay
+      }
+      const Logo = L.Control.extend({
+        onAdd() {
+          const el = L.DomUtil.create('div', 'google-logo')
+          el.innerHTML =
+            '<img alt="Google" src="https://developers.google.com/static/maps/documentation/images/google_on_non_white.png" style="height:18px;opacity:.95">'
+          return el
+        },
+      })
+      googleLogo = new Logo({ position: 'bottomleft' }).addTo(map)
+      const refrescarAtribucion = async () => {
+        const b = map.getBounds()
+        const txt = await atribucionGoogle(sat, {
+          north: b.getNorth(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          west: b.getWest(),
+          zoom: map.getZoom(),
+        })
+        if (vivo && txt) {
+          map.attributionControl.removeAttribution('Google')
+          map.attributionControl.addAttribution(txt)
+        }
+      }
+      void refrescarAtribucion()
+      map.on('moveend', () => void refrescarAtribucion())
+    })()
 
     L.control.zoom({ position: 'topright' }).addTo(map)
 
@@ -468,7 +539,7 @@ export function CampoMapaReal({
         map.removeLayer(labels)
         btn.classList.remove('on')
       } else {
-        if (!labels) labels = L.tileLayer(LABELS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.9 })
+        if (!labels) labels = L.tileLayer(labelsUrl, labelsOpts)
         labels.addTo(map)
         btn.classList.add('on')
       }
@@ -628,6 +699,8 @@ export function CampoMapaReal({
     })
 
     return () => {
+      vivo = false
+      googleLogo?.remove()
       clearTimeout(t)
       ro.disconnect()
       document.removeEventListener('fullscreenchange', onFs)
