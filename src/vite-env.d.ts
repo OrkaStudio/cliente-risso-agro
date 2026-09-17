@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_PUBLISHABLE_KEY: string
   /** Opcional: Google Map Tiles API. Sin ella, el satélite es Esri. */
   readonly VITE_GOOGLE_MAPS_KEY?: string
+  /** Opcional: MapTiler (satélite Maxar, gratis sin tarjeta). Google tiene prioridad. */
+  readonly VITE_MAPTILER_KEY?: string
 }
 
 interface ImportMeta {

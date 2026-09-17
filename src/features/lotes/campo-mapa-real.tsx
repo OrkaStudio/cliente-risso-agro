@@ -175,6 +175,32 @@ export function CampoMapaReal({
     // atribución de la zona visible la exige Google: se refresca al moverse.
     let vivo = true
     let googleLogo: L.Control | null = null
+    // MapTiler (si hay clave y no hay Google): satélite Maxar, plan gratis sin
+    // tarjeta (100k pedidos/mes; al pasarse se frena, no cobra). Logo exigido.
+    const maptilerKey = import.meta.env.VITE_MAPTILER_KEY as string | undefined
+    if (!googleTilesDisponible() && maptilerKey) {
+      const mt = L.tileLayer(
+        `https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${maptilerKey}`,
+        { maxZoom: 21, maxNativeZoom: 20, attribution: '© MapTiler © Maxar' },
+      )
+      mt.on('load', () => {
+        if (map.hasLayer(esriImagen)) map.removeLayer(esriImagen)
+      })
+      mt.addTo(map)
+      const LogoMT = L.Control.extend({
+        onAdd() {
+          const el = L.DomUtil.create('a', 'google-logo')
+          el.href = 'https://www.maptiler.com'
+          el.target = '_blank'
+          el.rel = 'noopener'
+          el.innerHTML =
+            '<img alt="MapTiler" src="https://api.maptiler.com/resources/logo.svg" style="height:20px;opacity:.95">'
+          return el
+        },
+      })
+      googleLogo = new LogoMT({ position: 'bottomleft' }).addTo(map)
+    }
+
     void (async () => {
       if (!googleTilesDisponible()) return
       const [sat, ov] = await Promise.all([sesionGoogle('satellite'), sesionGoogle('overlay')])
