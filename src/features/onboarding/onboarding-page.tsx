@@ -1,8 +1,9 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  ArrowLeft,
   ArrowRight,
   Beef,
   Building2,
@@ -28,6 +29,7 @@ import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
+import { CroquisVivo, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
@@ -56,7 +58,7 @@ type CampoCargado = {
   lat: number
   lon: number
   hectareas: number
-  potreros: { id: string; nombre: string; hectareas: number | null }[]
+  potreros: { id: string; nombre: string; hectareas: number | null; cabezas: number }[]
   cabezas: number
 }
 
@@ -65,6 +67,17 @@ type CampoCargado = {
 type FilaPotrero = { numero: string; hectareas: string }
 
 type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
+
+/**
+ * Lo que se está escribiendo AHORA, antes de guardar: el croquis de la
+ * escena lo dibuja en vivo. Cada paso avisa con cada tecla.
+ */
+type Borrador = {
+  campo: { nombre: string; hectareas: number | null }
+  potreros: { nombre: string; hectareas: number | null }[]
+  cabezas: Record<string, number>
+}
+const BORRADOR_VACIO: Borrador = { campo: { nombre: '', hectareas: null }, potreros: [], cabezas: {} }
 
 /**
  * Onboarding post-registro: empresa → por cada campo (datos · potreros ·
@@ -100,6 +113,13 @@ export function OnboardingPage() {
   // Campos ya cargados + el que se está cargando
   const [campos, setCampos] = useState<CampoCargado[]>([])
   const [campoActual, setCampoActual] = useState<CampoCargado | null>(null)
+  const [borrador, setBorrador] = useState<Borrador>(BORRADOR_VACIO)
+
+  // Al cambiar de paso, arriba de todo: en el teléfono el croquis está sobre
+  // la tarjeta, y ver cómo quedó lo que acaba de cargar es el premio.
+  useEffect(() => {
+    document.querySelector<HTMLElement>('[data-auth-scroll]')?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [etapa])
   // El aha del día 0: al terminar, la app ya sabe el clima de SU campo.
   const primero = campos[0]
   const clima = useClima(
@@ -154,11 +174,11 @@ export function OnboardingPage() {
   return (
     <AuthLayout
       escena={
-        <MapaDelViaje
+        <EscenaCroquis
           etapa={etapa}
-          empresa={empresa}
           campos={campos}
           campoActual={campoActual}
+          borrador={borrador}
         />
       }
     >
@@ -208,7 +228,13 @@ export function OnboardingPage() {
               primero={campos.length === 0}
               ocupado={ocupado}
               setOcupado={setOcupado}
+              onBorrador={(campo) => setBorrador({ ...BORRADOR_VACIO, campo })}
+              onVolver={() => {
+                setBorrador(BORRADOR_VACIO)
+                setEtapa('otro')
+              }}
               onListo={(c) => {
+                setBorrador(BORRADOR_VACIO)
                 setCampoActual(c)
                 setEtapa('potreros')
               }}
@@ -224,7 +250,9 @@ export function OnboardingPage() {
               campo={campoActual}
               ocupado={ocupado}
               setOcupado={setOcupado}
+              onBorrador={(potreros) => setBorrador({ ...BORRADOR_VACIO, potreros })}
               onListo={(potreros) => {
+                setBorrador(BORRADOR_VACIO)
                 const c = { ...campoActual, potreros }
                 setCampoActual(c)
                 // Sin hacienda que cargar (agrícola o sin potreros) → ¿otro campo?
@@ -253,8 +281,17 @@ export function OnboardingPage() {
               campo={campoActual}
               ocupado={ocupado}
               setOcupado={setOcupado}
-              onListo={(cabezas) => {
-                setCampos((xs) => [...xs, { ...campoActual, cabezas }])
+              onBorrador={(cabezas) => setBorrador({ ...BORRADOR_VACIO, cabezas })}
+              onListo={(cabezas, porPotrero) => {
+                setBorrador(BORRADOR_VACIO)
+                setCampos((xs) => [
+                  ...xs,
+                  {
+                    ...campoActual,
+                    cabezas,
+                    potreros: campoActual.potreros.map((p) => ({ ...p, cabezas: porPotrero[p.id] ?? 0 })),
+                  },
+                ])
                 setCampoActual(null)
                 setEtapa('otro')
               }}
@@ -388,12 +425,17 @@ function PasoCampo({
   primero,
   ocupado,
   setOcupado,
+  onBorrador,
+  onVolver,
   onListo,
 }: {
   empresaId: string
   primero: boolean
   ocupado: boolean
   setOcupado: (v: boolean) => void
+  onBorrador: (b: Borrador['campo']) => void
+  /** Se arrepintió de "otro campo": vuelve a la pregunta. */
+  onVolver: () => void
   onListo: (c: CampoCargado) => void
 }) {
   const [nombre, setNombre] = useState('')
@@ -471,6 +513,7 @@ function PasoCampo({
             value={nombre}
             onChange={(e) => {
               setNombre(e.target.value)
+              onBorrador({ nombre: e.target.value.trim(), hectareas: numeroDe(hectareas) })
               setErrores((x) => ({ ...x, nombre: undefined }))
             }}
             placeholder="Ej: Don Gilberto"
@@ -563,6 +606,7 @@ function PasoCampo({
                 value={hectareas}
                 onChange={(e) => {
                   setHectareas(e.target.value)
+                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(e.target.value) })
                   setErrores((x) => ({ ...x, hectareas: undefined }))
                 }}
                 placeholder="Según el título"
@@ -574,10 +618,21 @@ function PasoCampo({
         </Reveal>
 
         <ErrorCampo mensaje={errores.general} />
-        <Reveal delay={0.32} className="mt-2">
+        <Reveal delay={0.32} className="mt-2 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
             {ocupado ? 'Guardando…' : 'Guardar el campo'}
           </Button>
+          {!primero && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              disabled={ocupado}
+              onClick={onVolver}
+            >
+              <ArrowLeft className="size-4" /> Volver
+            </Button>
+          )}
         </Reveal>
       </form>
     </>
@@ -593,16 +648,25 @@ function PasoPotreros({
   campo,
   ocupado,
   setOcupado,
+  onBorrador,
   onListo,
 }: {
   empresaId: string
   campo: CampoCargado
   ocupado: boolean
   setOcupado: (v: boolean) => void
+  onBorrador: (p: Borrador['potreros']) => void
   onListo: (potreros: CampoCargado['potreros']) => void
 }) {
   const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
   const [error, setError] = useState<string | null>(null)
+
+  // Cada cambio de filas avisa al croquis de la escena.
+  function cambiarFilas(fn: (fs: FilaPotrero[]) => FilaPotrero[]) {
+    const next = fn(filas)
+    setFilas(next)
+    onBorrador(next.map((f) => ({ nombre: `${f.numero.trim() || '?'}A`, hectareas: haDe(f) })))
+  }
 
   // La regla es una sola: los potreros suman EXACTAMENTE las hectáreas del
   // campo. Ni "más o menos" ni potreros sin hectáreas — es su negocio. Quien
@@ -657,7 +721,7 @@ function PasoPotreros({
           estadoCiclo: estadoInicialPorActividad(campo.actividad),
           hectareas,
         })
-        creados.push({ id, nombre, hectareas })
+        creados.push({ id, nombre, hectareas, cabezas: 0 })
       }
       onListo(creados)
     } catch (err) {
@@ -689,7 +753,7 @@ function PasoPotreros({
                   value={fila.numero}
                   onChange={(e) => {
                     setError(null)
-                    setFilas((fs) =>
+                    cambiarFilas((fs) =>
                       fs.map((f, j) =>
                         j === i ? { ...f, numero: e.target.value.replace(/\D/g, '') } : f,
                       ),
@@ -707,7 +771,7 @@ function PasoPotreros({
                     autoFocus
                     onChange={(e) => {
                       setError(null)
-                      setFilas((fs) =>
+                      cambiarFilas((fs) =>
                         fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
                       )
                     }}
@@ -730,7 +794,7 @@ function PasoPotreros({
                   size="icon"
                   aria-label={`Quitar potrero ${i + 1}`}
                   disabled={filas.length === 1}
-                  onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
+                  onClick={() => cambiarFilas((fs) => fs.filter((_, j) => j !== i))}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -745,7 +809,7 @@ function PasoPotreros({
             variant="outline"
             size="sm"
             onClick={() =>
-              setFilas((fs) => {
+              cambiarFilas((fs) => {
                 const nums = fs.map((f) => parseInt(f.numero, 10)).filter((n) => Number.isFinite(n))
                 const sig = (nums.length ? Math.max(...nums) : 0) + 1
                 return [...fs, { numero: String(sig), hectareas: '' }]
@@ -858,13 +922,15 @@ function PasoHacienda({
   campo,
   ocupado,
   setOcupado,
+  onBorrador,
   onListo,
 }: {
   empresaId: string
   campo: CampoCargado
   ocupado: boolean
   setOcupado: (v: boolean) => void
-  onListo: (cabezas: number) => void
+  onBorrador: (cabezas: Record<string, number>) => void
+  onListo: (cabezas: number, porPotrero: Record<string, number>) => void
 }) {
   const potreros = campo.potreros
   // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
@@ -897,8 +963,9 @@ function PasoHacienda({
       irA(indice + 1)
       return
     }
+    const totales = Object.fromEntries(potreros.map((p) => [p.id, totalDe(porPotrero[p.id])]))
     if (total === 0) {
-      onListo(0)
+      onListo(0, totales)
       return
     }
     setError(null)
@@ -921,7 +988,7 @@ function PasoHacienda({
       }
     }
     setOcupado(false)
-    onListo(total)
+    onListo(total, totales)
   }
 
   return (
@@ -1022,13 +1089,17 @@ function PasoHacienda({
                             autoFocus={e === 'bovino' && k === 0}
                             onChange={(ev) => {
                               setError(null)
-                              setPorPotrero((x) => ({
-                                ...x,
+                              const next = {
+                                ...porPotrero,
                                 [actual.id]: {
-                                  ...(x[actual.id] ?? {}),
+                                  ...(porPotrero[actual.id] ?? {}),
                                   [c]: ev.target.value.replace(/\D/g, ''),
                                 },
-                              }))
+                              }
+                              setPorPotrero(next)
+                              onBorrador(
+                                Object.fromEntries(potreros.map((p) => [p.id, totalDe(next[p.id])])),
+                              )
                             }}
                             placeholder="0"
                             className="px-2.5 tabular-nums"
@@ -1098,7 +1169,7 @@ function PasoHacienda({
             variant="ghost"
             className="w-full text-muted-foreground"
             disabled={ocupado}
-            onClick={() => onListo(0)}
+            onClick={() => onListo(0, {})}
           >
             La completo después
           </Button>
@@ -1145,63 +1216,92 @@ function Logrado({ children }: { children: ReactNode }) {
 }
 
 /**
- * El mapa del viaje, en la escena: la empresa y cada campo con sus tres
- * partes (datos · potreros · hacienda). La tilde verde en cada cosa hecha es
- * el reconocimiento que acompaña todo el recorrido, sin pop-ups.
+ * La escena del onboarding: el croquis que se dibuja solo mientras carga,
+ * con una línea arriba que dice dónde está (Datos · Potreros · Hacienda) y,
+ * abajo, los campos ya terminados. Está al lado del formulario, a la altura
+ * de los ojos: es el reconocimiento de cada tecla, no una lista lejana.
  */
-function MapaDelViaje({
+function EscenaCroquis({
   etapa,
-  empresa,
   campos,
   campoActual,
+  borrador,
 }: {
   etapa: Etapa
-  empresa: string
   campos: CampoCargado[]
   campoActual: CampoCargado | null
+  borrador: Borrador
 }) {
-  const empresaHecha = etapa !== 'empresa'
+  const ultimo = campos[campos.length - 1] ?? null
   const enCampo = etapa === 'campo' || etapa === 'potreros' || etapa === 'hacienda'
-  // Las tres partes del campo en curso, con su tilde a medida que avanza.
+
+  // Qué dibuja el croquis según la etapa.
+  const croquis: CampoCroquis =
+    etapa === 'campo'
+      ? { nombre: borrador.campo.nombre, hectareas: borrador.campo.hectareas, potreros: [], estado: 'campo' }
+      : etapa === 'potreros' && campoActual
+        ? {
+            nombre: campoActual.nombre,
+            hectareas: campoActual.hectareas,
+            potreros: borrador.potreros.map((p, i) => ({
+              clave: `${i}`,
+              nombre: p.nombre,
+              hectareas: p.hectareas,
+              cabezas: 0,
+            })),
+            estado: 'potreros',
+          }
+        : etapa === 'hacienda' && campoActual
+          ? {
+              nombre: campoActual.nombre,
+              hectareas: campoActual.hectareas,
+              potreros: campoActual.potreros.map((p) => ({
+                clave: p.id,
+                nombre: p.nombre,
+                hectareas: p.hectareas,
+                cabezas: borrador.cabezas[p.id] ?? 0,
+              })),
+              estado: 'hacienda',
+            }
+          : ultimo
+            ? {
+                nombre: ultimo.nombre,
+                hectareas: ultimo.hectareas,
+                potreros: ultimo.potreros.map((p) => ({
+                  clave: p.id,
+                  nombre: p.nombre,
+                  hectareas: p.hectareas,
+                  cabezas: p.cabezas,
+                })),
+                estado: 'hecho',
+              }
+            : { nombre: '', hectareas: null, potreros: [], estado: 'vacio' }
+
   const partes: { etapa: Etapa; nombre: string }[] = [
     { etapa: 'campo', nombre: 'Datos' },
     { etapa: 'potreros', nombre: 'Potreros' },
     ...(campoActual?.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
   ]
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
+  const cabezasCroquis = croquis.potreros.reduce((s, p) => s + p.cabezas, 0)
+  const potrerosConHa = croquis.potreros.filter((p) => p.hectareas).length
+  const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
+  const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
 
   return (
-    <div>
-      <p className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[32px]">
-        Armemos tu campo.
+    <div className="w-full max-w-[380px]">
+      <p className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[30px]">
+        {etapa === 'fin' ? '¡Tu campo está armado!' : 'Armemos tu campo.'}
       </p>
-      <p className="mt-1.5 text-sm text-sidebar-foreground/70">
-        Unos minutos y estás adentro.
-      </p>
-      <ol className="mt-6 grid gap-2.5 lg:mt-8 lg:gap-3">
-        <li>
-          <Hito hecho={empresaHecha} enCurso={!empresaHecha}>
-            {empresaHecha && empresa ? empresa : 'Tu empresa'}
-          </Hito>
-        </li>
-        {campos.map((c) => (
-          <li key={c.id} className="grid gap-0.5">
-            <Hito hecho>{c.nombre}</Hito>
-            <p className="ml-10 text-[13px] text-sidebar-foreground/60">
-              {ha(c.hectareas)} ha
-              {c.potreros.length > 0
-                ? ` · ${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`
-                : ''}
-              {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
-            </p>
-          </li>
-        ))}
-        {enCampo && (
-          <li className="grid gap-0.5">
-            <Hito enCurso>
-              {campoActual?.nombre ?? (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
-            </Hito>
-            <div className="ml-10 flex items-center gap-3 text-[13px]">
+
+      {/* Dónde está: el nombre del campo y sus tres partes. */}
+      <div className="mt-4 flex min-h-6 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm lg:mt-5">
+        {enCampo ? (
+          <>
+            <span className="font-semibold">
+              {croquis.nombre || (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
+            </span>
+            <span className="flex items-center gap-2.5 text-[13px]">
               {partes.map((p, i) => {
                 const hecha = i < indiceParte
                 const enCurso = i === indiceParte
@@ -1220,53 +1320,56 @@ function MapaDelViaje({
                   </span>
                 )
               })}
-            </div>
-          </li>
+            </span>
+          </>
+        ) : etapa === 'empresa' ? (
+          <span className="text-sidebar-foreground/70">Unos minutos y estás adentro.</span>
+        ) : ultimo ? (
+          <>
+            <span className="font-semibold">{ultimo.nombre}</span>
+            <span className="text-[13px] text-sidebar-foreground/70">
+              {ha(ultimo.hectareas)} ha
+              {ultimo.potreros.length > 0
+                ? ` · ${ultimo.potreros.length} ${ultimo.potreros.length === 1 ? 'potrero' : 'potreros'}`
+                : ''}
+            </span>
+          </>
+        ) : null}
+      </div>
+
+      <div className="mt-3">
+        <CroquisVivo campo={croquis} />
+      </div>
+
+      {/* Lo que lleva cargado, en una línea bajo el croquis. */}
+      <p className="mt-2 min-h-5 text-[13px] text-sidebar-foreground/70">
+        {nPotreros > 0 ? `${nPotreros} ${nPotreros === 1 ? 'potrero' : 'potreros'}` : ''}
+        {cabezasCroquis > 0 && (
+          <>
+            {nPotreros > 0 ? ' · ' : ''}
+            <span className="font-semibold tabular-nums text-[#e9b45f]">{cabezasCroquis} cabezas</span>
+          </>
         )}
-        {etapa === 'otro' && (
-          <li>
-            <Hito enCurso>¿Otro campo?</Hito>
-          </li>
-        )}
-        {etapa === 'fin' && (
-          <li>
-            <Hito hecho>Listo</Hito>
-          </li>
-        )}
-      </ol>
+      </p>
+
+      {/* Los campos ya terminados, cuando no son el que se ve. */}
+      {anteriores.length > 0 && (
+        <ol className="mt-4 flex flex-wrap gap-1.5">
+          {anteriores.map((c) => (
+            <li
+              key={c.id}
+              className="inline-flex items-center gap-1.5 rounded-full border border-sidebar-foreground/15 bg-sidebar px-2.5 py-1 text-xs text-sidebar-foreground/85 shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
+            >
+              <Check className="size-3 text-primary" strokeWidth={3} />
+              {c.nombre}
+              <span className="text-sidebar-foreground/50">
+                · {ha(c.hectareas)} ha{c.cabezas > 0 ? ` · ${c.cabezas} cab.` : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   )
 }
 
-function Hito({
-  hecho = false,
-  enCurso = false,
-  children,
-}: {
-  hecho?: boolean
-  enCurso?: boolean
-  children: ReactNode
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-3 text-[15px] transition-colors',
-        hecho && 'text-sidebar-foreground',
-        enCurso && 'font-semibold text-sidebar-foreground',
-        !hecho && !enCurso && 'text-sidebar-foreground/45',
-      )}
-    >
-      <span
-        className={cn(
-          'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs transition-colors',
-          hecho && 'border-primary bg-primary text-white',
-          enCurso && 'border-[#e9b45f] text-[#e9b45f]',
-          !hecho && !enCurso && 'border-sidebar-foreground/25',
-        )}
-      >
-        {hecho ? <Check className="size-3.5" strokeWidth={3} /> : enCurso ? '•' : ''}
-      </span>
-      <span className="min-w-0 truncate">{children}</span>
-    </div>
-  )
-}

@@ -37,7 +37,7 @@ export function AuthLayout({
       <div className="relative min-h-0 h-full">
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
             vista, el desplazamiento es un deslizamiento, no un salto. */}
-        <div className="flex h-full flex-col overflow-y-auto scroll-smooth">
+        <div data-auth-scroll className="flex h-full flex-col overflow-y-auto scroll-smooth">
           {/* min-h-full + relative: la escena de fondo cubre TODO el contenido
               (no sólo la primera pantalla) y se desplaza con él — frase y sol
               se van hacia arriba junto con la tarjeta, las lomas quedan al
