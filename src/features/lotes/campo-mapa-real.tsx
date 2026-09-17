@@ -62,6 +62,9 @@ export function CampoMapaReal({
   onDibujarPotrero,
   onSetPoligono,
   onVerPotrero,
+  onSetContorno,
+  marcarContorno,
+  onFinMarcarContorno,
 }: {
   campo: CampoVM
   contorno: LatLng[] | null
@@ -75,6 +78,11 @@ export function CampoMapaReal({
   /** Reemplaza/limpia el polígono de un potrero existente. */
   onSetPoligono: (potreroId: string, poligono: LatLng[] | null) => void
   onVerPotrero: (potreroId: string) => void
+  /** Guarda el contorno del campo marcado a mano (provincias sin catastro). */
+  onSetContorno?: (contorno: LatLng[]) => void
+  /** Pedido externo de "marcar el contorno": al cambiar a true arranca el dibujo. */
+  marcarContorno?: boolean
+  onFinMarcarContorno?: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -84,6 +92,18 @@ export function CampoMapaReal({
   const [dibujando, setDibujando] = useState<PotreroMapa | null>(null)
   const dibujandoRef = useRef<PotreroMapa | null>(null)
   dibujandoRef.current = dibujando
+  // Contorno del campo a mano: el próximo polígono cerrado es el CONTORNO,
+  // no un potrero.
+  const marcandoContornoRef = useRef(false)
+  marcandoContornoRef.current = !!marcarContorno
+  const setContornoRef = useRef(onSetContorno)
+  setContornoRef.current = onSetContorno
+  const finContornoRef = useRef(onFinMarcarContorno)
+  finContornoRef.current = onFinMarcarContorno
+  useEffect(() => {
+    if (marcarContorno) mapRef.current?.pm.enableDraw('Polygon')
+    else mapRef.current?.pm.disableDraw()
+  }, [marcarContorno])
   const faltanDibujar = potreros
     .filter((p) => !p.poligono)
     .slice()
@@ -120,13 +140,21 @@ export function CampoMapaReal({
     })
     mapRef.current = map
 
-    L.tileLayer(IMAGERY, { maxZoom: 19, attribution: '© Esri' }).addTo(map)
+    // maxNativeZoom 17: Esri no tiene imagen más fina en la pampa (Pehuajó,
+    // Pardo…) y de 18 en adelante sirve un placeholder gris "Map data not yet
+    // available". Con el tope, Leaflet agranda la de 17 (borrosa, pero campo)
+    // hasta el zoom 19 que necesita el dibujo fino.
+    L.tileLayer(IMAGERY, { maxZoom: 19, maxNativeZoom: 17, attribution: '© Esri' }).addTo(map)
     // Caminos/rutas (overlay transparente) → referencia y orientación.
-    L.tileLayer(ROADS, { maxZoom: 19, opacity: 0.95 }).addTo(map)
+    L.tileLayer(ROADS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.95 }).addTo(map)
     let labels: L.TileLayer | null = L.tileLayer(LABELS, {
       maxZoom: 19,
+      maxNativeZoom: 17,
       opacity: 0.9,
     }).addTo(map)
+    // La atribución "© Esri" es condición de la licencia de la imagen: se
+    // achica al mínimo (sin el link ni la bandera de Leaflet), no se quita.
+    map.attributionControl.setPrefix(false)
 
     L.control.zoom({ position: 'topright' }).addTo(map)
 
@@ -440,7 +468,7 @@ export function CampoMapaReal({
         map.removeLayer(labels)
         btn.classList.remove('on')
       } else {
-        if (!labels) labels = L.tileLayer(LABELS, { maxZoom: 19, opacity: 0.9 })
+        if (!labels) labels = L.tileLayer(LABELS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.9 })
         labels.addTo(map)
         btn.classList.add('on')
       }
@@ -470,6 +498,15 @@ export function CampoMapaReal({
     map.on('pm:create', (e: { layer: L.Layer }) => {
       const raw = e.layer as L.Polygon
       const pts = ringOf(raw)
+      // Marcando el contorno del campo: se guarda tal cual, sin chequeo de
+      // superposición (los potreros van adentro, no al revés).
+      if (marcandoContornoRef.current) {
+        map.removeLayer(raw)
+        setContornoRef.current?.(pts)
+        finContornoRef.current?.()
+        toast.success('Contorno guardado. Ahora dibujá los potreros adentro.')
+        return
+      }
       const clash = overlapsExisting(pts)
       if (clash) {
         map.removeLayer(raw)
@@ -597,6 +634,9 @@ export function CampoMapaReal({
       map.remove()
       mapRef.current = null
     }
+    // campo.centro sólo importa al montar (el mapa se re-monta por `key` al
+    // cambiar de campo): incluirlo re-crearía el mapa en cada cambio de datos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campo.id, campo.color.hex, campo.color.letra])
 
   const refs = REFERENCIAS[campo.nombre] ?? []
