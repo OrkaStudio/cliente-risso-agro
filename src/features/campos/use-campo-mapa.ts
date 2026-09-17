@@ -81,6 +81,8 @@ export type CampoVM = {
   tipo: TipoCampo
   hectareas: number | null
   color: CampoColor
+  /** Centro del campo (localidad o centroide) — donde arranca el mapa sin contorno. */
+  centro: { lat: number; lon: number } | null
 }
 
 export const useCampoMapa = (campoId: string) =>

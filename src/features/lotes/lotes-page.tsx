@@ -94,6 +94,7 @@ function vmDe(c: CampoConPotreros): CampoVM {
     tipo: c.tipo,
     hectareas: c.hectareas,
     color: colorDeCampo(c.color_idx),
+    centro: c.ubicacion.lat != null && c.ubicacion.lon != null ? { lat: c.ubicacion.lat, lon: c.ubicacion.lon } : null,
   }
 }
 

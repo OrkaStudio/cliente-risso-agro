@@ -108,7 +108,9 @@ export function CampoMapaReal({
     const hex = campo.color.hex
     const surcosId = `surcos-le-${campo.id}`
     const map = L.map(host, {
-      center: DEFAULT_CENTER,
+      // Sin contorno ni vista guardada, el mapa arranca en la localidad del
+      // campo (onboarding) — no en un punto fijo de la pampa.
+      center: campo.centro ? [campo.centro.lat, campo.centro.lon] : DEFAULT_CENTER,
       zoom: 13,
       zoomControl: false,
       zoomSnap: 0.5,
@@ -410,6 +412,7 @@ export function CampoMapaReal({
     else {
       const b = allBounds()
       if (b && b.isValid()) map.fitBounds(b, { padding: [30, 30] })
+      else if (campo.centro) map.setView([campo.centro.lat, campo.centro.lon], 13)
     }
     lockToField()
     let prevZoom = map.getZoom()
