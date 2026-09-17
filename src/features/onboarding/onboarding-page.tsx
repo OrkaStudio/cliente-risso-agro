@@ -1,13 +1,14 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  Beef,
   Building2,
   Check,
   CheckCircle2,
-  LandPlot,
   Grid2x2,
+  LandPlot,
   Plus,
   Trash2,
 } from 'lucide-react'
@@ -20,37 +21,56 @@ import {
   ErrorCampo,
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
-import { crearCampo, crearPotrero } from '@/features/campos/api'
+import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
+import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
+import { LocalidadInput } from '@/features/campos/localidad-input'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import {
+  categoriaLabel,
+  categoriasPorEspecie,
+  especieLabel,
+  type Especie,
+} from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
+import { Dropdown } from '@/components/ui/dropdown'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Constants, type Database } from '@/lib/supabase/types'
+import type { Localidad } from '@/lib/geocoding'
 import { cn } from '@/lib/utils'
-import type { Database } from '@/lib/supabase/types'
 
 type TipoCampo = Database['public']['Enums']['tipo_campo']
+type Categoria = Database['public']['Enums']['categoria_animal']
 
-/** Los tres pasos, en el orden del viaje. El mapa de la escena los lista. */
-const PASOS = [
-  { clave: 'empresa', titulo: 'Tu empresa', icono: Building2 },
-  { clave: 'campo', titulo: 'Tu primer campo', icono: LandPlot },
-  { clave: 'potreros', titulo: 'Sus potreros', icono: Grid2x2 },
-] as const
+/** Un campo ya cargado en este onboarding (para el mapa y el resumen). */
+type CampoCargado = {
+  id: string
+  nombre: string
+  actividad: ActividadCampo
+  localidad: string
+  hectareas: number | null
+  potreros: { id: string; nombre: string; hectareas: number | null }[]
+  cabezas: number
+}
 
-// El campo del onboarding es el 1º → letra A (fija, no se cambia). El NÚMERO sí
-// lo elige el productor (hay quien ya tiene su numeración). Se pre-llena por
-// posición (1, 2, 3…) editable.
+// El campo del onboarding lleva la letra de su orden (A, B, C… la pone la
+// DB). El NÚMERO sí lo elige el productor (hay quien ya tiene su numeración).
 type FilaPotrero = { numero: string; hectareas: string }
 
+type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
+
 /**
- * Onboarding post-registro: empresa → primer campo → potreros → listo.
- * Un usuario recién registrado no tiene membresía; el guard RequireEmpresa lo
- * manda acá. El alta de empresa corre en la RPC `crear_empresa_con_dueno`
- * (SECURITY DEFINER — no hay policies de INSERT en empresa/miembro_empresa).
+ * Onboarding post-registro: empresa → por cada campo (datos · potreros ·
+ * hacienda) → ¿otro campo? → listo. El guard RequireEmpresa manda acá a
+ * quien no tiene membresía. El alta de empresa corre en la RPC
+ * `crear_empresa_con_dueno` (SECURITY DEFINER: no hay policies de INSERT).
  *
- * Mismo lenguaje que las pantallas de auth: escena + tarjeta. La escena lleva
- * el MAPA del viaje (tres pasos con tilde a medida que se completan) y cada
- * paso arranca reconociendo el anterior. Un paso a la vez, sin pop-ups.
+ * Diseño en [[clientes/risso-agro/tareas/TASK-060-2026-09-16]]: cada dato
+ * que carga es una fila real que después recibe el contorno y el dibujo —
+ * nada se vuelve a escribir. El catastro NO se pide acá (nadie tiene la
+ * boleta a mano al registrarse): es el primer ítem de la puesta a punto.
+ * Mismo lenguaje que auth: escena con el mapa del viaje + tarjeta, cada paso
+ * arranca reconociendo el anterior, y "después" nunca es fracaso.
  */
 export function OnboardingPage() {
   const navigate = useNavigate()
@@ -58,10 +78,10 @@ export function OnboardingPage() {
   const { user } = useAuth()
   const { data: membresia, isLoading } = useEmpresa()
 
-  const [paso, setPaso] = useState(0)
+  const [etapa, setEtapa] = useState<Etapa>('empresa')
   const [ocupado, setOcupado] = useState(false)
 
-  // Paso 1 — empresa. Sugerimos "<Apellido> Agro" desde el registro (editable).
+  // Empresa
   const [nombreEmpresa, setNombreEmpresa] = useState(() => {
     const apellido = (user?.user_metadata as { apellido?: string } | undefined)
       ?.apellido
@@ -69,17 +89,10 @@ export function OnboardingPage() {
   })
   const [errorEmpresa, setErrorEmpresa] = useState<string | null>(null)
   const [empresaId, setEmpresaId] = useState<string | null>(null)
-  // Paso 2 — campo
-  const [nombreCampo, setNombreCampo] = useState('')
-  const [tipoCampo, setTipoCampo] = useState<TipoCampo>('propio')
-  const [hectareas, setHectareas] = useState('')
-  const [errorCampo, setErrorCampo] = useState<{ nombre?: string; hectareas?: string; general?: string }>({})
-  const [campoId, setCampoId] = useState<string | null>(null)
-  // Paso 3 — potreros
-  const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
-  const [errorPotreros, setErrorPotreros] = useState<string | null>(null)
-  const [potrerosCreados, setPotrerosCreados] = useState(0)
-  const [terminado, setTerminado] = useState(false)
+
+  // Campos ya cargados + el que se está cargando
+  const [campos, setCampos] = useState<CampoCargado[]>([])
+  const [campoActual, setCampoActual] = useState<CampoCargado | null>(null)
 
   // Si ya pertenece a una empresa y no la creó en este wizard, no va acá.
   if (!isLoading && membresia && !empresaId) {
@@ -104,74 +117,7 @@ export function OnboardingPage() {
       return
     }
     setEmpresaId(data)
-    setPaso(1)
-  }
-
-  async function crearPrimerCampo(e: FormEvent) {
-    e.preventDefault()
-    setErrorCampo({})
-    if (!empresaId) return
-    const nombre = nombreCampo.trim()
-    const ha = hectareas.trim() === '' ? null : Number(hectareas)
-    const errores: typeof errorCampo = {}
-    if (nombre.length < 2) errores.nombre = 'Falta el nombre'
-    if (ha !== null && (!Number.isFinite(ha) || ha < 0))
-      errores.hectareas = 'Tiene que ser un número'
-    if (Object.keys(errores).length) {
-      setErrorCampo(errores)
-      return
-    }
-    setOcupado(true)
-    try {
-      const id = await crearCampo({ empresaId, nombre, tipo: tipoCampo, hectareas: ha })
-      setCampoId(id)
-      setPaso(2)
-    } catch (err) {
-      setErrorCampo({
-        general: err instanceof Error ? err.message : 'No se pudo crear el campo.',
-      })
-    } finally {
-      setOcupado(false)
-    }
-  }
-
-  async function crearPotreros(e: FormEvent) {
-    e.preventDefault()
-    setErrorPotreros(null)
-    if (!empresaId || !campoId) return
-    for (const f of filas) {
-      const ha = f.hectareas.trim()
-      const n = ha === '' ? null : Number(ha)
-      if (n !== null && (!Number.isFinite(n) || n < 0)) {
-        setErrorPotreros(`Las hectáreas del potrero ${f.numero}A tienen que ser un número.`)
-        return
-      }
-      if (!f.numero.trim()) {
-        setErrorPotreros('Cada potrero necesita un número.')
-        return
-      }
-    }
-    setOcupado(true)
-    try {
-      // Se manda el número + A; el trigger fuerza la letra A del campo igual.
-      for (const f of filas) {
-        await crearPotrero({
-          empresaId,
-          campoId,
-          nombre: `${f.numero.trim()}A`,
-          estadoCiclo: 'ganadero',
-          hectareas: f.hectareas.trim() === '' ? null : Number(f.hectareas),
-        })
-      }
-      setPotrerosCreados(filas.length)
-      setTerminado(true)
-    } catch (err) {
-      setErrorPotreros(
-        err instanceof Error ? err.message : 'No se pudieron crear los potreros.',
-      )
-    } finally {
-      setOcupado(false)
-    }
+    setEtapa('campo')
   }
 
   async function entrar(destino: string) {
@@ -189,56 +135,21 @@ export function OnboardingPage() {
     )
   }
 
-  const pasoActual = terminado ? PASOS.length : paso
   const empresa = nombreEmpresa.trim()
-  const campo = nombreCampo.trim()
 
   return (
-    <AuthLayout escena={<MapaDelViaje actual={pasoActual} />}>
+    <AuthLayout
+      escena={
+        <MapaDelViaje
+          etapa={etapa}
+          empresa={empresa}
+          campos={campos}
+          campoActual={campoActual}
+        />
+      }
+    >
       <AnimatePresence mode="wait">
-        {terminado ? (
-          <Paso key="fin">
-            <div className="text-center">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <CheckCircle2 className="size-7" />
-              </span>
-              <h1 className="mt-5 text-2xl font-bold tracking-tight">
-                ¡Listo, {empresa}!
-              </h1>
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Tu campo ya está armado. Lo que sigue es cargar tu hacienda:
-                entrá a un potrero y usá <strong>Cargar animales</strong> — de a
-                lotes, sin caravanear nada todavía.
-              </p>
-            </div>
-            {/* Lo que acaba de construir, con nombre y apellido: es SU obra. */}
-            <ul className="mt-6 divide-y divide-border rounded-lg border border-border text-sm">
-              <Logro icono={Building2} etiqueta="Empresa" valor={empresa} />
-              <Logro
-                icono={LandPlot}
-                etiqueta="Campo"
-                valor={`${campo}${hectareas.trim() ? ` · ${hectareas.trim()} ha` : ''}`}
-              />
-              <Logro
-                icono={Grid2x2}
-                etiqueta="Potreros"
-                valor={
-                  potrerosCreados === 0
-                    ? 'Los cargás después'
-                    : `${potrerosCreados} en ${campo}`
-                }
-              />
-            </ul>
-            <div className="mt-6 grid gap-2">
-              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos/${campoId}`)}>
-                Ir a mi campo y cargar hacienda
-              </Button>
-              <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
-                Ver el inicio
-              </Button>
-            </div>
-          </Paso>
-        ) : paso === 0 ? (
+        {etapa === 'empresa' && (
           <Paso key="empresa">
             <AuthHeading
               icono={Building2}
@@ -269,180 +180,144 @@ export function OnboardingPage() {
               </Reveal>
             </form>
           </Paso>
-        ) : paso === 1 ? (
-          <Paso key="campo">
-            <Logrado>{empresa} ya existe</Logrado>
+        )}
+
+        {etapa === 'campo' && empresaId && (
+          <Paso key={`campo-${campos.length}`}>
+            <Logrado>
+              {campos.length === 0
+                ? `${empresa} ya existe`
+                : `${campos[campos.length - 1]!.nombre} cargado`}
+            </Logrado>
+            <PasoCampo
+              empresaId={empresaId}
+              primero={campos.length === 0}
+              ocupado={ocupado}
+              setOcupado={setOcupado}
+              onListo={(c) => {
+                setCampoActual(c)
+                setEtapa('potreros')
+              }}
+            />
+          </Paso>
+        )}
+
+        {etapa === 'potreros' && empresaId && campoActual && (
+          <Paso key={`potreros-${campoActual.id}`}>
+            <Logrado>{campoActual.nombre} guardado</Logrado>
+            <PasoPotreros
+              empresaId={empresaId}
+              campo={campoActual}
+              ocupado={ocupado}
+              setOcupado={setOcupado}
+              onListo={(potreros) => {
+                const c = { ...campoActual, potreros }
+                setCampoActual(c)
+                // Sin hacienda que cargar (agrícola o sin potreros) → ¿otro campo?
+                if (c.actividad === 'agricola' || potreros.length === 0) {
+                  setCampos((xs) => [...xs, c])
+                  setCampoActual(null)
+                  setEtapa('otro')
+                } else {
+                  setEtapa('hacienda')
+                }
+              }}
+            />
+          </Paso>
+        )}
+
+        {etapa === 'hacienda' && empresaId && campoActual && (
+          <Paso key={`hacienda-${campoActual.id}`}>
+            <Logrado>
+              {campoActual.potreros.length === 1
+                ? '1 potrero'
+                : `${campoActual.potreros.length} potreros`}{' '}
+              en {campoActual.nombre}
+            </Logrado>
+            <PasoHacienda
+              empresaId={empresaId}
+              campo={campoActual}
+              ocupado={ocupado}
+              setOcupado={setOcupado}
+              onListo={(cabezas) => {
+                setCampos((xs) => [...xs, { ...campoActual, cabezas }])
+                setCampoActual(null)
+                setEtapa('otro')
+              }}
+            />
+          </Paso>
+        )}
+
+        {etapa === 'otro' && (
+          <Paso key={`otro-${campos.length}`}>
+            <Logrado>
+              {campos[campos.length - 1]!.nombre}
+              {campos[campos.length - 1]!.cabezas > 0
+                ? ` · ${campos[campos.length - 1]!.cabezas} cabezas`
+                : ''}
+            </Logrado>
             <AuthHeading
               icono={LandPlot}
-              titulo="Tu primer campo"
-              subtitulo="Después podés sumar los que hagan falta — propios o alquilados."
+              titulo="¿Tenés otro campo?"
+              subtitulo="Cada campo lleva su ubicación, sus potreros y su hacienda. Podés sumarlo ahora o después desde Campos."
             />
-            <form onSubmit={crearPrimerCampo} className="mt-5 grid gap-3.5" noValidate>
-              <Reveal delay={0.14} className="grid gap-1.5">
-                <Label htmlFor="campo">Nombre del campo</Label>
-                <Input
-                  id="campo"
-                  value={nombreCampo}
-                  onChange={(e) => {
-                    setNombreCampo(e.target.value)
-                    setErrorCampo((x) => ({ ...x, nombre: undefined }))
-                  }}
-                  placeholder="Ej: Don Gilberto"
-                  aria-invalid={!!errorCampo.nombre}
-                  autoFocus
-                />
-                <ErrorCampo mensaje={errorCampo.nombre} />
-              </Reveal>
-              <Reveal delay={0.2} className="grid gap-1.5">
-                <Label>Tenencia</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(
-                    [
-                      ['propio', 'Propio'],
-                      ['alquilado', 'Alquilado'],
-                    ] as const
-                  ).map(([valor, etiqueta]) => (
-                    <button
-                      key={valor}
-                      type="button"
-                      onClick={() => setTipoCampo(valor)}
-                      className={cn(
-                        'h-9 rounded-lg border text-sm font-medium transition-colors',
-                        tipoCampo === valor
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-input text-muted-foreground hover:border-ring',
-                      )}
-                    >
-                      {etiqueta}
-                    </button>
-                  ))}
-                </div>
-              </Reveal>
-              <Reveal delay={0.26} className="grid gap-1.5">
-                <Label htmlFor="hectareas">
-                  Hectáreas{' '}
-                  <span className="font-normal text-muted-foreground">(si las sabés)</span>
-                </Label>
-                <Input
-                  id="hectareas"
-                  inputMode="decimal"
-                  value={hectareas}
-                  onChange={(e) => {
-                    setHectareas(e.target.value)
-                    setErrorCampo((x) => ({ ...x, hectareas: undefined }))
-                  }}
-                  placeholder="Ej: 420"
-                  aria-invalid={!!errorCampo.hectareas}
-                />
-                <ErrorCampo mensaje={errorCampo.hectareas} />
-              </Reveal>
-              <ErrorCampo mensaje={errorCampo.general} />
-              <Reveal delay={0.32} className="mt-2">
-                <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
-                  {ocupado ? 'Guardando…' : 'Guardar el campo'}
-                </Button>
-              </Reveal>
-            </form>
+            <div className="mt-6 grid gap-2">
+              <Button className={BOTON_PRINCIPAL} onClick={() => setEtapa('campo')}>
+                Sí, cargar otro campo
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 w-full text-[15px] font-semibold"
+                onClick={() => setEtapa('fin')}
+              >
+                No, terminar
+              </Button>
+            </div>
           </Paso>
-        ) : (
-          <Paso key="potreros">
-            <Logrado>{campo} guardado</Logrado>
-            <AuthHeading
-              icono={Grid2x2}
-              titulo={`Los potreros de ${campo}`}
-              subtitulo="Cargá los que te acuerdes — se pueden sumar, renombrar y dibujar en el mapa más adelante."
-            />
-            <form onSubmit={crearPotreros} className="mt-5" noValidate>
-              <Reveal delay={0.14} className="grid gap-2.5">
-                {filas.map((fila, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    {/* Número editable + letra A FIJA (del campo). */}
-                    <div className="flex items-stretch">
-                      <Input
-                        aria-label={`Número del potrero ${i + 1}`}
-                        inputMode="numeric"
-                        className="w-16 rounded-r-none"
-                        value={fila.numero}
-                        onChange={(e) =>
-                          setFilas((fs) =>
-                            fs.map((f, j) =>
-                              j === i ? { ...f, numero: e.target.value.replace(/\D/g, '') } : f,
-                            ),
-                          )
-                        }
-                      />
-                      <span className="flex w-9 items-center justify-center rounded-r-lg bg-secondary text-[15px] font-bold text-ink">
-                        A
-                      </span>
-                    </div>
-                    <Input
-                      aria-label={`Hectáreas del potrero ${i + 1}`}
-                      inputMode="decimal"
-                      className="flex-1"
-                      value={fila.hectareas}
-                      onChange={(e) =>
-                        setFilas((fs) =>
-                          fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
-                        )
-                      }
-                      placeholder="Hectáreas (opcional)"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Quitar potrero ${i + 1}`}
-                      disabled={filas.length === 1}
-                      onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+        )}
+
+        {etapa === 'fin' && (
+          <Paso key="fin">
+            <div className="text-center">
+              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <CheckCircle2 className="size-7" />
+              </span>
+              <h1 className="mt-5 text-2xl font-bold tracking-tight">¡Listo, {empresa}!</h1>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Esto es lo que armaste. Lo que sigue es traer el contorno de cada
+                campo y dibujar los potreros — desde <strong>Campos</strong>, con
+                pantalla grande.
+              </p>
+            </div>
+            {/* Lo que acaba de construir, campo por campo: es SU obra. */}
+            <ul className="mt-6 divide-y divide-border rounded-lg border border-border text-sm">
+              {campos.map((c) => (
+                <li key={c.id} className="px-3.5 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <LandPlot className="size-4 shrink-0 text-primary/80" strokeWidth={1.75} />
+                    <span className="font-medium">{c.nombre}</span>
+                    <span className="text-xs text-muted-foreground">
+                      · {actividadLabel[c.actividad]} · {c.localidad}
+                      {c.hectareas ? ` · ${c.hectareas} ha` : ''}
+                    </span>
                   </div>
-                ))}
-              </Reveal>
-              <Reveal delay={0.2} className="mt-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setFilas((fs) => {
-                      const nums = fs
-                        .map((f) => parseInt(f.numero, 10))
-                        .filter((n) => Number.isFinite(n))
-                      const sig = (nums.length ? Math.max(...nums) : 0) + 1
-                      return [...fs, { numero: String(sig), hectareas: '' }]
-                    })
-                  }
-                >
-                  <Plus className="size-4" /> Otro potrero
-                </Button>
-              </Reveal>
-              {errorPotreros && (
-                <p className="mt-3 text-xs text-destructive" role="alert">
-                  {errorPotreros}
-                </p>
-              )}
-              <Reveal delay={0.26} className="mt-5 grid gap-2">
-                <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
-                  {ocupado
-                    ? 'Guardando…'
-                    : `Guardar ${filas.length === 1 ? 'el potrero' : `los ${filas.length} potreros`}`}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full text-muted-foreground"
-                  disabled={ocupado}
-                  onClick={() => {
-                    setPotrerosCreados(0)
-                    setTerminado(true)
-                  }}
-                >
-                  Los cargo después
-                </Button>
-              </Reveal>
-            </form>
+                  <p className="mt-0.5 pl-6 text-xs text-muted-foreground">
+                    {c.potreros.length === 0
+                      ? 'Potreros: los cargás después'
+                      : `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`}
+                    {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 grid gap-2">
+              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos/${campos[0]?.id ?? ''}`)}>
+                Ir a mis campos
+              </Button>
+              <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
+                Ver el inicio
+              </Button>
+            </div>
           </Paso>
         )}
       </AnimatePresence>
@@ -450,8 +325,528 @@ export function OnboardingPage() {
   )
 }
 
+// ---------------------------------------------------------------------
+// Paso: este campo
+// ---------------------------------------------------------------------
+
+function PasoCampo({
+  empresaId,
+  primero,
+  ocupado,
+  setOcupado,
+  onListo,
+}: {
+  empresaId: string
+  primero: boolean
+  ocupado: boolean
+  setOcupado: (v: boolean) => void
+  onListo: (c: CampoCargado) => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [tipo, setTipo] = useState<TipoCampo>('propio')
+  const [actividad, setActividad] = useState<ActividadCampo | null>(null)
+  const [localidad, setLocalidad] = useState<Localidad | null>(null)
+  const [hectareas, setHectareas] = useState('')
+  const [errores, setErrores] = useState<{
+    nombre?: string
+    actividad?: string
+    localidad?: string
+    hectareas?: string
+    general?: string
+  }>({})
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault()
+    const errs: typeof errores = {}
+    const n = nombre.trim()
+    if (n.length < 2) errs.nombre = 'Falta el nombre'
+    if (!actividad) errs.actividad = 'Elegí qué se hace en este campo'
+    if (!localidad) errs.localidad = 'Elegí la localidad de la lista'
+    const ha = hectareas.trim() === '' ? null : Number(hectareas)
+    if (ha !== null && (!Number.isFinite(ha) || ha < 0))
+      errs.hectareas = 'Tiene que ser un número'
+    setErrores(errs)
+    if (Object.keys(errs).length || !actividad || !localidad) return
+
+    setOcupado(true)
+    try {
+      const id = await crearCampo({
+        empresaId,
+        nombre: n,
+        tipo,
+        hectareas: ha,
+        actividad,
+        ubicacion: {
+          localidad: localidad.nombre,
+          provincia: localidad.provincia,
+          lat: localidad.lat,
+          lon: localidad.lon,
+        },
+      })
+      onListo({
+        id,
+        nombre: n,
+        actividad,
+        localidad: localidad.nombre,
+        hectareas: ha,
+        potreros: [],
+        cabezas: 0,
+      })
+    } catch (err) {
+      setErrores({ general: err instanceof Error ? err.message : 'No se pudo crear el campo.' })
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <>
+      <AuthHeading
+        icono={LandPlot}
+        titulo={primero ? 'Tu primer campo' : 'Otro campo'}
+        subtitulo="Cómo se llama, qué se hace y dónde está. Lo demás lo completás después."
+      />
+      <form onSubmit={guardar} className="mt-5 grid gap-3.5" noValidate>
+        <Reveal delay={0.14} className="grid gap-1.5">
+          <Label htmlFor="campo">Nombre del campo</Label>
+          <Input
+            id="campo"
+            value={nombre}
+            onChange={(e) => {
+              setNombre(e.target.value)
+              setErrores((x) => ({ ...x, nombre: undefined }))
+            }}
+            placeholder="Ej: Don Gilberto"
+            aria-invalid={!!errores.nombre}
+            autoFocus
+          />
+          <ErrorCampo mensaje={errores.nombre} />
+        </Reveal>
+
+        <Reveal delay={0.18} className="grid gap-1.5">
+          <Label>¿Qué se hace en este campo?</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {Constants.public.Enums.actividad_campo.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => {
+                  setActividad(a)
+                  setErrores((x) => ({ ...x, actividad: undefined }))
+                }}
+                className={cn(
+                  'h-9 rounded-lg border text-sm font-medium transition-colors',
+                  actividad === a
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-input text-muted-foreground hover:border-ring',
+                  errores.actividad && !actividad && 'border-destructive',
+                )}
+              >
+                {actividadLabel[a]}
+              </button>
+            ))}
+          </div>
+          <ErrorCampo mensaje={errores.actividad} />
+        </Reveal>
+
+        <Reveal delay={0.22} className="grid gap-1.5">
+          <Label htmlFor="localidad">¿Dónde está el campo?</Label>
+          <LocalidadInput
+            id="localidad"
+            value={localidad}
+            onChange={(l) => {
+              setLocalidad(l)
+              setErrores((x) => ({ ...x, localidad: undefined }))
+            }}
+            invalido={!!errores.localidad}
+          />
+          {errores.localidad ? (
+            <ErrorCampo mensaje={errores.localidad} />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              La localidad más cercana al campo, no tu domicilio. De acá sale el
+              clima de este campo.
+            </p>
+          )}
+        </Reveal>
+
+        <Reveal delay={0.26}>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Tenencia</Label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(
+                  [
+                    ['propio', 'Propio'],
+                    ['alquilado', 'Alquilado'],
+                  ] as const
+                ).map(([valor, etiqueta]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() => setTipo(valor)}
+                    className={cn(
+                      'h-8 rounded-lg border text-sm font-medium transition-colors',
+                      tipo === valor
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-input text-muted-foreground hover:border-ring',
+                    )}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="hectareas">
+                Hectáreas{' '}
+                <span className="font-normal text-muted-foreground">(si las sabés)</span>
+              </Label>
+              <Input
+                id="hectareas"
+                inputMode="decimal"
+                value={hectareas}
+                onChange={(e) => {
+                  setHectareas(e.target.value)
+                  setErrores((x) => ({ ...x, hectareas: undefined }))
+                }}
+                placeholder="Ej: 420"
+                aria-invalid={!!errores.hectareas}
+              />
+              <ErrorCampo mensaje={errores.hectareas} />
+            </div>
+          </div>
+        </Reveal>
+
+        <ErrorCampo mensaje={errores.general} />
+        <Reveal delay={0.32} className="mt-2">
+          <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
+            {ocupado ? 'Guardando…' : 'Guardar el campo'}
+          </Button>
+        </Reveal>
+      </form>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Paso: sus potreros
+// ---------------------------------------------------------------------
+
+function PasoPotreros({
+  empresaId,
+  campo,
+  ocupado,
+  setOcupado,
+  onListo,
+}: {
+  empresaId: string
+  campo: CampoCargado
+  ocupado: boolean
+  setOcupado: (v: boolean) => void
+  onListo: (potreros: CampoCargado['potreros']) => void
+}) {
+  const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
+  const [error, setError] = useState<string | null>(null)
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    for (const f of filas) {
+      if (!f.numero.trim()) {
+        setError('Cada potrero necesita un número.')
+        return
+      }
+      const ha = f.hectareas.trim()
+      const n = ha === '' ? null : Number(ha)
+      if (n !== null && (!Number.isFinite(n) || n < 0)) {
+        setError(`Las hectáreas del potrero ${f.numero} tienen que ser un número.`)
+        return
+      }
+    }
+    setOcupado(true)
+    try {
+      const creados: CampoCargado['potreros'] = []
+      // Se manda sólo el número; la DB le pone la letra del campo.
+      for (const f of filas) {
+        const hectareas = f.hectareas.trim() === '' ? null : Number(f.hectareas)
+        const id = await crearPotrero({
+          empresaId,
+          campoId: campo.id,
+          nombre: `${f.numero.trim()}A`,
+          estadoCiclo: estadoInicialPorActividad(campo.actividad),
+          hectareas,
+        })
+        creados.push({ id, nombre: `${f.numero.trim()}A`, hectareas })
+      }
+      onListo(creados)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron crear los potreros.')
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <>
+      <AuthHeading
+        icono={Grid2x2}
+        titulo={`Los potreros de ${campo.nombre}`}
+        subtitulo="Cargá los que te acuerdes. Cuando los dibujes en el mapa vas a elegir cuál estás marcando de esta misma lista."
+      />
+      <form onSubmit={guardar} className="mt-5" noValidate>
+        <Reveal delay={0.14} className="grid gap-2.5">
+          {filas.map((fila, i) => (
+            <div key={i} className="flex items-center gap-2">
+              {/* Número editable; la letra la pone el campo. */}
+              <Input
+                aria-label={`Número del potrero ${i + 1}`}
+                inputMode="numeric"
+                className="w-16"
+                value={fila.numero}
+                onChange={(e) =>
+                  setFilas((fs) =>
+                    fs.map((f, j) =>
+                      j === i ? { ...f, numero: e.target.value.replace(/\D/g, '') } : f,
+                    ),
+                  )
+                }
+              />
+              <Input
+                aria-label={`Hectáreas del potrero ${i + 1}`}
+                inputMode="decimal"
+                className="flex-1"
+                value={fila.hectareas}
+                onChange={(e) =>
+                  setFilas((fs) =>
+                    fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
+                  )
+                }
+                placeholder="Hectáreas (si las sabés)"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Quitar potrero ${i + 1}`}
+                disabled={filas.length === 1}
+                onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ))}
+        </Reveal>
+        <Reveal delay={0.2} className="mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setFilas((fs) => {
+                const nums = fs
+                  .map((f) => parseInt(f.numero, 10))
+                  .filter((n) => Number.isFinite(n))
+                const sig = (nums.length ? Math.max(...nums) : 0) + 1
+                return [...fs, { numero: String(sig), hectareas: '' }]
+              })
+            }
+          >
+            <Plus className="size-4" /> Otro potrero
+          </Button>
+        </Reveal>
+        {error && (
+          <p className="mt-3 text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <Reveal delay={0.26} className="mt-5 grid gap-2">
+          <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
+            {ocupado
+              ? 'Guardando…'
+              : `Guardar ${filas.length === 1 ? 'el potrero' : `los ${filas.length} potreros`}`}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            disabled={ocupado}
+            onClick={() => onListo([])}
+          >
+            Los cargo después
+          </Button>
+        </Reveal>
+      </form>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Paso: su hacienda, más o menos
+// ---------------------------------------------------------------------
+
+const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+
+function PasoHacienda({
+  empresaId,
+  campo,
+  ocupado,
+  setOcupado,
+  onListo,
+}: {
+  empresaId: string
+  campo: CampoCargado
+  ocupado: boolean
+  setOcupado: (v: boolean) => void
+  onListo: (cabezas: number) => void
+}) {
+  const [cantidades, setCantidades] = useState<Partial<Record<Categoria, string>>>({})
+  // Bovinos a la vista; ovinos/equinos plegados: en la cría pampeana el
+  // 90 % de las veces no hacen falta.
+  const [especiesAbiertas, setEspeciesAbiertas] = useState<Especie[]>(['bovino'])
+  const [potreroId, setPotreroId] = useState(campo.potreros[0]?.id ?? '')
+  const [error, setError] = useState<string | null>(null)
+
+  const items = (Object.entries(cantidades) as [Categoria, string][])
+    .map(([categoria, v]) => ({ categoria, cantidad: parseInt(v, 10) || 0 }))
+    .filter((x) => x.cantidad > 0)
+  const total = items.reduce((s, x) => s + x.cantidad, 0)
+  const potrero = campo.potreros.find((p) => p.id === potreroId)
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (total === 0) {
+      setError('Poné al menos una cantidad, o tocá "La cargo después".')
+      return
+    }
+    setOcupado(true)
+    const { error } = await supabase.rpc('crear_animales_masivo', {
+      p_empresa_id: empresaId,
+      p_potrero_id: potreroId || undefined,
+      p_items: items,
+      p_origen: 'onboarding',
+    })
+    setOcupado(false)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    onListo(total)
+  }
+
+  return (
+    <>
+      <AuthHeading
+        icono={Beef}
+        titulo={`¿Qué hay en ${campo.nombre}, más o menos?`}
+        subtitulo="Redondeá. Después ajustás animal por animal desde la manga."
+      />
+      <form onSubmit={guardar} className="mt-5" noValidate>
+        <Reveal delay={0.14} className="grid gap-4">
+          {ESPECIES.map((esp) => {
+            const abierta = especiesAbiertas.includes(esp)
+            return (
+              <div key={esp}>
+                {esp !== 'bovino' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEspeciesAbiertas((xs) =>
+                        abierta ? xs.filter((x) => x !== esp) : [...xs, esp],
+                      )
+                    }
+                    className="mb-2 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {abierta ? `Sin ${especieLabel[esp].toLowerCase()}s` : `+ ${especieLabel[esp]}s`}
+                  </button>
+                )}
+                {abierta && (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {categoriasPorEspecie[esp].map((c) => (
+                      <label key={c} className="grid gap-1">
+                        <span className="text-xs text-muted-foreground">{categoriaLabel[c]}</span>
+                        <Input
+                          inputMode="numeric"
+                          value={cantidades[c] ?? ''}
+                          onChange={(e) =>
+                            setCantidades((x) => ({
+                              ...x,
+                              [c]: e.target.value.replace(/\D/g, ''),
+                            }))
+                          }
+                          placeholder="0"
+                          className="tabular-nums"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </Reveal>
+
+        {campo.potreros.length > 1 && (
+          <Reveal delay={0.2} className="mt-4 grid gap-1.5">
+            <Label>¿En qué potrero están ahora?</Label>
+            <Dropdown
+              block
+              ariaLabel="Potrero donde está la hacienda"
+              value={potreroId}
+              onChange={setPotreroId}
+              options={campo.potreros.map((p) => ({ value: p.id, label: p.nombre }))}
+            />
+          </Reveal>
+        )}
+
+        {/* Dónde quedan, dicho con todas las letras. */}
+        <Reveal delay={0.24} className="mt-3">
+          <p className="text-xs text-muted-foreground">
+            {total > 0
+              ? `${total} ${total === 1 ? 'animal queda' : 'animales quedan'} en ${campo.nombre}${potrero ? `, potrero ${potrero.nombre}` : ''}. Después los movés desde el mapa o la manga.`
+              : `Quedan en ${campo.nombre}${potrero ? `, potrero ${potrero.nombre}` : ''}. Después los movés desde el mapa o la manga.`}
+          </p>
+        </Reveal>
+
+        {error && (
+          <p className="mt-3 text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <Reveal delay={0.28} className="mt-5 grid gap-2">
+          <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
+            {ocupado
+              ? 'Guardando…'
+              : total > 0
+                ? `Guardar ${total} ${categoriaNombreGenerico(total)}`
+                : 'Guardar mi hacienda'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            disabled={ocupado}
+            onClick={() => onListo(0)}
+          >
+            La cargo después
+          </Button>
+        </Reveal>
+      </form>
+    </>
+  )
+}
+
+function categoriaNombreGenerico(n: number): string {
+  return n === 1 ? 'cabeza' : 'cabezas'
+}
+
+// ---------------------------------------------------------------------
+// Piezas
+// ---------------------------------------------------------------------
+
 /** Transición entre pasos: el que se va sale hacia arriba, el nuevo entra desde abajo. */
-function Paso({ children }: { children: React.ReactNode }) {
+function Paso({ children }: { children: ReactNode }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
@@ -468,7 +863,7 @@ function Paso({ children }: { children: React.ReactNode }) {
  * El reconocimiento del paso anterior, arriba del título del nuevo: chico,
  * verde, con tilde. No es un pop-up ni un paso aparte — acompaña.
  */
-function Logrado({ children }: { children: React.ReactNode }) {
+function Logrado({ children }: { children: ReactNode }) {
   return (
     <motion.p
       initial={{ opacity: 0, y: -6 }}
@@ -482,67 +877,90 @@ function Logrado({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Logro({
-  icono: Icono,
-  etiqueta,
-  valor,
-}: {
-  icono: typeof Building2
-  etiqueta: string
-  valor: string
-}) {
-  return (
-    <li className="flex items-center gap-3 px-3.5 py-2.5">
-      <Icono className="size-4 shrink-0 text-primary/80" strokeWidth={1.75} />
-      <span className="w-20 shrink-0 text-xs text-muted-foreground">{etiqueta}</span>
-      <span className="min-w-0 truncate font-medium">{valor}</span>
-    </li>
-  )
-}
-
 /**
- * El mapa del viaje, en la escena: los tres pasos con su estado. La tilde
- * verde en cada uno completado es el reconocimiento que acompaña todo el
- * recorrido, sin pop-ups. `actual` = índice del paso en curso (3 = terminado).
+ * El mapa del viaje, en la escena: la empresa y cada campo con sus tres
+ * partes (datos · potreros · hacienda). La tilde verde en cada cosa hecha es
+ * el reconocimiento que acompaña todo el recorrido, sin pop-ups.
  */
-function MapaDelViaje({ actual }: { actual: number }) {
+function MapaDelViaje({
+  etapa,
+  empresa,
+  campos,
+  campoActual,
+}: {
+  etapa: Etapa
+  empresa: string
+  campos: CampoCargado[]
+  campoActual: CampoCargado | null
+}) {
+  const empresaHecha = etapa !== 'empresa'
+  const enCampo = etapa === 'campo' || etapa === 'potreros' || etapa === 'hacienda'
+  const subEtiqueta =
+    etapa === 'campo' ? 'Datos' : etapa === 'potreros' ? 'Potreros' : etapa === 'hacienda' ? 'Hacienda' : ''
+
   return (
     <div>
       <p className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[32px]">
         Armemos tu campo.
       </p>
       <p className="mt-1.5 text-sm text-sidebar-foreground/70">
-        Tres pasos y estás adentro.
+        Unos minutos y estás adentro.
       </p>
       <ol className="mt-6 grid gap-2.5 lg:mt-8 lg:gap-3">
-        {PASOS.map((p, i) => {
-          const hecho = i < actual
-          const enCurso = i === actual
-          return (
-            <li
-              key={p.clave}
-              className={cn(
-                'flex items-center gap-3 text-[15px] transition-colors',
-                hecho && 'text-sidebar-foreground',
-                enCurso && 'font-semibold text-sidebar-foreground',
-                !hecho && !enCurso && 'text-sidebar-foreground/45',
-              )}
-            >
-              <span
-                className={cn(
-                  'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs transition-colors',
-                  hecho && 'border-primary bg-primary text-white',
-                  enCurso && 'border-[#e9b45f] text-[#e9b45f]',
-                  !hecho && !enCurso && 'border-sidebar-foreground/25',
-                )}
-              >
-                {hecho ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
-              </span>
-              {p.titulo}
-            </li>
-          )
-        })}
+        <Hito hecho={empresaHecha} enCurso={!empresaHecha}>
+          {empresaHecha && empresa ? empresa : 'Tu empresa'}
+        </Hito>
+        {campos.map((c) => (
+          <Hito key={c.id} hecho>
+            {c.nombre}
+            <span className="ml-1.5 text-[13px] font-normal text-sidebar-foreground/60">
+              {c.potreros.length > 0 ? `· ${c.potreros.length} potreros` : ''}
+              {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
+            </span>
+          </Hito>
+        ))}
+        {enCampo && (
+          <Hito enCurso>
+            {campoActual?.nombre ?? (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
+            <span className="ml-1.5 text-[13px] font-normal text-[#e9b45f]/80">· {subEtiqueta}</span>
+          </Hito>
+        )}
+        {etapa === 'otro' && <Hito enCurso>¿Otro campo?</Hito>}
+        {etapa === 'fin' && <Hito hecho>Listo</Hito>}
       </ol>
     </div>
+  )
+}
+
+function Hito({
+  hecho = false,
+  enCurso = false,
+  children,
+}: {
+  hecho?: boolean
+  enCurso?: boolean
+  children: ReactNode
+}) {
+  return (
+    <li
+      className={cn(
+        'flex items-center gap-3 text-[15px] transition-colors',
+        hecho && 'text-sidebar-foreground',
+        enCurso && 'font-semibold text-sidebar-foreground',
+        !hecho && !enCurso && 'text-sidebar-foreground/45',
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs transition-colors',
+          hecho && 'border-primary bg-primary text-white',
+          enCurso && 'border-[#e9b45f] text-[#e9b45f]',
+          !hecho && !enCurso && 'border-sidebar-foreground/25',
+        )}
+      >
+        {hecho ? <Check className="size-3.5" strokeWidth={3} /> : enCurso ? '•' : ''}
+      </span>
+      <span className="min-w-0 truncate">{children}</span>
+    </li>
   )
 }

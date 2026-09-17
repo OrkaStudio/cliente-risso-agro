@@ -315,7 +315,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                   campo={vm}
                   contorno={contorno}
                   potreros={potreros}
-                  onDibujarPotrero={async (nombre, poligono) => {
+                  onDibujarPotrero={async (nombre, poligono, haMedidas) => {
                     const existing = potreros.find((p) => p.nombre === nombre)
                     const id = existing
                       ? existing.id
@@ -324,8 +324,20 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                           campoId: vm.id,
                           nombre,
                           estadoCiclo: 'descanso',
+                          hectareas: haMedidas > 0 ? haMedidas : null,
                         })
                     await setPoligono.mutateAsync({ potreroId: id, poligono })
+                    // Potrero que ya existía (onboarding, con hectáreas de
+                    // memoria): el dibujo manda, las hectáreas pasan a ser las
+                    // medidas.
+                    if (existing && haMedidas > 0) {
+                      await guardarPotrero.mutateAsync({
+                        id,
+                        estadoCiclo: existing.estadoCiclo,
+                        hectareas: haMedidas,
+                        cultivo: existing.cultivo,
+                      })
+                    }
                     return id
                   }}
                   onSetPoligono={(potreroId, poligono) =>

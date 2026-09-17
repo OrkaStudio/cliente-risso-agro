@@ -66,8 +66,12 @@ export function CampoMapaReal({
   campo: CampoVM
   contorno: LatLng[] | null
   potreros: PotreroMapa[]
-  /** Crea (o reusa por nombre) el potrero y le guarda el polígono. Devuelve su id. */
-  onDibujarPotrero: (nombre: string, poligono: LatLng[]) => Promise<string>
+  /**
+   * Crea (o reusa por nombre) el potrero y le guarda el polígono. Devuelve su
+   * id. `haMedidas` son las hectáreas del dibujo: para un potrero que ya
+   * existía con hectáreas declaradas (onboarding), las medidas mandan.
+   */
+  onDibujarPotrero: (nombre: string, poligono: LatLng[], haMedidas: number) => Promise<string>
   /** Reemplaza/limpia el polígono de un potrero existente. */
   onSetPoligono: (potreroId: string, poligono: LatLng[] | null) => void
   onVerPotrero: (potreroId: string) => void
@@ -75,6 +79,15 @@ export function CampoMapaReal({
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const [hover, setHover] = useState<PotreroInfo | null>(null)
+  // "Faltan dibujar": el potrero elegido ANTES de dibujar (los del onboarding
+  // nacen sin polígono). El productor lo elige de la lista, no lo recuerda.
+  const [dibujando, setDibujando] = useState<PotreroMapa | null>(null)
+  const dibujandoRef = useRef<PotreroMapa | null>(null)
+  dibujandoRef.current = dibujando
+  const faltanDibujar = potreros
+    .filter((p) => !p.poligono)
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
 
   // Refs a los datos/callbacks para que el efecto (que corre una vez por campo)
   // siempre lea lo último sin re-montar el mapa.
@@ -460,6 +473,59 @@ export function CampoMapaReal({
         toast.error(`No puede superponerse al potrero ${clash}`)
         return
       }
+      const tf = toTurf(pts)
+      const haMedidas = tf ? Math.round((area(tf) / 10_000) * 10) / 10 : 0
+
+      // Elegido de "Faltan dibujar": el dibujo cae en ESE potrero (mismo id,
+      // ya tiene hectáreas y animales). Si las hectáreas medidas se alejan
+      // mucho de las declaradas, preguntamos antes — puede ser otro potrero.
+      const elegido = dibujandoRef.current
+      if (elegido) {
+        const declaradas = elegido.hectareas
+        const desvio =
+          declaradas && declaradas > 0 ? Math.abs(haMedidas - declaradas) / declaradas : 0
+        const guardarElegido = async () => {
+          try {
+            const id = await dibujarRef.current(elegido.nombre, pts, haMedidas)
+            map.removeLayer(raw)
+            map.closePopup()
+            addPotrero(id, elegido.nombre, pts)
+            selectPotrero(id)
+            setDibujando(null)
+            toast.success(
+              declaradas && Math.round(declaradas) !== Math.round(haMedidas)
+                ? `${elegido.nombre} dibujado · ${haMedidas} ha medidas (habías puesto ${declaradas})`
+                : `${elegido.nombre} dibujado · ${haMedidas} ha`,
+            )
+          } catch (err) {
+            map.removeLayer(raw)
+            setDibujando(null)
+            toast.error(`No se pudo guardar: ${(err as Error).message}`)
+          }
+        }
+        if (desvio <= 0.3) {
+          void guardarElegido()
+          return
+        }
+        // Desvío grande: confirmar en el lugar.
+        const box = L.DomUtil.create('div', 'potrero-input')
+        box.innerHTML =
+          `<label>Dibujaste ${haMedidas} ha y habías puesto ${declaradas} para ${elegido.nombre}. ¿Es este potrero?</label>` +
+          `<div class="pi-row"><button class="pi-ok" type="button" data-si>Sí, es ${elegido.nombre}</button>` +
+          `<button class="pi-ok" type="button" data-no style="background:transparent;color:inherit;border:1px solid currentColor">No, descartar</button></div>`
+        L.DomEvent.disableClickPropagation(box)
+        const popup = L.popup({ className: 'potrero-popup', closeButton: false })
+          .setLatLng(raw.getBounds().getCenter())
+          .setContent(box)
+          .openOn(map)
+        box.querySelector('[data-si]')!.addEventListener('click', () => void guardarElegido())
+        box.querySelector('[data-no]')!.addEventListener('click', () => {
+          map.closePopup(popup)
+          map.removeLayer(raw)
+          setDibujando(null)
+        })
+        return
+      }
       // El NÚMERO lo elige el productor (pre-cargado con el siguiente); la LETRA
       // es la del campo y no se cambia (la DB la fuerza igual).
       const letra = campo.color.letra
@@ -490,7 +556,7 @@ export function CampoMapaReal({
         okBtn.disabled = true
         okBtn.textContent = 'Guardando…'
         try {
-          const id = await dibujarRef.current(numero, pts)
+          const id = await dibujarRef.current(numero, pts, haMedidas)
           map.removeLayer(raw)
           map.closePopup(popup)
           addPotrero(id, numero, pts)
@@ -538,6 +604,57 @@ export function CampoMapaReal({
       <div className="flex flex-col gap-3 lg:flex-row">
         <div className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1">
           <div ref={ref} className="absolute inset-0" />
+          {/* "Faltan dibujar": los potreros sin polígono (los del onboarding).
+              Elegís cuál estás marcando y recién ahí dibujás — nada que
+              recordar. Cuando la lista queda vacía, desaparece. */}
+          {(faltanDibujar.length > 0 || dibujando) && (
+            <div className="absolute bottom-3 left-3 z-[460] max-w-[260px] rounded-xl border border-border bg-white/92 p-2.5 shadow-[0_8px_24px_rgba(16,30,20,0.14)] backdrop-blur">
+              {dibujando ? (
+                <div className="flex items-center gap-2">
+                  <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" />
+                  <p className="text-[12.5px] text-ink">
+                    Dibujando <b>{dibujando.nombre}</b> — cerrá el polígono para guardar.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      mapRef.current?.pm.disableDraw()
+                      setDibujando(null)
+                    }}
+                    className="ml-auto shrink-0 text-[12px] font-medium text-muted-foreground hover:text-ink"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.04em] text-faint">
+                    Faltan dibujar
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {faltanDibujar.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setDibujando(p)
+                          mapRef.current?.pm.enableDraw('Polygon')
+                        }}
+                        title="Tocá y dibujá este potrero sobre el mapa"
+                        className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[12px] font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+                      >
+                        {p.nombre}
+                        <span className="ml-1 font-normal text-primary/70">
+                          {p.hectareas ? `· ${p.hectareas} ha` : ''}
+                          {p.cabezas > 0 ? ` · ${p.cabezas} cab.` : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         {/* Orientación: N/S/E/O (mapa norte-arriba) + referencia por lado */}
         <div className="pointer-events-none absolute inset-0 z-[450]">
           {CARDINALES.map(({ dir, pos, arrow }) => (

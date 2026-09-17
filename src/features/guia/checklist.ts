@@ -39,7 +39,7 @@ export function useChecklist() {
     networkMode: 'offlineFirst',
     staleTime: 15_000,
     queryFn: async (): Promise<ItemChecklist[]> => {
-      const [campos, potreros, activos, ubicados, recorridas] = await Promise.all([
+      const [campos, potreros, activos, ubicados, recorridas, provincias] = await Promise.all([
         supabase
           .from('campo')
           .select('id', { count: 'exact', head: true })
@@ -65,15 +65,36 @@ export function useChecklist() {
           .from('recorrida')
           .select('id', { count: 'exact', head: true })
           .then((r) => head(r.count, r.error)),
+        // Provincias de los campos sin contorno: el consejo del catastro
+        // depende de dónde está el campo (no de dónde vive el dueño).
+        supabase
+          .from('campo')
+          .select('provincia')
+          .is('contorno', null)
+          .then((r) => {
+            if (r.error) throw new Error(r.error.message)
+            return (r.data ?? []).map((c) => c.provincia)
+          }),
       ])
+
+      // Hoy el catastro automático es Buenos Aires (ARBA). Para el resto no se
+      // promete: el contorno se marca sobre el satélite. Con campos en las dos
+      // situaciones, gana la explicación de BA (el resto lo dice el diálogo).
+      const hayBuenosAires = provincias.some((p) => p === 'Buenos Aires')
+      const hayOtras = provincias.some((p) => p && p !== 'Buenos Aires')
+      const detalleCampo = hayBuenosAires
+        ? 'Con los tres números de la boleta de ARBA, el mapa se arma solo.'
+        : hayOtras
+          ? 'Ubicalo en el satélite y marcá el contorno.'
+          : 'Con la boleta de ARBA, el mapa se arma solo.'
 
       return [
         {
           id: 'campo',
           titulo: 'Traé tu campo',
           // Una línea. La explicación larga vive en la ficha y en el diálogo real.
-          detalle: 'Con la boleta de ARBA, el mapa se arma solo.',
-          cta: 'Traer mi campo',
+          detalle: detalleCampo,
+          cta: hayBuenosAires || !hayOtras ? 'Traer mi campo' : 'Marcar mi campo',
           ruta: '/campos',
           accion: 'campos-catastro',
           hecho: campos >= 1,
