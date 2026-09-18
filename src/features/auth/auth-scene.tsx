@@ -71,7 +71,7 @@ export function AuthScene({
             : mensaje
               ? // Con el croquis del onboarding en el medio, el sol baja a la
                 // esquina: el dibujo tiene que quedar limpio.
-                'absolute left-[84%] top-[84%] -translate-x-1/2 -translate-y-1/2'
+                'absolute left-[87%] top-[79%] -translate-x-1/2 -translate-y-1/2'
               : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
       >
@@ -125,7 +125,10 @@ export function AuthScene({
         className={
           compacta
             ? 'absolute inset-x-0 bottom-0 h-[24%] min-h-[150px] w-full'
-            : 'absolute inset-x-0 bottom-0 h-[42%] w-full'
+            : mensaje
+              ? // Con la ficha del onboarding encima, el horizonte se agacha.
+                'absolute inset-x-0 bottom-0 h-[30%] w-full'
+              : 'absolute inset-x-0 bottom-0 h-[42%] w-full'
         }
         viewBox="0 0 800 340"
         preserveAspectRatio="xMidYMax slice"
@@ -151,7 +154,7 @@ export function AuthScene({
             mal el transform-origin dentro de un SVG y la rueda se separaba
             de la torre). */}
         <g
-          transform="translate(248 94) scale(1.3)"
+          transform={mensaje && !compacta ? 'translate(248 150) scale(1)' : 'translate(248 94) scale(1.3)'}
           stroke={TINTA}
           fill="none"
         >

@@ -358,7 +358,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
             textAnchor="middle"
             className={cn(
               'font-heading font-semibold',
-              campo.nombre ? 'fill-sidebar-foreground' : 'fill-sidebar-foreground/40',
+              campo.nombre && estado !== 'vacio' ? 'fill-sidebar-foreground' : 'fill-sidebar-foreground/40',
             )}
             fontSize={campo.nombre.length > 18 ? 16 : 20}
           >

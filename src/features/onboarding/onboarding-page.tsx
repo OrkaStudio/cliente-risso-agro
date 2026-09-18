@@ -195,6 +195,7 @@ export function OnboardingPage() {
       escena={
         <EscenaCroquis
           etapa={etapa}
+          empresa={empresa}
           campos={campos}
           campoActual={campoActual}
           borrador={borrador}
@@ -1138,9 +1139,13 @@ function PasoHacienda({
                     <span className="ml-1.5 text-xs font-normal text-muted-foreground">{ha(actual.hectareas)} ha</span>
                   ) : null}
                 </p>
-                <p className={cn('text-xs tabular-nums', totalActual > 0 ? 'font-medium text-primary' : 'text-muted-foreground')}>
-                  {totalActual > 0 ? `${totalActual} ${totalActual === 1 ? 'cabeza' : 'cabezas'} acá` : 'Todavía vacío'}
-                </p>
+                {campoEntero ? (
+                  <p className={cn('text-xs tabular-nums', totalActual > 0 ? 'font-medium text-primary' : 'text-muted-foreground')}>
+                    {totalActual > 0 ? `${totalActual} ${totalActual === 1 ? 'cabeza' : 'cabezas'}` : 'Todavía vacío'}
+                  </p>
+                ) : totalActual === 0 ? (
+                  <p className="text-xs text-muted-foreground">Todavía vacío</p>
+                ) : null}
               </div>
               {/* Una especie por vez: pestañas con el conteo de cada una. Casi
                   todos cargan sólo vacunos; las otras están a un toque. */}
@@ -1308,11 +1313,13 @@ function Logrado({ children }: { children: ReactNode }) {
  */
 function EscenaCroquis({
   etapa,
+  empresa,
   campos,
   campoActual,
   borrador,
 }: {
   etapa: Etapa
+  empresa: string
   campos: CampoCargado[]
   campoActual: CampoCargado | null
   borrador: Borrador
@@ -1371,7 +1378,7 @@ function EscenaCroquis({
                 sueltas: ultimo.sueltas,
                 estado: 'hecho',
               }
-            : { nombre: '', hectareas: null, actividad: null, potreros: [], estado: 'vacio' }
+            : { nombre: etapa === 'empresa' ? 'Tu primer campo' : '', hectareas: null, actividad: null, potreros: [], estado: 'vacio' }
 
   const partes: { etapa: Etapa; nombre: string }[] = [
     { etapa: 'campo', nombre: 'Datos' },
@@ -1417,7 +1424,7 @@ function EscenaCroquis({
               ? croquis.nombre || (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')
               : ultimo
                 ? ultimo.nombre
-                : 'Tu campo'}
+                : empresa || 'Tu empresa'}
           </span>
           <ChipActividad actividad={croquis.actividad} />
           {enCampo ? (
