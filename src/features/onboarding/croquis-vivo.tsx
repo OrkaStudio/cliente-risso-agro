@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ActividadCampo } from '@/features/campos/api'
-import { categoriasPorEspecie } from '@/features/hacienda/labels'
+import { categoriasPorEspecie, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 import {
   estiloDeCategoria,
   totalCabezas,
@@ -26,12 +26,32 @@ import { cn } from '@/lib/utils'
 
 const ACTIVIDAD_NOMBRE: Record<ActividadCampo, string> = { ganadera: 'Ganadera', agricola: 'Agrícola', mixta: 'Mixta' }
 
-/** La marca de una categoría, centrada en (0,0). Se usa en el croquis y en la leyenda. */
+/**
+ * Siluetas de perfil, mirando a la derecha, en una caja de 20×14 centrada en
+ * (0,0). Dibujadas a mano porque lucide no tiene animales de campo. Tienen
+ * que leerse a 14 px: cuerpo, cabeza y patas, nada más.
+ */
+const SILUETA: Record<Especie, string> = {
+  // Vaca: cuerpo rectangular, cabeza baja con cuernos, cuatro patas, cola.
+  bovino:
+    'M-6.8 -3.5 h10.6 a2.2 2.2 0 0 1 2.2 2.2 v2.5999999999999996 a2.2 2.2 0 0 1 -2.2 2.2 h-10.6 a2.2 2.2 0 0 1 -2.2 -2.2 v-2.5999999999999996 a2.2 2.2 0 0 1 2.2 -2.2 z M5.8 -6 h3.4 a1.3 1.3 0 0 1 1.3 1.3 v2.6 a1.3 1.3 0 0 1 -1.3 1.3 h-3.4 a1.3 1.3 0 0 1 -1.3 -1.3 v-2.6 a1.3 1.3 0 0 1 1.3 -1.3 z M5.2 -6 l-0.8 -2 l1.8 0.6 z M9.6 -6 l0.9 -2 l-1.8 0.6 z M-7.6 3.3 h1.5 v3.7 h-1.5 z M-4.6 3.3 h1.5 v3.7 h-1.5 z M1.2 3.3 h1.5 v3.7 h-1.5 z M4 3.3 h1.5 v3.7 h-1.5 z M-2.8 3.6 a1.3 1.3 0 1 1 2.6 0 a1.3 1.3 0 1 1 -2.6 0 z M-9 -2.6 l-1.7 4.8 l1 0.35 l1.6 -4.5 z',
+  // Oveja: cuerpo redondo de lana, cabeza chica y oscura, patas finas.
+  ovino:
+    'M-5.1 -4 h7.7 a3.4 3.4 0 0 1 3.4 3.4 v0.7000000000000002 a3.4 3.4 0 0 1 -3.4 3.4 h-7.7 a3.4 3.4 0 0 1 -3.4 -3.4 v-0.7000000000000002 a3.4 3.4 0 0 1 3.4 -3.4 z M-6.9 -4.2 a2.7 2.7 0 1 1 5.4 0 a2.7 2.7 0 1 1 -5.4 0 z M-1.9000000000000001 -4.6 a3.1 3.1 0 1 1 6.2 0 a3.1 3.1 0 1 1 -6.2 0 z M-3.2 -3.6 a2.4 2.4 0 1 1 4.8 0 a2.4 2.4 0 1 1 -4.8 0 z M6.199999999999999 -2.4 h2.3999999999999995 a1.6 1.6 0 0 1 1.6 1.6 v1.3999999999999995 a1.6 1.6 0 0 1 -1.6 1.6 h-2.3999999999999995 a1.6 1.6 0 0 1 -1.6 -1.6 v-1.3999999999999995 a1.6 1.6 0 0 1 1.6 -1.6 z M-6.4 3.2 h1.3 v3.8 h-1.3 z M-3.4 3.2 h1.3 v3.8 h-1.3 z M0.6 3.2 h1.3 v3.8 h-1.3 z M3.6 3.2 h1.3 v3.8 h-1.3 z',
+  // Caballo: cuerpo alargado, cuello alto, cabeza, patas largas, cola.
+  equino:
+    'M-7.0 -3 h9.0 a2.5 2.5 0 0 1 2.5 2.5 v1.4000000000000004 a2.5 2.5 0 0 1 -2.5 2.5 h-9.0 a2.5 2.5 0 0 1 -2.5 -2.5 v-1.4000000000000004 a2.5 2.5 0 0 1 2.5 -2.5 z M1.2 -2.6 L4.6 -9.2 L7.6 -9.8 L11.2 -8.2 L10.6 -6.6 L8.2 -6.9 L7 -2.6 z M5.6 -9.4 l0.5 -1.8 l1.3 1.3 z M4.6 -9.2 L3 -9.6 L0.2 -3.6 L1.6 -3 z M-8 3 h1.4 v4.6 h-1.4 z M-5 3 h1.4 v4.6 h-1.4 z M0 3 h1.4 v4.6 h-1.4 z M2.8 3 h1.4 v4.6 h-1.4 z M-9.4 -2 l-2.2 5.4 l1.1 0.4 l2 -5 z',
+}
+
+/**
+ * La marca de una categoría, centrada en (0,0): la silueta de su especie en
+ * el color de la especie; el rol va por tamaño — la cría chica, el macho más
+ * corpulento que la hembra. Se usa en el croquis y en la leyenda.
+ */
 export function MarcaCategoria({ categoria }: { categoria: Categoria }) {
   const { color, rol } = estiloDeCategoria(categoria)
-  if (rol === 'macho') return <path d="M0 -3.6 L3.6 0 L0 3.6 L-3.6 0 Z" fill={color} />
-  if (rol === 'cria') return <circle r={1.8} fill={color} />
-  return <circle r={2.9} fill={color} />
+  const escala = rol === 'cria' ? 0.6 : rol === 'macho' ? 1.08 : 0.92
+  return <path d={SILUETA[especiePorCategoria[categoria]]} fill={color} transform={`scale(${escala})`} />
 }
 
 export type CampoCroquis = {
@@ -84,11 +104,13 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
  * hasta lo que entra en el potrero.
  */
 function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number; categoria: Categoria }[] {
-  const paso = 9
-  const x0 = r.x + 8
-  const y0 = r.y + 24 // debajo de la etiqueta
-  const cols = Math.max(0, Math.floor((r.w - 16) / paso))
-  const filas = Math.max(0, Math.floor((r.h - 30) / paso))
+  // Una silueta cada 5 cabezas, en una grilla de 22×20 (la caja de 20×14 más aire).
+  const pasoX = 22
+  const pasoY = 20
+  const x0 = r.x + 12
+  const y0 = r.y + 26 // debajo de la etiqueta
+  const cols = Math.max(0, Math.floor((r.w - 20) / pasoX))
+  const filas = Math.max(0, Math.floor((r.h - 32) / pasoY))
   const capacidad = cols * filas
   const out: { cx: number; cy: number; categoria: Categoria }[] = []
   // Cada especie arranca en su propia fila: la tira no mezcla vacas con
@@ -101,7 +123,7 @@ function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number
     for (const c of cats) {
       for (let k = 0; k < Math.max(1, Math.ceil((cabezas[c] ?? 0) / 5)); k++) {
         if (i >= capacidad) return out
-        out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3, categoria: c })
+        out.push({ cx: x0 + (i % cols) * pasoX + 10, cy: y0 + Math.floor(i / cols) * pasoY + 7, categoria: c })
         i++
       }
     }
