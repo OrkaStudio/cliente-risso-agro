@@ -99,7 +99,7 @@ function composTexto(t: TropaDelPotrero): string {
 /** Fila de "cuántos se mueven" de una categoría: stepper −/+ que llena el
  *  ancho, con el máximo disponible y un atajo "Todas". Se puede tipear también.
  */
-function CantidadRow({
+export function CantidadRow({
   label,
   hay,
   value,

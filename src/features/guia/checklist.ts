@@ -121,11 +121,17 @@ export function useChecklist() {
         {
           id: 'tropas',
           titulo: 'Ubicá las tropas',
-          detalle: 'Cada tropa en su potrero, tocando el mapa.',
-          cta: 'Ver el mapa',
-          ruta: '/campos',
-          accion: null,
-          hecho: ubicados >= 1,
+          // Con animales sin potrero (cargados en el onboarding antes que los
+          // potreros) el camino es Hacienda → "Ubicar en un potrero"; el mapa
+          // sólo mueve desde un potrero de origen.
+          detalle:
+            activos > ubicados
+              ? `${activos - ubicados} ${activos - ubicados === 1 ? 'animal' : 'animales'} sin potrero: poné cada uno en el suyo.`
+              : 'Cada tropa en su potrero, tocando el mapa.',
+          cta: activos > ubicados ? 'Ubicarlos' : 'Ver el mapa',
+          ruta: activos > ubicados ? '/hacienda' : '/campos',
+          accion: activos > ubicados ? 'hacienda-ubicar' : null,
+          hecho: activos >= 1 && ubicados === activos,
         },
         {
           id: 'recorrida',

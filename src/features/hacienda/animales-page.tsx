@@ -6,6 +6,7 @@ import {
   HeartPulse,
   Layers,
   LogOut,
+  MapPinned,
   Scissors,
   Search,
   Stethoscope,
@@ -34,7 +35,9 @@ import {
   type Senal,
 } from '@/features/hacienda/senales'
 import { CrearAnimalDialog } from '@/features/hacienda/crear-animal-dialog'
+import { UbicarAnimalesDialog } from '@/features/hacienda/ubicar-animales-dialog'
 import { DarBajaDialog } from '@/features/hacienda/acciones-animal'
+import { Button } from '@/components/ui/button'
 import { Contador } from '@/components/contador'
 import { Panel } from '@/components/panel'
 import { PageHeader, Stat } from '@/components/page-header'
@@ -113,6 +116,9 @@ export function AnimalesPage() {
   )
   const [senalF, setSenalF] = useState<Senal | null>(null)
   const [view, setView] = useState<'tabla' | 'potrero'>('tabla')
+  // Los activos sin potrero (onboarding sin potreros, carga sin destino):
+  // el único camino para ubicarlos es este diálogo.
+  const [ubicando, setUbicando] = useState(false)
 
   const potreroNombre = useMemo(
     () => new Map((potreros.data ?? []).map((p) => [p.id, p.nombre])),
@@ -125,6 +131,10 @@ export function AnimalesPage() {
   )
 
   const todos = useMemo(() => animales.data ?? [], [animales.data])
+  const sinPotrero = useMemo(
+    () => todos.filter((a) => a.estado === 'activo' && !a.potrero_id),
+    [todos],
+  )
 
   // Alcance del apartado: si hay un campo elegido, todo (stock, conteos y
   // tabla) se acota a los animales de ese campo.
@@ -225,7 +235,8 @@ export function AnimalesPage() {
   }, [lista, q, catF, estF, potF, soloSinCaravana, senalF, senalesPorAnimal])
 
   const potrerosConAnimales = useMemo(
-    () => new Set(lista.filter((a) => a.estado === 'activo').map((a) => a.potrero_id)).size,
+    () =>
+      new Set(lista.filter((a) => a.estado === 'activo' && a.potrero_id).map((a) => a.potrero_id)).size,
     [lista],
   )
 
@@ -252,6 +263,26 @@ export function AnimalesPage() {
           </div>
         }
       />
+
+      {sinPotrero.length > 0 && (
+        <div
+          data-guia="hacienda-ubicar"
+          className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 dark:border-amber-500/40 dark:bg-amber-950/30"
+        >
+          <MapPinned className="size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+          <p className="min-w-0 flex-1 text-[13px] leading-snug text-ink">
+            <span className="font-semibold">
+              {sinPotrero.length} {sinPotrero.length === 1 ? 'animal' : 'animales'} sin potrero.
+            </span>{' '}
+            Cargados antes de tener los potreros: ubicalos en el suyo para que la Recorrida y la
+            Manga los encuentren.
+          </p>
+          <Button size="sm" onClick={() => setUbicando(true)}>
+            Ubicar en un potrero
+          </Button>
+        </div>
+      )}
+      <UbicarAnimalesDialog open={ubicando} onOpenChange={setUbicando} animales={sinPotrero} />
 
       {/* Stock por categoría + Señales del rodeo */}
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">

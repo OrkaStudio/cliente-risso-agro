@@ -66,6 +66,8 @@ type CampoCargado = {
   lon: number
   hectareas: number
   potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorEspecie }[]
+  /** Hacienda cargada sin potrero (el campo entero). */
+  sueltas?: CabezasPorEspecie
   cabezas: number
 }
 
@@ -85,6 +87,9 @@ type Borrador = {
   /** Por potrero, cabezas por especie: el croquis las dibuja distinto. */
   cabezas: Record<string, CabezasPorEspecie>
 }
+/** Clave del pseudo-potrero "todo el campo" en la hacienda sin potreros. */
+const TODO_EL_CAMPO = '__campo__'
+
 const BORRADOR_VACIO: Borrador = {
   campo: { nombre: '', hectareas: null, actividad: null },
   potreros: [],
@@ -267,8 +272,10 @@ export function OnboardingPage() {
                 setBorrador(BORRADOR_VACIO)
                 const c = { ...campoActual, potreros }
                 setCampoActual(c)
-                // Sin hacienda que cargar (agrícola o sin potreros) → ¿otro campo?
-                if (c.actividad === 'agricola' || potreros.length === 0) {
+                // Sólo el campo agrícola se salta la hacienda. Sin potreros
+                // igual se pide: las cabezas son el dato que más vale, y
+                // después las ubica desde Hacienda.
+                if (c.actividad === 'agricola') {
                   setCampos((xs) => [...xs, c])
                   setCampoActual(null)
                   setEtapa('otro')
@@ -283,10 +290,11 @@ export function OnboardingPage() {
         {etapa === 'hacienda' && empresaId && campoActual && (
           <Paso key={`hacienda-${campoActual.id}`}>
             <Logrado>
-              {campoActual.potreros.length === 1
-                ? '1 potrero'
-                : `${campoActual.potreros.length} potreros`}{' '}
-              en {campoActual.nombre}
+              {campoActual.potreros.length === 0
+                ? `${campoActual.nombre} guardado`
+                : campoActual.potreros.length === 1
+                  ? `1 potrero en ${campoActual.nombre}`
+                  : `${campoActual.potreros.length} potreros en ${campoActual.nombre}`}
             </Logrado>
             <PasoHacienda
               empresaId={empresaId}
@@ -302,6 +310,7 @@ export function OnboardingPage() {
                     ...campoActual,
                     cabezas,
                     potreros: campoActual.potreros.map((p) => ({ ...p, cabezas: porPotrero[p.id] ?? {} })),
+                    sueltas: porPotrero[TODO_EL_CAMPO],
                   },
                 ])
                 setCampoActual(null)
@@ -407,15 +416,29 @@ export function OnboardingPage() {
             <div className="mt-5 flex items-start gap-3 rounded-lg bg-primary/5 px-3.5 py-3">
               <PencilRuler className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
               <div className="text-sm">
-                <p className="font-medium">Lo que sigue: dibujar los potreros sobre el satélite</p>
-                <p className="text-xs text-muted-foreground">
-                  Cinco minutos, en la compu. Elegís cada potrero de la lista y lo marcás.
-                </p>
+                {primero.potreros.length > 0 ? (
+                  <>
+                    <p className="font-medium">Lo que sigue: dibujar los potreros sobre el satélite</p>
+                    <p className="text-xs text-muted-foreground">
+                      Cinco minutos, en la compu. Elegís cada potrero de la lista y lo marcás.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">Lo que sigue: cargar los potreros de {primero.nombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Número y hectáreas de cada uno, desde Campos.
+                      {primero.cabezas > 0
+                        ? ` Después ubicás las ${primero.cabezas} cabezas en el suyo desde Hacienda.`
+                        : ''}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             <div className="mt-4 grid gap-2">
               <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos?campo=${primero.id}`)}>
-                Ir a dibujar mis potreros
+                {primero.potreros.length > 0 ? 'Ir a dibujar mis potreros' : 'Ir a cargar mis potreros'}
               </Button>
               <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
                 Ver el inicio
@@ -957,10 +980,15 @@ function PasoHacienda({
   onBorrador: (cabezas: Record<string, CabezasPorEspecie>) => void
   onListo: (cabezas: number, porPotrero: Record<string, CabezasPorEspecie>) => void
 }) {
-  const potreros = campo.potreros
   // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
   // recorre un potrero por vez — fichas arriba, el activo abajo — y se
-  // guarda todo junto al final.
+  // guarda todo junto al final. Sin potreros (los dejó para después), el
+  // lugar es el campo entero: se guardan sin potrero, con el campo en el
+  // contexto del alta, y las ubica después desde Hacienda.
+  const campoEntero = campo.potreros.length === 0
+  const potreros: CampoCargado['potreros'] = campoEntero
+    ? [{ id: TODO_EL_CAMPO, nombre: campo.nombre, hectareas: campo.hectareas, cabezas: {} }]
+    : campo.potreros
   const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>({})
   const [especies, setEspecies] = useState<Record<string, Especie[]>>({})
   const [indice, setIndice] = useState(0)
@@ -1002,13 +1030,15 @@ function PasoHacienda({
       if (items.length === 0) continue
       const { error } = await supabase.rpc('crear_animales_masivo', {
         p_empresa_id: empresaId,
-        p_potrero_id: p.id,
+        p_potrero_id: p.id === TODO_EL_CAMPO ? undefined : p.id,
         p_items: items,
         p_origen: 'onboarding',
+        // Sin potrero, que quede dicho de qué campo son.
+        p_contexto: p.id === TODO_EL_CAMPO ? { campo_id: campo.id, campo: campo.nombre } : undefined,
       })
       if (error) {
         setOcupado(false)
-        setError(`Potrero ${p.nombre}: ${error.message}`)
+        setError(`${p.id === TODO_EL_CAMPO ? campo.nombre : `Potrero ${p.nombre}`}: ${error.message}`)
         return
       }
     }
@@ -1021,14 +1051,18 @@ function PasoHacienda({
       <AuthHeading
         icono={Beef}
         titulo={`La hacienda de ${campo.nombre}`}
-        subtitulo="Un potrero por vez: cuántas cabezas hay hoy en cada uno. Si está vacío, pasás al siguiente."
+        subtitulo={
+          campoEntero
+            ? 'Cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las ubicás en cada uno desde Hacienda.'
+            : 'Un potrero por vez: cuántas cabezas hay hoy en cada uno. Si está vacío, pasás al siguiente.'
+        }
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         {/* Las fichas: dónde estoy, qué hice, cuánto llevo. */}
         <Reveal delay={0.14}>
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              Potrero {indice + 1} de {potreros.length}
+              {campoEntero ? 'Todo el campo' : `Potrero ${indice + 1} de ${potreros.length}`}
             </p>
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.span
@@ -1043,7 +1077,7 @@ function PasoHacienda({
               </motion.span>
             </AnimatePresence>
           </div>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <div className={cn('mt-2.5 flex flex-wrap gap-1.5', campoEntero && 'hidden')}>
             {potreros.map((p, i) => {
               const t = totalDe(porPotrero[p.id])
               const visto = vistos.includes(p.id)
@@ -1089,7 +1123,7 @@ function PasoHacienda({
             >
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-[15px] font-semibold">
-                  Potrero {actual.nombre}
+                  {campoEntero ? campo.nombre : `Potrero ${actual.nombre}`}
                   {actual.hectareas ? (
                     <span className="ml-1.5 text-xs font-normal text-muted-foreground">{ha(actual.hectareas)} ha</span>
                   ) : null}
@@ -1294,6 +1328,7 @@ function EscenaCroquis({
                 hectareas: p.hectareas,
                 cabezas: borrador.cabezas[p.id] ?? {},
               })),
+              sueltas: borrador.cabezas[TODO_EL_CAMPO],
               estado: 'hacienda',
             }
           : ultimo
@@ -1307,6 +1342,7 @@ function EscenaCroquis({
                   hectareas: p.hectareas,
                   cabezas: p.cabezas,
                 })),
+                sueltas: ultimo.sueltas,
                 estado: 'hecho',
               }
             : { nombre: '', hectareas: null, actividad: null, potreros: [], estado: 'vacio' }
@@ -1317,8 +1353,11 @@ function EscenaCroquis({
     ...(croquis.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
   ]
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
-  const cabezasCroquis = croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0)
-  const especiesCroquis = ESPECIES.filter((e) => croquis.potreros.some((p) => (p.cabezas[e] ?? 0) > 0))
+  const cabezasCroquis =
+    croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0) + totalCabezas(croquis.sueltas ?? {})
+  const especiesCroquis = ESPECIES.filter(
+    (e) => croquis.potreros.some((p) => (p.cabezas[e] ?? 0) > 0) || (croquis.sueltas?.[e] ?? 0) > 0,
+  )
   const potrerosConHa = croquis.potreros.filter((p) => p.hectareas).length
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
@@ -1395,7 +1434,8 @@ function EscenaCroquis({
         {especiesCroquis.length > 0 && (
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             {especiesCroquis.map((e) => {
-              const n = croquis.potreros.reduce((s, p) => s + (p.cabezas[e] ?? 0), 0)
+              const n =
+                croquis.potreros.reduce((s, p) => s + (p.cabezas[e] ?? 0), 0) + (croquis.sueltas?.[e] ?? 0)
               return (
                 <span key={e} className="inline-flex items-center gap-1.5 tabular-nums">
                   <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
