@@ -143,18 +143,38 @@ export const periodoLabel: Record<Periodo, string> = {
   todo: 'Desde el inicio',
 }
 
+// Las fechas de la app son días del calendario del productor (Argentina,
+// UTC−3), no instantes. `toISOString()` las pasa por UTC: después de las 21:00
+// hora local el día ya cambió allá y el corte del período se corría un día
+// —"hasta" pasaba a ser mañana y los "últimos 12 meses" arrancaban el día 2—.
+// Por eso acá se formatea y se parsea SIEMPRE en hora local.
+
+/** Date → 'YYYY-MM-DD' en hora local (nunca vía UTC). */
+function ymd(d: Date): string {
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
+
+/** 'YYYY-MM-DD' → Date a medianoche local (`new Date(s)` la parsearía como UTC). */
+function parseYmd(s: string): Date {
+  const [a, m, d] = s.split('-').map(Number)
+  return new Date(a, m - 1, d)
+}
+
 /** [desde, hasta] en YYYY-MM-DD (hasta = hoy). 'todo' → desde null. */
 export function rangoPeriodo(p: Periodo, hoy = new Date()): {
   desde: string | null
   hasta: string
 } {
-  const hasta = hoy.toISOString().slice(0, 10)
+  const hasta = ymd(hoy)
   if (p === 'todo') return { desde: null, hasta }
   if (p === 'anio') return { desde: `${hoy.getFullYear()}-01-01`, hasta }
-  const d = new Date(hoy)
-  d.setMonth(d.getMonth() - 11)
-  d.setDate(1)
-  return { desde: d.toISOString().slice(0, 10), hasta }
+  // Se construye por (año, mes, 1) en vez de restarle meses a `hoy`: si hoy es
+  // 31, `setMonth` desborda al mes siguiente cuando el destino tiene menos días
+  // (31/01 − 11 meses caía en marzo, no en febrero).
+  const d = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1)
+  return { desde: ymd(d), hasta }
 }
 
 /** Rango equivalente ANTERIOR (para la tendencia vs período previo). */
@@ -165,17 +185,14 @@ export function rangoAnterior(p: Periodo, hoy = new Date()): {
   if (p === 'todo') return null
   const { desde, hasta } = rangoPeriodo(p, hoy)
   if (!desde) return null
-  const d1 = new Date(desde)
-  const d2 = new Date(hasta)
+  const d1 = parseYmd(desde)
+  const d2 = parseYmd(hasta)
   const dias = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86_400_000))
   const prevHasta = new Date(d1)
   prevHasta.setDate(prevHasta.getDate() - 1)
   const prevDesde = new Date(prevHasta)
   prevDesde.setDate(prevDesde.getDate() - dias)
-  return {
-    desde: prevDesde.toISOString().slice(0, 10),
-    hasta: prevHasta.toISOString().slice(0, 10),
-  }
+  return { desde: ymd(prevDesde), hasta: ymd(prevHasta) }
 }
 
 /** Fecha efectiva de un movimiento realizado (caja). */
@@ -207,7 +224,10 @@ export function serieMensualNeto(
 ): { mes: string; valor: number }[] {
   const porMes = new Map<string, number>()
   let minMes: string | null = desde ? desde.slice(0, 7) : null
-  for (const m of movs) {
+  // Filtra con el mismo criterio que el resto de la pantalla en vez de confiar
+  // en que el caller ya lo hizo: sin esto, un anulado con fecha de cobro sumaba
+  // al gráfico y un movimiento anterior a `desde` estiraba el eje hacia atrás.
+  for (const m of realizadosEnRango(movs, desde, hasta)) {
     const f = fechaCaja(m)
     if (!f) continue
     const mes = f.slice(0, 7)
@@ -240,7 +260,9 @@ export const formatARS = (n: number) => fmt.format(n)
 export function fmtCompact(n: number): string {
   const abs = Math.abs(n)
   const sign = n < 0 ? '−' : ''
-  if (abs >= 1_000_000)
+  // El corte es 999.500 y no 1.000.000: de ahí para arriba `Math.round` sobre
+  // los miles daría 1000 y se imprimía "$1000k" en vez de "$1,0M".
+  if (abs >= 999_500)
     return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
   if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
   return `${sign}$${abs}`
