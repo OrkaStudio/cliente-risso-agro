@@ -32,9 +32,11 @@ import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/lab
 import { LocalidadInput } from '@/features/campos/localidad-input'
 import { CroquisVivo, MarcaCategoria, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
 import {
-  estiloDeCategoria,
+  ESTILO_ESPECIE,
+  ROL_POR_CATEGORIA,
   totalCabezas,
   type CabezasPorCategoria,
+  type RolAnimal,
 } from '@/features/onboarding/especies-croquis'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useClima } from '@/features/cotizaciones/hooks'
@@ -947,16 +949,22 @@ function ha(n: number): string {
 // ---------------------------------------------------------------------
 
 const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
-const ORDEN_CATEGORIAS: Categoria[] = [
-  ...categoriasPorEspecie.bovino,
-  ...categoriasPorEspecie.ovino,
-  ...categoriasPorEspecie.equino,
-]
 type Cantidades = Partial<Record<Categoria, string>>
 
 function totalDe(c: Cantidades | undefined): number {
   return Object.values(c ?? {}).reduce((s, v) => s + (parseInt(v ?? '', 10) || 0), 0)
 }
+
+function totalDeEspecie(c: Cantidades | undefined, e: Especie): number {
+  return categoriasPorEspecie[e].reduce((s, cat) => s + (parseInt(c?.[cat] ?? '', 10) || 0), 0)
+}
+
+/** Los grupos de la grilla, en el mismo orden y con la misma marca que el croquis. */
+const GRUPOS_ROL: { rol: RolAnimal; nombre: string }[] = [
+  { rol: 'hembra', nombre: 'Vientres' },
+  { rol: 'cria', nombre: 'Crías' },
+  { rol: 'macho', nombre: 'Machos' },
+]
 
 function porCategoriaDe(c: Cantidades | undefined): CabezasPorCategoria {
   const out: CabezasPorCategoria = {}
@@ -992,7 +1000,7 @@ function PasoHacienda({
     ? [{ id: TODO_EL_CAMPO, nombre: campo.nombre, hectareas: campo.hectareas, cabezas: {} }]
     : campo.potreros
   const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>({})
-  const [especies, setEspecies] = useState<Record<string, Especie[]>>({})
+  const [especieActiva, setEspecieActiva] = useState<Especie>('bovino')
   const [indice, setIndice] = useState(0)
   const [vistos, setVistos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -1002,11 +1010,11 @@ function PasoHacienda({
   const totalActual = totalDe(cantActual)
   const total = potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
   const esUltimo = indice === potreros.length - 1
-  const especiesActual = especies[actual.id] ?? ['bovino']
 
   function irA(i: number) {
     setVistos((v) => (v.includes(actual.id) ? v : [...v, actual.id]))
     setIndice(i)
+    setEspecieActiva('bovino')
     setError(null)
   }
 
@@ -1134,73 +1142,89 @@ function PasoHacienda({
                   {totalActual > 0 ? `${totalActual} ${totalActual === 1 ? 'cabeza' : 'cabezas'} acá` : 'Todavía vacío'}
                 </p>
               </div>
-              <div className="mt-3 grid gap-3">
-                {ESPECIES.filter((e) => especiesActual.includes(e)).map((e) => (
-                  <div key={e}>
-                    {e !== 'bovino' && (
-                      <p className="mb-1.5 text-xs font-semibold text-foreground">{especieLabel[e]}s</p>
-                    )}
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                      {categoriasPorEspecie[e].map((c, k) => (
-                        <label key={c} className="grid gap-1">
-                          <span className="truncate text-xs text-muted-foreground">{categoriaLabel[c]}</span>
-                          <Input
-                            inputMode="numeric"
-                            value={cantActual[c] ?? ''}
-                            autoFocus={e === 'bovino' && k === 0}
-                            onChange={(ev) => {
-                              setError(null)
-                              const next = {
-                                ...porPotrero,
-                                [actual.id]: {
-                                  ...(porPotrero[actual.id] ?? {}),
-                                  [c]: ev.target.value.replace(/\D/g, ''),
-                                },
-                              }
-                              setPorPotrero(next)
-                              onBorrador(
-                                Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(next[p.id])])),
-                              )
-                            }}
-                            placeholder="0"
-                            className="px-2.5 tabular-nums"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {/* Otras especies: se suman (o se quitan) con un toque. */}
-                <div className="flex flex-wrap gap-1.5">
-                  {ESPECIES.filter((e) => e !== 'bovino').map((e) => {
-                    const on = especiesActual.includes(e)
+              {/* Una especie por vez: pestañas con el conteo de cada una. Casi
+                  todos cargan sólo vacunos; las otras están a un toque. */}
+              <div className="mt-3 flex gap-1 rounded-lg bg-secondary p-1" role="tablist" aria-label="Especie">
+                {ESPECIES.map((e) => {
+                  const t = totalDeEspecie(cantActual, e)
+                  const activa = especieActiva === e
+                  return (
+                    <button
+                      key={e}
+                      type="button"
+                      role="tab"
+                      aria-selected={activa}
+                      onClick={() => setEspecieActiva(e)}
+                      className={cn(
+                        'flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors',
+                        activa ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <span
+                        className="inline-block size-2 rounded-full"
+                        style={{ background: ESTILO_ESPECIE[e].color, opacity: activa || t > 0 ? 1 : 0.35 }}
+                      />
+                      {especieLabel[e]}s
+                      {t > 0 && <span className="tabular-nums text-primary">{t}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Las categorías, agrupadas como en el croquis: vientres · crías · machos. */}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={especieActiva}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="mt-3 grid gap-3"
+                >
+                  {GRUPOS_ROL.map(({ rol, nombre }) => {
+                    const cats = categoriasPorEspecie[especieActiva].filter((c) => ROL_POR_CATEGORIA[c] === rol)
+                    if (cats.length === 0) return null
                     return (
-                      <button
-                        key={e}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() =>
-                          setEspecies((x) => ({
-                            ...x,
-                            [actual.id]: on
-                              ? especiesActual.filter((y) => y !== e)
-                              : [...especiesActual, e],
-                          }))
-                        }
-                        className={cn(
-                          'inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
-                          on
-                            ? 'border-primary/40 bg-primary/10 text-primary'
-                            : 'border-border text-muted-foreground hover:border-ring',
-                        )}
-                      >
-                        {on ? <Check className="size-3" strokeWidth={3} /> : <Plus className="size-3" strokeWidth={2.5} />}
-                        {especieLabel[e]}s
-                      </button>
+                      <div key={rol} className="grid gap-1.5">
+                        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
+                            <MarcaCategoria categoria={cats[0]!} />
+                          </svg>
+                          {nombre}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {cats.map((c, k) => (
+                            <label key={c} className="grid gap-1">
+                              <span className="truncate text-xs text-muted-foreground">{categoriaLabel[c]}</span>
+                              <Input
+                                inputMode="numeric"
+                                value={cantActual[c] ?? ''}
+                                autoFocus={rol === 'hembra' && k === 0}
+                                onChange={(ev) => {
+                                  setError(null)
+                                  const next = {
+                                    ...porPotrero,
+                                    [actual.id]: {
+                                      ...(porPotrero[actual.id] ?? {}),
+                                      [c]: ev.target.value.replace(/\D/g, ''),
+                                    },
+                                  }
+                                  setPorPotrero(next)
+                                  onBorrador(
+                                    Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(next[p.id])])),
+                                  )
+                                }}
+                                placeholder="0"
+                                className="px-2.5 tabular-nums"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     )
                   })}
-                </div>
-              </div>
+                </motion.div>
+              </AnimatePresence>
             </motion.div>
           </AnimatePresence>
         </Reveal>
@@ -1357,12 +1381,16 @@ function EscenaCroquis({
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
   const cabezasCroquis =
     croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0) + totalCabezas(croquis.sueltas ?? {})
-  // Leyenda por categoría: lo que cargó, con su marca, en orden canónico.
-  const porCategoriaCroquis = new Map<Categoria, number>()
-  for (const c of ORDEN_CATEGORIAS) {
-    const n = croquis.potreros.reduce((s, p) => s + (p.cabezas[c] ?? 0), 0) + (croquis.sueltas?.[c] ?? 0)
-    if (n > 0) porCategoriaCroquis.set(c, n)
-  }
+  // Leyenda agrupada por especie, con sus categorías en orden canónico.
+  const porEspecieCroquis = ESPECIES.map((especie) => {
+    const categorias = categoriasPorEspecie[especie]
+      .map((c) => {
+        const n = croquis.potreros.reduce((s, p) => s + (p.cabezas[c] ?? 0), 0) + (croquis.sueltas?.[c] ?? 0)
+        return [c, n] as [Categoria, number]
+      })
+      .filter(([, n]) => n > 0)
+    return { especie, total: categorias.reduce((s, [, n]) => s + n, 0), categorias }
+  }).filter((e) => e.total > 0)
   const potrerosConHa = croquis.potreros.filter((p) => p.hectareas).length
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
@@ -1372,16 +1400,28 @@ function EscenaCroquis({
       <p className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[30px]">
         {etapa === 'fin' ? '¡Tu campo está armado!' : 'Armemos tu campo.'}
       </p>
+      <p className="mt-1 text-sm text-sidebar-foreground/60">
+        {etapa === 'empresa'
+          ? 'Unos minutos y estás adentro.'
+          : etapa === 'fin'
+            ? 'Lo que cargaste, dibujado.'
+            : 'Se va dibujando con lo que cargás.'}
+      </p>
 
-      {/* Dónde está: el nombre del campo y sus tres partes. */}
-      <div className="mt-4 flex min-h-6 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm lg:mt-5">
-        {enCampo ? (
-          <>
-            <span className="font-semibold">
-              {croquis.nombre || (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')}
-            </span>
-            <ChipActividad actividad={croquis.actividad} />
-            <span className="flex items-center gap-2.5 text-[13px]">
+      {/* La ficha del campo: una sola pieza sobre la escena, nada suelto. */}
+      <div className="mt-5 overflow-hidden rounded-2xl border border-sidebar-foreground/10 bg-[#0b1a10]/70 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+        {/* Encabezado: qué campo, qué actividad, en qué parte va. */}
+        <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 border-b border-sidebar-foreground/10 px-4 py-2.5">
+          <span className="font-semibold">
+            {enCampo
+              ? croquis.nombre || (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')
+              : ultimo
+                ? ultimo.nombre
+                : 'Tu campo'}
+          </span>
+          <ChipActividad actividad={croquis.actividad} />
+          {enCampo ? (
+            <span className="ml-auto flex items-center gap-2.5 text-[13px]">
               {partes.map((p, i) => {
                 const hecha = i < indiceParte
                 const enCurso = i === indiceParte
@@ -1390,9 +1430,9 @@ function EscenaCroquis({
                     key={p.etapa}
                     className={cn(
                       'inline-flex items-center gap-1 transition-colors',
-                      hecha && 'text-sidebar-foreground/80',
+                      hecha && 'text-sidebar-foreground/70',
                       enCurso && 'font-semibold text-[#e9b45f]',
-                      !hecha && !enCurso && 'text-sidebar-foreground/40',
+                      !hecha && !enCurso && 'text-sidebar-foreground/35',
                     )}
                   >
                     {hecha ? <Check className="size-3 text-primary" strokeWidth={3} /> : null}
@@ -1401,63 +1441,61 @@ function EscenaCroquis({
                 )
               })}
             </span>
-          </>
-        ) : etapa === 'empresa' ? (
-          <span className="text-sidebar-foreground/70">Unos minutos y estás adentro.</span>
-        ) : ultimo ? (
-          <>
-            <span className="font-semibold">{ultimo.nombre}</span>
-            <ChipActividad actividad={ultimo.actividad} />
-            <span className="text-[13px] text-sidebar-foreground/70">
-              {ha(ultimo.hectareas)} ha
-              {ultimo.potreros.length > 0
-                ? ` · ${ultimo.potreros.length} ${ultimo.potreros.length === 1 ? 'potrero' : 'potreros'}`
-                : ''}
-            </span>
-          </>
-        ) : null}
-      </div>
+          ) : ultimo ? (
+            <span className="ml-auto text-[13px] text-sidebar-foreground/60">{ha(ultimo.hectareas)} ha</span>
+          ) : null}
+        </div>
 
-      <div className="mt-3">
-        <CroquisVivo campo={croquis} />
-      </div>
+        <div className="px-3 pt-3">
+          <CroquisVivo campo={croquis} />
+        </div>
 
-      {/* Lo que lleva cargado, en una línea bajo el croquis. */}
-      <div className="mt-2 min-h-5 text-[13px] text-sidebar-foreground/70">
-        <p>
-          {nPotreros > 0 ? `${nPotreros} ${nPotreros === 1 ? 'potrero' : 'potreros'}` : ''}
-          {cabezasCroquis > 0 && (
-            <>
-              {nPotreros > 0 ? ' · ' : ''}
-              <span className="font-semibold tabular-nums text-sidebar-foreground">
-                {cabezasCroquis} cabezas
-              </span>
-            </>
+        {/* Totales y leyenda: cifras grandes, categorías agrupadas por especie. */}
+        <div className="px-4 pb-3.5 pt-2">
+          <div className="flex items-baseline gap-5">
+            <Cifra valor={croquis.hectareas ? ha(croquis.hectareas) : '—'} unidad="ha" />
+            <Cifra valor={nPotreros > 0 ? String(nPotreros) : '—'} unidad={nPotreros === 1 ? 'potrero' : 'potreros'} />
+            <Cifra
+              valor={cabezasCroquis > 0 ? String(cabezasCroquis) : '—'}
+              unidad={cabezasCroquis === 1 ? 'cabeza' : 'cabezas'}
+              acento={cabezasCroquis > 0}
+            />
+          </div>
+          {porEspecieCroquis.length > 0 && (
+            <ul className="mt-2.5 grid gap-1 border-t border-sidebar-foreground/10 pt-2.5 text-[12.5px]">
+              {porEspecieCroquis.map(({ especie, total, categorias }) => (
+                <li key={especie} className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                  <span className="inline-flex w-[104px] shrink-0 items-center gap-1.5 font-semibold tabular-nums">
+                    <span
+                      className="inline-block size-2 rounded-full"
+                      style={{ background: ESTILO_ESPECIE[especie].color }}
+                    />
+                    {total} {ESTILO_ESPECIE[especie].nombre}
+                  </span>
+                  <span className="flex flex-wrap gap-x-2.5 text-sidebar-foreground/70">
+                    {categorias.map(([c, n]) => (
+                      <span key={c} className="inline-flex items-center gap-1 tabular-nums">
+                        <svg width="9" height="9" viewBox="-5 -5 10 10" aria-hidden>
+                          <MarcaCategoria categoria={c} />
+                        </svg>
+                        {n} {categoriaNombre(c, n).toLowerCase()}
+                      </span>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
-        </p>
-        {/* Leyenda: sólo las categorías que hay. */}
-        {porCategoriaCroquis.size > 0 && (
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            {[...porCategoriaCroquis.entries()].map(([c, n]) => (
-              <span key={c} className="inline-flex items-center gap-1.5 tabular-nums">
-                <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
-                  <MarcaCategoria categoria={c} />
-                </svg>
-                <span style={{ color: estiloDeCategoria(c).color }}>{n}</span>{' '}
-                {categoriaNombre(c, n).toLowerCase()}
-              </span>
-            ))}
-          </p>
-        )}
+        </div>
       </div>
 
       {/* Los campos ya terminados, cuando no son el que se ve. */}
       {anteriores.length > 0 && (
-        <ol className="mt-4 flex flex-wrap gap-1.5">
+        <ol className="mt-3 flex flex-wrap gap-1.5">
           {anteriores.map((c) => (
             <li
               key={c.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-sidebar-foreground/15 bg-sidebar px-2.5 py-1 text-xs text-sidebar-foreground/85 shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-sidebar-foreground/15 bg-[#0b1a10]/70 px-2.5 py-1 text-xs text-sidebar-foreground/85"
             >
               <Check className="size-3 text-primary" strokeWidth={3} />
               {c.nombre}
@@ -1469,6 +1507,16 @@ function EscenaCroquis({
         </ol>
       )}
     </div>
+  )
+}
+
+/** Una cifra de la ficha: número grande, unidad chica. */
+function Cifra({ valor, unidad, acento = false }: { valor: string; unidad: string; acento?: boolean }) {
+  return (
+    <span className="inline-flex items-baseline gap-1 tabular-nums">
+      <span className={cn('text-[19px] font-semibold leading-none', acento && 'text-[#e9b45f]')}>{valor}</span>
+      <span className="text-[12px] text-sidebar-foreground/60">{unidad}</span>
+    </span>
   )
 }
 

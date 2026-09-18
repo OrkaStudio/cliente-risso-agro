@@ -24,12 +24,6 @@ import { cn } from '@/lib/utils'
  * lo que falta asignar queda rayado.
  */
 
-/** Orden canónico: vacunos, ovinos, equinos; adentro, el orden de la app. */
-const ORDEN_CATEGORIAS: Categoria[] = [
-  ...categoriasPorEspecie.bovino,
-  ...categoriasPorEspecie.ovino,
-  ...categoriasPorEspecie.equino,
-]
 const ACTIVIDAD_NOMBRE: Record<ActividadCampo, string> = { ganadera: 'Ganadera', agricola: 'Agrícola', mixta: 'Mixta' }
 
 /** La marca de una categoría, centrada en (0,0). Se usa en el croquis y en la leyenda. */
@@ -97,13 +91,19 @@ function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number
   const filas = Math.max(0, Math.floor((r.h - 30) / paso))
   const capacidad = cols * filas
   const out: { cx: number; cy: number; categoria: Categoria }[] = []
-  for (const c of ORDEN_CATEGORIAS) {
-    const n = cabezas[c] ?? 0
-    if (n <= 0) continue
-    for (let k = 0; k < Math.max(1, Math.ceil(n / 5)); k++) {
-      const i = out.length
-      if (i >= capacidad) return out
-      out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3, categoria: c })
+  // Cada especie arranca en su propia fila: la tira no mezcla vacas con
+  // ovejas, se lee por bloques.
+  let i = 0
+  for (const especie of ['bovino', 'ovino', 'equino'] as const) {
+    const cats = categoriasPorEspecie[especie].filter((c) => (cabezas[c] ?? 0) > 0)
+    if (cats.length === 0) continue
+    if (i % cols !== 0) i += cols - (i % cols)
+    for (const c of cats) {
+      for (let k = 0; k < Math.max(1, Math.ceil((cabezas[c] ?? 0) / 5)); k++) {
+        if (i >= capacidad) return out
+        out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3, categoria: c })
+        i++
+      }
     }
   }
   return out

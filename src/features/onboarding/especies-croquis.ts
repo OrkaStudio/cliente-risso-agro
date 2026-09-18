@@ -18,13 +18,13 @@ export function totalCabezas(c: CabezasPorCategoria): number {
 }
 
 /**
- * Cada especie con su color: vacunos ámbar, ovinos crema (la lana), equinos
+ * Cada especie con su color: bovinos ámbar, ovinos crema (la lana), equinos
  * castaño. La FORMA dice el rol dentro de la especie — la hembra adulta es
  * el círculo (la base del rodeo), el macho el rombo, la cría un punto chico.
  * Con color + forma se lee de un vistazo; la leyenda por categoría confirma.
  */
 export const ESTILO_ESPECIE: Record<Especie, { color: string; nombre: string }> = {
-  bovino: { color: '#e9b45f', nombre: 'vacunos' },
+  bovino: { color: '#e9b45f', nombre: 'bovinos' },
   ovino: { color: '#f1ebd9', nombre: 'ovinos' },
   equino: { color: '#d98a5a', nombre: 'equinos' },
 }
