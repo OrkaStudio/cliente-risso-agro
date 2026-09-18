@@ -102,6 +102,18 @@ export function useMoverAnimales() {
   })
 }
 
+export function useUbicarAnimales() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.ubicarAnimales,
+    onSuccess: () => {
+      invalidarStock(qc)
+      qc.invalidateQueries({ queryKey: ['eventos'] })
+      qc.invalidateQueries({ queryKey: ['asistente-checklist'] })
+    },
+  })
+}
+
 export function useRegistrarEvento(animalId: string) {
   const qc = useQueryClient()
   return useMutation({

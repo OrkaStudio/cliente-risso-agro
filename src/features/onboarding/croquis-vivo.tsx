@@ -38,6 +38,8 @@ export type CampoCroquis = {
   /** Qué se hace en el campo: cambia la textura de los potreros. */
   actividad: ActividadCampo | null
   potreros: PotreroCroquis[]
+  /** Hacienda sin potrero: se dibuja suelta dentro del contorno. */
+  sueltas?: CabezasPorEspecie
   /** Qué se está dibujando ahora: cambia el acento del croquis. */
   estado: 'vacio' | 'campo' | 'potreros' | 'hacienda' | 'hecho'
 }
@@ -315,6 +317,27 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           </motion.g>
         )}
       </AnimatePresence>
+
+      {/* Hacienda sin potrero: cae suelta dentro del contorno, bajo el nombre. */}
+      {conHa.length === 0 &&
+        puntos(
+          {
+            x: interior.x + 6,
+            y: interior.y + ALTO / 2 + 2,
+            w: interior.w - 12,
+            h: interior.y + interior.h - (interior.y + ALTO / 2 + 2),
+          }, campo.sueltas ?? {}).map(
+          (pt, i) => (
+            <motion.g
+              key={`suelta-${pt.especie}-${i}`}
+              initial={{ scale: 0, opacity: 0, x: pt.cx, y: pt.cy }}
+              animate={{ scale: 1, opacity: 0.95, x: pt.cx, y: pt.cy }}
+              transition={{ type: 'spring', stiffness: 500, damping: 22, delay: Math.min(i, 24) * 0.02 }}
+            >
+              <MarcaEspecie especie={pt.especie} />
+            </motion.g>
+          ),
+        )}
 
       {/* Sin potreros todavía: el nombre y las hectáreas, grandes, en el medio. */}
       {conHa.length === 0 && (

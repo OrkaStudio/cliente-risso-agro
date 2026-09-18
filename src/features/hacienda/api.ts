@@ -394,3 +394,24 @@ export async function registrarEvento(input: {
   })
   if (error) throw new Error(error.message)
 }
+
+/**
+ * Ubicar animales que están SIN potrero (cargados en el onboarding antes de
+ * tener potreros, o desde Hacienda sin destino): misma RPC `mover_animales`,
+ * por ids, sin potrero de origen. Conservan su tropa. Atómico.
+ */
+export async function ubicarAnimales(input: {
+  empresaId: string
+  potreroDestinoId: string
+  animalIds: string[]
+}): Promise<number> {
+  if (input.animalIds.length === 0) throw new Error('No hay animales para ubicar')
+  const { data, error } = await supabase.rpc('mover_animales', {
+    p_empresa_id: input.empresaId,
+    p_potrero_destino: input.potreroDestinoId,
+    p_animal_ids: input.animalIds,
+    p_contexto: { tipo: 'ubicar' },
+  })
+  if (error) throw new Error(error.message)
+  return (data as { movidos: number }).movidos
+}
