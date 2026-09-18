@@ -10,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   Droplets,
+  Footprints,
   Grid2x2,
   LandPlot,
   PencilRuler,
@@ -28,6 +29,8 @@ import {
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
+import { crearAlquilerDeCampo, frecuenciaLabel, type Frecuencia } from '@/features/analitica/api'
+import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
 import { CroquisVivo, MarcaCategoria, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
@@ -116,6 +119,7 @@ export function OnboardingPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
   const { data: membresia, isLoading } = useEmpresa()
+  const esMovil = useIsMobile()
 
   const [etapa, setEtapa] = useState<Etapa>('empresa')
   const [ocupado, setOcupado] = useState(false)
@@ -417,9 +421,29 @@ export function OnboardingPage() {
 
             {/* UN solo siguiente paso, nombrado y con su costo en tiempo. */}
             <div className="mt-5 flex items-start gap-3 rounded-lg bg-primary/5 px-3.5 py-3">
-              <PencilRuler className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
+              {esMovil && primero.potreros.length > 0 ? (
+                <Footprints className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
+              ) : (
+                <PencilRuler className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
+              )}
               <div className="text-sm">
-                {primero.potreros.length > 0 ? (
+                {esMovil && primero.potreros.length > 0 ? (
+                  <>
+                    <p className="font-medium">Lo que sigue: probá la Recorrida</p>
+                    <p className="text-xs text-muted-foreground">
+                      Potrero por potrero, pasto y agua, desde el celular y sin señal. Dibujar los
+                      potreros sobre el satélite queda para cuando estés en la compu.
+                    </p>
+                  </>
+                ) : esMovil ? (
+                  <>
+                    <p className="font-medium">Lo que sigue: cargar los potreros, desde la compu</p>
+                    <p className="text-xs text-muted-foreground">
+                      Número y hectáreas de cada uno. Mientras tanto, el Modo Campo ya está listo en
+                      el celular.
+                    </p>
+                  </>
+                ) : primero.potreros.length > 0 ? (
                   <>
                     <p className="font-medium">Lo que sigue: dibujar los potreros sobre el satélite</p>
                     <p className="text-xs text-muted-foreground">
@@ -440,8 +464,25 @@ export function OnboardingPage() {
               </div>
             </div>
             <div className="mt-4 grid gap-2">
-              <Button className={BOTON_PRINCIPAL} onClick={() => entrar(`/campos?campo=${primero.id}`)}>
-                {primero.potreros.length > 0 ? 'Ir a dibujar mis potreros' : 'Ir a cargar mis potreros'}
+              <Button
+                className={BOTON_PRINCIPAL}
+                onClick={() =>
+                  entrar(
+                    esMovil
+                      ? primero.potreros.length > 0
+                        ? '/campo/recorrida'
+                        : '/campo'
+                      : `/campos?campo=${primero.id}`,
+                  )
+                }
+              >
+                {esMovil
+                  ? primero.potreros.length > 0
+                    ? 'Probar la Recorrida'
+                    : 'Ir al Modo Campo'
+                  : primero.potreros.length > 0
+                    ? 'Ir a dibujar mis potreros'
+                    : 'Ir a cargar mis potreros'}
               </Button>
               <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
                 Ver el inicio
@@ -481,11 +522,15 @@ function PasoCampo({
   const [actividad, setActividad] = useState<ActividadCampo | null>(null)
   const [localidad, setLocalidad] = useState<Localidad | null>(null)
   const [hectareas, setHectareas] = useState('')
+  // Alquilado: lo que paga, opcional. Si lo pone, queda como gasto recurrente.
+  const [alquilerMonto, setAlquilerMonto] = useState('')
+  const [alquilerFrecuencia, setAlquilerFrecuencia] = useState<Frecuencia>('mensual')
   const [errores, setErrores] = useState<{
     nombre?: string
     actividad?: string
     localidad?: string
     hectareas?: string
+    alquiler?: string
     general?: string
   }>({})
 
@@ -500,6 +545,9 @@ function PasoCampo({
     const ha = numeroDe(hectareas)
     if (ha === null) errs.hectareas = 'Necesitamos las hectáreas'
     else if (!Number.isFinite(ha) || ha <= 0) errs.hectareas = 'Un número mayor que cero'
+    const alquiler = tipo === 'alquilado' ? numeroDe(alquilerMonto) : null
+    if (alquiler !== null && (!Number.isFinite(alquiler) || alquiler <= 0))
+      errs.alquiler = 'Un número mayor que cero, o dejalo vacío'
     setErrores(errs)
     if (Object.keys(errs).length || !actividad || !localidad || ha === null) return
 
@@ -518,6 +566,21 @@ function PasoCampo({
           lon: localidad.lon,
         },
       })
+      // El alquiler entra como serie de cuotas del campo recién creado. Si
+      // falla, el campo ya existe: se avisa y sigue (lo carga desde Analítica).
+      if (alquiler !== null) {
+        try {
+          await crearAlquilerDeCampo({
+            empresaId,
+            campoId: id,
+            campoNombre: n,
+            monto: alquiler,
+            frecuencia: alquilerFrecuencia,
+          })
+        } catch {
+          /* el campo quedó; el alquiler se carga después */
+        }
+      }
       onListo({
         id,
         nombre: n,
@@ -655,6 +718,70 @@ function PasoCampo({
             </div>
           </div>
         </Reveal>
+
+        {/* Alquilado: lo que paga, si lo tiene a mano. Queda como gasto
+            recurrente del campo — el número que Analítica necesita para la
+            rentabilidad y que nadie vuelve a cargar después. */}
+        <AnimatePresence initial={false}>
+          {tipo === 'alquilado' && (
+            <motion.div
+              key="alquiler"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+              <div className="grid gap-1.5 rounded-lg border border-border bg-secondary/50 px-3.5 py-3">
+                <Label htmlFor="alquiler">¿Cuánto pagás de alquiler?</Label>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      id="alquiler"
+                      inputMode="decimal"
+                      className="pl-7 tabular-nums"
+                      value={alquilerMonto}
+                      onChange={(e) => {
+                        setAlquilerMonto(e.target.value)
+                        setErrores((x) => ({ ...x, alquiler: undefined }))
+                      }}
+                      placeholder="Opcional"
+                      aria-invalid={!!errores.alquiler}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 sm:flex">
+                    {(['mensual', 'trimestral', 'anual'] as Frecuencia[]).map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setAlquilerFrecuencia(f)}
+                        className={cn(
+                          'h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors',
+                          alquilerFrecuencia === f
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-input text-muted-foreground hover:border-ring',
+                        )}
+                      >
+                        {frecuenciaLabel[f]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {errores.alquiler ? (
+                  <ErrorCampo mensaje={errores.alquiler} />
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Queda como gasto fijo de este campo en Analítica y en la Agenda. Si no lo tenés a
+                    mano, lo cargás después.
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <ErrorCampo mensaje={errores.general} />
         <Reveal delay={0.32} className="mt-2 grid gap-2">
