@@ -5,6 +5,7 @@ import {
   getDolarBlue,
   getGordoActual,
   getPronostico,
+  type UbicacionClima,
 } from '@/features/cotizaciones/api'
 
 /**
@@ -21,21 +22,27 @@ export const useDolarBlue = () =>
     retry: 1,
   })
 
-/** Clima del campo principal (Open-Meteo). Cambia lento → cache 15 min. */
-export const useClima = () =>
+/**
+ * Clima del campo elegido (Open-Meteo). Cambia lento → cache 15 min. Sin
+ * ubicación (ningún campo con centro) no consulta: `data` queda undefined y
+ * la UI pide cargar la ubicación en vez de mostrar un clima ajeno.
+ */
+export const useClima = (u: UbicacionClima | null) =>
   useQuery({
-    queryKey: ['clima'],
-    queryFn: getClima,
+    queryKey: ['clima', u?.lat, u?.lon],
+    queryFn: () => getClima(u!),
+    enabled: u !== null,
     staleTime: 15 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000,
     retry: 1,
   })
 
-/** Pronóstico 7 días (Open-Meteo). Cambia poco → cache 1 h. */
-export const usePronostico = () =>
+/** Pronóstico 7 días del campo elegido (Open-Meteo). Cambia poco → cache 1 h. */
+export const usePronostico = (u: UbicacionClima | null) =>
   useQuery({
-    queryKey: ['pronostico'],
-    queryFn: getPronostico,
+    queryKey: ['pronostico', u?.lat, u?.lon],
+    queryFn: () => getPronostico(u!),
+    enabled: u !== null,
     staleTime: 60 * 60 * 1000,
     retry: 1,
   })

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowUpRight,
   Beef,
@@ -8,7 +8,9 @@ import {
   Layers,
   Map as MapIcon,
   PencilRuler,
+  MapPin,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   useCamposConPotreros,
   useCrearInfraestructura,
@@ -94,6 +96,7 @@ function vmDe(c: CampoConPotreros): CampoVM {
     tipo: c.tipo,
     hectareas: c.hectareas,
     color: colorDeCampo(c.color_idx),
+    centro: c.ubicacion.lat != null && c.ubicacion.lon != null ? { lat: c.ubicacion.lat, lon: c.ubicacion.lon } : null,
   }
 }
 
@@ -173,8 +176,14 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
   const empresaId = empresa.data?.empresa_id ?? ''
 
   const vms = campos.map(vmDe)
-  const [campoId, setCampoId] = useState(vms[0]?.id ?? '')
+  // ?campo=<id>: el onboarding manda acá con el campo recién creado.
+  const [params] = useSearchParams()
+  const pedido = params.get('campo')
+  const [campoId, setCampoId] = useState(
+    (pedido && vms.some((c) => c.id === pedido) ? pedido : vms[0]?.id) ?? '',
+  )
   const [ver, setVer] = useState(0)
+  const [marcandoContorno, setMarcandoContorno] = useState(false)
   const vm = vms.find((c) => c.id === campoId) ?? vms[0]
   const campoData = campos.find((c) => c.id === vm?.id)
 
@@ -291,13 +300,39 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
               data-guia="campos-catastro"
               className="mb-3 flex flex-wrap items-center gap-2.5"
             >
-              <CatastroDialog
-                onAplicar={(anillo: LatLng[]) => setContorno.mutate(anillo)}
-                onAplicado={() => setVer((v) => v + 1)}
-              />
-              <span className="text-[12.5px] text-muted-foreground">
-                Traé el contorno del catastro y dibujá los potreros adentro.
-              </span>
+              {/* El catastro automático es de Buenos Aires (ARBA). En otra
+                  provincia, o sin provincia cargada, el contorno se marca a
+                  mano sobre el satélite — no se promete lo que no hay. */}
+              {campoData?.ubicacion.provincia === 'Buenos Aires' || !campoData?.ubicacion.provincia ? (
+                <>
+                  <CatastroDialog
+                    onAplicar={(anillo: LatLng[]) => setContorno.mutate(anillo)}
+                    onAplicado={() => setVer((v) => v + 1)}
+                  />
+                  <span className="text-[12.5px] text-muted-foreground">
+                    {campoData?.ubicacion.provincia
+                      ? 'Con los tres números de la boleta de ARBA, el contorno se arma solo. Después dibujá los potreros adentro.'
+                      : 'Traé el contorno del catastro y dibujá los potreros adentro.'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant={marcandoContorno ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setMarcandoContorno((v) => !v)}
+                  >
+                    <MapPin className="size-4" />
+                    {marcandoContorno ? 'Cancelar' : contorno ? 'Marcar el contorno de nuevo' : 'Marcar el contorno'}
+                  </Button>
+                  <span className="text-[12.5px] text-muted-foreground">
+                    {marcandoContorno
+                      ? 'Hacé clic en las esquinas del campo y cerrá en la primera.'
+                      : `En ${campoData.ubicacion.provincia} el contorno se marca sobre el satélite. Después dibujá los potreros adentro.`}
+                  </span>
+                </>
+              )}
             </div>
             {/* Ancla del asistente: SOLO el mapa (no todo MapaVista — un ancla
                 a pantalla completa no explica nada). */}
@@ -315,7 +350,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                   campo={vm}
                   contorno={contorno}
                   potreros={potreros}
-                  onDibujarPotrero={async (nombre, poligono) => {
+                  onDibujarPotrero={async (nombre, poligono, haMedidas) => {
                     const existing = potreros.find((p) => p.nombre === nombre)
                     const id = existing
                       ? existing.id
@@ -324,13 +359,31 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                           campoId: vm.id,
                           nombre,
                           estadoCiclo: 'descanso',
+                          hectareas: haMedidas > 0 ? haMedidas : null,
                         })
                     await setPoligono.mutateAsync({ potreroId: id, poligono })
+                    // Potrero que ya existía (onboarding, con hectáreas de
+                    // memoria): el dibujo manda, las hectáreas pasan a ser las
+                    // medidas.
+                    if (existing && haMedidas > 0) {
+                      await guardarPotrero.mutateAsync({
+                        id,
+                        estadoCiclo: existing.estadoCiclo,
+                        hectareas: haMedidas,
+                        cultivo: existing.cultivo,
+                      })
+                    }
                     return id
                   }}
                   onSetPoligono={(potreroId, poligono) =>
                     setPoligono.mutate({ potreroId, poligono })
                   }
+                  onSetContorno={(anillo) => {
+                    setContorno.mutate(anillo)
+                    setVer((v) => v + 1)
+                  }}
+                  marcarContorno={marcandoContorno}
+                  onFinMarcarContorno={() => setMarcandoContorno(false)}
                   onVerPotrero={(id) => navigate(`/potrero/${id}`)}
                 />
               </Suspense>

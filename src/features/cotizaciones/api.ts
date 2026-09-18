@@ -39,16 +39,8 @@ export async function getDolarBlue(): Promise<Dolar> {
   }
 }
 
-/**
- * Ubicación del campo principal para el clima. Provisional: la tabla
- * `campo` todavía no guarda coordenadas; cuando las tenga, esto sale de la
- * empresa/campo elegido. Por ahora, Las Flores (Buenos Aires).
- */
-export const CAMPO_PRINCIPAL = {
-  nombre: 'Las Flores',
-  lat: -35.935128,
-  lon: -59.335386,
-} as const
+/** Dónde se pide el pronóstico: el centro de un campo y su nombre. */
+export type UbicacionClima = { nombre: string; lat: number; lon: number }
 
 /** Descripción corta por código WMO (open-meteo). */
 const WMO: Record<number, string> = {
@@ -100,11 +92,10 @@ export type Clima = {
 }
 
 /**
- * Clima actual + del día del campo principal vía Open-Meteo (gratis, sin
- * key). Incluye máx/mín, lluvia y aviso de helada (clave para el productor).
+ * Clima actual + del día de UN campo vía Open-Meteo (gratis, sin key). Incluye máx/mín, lluvia y aviso de helada (clave para el productor).
  */
-export async function getClima(): Promise<Clima> {
-  const { lat, lon, nombre } = CAMPO_PRINCIPAL
+export async function getClima(u: UbicacionClima): Promise<Clima> {
+  const { lat, lon, nombre } = u
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&current=temperature_2m,weather_code` +
@@ -149,10 +140,10 @@ export type DiaPronostico = {
 }
 
 /**
- * Pronóstico de 7 días del campo principal (Open-Meteo, gratis, sin key).
+ * Pronóstico de 7 días de UN campo (Open-Meteo, gratis, sin key).
  */
-export async function getPronostico(): Promise<DiaPronostico[]> {
-  const { lat, lon } = CAMPO_PRINCIPAL
+export async function getPronostico(u: UbicacionClima): Promise<DiaPronostico[]> {
+  const { lat, lon } = u
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum` +

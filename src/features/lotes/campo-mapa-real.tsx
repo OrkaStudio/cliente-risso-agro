@@ -11,6 +11,12 @@ if (typeof window !== 'undefined')
   (window as unknown as { L: typeof L }).L = L
 await import('@geoman-io/leaflet-geoman-free')
 import { toast } from 'sonner'
+import {
+  atribucionGoogle,
+  googleTilesDisponible,
+  sesionGoogle,
+  urlTilesGoogle,
+} from '@/lib/google-tiles'
 import intersect from '@turf/intersect'
 import area from '@turf/area'
 import { featureCollection, polygon as turfPolygon } from '@turf/helpers'
@@ -62,19 +68,52 @@ export function CampoMapaReal({
   onDibujarPotrero,
   onSetPoligono,
   onVerPotrero,
+  onSetContorno,
+  marcarContorno,
+  onFinMarcarContorno,
 }: {
   campo: CampoVM
   contorno: LatLng[] | null
   potreros: PotreroMapa[]
-  /** Crea (o reusa por nombre) el potrero y le guarda el polígono. Devuelve su id. */
-  onDibujarPotrero: (nombre: string, poligono: LatLng[]) => Promise<string>
+  /**
+   * Crea (o reusa por nombre) el potrero y le guarda el polígono. Devuelve su
+   * id. `haMedidas` son las hectáreas del dibujo: para un potrero que ya
+   * existía con hectáreas declaradas (onboarding), las medidas mandan.
+   */
+  onDibujarPotrero: (nombre: string, poligono: LatLng[], haMedidas: number) => Promise<string>
   /** Reemplaza/limpia el polígono de un potrero existente. */
   onSetPoligono: (potreroId: string, poligono: LatLng[] | null) => void
   onVerPotrero: (potreroId: string) => void
+  /** Guarda el contorno del campo marcado a mano (provincias sin catastro). */
+  onSetContorno?: (contorno: LatLng[]) => void
+  /** Pedido externo de "marcar el contorno": al cambiar a true arranca el dibujo. */
+  marcarContorno?: boolean
+  onFinMarcarContorno?: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const [hover, setHover] = useState<PotreroInfo | null>(null)
+  // "Faltan dibujar": el potrero elegido ANTES de dibujar (los del onboarding
+  // nacen sin polígono). El productor lo elige de la lista, no lo recuerda.
+  const [dibujando, setDibujando] = useState<PotreroMapa | null>(null)
+  const dibujandoRef = useRef<PotreroMapa | null>(null)
+  dibujandoRef.current = dibujando
+  // Contorno del campo a mano: el próximo polígono cerrado es el CONTORNO,
+  // no un potrero.
+  const marcandoContornoRef = useRef(false)
+  marcandoContornoRef.current = !!marcarContorno
+  const setContornoRef = useRef(onSetContorno)
+  setContornoRef.current = onSetContorno
+  const finContornoRef = useRef(onFinMarcarContorno)
+  finContornoRef.current = onFinMarcarContorno
+  useEffect(() => {
+    if (marcarContorno) mapRef.current?.pm.enableDraw('Polygon')
+    else mapRef.current?.pm.disableDraw()
+  }, [marcarContorno])
+  const faltanDibujar = potreros
+    .filter((p) => !p.poligono)
+    .slice()
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
 
   // Refs a los datos/callbacks para que el efecto (que corre una vez por campo)
   // siempre lea lo último sin re-montar el mapa.
@@ -95,7 +134,9 @@ export function CampoMapaReal({
     const hex = campo.color.hex
     const surcosId = `surcos-le-${campo.id}`
     const map = L.map(host, {
-      center: DEFAULT_CENTER,
+      // Sin contorno ni vista guardada, el mapa arranca en la localidad del
+      // campo (onboarding) — no en un punto fijo de la pampa.
+      center: campo.centro ? [campo.centro.lat, campo.centro.lon] : DEFAULT_CENTER,
       zoom: 13,
       zoomControl: false,
       zoomSnap: 0.5,
@@ -105,13 +146,112 @@ export function CampoMapaReal({
     })
     mapRef.current = map
 
-    L.tileLayer(IMAGERY, { maxZoom: 19, attribution: '© Esri' }).addTo(map)
+    // ---------- capas base ----------
+    // Esri arranca siempre (gratis, sin clave). maxNativeZoom 17: en la pampa
+    // (Pehuajó, Pardo…) no tiene imagen más fina y de 18 en adelante sirve un
+    // placeholder gris "Map data not yet available"; con el tope, Leaflet
+    // agranda la de 17 (borrosa, pero campo) hasta el 19 del dibujo fino.
+    const esriImagen = L.tileLayer(IMAGERY, {
+      maxZoom: 19,
+      maxNativeZoom: 17,
+      attribution: '© Esri',
+    }).addTo(map)
     // Caminos/rutas (overlay transparente) → referencia y orientación.
-    L.tileLayer(ROADS, { maxZoom: 19, opacity: 0.95 }).addTo(map)
+    const esriCaminos = L.tileLayer(ROADS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.95 }).addTo(map)
     let labels: L.TileLayer | null = L.tileLayer(LABELS, {
       maxZoom: 19,
+      maxNativeZoom: 17,
       opacity: 0.9,
     }).addTo(map)
+    let labelsUrl = LABELS
+    let labelsOpts: L.TileLayerOptions = { maxZoom: 19, maxNativeZoom: 17, opacity: 0.9 }
+    // La atribución es condición de la licencia de la imagen (Esri o Google):
+    // se achica al mínimo (sin el link ni la bandera de Leaflet), no se quita.
+    map.attributionControl.setPrefix(false)
+
+    // Google Map Tiles (si hay clave): mejor imagen en el campo argentino
+    // (zoom 19–20, vuelos recientes) y la que el productor ya conoce. Se pide
+    // la sesión y, si llega, reemplaza a Esri; si no, Esri queda. La
+    // atribución de la zona visible la exige Google: se refresca al moverse.
+    let vivo = true
+    let googleLogo: L.Control | null = null
+    // MapTiler (si hay clave y no hay Google): satélite Maxar, plan gratis sin
+    // tarjeta (100k pedidos/mes; al pasarse se frena, no cobra). Logo exigido.
+    const maptilerKey = import.meta.env.VITE_MAPTILER_KEY as string | undefined
+    if (!googleTilesDisponible() && maptilerKey) {
+      const mt = L.tileLayer(
+        `https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${maptilerKey}`,
+        { maxZoom: 21, maxNativeZoom: 20, attribution: '© MapTiler © Maxar' },
+      )
+      mt.on('load', () => {
+        if (map.hasLayer(esriImagen)) map.removeLayer(esriImagen)
+      })
+      mt.addTo(map)
+      const LogoMT = L.Control.extend({
+        onAdd() {
+          const el = L.DomUtil.create('a', 'google-logo')
+          el.href = 'https://www.maptiler.com'
+          el.target = '_blank'
+          el.rel = 'noopener'
+          el.innerHTML =
+            '<img alt="MapTiler" src="https://api.maptiler.com/resources/logo.svg" style="height:20px;opacity:.95">'
+          return el
+        },
+      })
+      googleLogo = new LogoMT({ position: 'bottomleft' }).addTo(map)
+    }
+
+    void (async () => {
+      if (!googleTilesDisponible()) return
+      const [sat, ov] = await Promise.all([sesionGoogle('satellite'), sesionGoogle('overlay')])
+      if (!vivo || !sat) return
+      const gImagen = L.tileLayer(urlTilesGoogle(sat), {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        attribution: 'Google',
+      })
+      gImagen.on('load', () => {
+        // Recién cuando Google tiene tiles en pantalla, Esri se retira.
+        if (map.hasLayer(esriImagen)) map.removeLayer(esriImagen)
+      })
+      gImagen.addTo(map)
+      if (ov) {
+        const gOverlay = L.tileLayer(urlTilesGoogle(ov), { maxZoom: 21, maxNativeZoom: 20, opacity: 0.95 })
+        gOverlay.addTo(map)
+        map.removeLayer(esriCaminos)
+        if (labels && map.hasLayer(labels)) map.removeLayer(labels)
+        labels = null
+        // El botón "Aa" pasa a prender/apagar el overlay de Google.
+        labelsUrl = urlTilesGoogle(ov)
+        labelsOpts = { maxZoom: 21, maxNativeZoom: 20, opacity: 0.95 }
+        labels = gOverlay
+      }
+      const Logo = L.Control.extend({
+        onAdd() {
+          const el = L.DomUtil.create('div', 'google-logo')
+          el.innerHTML =
+            '<img alt="Google" src="https://developers.google.com/static/maps/documentation/images/google_on_non_white.png" style="height:18px;opacity:.95">'
+          return el
+        },
+      })
+      googleLogo = new Logo({ position: 'bottomleft' }).addTo(map)
+      const refrescarAtribucion = async () => {
+        const b = map.getBounds()
+        const txt = await atribucionGoogle(sat, {
+          north: b.getNorth(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          west: b.getWest(),
+          zoom: map.getZoom(),
+        })
+        if (vivo && txt) {
+          map.attributionControl.removeAttribution('Google')
+          map.attributionControl.addAttribution(txt)
+        }
+      }
+      void refrescarAtribucion()
+      map.on('moveend', () => void refrescarAtribucion())
+    })()
 
     L.control.zoom({ position: 'topright' }).addTo(map)
 
@@ -397,6 +537,7 @@ export function CampoMapaReal({
     else {
       const b = allBounds()
       if (b && b.isValid()) map.fitBounds(b, { padding: [30, 30] })
+      else if (campo.centro) map.setView([campo.centro.lat, campo.centro.lon], 13)
     }
     lockToField()
     let prevZoom = map.getZoom()
@@ -424,7 +565,7 @@ export function CampoMapaReal({
         map.removeLayer(labels)
         btn.classList.remove('on')
       } else {
-        if (!labels) labels = L.tileLayer(LABELS, { maxZoom: 19, opacity: 0.9 })
+        if (!labels) labels = L.tileLayer(labelsUrl, labelsOpts)
         labels.addTo(map)
         btn.classList.add('on')
       }
@@ -454,10 +595,72 @@ export function CampoMapaReal({
     map.on('pm:create', (e: { layer: L.Layer }) => {
       const raw = e.layer as L.Polygon
       const pts = ringOf(raw)
+      // Marcando el contorno del campo: se guarda tal cual, sin chequeo de
+      // superposición (los potreros van adentro, no al revés).
+      if (marcandoContornoRef.current) {
+        map.removeLayer(raw)
+        setContornoRef.current?.(pts)
+        finContornoRef.current?.()
+        toast.success('Contorno guardado. Ahora dibujá los potreros adentro.')
+        return
+      }
       const clash = overlapsExisting(pts)
       if (clash) {
         map.removeLayer(raw)
         toast.error(`No puede superponerse al potrero ${clash}`)
+        return
+      }
+      const tf = toTurf(pts)
+      const haMedidas = tf ? Math.round((area(tf) / 10_000) * 10) / 10 : 0
+
+      // Elegido de "Faltan dibujar": el dibujo cae en ESE potrero (mismo id,
+      // ya tiene hectáreas y animales). Si las hectáreas medidas se alejan
+      // mucho de las declaradas, preguntamos antes — puede ser otro potrero.
+      const elegido = dibujandoRef.current
+      if (elegido) {
+        const declaradas = elegido.hectareas
+        const desvio =
+          declaradas && declaradas > 0 ? Math.abs(haMedidas - declaradas) / declaradas : 0
+        const guardarElegido = async () => {
+          try {
+            const id = await dibujarRef.current(elegido.nombre, pts, haMedidas)
+            map.removeLayer(raw)
+            map.closePopup()
+            addPotrero(id, elegido.nombre, pts)
+            selectPotrero(id)
+            setDibujando(null)
+            toast.success(
+              declaradas && Math.round(declaradas) !== Math.round(haMedidas)
+                ? `${elegido.nombre} dibujado · ${haMedidas} ha medidas (habías puesto ${declaradas})`
+                : `${elegido.nombre} dibujado · ${haMedidas} ha`,
+            )
+          } catch (err) {
+            map.removeLayer(raw)
+            setDibujando(null)
+            toast.error(`No se pudo guardar: ${(err as Error).message}`)
+          }
+        }
+        if (desvio <= 0.3) {
+          void guardarElegido()
+          return
+        }
+        // Desvío grande: confirmar en el lugar.
+        const box = L.DomUtil.create('div', 'potrero-input')
+        box.innerHTML =
+          `<label>Dibujaste ${haMedidas} ha y habías puesto ${declaradas} para ${elegido.nombre}. ¿Es este potrero?</label>` +
+          `<div class="pi-row"><button class="pi-ok" type="button" data-si>Sí, es ${elegido.nombre}</button>` +
+          `<button class="pi-ok" type="button" data-no style="background:transparent;color:inherit;border:1px solid currentColor">No, descartar</button></div>`
+        L.DomEvent.disableClickPropagation(box)
+        const popup = L.popup({ className: 'potrero-popup', closeButton: false })
+          .setLatLng(raw.getBounds().getCenter())
+          .setContent(box)
+          .openOn(map)
+        box.querySelector('[data-si]')!.addEventListener('click', () => void guardarElegido())
+        box.querySelector('[data-no]')!.addEventListener('click', () => {
+          map.closePopup(popup)
+          map.removeLayer(raw)
+          setDibujando(null)
+        })
         return
       }
       // El NÚMERO lo elige el productor (pre-cargado con el siguiente); la LETRA
@@ -490,7 +693,7 @@ export function CampoMapaReal({
         okBtn.disabled = true
         okBtn.textContent = 'Guardando…'
         try {
-          const id = await dibujarRef.current(numero, pts)
+          const id = await dibujarRef.current(numero, pts, haMedidas)
           map.removeLayer(raw)
           map.closePopup(popup)
           addPotrero(id, numero, pts)
@@ -522,12 +725,17 @@ export function CampoMapaReal({
     })
 
     return () => {
+      vivo = false
+      googleLogo?.remove()
       clearTimeout(t)
       ro.disconnect()
       document.removeEventListener('fullscreenchange', onFs)
       map.remove()
       mapRef.current = null
     }
+    // campo.centro sólo importa al montar (el mapa se re-monta por `key` al
+    // cambiar de campo): incluirlo re-crearía el mapa en cada cambio de datos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campo.id, campo.color.hex, campo.color.letra])
 
   const refs = REFERENCIAS[campo.nombre] ?? []
@@ -538,6 +746,57 @@ export function CampoMapaReal({
       <div className="flex flex-col gap-3 lg:flex-row">
         <div className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1">
           <div ref={ref} className="absolute inset-0" />
+          {/* "Faltan dibujar": los potreros sin polígono (los del onboarding).
+              Elegís cuál estás marcando y recién ahí dibujás — nada que
+              recordar. Cuando la lista queda vacía, desaparece. */}
+          {(faltanDibujar.length > 0 || dibujando) && (
+            <div className="absolute bottom-3 left-3 z-[460] max-w-[260px] rounded-xl border border-border bg-white/92 p-2.5 shadow-[0_8px_24px_rgba(16,30,20,0.14)] backdrop-blur">
+              {dibujando ? (
+                <div className="flex items-center gap-2">
+                  <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" />
+                  <p className="text-[12.5px] text-ink">
+                    Dibujando <b>{dibujando.nombre}</b> — cerrá el polígono para guardar.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      mapRef.current?.pm.disableDraw()
+                      setDibujando(null)
+                    }}
+                    className="ml-auto shrink-0 text-[12px] font-medium text-muted-foreground hover:text-ink"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.04em] text-faint">
+                    Faltan dibujar
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {faltanDibujar.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setDibujando(p)
+                          mapRef.current?.pm.enableDraw('Polygon')
+                        }}
+                        title="Tocá y dibujá este potrero sobre el mapa"
+                        className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[12px] font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+                      >
+                        {p.nombre}
+                        <span className="ml-1 font-normal text-primary/70">
+                          {p.hectareas ? `· ${p.hectareas} ha` : ''}
+                          {p.cabezas > 0 ? ` · ${p.cabezas} cab.` : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         {/* Orientación: N/S/E/O (mapa norte-arriba) + referencia por lado */}
         <div className="pointer-events-none absolute inset-0 z-[450]">
           {CARDINALES.map(({ dir, pos, arrow }) => (

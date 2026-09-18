@@ -10,9 +10,12 @@ import {
   useCrearCampo,
   useCrearPotrero,
 } from '@/features/campos/hooks'
-import { USO, tipoCampoLabel } from '@/features/campos/labels'
+import { USO, actividadLabel, tipoCampoLabel } from '@/features/campos/labels'
+import { LocalidadInput } from '@/features/campos/localidad-input'
+import type { Localidad } from '@/lib/geocoding'
 import { usoDeEstado, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dropdown } from '@/components/ui/dropdown'
@@ -42,6 +45,14 @@ export function CampoFormDialog({
   const [open, setOpen] = useState(false)
   const [nombre, setNombre] = useState(campo?.nombre ?? '')
   const [tipo, setTipo] = useState(campo?.tipo ?? 'propio')
+  const [actividad, setActividad] = useState<Campo['actividad']>(campo?.actividad ?? null)
+  // La localidad elegida (con coordenadas). Si el campo ya tiene contorno, el
+  // clima usa el centroide igual; la localidad queda como referencia.
+  const [localidad, setLocalidad] = useState<Localidad | null>(
+    campo?.localidad && campo.lat != null && campo.lon != null
+      ? { nombre: campo.localidad, provincia: campo.provincia ?? '', lat: campo.lat, lon: campo.lon }
+      : null,
+  )
   const [hectareas, setHectareas] = useState(
     campo?.hectareas != null ? String(campo.hectareas) : '',
   )
@@ -64,6 +75,17 @@ export function CampoFormDialog({
           nombre,
           tipo,
           hectareas: parseHa(hectareas),
+          actividad,
+          ubicacion: localidad
+            ? {
+                localidad: localidad.nombre,
+                provincia: localidad.provincia,
+                // Con contorno, el centroide manda (lo pone setCampoContorno);
+                // sin contorno, el centro es la localidad.
+                lat: campo.contorno ? campo.lat : localidad.lat,
+                lon: campo.contorno ? campo.lon : localidad.lon,
+              }
+            : { localidad: null, provincia: null, lat: campo.contorno ? campo.lat : null, lon: campo.contorno ? campo.lon : null },
         })
         toast.success('Campo actualizado')
       } else {
@@ -72,6 +94,10 @@ export function CampoFormDialog({
           nombre,
           tipo,
           hectareas: parseHa(hectareas),
+          actividad,
+          ubicacion: localidad
+            ? { localidad: localidad.nombre, provincia: localidad.provincia, lat: localidad.lat, lon: localidad.lon }
+            : undefined,
         })
         toast.success('Campo creado')
       }
@@ -111,6 +137,34 @@ export function CampoFormDialog({
             onChange={(e) => setNombre(e.target.value)}
             autoFocus
           />
+        </motion.div>
+        <motion.div variants={formItem} className="grid gap-2">
+          <Label>Actividad</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {Constants.public.Enums.actividad_campo.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setActividad(a)}
+                className={cn(
+                  'h-9 rounded-lg border text-sm font-medium transition-colors',
+                  actividad === a
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-input text-muted-foreground hover:border-ring',
+                )}
+              >
+                {actividadLabel[a]}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+        <motion.div variants={formItem} className="grid gap-2">
+          <Label htmlFor="campo-localidad">¿Dónde está el campo?</Label>
+          <LocalidadInput id="campo-localidad" value={localidad} onChange={setLocalidad} />
+          <p className="text-xs text-muted-foreground">
+            Localidad más cercana al campo (no tu domicilio). Es la ubicación del
+            clima de este campo.
+          </p>
         </motion.div>
         <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">

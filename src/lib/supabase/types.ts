@@ -89,33 +89,48 @@ export type Database = {
       }
       campo: {
         Row: {
+          actividad: Database["public"]["Enums"]["actividad_campo"] | null
           color_idx: number | null
           contorno: Json | null
           created_at: string
           empresa_id: string
           hectareas: number | null
           id: string
+          lat: number | null
+          localidad: string | null
+          lon: number | null
           nombre: string
+          provincia: string | null
           tipo: Database["public"]["Enums"]["tipo_campo"]
         }
         Insert: {
+          actividad?: Database["public"]["Enums"]["actividad_campo"] | null
           color_idx?: number | null
           contorno?: Json | null
           created_at?: string
           empresa_id: string
           hectareas?: number | null
           id?: string
+          lat?: number | null
+          localidad?: string | null
+          lon?: number | null
           nombre: string
+          provincia?: string | null
           tipo?: Database["public"]["Enums"]["tipo_campo"]
         }
         Update: {
+          actividad?: Database["public"]["Enums"]["actividad_campo"] | null
           color_idx?: number | null
           contorno?: Json | null
           created_at?: string
           empresa_id?: string
           hectareas?: number | null
           id?: string
+          lat?: number | null
+          localidad?: string | null
+          lon?: number | null
           nombre?: string
+          provincia?: string | null
           tipo?: Database["public"]["Enums"]["tipo_campo"]
         }
         Relationships: [
@@ -1483,6 +1498,7 @@ export type Database = {
         | "silo"
         | "fardo"
         | "diferido"
+      actividad_campo: "ganadera" | "agricola" | "mixta"
       categoria_animal:
         | "vaca"
         | "vaquillona"
@@ -1698,6 +1714,7 @@ export const Constants = {
         "fardo",
         "diferido",
       ],
+      actividad_campo: ["ganadera", "agricola", "mixta"],
       categoria_animal: [
         "vaca",
         "vaquillona",

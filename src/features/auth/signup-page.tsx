@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AtSign, ClipboardCheck, MailCheck, Sprout } from 'lucide-react'
+import { ClipboardCheck, Mail, MailCheck, Sprout } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth, YA_REGISTRADO } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -231,7 +231,7 @@ export function SignupPage() {
               <Reveal delay={0.24} className="grid gap-1.5">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
-                  <IconoCampo icono={AtSign} />
+                  <IconoCampo icono={Mail} />
                   <Input
                     id="email"
                     type="email"
@@ -396,7 +396,7 @@ function RevisarContacto({
 }
 
 /** Ícono decorativo a la izquierda del input, en el peso del ojito. */
-function IconoCampo({ icono: Icono }: { icono: typeof AtSign }) {
+function IconoCampo({ icono: Icono }: { icono: typeof Mail }) {
   return (
     <span
       aria-hidden

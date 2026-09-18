@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { AuthScene } from '@/features/auth/auth-scene'
+import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
 
 /**
@@ -15,10 +15,13 @@ import { Reveal } from '@/features/auth/reveal'
 export function AuthLayout({
   children,
   solAnimado = false,
+  escena,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
   solAnimado?: boolean
+  /** Contenido de la escena en lugar de la frase de marketing. */
+  escena?: ReactNode
 }) {
   return (
     // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
@@ -29,12 +32,12 @@ export function AuthLayout({
       {/* La sombra ancha y suave hacia la derecha funde el borde entre la
           escena oscura y el panel porcelana (sin línea a cuchillo). */}
       <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
-        <AuthScene />
+        <AuthScene mensaje={escena} />
       </div>
       <div className="relative min-h-0 h-full">
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
             vista, el desplazamiento es un deslizamiento, no un salto. */}
-        <div className="flex h-full flex-col overflow-y-auto scroll-smooth">
+        <div data-auth-scroll className="flex h-full flex-col overflow-y-auto scroll-smooth">
           {/* min-h-full + relative: la escena de fondo cubre TODO el contenido
               (no sólo la primera pantalla) y se desplaza con él — frase y sol
               se van hacia arriba junto con la tarjeta, las lomas quedan al
@@ -43,10 +46,14 @@ export function AuthLayout({
             <div className="absolute inset-0 lg:hidden">
               <AuthScene variante="fondo" solAnimado={solAnimado} />
             </div>
+            {/* Teléfono: marca + mensaje EN EL FLUJO, arriba de la tarjeta. */}
+            <div className="relative lg:hidden">
+              <MensajeEscenaMovil mensaje={escena} />
+            </div>
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
-            <div className="relative flex flex-1 flex-col items-center px-5 pt-[132px] pb-3 sm:justify-center sm:p-10">
+            <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:p-10">
               <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
                 {children}
               </div>

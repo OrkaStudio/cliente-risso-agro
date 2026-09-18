@@ -18,7 +18,7 @@ import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
-import { useClima, useDolarBlue } from '@/features/cotizaciones/hooks'
+import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
@@ -40,7 +40,6 @@ const TickerDivider = () => <span className="h-6 w-px bg-sidebar-border" />
  *  de muestra). Los slots presentes se separan con un divisor. */
 function Ticker() {
   const blue = useDolarBlue()
-  const clima = useClima()
   const empresa = useEmpresa()
   const empresaId = empresa.data?.empresa_id ?? ''
 
@@ -61,7 +60,9 @@ function Ticker() {
         </b>
       </div>
     ) : null,
-    clima.data ? <ClimaSlot key="clima" /> : null,
+    // El slot del clima decide solo si tiene algo que mostrar (campo elegido
+    // con ubicación y respuesta de Open-Meteo) o si pide ubicar el campo.
+    <ClimaSlot key="clima" />,
   ].filter(Boolean)
 
   return (

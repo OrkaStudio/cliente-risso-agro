@@ -1,4 +1,5 @@
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 /**
@@ -18,25 +19,32 @@ export function Reveal({
 }) {
   // `className` va en el motion.div, que es el padre real de los children:
   // un `grid gap-2` tiene que separar label e input, no envolver al bloque.
+  // Mientras barre, el contenedor recorta (el panel verde no debe asomar).
+  // Terminada la entrada, deja de recortar: un desplegable dentro del bloque
+  // (la lista de localidades) tiene que poder salirse.
+  const [entrando, setEntrando] = useState(true)
   return (
     // -m-1 p-1: 4px de holgura para que el anillo de foco (2px + 2px de
     // offset) del último input del bloque no quede recortado por el overflow.
-    <div className="relative -m-1 overflow-hidden p-1">
+    <div className={cn('relative -m-1 p-1', entrando ? 'overflow-hidden' : 'overflow-visible')}>
       <motion.div
         className={className}
         initial={{ opacity: 0, y: 22 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: delay + 0.18, ease: 'easeOut' }}
+        onAnimationComplete={() => setEntrando(false)}
       >
         {children}
       </motion.div>
-      <motion.span
-        aria-hidden
-        className="absolute inset-y-0.5 z-10 rounded-sm bg-primary"
-        initial={{ left: 0, right: 0 }}
-        animate={{ left: '100%', right: '-4%' }}
-        transition={{ duration: 0.45, delay, ease: 'easeIn' }}
-      />
+      {entrando && (
+        <motion.span
+          aria-hidden
+          className="absolute inset-y-0.5 z-10 rounded-sm bg-primary"
+          initial={{ left: 0, right: 0 }}
+          animate={{ left: '100%', right: '-4%' }}
+          transition={{ duration: 0.45, delay, ease: 'easeIn' }}
+        />
+      )}
     </div>
   )
 }
