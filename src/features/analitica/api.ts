@@ -255,17 +255,17 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
 }
 
 /**
- * El alquiler de un campo, como serie de cuotas pendientes de un año, desde
- * el onboarding: lo que paga entra como costo recurrente del campo en
- * Analítica y la Agenda, sin que tenga que ir a cargarlo después.
- * Categoría global "Alquiler de campo" (grupo estructura).
+ * El alquiler de un campo, como serie de cuotas pendientes de un año a
+ * partir del primer pago: lo pactado entra como costo recurrente del campo
+ * en Analítica y la Agenda. Categoría global "Alquiler de campo".
  */
 export async function crearAlquilerDeCampo(input: {
   empresaId: string
   campoId: string
-  campoNombre: string
-  monto: number
+  montoCuota: number
   frecuencia: Frecuencia
+  primeraFecha: string
+  descripcion: string
 }): Promise<void> {
   const { data: cat, error } = await supabase
     .from('categoria_movimiento')
@@ -275,18 +275,16 @@ export async function crearAlquilerDeCampo(input: {
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!cat) throw new Error('No encontramos la categoría "Alquiler de campo".')
-  const hoy = new Date()
-  const primera = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
   await crearSerie({
     empresaId: input.empresaId,
     tipo: 'gasto',
     categoriaId: cat.id,
     campoId: input.campoId,
-    montoCuota: input.monto,
+    montoCuota: input.montoCuota,
     frecuencia: input.frecuencia,
-    primeraFecha: primera,
+    primeraFecha: input.primeraFecha,
     // Un año por delante; después lo renueva o lo cancela desde la Agenda.
     cantidad: 12 / MESES_FREQ[input.frecuencia],
-    descripcion: `Alquiler ${input.campoNombre}`,
+    descripcion: input.descripcion,
   })
 }

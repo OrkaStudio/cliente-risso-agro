@@ -29,7 +29,7 @@ import {
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
-import { crearAlquilerDeCampo, frecuenciaLabel, type Frecuencia } from '@/features/analitica/api'
+import { PasoAlquiler } from '@/features/onboarding/paso-alquiler'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
@@ -70,6 +70,9 @@ type CampoCargado = {
   lat: number
   lon: number
   hectareas: number
+  tipo: TipoCampo
+  /** Lo que paga de alquiler, dicho corto ("$ 3.480.000 trimestral"). */
+  alquiler?: string | null
   potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorCategoria }[]
   /** Hacienda cargada sin potrero (el campo entero). */
   sueltas?: CabezasPorCategoria
@@ -80,7 +83,7 @@ type CampoCargado = {
 // DB). El NÚMERO sí lo elige el productor (hay quien ya tiene su numeración).
 type FilaPotrero = { numero: string; hectareas: string }
 
-type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
+type Etapa = 'empresa' | 'campo' | 'alquiler' | 'potreros' | 'hacienda' | 'otro' | 'fin'
 
 /**
  * Lo que se está escribiendo AHORA, antes de guardar: el croquis de la
@@ -260,6 +263,22 @@ export function OnboardingPage() {
               onListo={(c) => {
                 setBorrador(BORRADOR_VACIO)
                 setCampoActual(c)
+                setEtapa(c.tipo === 'alquilado' ? 'alquiler' : 'potreros')
+              }}
+            />
+          </Paso>
+        )}
+
+        {etapa === 'alquiler' && empresaId && campoActual && (
+          <Paso key={`alquiler-${campoActual.id}`}>
+            <Logrado>{campoActual.nombre} guardado</Logrado>
+            <PasoAlquiler
+              empresaId={empresaId}
+              campo={campoActual}
+              ocupado={ocupado}
+              setOcupado={setOcupado}
+              onListo={(resumen) => {
+                setCampoActual({ ...campoActual, alquiler: resumen })
                 setEtapa('potreros')
               }}
             />
@@ -268,7 +287,9 @@ export function OnboardingPage() {
 
         {etapa === 'potreros' && empresaId && campoActual && (
           <Paso key={`potreros-${campoActual.id}`}>
-            <Logrado>{campoActual.nombre} guardado</Logrado>
+            <Logrado>
+              {campoActual.alquiler ? `Alquiler: ${campoActual.alquiler}` : `${campoActual.nombre} guardado`}
+            </Logrado>
             <PasoPotreros
               empresaId={empresaId}
               campo={campoActual}
@@ -522,15 +543,11 @@ function PasoCampo({
   const [actividad, setActividad] = useState<ActividadCampo | null>(null)
   const [localidad, setLocalidad] = useState<Localidad | null>(null)
   const [hectareas, setHectareas] = useState('')
-  // Alquilado: lo que paga, opcional. Si lo pone, queda como gasto recurrente.
-  const [alquilerMonto, setAlquilerMonto] = useState('')
-  const [alquilerFrecuencia, setAlquilerFrecuencia] = useState<Frecuencia>('mensual')
   const [errores, setErrores] = useState<{
     nombre?: string
     actividad?: string
     localidad?: string
     hectareas?: string
-    alquiler?: string
     general?: string
   }>({})
 
@@ -545,9 +562,6 @@ function PasoCampo({
     const ha = numeroDe(hectareas)
     if (ha === null) errs.hectareas = 'Necesitamos las hectáreas'
     else if (!Number.isFinite(ha) || ha <= 0) errs.hectareas = 'Un número mayor que cero'
-    const alquiler = tipo === 'alquilado' ? numeroDe(alquilerMonto) : null
-    if (alquiler !== null && (!Number.isFinite(alquiler) || alquiler <= 0))
-      errs.alquiler = 'Un número mayor que cero, o dejalo vacío'
     setErrores(errs)
     if (Object.keys(errs).length || !actividad || !localidad || ha === null) return
 
@@ -566,21 +580,6 @@ function PasoCampo({
           lon: localidad.lon,
         },
       })
-      // El alquiler entra como serie de cuotas del campo recién creado. Si
-      // falla, el campo ya existe: se avisa y sigue (lo carga desde Analítica).
-      if (alquiler !== null) {
-        try {
-          await crearAlquilerDeCampo({
-            empresaId,
-            campoId: id,
-            campoNombre: n,
-            monto: alquiler,
-            frecuencia: alquilerFrecuencia,
-          })
-        } catch {
-          /* el campo quedó; el alquiler se carga después */
-        }
-      }
       onListo({
         id,
         nombre: n,
@@ -589,6 +588,7 @@ function PasoCampo({
         lat: localidad.lat,
         lon: localidad.lon,
         hectareas: ha,
+        tipo,
         potreros: [],
         cabezas: 0,
       })
@@ -718,70 +718,6 @@ function PasoCampo({
             </div>
           </div>
         </Reveal>
-
-        {/* Alquilado: lo que paga, si lo tiene a mano. Queda como gasto
-            recurrente del campo — el número que Analítica necesita para la
-            rentabilidad y que nadie vuelve a cargar después. */}
-        <AnimatePresence initial={false}>
-          {tipo === 'alquilado' && (
-            <motion.div
-              key="alquiler"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="overflow-hidden"
-            >
-              <div className="grid gap-1.5 rounded-lg border border-border bg-secondary/50 px-3.5 py-3">
-                <Label htmlFor="alquiler">¿Cuánto pagás de alquiler?</Label>
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <div className="relative">
-                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
-                      $
-                    </span>
-                    <Input
-                      id="alquiler"
-                      inputMode="decimal"
-                      className="pl-7 tabular-nums"
-                      value={alquilerMonto}
-                      onChange={(e) => {
-                        setAlquilerMonto(e.target.value)
-                        setErrores((x) => ({ ...x, alquiler: undefined }))
-                      }}
-                      placeholder="Opcional"
-                      aria-invalid={!!errores.alquiler}
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 sm:flex">
-                    {(['mensual', 'trimestral', 'anual'] as Frecuencia[]).map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setAlquilerFrecuencia(f)}
-                        className={cn(
-                          'h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors',
-                          alquilerFrecuencia === f
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-input text-muted-foreground hover:border-ring',
-                        )}
-                      >
-                        {frecuenciaLabel[f]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {errores.alquiler ? (
-                  <ErrorCampo mensaje={errores.alquiler} />
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Queda como gasto fijo de este campo en Analítica y en la Agenda. Si no lo tenés a
-                    mano, lo cargás después.
-                  </p>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <ErrorCampo mensaje={errores.general} />
         <Reveal delay={0.32} className="mt-2 grid gap-2">
@@ -1452,7 +1388,7 @@ function EscenaCroquis({
   borrador: Borrador
 }) {
   const ultimo = campos[campos.length - 1] ?? null
-  const enCampo = etapa === 'campo' || etapa === 'potreros' || etapa === 'hacienda'
+  const enCampo = etapa === 'campo' || etapa === 'alquiler' || etapa === 'potreros' || etapa === 'hacienda'
 
   // Qué dibuja el croquis según la etapa.
   const croquis: CampoCroquis =
@@ -1464,7 +1400,7 @@ function EscenaCroquis({
           potreros: [],
           estado: 'campo',
         }
-      : etapa === 'potreros' && campoActual
+      : (etapa === 'potreros' || etapa === 'alquiler') && campoActual
         ? {
             nombre: campoActual.nombre,
             hectareas: campoActual.hectareas,
@@ -1512,7 +1448,7 @@ function EscenaCroquis({
     { etapa: 'potreros', nombre: 'Potreros' },
     ...(croquis.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
   ]
-  const indiceParte = partes.findIndex((p) => p.etapa === etapa)
+  const indiceParte = etapa === 'alquiler' ? 0 : partes.findIndex((p) => p.etapa === etapa)
   const cabezasCroquis =
     croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0) + totalCabezas(croquis.sueltas ?? {})
   // Leyenda agrupada por especie, con sus categorías en orden canónico.
