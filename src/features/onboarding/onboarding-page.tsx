@@ -1255,7 +1255,7 @@ function PasoHacienda({
                     return (
                       <div key={rol} className="grid gap-1.5">
                         <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
+                          <svg width="16" height="12" viewBox="-11 -8 22 16" aria-hidden>
                             <MarcaCategoria categoria={cats[0]!} />
                           </svg>
                           {nombre}
@@ -1545,7 +1545,7 @@ function EscenaCroquis({
                   <span className="flex flex-wrap gap-x-2.5 text-sidebar-foreground/70">
                     {categorias.map(([c, n]) => (
                       <span key={c} className="inline-flex items-center gap-1 tabular-nums">
-                        <svg width="9" height="9" viewBox="-5 -5 10 10" aria-hidden>
+                        <svg width="16" height="12" viewBox="-11 -8 22 16" aria-hidden>
                           <MarcaCategoria categoria={c} />
                         </svg>
                         {n} {categoriaNombre(c, n).toLowerCase()}
