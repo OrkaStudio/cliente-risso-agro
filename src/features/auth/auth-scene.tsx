@@ -68,7 +68,11 @@ export function AuthScene({
           compacta
             ? // Sol apoyado en el horizonte, a la derecha: como en escritorio.
               'absolute left-[74%] bottom-[19%] -translate-x-1/2 translate-y-1/2'
-            : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
+            : mensaje
+              ? // Con el croquis del onboarding en el medio, el sol baja a la
+                // esquina: el dibujo tiene que quedar limpio.
+                'absolute left-[84%] top-[84%] -translate-x-1/2 -translate-y-1/2'
+              : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
       >
         {ondas && [0, 1, 2, 3].map((i) => (
@@ -237,7 +241,7 @@ export function AuthScene({
           van en ámbar (el color del sol de la escena). */}
       {!compacta && (
       <motion.div
-        className="relative mt-14 max-w-md"
+        className={mensaje ? 'relative mt-10 flex flex-1 flex-col items-center' : 'relative mt-14 max-w-md'}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}

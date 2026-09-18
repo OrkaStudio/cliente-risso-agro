@@ -1,12 +1,15 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ActividadCampo } from '@/features/campos/api'
-import type { Especie } from '@/features/hacienda/labels'
+import { categoriasPorEspecie } from '@/features/hacienda/labels'
 import {
-  ESTILO_ESPECIE,
+  estiloDeCategoria,
   totalCabezas,
-  type CabezasPorEspecie,
+  type CabezasPorCategoria,
   type PotreroCroquis,
 } from '@/features/onboarding/especies-croquis'
+import type { Database } from '@/lib/supabase/types'
+
+type Categoria = Database['public']['Enums']['categoria_animal']
 import { cn } from '@/lib/utils'
 
 /**
@@ -21,14 +24,19 @@ import { cn } from '@/lib/utils'
  * lo que falta asignar queda rayado.
  */
 
-const ORDEN_ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+/** Orden canónico: vacunos, ovinos, equinos; adentro, el orden de la app. */
+const ORDEN_CATEGORIAS: Categoria[] = [
+  ...categoriasPorEspecie.bovino,
+  ...categoriasPorEspecie.ovino,
+  ...categoriasPorEspecie.equino,
+]
 const ACTIVIDAD_NOMBRE: Record<ActividadCampo, string> = { ganadera: 'Ganadera', agricola: 'Agrícola', mixta: 'Mixta' }
 
-/** La marca de una especie, centrada en (0,0). Se usa en el croquis y en la leyenda. */
-export function MarcaEspecie({ especie }: { especie: Especie }) {
-  const color = ESTILO_ESPECIE[especie].color
-  if (especie === 'equino') return <path d="M0 -3.4 L3.4 0 L0 3.4 L-3.4 0 Z" fill={color} />
-  if (especie === 'ovino') return <circle r={2.4} fill={color} />
+/** La marca de una categoría, centrada en (0,0). Se usa en el croquis y en la leyenda. */
+export function MarcaCategoria({ categoria }: { categoria: Categoria }) {
+  const { color, rol } = estiloDeCategoria(categoria)
+  if (rol === 'macho') return <path d="M0 -3.6 L3.6 0 L0 3.6 L-3.6 0 Z" fill={color} />
+  if (rol === 'cria') return <circle r={1.8} fill={color} />
   return <circle r={2.9} fill={color} />
 }
 
@@ -39,7 +47,7 @@ export type CampoCroquis = {
   actividad: ActividadCampo | null
   potreros: PotreroCroquis[]
   /** Hacienda sin potrero: se dibuja suelta dentro del contorno. */
-  sueltas?: CabezasPorEspecie
+  sueltas?: CabezasPorCategoria
   /** Qué se está dibujando ahora: cambia el acento del croquis. */
   estado: 'vacio' | 'campo' | 'potreros' | 'hacienda' | 'hecho'
 }
@@ -78,24 +86,24 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
 }
 
 /**
- * Un punto cada 5 cabezas (mínimo 1 por especie), en el orden vacunos →
- * ovinos → equinos, hasta lo que entra en el potrero.
+ * Un punto cada 5 cabezas (mínimo 1 por categoría), en orden canónico,
+ * hasta lo que entra en el potrero.
  */
-function puntos(r: Rect, cabezas: CabezasPorEspecie): { cx: number; cy: number; especie: Especie }[] {
+function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number; categoria: Categoria }[] {
   const paso = 9
   const x0 = r.x + 8
   const y0 = r.y + 24 // debajo de la etiqueta
   const cols = Math.max(0, Math.floor((r.w - 16) / paso))
   const filas = Math.max(0, Math.floor((r.h - 30) / paso))
   const capacidad = cols * filas
-  const out: { cx: number; cy: number; especie: Especie }[] = []
-  for (const e of ORDEN_ESPECIES) {
-    const n = cabezas[e] ?? 0
+  const out: { cx: number; cy: number; categoria: Categoria }[] = []
+  for (const c of ORDEN_CATEGORIAS) {
+    const n = cabezas[c] ?? 0
     if (n <= 0) continue
     for (let k = 0; k < Math.max(1, Math.ceil(n / 5)); k++) {
       const i = out.length
       if (i >= capacidad) return out
-      out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3, especie: e })
+      out.push({ cx: x0 + (i % cols) * paso + 3, cy: y0 + Math.floor(i / cols) * paso + 3, categoria: c })
     }
   }
   return out
@@ -177,6 +185,8 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
             const pts = puntos(r, p.cabezas)
             const t = totalCabezas(p.cabezas)
             const chico = r.w < 70 || r.h < 40
+            // Con el conteo a la derecha, las hectáreas sólo entran en potreros anchos.
+            const conHa = t > 0 ? r.w >= 120 : r.w >= 70
             return (
               <motion.g
                 key={p.clave}
@@ -242,14 +252,14 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                 >
                   <text className="fill-sidebar-foreground font-semibold" fontSize={chico ? 10 : 12} style={{ paintOrder: 'stroke' }} stroke="var(--sidebar)" strokeWidth={3} strokeLinejoin="round">
                     {p.nombre}
-                    {!chico && p.hectareas ? (
+                    {conHa && p.hectareas ? (
                       <tspan className="fill-sidebar-foreground/60 font-normal" fontSize={10}>
                         {' '}
                         {p.hectareas.toLocaleString('es-AR')} ha
                       </tspan>
                     ) : null}
                   </text>
-                  {t > 0 && !chico && (
+                  {t > 0 && r.w >= 44 && (
                     <text
                       x={Math.max(0, r.w - 16)}
                       textAnchor="end"
@@ -266,12 +276,12 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                 </motion.g>
                 {pts.map((pt, i) => (
                   <motion.g
-                    key={`${pt.especie}-${i}`}
+                    key={`${pt.categoria}-${i}`}
                     initial={{ scale: 0, opacity: 0, x: pt.cx, y: pt.cy }}
                     animate={{ scale: 1, opacity: 0.95, x: pt.cx, y: pt.cy }}
                     transition={{ type: 'spring', stiffness: 500, damping: 22, delay: Math.min(i, 24) * 0.02 }}
                   >
-                    <MarcaEspecie especie={pt.especie} />
+                    <MarcaCategoria categoria={pt.categoria} />
                   </motion.g>
                 ))}
               </motion.g>
@@ -329,12 +339,12 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           }, campo.sueltas ?? {}).map(
           (pt, i) => (
             <motion.g
-              key={`suelta-${pt.especie}-${i}`}
+              key={`suelta-${pt.categoria}-${i}`}
               initial={{ scale: 0, opacity: 0, x: pt.cx, y: pt.cy }}
               animate={{ scale: 1, opacity: 0.95, x: pt.cx, y: pt.cy }}
               transition={{ type: 'spring', stiffness: 500, damping: 22, delay: Math.min(i, 24) * 0.02 }}
             >
-              <MarcaEspecie especie={pt.especie} />
+              <MarcaCategoria categoria={pt.categoria} />
             </motion.g>
           ),
         )}

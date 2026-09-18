@@ -30,20 +30,20 @@ import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
-import { CroquisVivo, MarcaEspecie, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
+import { CroquisVivo, MarcaCategoria, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
 import {
-  ESTILO_ESPECIE,
+  estiloDeCategoria,
   totalCabezas,
-  type CabezasPorEspecie,
+  type CabezasPorCategoria,
 } from '@/features/onboarding/especies-croquis'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import {
   categoriaLabel,
+  categoriaNombre,
   categoriasPorEspecie,
   especieLabel,
-  especiePorCategoria,
   type Especie,
 } from '@/features/hacienda/labels'
 import { Button } from '@/components/ui/button'
@@ -65,9 +65,9 @@ type CampoCargado = {
   lat: number
   lon: number
   hectareas: number
-  potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorEspecie }[]
+  potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorCategoria }[]
   /** Hacienda cargada sin potrero (el campo entero). */
-  sueltas?: CabezasPorEspecie
+  sueltas?: CabezasPorCategoria
   cabezas: number
 }
 
@@ -85,7 +85,7 @@ type Borrador = {
   campo: { nombre: string; hectareas: number | null; actividad: ActividadCampo | null }
   potreros: { nombre: string; hectareas: number | null }[]
   /** Por potrero, cabezas por especie: el croquis las dibuja distinto. */
-  cabezas: Record<string, CabezasPorEspecie>
+  cabezas: Record<string, CabezasPorCategoria>
 }
 /** Clave del pseudo-potrero "todo el campo" en la hacienda sin potreros. */
 const TODO_EL_CAMPO = '__campo__'
@@ -947,20 +947,22 @@ function ha(n: number): string {
 // ---------------------------------------------------------------------
 
 const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
+const ORDEN_CATEGORIAS: Categoria[] = [
+  ...categoriasPorEspecie.bovino,
+  ...categoriasPorEspecie.ovino,
+  ...categoriasPorEspecie.equino,
+]
 type Cantidades = Partial<Record<Categoria, string>>
 
 function totalDe(c: Cantidades | undefined): number {
   return Object.values(c ?? {}).reduce((s, v) => s + (parseInt(v ?? '', 10) || 0), 0)
 }
 
-function porEspecieDe(c: Cantidades | undefined): CabezasPorEspecie {
-  const out: CabezasPorEspecie = {}
+function porCategoriaDe(c: Cantidades | undefined): CabezasPorCategoria {
+  const out: CabezasPorCategoria = {}
   for (const [cat, v] of Object.entries(c ?? {}) as [Categoria, string][]) {
     const n = parseInt(v, 10) || 0
-    if (n > 0) {
-      const e = especiePorCategoria[cat]
-      out[e] = (out[e] ?? 0) + n
-    }
+    if (n > 0) out[cat] = n
   }
   return out
 }
@@ -977,8 +979,8 @@ function PasoHacienda({
   campo: CampoCargado
   ocupado: boolean
   setOcupado: (v: boolean) => void
-  onBorrador: (cabezas: Record<string, CabezasPorEspecie>) => void
-  onListo: (cabezas: number, porPotrero: Record<string, CabezasPorEspecie>) => void
+  onBorrador: (cabezas: Record<string, CabezasPorCategoria>) => void
+  onListo: (cabezas: number, porPotrero: Record<string, CabezasPorCategoria>) => void
 }) {
   // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
   // recorre un potrero por vez — fichas arriba, el activo abajo — y se
@@ -1016,7 +1018,7 @@ function PasoHacienda({
       irA(indice + 1)
       return
     }
-    const totales = Object.fromEntries(potreros.map((p) => [p.id, porEspecieDe(porPotrero[p.id])]))
+    const totales = Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(porPotrero[p.id])]))
     if (total === 0) {
       onListo(0, totales)
       return
@@ -1157,7 +1159,7 @@ function PasoHacienda({
                               }
                               setPorPotrero(next)
                               onBorrador(
-                                Object.fromEntries(potreros.map((p) => [p.id, porEspecieDe(next[p.id])])),
+                                Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(next[p.id])])),
                               )
                             }}
                             placeholder="0"
@@ -1355,15 +1357,18 @@ function EscenaCroquis({
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
   const cabezasCroquis =
     croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0) + totalCabezas(croquis.sueltas ?? {})
-  const especiesCroquis = ESPECIES.filter(
-    (e) => croquis.potreros.some((p) => (p.cabezas[e] ?? 0) > 0) || (croquis.sueltas?.[e] ?? 0) > 0,
-  )
+  // Leyenda por categoría: lo que cargó, con su marca, en orden canónico.
+  const porCategoriaCroquis = new Map<Categoria, number>()
+  for (const c of ORDEN_CATEGORIAS) {
+    const n = croquis.potreros.reduce((s, p) => s + (p.cabezas[c] ?? 0), 0) + (croquis.sueltas?.[c] ?? 0)
+    if (n > 0) porCategoriaCroquis.set(c, n)
+  }
   const potrerosConHa = croquis.potreros.filter((p) => p.hectareas).length
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
 
   return (
-    <div className="w-full max-w-[380px]">
+    <div className="w-full max-w-[520px]">
       <p className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[30px]">
         {etapa === 'fin' ? '¡Tu campo está armado!' : 'Armemos tu campo.'}
       </p>
@@ -1430,21 +1435,18 @@ function EscenaCroquis({
             </>
           )}
         </p>
-        {/* Leyenda: sólo las especies que hay. */}
-        {especiesCroquis.length > 0 && (
+        {/* Leyenda: sólo las categorías que hay. */}
+        {porCategoriaCroquis.size > 0 && (
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            {especiesCroquis.map((e) => {
-              const n =
-                croquis.potreros.reduce((s, p) => s + (p.cabezas[e] ?? 0), 0) + (croquis.sueltas?.[e] ?? 0)
-              return (
-                <span key={e} className="inline-flex items-center gap-1.5 tabular-nums">
-                  <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
-                    <MarcaEspecie especie={e} />
-                  </svg>
-                  <span style={{ color: ESTILO_ESPECIE[e].color }}>{n}</span> {ESTILO_ESPECIE[e].nombre}
-                </span>
-              )
-            })}
+            {[...porCategoriaCroquis.entries()].map(([c, n]) => (
+              <span key={c} className="inline-flex items-center gap-1.5 tabular-nums">
+                <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden>
+                  <MarcaCategoria categoria={c} />
+                </svg>
+                <span style={{ color: estiloDeCategoria(c).color }}>{n}</span>{' '}
+                {categoriaNombre(c, n).toLowerCase()}
+              </span>
+            ))}
           </p>
         )}
       </div>
