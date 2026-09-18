@@ -44,3 +44,6 @@ dist-ssr
 # Vercel (link local del CLI)
 .vercel
 .env*
+
+# Scripts locales de auditoría/siembra (llevan IDs del tenant de prueba)
+*.local.mjs
