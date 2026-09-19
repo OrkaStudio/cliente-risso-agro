@@ -263,7 +263,7 @@ export function AgendaPage() {
 
   async function onRevertir(v: Vencimiento) {
     try {
-      await revertir.mutateAsync(v.id)
+      await revertir.mutateAsync(v)
       toast.success('Vuelto a pendiente')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error')
