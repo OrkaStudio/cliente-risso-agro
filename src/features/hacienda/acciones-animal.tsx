@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
@@ -215,12 +216,7 @@ export function RegistrarEventoDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="ev-retiro">Retiro hasta (opcional)</Label>
-              <Input
-                id="ev-retiro"
-                type="date"
-                value={retiroHasta}
-                onChange={(e) => setRetiroHasta(e.target.value)}
-              />
+              <CampoFecha id="ev-retiro" value={retiroHasta} onChange={setRetiroHasta} />
               <p className="text-xs text-muted-foreground">
                 Si el tratamiento tiene tiempo de retiro, el animal queda
                 marcado "no vender" hasta esa fecha.
@@ -231,12 +227,7 @@ export function RegistrarEventoDialog({
 
         <div className="grid gap-2">
           <Label htmlFor="ev-fecha">Fecha</Label>
-          <Input
-            id="ev-fecha"
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-          />
+          <CampoFecha id="ev-fecha" value={fecha} onChange={setFecha} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="ev-nota">Nota (opcional)</Label>
@@ -386,12 +377,7 @@ export function DarBajaDialog({
         </div>
         <div className="grid gap-2">
           <Label htmlFor="db-fecha">Fecha</Label>
-          <Input
-            id="db-fecha"
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-          />
+          <CampoFecha id="db-fecha" value={fecha} onChange={setFecha} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="db-motivo">Nota (opcional)</Label>

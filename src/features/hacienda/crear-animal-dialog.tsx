@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
 import { FormDialog, formItem } from '@/components/form-dialog'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 
 const ESPECIES: Especie[] = ['bovino', 'ovino', 'equino']
 
@@ -188,12 +189,7 @@ export function CrearAnimalDialog() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="nacimiento">Nacimiento (opcional)</Label>
-            <Input
-              id="nacimiento"
-              type="date"
-              value={fechaNacimiento}
-              onChange={(e) => setFechaNacimiento(e.target.value)}
-            />
+            <CampoFecha id="nacimiento" value={fechaNacimiento} onChange={setFechaNacimiento} conBorrar />
           </div>
         </motion.div>
 

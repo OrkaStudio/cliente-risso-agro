@@ -319,7 +319,7 @@ export function MetricCard({
     <Panel title={titulo} sub={sub} guia={guia} className={cn('flex flex-col', className)}>
       {/* Valor + delta (misma gramática en todas las metric cards) */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="tnum font-heading text-[34px] font-bold leading-none tracking-tight text-ink">
+        <div className="tnum-prop font-heading text-[34px] font-bold leading-none tracking-tight text-ink">
           {headline}
         </div>
         {tendencia != null && (

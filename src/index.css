@@ -230,6 +230,14 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
   }
+  /* Igual que .tnum pero SIN imponer la mono: alinea las cifras y deja la
+     tipografía que ya tenga el elemento. En mono cada glifo ocupa el mismo
+     ancho —también la coma—, y en un número titular eso abre un hueco que se
+     lee "$118 , 3M". En columnas de tabla la mono sigue siendo lo correcto. */
+  .tnum-prop {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
 }
 
 /* Entrada escalonada de los potreros en la vista contenida. */

@@ -19,8 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { formField, formLabel } from '@/components/form-dialog'
+import { formLabel } from '@/components/form-dialog'
 import { cn } from '@/lib/utils'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 const ddmmaaaa = (f: string) => f.split('-').reverse().join('/')
@@ -212,13 +213,7 @@ export function LiquidarDialog({
                 <label htmlFor="liq-fecha" className={formLabel}>
                   Fecha en que se {cobro ? 'cobró' : 'pagó'}
                 </label>
-                <input
-                  id="liq-fecha"
-                  type="date"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  className={cn(formField, '[color-scheme:light]')}
-                />
+                <CampoFecha id="liq-fecha" value={fecha} onChange={setFecha} />
               </div>
               {error && <p className="text-sm font-medium text-destructive">{error}</p>}
               <Button

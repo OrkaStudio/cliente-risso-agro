@@ -22,6 +22,7 @@ import {
 import type { Database } from '@/lib/supabase/types'
 import { medioLabel, type Vencimiento } from '@/features/agenda/api'
 import { LiquidarDialog } from '@/features/agenda/liquidar-dialog'
+import { fmtCompact } from '@/features/analitica/compute'
 import { Panel } from '@/components/panel'
 import { rootZoom } from '@/lib/zoom'
 import { cn } from '@/lib/utils'
@@ -48,14 +49,6 @@ function MedioBadge({ medio, esEcheq }: { medio: MedioPago | null; esEcheq: bool
       {medioLabel(medio, esEcheq)}
     </span>
   )
-}
-
-function fmtCompact(n: number): string {
-  const abs = Math.abs(n)
-  if (abs >= 1_000_000)
-    return `$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
-  if (abs >= 1_000) return `$${Math.round(abs / 1_000)}k`
-  return `$${abs}`
 }
 
 function estaVencido(fecha: string | null): boolean {

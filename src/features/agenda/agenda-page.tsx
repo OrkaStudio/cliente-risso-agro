@@ -263,7 +263,7 @@ export function AgendaPage() {
 
   async function onRevertir(v: Vencimiento) {
     try {
-      await revertir.mutateAsync(v.id)
+      await revertir.mutateAsync(v)
       toast.success('Vuelto a pendiente')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error')
@@ -281,7 +281,7 @@ export function AgendaPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-20">
       {movItem && (
         <LiquidarDialog
           item={movItem}

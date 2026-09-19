@@ -85,11 +85,28 @@ export async function liquidarMovimiento(id: string, fecha: string): Promise<voi
   if (error) throw new Error(error.message)
 }
 
-/** Deshace la liquidación: vuelve a pendiente (sin fecha de cobro/pago). */
-export async function revertirLiquidacion(id: string): Promise<void> {
+/**
+ * Deshace la liquidación: vuelve a pendiente (sin fecha de cobro/pago).
+ *
+ * Un movimiento cargado directo como pagado (una compra en efectivo) nunca tuvo
+ * vencimiento, y la base exige que todo movimiento tenga al menos una fecha de
+ * agenda (CHECK `movimiento_tiene_fecha_agenda`). Antes eso hacía que Deshacer
+ * fallara siempre en esas filas, con el error crudo de Postgres en pantalla.
+ * Ahora el vencimiento pasa a ser el día en que figuraba pagado: el movimiento
+ * vuelve a la Agenda como vencido ese día, que es lo que el productor después
+ * puede corregir.
+ */
+export async function revertirLiquidacion(
+  id: string,
+  fechas: Pick<Vencimiento, 'fechaVencimiento' | 'fechaCobroPago'>,
+): Promise<void> {
   const { error } = await supabase
     .from('movimiento_financiero')
-    .update({ fecha_cobro_pago: null, estado: 'pendiente' })
+    .update({
+      fecha_cobro_pago: null,
+      estado: 'pendiente',
+      fecha_vencimiento: fechas.fechaVencimiento ?? fechas.fechaCobroPago,
+    })
     .eq('id', id)
   if (error) throw new Error(error.message)
 }

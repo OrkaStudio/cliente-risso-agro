@@ -18,16 +18,8 @@ import { HoyCabecera } from '@/features/inicio/hoy-cabecera'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { Panel } from '@/components/panel'
 import { PageHeader, Stat } from '@/components/page-header'
+import { fmtCompact } from '@/features/analitica/compute'
 import { cn } from '@/lib/utils'
-
-function fmtCompact(n: number): string {
-  const abs = Math.abs(n)
-  const sign = n < 0 ? '−' : ''
-  if (abs >= 1_000_000)
-    return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
-  return `${sign}$${abs}`
-}
 
 function fechaLarga(): string {
   const s = new Date().toLocaleDateString('es-AR', {

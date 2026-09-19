@@ -3,6 +3,7 @@ import {
   listVencimientos,
   liquidarMovimiento,
   revertirLiquidacion,
+  type Vencimiento,
 } from '@/features/agenda/api'
 
 export const useVencimientos = () =>
@@ -31,7 +32,8 @@ export function useLiquidar() {
 export function useRevertirLiquidacion() {
   const invalidar = useInvalidarMovimientos()
   return useMutation({
-    mutationFn: (id: string) => revertirLiquidacion(id),
+    mutationFn: (v: Pick<Vencimiento, 'id' | 'fechaVencimiento' | 'fechaCobroPago'>) =>
+      revertirLiquidacion(v.id, v),
     onSuccess: invalidar,
   })
 }
