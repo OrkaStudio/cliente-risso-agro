@@ -45,13 +45,12 @@ const SILUETA: Record<Especie, string> = {
 
 /**
  * La marca de una categoría, centrada en (0,0): la silueta de su especie en
- * el color de la especie; el rol va por tamaño — la cría chica, el macho más
- * corpulento que la hembra. Se usa en el croquis y en la leyenda.
+ * el color de la especie, siempre del mismo tamaño — una vaca es una vaca,
+ * sea vaca, ternero o toro. Se usa en el croquis y en la leyenda.
  */
 export function MarcaCategoria({ categoria }: { categoria: Categoria }) {
-  const { color, rol } = estiloDeCategoria(categoria)
-  const escala = rol === 'cria' ? 0.6 : rol === 'macho' ? 1.08 : 0.92
-  return <path d={SILUETA[especiePorCategoria[categoria]]} fill={color} transform={`scale(${escala})`} />
+  const { color } = estiloDeCategoria(categoria)
+  return <path d={SILUETA[especiePorCategoria[categoria]]} fill={color} />
 }
 
 export type CampoCroquis = {
@@ -124,11 +123,12 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
 }
 
 /**
- * Un punto cada 5 cabezas (mínimo 1 por categoría), en orden canónico,
- * hasta lo que entra en el potrero.
+ * Las siluetas de un potrero: cada especie presente aparece al menos una
+ * vez, y el resto de los lugares se reparte proporcional a las cabezas (una
+ * silueta representa ~5, pero si no entran, se escala). Cada especie en su
+ * fila: se lee por bloques.
  */
 function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number; categoria: Categoria }[] {
-  // Una silueta cada 5 cabezas, en una grilla de 22×20 (la caja de 20×14 más aire).
   const pasoX = 22
   const pasoY = 20
   const x0 = r.x + 12
@@ -137,21 +137,41 @@ function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number
   const filas = Math.max(0, Math.floor((r.h - 32) / pasoY))
   const capacidad = cols * filas
   const out: { cx: number; cy: number; categoria: Categoria }[] = []
-  // Cada especie arranca en su propia fila: la tira no mezcla vacas con
-  // ovejas, se lee por bloques.
-  let i = 0
-  for (const especie of ['bovino', 'ovino', 'equino'] as const) {
-    const cats = categoriasPorEspecie[especie].filter((c) => (cabezas[c] ?? 0) > 0)
-    if (cats.length === 0) continue
-    if (i % cols !== 0) i += cols - (i % cols)
-    for (const c of cats) {
-      for (let k = 0; k < Math.max(1, Math.ceil((cabezas[c] ?? 0) / 5)); k++) {
-        if (i >= capacidad) return out
-        out.push({ cx: x0 + (i % cols) * pasoX + 10, cy: y0 + Math.floor(i / cols) * pasoY + 7, categoria: c })
-        i++
-      }
+  if (capacidad === 0) return out
+
+  // Por especie: total de cabezas y la categoría que la representa (la que más tiene).
+  const especies = (['bovino', 'ovino', 'equino'] as const)
+    .map((e) => {
+      const cats = categoriasPorEspecie[e].filter((c) => (cabezas[c] ?? 0) > 0)
+      const total = cats.reduce((s, c) => s + (cabezas[c] ?? 0), 0)
+      const principal = cats.sort((a, b) => (cabezas[b] ?? 0) - (cabezas[a] ?? 0))[0]
+      return { e, total, principal }
+    })
+    .filter((x) => x.total > 0 && x.principal)
+  if (especies.length === 0) return out
+  const totalCabezas = especies.reduce((s, x) => s + x.total, 0)
+
+  // Cuántas siluetas por especie: al menos una cada una; el resto
+  // proporcional, sin pasarse de lo que entra (cada especie ocupa fila propia,
+  // así que el tope real es por filas).
+  const objetivo = Math.min(Math.ceil(totalCabezas / 5), capacidad)
+  const cuentas = especies.map((x) => Math.max(1, Math.round((x.total / totalCabezas) * objetivo)))
+
+  let fila = 0
+  especies.forEach((x, idx) => {
+    if (fila >= filas) return
+    const filasQueQuedan = filas - fila
+    // Las últimas especies necesitan al menos una fila cada una.
+    const reservadas = especies.length - idx - 1
+    const filasDisponibles = Math.max(1, filasQueQuedan - reservadas)
+    const n = Math.min(cuentas[idx]!, filasDisponibles * cols)
+    for (let k = 0; k < n; k++) {
+      const col = k % cols
+      const f = fila + Math.floor(k / cols)
+      out.push({ cx: x0 + col * pasoX + 10, cy: y0 + f * pasoY + 7, categoria: x.principal! })
     }
-  }
+    fila += Math.ceil(n / cols)
+  })
   return out
 }
 
@@ -400,7 +420,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         <g>
           <text
             x={ANCHO / 2}
-            y={ALTO / 2 - (campo.hectareas ? 4 : -5)}
+            y={ALTO / 2 - (campo.hectareas || campo.actividad ? 6 : -5)}
             textAnchor="middle"
             className={cn(
               'font-heading font-semibold',
@@ -413,7 +433,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           {campo.hectareas || campo.actividad ? (
             <text
               x={ANCHO / 2}
-              y={ALTO / 2 + 16}
+              y={ALTO / 2 + 18}
               textAnchor="middle"
               className="fill-[#e9b45f] font-semibold tabular-nums"
               fontSize={13}
