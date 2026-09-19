@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
@@ -20,9 +21,6 @@ function fmtFecha(f: string) {
 
 const labelClass =
   'mb-1.5 block text-[11px] font-bold uppercase tracking-[0.06em] text-faint'
-const fieldClass =
-  'w-full rounded-[10px] border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft'
-
 /**
  * Slot del gordo en el ticker. Carga manual (no hay API confiable):
  * muestra el último precio cargado y abre un diálogo para actualizarlo.
@@ -131,13 +129,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
               <label htmlFor="g-fecha" className={labelClass}>
                 Fecha
               </label>
-              <input
-                id="g-fecha"
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className={`${fieldClass} [color-scheme:light]`}
-              />
+              <CampoFecha id="g-fecha" value={fecha} onChange={setFecha} />
             </div>
             {error && (
               <p className="text-sm font-medium text-destructive">{error}</p>
