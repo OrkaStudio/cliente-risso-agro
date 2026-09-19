@@ -209,6 +209,9 @@ export function OnboardingPage() {
         />
       }
     >
+      {/* Progreso con ventaja: la cuenta ya cuenta como hecha (Nunes & Drèze:
+          un avance ya dado duplica las ganas de terminar). */}
+      <ProgresoOnboarding etapa={etapa} alquilado={campoActual?.tipo === 'alquilado'} />
       <AnimatePresence mode="wait">
         {etapa === 'empresa' && (
           <Paso key="empresa">
@@ -1587,6 +1590,58 @@ function Cifra({ valor, unidad, acento = false }: { valor: string; unidad: strin
       <span className={cn('text-[19px] font-semibold leading-none', acento && 'text-[#e9b45f]')}>{valor}</span>
       <span className="text-[12px] text-sidebar-foreground/60">{unidad}</span>
     </span>
+  )
+}
+
+/**
+ * La barra de progreso del onboarding, arriba de la tarjeta. Arranca con
+ * "Tu cuenta" hecha — el registro ya fue un paso, y verlo tildado es el
+ * empujón para seguir (efecto de progreso regalado). Los tramos se
+ * completan a medida que avanza; el alquiler aparece sólo si el campo es
+ * alquilado.
+ */
+function ProgresoOnboarding({ etapa, alquilado }: { etapa: Etapa; alquilado: boolean }) {
+  const tramos: { etapa: Etapa | 'cuenta'; nombre: string }[] = [
+    { etapa: 'cuenta', nombre: 'Tu cuenta' },
+    { etapa: 'empresa', nombre: 'Empresa' },
+    { etapa: 'campo', nombre: 'Campo' },
+    ...(alquilado ? [{ etapa: 'alquiler' as Etapa, nombre: 'Alquiler' }] : []),
+    { etapa: 'potreros', nombre: 'Potreros' },
+    { etapa: 'hacienda', nombre: 'Hacienda' },
+    { etapa: 'fin', nombre: 'Listo' },
+  ]
+  // 'otro' (¿otro campo?) cuenta como hacienda terminada.
+  const actual = etapa === 'otro' ? 'fin' : etapa
+  const indice = Math.max(0, tramos.findIndex((t) => t.etapa === actual))
+  const hechos = etapa === 'fin' ? tramos.length : indice
+  return (
+    <div className="mb-5" aria-label={`Paso ${indice + 1} de ${tramos.length}`}>
+      <div className="flex gap-1">
+        {tramos.map((t, i) => (
+          <motion.span
+            key={t.etapa}
+            className={cn('h-1.5 flex-1 rounded-full', i < hechos ? 'bg-primary' : i === indice ? 'bg-primary/35' : 'bg-border')}
+            initial={false}
+            animate={{ scaleY: i === indice ? 1.4 : 1 }}
+          />
+        ))}
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        {etapa === 'fin' ? (
+          <span className="font-medium text-primary">Todo listo</span>
+        ) : (
+          <>
+            <span className="font-medium text-primary">
+              <Check className="mr-0.5 inline size-3" strokeWidth={3} />
+              {hechos === 1 ? 'Tu cuenta ya está' : `${hechos} de ${tramos.length} listos`}
+            </span>
+            {' · '}
+            {tramos[indice]!.nombre}
+            {indice + 1 < tramos.length ? ` · después ${tramos[indice + 1]!.nombre.toLowerCase()}` : ''}
+          </>
+        )}
+      </p>
+    </div>
   )
 }
 
