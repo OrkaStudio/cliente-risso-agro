@@ -14,7 +14,7 @@ import { leerMembresiaPersistida, useEmpresa } from '@/features/empresa/use-empr
  * Ver [[clientes/risso-agro/tareas/TASK-042-2026-07-15]].
  */
 export function RequireEmpresa() {
-  const { data: membresia, isSuccess, fetchStatus } = useEmpresa()
+  const { data: membresia, isSuccess, isError, fetchStatus } = useEmpresa()
 
   // Consulta exitosa: la verdad del servidor manda.
   if (isSuccess) {
@@ -22,12 +22,15 @@ export function RequireEmpresa() {
     return <Outlet />
   }
 
-  // Todavía sin respuesta del servidor. Si ya conocemos la membresía (visita
-  // previa con señal), entramos igual — no rebotamos al onboarding por no poder
-  // preguntar. Cubre offline (query en `paused`) y error de red de forma
-  // uniforme, sin depender de la config de reintentos.
+  // Sin respuesta del servidor. La membresía guardada (visita previa con
+  // señal) vale sólo cuando NO podemos preguntar: sin red, o la consulta
+  // falló. Con red y consultando, esperamos — si entráramos con el dato
+  // viejo, un usuario recién dado de baja de su empresa (o una cuenta de
+  // prueba reseteada) vería la app un instante y después el rebote al
+  // onboarding.
+  const sinRed = typeof navigator !== 'undefined' && navigator.onLine === false
   const persistida = leerMembresiaPersistida()
-  if (persistida) return <Outlet />
+  if (persistida && (sinRed || isError || fetchStatus !== 'fetching')) return <Outlet />
 
   // Buscando activamente con red: esperar.
   if (fetchStatus === 'fetching') {

@@ -138,7 +138,10 @@ export const frecuenciaLabel: Record<Frecuencia, string> = {
 
 function addMeses(fecha: string, meses: number): string {
   const [y, m, d] = fecha.split('-').map(Number)
-  const dt = new Date(y, m - 1 + meses, d)
+  // El día se recorta al último del mes destino: una cuota del 31 no puede
+  // caer el 3 del mes siguiente.
+  const ultimoDia = new Date(y!, m! - 1 + meses + 1, 0).getDate()
+  const dt = new Date(y!, m! - 1 + meses, Math.min(d!, ultimoDia))
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 

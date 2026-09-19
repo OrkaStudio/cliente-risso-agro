@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { formField, formLabel } from '@/components/form-dialog'
+import { formatearNumero } from '@/features/onboarding/numeros'
 import { cn } from '@/lib/utils'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -63,8 +64,12 @@ export function LiquidarDialog({
     else setOpenState(v)
   }
   const [fecha, setFecha] = useState(hoy())
+  // El importe que se pagó de verdad. Arranca en lo previsto; una cuota
+  // estimada (descripción con "est.") lo pide explícitamente.
+  const [montoReal, setMontoReal] = useState(() => formatearNumero(String(Math.round(item.monto))))
   const [error, setError] = useState<string | null>(null)
   const mut = useLiquidar()
+  const estimado = /\best\.\s/.test(item.descripcion ?? '')
 
   const cobro = item.tipo === 'ingreso'
   const liquidado = item.estado === 'liquidado'
@@ -74,8 +79,17 @@ export function LiquidarDialog({
   async function onConfirm(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    const montoNum = Number(montoReal.replace(/\./g, '').replace(',', '.'))
+    if (!Number.isFinite(montoNum) || montoNum <= 0) {
+      setError('El importe tiene que ser un número mayor que cero.')
+      return
+    }
     try {
-      await mut.mutateAsync({ id: item.id, fecha })
+      await mut.mutateAsync({
+        id: item.id,
+        fecha,
+        monto: Math.round(montoNum) !== Math.round(item.monto) ? Math.round(montoNum) : undefined,
+      })
       toast.success(cobro ? 'Marcado como cobrado' : 'Marcado como pagado')
       setOpen(false)
     } catch (err) {
@@ -208,6 +222,31 @@ export function LiquidarDialog({
             </div>
           ) : (
             <form onSubmit={onConfirm} className="grid gap-3">
+              <div>
+                <label htmlFor="liq-monto" className={formLabel}>
+                  {estimado
+                    ? `Cuánto se ${cobro ? 'cobró' : 'pagó'} (lo de arriba es una estimación)`
+                    : `Importe ${cobro ? 'cobrado' : 'pagado'}`}
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+                    $
+                  </span>
+                  <input
+                    id="liq-monto"
+                    inputMode="decimal"
+                    value={montoReal}
+                    onChange={(e) => setMontoReal(formatearNumero(e.target.value))}
+                    className={cn(formField, 'tnum pl-7')}
+                  />
+                </div>
+                {estimado && (
+                  <p className="mt-1 text-[11.5px] text-muted-foreground">
+                    Esta cuota se calculó al precio del día que la cargaste. Poné lo que figura en el
+                    recibo: eso es lo que entra a la cuenta del campo.
+                  </p>
+                )}
+              </div>
               <div>
                 <label htmlFor="liq-fecha" className={formLabel}>
                   Fecha en que se {cobro ? 'cobró' : 'pagó'}
