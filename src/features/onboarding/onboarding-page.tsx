@@ -8,7 +8,6 @@ import {
   Beef,
   Building2,
   Check,
-  CheckCircle2,
   Droplets,
   Footprints,
   Grid2x2,
@@ -36,6 +35,7 @@ import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
 import { CroquisVivo, MarcaCategoria, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
+import { Confeti, Contador, SelloListo } from '@/features/onboarding/festejo'
 import {
   ESTILO_ESPECIE,
   ROL_POR_CATEGORIA,
@@ -361,19 +361,48 @@ export function OnboardingPage() {
         {etapa === 'fin' && primero && (
           <Paso key="fin">
             <div className="text-center">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <CheckCircle2 className="size-7" />
-              </span>
-              <h1 className="mt-5 text-2xl font-bold tracking-tight">¡Listo, {empresa}!</h1>
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                {campos.length === 1 ? 'La app ya sabe de tu campo.' : `La app ya sabe de tus ${campos.length} campos.`}
-              </p>
+              <SelloListo />
+              <motion.h1
+                className="mt-5 text-2xl font-bold tracking-tight"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                ¡Listo, {empresa}!
+              </motion.h1>
+              <motion.p
+                className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.45 }}
+              >
+                {campos.length === 1 ? 'Tu cuenta y tu campo, listos.' : `Tu cuenta y tus ${campos.length} campos, listos.`}
+              </motion.p>
             </div>
 
-            {/* Valor ya, no promesa: cada campo con SU clima de hoy y lo que cargó. */}
-            <ul className="mt-6 divide-y divide-border rounded-lg border border-border">
-              {campos.map((c) => (
-                <CampoAlFinal key={c.id} campo={c} />
+            {/* Lo que armó, en tres números que cuentan. */}
+            <motion.div
+              className="mt-6 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-primary/5"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              {[
+                { v: campos.reduce((s, c) => s + c.hectareas, 0), l: 'hectáreas' },
+                { v: campos.reduce((s, c) => s + c.potreros.length, 0), l: 'potreros' },
+                { v: campos.reduce((s, c) => s + c.cabezas, 0), l: 'cabezas' },
+              ].map((x) => (
+                <div key={x.l} className="px-2 py-3 text-center">
+                  <Contador valor={x.v} className="block text-[22px] font-bold leading-none text-primary" />
+                  <span className="mt-1 block text-[11px] uppercase tracking-wide text-muted-foreground">{x.l}</span>
+                </div>
+              ))}
+            </motion.div>
+
+            {/* Valor ya, no promesa: cada campo con SU clima de hoy. */}
+            <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+              {campos.map((c, i) => (
+                <CampoAlFinal key={c.id} campo={c} indice={i} />
               ))}
             </ul>
 
@@ -1450,17 +1479,15 @@ function EscenaCroquis({
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
 
+  if (etapa === 'fin') return <EscenaFinal empresa={empresa} campos={campos} />
+
   return (
     <div className="w-full max-w-[520px]">
       <p className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[30px]">
-        {etapa === 'fin' ? '¡Tu campo está armado!' : 'Armemos tu campo.'}
+        Armemos tu campo.
       </p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
-        {etapa === 'empresa'
-          ? 'Unos minutos y estás adentro.'
-          : etapa === 'fin'
-            ? 'Lo que cargaste, dibujado.'
-            : 'Se va dibujando con lo que cargás.'}
+        {etapa === 'empresa' ? 'Unos minutos y estás adentro.' : 'Se va dibujando con lo que cargás.'}
       </p>
 
       {/* La ficha del campo: una sola pieza sobre la escena, nada suelto. */}
@@ -1672,13 +1699,119 @@ function ProgresoOnboarding({ etapa }: { etapa: Etapa }) {
 }
 
 /**
+ * La escena del final: la EMPRESA, no el último campo. Cada campo con su
+ * letra y color, en un mini croquis con su hacienda, entrando en cascada
+ * bajo una lluvia de confeti. Es el "mirá todo lo que armaste".
+ */
+function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargado[] }) {
+  const hectareas = campos.reduce((s, c) => s + c.hectareas, 0)
+  const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
+  const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
+  return (
+    <div className="w-full max-w-[520px]">
+      {/* Cubre toda la escena (el panel es relative + overflow-hidden), no sólo la ficha. */}
+      <div className="pointer-events-none absolute inset-0">
+        <Confeti />
+      </div>
+      <motion.p
+        className="font-heading text-[26px] font-semibold leading-tight tracking-tight lg:text-[30px]"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        ¡{empresa} ya está en marcha!
+      </motion.p>
+      <p className="mt-1 text-sm text-sidebar-foreground/60">
+        {campos.length === 1 ? 'Tu campo, dibujado con lo que cargaste.' : `Tus ${campos.length} campos, dibujados con lo que cargaste.`}
+      </p>
+
+      {/* La empresa en cifras, contando hacia arriba. */}
+      <div className="mt-5 flex items-baseline gap-6">
+        <span className="inline-flex items-baseline gap-1">
+          <Contador valor={hectareas} className="text-[28px] font-semibold leading-none" />
+          <span className="text-[12px] text-sidebar-foreground/60">ha</span>
+        </span>
+        <span className="inline-flex items-baseline gap-1">
+          <Contador valor={potreros} className="text-[28px] font-semibold leading-none" />
+          <span className="text-[12px] text-sidebar-foreground/60">{potreros === 1 ? 'potrero' : 'potreros'}</span>
+        </span>
+        {cabezas > 0 && (
+          <span className="inline-flex items-baseline gap-1">
+            <Contador valor={cabezas} className="text-[28px] font-semibold leading-none text-[#e9b45f]" />
+            <span className="text-[12px] text-sidebar-foreground/60">{cabezas === 1 ? 'cabeza' : 'cabezas'}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Cada campo, con su letra y color, en cascada. */}
+      <ul className={cn('mt-5 grid gap-3', campos.length > 1 && 'sm:grid-cols-2')}>
+        {campos.map((c, i) => {
+          const color = colorDeCampo(c.colorIdx)
+          return (
+            <motion.li
+              key={c.id}
+              className="overflow-hidden rounded-xl border border-sidebar-foreground/10 bg-[#0b1a10]/70 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm"
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.25 + i * 0.15 }}
+            >
+              <div className="flex items-center gap-2 border-b border-sidebar-foreground/10 px-3 py-2">
+                <span
+                  className="inline-flex size-5 items-center justify-center rounded text-[11px] font-bold text-white"
+                  style={{ background: color.hex }}
+                >
+                  {color.letra}
+                </span>
+                <span className="truncate text-sm font-semibold">{c.nombre}</span>
+                <span className="ml-auto shrink-0 text-[11px] text-sidebar-foreground/60">{ha(c.hectareas)} ha</span>
+              </div>
+              <div className="px-2 pt-2">
+                <CroquisVivo
+                  campo={{
+                    nombre: c.nombre,
+                    hectareas: c.hectareas,
+                    actividad: c.actividad,
+                    color: color.hex,
+                    potreros: c.potreros.map((p) => ({ clave: p.id, nombre: p.nombre, hectareas: p.hectareas, cabezas: p.cabezas })),
+                    sueltas: c.sueltas,
+                    estado: 'hecho',
+                  }}
+                />
+              </div>
+              <p className="px-3 pb-2 pt-1 text-[11px] text-sidebar-foreground/60">
+                {c.potreros.length > 0 ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}` : 'sin potreros todavía'}
+                {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
+                {' · '}
+                {actividadLabel[c.actividad].toLowerCase()}
+              </p>
+            </motion.li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+/**
  * Una fila del cierre: el campo, lo que cargó y el clima de hoy en SU
  * localidad — cada campo consulta el suyo, porque el clima es por campo.
  */
-function CampoAlFinal({ campo }: { campo: CampoCargado }) {
+function CampoAlFinal({ campo, indice }: { campo: CampoCargado; indice: number }) {
   const clima = useClima({ nombre: campo.nombre, lat: campo.lat, lon: campo.lon })
+  const color = colorDeCampo(campo.colorIdx)
   return (
-    <li className="flex items-center gap-3 px-3.5 py-2.5">
+    <motion.li
+      className="flex items-center gap-3 px-3.5 py-2.5"
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.65 + indice * 0.12 }}
+    >
+      <span
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-white"
+        style={{ background: color.hex }}
+      >
+        {color.letra}
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
           {campo.nombre} <span className="font-normal text-muted-foreground">· {campo.localidad}</span>
@@ -1710,7 +1843,7 @@ function CampoAlFinal({ campo }: { campo: CampoCargado }) {
       ) : (
         <span className="text-[11px] text-muted-foreground">{clima.isLoading ? 'clima…' : ''}</span>
       )}
-    </li>
+    </motion.li>
   )
 }
 
