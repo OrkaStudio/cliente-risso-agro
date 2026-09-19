@@ -415,3 +415,30 @@ export async function ubicarAnimales(input: {
   if (error) throw new Error(error.message)
   return (data as { movidos: number }).movidos
 }
+
+/**
+ * Deshace un alta del onboarding para volver a cargarla: borra los
+ * animales activos de esos potreros que entraron con origen 'onboarding'.
+ * Caravanas y eventos se van en cascada; no toca nada cargado por otro
+ * camino.
+ */
+export async function borrarAltaOnboarding(potreroIds: string[]): Promise<void> {
+  if (potreroIds.length === 0) return
+  const { error } = await supabase
+    .from('animal')
+    .delete()
+    .in('potrero_id', potreroIds)
+    .eq('origen', 'onboarding')
+  if (error) throw new Error(error.message)
+}
+
+/** Igual que la anterior, para la hacienda cargada sin potrero (campo entero). */
+export async function borrarAltaOnboardingSinPotrero(empresaId: string): Promise<void> {
+  const { error } = await supabase
+    .from('animal')
+    .delete()
+    .eq('empresa_id', empresaId)
+    .is('potrero_id', null)
+    .eq('origen', 'onboarding')
+  if (error) throw new Error(error.message)
+}

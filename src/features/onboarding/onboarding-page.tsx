@@ -29,7 +29,15 @@ import {
   ErrorCampo,
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
-import { actualizarCampo, crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
+import {
+  actualizarCampo,
+  actualizarPotrero,
+  crearCampo,
+  crearPotrero,
+  eliminarPotrero,
+  type ActividadCampo,
+} from '@/features/campos/api'
+import { borrarAltaOnboarding, borrarAltaOnboardingSinPotrero } from '@/features/hacienda/api'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
@@ -83,7 +91,7 @@ type CampoCargado = {
 
 // El campo del onboarding lleva la letra de su orden (A, B, C… la pone la
 // DB). El NÚMERO sí lo elige el productor (hay quien ya tiene su numeración).
-type FilaPotrero = { numero: string; hectareas: string }
+type FilaPotrero = { id?: string; numero: string; hectareas: string }
 
 type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
 
@@ -178,6 +186,32 @@ export function OnboardingPage() {
     }
     setEmpresaId(data)
     setEtapa('campo')
+  }
+
+  /**
+   * "Revisar" el último campo desde ¿Otro campo?: su hacienda ya está
+   * guardada, así que se deshace el alta del onboarding (sólo esos
+   * animales) y se vuelve a la hacienda con los potreros intactos. Si era
+   * agrícola o no tenía potreros, vuelve a los potreros / al campo.
+   */
+  async function revisarUltimoCampo() {
+    const c = campos[campos.length - 1]
+    if (!c || !empresaId) return
+    setOcupado(true)
+    try {
+      if (c.cabezas > 0) {
+        if (c.potreros.length > 0) await borrarAltaOnboarding(c.potreros.map((p) => p.id))
+        else await borrarAltaOnboardingSinPotrero(empresaId)
+      }
+      setCampos((xs) => xs.slice(0, -1))
+      // Lo cargado queda como punto de partida en el formulario; en la DB
+      // se deshizo y se vuelve a guardar al confirmar.
+      setCampoActual({ ...c, cabezas: 0 })
+      setBorrador(BORRADOR_VACIO)
+      setEtapa(c.actividad === 'agricola' ? 'potreros' : 'hacienda')
+    } finally {
+      setOcupado(false)
+    }
   }
 
   async function entrar(destino: string) {
@@ -325,6 +359,15 @@ export function OnboardingPage() {
               ocupado={ocupado}
               setOcupado={setOcupado}
               onBorrador={(cabezas) => setBorrador({ ...BORRADOR_VACIO, cabezas })}
+              onVolver={() => {
+                setBorrador(BORRADOR_VACIO)
+                if (campoActual.potreros.length === 0) {
+                  setCorrigiendo(true)
+                  setEtapa('campo')
+                } else {
+                  setEtapa('potreros')
+                }
+              }}
               onListo={(cabezas, porPotrero) => {
                 setBorrador(BORRADOR_VACIO)
                 setCampos((xs) => [
@@ -366,6 +409,14 @@ export function OnboardingPage() {
                 onClick={() => setEtapa('fin')}
               >
                 No, terminar
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                disabled={ocupado}
+                onClick={() => void revisarUltimoCampo()}
+              >
+                <ArrowLeft className="size-4" /> Revisar {campos[campos.length - 1]!.nombre}
               </Button>
             </div>
           </Paso>
@@ -748,7 +799,16 @@ function PasoPotreros({
   onCorregirCampo: () => void
   onListo: (potreros: CampoCargado['potreros']) => void
 }) {
-  const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
+  // Volviendo desde hacienda: los potreros ya existen y se editan (diff).
+  const [filas, setFilas] = useState<FilaPotrero[]>(() =>
+    campo.potreros.length > 0
+      ? campo.potreros.map((p) => ({
+          id: p.id,
+          numero: p.nombre.replace(/\D/g, ''),
+          hectareas: p.hectareas !== null ? String(p.hectareas).replace('.', ',') : '',
+        }))
+      : [{ numero: '1', hectareas: '' }],
+  )
   const [error, setError] = useState<string | null>(null)
   // La letra del campo (A, B, C…): la misma que la DB le pone a cada potrero.
   const letra = colorDeCampo(campo.colorIdx).letra
@@ -802,19 +862,23 @@ function PasoPotreros({
     setOcupado(true)
     try {
       const creados: CampoCargado['potreros'] = []
-      // Se manda sólo el número; la DB le pone la letra del campo.
+      const letra = colorDeCampo(campo.colorIdx).letra
+      const estadoCiclo = estadoInicialPorActividad(campo.actividad)
+      // Los que ya existían y no están más en la lista: se borran (son
+      // recién creados en este onboarding, sin historia).
+      const vivos = new Set(filas.map((f) => f.id).filter(Boolean))
+      for (const p of campo.potreros) if (!vivos.has(p.id)) await eliminarPotrero(p.id)
       for (const f of filas) {
         const hectareas = haDe(f)
-        // Se manda el número; el nombre real (con la letra del campo) lo
-        // devuelve la DB.
-        const { id, nombre } = await crearPotrero({
-          empresaId,
-          campoId: campo.id,
-          nombre: f.numero.trim(),
-          estadoCiclo: estadoInicialPorActividad(campo.actividad),
-          hectareas,
-        })
-        creados.push({ id, nombre, hectareas, cabezas: {} })
+        const numero = f.numero.trim()
+        if (f.id) {
+          // Se manda el número; la letra la fuerza el trigger de la DB.
+          await actualizarPotrero({ id: f.id, nombre: numero, estadoCiclo, hectareas })
+          creados.push({ id: f.id, nombre: `${numero}${letra}`, hectareas, cabezas: {} })
+        } else {
+          const { id, nombre } = await crearPotrero({ empresaId, campoId: campo.id, nombre: numero, estadoCiclo, hectareas })
+          creados.push({ id, nombre, hectareas, cabezas: {} })
+        }
       }
       onListo(creados)
     } catch (err) {
@@ -986,6 +1050,15 @@ function PasoPotreros({
           >
             Los completo después
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            disabled={ocupado}
+            onClick={onCorregirCampo}
+          >
+            <ArrowLeft className="size-4" /> Volver a los datos del campo
+          </Button>
         </Reveal>
       </form>
     </>
@@ -1075,6 +1148,7 @@ function PasoHacienda({
   ocupado,
   setOcupado,
   onBorrador,
+  onVolver,
   onListo,
 }: {
   empresaId: string
@@ -1082,6 +1156,8 @@ function PasoHacienda({
   ocupado: boolean
   setOcupado: (v: boolean) => void
   onBorrador: (cabezas: Record<string, CabezasPorCategoria>) => void
+  /** Volver a los potreros para corregirlos (nada de hacienda guardada aún). */
+  onVolver: () => void
   onListo: (cabezas: number, porPotrero: Record<string, CabezasPorCategoria>) => void
 }) {
   // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
@@ -1093,7 +1169,15 @@ function PasoHacienda({
   const potreros: CampoCargado['potreros'] = campoEntero
     ? [{ id: TODO_EL_CAMPO, nombre: campo.nombre, hectareas: campo.hectareas, cabezas: {} }]
     : campo.potreros
-  const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>({})
+  const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>(() => {
+    // Revisando: arranca con lo que ya había cargado.
+    const out: Record<string, Cantidades> = {}
+    const aCant = (c: CabezasPorCategoria): Cantidades =>
+      Object.fromEntries(Object.entries(c).map(([k, v]) => [k, String(v)])) as Cantidades
+    for (const p of campo.potreros) if (totalCabezas(p.cabezas) > 0) out[p.id] = aCant(p.cabezas)
+    if (campo.sueltas && totalCabezas(campo.sueltas) > 0) out[TODO_EL_CAMPO] = aCant(campo.sueltas)
+    return out
+  })
   const [especieActiva, setEspecieActiva] = useState<Especie>('bovino')
   const [indice, setIndice] = useState(0)
   const [vistos, setVistos] = useState<string[]>([])
@@ -1365,15 +1449,14 @@ function PasoHacienda({
               'Terminar sin hacienda'
             )}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full text-muted-foreground"
-            disabled={ocupado}
-            onClick={() => onListo(0, {})}
-          >
-            La completo después
-          </Button>
+          <div className="flex items-center justify-between">
+            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" disabled={ocupado} onClick={onVolver}>
+              <ArrowLeft className="size-4" /> {campoEntero ? 'Volver al campo' : 'Volver a los potreros'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" disabled={ocupado} onClick={() => onListo(0, {})}>
+              La completo después
+            </Button>
+          </div>
         </Reveal>
       </form>
     </>

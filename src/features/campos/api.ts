@@ -288,6 +288,16 @@ export async function crearPotrero(input: {
   return { id: data.id, nombre: data.nombre }
 }
 
+/**
+ * Borra un potrero recién creado (onboarding, "Volver" a corregir). Sólo
+ * para potreros sin historia: los animales quedan sin potrero (SET NULL),
+ * las observaciones se van en cascada.
+ */
+export async function eliminarPotrero(id: string): Promise<void> {
+  const { error } = await supabase.from('potrero').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function actualizarPotrero(input: {
   id: string
   /** Solo el NÚMERO importa: la LETRA la fuerza el trigger de la DB a la del
