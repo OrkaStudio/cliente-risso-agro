@@ -48,3 +48,4 @@ dist-ssr
 # Scripts locales de auditoría/siembra (llevan IDs del tenant de prueba)
 *.local.mjs
 auditoria-shots/
+*.local.py
