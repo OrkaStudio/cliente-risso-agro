@@ -250,7 +250,7 @@ export function OnboardingPage() {
           <Paso key={`campo-${campos.length}`}>
             <Logrado>
               {campos.length === 0
-                ? `${empresa} ya existe`
+                ? `¡${empresa} ya tiene su lugar!`
                 : `${campos[campos.length - 1]!.nombre} cargado`}
             </Logrado>
             <PasoCampo

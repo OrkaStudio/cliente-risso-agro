@@ -148,6 +148,9 @@ export function PasoAlquiler({
   const siguiente = ORDEN[indice + 1] ?? null
 
   function elegirUnidad(v: Unidad) {
+    // Cambiar la unidad vacía la cantidad: 5.000.000 kg no es un error del
+    // productor, es un resto nuestro.
+    if (v !== unidad) setCantidad('')
     setUnidad(v)
     // En pesos o dólares lo común es el total del campo; en kilos o
     // quintales, por hectárea.

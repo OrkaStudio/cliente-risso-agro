@@ -76,11 +76,20 @@ export async function listVencimientos(): Promise<Vencimiento[]> {
   }))
 }
 
-/** Marca un movimiento como cobrado/pagado: setea la fecha y pasa a liquidado. */
-export async function liquidarMovimiento(id: string, fecha: string): Promise<void> {
+/**
+ * Marca un movimiento como cobrado/pagado: setea la fecha y pasa a liquidado.
+ * `monto` (opcional) corrige el importe al liquidar — una cuota estimada (el
+ * alquiler en kilos de novillo, en dólares) recién sabe cuánto fue el día
+ * que se paga. Lo que entra a la Analítica es lo que se pagó, no la estimación.
+ */
+export async function liquidarMovimiento(id: string, fecha: string, monto?: number): Promise<void> {
   const { error } = await supabase
     .from('movimiento_financiero')
-    .update({ fecha_cobro_pago: fecha, estado: 'liquidado' })
+    .update({
+      fecha_cobro_pago: fecha,
+      estado: 'liquidado',
+      ...(monto !== undefined ? { monto } : {}),
+    })
     .eq('id', id)
   if (error) throw new Error(error.message)
 }
