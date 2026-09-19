@@ -281,7 +281,7 @@ export function AgendaPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-20">
       {movItem && (
         <LiquidarDialog
           item={movItem}
