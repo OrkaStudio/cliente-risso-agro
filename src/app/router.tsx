@@ -3,6 +3,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { ErrorNuevaVersion } from '@/app/error-nueva-version'
 import { LoginPage } from '@/features/auth/login-page'
 import { SignupPage } from '@/features/auth/signup-page'
 import { RecuperarPage } from '@/features/auth/recuperar-page'
@@ -92,18 +93,22 @@ const OnboardingPage = lazy(() =>
 export const router = createBrowserRouter([
   {
     path: '/login',
+    errorElement: <ErrorNuevaVersion />,
     element: <LoginPage />,
   },
   {
     path: '/registro',
+    errorElement: <ErrorNuevaVersion />,
     element: <SignupPage />,
   },
   {
     path: '/recuperar',
+    errorElement: <ErrorNuevaVersion />,
     element: <RecuperarPage />,
   },
   {
     element: <ProtectedRoute />,
+    errorElement: <ErrorNuevaVersion />,
     children: [
       {
         // Llega con la sesión del link de recuperación; elige contraseña nueva.
