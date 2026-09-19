@@ -29,7 +29,6 @@ import {
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
-import { PasoAlquiler } from '@/features/onboarding/paso-alquiler'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
@@ -71,8 +70,6 @@ type CampoCargado = {
   lon: number
   hectareas: number
   tipo: TipoCampo
-  /** Lo que paga de alquiler, dicho corto ("$ 3.480.000 trimestral"). */
-  alquiler?: string | null
   potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorCategoria }[]
   /** Hacienda cargada sin potrero (el campo entero). */
   sueltas?: CabezasPorCategoria
@@ -83,7 +80,7 @@ type CampoCargado = {
 // DB). El NÚMERO sí lo elige el productor (hay quien ya tiene su numeración).
 type FilaPotrero = { numero: string; hectareas: string }
 
-type Etapa = 'empresa' | 'campo' | 'alquiler' | 'potreros' | 'hacienda' | 'otro' | 'fin'
+type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
 
 /**
  * Lo que se está escribiendo AHORA, antes de guardar: el croquis de la
@@ -211,7 +208,7 @@ export function OnboardingPage() {
     >
       {/* Progreso con ventaja: la cuenta ya cuenta como hecha (Nunes & Drèze:
           un avance ya dado duplica las ganas de terminar). */}
-      <ProgresoOnboarding etapa={etapa} alquilado={campoActual?.tipo === 'alquilado'} />
+      <ProgresoOnboarding etapa={etapa} />
       <AnimatePresence mode="wait">
         {etapa === 'empresa' && (
           <Paso key="empresa">
@@ -266,22 +263,6 @@ export function OnboardingPage() {
               onListo={(c) => {
                 setBorrador(BORRADOR_VACIO)
                 setCampoActual(c)
-                setEtapa(c.tipo === 'alquilado' ? 'alquiler' : 'potreros')
-              }}
-            />
-          </Paso>
-        )}
-
-        {etapa === 'alquiler' && empresaId && campoActual && (
-          <Paso key={`alquiler-${campoActual.id}`}>
-            <Logrado>{campoActual.nombre} guardado</Logrado>
-            <PasoAlquiler
-              empresaId={empresaId}
-              campo={campoActual}
-              ocupado={ocupado}
-              setOcupado={setOcupado}
-              onListo={(resumen) => {
-                setCampoActual({ ...campoActual, alquiler: resumen })
                 setEtapa('potreros')
               }}
             />
@@ -290,9 +271,7 @@ export function OnboardingPage() {
 
         {etapa === 'potreros' && empresaId && campoActual && (
           <Paso key={`potreros-${campoActual.id}`}>
-            <Logrado>
-              {campoActual.alquiler ? `Alquiler: ${campoActual.alquiler}` : `${campoActual.nombre} guardado`}
-            </Logrado>
+            <Logrado>{campoActual.nombre} guardado</Logrado>
             <PasoPotreros
               empresaId={empresaId}
               campo={campoActual}
@@ -1391,7 +1370,7 @@ function EscenaCroquis({
   borrador: Borrador
 }) {
   const ultimo = campos[campos.length - 1] ?? null
-  const enCampo = etapa === 'campo' || etapa === 'alquiler' || etapa === 'potreros' || etapa === 'hacienda'
+  const enCampo = etapa === 'campo' || etapa === 'potreros' || etapa === 'hacienda'
 
   // Qué dibuja el croquis según la etapa.
   const croquis: CampoCroquis =
@@ -1403,7 +1382,7 @@ function EscenaCroquis({
           potreros: [],
           estado: 'campo',
         }
-      : (etapa === 'potreros' || etapa === 'alquiler') && campoActual
+      : etapa === 'potreros' && campoActual
         ? {
             nombre: campoActual.nombre,
             hectareas: campoActual.hectareas,
@@ -1451,7 +1430,7 @@ function EscenaCroquis({
     { etapa: 'potreros', nombre: 'Potreros' },
     ...(croquis.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
   ]
-  const indiceParte = etapa === 'alquiler' ? 0 : partes.findIndex((p) => p.etapa === etapa)
+  const indiceParte = partes.findIndex((p) => p.etapa === etapa)
   const cabezasCroquis =
     croquis.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0) + totalCabezas(croquis.sueltas ?? {})
   // Leyenda agrupada por especie, con sus categorías en orden canónico.
@@ -1594,50 +1573,87 @@ function Cifra({ valor, unidad, acento = false }: { valor: string; unidad: strin
 }
 
 /**
- * La barra de progreso del onboarding, arriba de la tarjeta. Arranca con
- * "Tu cuenta" hecha — el registro ya fue un paso, y verlo tildado es el
- * empujón para seguir (efecto de progreso regalado). Los tramos se
- * completan a medida que avanza; el alquiler aparece sólo si el campo es
- * alquilado.
+ * El progreso del onboarding, arriba de la tarjeta: un sendero con un hito
+ * por paso y una luz que avanza. Arranca con "Tu cuenta" hecha — el
+ * registro ya fue un paso, y verlo tildado es el empujón para seguir
+ * (efecto de progreso regalado). Los hitos hechos se tildan; el actual
+ * late; los que faltan quedan apagados.
  */
-function ProgresoOnboarding({ etapa, alquilado }: { etapa: Etapa; alquilado: boolean }) {
-  const tramos: { etapa: Etapa | 'cuenta'; nombre: string }[] = [
-    { etapa: 'cuenta', nombre: 'Tu cuenta' },
-    { etapa: 'empresa', nombre: 'Empresa' },
-    { etapa: 'campo', nombre: 'Campo' },
-    ...(alquilado ? [{ etapa: 'alquiler' as Etapa, nombre: 'Alquiler' }] : []),
-    { etapa: 'potreros', nombre: 'Potreros' },
-    { etapa: 'hacienda', nombre: 'Hacienda' },
-    { etapa: 'fin', nombre: 'Listo' },
-  ]
+const TRAMOS: { etapa: Etapa | 'cuenta'; nombre: string }[] = [
+  { etapa: 'cuenta', nombre: 'Tu cuenta' },
+  { etapa: 'empresa', nombre: 'Empresa' },
+  { etapa: 'campo', nombre: 'Campo' },
+  { etapa: 'potreros', nombre: 'Potreros' },
+  { etapa: 'hacienda', nombre: 'Hacienda' },
+  { etapa: 'fin', nombre: 'Listo' },
+]
+
+function ProgresoOnboarding({ etapa }: { etapa: Etapa }) {
   // 'otro' (¿otro campo?) cuenta como hacienda terminada.
   const actual = etapa === 'otro' ? 'fin' : etapa
-  const indice = Math.max(0, tramos.findIndex((t) => t.etapa === actual))
-  const hechos = etapa === 'fin' ? tramos.length : indice
+  const indice = Math.max(0, TRAMOS.findIndex((t) => t.etapa === actual))
+  const terminado = etapa === 'fin'
+  const hechos = terminado ? TRAMOS.length : indice
+  const n = TRAMOS.length
+  // Posición de la luz: sobre el hito actual (o al final).
+  const pos = terminado ? 1 : indice / (n - 1)
   return (
-    <div className="mb-5" aria-label={`Paso ${indice + 1} de ${tramos.length}`}>
-      <div className="flex gap-1">
-        {tramos.map((t, i) => (
-          <motion.span
-            key={t.etapa}
-            className={cn('h-1.5 flex-1 rounded-full', i < hechos ? 'bg-primary' : i === indice ? 'bg-primary/35' : 'bg-border')}
-            initial={false}
-            animate={{ scaleY: i === indice ? 1.4 : 1 }}
-          />
-        ))}
+    <div className="mb-5" aria-label={`Paso ${indice + 1} de ${n}`}>
+      <div className="relative h-7">
+        {/* El sendero */}
+        <div className="absolute inset-x-[10px] top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-border" />
+        {/* Lo recorrido, con la luz al frente */}
+        <motion.div
+          className="absolute left-[10px] top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-primary"
+          initial={false}
+          animate={{ width: `calc((100% - 20px) * ${pos})` }}
+          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+        />
+        <motion.div
+          aria-hidden
+          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_0_4px_rgba(31,122,71,0.18),0_0_14px_2px_rgba(31,122,71,0.45)]"
+          initial={false}
+          animate={{ left: `calc(10px + (100% - 20px) * ${pos})` }}
+          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+        />
+        {/* Los hitos */}
+        <ol className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between">
+          {TRAMOS.map((t, i) => {
+            const hecho = i < hechos
+            const enCurso = !terminado && i === indice
+            return (
+              <li key={t.etapa} className="relative flex size-5 items-center justify-center">
+                <motion.span
+                  className={cn(
+                    'flex items-center justify-center rounded-full transition-colors',
+                    hecho
+                      ? 'size-4 bg-primary text-white'
+                      : enCurso
+                        ? 'size-5 border-2 border-primary bg-card'
+                        : 'size-2 bg-border',
+                  )}
+                  initial={false}
+                  animate={enCurso ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                  transition={enCurso ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : undefined}
+                >
+                  {hecho && <Check className="size-2.5" strokeWidth={3.5} />}
+                </motion.span>
+              </li>
+            )
+          })}
+        </ol>
       </div>
-      <p className="mt-1.5 text-[11px] text-muted-foreground">
-        {etapa === 'fin' ? (
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        {terminado ? (
           <span className="font-medium text-primary">Todo listo</span>
         ) : (
           <>
             <span className="font-medium text-primary">
-              <Check className="mr-0.5 inline size-3" strokeWidth={3} />
-              {hechos === 1 ? 'Tu cuenta ya está' : `${hechos} de ${tramos.length} listos`}
+              {hechos === 1 ? 'Tu cuenta ya está' : `${hechos} de ${n} listos`}
             </span>
             {' · '}
-            {tramos[indice]!.nombre}
-            {indice + 1 < tramos.length ? ` · después ${tramos[indice + 1]!.nombre.toLowerCase()}` : ''}
+            <span className="font-medium text-foreground">{TRAMOS[indice]!.nombre}</span>
+            {indice + 1 < n ? ` · después ${TRAMOS[indice + 1]!.nombre.toLowerCase()}` : ''}
           </>
         )}
       </p>

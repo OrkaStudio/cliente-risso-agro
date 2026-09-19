@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase/client'
  */
 
 export type ItemChecklist = {
-  id: 'campo' | 'potreros' | 'hacienda' | 'tropas' | 'recorrida'
+  id: 'campo' | 'potreros' | 'hacienda' | 'tropas' | 'alquiler' | 'recorrida'
   titulo: string
   /** Qué es y por qué importa, en criollo — el productor lee y entiende. */
   detalle: string
@@ -39,7 +39,7 @@ export function useChecklist() {
     networkMode: 'offlineFirst',
     staleTime: 15_000,
     queryFn: async (): Promise<ItemChecklist[]> => {
-      const [campos, potreros, activos, ubicados, recorridas, provincias] = await Promise.all([
+      const [campos, potreros, activos, ubicados, recorridas, provincias, alquilados, conAlquiler] = await Promise.all([
         supabase
           .from('campo')
           .select('id', { count: 'exact', head: true })
@@ -75,7 +75,26 @@ export function useChecklist() {
             if (r.error) throw new Error(r.error.message)
             return (r.data ?? []).map((c) => c.provincia)
           }),
+        // Campos alquilados: el alquiler es un gasto recurrente que se pide
+        // acá, no en el onboarding (cuando tiene el contrato a mano).
+        supabase
+          .from('campo')
+          .select('id, nombre')
+          .eq('tipo', 'alquilado')
+          .then((r) => {
+            if (r.error) throw new Error(r.error.message)
+            return r.data ?? []
+          }),
+        supabase
+          .from('movimiento_financiero')
+          .select('campo_id, categoria:categoria_movimiento!inner(nombre)')
+          .eq('categoria.nombre', 'Alquiler de campo')
+          .then((r) => {
+            if (r.error) throw new Error(r.error.message)
+            return new Set((r.data ?? []).map((m) => m.campo_id))
+          }),
       ])
+      const sinAlquiler = alquilados.filter((c) => !conAlquiler.has(c.id))
 
       // Hoy el catastro automático es Buenos Aires (ARBA). Para el resto no se
       // promete: el contorno se marca sobre el satélite. Con campos en las dos
@@ -133,6 +152,22 @@ export function useChecklist() {
           accion: activos > ubicados ? 'hacienda-ubicar' : null,
           hecho: activos >= 1 && ubicados === activos,
         },
+        ...(alquilados.length > 0
+          ? [
+              {
+                id: 'alquiler' as const,
+                titulo: sinAlquiler.length === 1 ? `Cargá el alquiler de ${sinAlquiler[0]!.nombre}` : 'Cargá el alquiler',
+                detalle:
+                  sinAlquiler.length > 0
+                    ? 'Como está en el contrato: en kilos, quintales, dólares o pesos. Cada pago queda en la Agenda.'
+                    : 'Cada pago está en la Agenda y en la cuenta del campo.',
+                cta: 'Cargar el alquiler',
+                ruta: '/analitica',
+                accion: 'analitica-alquiler',
+                hecho: sinAlquiler.length === 0,
+              },
+            ]
+          : []),
         {
           id: 'recorrida',
           titulo: 'Probá la Recorrida',

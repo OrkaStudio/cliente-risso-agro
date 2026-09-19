@@ -4,6 +4,7 @@ import {
   getClima,
   getDolarBlue,
   getGordoActual,
+  getNovilloCanuelas,
   getPronostico,
   type UbicacionClima,
 } from '@/features/cotizaciones/api'
@@ -48,6 +49,15 @@ export const usePronostico = (u: UbicacionClima | null) =>
   })
 
 /** Último precio del gordo (carga manual). enabled hasta tener empresa. */
+/** Novillo de Cañuelas, automático. Se refresca cada 12 h; si falla, el ticker cae al manual. */
+export const useNovilloCanuelas = () =>
+  useQuery({
+    queryKey: ['novillo-canuelas'],
+    queryFn: getNovilloCanuelas,
+    staleTime: 12 * 60 * 60 * 1000,
+    retry: 1,
+  })
+
 export const useGordoActual = (empresaId: string) =>
   useQuery({
     queryKey: ['gordo-actual', empresaId],
