@@ -354,13 +354,15 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                     const existing = potreros.find((p) => p.nombre === nombre)
                     const id = existing
                       ? existing.id
-                      : await crearPotrero.mutateAsync({
-                          empresaId,
-                          campoId: vm.id,
-                          nombre,
-                          estadoCiclo: 'descanso',
-                          hectareas: haMedidas > 0 ? haMedidas : null,
-                        })
+                      : (
+                          await crearPotrero.mutateAsync({
+                            empresaId,
+                            campoId: vm.id,
+                            nombre,
+                            estadoCiclo: 'descanso',
+                            hectareas: haMedidas > 0 ? haMedidas : null,
+                          })
+                        ).id
                     await setPoligono.mutateAsync({ potreroId: id, poligono })
                     // Potrero que ya existía (onboarding, con hectáreas de
                     // memoria): el dibujo manda, las hectáreas pasan a ser las

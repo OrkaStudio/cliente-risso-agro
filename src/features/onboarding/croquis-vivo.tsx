@@ -58,6 +58,8 @@ export type CampoCroquis = {
   hectareas: number | null
   /** Qué se hace en el campo: cambia la textura de los potreros. */
   actividad: ActividadCampo | null
+  /** Color del campo (el de la paleta de Campos): identidad del contorno. */
+  color?: string | null
   potreros: PotreroCroquis[]
   /** Hacienda sin potrero: se dibuja suelta dentro del contorno. */
   sueltas?: CabezasPorCategoria
@@ -83,8 +85,14 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
   const validos = items.filter((i) => i.area > 0)
   if (validos.length === 0) return out
   const total = validos.reduce((s, i) => s + i.area, 0)
-  const escala = (r.w * r.h) / total
-  const restantes = [...validos].sort((x, y) => y.area - x.area).map((i) => ({ clave: i.clave, area: i.area * escala }))
+  // Piso visual: ningún potrero ocupa menos del 2,5 % del croquis. 2 ha en
+  // 1.000 son reales, pero una astilla de 3 px no le dice nada a nadie; el
+  // resto se reescala para que sigan sumando el campo.
+  const piso = total * 0.025
+  const ajustados = validos.map((i) => ({ clave: i.clave, area: Math.max(i.area, piso) }))
+  const totalAjustado = ajustados.reduce((s, i) => s + i.area, 0)
+  const escala = (r.w * r.h) / totalAjustado
+  const restantes = [...ajustados].sort((x, y) => y.area - x.area).map((i) => ({ clave: i.clave, area: i.area * escala }))
   let libre: Rect = { ...r }
 
   const peor = (tira: { area: number }[], lado: number) => {
@@ -124,22 +132,20 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
 
 /**
  * Las siluetas de un potrero: cada especie presente aparece al menos una
- * vez, y el resto de los lugares se reparte proporcional a las cabezas (una
- * silueta representa ~5, pero si no entran, se escala). Cada especie en su
- * fila: se lee por bloques.
+ * vez, cada una en su fila (o filas), el bloque centrado en el potrero.
+ * Una silueta representa ~5 cabezas; si no entran, se reparte lo que hay
+ * en proporción. Nunca se pisa la etiqueta.
  */
 function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number; categoria: Categoria }[] {
   const pasoX = 22
-  const pasoY = 20
-  const x0 = r.x + 12
-  const y0 = r.y + 26 // debajo de la etiqueta
-  const cols = Math.max(0, Math.floor((r.w - 20) / pasoX))
-  const filas = Math.max(0, Math.floor((r.h - 32) / pasoY))
-  const capacidad = cols * filas
+  const pasoY = 18
+  const arriba = 24 // la etiqueta
+  const margen = 8
+  const cols = Math.max(0, Math.floor((r.w - margen * 2) / pasoX))
+  const filas = Math.max(0, Math.floor((r.h - arriba - margen) / pasoY))
   const out: { cx: number; cy: number; categoria: Categoria }[] = []
-  if (capacidad === 0) return out
+  if (cols === 0 || filas === 0) return out
 
-  // Por especie: total de cabezas y la categoría que la representa (la que más tiene).
   const especies = (['bovino', 'ovino', 'equino'] as const)
     .map((e) => {
       const cats = categoriasPorEspecie[e].filter((c) => (cabezas[c] ?? 0) > 0)
@@ -148,29 +154,31 @@ function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number
       return { e, total, principal }
     })
     .filter((x) => x.total > 0 && x.principal)
-  if (especies.length === 0) return out
+  if (especies.length === 0 || especies.length > filas) {
+    // No entran todas las especies en filas propias: una silueta por especie, en una fila.
+    especies.slice(0, cols).forEach((x, k) => {
+      out.push({ cx: r.x + r.w / 2 + (k - (Math.min(especies.length, cols) - 1) / 2) * pasoX, cy: r.y + arriba + pasoY / 2 + 2, categoria: x.principal! })
+    })
+    return out
+  }
   const totalCabezas = especies.reduce((s, x) => s + x.total, 0)
-
-  // Cuántas siluetas por especie: al menos una cada una; el resto
-  // proporcional, sin pasarse de lo que entra (cada especie ocupa fila propia,
-  // así que el tope real es por filas).
-  const objetivo = Math.min(Math.ceil(totalCabezas / 5), capacidad)
-  const cuentas = especies.map((x) => Math.max(1, Math.round((x.total / totalCabezas) * objetivo)))
-
-  let fila = 0
-  especies.forEach((x, idx) => {
-    if (fila >= filas) return
-    const filasQueQuedan = filas - fila
-    // Las últimas especies necesitan al menos una fila cada una.
-    const reservadas = especies.length - idx - 1
-    const filasDisponibles = Math.max(1, filasQueQuedan - reservadas)
-    const n = Math.min(cuentas[idx]!, filasDisponibles * cols)
-    for (let k = 0; k < n; k++) {
-      const col = k % cols
-      const f = fila + Math.floor(k / cols)
-      out.push({ cx: x0 + col * pasoX + 10, cy: y0 + f * pasoY + 7, categoria: x.principal! })
+  // Filas por especie: al menos una; las que sobran, proporcionales.
+  const sobrantes = filas - especies.length
+  const filasPor = especies.map((x) => 1 + Math.floor((x.total / totalCabezas) * sobrantes))
+  // Siluetas por especie: ~1 cada 5, tope por sus filas.
+  const cuentas = especies.map((x, i) => Math.min(Math.max(1, Math.round(x.total / 5)), filasPor[i]! * cols))
+  const filasUsadas = cuentas.map((n) => Math.ceil(n / cols))
+  const altoBloque = filasUsadas.reduce((s, n) => s + n, 0) * pasoY
+  // Centrado vertical en lo que queda bajo la etiqueta.
+  let y = r.y + arriba + Math.max(0, (r.h - arriba - margen - altoBloque) / 2) + pasoY / 2
+  especies.forEach((x, i) => {
+    const n = cuentas[i]!
+    for (let f = 0; f < filasUsadas[i]!; f++) {
+      const enFila = Math.min(cols, n - f * cols)
+      const x0 = r.x + r.w / 2 - ((enFila - 1) * pasoX) / 2
+      for (let k = 0; k < enFila; k++) out.push({ cx: x0 + k * pasoX, cy: y, categoria: x.principal! })
+      y += pasoY
     }
-    fila += Math.ceil(n / cols)
   })
   return out
 }
@@ -201,11 +209,10 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
   const rects = repartir(items, interior)
   const cabezas = campo.potreros.reduce((s, p) => s + totalCabezas(p.cabezas), 0)
 
-  const acento = excede
-    ? 'stroke-destructive'
-    : estado === 'hecho'
-      ? 'stroke-primary'
-      : 'stroke-[#e9b45f]'
+  // El contorno lleva el color del campo (el mismo que en Campos y en el
+  // mapa) apenas existe; antes de eso, el ámbar de "en construcción".
+  const colorContorno = excede ? undefined : (campo.color ?? undefined)
+  const acento = excede ? 'stroke-destructive' : colorContorno ? '' : 'stroke-[#e9b45f]'
 
   return (
     <svg
@@ -236,6 +243,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         height={ALTO - 8}
         rx={14}
         className={cn('fill-sidebar-foreground/[0.04]', acento)}
+        stroke={colorContorno}
         strokeWidth={estado === 'vacio' ? 1.25 : 1.75}
         strokeDasharray={estado === 'hecho' ? undefined : '7 6'}
         initial={false}

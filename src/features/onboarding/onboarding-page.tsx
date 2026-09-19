@@ -12,6 +12,8 @@ import {
   Droplets,
   Footprints,
   Grid2x2,
+  OctagonAlert,
+  TriangleAlert,
   LandPlot,
   PencilRuler,
   Plus,
@@ -29,6 +31,7 @@ import {
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
 import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
+import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
@@ -69,6 +72,8 @@ type CampoCargado = {
   lon: number
   hectareas: number
   tipo: TipoCampo
+  /** Índice del campo en la empresa (trigger de la DB): letra A/B/C y color. */
+  colorIdx: number
   potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorCategoria }[]
   /** Hacienda cargada sin potrero (el campo entero). */
   sueltas?: CabezasPorCategoria
@@ -499,7 +504,7 @@ function PasoCampo({
 
     setOcupado(true)
     try {
-      const id = await crearCampo({
+      const { id, colorIdx } = await crearCampo({
         empresaId,
         nombre: n,
         tipo,
@@ -521,6 +526,7 @@ function PasoCampo({
         lon: localidad.lon,
         hectareas: ha,
         tipo,
+        colorIdx,
         potreros: [],
         cabezas: 0,
       })
@@ -557,7 +563,7 @@ function PasoCampo({
         </Reveal>
 
         <Reveal delay={0.18} className="grid gap-1.5">
-          <Label>¿Qué se hace en este campo?</Label>
+          <Label>¿Qué actividad se hace en este campo?</Label>
           <div className="grid grid-cols-3 gap-2">
             {Constants.public.Enums.actividad_campo.map((a) => (
               <button
@@ -694,12 +700,14 @@ function PasoPotreros({
 }) {
   const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
   const [error, setError] = useState<string | null>(null)
+  // La letra del campo (A, B, C…): la misma que la DB le pone a cada potrero.
+  const letra = colorDeCampo(campo.colorIdx).letra
 
   // Cada cambio de filas avisa al croquis de la escena.
   function cambiarFilas(fn: (fs: FilaPotrero[]) => FilaPotrero[]) {
     const next = fn(filas)
     setFilas(next)
-    onBorrador(next.map((f) => ({ nombre: `${f.numero.trim() || '?'}A`, hectareas: haDe(f) })))
+    onBorrador(next.map((f) => ({ nombre: `${f.numero.trim() || '?'}${letra}`, hectareas: haDe(f) })))
   }
 
   // La regla es una sola: los potreros suman EXACTAMENTE las hectáreas del
@@ -747,11 +755,12 @@ function PasoPotreros({
       // Se manda sólo el número; la DB le pone la letra del campo.
       for (const f of filas) {
         const hectareas = haDe(f)
-        const nombre = `${f.numero.trim()}A`
-        const id = await crearPotrero({
+        // Se manda el número; el nombre real (con la letra del campo) lo
+        // devuelve la DB.
+        const { id, nombre } = await crearPotrero({
           empresaId,
           campoId: campo.id,
-          nombre,
+          nombre: f.numero.trim(),
           estadoCiclo: estadoInicialPorActividad(campo.actividad),
           hectareas,
         })
@@ -1271,13 +1280,9 @@ function PasoHacienda({
         </Reveal>
 
         {error ? (
-          <p className="mt-3 text-xs text-destructive" role="alert">
-            {error}
-          </p>
+          <Aviso tono="error">{error}</Aviso>
         ) : avisoActual ? (
-          <p className={cn('mt-3 text-xs', avisoActual.bloquea ? 'text-destructive' : 'text-amber-700')} role="status">
-            {avisoActual.texto}
-          </p>
+          <Aviso tono={avisoActual.bloquea ? 'error' : 'atencion'}>{avisoActual.texto}</Aviso>
         ) : null}
         <Reveal delay={0.22} className="mt-5 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
@@ -1382,6 +1387,7 @@ function EscenaCroquis({
             nombre: campoActual.nombre,
             hectareas: campoActual.hectareas,
             actividad: campoActual.actividad,
+            color: colorDeCampo(campoActual.colorIdx).hex,
             potreros: borrador.potreros.map((p, i) => ({
               clave: `${i}`,
               nombre: p.nombre,
@@ -1395,6 +1401,7 @@ function EscenaCroquis({
               nombre: campoActual.nombre,
               hectareas: campoActual.hectareas,
               actividad: campoActual.actividad,
+              color: colorDeCampo(campoActual.colorIdx).hex,
               potreros: campoActual.potreros.map((p) => ({
                 clave: p.id,
                 nombre: p.nombre,
@@ -1409,6 +1416,7 @@ function EscenaCroquis({
                 nombre: ultimo.nombre,
                 hectareas: ultimo.hectareas,
                 actividad: ultimo.actividad,
+                color: colorDeCampo(ultimo.colorIdx).hex,
                 potreros: ultimo.potreros.map((p) => ({
                   clave: p.id,
                   nombre: p.nombre,
@@ -1459,6 +1467,18 @@ function EscenaCroquis({
       <div className="mt-5 overflow-hidden rounded-2xl border border-sidebar-foreground/10 bg-[#0b1a10]/70 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-sm">
         {/* Encabezado: qué campo, qué actividad, en qué parte va. */}
         <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 border-b border-sidebar-foreground/10 px-4 py-2.5">
+          {(() => {
+            const c = enCampo ? campoActual : ultimo
+            return c ? (
+              <span
+                className="inline-flex size-6 items-center justify-center rounded-md text-[12px] font-bold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
+                style={{ background: colorDeCampo(c.colorIdx).hex }}
+                title={`Campo ${colorDeCampo(c.colorIdx).letra} · ${colorDeCampo(c.colorIdx).nombre}`}
+              >
+                {colorDeCampo(c.colorIdx).letra}
+              </span>
+            ) : null
+          })()}
           <span className="font-semibold">
             {enCampo
               ? croquis.nombre || (campos.length === 0 ? 'Tu primer campo' : 'Otro campo')
@@ -1534,7 +1554,12 @@ function EscenaCroquis({
               key={c.id}
               className="inline-flex items-center gap-1.5 rounded-full border border-sidebar-foreground/15 bg-[#0b1a10]/70 px-2.5 py-1 text-xs text-sidebar-foreground/85"
             >
-              <Check className="size-3 text-primary" strokeWidth={3} />
+              <span
+                className="inline-flex size-4 items-center justify-center rounded text-[10px] font-bold text-white"
+                style={{ background: colorDeCampo(c.colorIdx).hex }}
+              >
+                {colorDeCampo(c.colorIdx).letra}
+              </span>
               {c.nombre}
               <span className="text-sidebar-foreground/50">
                 · {ha(c.hectareas)} ha{c.cabezas > 0 ? ` · ${c.cabezas} cab.` : ''}
@@ -1689,6 +1714,32 @@ function CampoAlFinal({ campo }: { campo: CampoCargado }) {
   )
 }
 
+/**
+ * Un aviso con forma: ícono, fondo suave y borde del tono. Reemplaza al
+ * texto rojo suelto — un número que no cierra merece una tarjeta que se
+ * lea, no una línea que asuste.
+ */
+function Aviso({ tono, children }: { tono: 'error' | 'atencion'; children: ReactNode }) {
+  const Icono = tono === 'error' ? OctagonAlert : TriangleAlert
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      role={tono === 'error' ? 'alert' : 'status'}
+      className={cn(
+        'mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[13px] leading-snug',
+        tono === 'error'
+          ? 'border-destructive/30 bg-destructive/5 text-destructive'
+          : 'border-amber-300/70 bg-amber-50 text-amber-800',
+      )}
+    >
+      <Icono className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
+      <span>{children}</span>
+    </motion.div>
+  )
+}
+
 /** Qué se hace en el campo, con su ícono: aparece apenas lo elige y queda. */
 function ChipActividad({ actividad }: { actividad: ActividadCampo | null }) {
   if (!actividad) return null
@@ -1702,7 +1753,7 @@ function ChipActividad({ actividad }: { actividad: ActividadCampo | null }) {
     >
       {actividad !== 'agricola' && <Beef className="size-3" strokeWidth={2} />}
       {actividad !== 'ganadera' && <Wheat className="size-3" strokeWidth={2} />}
-      {actividadLabel[actividad]}
+      Actividad {actividadLabel[actividad].toLowerCase()}
     </motion.span>
   )
 }

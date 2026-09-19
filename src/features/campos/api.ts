@@ -179,7 +179,7 @@ export async function crearCampo(input: {
   hectareas?: number | null
   actividad?: ActividadCampo | null
   ubicacion?: Partial<UbicacionCampo>
-}): Promise<string> {
+}): Promise<{ id: string; colorIdx: number }> {
   const { data, error } = await supabase
     .from('campo')
     .insert({
@@ -193,10 +193,12 @@ export async function crearCampo(input: {
       lat: input.ubicacion?.lat ?? null,
       lon: input.ubicacion?.lon ?? null,
     })
-    .select('id')
+    .select('id, color_idx')
     .single()
   if (error) throw new Error(error.message)
-  return data.id
+  // color_idx lo asigna el trigger de la DB (0, 1, 2… por empresa): de ahí
+  // salen la letra (A, B, C…) y el color del campo. Ver colorDeCampo.
+  return { id: data.id, colorIdx: data.color_idx ?? 0 }
 }
 
 export async function actualizarCampo(input: {
@@ -260,13 +262,17 @@ export async function listPotreros(campoId: string): Promise<Potrero[]> {
   return data
 }
 
+/**
+ * Alta de potrero. Se manda el NÚMERO; la LETRA la pone el trigger de la DB
+ * (la del campo: 1A en el campo A, 1B en el B). Devuelve el nombre real.
+ */
 export async function crearPotrero(input: {
   empresaId: string
   campoId: string
   nombre: string
   estadoCiclo: EstadoCiclo
   hectareas?: number | null
-}): Promise<string> {
+}): Promise<{ id: string; nombre: string }> {
   const { data, error } = await supabase
     .from('potrero')
     .insert({
@@ -276,10 +282,10 @@ export async function crearPotrero(input: {
       estado_ciclo: input.estadoCiclo,
       hectareas: input.hectareas ?? null,
     })
-    .select('id')
+    .select('id, nombre')
     .single()
   if (error) throw new Error(error.message)
-  return data.id
+  return { id: data.id, nombre: data.nombre }
 }
 
 export async function actualizarPotrero(input: {
