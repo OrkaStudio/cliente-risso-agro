@@ -12,12 +12,21 @@ export const useCamposConPotreros = () =>
   })
 
 export const useCampo = (id: string) =>
-  useQuery({ queryKey: ['campo', id], queryFn: () => api.getCampo(id) })
+  useQuery({
+    queryKey: ['campo', id],
+    queryFn: () => api.getCampo(id),
+    enabled: !!id,
+  })
 
+// Sin campo elegido no hay nada que pedir: la consulta salía con
+// `campo_id=eq.` vacío y Postgres la rechazaba con un 400 ("invalid input
+// syntax for type uuid"). No rompía nada visible, pero ensuciaba la consola y
+// gastaba un viaje en cada apertura del diálogo de carga.
 export const usePotreros = (campoId: string) =>
   useQuery({
     queryKey: ['potreros-campo', campoId],
     queryFn: () => api.listPotreros(campoId),
+    enabled: !!campoId,
   })
 
 export function useCrearCampo() {
