@@ -9,7 +9,7 @@ export const useVencimientos = () =>
   useQuery({ queryKey: ['vencimientos'], queryFn: listVencimientos })
 
 /** Invalida todo lo que depende del estado de los movimientos. */
-function useInvalidarMovimientos() {
+export function useInvalidarMovimientos() {
   const qc = useQueryClient()
   return () => {
     qc.invalidateQueries({ queryKey: ['vencimientos'] })

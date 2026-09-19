@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CalendarClock, ChevronDown } from 'lucide-react'
+import { ArrowRight, CalendarClock, ChevronDown, Receipt } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useCamposConPotreros } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
@@ -20,6 +20,8 @@ import {
   type Periodo,
 } from '@/features/analitica/compute'
 import { CargarDialog } from '@/features/analitica/cargar-dialog'
+import { Button } from '@/components/ui/button'
+import { AlquilerDialog } from '@/features/analitica/alquiler-dialog'
 import { RentabilidadActividad } from '@/features/analitica/rentabilidad-actividad'
 import { PosicionIva } from '@/features/analitica/posicion-iva'
 import {
@@ -58,6 +60,7 @@ export function AnaliticaPage() {
     () => searchParams.get('campo'),
   )
   const [periodo, setPeriodo] = useState<Periodo>('12m')
+  const [alquilerAbierto, setAlquilerAbierto] = useState(false)
 
   const nombreCampo =
     (campos.data ?? []).find((c) => c.id === campoF)?.nombre ?? null
@@ -197,6 +200,12 @@ export function AnaliticaPage() {
                 })),
               ]}
             />
+            <div data-guia="analitica-alquiler">
+              <Button variant="outline" onClick={() => setAlquilerAbierto(true)}>
+                <Receipt className="size-4" /> Cargar un alquiler
+              </Button>
+              <AlquilerDialog empresaId={empresaId} open={alquilerAbierto} onOpenChange={setAlquilerAbierto} />
+            </div>
             <div data-guia="analitica-cargar">
               <CargarDialog empresaId={empresaId} />
             </div>

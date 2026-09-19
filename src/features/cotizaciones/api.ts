@@ -230,3 +230,28 @@ export async function cargarGordo(input: {
   })
   if (error) throw new Error(error.message)
 }
+
+export type NovilloCanuelas = {
+  /** $ por kg vivo, promedio general de NOVILLOS del último remate. */
+  valor: number
+  /** Fecha del remate (YYYY-MM-DD). */
+  fecha: string
+  fuente: string
+  categorias: { nombre: string; promedio: number; cabezas: number }[]
+}
+
+/**
+ * Precio del novillo de Cañuelas, traído por la edge function
+ * `precio-novillo` (la página no manda CORS). Es la referencia automática:
+ * el ticker lo muestra y el alquiler pactado en kilos lo usa sin preguntar.
+ * La carga manual (`cargarGordo`) queda para quien usa otra referencia (su
+ * consignatario, ROSGAN).
+ */
+export async function getNovilloCanuelas(): Promise<NovilloCanuelas> {
+  const { data, error } = await supabase.functions.invoke<NovilloCanuelas | { error: string }>('precio-novillo', {
+    method: 'GET',
+  })
+  if (error) throw new Error(error.message)
+  if (!data || 'error' in data) throw new Error((data as { error?: string })?.error ?? 'Sin precio')
+  return data
+}

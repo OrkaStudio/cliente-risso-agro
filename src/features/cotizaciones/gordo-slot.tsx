@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Beef, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { GORDO_FUENTE } from '@/features/cotizaciones/api'
-import { useCargarGordo, useGordoActual } from '@/features/cotizaciones/hooks'
+import { useCargarGordo, useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,11 +24,23 @@ const fieldClass =
   'w-full rounded-[10px] border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgba(16,24,19,0.05)] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-field-soft'
 
 /**
- * Slot del gordo en el ticker. Carga manual (no hay API confiable):
- * muestra el último precio cargado y abre un diálogo para actualizarlo.
+ * Slot del gordo en el ticker. El precio sale solo de Cañuelas (edge
+ * function); la carga manual queda de respaldo: si el productor cargó uno
+ * más nuevo que el remate, o Cañuelas no responde, se muestra el suyo.
  */
 export function GordoSlot({ empresaId }: { empresaId: string }) {
-  const gordo = useGordoActual(empresaId)
+  const manual = useGordoActual(empresaId)
+  const canuelas = useNovilloCanuelas()
+  // El más reciente manda; a igual fecha, el manual (lo puso él a propósito).
+  const gordo = {
+    ...manual,
+    data:
+      canuelas.data && (!manual.data || canuelas.data.fecha > manual.data.fecha)
+        ? { valor: canuelas.data.valor, fecha: canuelas.data.fecha, auto: true }
+        : manual.data
+          ? { ...manual.data, auto: false }
+          : null,
+  }
   const cargar = useCargarGordo()
   const [open, setOpen] = useState(false)
   const [valor, setValor] = useState('')
@@ -64,7 +76,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           type="button"
           onClick={abrir}
           disabled={!empresaId}
-          title={`Gordo — $${gordo.data.valor.toLocaleString('es-AR')}/kg · ${fmtFecha(gordo.data.fecha)} · tocá para actualizar`}
+          title={`Gordo — $${gordo.data.valor.toLocaleString('es-AR')}/kg · ${fmtFecha(gordo.data.fecha)}${gordo.data.auto ? ' · Cañuelas, promedio novillos' : ' · cargado a mano'} · tocá para actualizar`}
           className="flex shrink-0 items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-white/[0.07]"
         >
           <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">

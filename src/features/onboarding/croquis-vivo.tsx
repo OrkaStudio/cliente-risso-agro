@@ -73,30 +73,54 @@ const ALTO = 200
 const MARGEN = 14
 
 /**
- * Reparto por bipartición: divide la lista en dos mitades de área parecida,
- * corta el rectángulo por el lado largo en esa proporción, y sigue. Da
- * rectángulos de proporción razonable sin importar el orden.
+ * Reparto en tiras (squarified treemap simplificado): los potreros se
+ * ordenan de mayor a menor y se van llenando tiras a lo largo del lado
+ * corto; cada tira se cierra cuando agregar el siguiente empeoraría la
+ * proporción de sus rectángulos. Da cuadrados razonables, sin astillas ni
+ * solapamientos, con cualquier mezcla de tamaños.
  */
 function repartir(items: { clave: string; area: number }[], r: Rect): Record<string, Rect> {
-  if (items.length === 0) return {}
-  if (items.length === 1) return { [items[0]!.clave]: r }
-  const total = items.reduce((s, i) => s + i.area, 0)
-  let acumulado = 0
-  let corte = 1
-  for (let i = 0; i < items.length - 1; i++) {
-    acumulado += items[i]!.area
-    corte = i + 1
-    if (acumulado >= total / 2) break
+  const out: Record<string, Rect> = {}
+  const validos = items.filter((i) => i.area > 0)
+  if (validos.length === 0) return out
+  const total = validos.reduce((s, i) => s + i.area, 0)
+  const escala = (r.w * r.h) / total
+  const restantes = [...validos].sort((x, y) => y.area - x.area).map((i) => ({ clave: i.clave, area: i.area * escala }))
+  let libre: Rect = { ...r }
+
+  const peor = (tira: { area: number }[], lado: number) => {
+    const suma = tira.reduce((s, i) => s + i.area, 0)
+    const grosor = suma / lado
+    let w = 0
+    for (const i of tira) {
+      const largo = i.area / grosor
+      w = Math.max(w, Math.max(largo / grosor, grosor / largo))
+    }
+    return w
   }
-  const a = items.slice(0, corte)
-  const b = items.slice(corte)
-  const fa = a.reduce((s, i) => s + i.area, 0) / total
-  const horizontal = r.w >= r.h
-  const ra: Rect = horizontal ? { ...r, w: r.w * fa } : { ...r, h: r.h * fa }
-  const rb: Rect = horizontal
-    ? { ...r, x: r.x + r.w * fa, w: r.w * (1 - fa) }
-    : { ...r, y: r.y + r.h * fa, h: r.h * (1 - fa) }
-  return { ...repartir(a, ra), ...repartir(b, rb) }
+
+  while (restantes.length > 0) {
+    const horizontal = libre.w >= libre.h
+    const lado = horizontal ? libre.h : libre.w
+    const tira: { clave: string; area: number }[] = [restantes.shift()!]
+    while (restantes.length > 0 && peor([...tira, restantes[0]!], lado) <= peor(tira, lado)) {
+      tira.push(restantes.shift()!)
+    }
+    const suma = tira.reduce((s, i) => s + i.area, 0)
+    const grosor = suma / lado
+    let avance = 0
+    for (const i of tira) {
+      const largo = i.area / grosor
+      out[i.clave] = horizontal
+        ? { x: libre.x, y: libre.y + avance, w: grosor, h: largo }
+        : { x: libre.x + avance, y: libre.y, w: largo, h: grosor }
+      avance += largo
+    }
+    libre = horizontal
+      ? { x: libre.x + grosor, y: libre.y, w: libre.w - grosor, h: libre.h }
+      : { x: libre.x, y: libre.y + grosor, w: libre.w, h: libre.h - grosor }
+  }
+  return out
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   MapPin,
   MapPinned,
   PencilRuler,
+  Receipt,
   Smartphone,
   type LucideIcon,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ const ICONO_PASO: Record<ItemChecklist['id'], LucideIcon> = {
   potreros: PencilRuler,
   hacienda: Beef,
   tropas: MapPin,
+  alquiler: Receipt,
   recorrida: Footprints,
 }
 
