@@ -45,7 +45,6 @@ import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import {
   categoriaLabel,
-  categoriaNombre,
   categoriasPorEspecie,
   especieLabel,
   type Especie,
@@ -143,13 +142,9 @@ export function OnboardingPage() {
   useEffect(() => {
     document.querySelector<HTMLElement>('[data-auth-scroll]')?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [etapa])
-  // El aha del día 0: al terminar, la app ya sabe el clima de SU campo.
-  const primero = campos[0]
-  const clima = useClima(
-    etapa === 'fin' && primero
-      ? { nombre: primero.nombre, lat: primero.lat, lon: primero.lon }
-      : null,
-  )
+  // El campo por el que sigue: el primero que tiene potreros (si ninguno,
+  // el primero cargado). Nunca "el primero" como si fuera toda la empresa.
+  const primero = campos.find((c) => c.potreros.length > 0) ?? campos[0]
 
   // Si ya pertenece a una empresa y no la creó en este wizard, no va acá.
   if (!isLoading && membresia && !empresaId) {
@@ -366,61 +361,16 @@ export function OnboardingPage() {
               </span>
               <h1 className="mt-5 text-2xl font-bold tracking-tight">¡Listo, {empresa}!</h1>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                La app ya sabe de tu campo.
+                {campos.length === 1 ? 'La app ya sabe de tu campo.' : `La app ya sabe de tus ${campos.length} campos.`}
               </p>
             </div>
 
-            {/* Valor ya, no promesa: el clima de SU campo hoy, y lo que cargó. */}
-            <div className="mt-6 rounded-lg border border-border">
-              <div className="flex items-center gap-3 px-3.5 py-3">
-                {clima.data ? (
-                  <>
-                    <WmoIcon code={clima.data.code} className="size-8 shrink-0 text-accent" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-muted-foreground">
-                        Hoy en {primero.nombre} · {primero.localidad}
-                      </p>
-                      <p className="text-[15px] font-semibold">
-                        {clima.data.temp}°{' '}
-                        <span className="font-normal text-muted-foreground">
-                          {clima.data.max}° / {clima.data.min}° · {clima.data.descripcion}
-                        </span>
-                      </p>
-                    </div>
-                    {clima.data.helada ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-sky/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky">
-                        <Snowflake className="size-3" /> Helada
-                      </span>
-                    ) : clima.data.lluviaProb >= 30 ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-sky">
-                        <Droplets className="size-3.5" /> {clima.data.lluviaProb}%
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {clima.isLoading ? 'Buscando el clima de tu campo…' : `Tu campo en ${primero.localidad}.`}
-                  </p>
-                )}
-              </div>
-              <ul className="divide-y divide-border border-t border-border text-sm">
-                {campos.map((c) => (
-                  <li key={c.id} className="flex items-center gap-2.5 px-3.5 py-2">
-                    <LandPlot className="size-4 shrink-0 text-primary/80" strokeWidth={1.75} />
-                    <div className="min-w-0">
-                      <p className="font-medium">{c.nombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {ha(c.hectareas)} ha
-                        {c.potreros.length > 0
-                          ? ` · ${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}`
-                          : ' · sin potreros todavía'}
-                        {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Valor ya, no promesa: cada campo con SU clima de hoy y lo que cargó. */}
+            <ul className="mt-6 divide-y divide-border rounded-lg border border-border">
+              {campos.map((c) => (
+                <CampoAlFinal key={c.id} campo={c} />
+              ))}
+            </ul>
 
             {/* UN solo siguiente paso, nombrado y con su costo en tiempo. */}
             <div className="mt-5 flex items-start gap-3 rounded-lg bg-primary/5 px-3.5 py-3">
@@ -1001,6 +951,33 @@ function totalDe(c: Cantidades | undefined): number {
   return Object.values(c ?? {}).reduce((s, v) => s + (parseInt(v ?? '', 10) || 0), 0)
 }
 
+/**
+ * Aviso de carga animal. Bloquea si supera lo que la base acepta por vez
+ * (2.000) o si no cierra con las hectáreas (más de 10 por ha); avisa, sin
+ * bloquear, entre 4 y 10 por ha.
+ */
+function avisoCarga(cabezas: number, hectareas: number | null): { texto: string; bloquea: boolean } | null {
+  if (cabezas <= 0) return null
+  if (cabezas > 2000)
+    return {
+      texto: `${cabezas.toLocaleString('es-AR')} cabezas es más de lo que se carga de una vez (2.000). Si son tantas, cargalas en dos tandas desde Hacienda.`,
+      bloquea: true,
+    }
+  if (!hectareas) return null
+  const porHa = cabezas / hectareas
+  if (porHa > 10)
+    return {
+      texto: `${cabezas.toLocaleString('es-AR')} cabezas en ${hectareas.toLocaleString('es-AR')} ha son ${Math.round(porHa)} por hectárea. Revisá el número: lo normal es alrededor de 1.`,
+      bloquea: true,
+    }
+  if (porHa > 4)
+    return {
+      texto: `${Math.round(porHa)} cabezas por hectárea es mucho para ${hectareas.toLocaleString('es-AR')} ha. Si está bien, seguí.`,
+      bloquea: false,
+    }
+  return null
+}
+
 function totalDeEspecie(c: Cantidades | undefined, e: Especie): number {
   return categoriasPorEspecie[e].reduce((s, cat) => s + (parseInt(c?.[cat] ?? '', 10) || 0), 0)
 }
@@ -1054,6 +1031,11 @@ function PasoHacienda({
   const actual = potreros[indice]!
   const cantActual = porPotrero[actual.id] ?? {}
   const totalActual = totalDe(cantActual)
+  // Un número que no cierra con las hectáreas se avisa antes de guardar.
+  // Referencia: en la pampa húmeda la carga ronda 1 cabeza/ha (INTA); diez
+  // veces eso no pasa ni en un feedlot chico. Y la base carga hasta 2.000
+  // por potrero por vez: más que eso se hace en dos tandas desde Hacienda.
+  const avisoActual = avisoCarga(totalActual, actual.hectareas)
   const total = potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
   const esUltimo = indice === potreros.length - 1
 
@@ -1069,7 +1051,16 @@ function PasoHacienda({
     // Enter o el botón: en un potrero intermedio pasa al siguiente; en el
     // último guarda todo.
     if (!esUltimo) {
+      if (avisoActual?.bloquea) {
+        setError(avisoActual.texto)
+        return
+      }
       irA(indice + 1)
+      return
+    }
+    const bloqueado = potreros.find((p) => avisoCarga(totalDe(porPotrero[p.id]), p.hectareas)?.bloquea)
+    if (bloqueado) {
+      setError(`Potrero ${bloqueado.nombre}: ${avisoCarga(totalDe(porPotrero[bloqueado.id]), bloqueado.hectareas)!.texto}`)
       return
     }
     const totales = Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(porPotrero[p.id])]))
@@ -1279,11 +1270,15 @@ function PasoHacienda({
           </AnimatePresence>
         </Reveal>
 
-        {error && (
+        {error ? (
           <p className="mt-3 text-xs text-destructive" role="alert">
             {error}
           </p>
-        )}
+        ) : avisoActual ? (
+          <p className={cn('mt-3 text-xs', avisoActual.bloquea ? 'text-destructive' : 'text-amber-700')} role="status">
+            {avisoActual.texto}
+          </p>
+        ) : null}
         <Reveal delay={0.22} className="mt-5 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
             {ocupado ? (
@@ -1513,27 +1508,17 @@ function EscenaCroquis({
               acento={cabezasCroquis > 0}
             />
           </div>
+          {/* Una línea: la silueta y el total de cada especie. El detalle por
+              categoría vive en la tarjeta, donde lo está cargando. */}
           {porEspecieCroquis.length > 0 && (
-            <ul className="mt-2.5 grid gap-1 border-t border-sidebar-foreground/10 pt-2.5 text-[12.5px]">
+            <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-sidebar-foreground/10 pt-2.5 text-[13px]">
               {porEspecieCroquis.map(({ especie, total, categorias }) => (
-                <li key={especie} className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                  <span className="inline-flex w-[104px] shrink-0 items-center gap-1.5 font-semibold tabular-nums">
-                    <span
-                      className="inline-block size-2 rounded-full"
-                      style={{ background: ESTILO_ESPECIE[especie].color }}
-                    />
-                    {total} {ESTILO_ESPECIE[especie].nombre}
-                  </span>
-                  <span className="flex flex-wrap gap-x-2.5 text-sidebar-foreground/70">
-                    {categorias.map(([c, n]) => (
-                      <span key={c} className="inline-flex items-center gap-1 tabular-nums">
-                        <svg width="16" height="12" viewBox="-11 -8 22 16" aria-hidden>
-                          <MarcaCategoria categoria={c} />
-                        </svg>
-                        {n} {categoriaNombre(c, n).toLowerCase()}
-                      </span>
-                    ))}
-                  </span>
+                <li key={especie} className="inline-flex items-center gap-1.5 tabular-nums">
+                  <svg width="20" height="14" viewBox="-11 -8 22 16" aria-hidden>
+                    <MarcaCategoria categoria={categorias[0]![0]} />
+                  </svg>
+                  <span className="font-semibold">{total}</span>
+                  <span className="text-sidebar-foreground/70">{ESTILO_ESPECIE[especie].nombre}</span>
                 </li>
               ))}
             </ul>
@@ -1658,6 +1643,49 @@ function ProgresoOnboarding({ etapa }: { etapa: Etapa }) {
         )}
       </p>
     </div>
+  )
+}
+
+/**
+ * Una fila del cierre: el campo, lo que cargó y el clima de hoy en SU
+ * localidad — cada campo consulta el suyo, porque el clima es por campo.
+ */
+function CampoAlFinal({ campo }: { campo: CampoCargado }) {
+  const clima = useClima({ nombre: campo.nombre, lat: campo.lat, lon: campo.lon })
+  return (
+    <li className="flex items-center gap-3 px-3.5 py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">
+          {campo.nombre} <span className="font-normal text-muted-foreground">· {campo.localidad}</span>
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {ha(campo.hectareas)} ha
+          {campo.potreros.length > 0
+            ? ` · ${campo.potreros.length} ${campo.potreros.length === 1 ? 'potrero' : 'potreros'}`
+            : ' · sin potreros todavía'}
+          {campo.cabezas > 0 ? ` · ${campo.cabezas} cabezas` : ''}
+        </p>
+      </div>
+      {clima.data ? (
+        <div className="flex shrink-0 items-center gap-2" title={clima.data.descripcion}>
+          {clima.data.helada ? (
+            <Snowflake className="size-4 text-sky" />
+          ) : clima.data.lluviaProb >= 30 ? (
+            <Droplets className="size-4 text-sky" />
+          ) : (
+            <WmoIcon code={clima.data.code} className="size-6 text-accent" />
+          )}
+          <p className="text-right leading-tight">
+            <span className="text-[15px] font-semibold tabular-nums">{clima.data.temp}°</span>
+            <span className="block text-[11px] tabular-nums text-muted-foreground">
+              {clima.data.max}° / {clima.data.min}°
+            </span>
+          </p>
+        </div>
+      ) : (
+        <span className="text-[11px] text-muted-foreground">{clima.isLoading ? 'clima…' : ''}</span>
+      )}
+    </li>
   )
 }
 
