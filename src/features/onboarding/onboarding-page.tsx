@@ -29,7 +29,7 @@ import {
   ErrorCampo,
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
-import { crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
+import { actualizarCampo, crearCampo, crearPotrero, type ActividadCampo } from '@/features/campos/api'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
@@ -68,6 +68,7 @@ type CampoCargado = {
   nombre: string
   actividad: ActividadCampo
   localidad: string
+  provincia: string
   lat: number
   lon: number
   hectareas: number
@@ -141,6 +142,8 @@ export function OnboardingPage() {
   const [campos, setCampos] = useState<CampoCargado[]>([])
   const [campoActual, setCampoActual] = useState<CampoCargado | null>(null)
   const [borrador, setBorrador] = useState<Borrador>(BORRADOR_VACIO)
+  // Volvió de potreros a corregir el campo (se pasó de hectáreas, etc.).
+  const [corrigiendo, setCorrigiendo] = useState(false)
 
   // Al cambiar de paso, arriba de todo: en el teléfono el croquis está sobre
   // la tarjeta, y ver cómo quedó lo que acaba de cargar es el premio.
@@ -244,24 +247,29 @@ export function OnboardingPage() {
         )}
 
         {etapa === 'campo' && empresaId && (
-          <Paso key={`campo-${campos.length}`}>
-            <Logrado>
-              {campos.length === 0
-                ? `¡${empresa} ya tiene su lugar!`
-                : `${campos[campos.length - 1]!.nombre} cargado`}
-            </Logrado>
+          <Paso key={`campo-${campos.length}-${corrigiendo ? 'edit' : 'new'}`}>
+            {!corrigiendo && (
+              <Logrado>
+                {campos.length === 0
+                  ? `¡${empresa} ya tiene su lugar!`
+                  : `${campos[campos.length - 1]!.nombre} cargado`}
+              </Logrado>
+            )}
             <PasoCampo
               empresaId={empresaId}
               primero={campos.length === 0}
+              existente={corrigiendo ? campoActual : null}
               ocupado={ocupado}
               setOcupado={setOcupado}
               onBorrador={(campo) => setBorrador({ ...BORRADOR_VACIO, campo })}
               onVolver={() => {
                 setBorrador(BORRADOR_VACIO)
-                setEtapa('otro')
+                setCorrigiendo(false)
+                setEtapa(corrigiendo ? 'potreros' : 'otro')
               }}
               onListo={(c) => {
                 setBorrador(BORRADOR_VACIO)
+                setCorrigiendo(false)
                 setCampoActual(c)
                 setEtapa('potreros')
               }}
@@ -278,6 +286,11 @@ export function OnboardingPage() {
               ocupado={ocupado}
               setOcupado={setOcupado}
               onBorrador={(potreros) => setBorrador({ ...BORRADOR_VACIO, potreros })}
+              onCorregirCampo={() => {
+                setBorrador(BORRADOR_VACIO)
+                setCorrigiendo(true)
+                setEtapa('campo')
+              }}
               onListo={(potreros) => {
                 setBorrador(BORRADOR_VACIO)
                 const c = { ...campoActual, potreros }
@@ -494,6 +507,7 @@ function PasoCampo({
   onBorrador,
   onVolver,
   onListo,
+  existente = null,
 }: {
   empresaId: string
   primero: boolean
@@ -503,12 +517,18 @@ function PasoCampo({
   /** Se arrepintió de "otro campo": vuelve a la pregunta. */
   onVolver: () => void
   onListo: (c: CampoCargado) => void
+  /** Volvió desde potreros a corregir: el campo ya existe, se actualiza. */
+  existente?: CampoCargado | null
 }) {
-  const [nombre, setNombre] = useState('')
-  const [tipo, setTipo] = useState<TipoCampo>('propio')
-  const [actividad, setActividad] = useState<ActividadCampo | null>(null)
-  const [localidad, setLocalidad] = useState<Localidad | null>(null)
-  const [hectareas, setHectareas] = useState('')
+  const [nombre, setNombre] = useState(existente?.nombre ?? '')
+  const [tipo, setTipo] = useState<TipoCampo>(existente?.tipo ?? 'propio')
+  const [actividad, setActividad] = useState<ActividadCampo | null>(existente?.actividad ?? null)
+  const [localidad, setLocalidad] = useState<Localidad | null>(
+    existente
+      ? { nombre: existente.localidad, provincia: existente.provincia, lat: existente.lat, lon: existente.lon }
+      : null,
+  )
+  const [hectareas, setHectareas] = useState(existente ? String(existente.hectareas).replace('.', ',') : '')
   const [errores, setErrores] = useState<{
     nombre?: string
     actividad?: string
@@ -533,24 +553,22 @@ function PasoCampo({
 
     setOcupado(true)
     try {
-      const { id, colorIdx } = await crearCampo({
-        empresaId,
-        nombre: n,
-        tipo,
-        hectareas: ha,
-        actividad,
-        ubicacion: {
-          localidad: localidad.nombre,
-          provincia: localidad.provincia,
-          lat: localidad.lat,
-          lon: localidad.lon,
-        },
-      })
+      const ubicacion = {
+        localidad: localidad.nombre,
+        provincia: localidad.provincia,
+        lat: localidad.lat,
+        lon: localidad.lon,
+      }
+      const { id, colorIdx } = existente
+        ? (await actualizarCampo({ id: existente.id, nombre: n, tipo, hectareas: ha, actividad, ubicacion }),
+          { id: existente.id, colorIdx: existente.colorIdx })
+        : await crearCampo({ empresaId, nombre: n, tipo, hectareas: ha, actividad, ubicacion })
       onListo({
         id,
         nombre: n,
         actividad,
         localidad: localidad.nombre,
+        provincia: localidad.provincia,
         lat: localidad.lat,
         lon: localidad.lon,
         hectareas: ha,
@@ -570,7 +588,7 @@ function PasoCampo({
     <>
       <AuthHeading
         icono={LandPlot}
-        titulo={primero ? 'Tu primer campo' : 'Otro campo'}
+        titulo={existente ? `Corregir ${existente.nombre}` : primero ? 'Tu primer campo' : 'Otro campo'}
         subtitulo="Cómo se llama, qué se hace, dónde está y cuántas hectáreas tiene."
       />
       <form onSubmit={guardar} className="mt-5 grid gap-3.5" noValidate>
@@ -689,7 +707,7 @@ function PasoCampo({
         <ErrorCampo mensaje={errores.general} />
         <Reveal delay={0.32} className="mt-2 grid gap-2">
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
-            {ocupado ? 'Guardando…' : 'Guardar el campo'}
+            {ocupado ? 'Guardando…' : existente ? 'Guardar los cambios' : 'Guardar el campo'}
           </Button>
           {!primero && (
             <Button
@@ -718,6 +736,7 @@ function PasoPotreros({
   ocupado,
   setOcupado,
   onBorrador,
+  onCorregirCampo,
   onListo,
 }: {
   empresaId: string
@@ -725,6 +744,8 @@ function PasoPotreros({
   ocupado: boolean
   setOcupado: (v: boolean) => void
   onBorrador: (p: Borrador['potreros']) => void
+  /** Se pasó de hectáreas: probablemente las del campo estaban mal. */
+  onCorregirCampo: () => void
   onListo: (potreros: CampoCargado['potreros']) => void
 }) {
   const [filas, setFilas] = useState<FilaPotrero[]>([{ numero: '1', hectareas: '' }])
@@ -922,6 +943,18 @@ function PasoPotreros({
                 {estado}
               </span>
             </div>
+            {excede && (
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                ¿Las hectáreas del campo estaban mal?
+                <button
+                  type="button"
+                  onClick={onCorregirCampo}
+                  className="inline-flex h-7 items-center gap-1 rounded-md border border-input px-2 font-medium text-foreground hover:border-ring"
+                >
+                  <ArrowLeft className="size-3" /> Corregir el campo
+                </button>
+              </p>
+            )}
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border">
               <motion.div
                 className={cn('h-full rounded-full', excede || repetido ? 'bg-destructive' : 'bg-primary')}
@@ -998,19 +1031,19 @@ function avisoCarga(cabezas: number, hectareas: number | null): { texto: string;
   if (cabezas <= 0) return null
   if (cabezas > 2000)
     return {
-      texto: `${cabezas.toLocaleString('es-AR')} cabezas es más de lo que se carga de una vez (2.000). Si son tantas, cargalas en dos tandas desde Hacienda.`,
+      texto: `Hasta 2.000 por potrero de una vez. Las que sobren, después desde Hacienda.`,
       bloquea: true,
     }
   if (!hectareas) return null
   const porHa = cabezas / hectareas
   if (porHa > 10)
     return {
-      texto: `${cabezas.toLocaleString('es-AR')} cabezas en ${hectareas.toLocaleString('es-AR')} ha son ${Math.round(porHa)} por hectárea. Revisá el número: lo normal es alrededor de 1.`,
+      texto: `${Math.round(porHa)} cabezas por hectárea no cierra (lo normal es cerca de 1). Revisá el número.`,
       bloquea: true,
     }
   if (porHa > 4)
     return {
-      texto: `${Math.round(porHa)} cabezas por hectárea es mucho para ${hectareas.toLocaleString('es-AR')} ha. Si está bien, seguí.`,
+      texto: `${Math.round(porHa)} por hectárea es mucho para ${hectareas.toLocaleString('es-AR')} ha. Si está bien, seguí.`,
       bloquea: false,
     }
   return null
@@ -1138,8 +1171,8 @@ function PasoHacienda({
         titulo={`La hacienda de ${campo.nombre}`}
         subtitulo={
           campoEntero
-            ? 'Cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las ubicás en cada uno desde Hacienda.'
-            : 'Un potrero por vez: cuántas cabezas hay hoy en cada uno. Si está vacío, pasás al siguiente.'
+            ? 'Tus animales: cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las ubicás en cada uno.'
+            : 'Tus animales: cuántas cabezas hay hoy en cada potrero. Si está vacío, pasás al siguiente.'
         }
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
@@ -1314,7 +1347,11 @@ function PasoHacienda({
           <Aviso tono={avisoActual.bloquea ? 'error' : 'atencion'}>{avisoActual.texto}</Aviso>
         ) : null}
         <Reveal delay={0.22} className="mt-5 grid gap-2">
-          <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
+          <Button
+            type="submit"
+            disabled={ocupado || avisoActual?.bloquea}
+            className={cn(BOTON_PRINCIPAL, avisoActual?.bloquea && 'opacity-50')}
+          >
             {ocupado ? (
               'Guardando…'
             ) : !esUltimo ? (
@@ -1708,7 +1745,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
   const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
   const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
   return (
-    <div className="w-full max-w-[520px]">
+    <div className={cn('w-full', campos.length === 1 ? 'max-w-[520px]' : campos.length === 2 ? 'max-w-[640px]' : 'max-w-[760px]')}>
       {/* Cubre toda la escena (el panel es relative + overflow-hidden), no sólo la ficha. */}
       <div className="pointer-events-none absolute inset-0">
         <Confeti />
@@ -1744,7 +1781,13 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
       </div>
 
       {/* Cada campo, con su letra y color, en cascada. */}
-      <ul className={cn('mt-5 grid gap-3', campos.length > 1 && 'sm:grid-cols-2')}>
+      <ul
+        className={cn(
+          'mt-5 grid gap-3',
+          campos.length === 2 && 'sm:grid-cols-2',
+          campos.length >= 3 && 'sm:grid-cols-2 lg:grid-cols-3',
+        )}
+      >
         {campos.map((c, i) => {
           const color = colorDeCampo(c.colorIdx)
           return (
@@ -1778,12 +1821,13 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                   }}
                 />
               </div>
-              <p className="px-3 pb-2 pt-1 text-[11px] text-sidebar-foreground/60">
-                {c.potreros.length > 0 ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}` : 'sin potreros todavía'}
-                {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
-                {' · '}
-                {actividadLabel[c.actividad].toLowerCase()}
-              </p>
+              <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
+                <p className="text-[11px] text-sidebar-foreground/60">
+                  {c.potreros.length > 0 ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}` : 'sin potreros todavía'}
+                  {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
+                </p>
+                <ChipActividad actividad={c.actividad} />
+              </div>
             </motion.li>
           )
         })}

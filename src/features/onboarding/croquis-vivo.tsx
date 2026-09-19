@@ -85,10 +85,10 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
   const validos = items.filter((i) => i.area > 0)
   if (validos.length === 0) return out
   const total = validos.reduce((s, i) => s + i.area, 0)
-  // Piso visual: ningún potrero ocupa menos del 2,5 % del croquis. 2 ha en
+  // Piso visual: ningún potrero ocupa menos del 5 % del croquis. 2 ha en
   // 1.000 son reales, pero una astilla de 3 px no le dice nada a nadie; el
   // resto se reescala para que sigan sumando el campo.
-  const piso = total * 0.025
+  const piso = total * 0.05
   const ajustados = validos.map((i) => ({ clave: i.clave, area: Math.max(i.area, piso) }))
   const totalAjustado = ajustados.reduce((s, i) => s + i.area, 0)
   const escala = (r.w * r.h) / totalAjustado
@@ -131,21 +131,13 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
 }
 
 /**
- * Las siluetas de un potrero: cada especie presente aparece al menos una
- * vez, cada una en su fila (o filas), el bloque centrado en el potrero.
- * Una silueta representa ~5 cabezas; si no entran, se reparte lo que hay
- * en proporción. Nunca se pisa la etiqueta.
+ * La hacienda de un potrero, resumida: UNA silueta por especie con su
+ * número, en fila y centrada. Nada de multiplicar vaquitas — se lee de un
+ * vistazo y no compite con la etiqueta. Si el potrero es muy chico, sólo
+ * las siluetas (el número ya está arriba).
  */
-function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number; categoria: Categoria }[] {
-  const pasoX = 22
-  const pasoY = 18
-  const arriba = 24 // la etiqueta
-  const margen = 8
-  const cols = Math.max(0, Math.floor((r.w - margen * 2) / pasoX))
-  const filas = Math.max(0, Math.floor((r.h - arriba - margen) / pasoY))
-  const out: { cx: number; cy: number; categoria: Categoria }[] = []
-  if (cols === 0 || filas === 0) return out
-
+type Resumen = { cx: number; cy: number; categoria: Categoria; n: number }
+function resumenHacienda(r: Rect, cabezas: CabezasPorCategoria): { items: Resumen[]; conNumero: boolean } {
   const especies = (['bovino', 'ovino', 'equino'] as const)
     .map((e) => {
       const cats = categoriasPorEspecie[e].filter((c) => (cabezas[c] ?? 0) > 0)
@@ -154,33 +146,24 @@ function puntos(r: Rect, cabezas: CabezasPorCategoria): { cx: number; cy: number
       return { e, total, principal }
     })
     .filter((x) => x.total > 0 && x.principal)
-  if (especies.length === 0 || especies.length > filas) {
-    // No entran todas las especies en filas propias: una silueta por especie, en una fila.
-    especies.slice(0, cols).forEach((x, k) => {
-      out.push({ cx: r.x + r.w / 2 + (k - (Math.min(especies.length, cols) - 1) / 2) * pasoX, cy: r.y + arriba + pasoY / 2 + 2, categoria: x.principal! })
-    })
-    return out
-  }
-  const totalCabezas = especies.reduce((s, x) => s + x.total, 0)
-  // Filas por especie: al menos una; las que sobran, proporcionales.
-  const sobrantes = filas - especies.length
-  const filasPor = especies.map((x) => 1 + Math.floor((x.total / totalCabezas) * sobrantes))
-  // Siluetas por especie: ~1 cada 5, tope por sus filas.
-  const cuentas = especies.map((x, i) => Math.min(Math.max(1, Math.round(x.total / 5)), filasPor[i]! * cols))
-  const filasUsadas = cuentas.map((n) => Math.ceil(n / cols))
-  const altoBloque = filasUsadas.reduce((s, n) => s + n, 0) * pasoY
-  // Centrado vertical en lo que queda bajo la etiqueta.
-  let y = r.y + arriba + Math.max(0, (r.h - arriba - margen - altoBloque) / 2) + pasoY / 2
-  especies.forEach((x, i) => {
-    const n = cuentas[i]!
-    for (let f = 0; f < filasUsadas[i]!; f++) {
-      const enFila = Math.min(cols, n - f * cols)
-      const x0 = r.x + r.w / 2 - ((enFila - 1) * pasoX) / 2
-      for (let k = 0; k < enFila; k++) out.push({ cx: x0 + k * pasoX, cy: y, categoria: x.principal! })
-      y += pasoY
-    }
+  if (especies.length === 0) return { items: [], conNumero: false }
+  const arriba = 22
+  const altoLibre = r.h - arriba - 6
+  if (altoLibre < 14) return { items: [], conNumero: false }
+  // Cada ítem: silueta (20) + número (~7 px por dígito) + aire.
+  const conNumero = r.w >= 24 * especies.length + 14 * especies.length && altoLibre >= 16
+  const anchos = especies.map((x) => 22 + (conNumero ? 6 + String(x.total).length * 7 : 0))
+  const total = anchos.reduce((s, w) => s + w, 0) + (especies.length - 1) * 8
+  let x = r.x + r.w / 2 - total / 2
+  const cy = r.y + arriba + altoLibre / 2
+  const items: Resumen[] = especies.map((e, i) => {
+    const cx = x + 11
+    x += anchos[i]! + 8
+    return { cx, cy, categoria: e.principal!, n: e.total }
   })
-  return out
+  // Si ni las siluetas entran, mostrar sólo la primera.
+  if (total > r.w - 8) return { items: items.slice(0, 1).map((it) => ({ ...it, cx: r.x + r.w / 2 })), conNumero: false }
+  return { items, conNumero }
 }
 
 /** Un rectángulo con el patrón de la actividad, que sigue al potrero al moverse. */
@@ -256,7 +239,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           .filter((p) => rects[p.clave])
           .map((p) => {
             const r = rects[p.clave]!
-            const pts = puntos(r, p.cabezas)
+            const { items: resumen, conNumero } = resumenHacienda(r, p.cabezas)
             const t = totalCabezas(p.cabezas)
             const chico = r.w < 70 || r.h < 40
             // Con el conteo a la derecha, las hectáreas sólo entran en potreros anchos.
@@ -309,7 +292,16 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                       />
                       <Textura r={r} patron="croquis-surcos" />
                     </g>
+                    <clipPath id={`borde-${p.clave}`}>
+                      <motion.rect
+                        rx={6}
+                        initial={false}
+                        animate={{ x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                      />
+                    </clipPath>
                     <motion.line
+                      clipPath={`url(#borde-${p.clave})`}
                       className="stroke-sidebar-foreground/45"
                       strokeWidth={1}
                       strokeDasharray="3 3"
@@ -333,7 +325,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                       </tspan>
                     ) : null}
                   </text>
-                  {t > 0 && r.w >= 44 && (
+                  {t > 0 && !conNumero && r.w >= 64 && (
                     <text
                       x={Math.max(0, r.w - 16)}
                       textAnchor="end"
@@ -348,14 +340,28 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                     </text>
                   )}
                 </motion.g>
-                {pts.map((pt, i) => (
+                {resumen.map((it, i) => (
                   <motion.g
-                    key={`${pt.categoria}-${i}`}
-                    initial={{ scale: 0, opacity: 0, x: pt.cx, y: pt.cy }}
-                    animate={{ scale: 1, opacity: 0.95, x: pt.cx, y: pt.cy }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 22, delay: Math.min(i, 24) * 0.02 }}
+                    key={it.categoria}
+                    initial={{ scale: 0, opacity: 0, x: it.cx, y: it.cy }}
+                    animate={{ scale: 1, opacity: 1, x: it.cx, y: it.cy }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 22, delay: i * 0.05 }}
                   >
-                    <MarcaCategoria categoria={pt.categoria} />
+                    <MarcaCategoria categoria={it.categoria} />
+                    {conNumero && (
+                      <text
+                        x={14}
+                        y={4}
+                        className="fill-sidebar-foreground font-semibold tabular-nums"
+                        fontSize={11}
+                        style={{ paintOrder: 'stroke' }}
+                        stroke="var(--sidebar)"
+                        strokeWidth={3}
+                        strokeLinejoin="round"
+                      >
+                        {it.n}
+                      </text>
+                    )}
                   </motion.g>
                 ))}
               </motion.g>
@@ -402,26 +408,24 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         )}
       </AnimatePresence>
 
-      {/* Hacienda sin potrero: cae suelta dentro del contorno, bajo el nombre. */}
+      {/* Hacienda sin potrero: el resumen por especie, bajo el nombre del campo. */}
       {conHa.length === 0 &&
-        puntos(
-          {
-            x: interior.x + 6,
-            y: interior.y + ALTO / 2 + 2,
-            w: interior.w - 12,
-            h: interior.y + interior.h - (interior.y + ALTO / 2 + 2),
-          }, campo.sueltas ?? {}).map(
-          (pt, i) => (
-            <motion.g
-              key={`suelta-${pt.categoria}-${i}`}
-              initial={{ scale: 0, opacity: 0, x: pt.cx, y: pt.cy }}
-              animate={{ scale: 1, opacity: 0.95, x: pt.cx, y: pt.cy }}
-              transition={{ type: 'spring', stiffness: 500, damping: 22, delay: Math.min(i, 24) * 0.02 }}
-            >
-              <MarcaCategoria categoria={pt.categoria} />
-            </motion.g>
-          ),
-        )}
+        resumenHacienda(
+          { x: interior.x, y: interior.y + ALTO / 2 + 6, w: interior.w, h: interior.h / 2 - 6 },
+          campo.sueltas ?? {},
+        ).items.map((it, i) => (
+          <motion.g
+            key={`suelta-${it.categoria}`}
+            initial={{ scale: 0, opacity: 0, x: it.cx, y: it.cy }}
+            animate={{ scale: 1, opacity: 1, x: it.cx, y: it.cy }}
+            transition={{ type: 'spring', stiffness: 400, damping: 22, delay: i * 0.05 }}
+          >
+            <MarcaCategoria categoria={it.categoria} />
+            <text x={14} y={4} className="fill-sidebar-foreground font-semibold tabular-nums" fontSize={11}>
+              {it.n}
+            </text>
+          </motion.g>
+        ))}
 
       {/* Sin potreros todavía: el nombre y las hectáreas, grandes, en el medio. */}
       {conHa.length === 0 && (
