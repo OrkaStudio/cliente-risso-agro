@@ -235,6 +235,11 @@ export function OnboardingPage() {
 
   return (
     <AuthLayout
+      // El tractor remolca la tarjeta sólo al abrir y al cerrar; los pasos
+      // del medio entran callados. `ciclo` vuelve a montarla para que el
+      // remolque se repita en el festejo.
+      entrada={etapa === 'empresa' || etapa === 'fin' ? 'tractor' : 'suave'}
+      ciclo={etapa === 'empresa' || etapa === 'fin' ? etapa : 'medio'}
       escena={
         <EscenaCroquis
           etapa={etapa}
@@ -839,7 +844,10 @@ function PasoPotreros({
   const repetido = numeros.find((n, i) => n !== '' && numeros.indexOf(n) !== i)
   const listo = completo && !repetido
 
-  // Qué falta, dicho en una línea al lado de la barra.
+  // Qué falta, en DOS piezas. El titular va al lado de la barra y tiene que
+  // ser corto: cuando decía "Faltan 57 ha · hay potreros sin hectáreas" en un
+  // renglón, el número de la izquierda se partía en dos líneas y la fila
+  // quedaba desalineada. La aclaración baja abajo, que es su lugar.
   const estado = repetido
     ? `El potrero ${repetido} está dos veces`
     : completo
@@ -848,9 +856,19 @@ function PasoPotreros({
         ? `Se pasan ${ha(redondear1(-diferencia))} ha`
         : sumaHa === 0
           ? 'Las hectáreas de cada potrero'
-          : filasValidas
-            ? `Faltan ${ha(diferencia)} ha`
-            : `Faltan ${ha(diferencia)} ha · hay potreros sin hectáreas`
+          : `Faltan ${ha(diferencia)} ha`
+  const nota = !repetido && !completo && sumaHa > 0 && !filasValidas ? 'Hay potreros sin hectáreas' : null
+
+  // Lo que le falta al formulario para poder guardar, dicho en el botón. Un
+  // botón gris sin explicación se lee como que la app se trabó; diciendo qué
+  // falta, el gris es una consecuencia y no un misterio.
+  const faltaParaGuardar = repetido
+    ? `El potrero ${repetido} está dos veces`
+    : excede
+      ? `Se pasan ${ha(redondear1(-diferencia))} ha`
+      : !filasValidas
+        ? 'Completá las hectáreas'
+        : `Faltan ${ha(diferencia)} ha`
 
   async function guardar(e: FormEvent) {
     e.preventDefault()
@@ -991,13 +1009,13 @@ function PasoPotreros({
                   : 'border-border',
             )}
           >
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="font-semibold tabular-nums">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
+              <span className="shrink-0 font-semibold whitespace-nowrap tabular-nums">
                 {ha(sumaHa)} <span className="font-normal text-muted-foreground">de {ha(totalCampo)} ha</span>
               </span>
               <span
                 className={cn(
-                  'inline-flex items-center gap-1 font-medium tabular-nums',
+                  'inline-flex shrink-0 items-center gap-1 text-right font-medium whitespace-nowrap tabular-nums',
                   completo && !repetido
                     ? 'text-primary'
                     : excede || repetido
@@ -1029,6 +1047,7 @@ function PasoPotreros({
                 transition={{ type: 'spring', stiffness: 220, damping: 28 }}
               />
             </div>
+            {nota && <p className="mt-1.5 text-[11px] text-muted-foreground">{nota}</p>}
           </div>
         </Reveal>
 
@@ -1041,7 +1060,9 @@ function PasoPotreros({
           <Button type="submit" disabled={ocupado || !listo} className={BOTON_PRINCIPAL}>
             {ocupado
               ? 'Guardando…'
-              : `Guardar ${filas.length === 1 ? 'el potrero' : `los ${filas.length} potreros`}`}
+              : listo
+                ? `Guardar ${filas.length === 1 ? 'el potrero' : `los ${filas.length} potreros`}`
+                : faltaParaGuardar}
           </Button>
           <Button
             type="button"
@@ -1903,7 +1924,9 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
         ¡{empresa} ya está en marcha!
       </motion.p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
-        {campos.length === 1 ? 'Tu campo, dibujado con lo que cargaste.' : `Tus ${campos.length} campos, dibujados con lo que cargaste.`}
+        {campos.length === 1
+          ? 'Así quedó tu campo con lo que cargaste.'
+          : `Así quedaron tus ${campos.length} campos con lo que cargaste.`}
       </p>
 
       {/* La empresa en cifras, contando hacia arriba. */}
@@ -1929,7 +1952,18 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
           ocho potreros no se lee a un tercio del panel: prefiero que la
           tercera ficha caiga abajo y haya que bajar un poco. La escena ya
           scrollea, y acá lo que importa es que se vea lo que armó. */}
-      <ul className={cn('mt-5 grid gap-4', campos.length > 1 && 'sm:grid-cols-2')}>
+      <ul
+        className={cn(
+          'mt-5 grid gap-4',
+          campos.length > 1 && 'sm:grid-cols-2',
+          // Con una cantidad impar la última ficha queda sola en su fila.
+          // Alineada a la izquierda parece un error de grilla; centrada bajo
+          // las dos de arriba se lee como el cierre de la pila.
+          campos.length > 1 &&
+            campos.length % 2 === 1 &&
+            'sm:[&>li:last-child]:col-span-2 sm:[&>li:last-child]:mx-auto sm:[&>li:last-child]:w-[calc(50%-0.5rem)]',
+        )}
+      >
         {campos.map((c, i) => {
           const color = colorDeCampo(c.colorIdx)
           return (

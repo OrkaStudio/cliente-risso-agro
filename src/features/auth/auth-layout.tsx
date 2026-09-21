@@ -2,7 +2,7 @@ import { type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
-import { Sembradora } from '@/features/auth/sembradora'
+import { Remolque } from '@/features/auth/sembradora'
 
 /**
  * Shell de las pantallas de auth: escena ambiental a la izquierda (solo
@@ -17,12 +17,22 @@ export function AuthLayout({
   children,
   solAnimado = false,
   escena,
+  entrada = 'suave',
+  ciclo,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
   solAnimado?: boolean
   /** Contenido de la escena en lugar de la frase de marketing. */
   escena?: ReactNode
+  /**
+   * Cómo entra la tarjeta. `tractor` sólo en las pantallas que abren o
+   * cierran algo —entrar, crear la cuenta, el primer paso del onboarding y
+   * el festejo—; el resto entra `suave`. Ver `Remolque`.
+   */
+  entrada?: 'tractor' | 'suave'
+  /** Cambiarlo vuelve a montar la tarjeta y el remolque se repite. */
+  ciclo?: string
 }) {
   return (
     // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
@@ -55,9 +65,11 @@ export function AuthLayout({
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
             <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:p-10">
-              <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
-                {children}
-              </div>
+              <Remolque key={ciclo} activo={entrada === 'tractor'}>
+                <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
+                  {children}
+                </div>
+              </Remolque>
             </div>
           </div>
         </div>
@@ -101,10 +113,7 @@ export function AuthHeading({
   subtituloSoloEscritorio?: boolean
 }) {
   return (
-    // `relative` para que el tractor pueda cruzar por encima del encabezado
-    // sin ocupar lugar en el layout.
-    <div className="relative">
-      <Sembradora />
+    <div>
       <Reveal>
         <div className="flex items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">

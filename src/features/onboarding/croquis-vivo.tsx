@@ -188,14 +188,21 @@ function resumenHacienda(
     return { modo: 'siluetas', items }
   }
 
-  // No entran: una columna de puntos, uno por especie, con su color. Ocupa
-  // 8 px de ancho y 9 por especie — entra en cualquier potrero visible.
-  const altoColumna = especies.length * 9
-  if (r.w >= 14 && altoLibre >= altoColumna) {
-    let y = cy - altoColumna / 2 + 4.5
+  // No entran: una columna de puntos, uno por especie, con su color.
+  //
+  // El paso se ADAPTA al lugar que hay en vez de ser fijo. Con 9 px fijos, un
+  // potrero de 10 ha dentro de un campo de 1.000 dejaba al tercer punto fuera
+  // del rectángulo: se veían dos y el de equinos quedaba pisando el borde.
+  // Ahora el paso se achica hasta 6 px antes de rendirse, y la columna se
+  // encaja dentro del alto disponible, nunca centrada a ojo.
+  const n = especies.length
+  const paso = Math.min(9, (altoLibre - 6) / Math.max(1, n - 1))
+  if (r.w >= 14 && paso >= 6) {
+    const alto = (n - 1) * paso
+    let y = cy - alto / 2
     const items = especies.map((e) => {
       const it = marca(e, r.x + r.w / 2, y)
-      y += 9
+      y += paso
       return it
     })
     return { modo: 'puntos', items }

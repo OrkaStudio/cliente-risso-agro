@@ -119,7 +119,7 @@ export function SignupPage() {
 
   if (confirmarEn) {
     return (
-      <AuthLayout>
+      <AuthLayout entrada="tractor">
         <ConfirmarCorreo
           email={confirmarEn}
           onReenviar={() => resendConfirmation(confirmarEn)}
@@ -133,7 +133,7 @@ export function SignupPage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout entrada="tractor">
       <AnimatePresence mode="wait">
         {revisando ? (
           <motion.div

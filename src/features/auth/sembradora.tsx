@@ -1,67 +1,73 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { CURVA } from '@/lib/animacion'
 
 /**
- * La sembradora: un tractor cruza el ancho de la pantalla una sola vez, al
- * entrar, y deja atrás un surco. El contenido aparece detrás de él —cada
- * bloque arranca cuando el tractor ya le pasó por encima—, así que no es
- * decoración al costado: es lo que trae el contenido.
+ * El remolque: un tractor entra desde la izquierda, engancha la tarjeta con
+ * una soga y la sube desde abajo. Después larga la soga y se va por la
+ * derecha.
  *
- * Por qué acá y no en cada campo del formulario: el barrido verde que había
- * antes usaba un gesto fuerte a la frecuencia de uno tranquilo. Se repetía
- * en los ocho campos de un form y cansaba. Un gesto con personalidad va UNA
- * VEZ por pantalla; adentro del formulario el escalonado se mantiene mudo
- * (ver `Reveal`).
+ * Va SÓLO en las cuatro pantallas que abren y cierran algo —entrar, crear la
+ * cuenta, el primer paso del onboarding y el festejo final—, y no en cada
+ * pantalla intermedia. Esa es la lección de las dos versiones anteriores: lo
+ * que arruinaba al barrido verde no era el verde, era repetir un gesto fuerte
+ * a la frecuencia de uno tranquilo. Un tractor que trae la pantalla es
+ * memorable la primera vez y la última; ocho veces seguidas es una traba.
+ * Los pasos del medio entran callados (ver `Reveal` y `Paso`).
  *
- * Dura 1,1 s y no se repite. Con `prefers-reduced-motion` no aparece.
+ * Dura 2,1 s. Con `prefers-reduced-motion` la tarjeta aparece y ya.
  */
-export function Sembradora() {
+export function Remolque({ activo, children }: { activo: boolean; children: ReactNode }) {
   const quieto = useReducedMotion()
-  const [terminado, setTerminado] = useState(false)
-  // Sólo en el primer montaje de la pantalla: si el componente se re-renderiza
-  // no vuelve a pasar el tractor.
-  const yaPaso = useRef(false)
-  useEffect(() => {
-    yaPaso.current = true
-  }, [])
-
-  if (quieto || terminado) return null
+  if (!activo || quieto) return <>{children}</>
 
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-x-0 -top-7 z-0 h-6 overflow-visible"
-    >
-      {/* El surco: se dibuja detrás del tractor y se apaga cuando él sale. */}
+    <div className="relative flex w-full justify-center">
+      {/* El tractor y su soga. Van en el mismo div que se mueve en X, así la
+          soga lo acompaña en vez de quedar colgada en el aire. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-11 z-20 flex justify-center">
+        <motion.div
+          className="relative text-primary"
+          initial={{ x: '-62vw' }}
+          animate={{ x: ['-62vw', '0vw', '0vw', '62vw'] }}
+          transition={{ duration: 2.1, times: [0, 0.26, 0.74, 1], ease: ['easeOut', 'linear', 'easeIn'] }}
+        >
+          <Tractor />
+          {/* La soga cuelga del enganche trasero y se acorta a medida que la
+              tarjeta sube. Al final se suelta. */}
+          <motion.div
+            className="absolute top-full left-[7px] w-[2px] origin-top rounded-full bg-current opacity-70"
+            initial={{ height: 0 }}
+            animate={{ height: [0, 0, 128, 20, 0] }}
+            transition={{ duration: 2.1, times: [0, 0.2, 0.26, 0.74, 0.84], ease: 'easeOut' }}
+          />
+        </motion.div>
+      </div>
+
+      {/* La tarjeta, remolcada. */}
       <motion.div
-        className="absolute inset-x-0 bottom-0 h-px origin-left bg-[linear-gradient(90deg,transparent,var(--color-primary)_18%,var(--color-primary)_82%,transparent)] opacity-25"
-        initial={{ scaleX: 0 }}
-        animate={{ scaleX: 1, opacity: [0.25, 0.25, 0] }}
-        transition={{ duration: 1.5, ease: CURVA, times: [0, 0.7, 1] }}
-      />
-      {/* El tractor. Entra desde afuera del borde y sale por el otro lado. */}
-      <motion.div
-        className="absolute bottom-0 text-primary"
-        initial={{ left: '-8%' }}
-        animate={{ left: '104%' }}
-        transition={{ duration: 1.1, ease: [0.4, 0, 0.2, 1] }}
-        onAnimationComplete={() => setTerminado(true)}
+        className="flex w-full justify-center"
+        initial={{ y: 128, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{
+          y: { duration: 1.0, delay: 0.55, ease: CURVA },
+          opacity: { duration: 0.3, delay: 0.3 },
+        }}
       >
-        <Tractor />
+        {children}
       </motion.div>
     </div>
   )
 }
 
 /**
- * Tractor de perfil, mirando a la derecha, en una caja de 34×24. A 22 px de
+ * Tractor de perfil, mirando a la derecha, en una caja de 34×24. A 27 px de
  * alto lo que tiene que leerse es la silueta: rueda trasera grande, cabina
  * alta, escape. El detalle fino se pierde y no importa.
  */
 function Tractor() {
   return (
-    <svg width="38" height="27" viewBox="0 0 34 24" fill="none">
+    <svg width="42" height="30" viewBox="0 0 34 24" fill="none">
       {/* Escape, con su humito. */}
       <motion.circle
         cx="11.4"
@@ -81,12 +87,11 @@ function Tractor() {
         d="M6 11.4 h19.5 a1.8 1.8 0 0 1 1.8 1.8 v3.2 a1.8 1.8 0 0 1 -1.8 1.8 h-19.5 a1.8 1.8 0 0 1 -1.8 -1.8 v-3.2 a1.8 1.8 0 0 1 1.8 -1.8 z"
         className="fill-current"
       />
+      {/* Enganche trasero, de donde sale la soga. */}
+      <rect x="3.4" y="14.6" width="3.4" height="1.6" rx="0.8" className="fill-current" />
       {/* Rueda trasera, girando. */}
       <g transform="translate(9.5 16.5)">
-        <motion.g
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.75, repeat: Infinity, ease: 'linear' }}
-        >
+        <motion.g animate={{ rotate: 360 }} transition={{ duration: 0.75, repeat: Infinity, ease: 'linear' }}>
           <circle r="6" className="fill-current" />
           <circle r="2.4" className="fill-[var(--color-card)]" />
           <rect x="-0.5" y="-5.4" width="1" height="10.8" className="fill-[var(--color-card)]" opacity="0.5" />
@@ -95,10 +100,7 @@ function Tractor() {
       </g>
       {/* Rueda delantera, más chica y más rápida. */}
       <g transform="translate(25.5 18)">
-        <motion.g
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.5, repeat: Infinity, ease: 'linear' }}
-        >
+        <motion.g animate={{ rotate: 360 }} transition={{ duration: 0.5, repeat: Infinity, ease: 'linear' }}>
           <circle r="4.2" className="fill-current" />
           <circle r="1.6" className="fill-[var(--color-card)]" />
         </motion.g>
