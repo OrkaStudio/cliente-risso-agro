@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,6 +29,7 @@ import {
   ErrorCampo,
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
+import { CURVA } from '@/lib/animacion'
 import {
   actualizarCampo,
   actualizarPotrero,
@@ -60,7 +61,13 @@ import {
   especieLabel,
   type Especie,
 } from '@/features/hacienda/labels'
-import { RECEPTIVIDAD, evDeCabezas, formatearEv } from '@/features/hacienda/carga-animal'
+import {
+  RECEPTIVIDAD,
+  enVacas,
+  evDeCabezas,
+  topeConPastura,
+  vacasEnCampoNatural,
+} from '@/features/hacienda/carga-animal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -1112,7 +1119,9 @@ function totalDe(c: Cantidades | undefined): number {
  * rinde un campo natural. La cuenta va en EQUIVALENTE VACA y no en cabezas:
  * una oveja come la sexta parte que una vaca y un caballo un 20 % más, así
  * que "3 por hectárea" no quiere decir nada sin saber de qué animal se habla.
- * La tabla y las fuentes están en `@/features/hacienda/carga-animal`.
+ * La tabla y las fuentes están en `@/features/hacienda/carga-animal`. El EV
+ * queda del lado del código: en pantalla se dice en vacas, porque el que
+ * recién empieza no tiene por qué saber qué es un equivalente vaca.
  */
 function avisoCarga(
   cant: Cantidades | undefined,
@@ -1128,17 +1137,16 @@ function avisoCarga(
       bloquea: true,
     }
   if (!hectareas) return null
-  const evHa = evDeCabezas(porCategoriaDe(cant)) / hectareas
-  const { min, max } = RECEPTIVIDAD.campoNatural
-  const pastura = RECEPTIVIDAD.pasturaImplantada
-  if (evHa > pastura * 2)
+  const ev = evDeCabezas(porCategoriaDe(cant))
+  const evHa = ev / hectareas
+  if (evHa > RECEPTIVIDAD.pasturaImplantada * 2)
     return {
-      texto: `${formatearEv(evHa)} EV por hectárea. Ni una pastura implantada pasa de ${formatearEv(pastura)}. Revisá el número.`,
+      texto: `Para el pasto que comen, es como tener ${enVacas(ev)}. En ${ha(hectareas)} ha no entran ni con la mejor pastura sembrada: el tope son ${topeConPastura(hectareas)}. Revisá el número.`,
       bloquea: true,
     }
-  if (evHa > max)
+  if (evHa > RECEPTIVIDAD.campoNatural.max)
     return {
-      texto: `${formatearEv(evHa)} EV por hectárea. Un campo natural rinde entre ${formatearEv(min)} y ${formatearEv(max)}; con pastura implantada, hasta ${formatearEv(pastura)}.`,
+      texto: `Para el pasto que comen, es como tener ${enVacas(ev)}. En ${ha(hectareas)} ha de campo natural ${vacasEnCampoNatural(hectareas)}.`,
       bloquea: false,
     }
   return null
@@ -1522,14 +1530,34 @@ function VolverArriba({
   )
 }
 
-/** Transición entre pasos: el que se va sale hacia arriba, el nuevo entra desde abajo. */
+/**
+ * Transición entre pasos del onboarding. Mismo idioma que `Reveal`: el paso
+ * nuevo ENTRA EN FOCO donde está, en vez de deslizarse de una punta a la
+ * otra. El que se va sólo se desvanece hacia arriba — sin desenfoque de
+ * salida, para que el paso nuevo no compita con un fantasma borroso.
+ *
+ * El filtro se saca al llegar (`filter: none`) y no se deja en `blur(0px)`:
+ * un filtro activo, aunque sea nulo, crea bloque contenedor y le cambia el
+ * ancla a los desplegables posicionados de adentro.
+ */
 function Paso({ children }: { children: ReactNode }) {
+  const [entrando, setEntrando] = useState(true)
+  const quieto = useReducedMotion()
+  if (quieto) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        {children}
+      </motion.div>
+    )
+  }
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      initial={{ opacity: 0, y: 10, filter: 'blur(8px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, y: -8 }}
+      style={entrando ? undefined : { filter: 'none' }}
+      transition={{ duration: 0.45, ease: CURVA }}
+      onAnimationComplete={() => setEntrando(false)}
     >
       {children}
     </motion.div>

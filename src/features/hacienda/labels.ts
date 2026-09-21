@@ -15,10 +15,17 @@ export const especieLabel: Record<Especie, string> = {
 }
 
 /** Categorías ordenadas por especie (para selects agrupados). El orden acá es
- *  el orden con el que se muestran en el formulario. */
+ *  el orden con el que se muestran en el formulario.
+ *
+ *  `capon` vivió en `bovino` hasta el 21/09/2026 y era un error: un capón es
+ *  un OVINO castrado. El bovino castrado ya tiene su categoría —novillo—, así
+ *  que la lista de bovinos tenía un duplicado conceptual y la de ovinos se
+ *  quedaba sin macho de carne, que en la Patagonia y el sur bonaerense es la
+ *  categoría principal. Se movió con la base sin un solo animal en esa
+ *  categoría, así que no hubo nada que migrar. */
 export const categoriasPorEspecie: Record<Especie, Categoria[]> = {
-  bovino: ['vaca', 'vaquillona', 'novillo', 'ternero', 'ternera', 'toro', 'capon'],
-  ovino: ['oveja', 'carnero', 'cordero', 'cordera'],
+  bovino: ['vaca', 'vaquillona', 'novillo', 'ternero', 'ternera', 'toro'],
+  ovino: ['oveja', 'carnero', 'capon', 'cordero', 'cordera'],
   equino: ['yegua', 'padrillo', 'potrillo', 'potranca'],
 }
 
@@ -29,7 +36,7 @@ export const especiePorCategoria: Record<Categoria, Especie> = {
   ternero: 'bovino',
   ternera: 'bovino',
   toro: 'bovino',
-  capon: 'bovino',
+  capon: 'ovino',
   oveja: 'ovino',
   carnero: 'ovino',
   cordero: 'ovino',

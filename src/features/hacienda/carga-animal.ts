@@ -38,15 +38,9 @@ export const EV_POR_CATEGORIA: Record<Categoria, number> = {
   // (0,16), que es el promedio del año y el número que se usa a campo.
   oveja: 0.16,
   carnero: 0.15, // 70 kg en mantenimiento: 1,47 EV cada 10
+  capon: 0.16, // ovino castrado — ver la nota en `labels.ts`
   cordero: 0.09, // borrego de 30 kg: 0,52 EO ≈ 0,08 EV; se redondea para arriba
   cordera: 0.09,
-
-  // ⚠ CAPÓN está clasificado como BOVINO en `categoriasPorEspecie` y aparece en
-  // la pestaña Bovinos junto a Novillo y Toro. Un capón es un ovino castrado:
-  // la clasificación es un error del modelo, anterior a este archivo. El EV
-  // sigue al animal y no a la pestaña donde está mal guardado — un capón come
-  // como un ovino. Si se decide reclasificarlo, este valor ya es el correcto.
-  capon: 0.16,
 
   // Equinos. El valor general del yeguarizo es 1,20 EV (un caballo come MÁS
   // que una vaca). Adulto de 400-500 kg en mantenimiento: 0,76-0,88; con
@@ -88,4 +82,34 @@ export function evDeCabezas(cabezas: Partial<Record<Categoria, number>>): number
 /** "1,06" — el EV siempre con dos decimales: 0,16 redondeado a 0 no dice nada. */
 export function formatearEv(ev: number): string {
   return ev.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/**
+ * El EV dicho en el único animal que todos conocen. "EV" es la unidad
+ * correcta y es la que usa el código, pero en pantalla no va: el que recién
+ * empieza no tiene por qué saber qué es un equivalente vaca, y una pantalla
+ * que enseña vocabulario antes de decir algo útil no sirve de nada.
+ *
+ * "21 vacas" ES el EV — sólo que dicho de manera que se entienda sin haber
+ * cursado producción animal.
+ */
+export function enVacas(ev: number): string {
+  if (ev < 1) return 'menos de una vaca'
+  const n = Math.round(ev)
+  return `${n.toLocaleString('es-AR')} ${n === 1 ? 'vaca' : 'vacas'}`
+}
+
+/** Cuántas vacas come un campo natural de N hectáreas: "entre 12 y 16". */
+export function vacasEnCampoNatural(hectareas: number): string {
+  const min = Math.round(hectareas * RECEPTIVIDAD.campoNatural.min)
+  const max = Math.round(hectareas * RECEPTIVIDAD.campoNatural.max)
+  if (max < 1) return 'no entra ni una'
+  if (min < 1) return `entran hasta ${max}`
+  if (min === max) return `entran unas ${min}`
+  return `entran entre ${min} y ${max}`
+}
+
+/** El techo absoluto: lo que da una pastura implantada bien manejada. */
+export function topeConPastura(hectareas: number): number {
+  return Math.round(hectareas * RECEPTIVIDAD.pasturaImplantada)
 }
