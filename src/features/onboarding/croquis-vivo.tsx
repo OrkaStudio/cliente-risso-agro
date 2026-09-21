@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { ActividadCampo } from '@/features/campos/api'
 import { categoriasPorEspecie, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 import {
+  ESTILO_ESPECIE,
   estiloDeCategoria,
   totalCabezas,
   type CabezasPorCategoria,
@@ -131,13 +132,24 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
 }
 
 /**
- * La hacienda de un potrero, resumida: UNA silueta por especie con su
- * número, en fila y centrada. Nada de multiplicar vaquitas — se lee de un
- * vistazo y no compite con la etiqueta. Si el potrero es muy chico, sólo
- * las siluetas (el número ya está arriba).
+ * La hacienda de un potrero, resumida. UNA marca por especie, nunca una
+ * multiplicación de vaquitas, y en tres modos según el lugar que haya:
+ *
+ * - `siluetas`: la silueta de cada especie, en fila. Lo normal.
+ * - `puntos`: una columna de puntos del color de cada especie. Cuando el
+ *   potrero es angosto y las siluetas no entran — antes se mostraba sólo la
+ *   primera especie, que es peor que no mostrar ninguna: decía "acá hay
+ *   ovejas" en un potrero con ovejas, vacas y caballos.
+ * - `nada`: el potrero es una astilla y cualquier marca lo ensucia.
+ *
+ * El número de cabezas NO va acá en ningún modo: compite con la etiqueta y en
+ * un potrero chico no se lee. Vive en el hover, junto con las hectáreas.
  */
-type Resumen = { cx: number; cy: number; categoria: Categoria; n: number }
-function resumenHacienda(r: Rect, cabezas: CabezasPorCategoria): { items: Resumen[]; conNumero: boolean } {
+type MarcaResumen = { cx: number; cy: number; categoria: Categoria; color: string }
+function resumenHacienda(
+  r: Rect,
+  cabezas: CabezasPorCategoria,
+): { modo: 'siluetas' | 'puntos' | 'nada'; items: MarcaResumen[] } {
   const especies = (['bovino', 'ovino', 'equino'] as const)
     .map((e) => {
       const cats = categoriasPorEspecie[e].filter((c) => (cabezas[c] ?? 0) > 0)
@@ -146,24 +158,62 @@ function resumenHacienda(r: Rect, cabezas: CabezasPorCategoria): { items: Resume
       return { e, total, principal }
     })
     .filter((x) => x.total > 0 && x.principal)
-  if (especies.length === 0) return { items: [], conNumero: false }
+  if (especies.length === 0) return { modo: 'nada', items: [] }
+
   const arriba = 22
   const altoLibre = r.h - arriba - 6
-  if (altoLibre < 14) return { items: [], conNumero: false }
-  // Cada ítem: silueta (20) + número (~7 px por dígito) + aire.
-  const conNumero = r.w >= 24 * especies.length + 14 * especies.length && altoLibre >= 16
-  const anchos = especies.map((x) => 22 + (conNumero ? 6 + String(x.total).length * 7 : 0))
-  const total = anchos.reduce((s, w) => s + w, 0) + (especies.length - 1) * 8
-  let x = r.x + r.w / 2 - total / 2
   const cy = r.y + arriba + altoLibre / 2
-  const items: Resumen[] = especies.map((e, i) => {
-    const cx = x + 11
-    x += anchos[i]! + 8
-    return { cx, cy, categoria: e.principal!, n: e.total }
+  const marca = (e: (typeof especies)[number], cx: number, y: number): MarcaResumen => ({
+    cx,
+    cy: y,
+    categoria: e.principal!,
+    color: ESTILO_ESPECIE[e.e].color,
   })
-  // Si ni las siluetas entran, mostrar sólo la primera.
-  if (total > r.w - 8) return { items: items.slice(0, 1).map((it) => ({ ...it, cx: r.x + r.w / 2 })), conNumero: false }
-  return { items, conNumero }
+
+  // Siluetas en fila: 22 px cada una, 8 de aire entre ellas.
+  const anchoFila = especies.length * 22 + (especies.length - 1) * 8
+  if (altoLibre >= 16 && anchoFila <= r.w - 8) {
+    let x = r.x + r.w / 2 - anchoFila / 2
+    const items = especies.map((e) => {
+      const it = marca(e, x + 11, cy)
+      x += 30
+      return it
+    })
+    return { modo: 'siluetas', items }
+  }
+
+  // No entran: una columna de puntos, uno por especie, con su color. Ocupa
+  // 8 px de ancho y 9 por especie — entra en cualquier potrero visible.
+  const altoColumna = especies.length * 9
+  if (r.w >= 14 && altoLibre >= altoColumna) {
+    let y = cy - altoColumna / 2 + 4.5
+    const items = especies.map((e) => {
+      const it = marca(e, r.x + r.w / 2, y)
+      y += 9
+      return it
+    })
+    return { modo: 'puntos', items }
+  }
+  return { modo: 'nada', items: [] }
+}
+
+/** "9 bovinos · 9 ovinos · 9 equinos" — el desglose que el dibujo no dice. */
+function porEspecie(cabezas: CabezasPorCategoria): string[] {
+  const out: string[] = []
+  for (const e of ['bovino', 'ovino', 'equino'] as const) {
+    const n = categoriasPorEspecie[e].reduce((s, c) => s + (cabezas[c] ?? 0), 0)
+    if (n > 0) out.push(`${n.toLocaleString('es-AR')} ${ESTILO_ESPECIE[e].nombre}`)
+  }
+  return out
+}
+
+/** Lo que dice el hover de un potrero: todo lo que no entra dibujado. */
+function detallePotrero(p: PotreroCroquis): string {
+  const partes = [
+    p.hectareas ? `${p.hectareas.toLocaleString('es-AR')} ha` : null,
+    ...porEspecie(p.cabezas),
+  ].filter(Boolean)
+  return partes.length > 0 ? `Potrero ${p.nombre} — ${partes.join(' · ')}` : `Potrero ${p.nombre}`
 }
 
 /** Un rectángulo con el patrón de la actividad, que sigue al potrero al moverse. */
@@ -239,11 +289,22 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           .filter((p) => rects[p.clave])
           .map((p) => {
             const r = rects[p.clave]!
-            const { items: resumen, conNumero } = resumenHacienda(r, p.cabezas)
+            const { modo, items: resumen } = resumenHacienda(r, p.cabezas)
             const t = totalCabezas(p.cabezas)
             const chico = r.w < 70 || r.h < 40
-            // Con el conteo a la derecha, las hectáreas sólo entran en potreros anchos.
-            const conHa = t > 0 ? r.w >= 120 : r.w >= 70
+            // Las hectáreas se muestran siempre que entren. El umbral no es un
+            // número fijo —con 70 fijo, "4A 200 ha" no entraba en un potrero
+            // donde sobraba lugar— sino el ancho REAL de la etiqueta: el
+            // nombre en semibold de 12 y las hectáreas en 10, más el margen.
+            // Lo que no entra vive en el hover, que existe en todos.
+            const textoHa = p.hectareas ? `${p.hectareas.toLocaleString('es-AR')} ha` : ''
+            const anchoNombre = p.nombre.length * 7.2
+            const anchoHa = textoHa.length * 5.4
+            // Tres posibilidades, en este orden: al lado del nombre, debajo, o
+            // sólo en el hover. La segunda es la que salva a los potreros
+            // angostos pero altos, que son la mayoría de los chicos.
+            const haAlLado = textoHa !== '' && r.w >= anchoNombre + anchoHa + 20
+            const haDebajo = textoHa !== '' && !haAlLado && r.w >= anchoHa + 16 && r.h >= 42
             return (
               <motion.g
                 key={p.clave}
@@ -252,6 +313,7 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
               >
+                <title>{detallePotrero(p)}</title>
                 <motion.rect
                   rx={6}
                   className={cn(
@@ -318,25 +380,24 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                 >
                   <text className="fill-sidebar-foreground font-semibold" fontSize={chico ? 10 : 12} style={{ paintOrder: 'stroke' }} stroke="var(--sidebar)" strokeWidth={3} strokeLinejoin="round">
                     {p.nombre}
-                    {conHa && p.hectareas ? (
+                    {haAlLado ? (
                       <tspan className="fill-sidebar-foreground/60 font-normal" fontSize={10}>
                         {' '}
-                        {p.hectareas.toLocaleString('es-AR')} ha
+                        {textoHa}
                       </tspan>
                     ) : null}
                   </text>
-                  {t > 0 && !conNumero && r.w >= 64 && (
+                  {haDebajo && (
                     <text
-                      x={Math.max(0, r.w - 16)}
-                      textAnchor="end"
-                      className="fill-sidebar-foreground font-semibold tabular-nums"
-                      fontSize={11}
+                      y={12}
+                      className="fill-sidebar-foreground/60 font-normal"
+                      fontSize={10}
                       style={{ paintOrder: 'stroke' }}
                       stroke="var(--sidebar)"
                       strokeWidth={3}
                       strokeLinejoin="round"
                     >
-                      {t}
+                      {textoHa}
                     </text>
                   )}
                 </motion.g>
@@ -347,20 +408,10 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                     animate={{ scale: 1, opacity: 1, x: it.cx, y: it.cy }}
                     transition={{ type: 'spring', stiffness: 400, damping: 22, delay: i * 0.05 }}
                   >
-                    <MarcaCategoria categoria={it.categoria} />
-                    {conNumero && (
-                      <text
-                        x={14}
-                        y={4}
-                        className="fill-sidebar-foreground font-semibold tabular-nums"
-                        fontSize={11}
-                        style={{ paintOrder: 'stroke' }}
-                        stroke="var(--sidebar)"
-                        strokeWidth={3}
-                        strokeLinejoin="round"
-                      >
-                        {it.n}
-                      </text>
+                    {modo === 'siluetas' ? (
+                      <MarcaCategoria categoria={it.categoria} />
+                    ) : (
+                      <circle r={3} fill={it.color} stroke="var(--sidebar)" strokeWidth={1} />
                     )}
                   </motion.g>
                 ))}
@@ -408,24 +459,34 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         )}
       </AnimatePresence>
 
-      {/* Hacienda sin potrero: el resumen por especie, bajo el nombre del campo. */}
-      {conHa.length === 0 &&
-        resumenHacienda(
-          { x: interior.x, y: interior.y + ALTO / 2 + 6, w: interior.w, h: interior.h / 2 - 6 },
-          campo.sueltas ?? {},
-        ).items.map((it, i) => (
-          <motion.g
-            key={`suelta-${it.categoria}`}
-            initial={{ scale: 0, opacity: 0, x: it.cx, y: it.cy }}
-            animate={{ scale: 1, opacity: 1, x: it.cx, y: it.cy }}
-            transition={{ type: 'spring', stiffness: 400, damping: 22, delay: i * 0.05 }}
-          >
-            <MarcaCategoria categoria={it.categoria} />
-            <text x={14} y={4} className="fill-sidebar-foreground font-semibold tabular-nums" fontSize={11}>
-              {it.n}
-            </text>
-          </motion.g>
-        ))}
+      {/* Hacienda sin potrero: el resumen por especie, bajo el nombre del campo.
+          Misma regla que adentro de un potrero — la marca dice QUÉ hay, el
+          hover dice CUÁNTO. */}
+      {conHa.length === 0 && totalCabezas(campo.sueltas ?? {}) > 0 && (
+        <g>
+          <title>{porEspecie(campo.sueltas ?? {}).join(' · ')}</title>
+          {(() => {
+            const { modo, items } = resumenHacienda(
+              { x: interior.x, y: interior.y + ALTO / 2 + 6, w: interior.w, h: interior.h / 2 - 6 },
+              campo.sueltas ?? {},
+            )
+            return items.map((it, i) => (
+              <motion.g
+                key={`suelta-${it.categoria}`}
+                initial={{ scale: 0, opacity: 0, x: it.cx, y: it.cy }}
+                animate={{ scale: 1, opacity: 1, x: it.cx, y: it.cy }}
+                transition={{ type: 'spring', stiffness: 400, damping: 22, delay: i * 0.05 }}
+              >
+                {modo === 'siluetas' ? (
+                  <MarcaCategoria categoria={it.categoria} />
+                ) : (
+                  <circle r={3} fill={it.color} stroke="var(--sidebar)" strokeWidth={1} />
+                )}
+              </motion.g>
+            ))
+          })()}
+        </g>
+      )}
 
       {/* Sin potreros todavía: el nombre y las hectáreas, grandes, en el medio. */}
       {conHa.length === 0 && (

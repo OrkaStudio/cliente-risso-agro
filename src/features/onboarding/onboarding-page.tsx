@@ -55,11 +55,12 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import {
-  categoriaLabel,
+  categoriaPlural,
   categoriasPorEspecie,
   especieLabel,
   type Especie,
 } from '@/features/hacienda/labels'
+import { RECEPTIVIDAD, evDeCabezas, formatearEv } from '@/features/hacienda/carga-animal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -637,6 +638,11 @@ function PasoCampo({
 
   return (
     <>
+      {!primero && (
+        <VolverArriba onClick={onVolver} disabled={ocupado}>
+          Volver
+        </VolverArriba>
+      )}
       <AuthHeading
         icono={LandPlot}
         titulo={existente ? `Corregir ${existente.nombre}` : primero ? 'Tu primer campo' : 'Otro campo'}
@@ -743,8 +749,9 @@ function PasoCampo({
                 inputMode="decimal"
                 value={hectareas}
                 onChange={(e) => {
-                  setHectareas(e.target.value)
-                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(e.target.value), actividad })
+                  const v = soloDecimal(e.target.value)
+                  setHectareas(v)
+                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(v), actividad })
                   setErrores((x) => ({ ...x, hectareas: undefined }))
                 }}
                 placeholder="Según el título"
@@ -760,17 +767,6 @@ function PasoCampo({
           <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
             {ocupado ? 'Guardando…' : existente ? 'Guardar los cambios' : 'Guardar el campo'}
           </Button>
-          {!primero && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full text-muted-foreground"
-              disabled={ocupado}
-              onClick={onVolver}
-            >
-              <ArrowLeft className="size-4" /> Volver
-            </Button>
-          )}
         </Reveal>
       </form>
     </>
@@ -890,6 +886,9 @@ function PasoPotreros({
 
   return (
     <>
+      <VolverArriba onClick={onCorregirCampo} disabled={ocupado}>
+        Los datos de {campo.nombre}
+      </VolverArriba>
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
@@ -929,7 +928,9 @@ function PasoPotreros({
                     onChange={(e) => {
                       setError(null)
                       cambiarFilas((fs) =>
-                        fs.map((f, j) => (j === i ? { ...f, hectareas: e.target.value } : f)),
+                        fs.map((f, j) =>
+                          j === i ? { ...f, hectareas: soloDecimal(e.target.value) } : f,
+                        ),
                       )
                     }}
                     placeholder="Hectáreas"
@@ -1050,15 +1051,6 @@ function PasoPotreros({
           >
             Los completo después
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full text-muted-foreground"
-            disabled={ocupado}
-            onClick={onCorregirCampo}
-          >
-            <ArrowLeft className="size-4" /> Volver a los datos del campo
-          </Button>
         </Reveal>
       </form>
     </>
@@ -1069,6 +1061,25 @@ function PasoPotreros({
 function numeroDe(texto: string): number | null {
   const t = texto.trim().replace(',', '.')
   return t === '' ? null : Number(t)
+}
+
+/**
+ * Lo que se deja tipear en hectáreas: dígitos y UNA coma decimal. El punto se
+ * acepta y se convierte —el teclado numérico del teléfono da punto, no coma—
+ * y los ceros a la izquierda se caen solos, para que no exista "020 ha".
+ * Se filtra al tipear y no al validar: un campo que no acepta la letra no
+ * necesita después explicar por qué la rechaza.
+ */
+function soloDecimal(texto: string): string {
+  const limpio = texto.replace(/[^\d,.]/g, '').replace(/\./g, ',')
+  const [ent = '', ...resto] = limpio.split(',')
+  const entero = ent.replace(/^0+(?=\d)/, '')
+  return resto.length > 0 ? `${entero},${resto.join('').slice(0, 2)}` : entero
+}
+
+/** Lo que se deja tipear en un conteo de cabezas: dígitos, sin "09". */
+function soloEntero(texto: string): string {
+  return texto.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
 }
 
 function haDe(f: FilaPotrero): number | null {
@@ -1097,26 +1108,37 @@ function totalDe(c: Cantidades | undefined): number {
 
 /**
  * Aviso de carga animal. Bloquea si supera lo que la base acepta por vez
- * (2.000) o si no cierra con las hectáreas (más de 10 por ha); avisa, sin
- * bloquear, entre 4 y 10 por ha.
+ * (2.000) o si la carga es imposible; avisa, sin bloquear, cuando pasa lo que
+ * rinde un campo natural. La cuenta va en EQUIVALENTE VACA y no en cabezas:
+ * una oveja come la sexta parte que una vaca y un caballo un 20 % más, así
+ * que "3 por hectárea" no quiere decir nada sin saber de qué animal se habla.
+ * La tabla y las fuentes están en `@/features/hacienda/carga-animal`.
  */
-function avisoCarga(cabezas: number, hectareas: number | null): { texto: string; bloquea: boolean } | null {
+function avisoCarga(
+  cant: Cantidades | undefined,
+  hectareas: number | null,
+): { texto: string; bloquea: boolean } | null {
+  const cabezas = totalDe(cant)
   if (cabezas <= 0) return null
+  // Tope de la carga masiva, no del campo: es cuántas filas escribe la RPC
+  // de una vez, y por eso se mide en cabezas y no en EV.
   if (cabezas > 2000)
     return {
       texto: `Hasta 2.000 por potrero de una vez. Las que sobren, después desde Hacienda.`,
       bloquea: true,
     }
   if (!hectareas) return null
-  const porHa = cabezas / hectareas
-  if (porHa > 10)
+  const evHa = evDeCabezas(porCategoriaDe(cant)) / hectareas
+  const { min, max } = RECEPTIVIDAD.campoNatural
+  const pastura = RECEPTIVIDAD.pasturaImplantada
+  if (evHa > pastura * 2)
     return {
-      texto: `${Math.round(porHa)} cabezas por hectárea no cierra (lo normal es cerca de 1). Revisá el número.`,
+      texto: `${formatearEv(evHa)} EV por hectárea. Ni una pastura implantada pasa de ${formatearEv(pastura)}. Revisá el número.`,
       bloquea: true,
     }
-  if (porHa > 4)
+  if (evHa > max)
     return {
-      texto: `${Math.round(porHa)} por hectárea es mucho para ${hectareas.toLocaleString('es-AR')} ha. Si está bien, seguí.`,
+      texto: `${formatearEv(evHa)} EV por hectárea. Un campo natural rinde entre ${formatearEv(min)} y ${formatearEv(max)}; con pastura implantada, hasta ${formatearEv(pastura)}.`,
       bloquea: false,
     }
   return null
@@ -1186,11 +1208,9 @@ function PasoHacienda({
   const actual = potreros[indice]!
   const cantActual = porPotrero[actual.id] ?? {}
   const totalActual = totalDe(cantActual)
-  // Un número que no cierra con las hectáreas se avisa antes de guardar.
-  // Referencia: en la pampa húmeda la carga ronda 1 cabeza/ha (INTA); diez
-  // veces eso no pasa ni en un feedlot chico. Y la base carga hasta 2.000
-  // por potrero por vez: más que eso se hace en dos tandas desde Hacienda.
-  const avisoActual = avisoCarga(totalActual, actual.hectareas)
+  // Un número que no cierra con las hectáreas se avisa antes de guardar, en
+  // EV: la referencia es la receptividad del campo, no un conteo de cabezas.
+  const avisoActual = avisoCarga(cantActual, actual.hectareas)
   const total = potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
   const esUltimo = indice === potreros.length - 1
 
@@ -1213,9 +1233,9 @@ function PasoHacienda({
       irA(indice + 1)
       return
     }
-    const bloqueado = potreros.find((p) => avisoCarga(totalDe(porPotrero[p.id]), p.hectareas)?.bloquea)
+    const bloqueado = potreros.find((p) => avisoCarga(porPotrero[p.id], p.hectareas)?.bloquea)
     if (bloqueado) {
-      setError(`Potrero ${bloqueado.nombre}: ${avisoCarga(totalDe(porPotrero[bloqueado.id]), bloqueado.hectareas)!.texto}`)
+      setError(`Potrero ${bloqueado.nombre}: ${avisoCarga(porPotrero[bloqueado.id], bloqueado.hectareas)!.texto}`)
       return
     }
     const totales = Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(porPotrero[p.id])]))
@@ -1250,6 +1270,9 @@ function PasoHacienda({
 
   return (
     <>
+      <VolverArriba onClick={onVolver} disabled={ocupado}>
+        {campoEntero ? `Los datos de ${campo.nombre}` : `Los potreros de ${campo.nombre}`}
+      </VolverArriba>
       <AuthHeading
         icono={Beef}
         titulo={`La hacienda de ${campo.nombre}`}
@@ -1391,7 +1414,7 @@ function PasoHacienda({
                         <div className="grid grid-cols-3 gap-2">
                           {cats.map((c, k) => (
                             <label key={c} className="grid gap-1">
-                              <span className="truncate text-xs text-muted-foreground">{categoriaLabel[c]}</span>
+                              <span className="truncate text-xs text-muted-foreground">{categoriaPlural[c]}</span>
                               <Input
                                 inputMode="numeric"
                                 value={cantActual[c] ?? ''}
@@ -1402,7 +1425,7 @@ function PasoHacienda({
                                     ...porPotrero,
                                     [actual.id]: {
                                       ...(porPotrero[actual.id] ?? {}),
-                                      [c]: ev.target.value.replace(/\D/g, ''),
+                                      [c]: soloEntero(ev.target.value),
                                     },
                                   }
                                   setPorPotrero(next)
@@ -1449,14 +1472,15 @@ function PasoHacienda({
               'Terminar sin hacienda'
             )}
           </Button>
-          <div className="flex items-center justify-between">
-            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" disabled={ocupado} onClick={onVolver}>
-              <ArrowLeft className="size-4" /> {campoEntero ? 'Volver al campo' : 'Volver a los potreros'}
-            </Button>
-            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" disabled={ocupado} onClick={() => onListo(0, {})}>
-              La completo después
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full text-[15px] font-medium"
+            disabled={ocupado}
+            onClick={() => onListo(0, {})}
+          >
+            La completo después
+          </Button>
         </Reveal>
       </form>
     </>
@@ -1466,6 +1490,37 @@ function PasoHacienda({
 // ---------------------------------------------------------------------
 // Piezas
 // ---------------------------------------------------------------------
+
+/**
+ * Volver al paso anterior. Va ARRIBA Y A LA IZQUIERDA del panel, antes del
+ * título, y no abajo junto a las acciones: volver no es una opción que
+ * compita con seguir — es la salida, y la salida se busca en la esquina.
+ * Discreto a propósito (texto chico, sin borde): sólo lo mira el que lo
+ * necesita.
+ */
+function VolverArriba({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <Reveal>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="-ml-1.5 mb-3 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+      >
+        <ArrowLeft className="size-3.5" strokeWidth={2} />
+        {children}
+      </button>
+    </Reveal>
+  )
+}
 
 /** Transición entre pasos: el que se va sale hacia arriba, el nuevo entra desde abajo. */
 function Paso({ children }: { children: ReactNode }) {
