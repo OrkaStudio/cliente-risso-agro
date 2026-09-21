@@ -20,6 +20,7 @@ export function LocalidadInput({
   onEscribir,
   invalido = false,
   autoFocus,
+  ayuda,
 }: {
   id?: string
   value: Localidad | null
@@ -28,6 +29,8 @@ export function LocalidadInput({
   onEscribir?: () => void
   invalido?: boolean
   autoFocus?: boolean
+  /** Una línea de ayuda debajo del campo. La reemplaza el "no lo encontramos". */
+  ayuda?: string
 }) {
   const [texto, setTexto] = useState(value ? etiquetaLocalidad(value) : '')
   const [sugerencias, setSugerencias] = useState<Localidad[]>([])
@@ -152,9 +155,15 @@ export function LocalidadInput({
           ))}
         </ul>
       )}
-      {!value && texto.trim().length >= 2 && !buscando && sugerencias.length === 0 && (
+      {/* UNA sola línea debajo del campo, nunca dos apiladas: la ayuda de
+          siempre, o el "no lo encontramos" cuando corresponde. Y corresponde
+          recién con tres letras — con dos ("la") todavía no buscó nada y ya
+          estaba diciendo que no encontraba. */}
+      {!invalido && (
         <p className="mt-1.5 text-xs text-muted-foreground">
-          No encontramos esa localidad. Probá con el pueblo o la ciudad más cercana.
+          {!value && texto.trim().length >= 3 && !buscando && sugerencias.length === 0
+            ? 'No lo encontramos. Probá con otro pueblo cercano.'
+            : ayuda}
         </p>
       )}
     </div>

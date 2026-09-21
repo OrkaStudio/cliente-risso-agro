@@ -8,6 +8,7 @@ import {
   type CabezasPorCategoria,
   type PotreroCroquis,
 } from '@/features/onboarding/especies-croquis'
+import { decidirEtiqueta, decidirMarcas, type Etiqueta, type ModoMarcas } from '@/features/onboarding/croquis-layout'
 import type { Database } from '@/lib/supabase/types'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
@@ -39,12 +40,13 @@ const SILUETA: Record<Especie, string> = {
   // Oveja: cuerpo redondo de lana, cabeza chica y oscura, patas finas.
   ovino:
     'M-5.1 -4 h7.7 a3.4 3.4 0 0 1 3.4 3.4 v0.7000000000000002 a3.4 3.4 0 0 1 -3.4 3.4 h-7.7 a3.4 3.4 0 0 1 -3.4 -3.4 v-0.7000000000000002 a3.4 3.4 0 0 1 3.4 -3.4 z M-6.9 -4.2 a2.7 2.7 0 1 1 5.4 0 a2.7 2.7 0 1 1 -5.4 0 z M-1.9000000000000001 -4.6 a3.1 3.1 0 1 1 6.2 0 a3.1 3.1 0 1 1 -6.2 0 z M-3.2 -3.6 a2.4 2.4 0 1 1 4.8 0 a2.4 2.4 0 1 1 -4.8 0 z M6.199999999999999 -2.4 h2.3999999999999995 a1.6 1.6 0 0 1 1.6 1.6 v1.3999999999999995 a1.6 1.6 0 0 1 -1.6 1.6 h-2.3999999999999995 a1.6 1.6 0 0 1 -1.6 -1.6 v-1.3999999999999995 a1.6 1.6 0 0 1 1.6 -1.6 z M-6.4 3.2 h1.3 v3.8 h-1.3 z M-3.4 3.2 h1.3 v3.8 h-1.3 z M0.6 3.2 h1.3 v3.8 h-1.3 z M3.6 3.2 h1.3 v3.8 h-1.3 z',
-  // Caballo. El anterior tenía el cuello como un bloque recto y la cabeza
-  // pegada arriba: a 14 px se leía como un perro. Un caballo se reconoce por
-  // TRES cosas y ninguna es el cuerpo — el cuello arqueado que sube desde la
-  // cruz, la cabeza chica y en punta mirando abajo, y las patas largas.
+  // Caballo. Cuello y cabeza son UNA curva continua desde la cruz hasta el
+  // hocico —antes eran dos polígonos pegados y la costura se veía como un
+  // quiebre—, con la oreja saliendo de la nuca. Lo que hace reconocible a un
+  // caballo a 14 px no es el cuerpo: es el cuello arqueado, la cabeza chica
+  // en punta mirando abajo, y las patas largas.
   equino:
-    'M-7.4 -2.8 h9.2 a2.7 2.7 0 0 1 2.7 2.7 v1.2 a2.7 2.7 0 0 1 -2.7 2.7 h-9.2 a2.7 2.7 0 0 1 -2.7 -2.7 v-1.2 a2.7 2.7 0 0 1 2.7 -2.7 z M1.4 -2.4 C2.2 -5.6 3.6 -7.6 5.6 -8.8 L7.7 -7.1 C6.2 -6 5.2 -4.2 4.8 -1.8 z M5.2 -9.3 L9.4 -7.2 L9.7 -5.9 L8.6 -5.7 L4.7 -7.5 z M5.7 -8.9 l0.2 -2.1 l1.6 1.5 z M-7.8 3.2 h1.5 v4.8 h-1.5 z M-4.8 3.2 h1.5 v4.8 h-1.5 z M0.6 3.2 h1.5 v4.8 h-1.5 z M3.2 3.2 h1.5 v4.8 h-1.5 z M-9.7 -2.4 c-2 2.2 -2.4 5 -1.3 7.2 l1.4 -0.5 c-0.8 -1.9 -0.5 -3.9 1 -5.6 z',
+    'M-7.4 -2.8 h8.6 a2.7 2.7 0 0 1 2.7 2.7 v1.2 a2.7 2.7 0 0 1 -2.7 2.7 h-8.6 a2.7 2.7 0 0 1 -2.7 -2.7 v-1.2 a2.7 2.7 0 0 1 2.7 -2.7 z M1 -2.2 C2.2 -5.8 3.9 -8.1 6.1 -9.4 L6.5 -11.3 L7.9 -9.6 C9.2 -9.2 10.3 -8 10.5 -6.6 L9.4 -5.5 C8.3 -6 7.1 -6.4 6.2 -6.6 C5.6 -5 5.2 -3.5 5 -1.8 z M-7.8 3.2 h1.5 v4.8 h-1.5 z M-4.8 3.2 h1.5 v4.8 h-1.5 z M0.6 3.2 h1.5 v4.8 h-1.5 z M3.2 3.2 h1.5 v4.8 h-1.5 z M-9.7 -2.4 c-2 2.2 -2.4 5 -1.3 7.2 l1.4 -0.5 c-0.8 -1.9 -0.5 -3.9 1 -5.6 z',
 }
 
 /**
@@ -54,7 +56,19 @@ const SILUETA: Record<Especie, string> = {
  */
 export function MarcaCategoria({ categoria }: { categoria: Categoria }) {
   const { color } = estiloDeCategoria(categoria)
-  return <path d={SILUETA[especiePorCategoria[categoria]]} fill={color} />
+  // Contorno oscuro detrás del relleno (`paintOrder: stroke`): separa la
+  // silueta del fondo sin comerle forma. Sobre el verde del potrero y sobre
+  // la textura rayada del agrícola, sin contorno las patas se perdían.
+  return (
+    <path
+      d={SILUETA[especiePorCategoria[categoria]]}
+      fill={color}
+      stroke="#0a140d"
+      strokeWidth={1.1}
+      strokeLinejoin="round"
+      style={{ paintOrder: 'stroke' }}
+    />
+  )
 }
 
 export type CampoCroquis = {
@@ -135,28 +149,18 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
 }
 
 /**
- * La hacienda de un potrero, resumida. UNA marca por especie, nunca una
- * multiplicación de vaquitas, y en tres modos según el lugar que haya:
- *
- * - `siluetas`: la silueta de cada especie, en fila. Lo normal.
- * - `puntos`: una columna de puntos del color de cada especie. Cuando el
- *   potrero es angosto y las siluetas no entran — antes se mostraba sólo la
- *   primera especie, que es peor que no mostrar ninguna: decía "acá hay
- *   ovejas" en un potrero con ovejas, vacas y caballos.
- * - `nada`: el potrero es una astilla y cualquier marca lo ensucia.
- *
- * El número de cabezas NO va acá en ningún modo: compite con la etiqueta y en
- * un potrero chico no se lee. Vive en el hover, junto con las hectáreas.
+ * La hacienda de un potrero, resumida: UNA marca por especie, nunca una
+ * multiplicación de vaquitas. Qué marca y dónde lo decide `croquis-layout`,
+ * que tiene la tabla de casos y sus tests; acá sólo se pone la especie a
+ * cada posición. El número de cabezas NO va en ningún modo: compite con la
+ * etiqueta y en un potrero chico no se lee. Vive en el hover.
  */
 type MarcaResumen = { cx: number; cy: number; categoria: Categoria; color: string }
 function resumenHacienda(
   r: Rect,
   cabezas: CabezasPorCategoria,
-  /** Alto que ocupa la etiqueta arriba. Dos líneas piden más lugar: con el
-   *  valor fijo de una línea, los puntos de un potrero angosto se montaban
-   *  encima de "10 ha". */
-  arriba = 22,
-): { modo: 'siluetas' | 'puntos' | 'nada'; items: MarcaResumen[] } {
+  etiqueta: Etiqueta,
+): { modo: ModoMarcas; items: MarcaResumen[] } {
   const especies = (['bovino', 'ovino', 'equino'] as const)
     .map((e) => {
       const cats = categoriasPorEspecie[e].filter((c) => (cabezas[c] ?? 0) > 0)
@@ -165,49 +169,15 @@ function resumenHacienda(
       return { e, total, principal }
     })
     .filter((x) => x.total > 0 && x.principal)
-  if (especies.length === 0) return { modo: 'nada', items: [] }
-
-  const altoLibre = r.h - arriba - 6
-  const cy = r.y + arriba + altoLibre / 2
-  const marca = (e: (typeof especies)[number], cx: number, y: number): MarcaResumen => ({
-    cx,
-    cy: y,
-    categoria: e.principal!,
-    color: ESTILO_ESPECIE[e.e].color,
-  })
-
-  // Siluetas en fila: 22 px cada una, 8 de aire entre ellas.
-  const anchoFila = especies.length * 22 + (especies.length - 1) * 8
-  if (altoLibre >= 16 && anchoFila <= r.w - 8) {
-    let x = r.x + r.w / 2 - anchoFila / 2
-    const items = especies.map((e) => {
-      const it = marca(e, x + 11, cy)
-      x += 30
-      return it
-    })
-    return { modo: 'siluetas', items }
+  const { modo, posiciones } = decidirMarcas(r, especies.length, etiqueta)
+  return {
+    modo,
+    items: posiciones.map((pos, i) => ({
+      ...pos,
+      categoria: especies[i]!.principal!,
+      color: ESTILO_ESPECIE[especies[i]!.e].color,
+    })),
   }
-
-  // No entran: una columna de puntos, uno por especie, con su color.
-  //
-  // El paso se ADAPTA al lugar que hay en vez de ser fijo. Con 9 px fijos, un
-  // potrero de 10 ha dentro de un campo de 1.000 dejaba al tercer punto fuera
-  // del rectángulo: se veían dos y el de equinos quedaba pisando el borde.
-  // Ahora el paso se achica hasta 6 px antes de rendirse, y la columna se
-  // encaja dentro del alto disponible, nunca centrada a ojo.
-  const n = especies.length
-  const paso = Math.min(9, (altoLibre - 6) / Math.max(1, n - 1))
-  if (r.w >= 14 && paso >= 6) {
-    const alto = (n - 1) * paso
-    let y = cy - alto / 2
-    const items = especies.map((e) => {
-      const it = marca(e, r.x + r.w / 2, y)
-      y += paso
-      return it
-    })
-    return { modo: 'puntos', items }
-  }
-  return { modo: 'nada', items: [] }
 }
 
 /** "9 bovinos · 9 ovinos · 9 equinos" — el desglose que el dibujo no dice. */
@@ -308,21 +278,11 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
             const r = rects[p.clave]!
             const t = totalCabezas(p.cabezas)
             const chico = r.w < 70 || r.h < 40
-            // Las hectáreas se muestran siempre que entren. El umbral no es un
-            // número fijo —con 70 fijo, "4A 200 ha" no entraba en un potrero
-            // donde sobraba lugar— sino el ancho REAL de la etiqueta: el
-            // nombre en semibold de 12 y las hectáreas en 10, más el margen.
-            // Lo que no entra vive en el hover, que existe en todos.
+            // Etiqueta y marcas: la tabla de casos vive en `croquis-layout`.
+            // Lo que no entra dibujado está en el hover, que existe en todos.
             const textoHa = p.hectareas ? `${p.hectareas.toLocaleString('es-AR')} ha` : ''
-            const anchoNombre = p.nombre.length * 7.2
-            const anchoHa = textoHa.length * 5.4
-            // Tres posibilidades, en este orden: al lado del nombre, debajo, o
-            // sólo en el hover. La segunda es la que salva a los potreros
-            // angostos pero altos, que son la mayoría de los chicos.
-            const haAlLado = textoHa !== '' && r.w >= anchoNombre + anchoHa + 20
-            const haDebajo = textoHa !== '' && !haAlLado && r.w >= anchoHa + 16 && r.h >= 42
-            // Una línea ocupa hasta y≈22; con las hectáreas debajo, hasta ≈32.
-            const { modo, items: resumen } = resumenHacienda(r, p.cabezas, haDebajo ? 32 : 22)
+            const etiqueta = decidirEtiqueta(r, p.nombre, textoHa)
+            const { modo, items: resumen } = resumenHacienda(r, p.cabezas, etiqueta)
             return (
               <motion.g
                 key={p.clave}
@@ -393,23 +353,32 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                 )}
                 <motion.g
                   initial={false}
-                  animate={{ x: r.x + 8, y: r.y + 16 }}
+                  animate={{ x: etiqueta.x, y: r.y + 16 }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                 >
-                  <text className="fill-sidebar-foreground font-semibold" fontSize={chico ? 10 : 12} style={{ paintOrder: 'stroke' }} stroke="var(--sidebar)" strokeWidth={3} strokeLinejoin="round">
+                  <text
+                    className="fill-sidebar-foreground font-semibold"
+                    fontSize={chico ? 10 : 12}
+                    textAnchor={etiqueta.centrada ? 'middle' : 'start'}
+                    style={{ paintOrder: 'stroke' }}
+                    stroke="var(--sidebar)"
+                    strokeWidth={3}
+                    strokeLinejoin="round"
+                  >
                     {p.nombre}
-                    {haAlLado ? (
+                    {etiqueta.modo === 'lado' ? (
                       <tspan className="fill-sidebar-foreground/60 font-normal" fontSize={10}>
                         {' '}
                         {textoHa}
                       </tspan>
                     ) : null}
                   </text>
-                  {haDebajo && (
+                  {etiqueta.modo === 'debajo' && (
                     <text
                       y={12}
                       className="fill-sidebar-foreground/60 font-normal"
                       fontSize={10}
+                      textAnchor={etiqueta.centrada ? 'middle' : 'start'}
                       style={{ paintOrder: 'stroke' }}
                       stroke="var(--sidebar)"
                       strokeWidth={3}
@@ -484,10 +453,15 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
         <g>
           <title>{porEspecie(campo.sueltas ?? {}).join(' · ')}</title>
           {(() => {
-            const { modo, items } = resumenHacienda(
-              { x: interior.x, y: interior.y + ALTO / 2 + 6, w: interior.w, h: interior.h / 2 - 6 },
-              campo.sueltas ?? {},
-            )
+            const zona = { x: interior.x, y: interior.y + ALTO / 2 + 6, w: interior.w, h: interior.h / 2 - 6 }
+            // Sin etiqueta: el nombre del campo ya está arriba, fuera de esta zona.
+            const { modo, items } = resumenHacienda(zona, campo.sueltas ?? {}, {
+              modo: 'nombre',
+              centrada: true,
+              x: zona.x + zona.w / 2,
+              alto: 0,
+              ancho: 0,
+            })
             return items.map((it, i) => (
               <motion.g
                 key={`suelta-${it.categoria}`}

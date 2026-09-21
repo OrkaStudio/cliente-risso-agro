@@ -710,15 +710,9 @@ function PasoCampo({
             }}
             onEscribir={() => setErrores((x) => ({ ...x, localidad: undefined }))}
             invalido={!!errores.localidad}
+            ayuda="El pueblo más cercano al campo, no tu domicilio."
           />
-          {errores.localidad ? (
-            <ErrorCampo mensaje={errores.localidad} />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              La localidad más cercana al campo, no tu domicilio. De acá sale el
-              clima de este campo.
-            </p>
-          )}
+          <ErrorCampo mensaje={errores.localidad} />
         </Reveal>
 
         <Reveal delay={0.26}>
@@ -1910,7 +1904,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
   const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
   const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
   return (
-    <div className={cn('w-full', campos.length === 1 ? 'max-w-[620px]' : 'max-w-[1040px]')}>
+    <div className={cn('w-full', campos.length === 1 ? 'max-w-[680px]' : 'max-w-[1160px]')}>
       {/* Cubre toda la escena (el panel es relative + overflow-hidden), no sólo la ficha. */}
       <div className="pointer-events-none absolute inset-0">
         <Confeti />
