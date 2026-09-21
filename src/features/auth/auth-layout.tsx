@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
+import { Sembradora } from '@/features/auth/sembradora'
 
 /**
  * Shell de las pantallas de auth: escena ambiental a la izquierda (solo
@@ -100,7 +101,10 @@ export function AuthHeading({
   subtituloSoloEscritorio?: boolean
 }) {
   return (
-    <div>
+    // `relative` para que el tractor pueda cruzar por encima del encabezado
+    // sin ocupar lugar en el layout.
+    <div className="relative">
+      <Sembradora />
       <Reveal>
         <div className="flex items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">

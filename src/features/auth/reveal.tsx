@@ -1,28 +1,29 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { CURVA } from '@/lib/animacion'
 
 /**
- * Reveal escalonado para las pantallas de auth y del onboarding: el contenido
- * ENTRA EN FOCO. Sube unos pocos píxeles mientras se le va el desenfoque.
+ * Reveal escalonado para las pantallas de auth y del onboarding: cada bloque
+ * sube unos pocos píxeles y aparece, detrás del tractor que cruza la pantalla
+ * (ver `Sembradora`). Acá adentro el movimiento es MUDO a propósito: la
+ * personalidad va una vez por pantalla, no una vez por campo.
  *
- * Antes esto era un panel verde macizo que barría hacia la derecha y
- * descubría el texto, como un telón. Se cambió por tres razones:
+ * Las dos versiones anteriores fallaron por la misma razón de fondo —un
+ * efecto que necesita tapar algo—, y conviene no volver a intentarlo:
  *
- * 1. El borde duro del panel y el verde a pantalla completa gritan la marca
- *    en cada campo del formulario. Repetido ocho veces seguidas en un form,
- *    cansa.
- * 2. El telón obligaba a `overflow: hidden` mientras barría, para que el
- *    verde no asomara. Eso recortaba cualquier desplegable que se abriera
- *    dentro del bloque —la lista de localidades— y obligó a un `-m-1 p-1`
- *    para que el anillo de foco tampoco quedara cortado. Sin panel, no hace
- *    falta recortar nada: los dos parches se fueron.
- * 3. Un elemento que se enfoca se lee como algo que TERMINA DE PENSARSE, y
- *    esa es la gramática que queremos.
+ * 1. Un panel verde macizo barría hacia la derecha y descubría el texto.
+ *    Gritaba la marca en cada uno de los ocho campos del formulario, y
+ *    obligaba a `overflow: hidden` mientras barría para que el verde no
+ *    asomara — lo que recortaba la lista de localidades.
+ * 2. Un desenfoque de entrada. Más limpio, pero framer deja el `filter`
+ *    escrito en el style inline al terminar, y `blur(0px)` NO es `none`:
+ *    crea contexto de apilado igual. Eso encerró el `z-30` de la lista de
+ *    localidades y los campos de abajo le pasaron por encima. Limpiarlo con
+ *    la prop `style` no sirve: framer escribe después de React y gana.
  *
- * El desenfoque se saca del todo al terminar y no se deja en `blur(0px)`: un
- * `filter` activo, aunque sea nulo, crea bloque contenedor y stacking context
- * y le cambia el ancla a cualquier posicionado de adentro.
+ * Por eso acá no hay filtro ni recorte de ningún tipo. Sólo `opacity` e `y`,
+ * que framer resuelve a `transform: none` al terminar — sin contexto de
+ * apilado, sin nada que limpiar después.
  */
 export function Reveal({
   children,
@@ -34,33 +35,15 @@ export function Reveal({
   delay?: number
   className?: string
 }) {
-  // `className` va en el motion.div, que es el padre real de los children:
-  // un `grid gap-2` tiene que separar label e input, no envolver al bloque.
-  const [entrando, setEntrando] = useState(true)
   const quieto = useReducedMotion()
-
-  if (quieto) {
-    return (
-      <motion.div
-        className={className}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.2, delay }}
-      >
-        {children}
-      </motion.div>
-    )
-  }
-
   return (
+    // `className` va en el motion.div, que es el padre real de los children:
+    // un `grid gap-2` tiene que separar label e input, no envolver al bloque.
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 8, filter: 'blur(6px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      // Sin filtro una vez que llegó — ver la nota de arriba.
-      style={entrando ? undefined : { filter: 'none' }}
-      transition={{ duration: 0.55, delay, ease: CURVA }}
-      onAnimationComplete={() => setEntrando(false)}
+      initial={quieto ? { opacity: 0 } : { opacity: 0, y: 10 }}
+      animate={quieto ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      transition={{ duration: quieto ? 0.2 : 0.5, delay, ease: CURVA }}
     >
       {children}
     </motion.div>

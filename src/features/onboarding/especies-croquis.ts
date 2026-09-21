@@ -25,7 +25,12 @@ export function totalCabezas(c: CabezasPorCategoria): number {
  */
 export const ESTILO_ESPECIE: Record<Especie, { color: string; nombre: string }> = {
   bovino: { color: '#e9b45f', nombre: 'bovinos' },
-  ovino: { color: '#f1ebd9', nombre: 'ovinos' },
+  // El ovino era crema (#f1ebd9), por la lana. No se veía: sobre el verde
+  // oscuro del croquis un punto casi blanco desaparece contra el trazo del
+  // potrero, y en la pestaña clara se pierde del todo. El lila no es el
+  // color de una oveja, pero el punto tiene que DISTINGUIRSE — es su único
+  // trabajo — y es el que más se separa del ámbar y del castaño.
+  ovino: { color: '#b49ce0', nombre: 'ovinos' },
   equino: { color: '#d98a5a', nombre: 'equinos' },
 }
 

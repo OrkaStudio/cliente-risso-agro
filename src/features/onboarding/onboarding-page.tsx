@@ -61,13 +61,7 @@ import {
   especieLabel,
   type Especie,
 } from '@/features/hacienda/labels'
-import {
-  RECEPTIVIDAD,
-  enVacas,
-  evDeCabezas,
-  topeConPastura,
-  vacasEnCampoNatural,
-} from '@/features/hacienda/carga-animal'
+import { RECEPTIVIDAD, evDeCabezas } from '@/features/hacienda/carga-animal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -1140,15 +1134,9 @@ function avisoCarga(
   const ev = evDeCabezas(porCategoriaDe(cant))
   const evHa = ev / hectareas
   if (evHa > RECEPTIVIDAD.pasturaImplantada * 2)
-    return {
-      texto: `Para el pasto que comen, es como tener ${enVacas(ev)}. En ${ha(hectareas)} ha no entran ni con la mejor pastura sembrada: el tope son ${topeConPastura(hectareas)}. Revisá el número.`,
-      bloquea: true,
-    }
+    return { texto: `Para ${ha(hectareas)} ha parecen demasiados. ¿Lo revisás?`, bloquea: true }
   if (evHa > RECEPTIVIDAD.campoNatural.max)
-    return {
-      texto: `Para el pasto que comen, es como tener ${enVacas(ev)}. En ${ha(hectareas)} ha de campo natural ${vacasEnCampoNatural(hectareas)}.`,
-      bloquea: false,
-    }
+    return { texto: `Para ${ha(hectareas)} ha son bastantes. Fijate si está bien.`, bloquea: false }
   return null
 }
 
@@ -1531,33 +1519,23 @@ function VolverArriba({
 }
 
 /**
- * Transición entre pasos del onboarding. Mismo idioma que `Reveal`: el paso
- * nuevo ENTRA EN FOCO donde está, en vez de deslizarse de una punta a la
- * otra. El que se va sólo se desvanece hacia arriba — sin desenfoque de
- * salida, para que el paso nuevo no compita con un fantasma borroso.
+ * Transición entre pasos del onboarding: el paso nuevo aparece donde está y
+ * el anterior se desvanece hacia arriba. Corto y mudo — el gesto con
+ * personalidad de cada pantalla lo hace el tractor (ver `Sembradora`), que se
+ * monta de nuevo con cada paso.
  *
- * El filtro se saca al llegar (`filter: none`) y no se deja en `blur(0px)`:
- * un filtro activo, aunque sea nulo, crea bloque contenedor y le cambia el
- * ancla a los desplegables posicionados de adentro.
+ * Sin `filter`, por lo mismo que `Reveal`: framer deja el `blur(0px)` escrito
+ * y eso crea contexto de apilado, que fue lo que encerró la lista de
+ * localidades debajo de los campos siguientes.
  */
 function Paso({ children }: { children: ReactNode }) {
-  const [entrando, setEntrando] = useState(true)
   const quieto = useReducedMotion()
-  if (quieto) {
-    return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-        {children}
-      </motion.div>
-    )
-  }
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, y: -8 }}
-      style={entrando ? undefined : { filter: 'none' }}
-      transition={{ duration: 0.45, ease: CURVA }}
-      onAnimationComplete={() => setEntrando(false)}
+      initial={quieto ? { opacity: 0 } : { opacity: 0, y: 12 }}
+      animate={quieto ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      exit={quieto ? { opacity: 0 } : { opacity: 0, y: -10 }}
+      transition={{ duration: quieto ? 0.2 : 0.42, ease: CURVA }}
     >
       {children}
     </motion.div>
@@ -1911,7 +1889,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
   const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
   const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
   return (
-    <div className={cn('w-full', campos.length === 1 ? 'max-w-[520px]' : campos.length === 2 ? 'max-w-[640px]' : 'max-w-[760px]')}>
+    <div className={cn('w-full', campos.length === 1 ? 'max-w-[620px]' : 'max-w-[1040px]')}>
       {/* Cubre toda la escena (el panel es relative + overflow-hidden), no sólo la ficha. */}
       <div className="pointer-events-none absolute inset-0">
         <Confeti />
@@ -1947,13 +1925,11 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
       </div>
 
       {/* Cada campo, con su letra y color, en cascada. */}
-      <ul
-        className={cn(
-          'mt-5 grid gap-3',
-          campos.length === 2 && 'sm:grid-cols-2',
-          campos.length >= 3 && 'sm:grid-cols-2 lg:grid-cols-3',
-        )}
-      >
+      {/* DOS columnas como máximo, nunca tres. El croquis de un campo con
+          ocho potreros no se lee a un tercio del panel: prefiero que la
+          tercera ficha caiga abajo y haya que bajar un poco. La escena ya
+          scrollea, y acá lo que importa es que se vea lo que armó. */}
+      <ul className={cn('mt-5 grid gap-4', campos.length > 1 && 'sm:grid-cols-2')}>
         {campos.map((c, i) => {
           const color = colorDeCampo(c.colorIdx)
           return (
@@ -1964,17 +1940,17 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.25 + i * 0.15 }}
             >
-              <div className="flex items-center gap-2 border-b border-sidebar-foreground/10 px-3 py-2">
+              <div className="flex items-center gap-2.5 border-b border-sidebar-foreground/10 px-4 py-3">
                 <span
-                  className="inline-flex size-5 items-center justify-center rounded text-[11px] font-bold text-white"
+                  className="inline-flex size-6 items-center justify-center rounded-md text-[12px] font-bold text-white"
                   style={{ background: color.hex }}
                 >
                   {color.letra}
                 </span>
-                <span className="truncate text-sm font-semibold">{c.nombre}</span>
-                <span className="ml-auto shrink-0 text-[11px] text-sidebar-foreground/60">{ha(c.hectareas)} ha</span>
+                <span className="truncate text-[15px] font-semibold">{c.nombre}</span>
+                <span className="ml-auto shrink-0 text-xs text-sidebar-foreground/60">{ha(c.hectareas)} ha</span>
               </div>
-              <div className="px-2 pt-2">
+              <div className="px-3 pt-3">
                 <CroquisVivo
                   campo={{
                     nombre: c.nombre,
@@ -1987,8 +1963,8 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                   }}
                 />
               </div>
-              <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
-                <p className="text-[11px] text-sidebar-foreground/60">
+              <div className="flex items-center justify-between gap-2 px-4 pb-3.5 pt-2.5">
+                <p className="text-xs text-sidebar-foreground/60">
                   {c.potreros.length > 0 ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}` : 'sin potreros todavía'}
                   {c.cabezas > 0 ? ` · ${c.cabezas} cabezas` : ''}
                 </p>

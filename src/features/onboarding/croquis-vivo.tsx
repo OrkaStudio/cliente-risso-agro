@@ -39,9 +39,12 @@ const SILUETA: Record<Especie, string> = {
   // Oveja: cuerpo redondo de lana, cabeza chica y oscura, patas finas.
   ovino:
     'M-5.1 -4 h7.7 a3.4 3.4 0 0 1 3.4 3.4 v0.7000000000000002 a3.4 3.4 0 0 1 -3.4 3.4 h-7.7 a3.4 3.4 0 0 1 -3.4 -3.4 v-0.7000000000000002 a3.4 3.4 0 0 1 3.4 -3.4 z M-6.9 -4.2 a2.7 2.7 0 1 1 5.4 0 a2.7 2.7 0 1 1 -5.4 0 z M-1.9000000000000001 -4.6 a3.1 3.1 0 1 1 6.2 0 a3.1 3.1 0 1 1 -6.2 0 z M-3.2 -3.6 a2.4 2.4 0 1 1 4.8 0 a2.4 2.4 0 1 1 -4.8 0 z M6.199999999999999 -2.4 h2.3999999999999995 a1.6 1.6 0 0 1 1.6 1.6 v1.3999999999999995 a1.6 1.6 0 0 1 -1.6 1.6 h-2.3999999999999995 a1.6 1.6 0 0 1 -1.6 -1.6 v-1.3999999999999995 a1.6 1.6 0 0 1 1.6 -1.6 z M-6.4 3.2 h1.3 v3.8 h-1.3 z M-3.4 3.2 h1.3 v3.8 h-1.3 z M0.6 3.2 h1.3 v3.8 h-1.3 z M3.6 3.2 h1.3 v3.8 h-1.3 z',
-  // Caballo: cuerpo alargado, cuello alto, cabeza, patas largas, cola.
+  // Caballo. El anterior tenía el cuello como un bloque recto y la cabeza
+  // pegada arriba: a 14 px se leía como un perro. Un caballo se reconoce por
+  // TRES cosas y ninguna es el cuerpo — el cuello arqueado que sube desde la
+  // cruz, la cabeza chica y en punta mirando abajo, y las patas largas.
   equino:
-    'M-7.0 -3 h9.0 a2.5 2.5 0 0 1 2.5 2.5 v1.4000000000000004 a2.5 2.5 0 0 1 -2.5 2.5 h-9.0 a2.5 2.5 0 0 1 -2.5 -2.5 v-1.4000000000000004 a2.5 2.5 0 0 1 2.5 -2.5 z M1.2 -2.6 L4.6 -9.2 L7.6 -9.8 L11.2 -8.2 L10.6 -6.6 L8.2 -6.9 L7 -2.6 z M5.6 -9.4 l0.5 -1.8 l1.3 1.3 z M4.6 -9.2 L3 -9.6 L0.2 -3.6 L1.6 -3 z M-8 3 h1.4 v4.6 h-1.4 z M-5 3 h1.4 v4.6 h-1.4 z M0 3 h1.4 v4.6 h-1.4 z M2.8 3 h1.4 v4.6 h-1.4 z M-9.4 -2 l-2.2 5.4 l1.1 0.4 l2 -5 z',
+    'M-7.4 -2.8 h9.2 a2.7 2.7 0 0 1 2.7 2.7 v1.2 a2.7 2.7 0 0 1 -2.7 2.7 h-9.2 a2.7 2.7 0 0 1 -2.7 -2.7 v-1.2 a2.7 2.7 0 0 1 2.7 -2.7 z M1.4 -2.4 C2.2 -5.6 3.6 -7.6 5.6 -8.8 L7.7 -7.1 C6.2 -6 5.2 -4.2 4.8 -1.8 z M5.2 -9.3 L9.4 -7.2 L9.7 -5.9 L8.6 -5.7 L4.7 -7.5 z M5.7 -8.9 l0.2 -2.1 l1.6 1.5 z M-7.8 3.2 h1.5 v4.8 h-1.5 z M-4.8 3.2 h1.5 v4.8 h-1.5 z M0.6 3.2 h1.5 v4.8 h-1.5 z M3.2 3.2 h1.5 v4.8 h-1.5 z M-9.7 -2.4 c-2 2.2 -2.4 5 -1.3 7.2 l1.4 -0.5 c-0.8 -1.9 -0.5 -3.9 1 -5.6 z',
 }
 
 /**
@@ -149,6 +152,10 @@ type MarcaResumen = { cx: number; cy: number; categoria: Categoria; color: strin
 function resumenHacienda(
   r: Rect,
   cabezas: CabezasPorCategoria,
+  /** Alto que ocupa la etiqueta arriba. Dos líneas piden más lugar: con el
+   *  valor fijo de una línea, los puntos de un potrero angosto se montaban
+   *  encima de "10 ha". */
+  arriba = 22,
 ): { modo: 'siluetas' | 'puntos' | 'nada'; items: MarcaResumen[] } {
   const especies = (['bovino', 'ovino', 'equino'] as const)
     .map((e) => {
@@ -160,7 +167,6 @@ function resumenHacienda(
     .filter((x) => x.total > 0 && x.principal)
   if (especies.length === 0) return { modo: 'nada', items: [] }
 
-  const arriba = 22
   const altoLibre = r.h - arriba - 6
   const cy = r.y + arriba + altoLibre / 2
   const marca = (e: (typeof especies)[number], cx: number, y: number): MarcaResumen => ({
@@ -222,7 +228,11 @@ function Textura({ r, patron }: { r: Rect; patron: string }) {
     <motion.rect
       rx={6}
       fill={`url(#${patron})`}
-      initial={{ opacity: 0 }}
+      // `width` y `height` van también en `initial`: si sólo están en
+      // `animate`, el primer render sale sin el atributo y el navegador tira
+      // «<rect> attribute width: Expected length, "undefined"». Se veía sólo
+      // en campos agrícolas o mixtos, que son los únicos con textura.
+      initial={{ opacity: 0, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
       animate={{ opacity: 1, x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
       transition={{ type: 'spring', stiffness: 260, damping: 26 }}
     />
@@ -289,7 +299,6 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           .filter((p) => rects[p.clave])
           .map((p) => {
             const r = rects[p.clave]!
-            const { modo, items: resumen } = resumenHacienda(r, p.cabezas)
             const t = totalCabezas(p.cabezas)
             const chico = r.w < 70 || r.h < 40
             // Las hectáreas se muestran siempre que entren. El umbral no es un
@@ -305,6 +314,8 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
             // angostos pero altos, que son la mayoría de los chicos.
             const haAlLado = textoHa !== '' && r.w >= anchoNombre + anchoHa + 20
             const haDebajo = textoHa !== '' && !haAlLado && r.w >= anchoHa + 16 && r.h >= 42
+            // Una línea ocupa hasta y≈22; con las hectáreas debajo, hasta ≈32.
+            const { modo, items: resumen } = resumenHacienda(r, p.cabezas, haDebajo ? 32 : 22)
             return (
               <motion.g
                 key={p.clave}
