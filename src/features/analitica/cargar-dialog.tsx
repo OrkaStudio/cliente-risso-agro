@@ -41,6 +41,7 @@ import {
   formLabel,
 } from '@/components/form-dialog'
 import { cn } from '@/lib/utils'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
@@ -636,13 +637,7 @@ export function CargarDialog({
                   <label htmlFor="c-primera" className={formLabel}>
                     Primer vencimiento
                   </label>
-                  <input
-                    id="c-primera"
-                    type="date"
-                    value={primera}
-                    onChange={(e) => setPrimera(e.target.value)}
-                    className={cn(formField, '[color-scheme:light]')}
-                  />
+                  <CampoFecha id="c-primera" value={primera} onChange={setPrimera} />
                 </motion.div>
                 {montoNum > 0 && cant > 0 && (
                   <motion.div
@@ -699,26 +694,14 @@ export function CargarDialog({
                       <label htmlFor="c-fecha" className={formLabel}>
                         Fecha del {esGasto ? 'pago' : 'cobro'}
                       </label>
-                      <input
-                        id="c-fecha"
-                        type="date"
-                        value={fecha}
-                        onChange={(e) => setFecha(e.target.value)}
-                        className={cn(formField, '[color-scheme:light]')}
-                      />
+                      <CampoFecha id="c-fecha" value={fecha} onChange={setFecha} />
                     </div>
                   ) : (
                     <div>
                       <label htmlFor="c-vence" className={formLabel}>
                         ¿Cuándo lo tenés que {esGasto ? 'pagar' : 'cobrar'}?
                       </label>
-                      <input
-                        id="c-vence"
-                        type="date"
-                        value={vence}
-                        onChange={(e) => setVence(e.target.value)}
-                        className={cn(formField, '[color-scheme:light]')}
-                      />
+                      <CampoFecha id="c-vence" value={vence} onChange={setVence} />
                     </div>
                   )}
                 </motion.div>

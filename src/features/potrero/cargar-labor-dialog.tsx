@@ -10,6 +10,7 @@ import { useCategorias } from '@/features/analitica/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { LABORES, laborPorTipo, type TipoLabor } from '@/features/potrero/labores'
 import { useRegistrarLabor } from '@/features/potrero/hooks'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 
 /**
  * Cargar una labor agrícola.
@@ -143,13 +144,7 @@ export function CargarLaborDialog({
       <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
           <Label htmlFor="labor-fecha">¿Cuándo?</Label>
-          <Input
-            id="labor-fecha"
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            required
-          />
+          <CampoFecha id="labor-fecha" value={fecha} onChange={setFecha} />
         </div>
 
         {/* La única fila que cambia según el tipo. */}

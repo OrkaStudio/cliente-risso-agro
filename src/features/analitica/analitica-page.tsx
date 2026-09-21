@@ -138,9 +138,14 @@ export function AnaliticaPage() {
 
   // ===== Rentabilidades (realizado) =====
   const lineasCampo = useMemo(() => porCampo(realizados, 'caja'), [realizados])
+  // El $/ha se divide por la superficie DECLARADA del campo, no por la suma de
+  // los potreros dibujados: al empezar casi nadie los tiene todos cargados, y
+  // dividir por la parte dibujada infla el número sin avisar (un campo de 453 ha
+  // con 69 ha de potreros mostraba $1,1M/ha donde lo real era $168 mil).
+  // `totalHa` queda de respaldo para los campos sin superficie declarada.
   const haPorCampo = useMemo(() => {
     const map = new Map<string, number>()
-    for (const c of campos.data ?? []) map.set(c.id, c.totalHa)
+    for (const c of campos.data ?? []) map.set(c.id, c.hectareas ?? c.totalHa)
     return map
   }, [campos.data])
   const actividades = useMemo(
@@ -163,7 +168,7 @@ export function AnaliticaPage() {
   }, [data, hoy])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-20">
       {/* Encabezado */}
       <PageHeader
         title="Analítica"

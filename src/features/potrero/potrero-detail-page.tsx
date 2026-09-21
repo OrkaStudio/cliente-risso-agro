@@ -19,6 +19,7 @@ import { PotreroFormDialog } from '@/features/campos/campos-dialogs'
 import { CargarDialog } from '@/features/analitica/cargar-dialog'
 import { useMovimientos } from '@/features/analitica/hooks'
 import {
+  fmtCompact,
   formatARS,
   gastosPorCategoria,
   ingresosPorCategoria,
@@ -34,15 +35,6 @@ function fmtFecha(f: string | null): string | null {
   if (!f) return null
   const [y, m, d] = f.split('-')
   return `${d}/${m}/${y.slice(2)}`
-}
-
-function fmtCompact(n: number): string {
-  const abs = Math.abs(n)
-  const sign = n < 0 ? '−' : ''
-  if (abs >= 1_000_000)
-    return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')}M`
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`
-  return `${sign}$${abs}`
 }
 
 /**
