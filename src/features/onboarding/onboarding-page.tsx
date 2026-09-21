@@ -1417,7 +1417,7 @@ function PasoHacienda({
                     return (
                       <div key={rol} className="grid gap-1.5">
                         <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          <svg width="16" height="12" viewBox="-11 -8 22 16" aria-hidden>
+                          <svg width="20" height="16" viewBox="-13 -12 26 21" aria-hidden>
                             <MarcaCategoria categoria={cats[0]!} />
                           </svg>
                           {nombre}
@@ -1757,7 +1757,7 @@ function EscenaCroquis({
             <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-sidebar-foreground/10 pt-2.5 text-[13px]">
               {porEspecieCroquis.map(({ especie, total, categorias }) => (
                 <li key={especie} className="inline-flex items-center gap-1.5 tabular-nums">
-                  <svg width="20" height="14" viewBox="-11 -8 22 16" aria-hidden>
+                  <svg width="22" height="18" viewBox="-13 -12 26 21" aria-hidden>
                     <MarcaCategoria categoria={categorias[0]![0]} />
                   </svg>
                   <span className="font-semibold">{total}</span>
