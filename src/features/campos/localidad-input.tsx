@@ -36,7 +36,12 @@ export function LocalidadInput({
   const [sugerencias, setSugerencias] = useState<Localidad[]>([])
   const [abierto, setAbierto] = useState(false)
   const [activa, setActiva] = useState(0)
-  const [buscando, setBuscando] = useState(false)
+  // El texto para el que la última búsqueda TERMINÓ sin resultados. "No lo
+  // encontramos" se muestra sólo cuando coincide con lo que hay escrito —
+  // nunca en los 300 ms de espera antes de buscar, donde la lista está
+  // vacía pero todavía no se buscó nada. Ese hueco era el que hacía que el
+  // texto de abajo cambiara tres veces al escribir la tercera letra.
+  const [sinResultados, setSinResultados] = useState<string | null>(null)
   const listaId = useId()
   const ultimaBusqueda = useRef(0)
 
@@ -51,18 +56,19 @@ export function LocalidadInput({
         setSugerencias([])
         return
       }
-      setBuscando(true)
       try {
         const res = await buscarLocalidades(q)
         if (n === ultimaBusqueda.current) {
           setSugerencias(res)
+          setSinResultados(res.length === 0 ? q : null)
           setActiva(0)
           setAbierto(true)
         }
       } catch {
-        if (n === ultimaBusqueda.current) setSugerencias([])
-      } finally {
-        if (n === ultimaBusqueda.current) setBuscando(false)
+        if (n === ultimaBusqueda.current) {
+          setSugerencias([])
+          setSinResultados(null)
+        }
       }
     }, q.length < 2 ? 0 : 300)
     return () => clearTimeout(t)
@@ -156,12 +162,11 @@ export function LocalidadInput({
         </ul>
       )}
       {/* UNA sola línea debajo del campo, nunca dos apiladas: la ayuda de
-          siempre, o el "no lo encontramos" cuando corresponde. Y corresponde
-          recién con tres letras — con dos ("la") todavía no buscó nada y ya
-          estaba diciendo que no encontraba. */}
+          siempre, o el "no lo encontramos" cuando una búsqueda terminó sin
+          nada para lo que está escrito ahora. */}
       {!invalido && (
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {!value && texto.trim().length >= 3 && !buscando && sugerencias.length === 0
+          {!value && sinResultados !== null && sinResultados === texto.trim()
             ? 'No lo encontramos. Probá con otro pueblo cercano.'
             : ayuda}
         </p>

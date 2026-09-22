@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /**
@@ -22,15 +22,13 @@ import { motion, useReducedMotion } from 'framer-motion'
  * imperativamente por ref. Framer deja `filter: blur(0px)` escrito y eso crea
  * contexto de apilado, que ya encerró una vez la lista de localidades.
  *
- * Dura 3,5 s. Con `prefers-reduced-motion` la tarjeta aparece y ya.
+ * Dura 3,7 s. Con `prefers-reduced-motion` la tarjeta aparece y ya.
  */
 export function Remolque({ activo, children }: { activo: boolean; children: ReactNode }) {
   const quieto = useReducedMotion()
   const tarjeta = useRef<HTMLDivElement>(null)
   if (!activo || quieto) return <>{children}</>
 
-  /** Cuánto sube el conjunto. */
-  const RECORRIDO = 170
   /** Largo de la soga entre el enganche del tractor y el borde de la tarjeta. */
   const SOGA = 58
   /** Curva pareja: velocidad casi constante en el medio, sin latigazo. */
@@ -38,15 +36,18 @@ export function Remolque({ activo, children }: { activo: boolean; children: Reac
 
   return (
     <div className="relative flex w-full justify-center">
+      <RemolqueSinScroll />
       <motion.div
         ref={tarjeta}
         className="relative flex w-full justify-center"
-        initial={{ y: RECORRIDO, opacity: 0, filter: 'blur(2px)' }}
+        // Arranca UN VIEWPORT ENTERO por debajo de su lugar: la tarjeta (y el
+        // tractor, que va más arriba) entran desde la base de la pantalla, no
+        // aparecen en el medio de la nada.
+        initial={{ y: '100vh', opacity: 1, filter: 'blur(2px)' }}
         animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
         transition={{
-          y: { duration: 2.0, delay: 0.1, ease: SUBIDA },
-          opacity: { duration: 0.2 },
-          filter: { duration: 1.8, delay: 0.3, ease: 'easeOut' },
+          y: { duration: 2.2, delay: 0.1, ease: SUBIDA },
+          filter: { duration: 2.0, delay: 0.3, ease: 'easeOut' },
         }}
         onAnimationComplete={() => tarjeta.current?.style.removeProperty('filter')}
       >
@@ -59,8 +60,8 @@ export function Remolque({ activo, children }: { activo: boolean; children: Reac
           initial={{ y: 0, opacity: 1 }}
           animate={{ y: -900, opacity: [1, 1, 0] }}
           transition={{
-            y: { duration: 1.3, delay: 2.15, ease: [0.5, 0, 0.9, 0.4] },
-            opacity: { duration: 1.3, delay: 2.15, times: [0, 0.75, 1] },
+            y: { duration: 1.3, delay: 2.35, ease: [0.5, 0, 0.9, 0.4] },
+            opacity: { duration: 1.3, delay: 2.35, times: [0, 0.75, 1] },
           }}
         >
           <Tractor />
@@ -70,13 +71,39 @@ export function Remolque({ activo, children }: { activo: boolean; children: Reac
             style={{ height: SOGA, transformOrigin: 'top' }}
             initial={{ scaleY: 1, opacity: 0.85 }}
             animate={{ scaleY: 0.15, opacity: 0 }}
-            transition={{ duration: 0.45, delay: 2.15, ease: 'easeIn' }}
+            transition={{ duration: 0.45, delay: 2.35, ease: 'easeIn' }}
           />
         </motion.div>
         {children}
       </motion.div>
     </div>
   )
+}
+
+/**
+ * Mientras la tarjeta sube desde abajo de la pantalla, el contenedor con
+ * scroll no scrollea. Un elemento transformado fuera de la vista igual cuenta
+ * para el área de scroll, así que sin esto aparecía una barra durante dos
+ * segundos y el usuario podía scrollear hacia un lugar donde no hay nada.
+ * Se restablece al terminar, y siempre al desmontar.
+ */
+function RemolqueSinScroll() {
+  const marca = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const contenedor = marca.current?.closest<HTMLElement>('[data-auth-scroll]')
+    if (!contenedor) return
+    const previo = contenedor.style.overflowY
+    contenedor.style.overflowY = 'hidden'
+    contenedor.scrollTop = 0
+    const t = setTimeout(() => {
+      contenedor.style.overflowY = previo
+    }, 2400)
+    return () => {
+      clearTimeout(t)
+      contenedor.style.overflowY = previo
+    }
+  }, [])
+  return <span ref={marca} hidden />
 }
 
 /**
