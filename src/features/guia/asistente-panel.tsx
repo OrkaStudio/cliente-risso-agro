@@ -2,17 +2,18 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { ChevronRight, MessageCircle, Route, Sparkles, X } from 'lucide-react'
+import { ChevronRight, Compass, MessageCircle, Sparkles, X } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { Orbe, TextoStream } from '@/features/guia/guia'
+import { useEstadoPuestaAPunto } from '@/features/guia/checklist'
+import { proximaMision } from '@/features/guia/misiones'
+import { Orbe, TextoStream } from '@/features/guia/orbe'
 import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
 import {
   abrirPanel,
   cerrarPanel,
-  pedirGuia,
-  pedirRecibimiento,
+  empezarMision,
   usePanelAbierto,
 } from '@/features/guia/guia-store'
 import { ejecutarEnAncla } from '@/features/guia/ejecutar'
@@ -26,7 +27,7 @@ import {
   NOMBRE_SECCION,
   seccionDeRuta,
   type SeccionGuia,
-} from '@/features/guia/pasos'
+} from '@/features/guia/secciones'
 import { cn } from '@/lib/utils'
 
 /**
@@ -63,6 +64,8 @@ export function AsistentePanel() {
     empresa: empresa.data?.empresa?.nombre ?? null,
     seccion: seccion ? NOMBRE_SECCION[seccion] : null,
   })
+  const estado = useEstadoPuestaAPunto()
+  const mision = estado.data ? proximaMision(estado.data.resumen) : null
   const [hilo, setHilo] = React.useState<Burbuja[]>([])
   // Categoría activa del menú de preguntas — arranca en la de la sección actual.
   const [categoria, setCategoria] = React.useState<CategoriaFicha>(() =>
@@ -84,15 +87,10 @@ export function AsistentePanel() {
     ])
   }
 
-  const verRecorrido = () => {
+  const irALaMision = () => {
+    if (!mision) return
     cerrarPanel()
-    // El overlay del recorrido reacciona al pedido (misma maquinaria del chip).
-    setTimeout(() => pedirGuia(), 150)
-  }
-
-  const verBienvenida = () => {
-    cerrarPanel()
-    setTimeout(() => pedirRecibimiento(), 150)
+    setTimeout(() => empezarMision(mision.id), 150)
   }
 
   return createPortal(
@@ -260,28 +258,29 @@ export function AsistentePanel() {
                       <ChevronRight className="size-3.5 shrink-0 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-field-deep" />
                     </button>
                   ))}
-                  {seccion && (
-                    <div className="mt-2 flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={verRecorrido}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-card py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
-                      >
-                        <Route className="size-3.5" />
-                        Recorrer {NOMBRE_SECCION[seccion]}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={verBienvenida}
-                        title="Volver a ver la bienvenida"
-                        className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
-                      >
-                        <Sparkles className="size-3.5" />
-                        Bienvenida
-                      </button>
-                    </div>
-                  )}
                 </motion.div>
+
+                {/* La misión que sigue, con lo suyo: "Traé La Porteña al
+                    mapa · 2 min". Enseñar haciendo, desde acá también. */}
+                {mision && estado.data && (
+                  <button
+                    type="button"
+                    onClick={irALaMision}
+                    className="mx-4 mt-2 flex w-[calc(100%-32px)] items-center gap-2.5 rounded-2xl border border-field/40 bg-field-soft px-3.5 py-2.5 text-left transition-colors hover:border-field"
+                  >
+                    <Compass className="size-4 shrink-0 text-field-deep" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-bold text-field-deep">
+                        {mision.titulo(estado.data.resumen)}
+                      </span>
+                      <span className="block text-[11.5px] text-muted-foreground">
+                        Te acompaño mientras lo hacés ·{' '}
+                        {mision.invitacion(estado.data.resumen).minutos} min
+                      </span>
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-field-deep" />
+                  </button>
+                )}
 
                 {/* La salida a una persona: siempre a la vista, abajo de todo.
                     WhatsApp abre en otra pestaña con el mensaje ya escrito. */}

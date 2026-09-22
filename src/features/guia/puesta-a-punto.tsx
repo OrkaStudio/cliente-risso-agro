@@ -20,7 +20,13 @@ import {
   type ItemChecklist,
 } from '@/features/guia/checklist'
 import { ejecutarEnAncla } from '@/features/guia/ejecutar'
-import { useEscenaActiva, usePanelAbierto } from '@/features/guia/guia-store'
+import {
+  empezarMision,
+  useMisionActiva,
+  usePanelAbierto,
+  usePendiente,
+} from '@/features/guia/guia-store'
+import { misionDeItem } from '@/features/guia/misiones'
 import { cn } from '@/lib/utils'
 
 /**
@@ -32,8 +38,10 @@ import { cn } from '@/lib/utils'
  * - Expandida: SOLO el camino de 5 pasos (íconos, detalle de una línea en el
  *   activo, acordeón opcional en el resto).
  * - Misión completa → desaparece para siempre (los ticks salen de la base).
- * - Espera a que no haya escena (recibimiento / recorrido): la llegada es
- *   un momento por vez (TASK-063).
+ * - Con una misión en curso se esconde: el productor está haciendo, no
+ *   leyendo una lista (TASK-063). El botón del paso activo LANZA la misión
+ *   cuando hay una que lo resuelve (enseñar haciendo); si no, abre la
+ *   herramienta como siempre.
  */
 
 const ICONO_PASO: Record<ItemChecklist['id'], LucideIcon> = {
@@ -86,7 +94,10 @@ export function PuestaAPunto() {
   const navigate = useNavigate()
   const checklist = useEstadoPuestaAPunto()
   const panelAbierto = usePanelAbierto()
-  const escena = useEscenaActiva()
+  const mision = useMisionActiva()
+  // La invitación de llegada habla primero; la pastilla aparece cuando la
+  // respondió.
+  const invitando = usePendiente('recibimiento')
   const userId = user?.id ?? 'anon'
 
   const [colapsada, setColapsada] = React.useState(
@@ -95,13 +106,15 @@ export function PuestaAPunto() {
   const [expandido, setExpandido] = React.useState<string | null>(null)
 
   const items = checklist.data?.items ?? []
+  const resumen = checklist.data?.resumen
   const hechos = items.filter((i) => i.hecho).length
   const pendientes = items.filter((i) => !i.hecho)
   const siguiente = pendientes[0]
 
   // Misión completa (o sin datos todavía, o panel del Asistente abierto, o
-  // una escena en curso): nada.
-  if (!checklist.isSuccess || pendientes.length === 0 || panelAbierto || escena) return null
+  // una misión en curso): nada.
+  if (!checklist.isSuccess || pendientes.length === 0 || panelAbierto || mision || invitando)
+    return null
 
   const setColapso = (v: boolean) => {
     setColapsada(v)
@@ -113,6 +126,11 @@ export function PuestaAPunto() {
   }
 
   const irA = (item: ItemChecklist) => {
+    const m = resumen ? misionDeItem(item.id, resumen) : null
+    if (m) {
+      empezarMision(m.id)
+      return
+    }
     navigate(item.ruta)
     ejecutarEnAncla(item.accion)
   }

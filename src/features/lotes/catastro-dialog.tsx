@@ -81,6 +81,7 @@ export function CatastroDialog({
       <Button
         variant={triggerVariant}
         size="sm"
+        data-guia="catastro-boton"
         onClick={() => {
           reset()
           setOpen(true)
@@ -94,7 +95,7 @@ export function CatastroDialog({
           <DialogHeader>
             <DialogTitle>Traer contorno del catastro (ARBA)</DialogTitle>
           </DialogHeader>
-          <form onSubmit={onBuscar} className="grid gap-4">
+          <form onSubmit={onBuscar} className="grid gap-4" data-guia="catastro-form">
             <p className="text-[12.5px] text-muted-foreground">
               Nomenclatura catastral rural de Buenos Aires. Trae el contorno real
               de la parcela; los potreros internos se trazan aparte.

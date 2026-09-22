@@ -122,7 +122,9 @@ export function UbicarAnimalesDialog({
           Todavía no hay potreros. Cargalos desde Campos y volvé acá para ubicar la hacienda.
         </motion.p>
       ) : (
-        <>
+        // Ancla del asistente: la misión "ubicar" pega su burbuja acá. Misma
+        // grilla que el cuerpo del FormDialog para que el stagger no cambie.
+        <div data-guia="ubicar-form" className="grid gap-4">
           {conPotreros.length > 1 && (
             <motion.div variants={formItem} className="grid gap-2">
               <span className={formLabel}>Campo</span>
@@ -171,7 +173,7 @@ export function UbicarAnimalesDialog({
               ))}
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </FormDialog>
   )

@@ -13,11 +13,11 @@ import {
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
-import { Guia } from '@/features/guia/guia'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
-import { OfertaRecorrido } from '@/features/guia/oferta-recorrido'
+import { Invitacion } from '@/features/guia/invitacion'
+import { Mision } from '@/features/guia/mision'
 import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
-import { Recibimiento } from '@/features/guia/recibimiento'
+import { Spots } from '@/features/guia/spots'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
@@ -277,12 +277,12 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* La llegada, un momento por vez (TASK-063): el recibimiento una sola
-          vez; los recorridos por sección se ofrecen con un chip y se lanzan a
-          pedido; la pastilla y el chip esperan a que no haya escena. */}
-      <Recibimiento />
-      <Guia />
-      <OfertaRecorrido />
+      {/* El asistente enseña haciendo (TASK-063): la invitación una sola
+          vez, la misión en curso pegada al botón real, y un puntito por
+          panel la primera vez. Nada tapa la página. */}
+      <Invitacion />
+      <Mision />
+      <Spots />
 
       {/* Panel del Asistente (preguntas + WhatsApp) + smart checklist */}
       <AsistentePanel />

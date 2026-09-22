@@ -650,7 +650,9 @@ export function PotreroSidePanel({
                   el dibujo queda asignado a ese potrero.
                 </p>
               </div>
-              <ul className="flex flex-col gap-1.5">
+              {/* Ancla del asistente: la misión "primer potrero" pega su
+                  burbuja a esta lista. */}
+              <ul className="flex flex-col gap-1.5" data-guia="campos-faltan">
                 {sinDibujar.potreros.map((p) => (
                   <li key={p.id}>
                     <button

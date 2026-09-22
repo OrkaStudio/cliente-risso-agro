@@ -750,7 +750,9 @@ export function CampoMapaReal({
               pegado al mapa. La lista de los que faltan vive en el panel de
               la derecha (abajo del mapa quedaba fuera de la vista). */}
           {dibujando && (
-            <div className="absolute bottom-3 left-3 z-[460] max-w-[260px] rounded-xl border border-border bg-white/92 p-2.5 shadow-[0_8px_24px_rgba(16,30,20,0.14)] backdrop-blur">
+            <div
+              data-guia="campos-dibujando"
+              className="absolute bottom-3 left-3 z-[460] max-w-[260px] rounded-xl border border-border bg-white/92 p-2.5 shadow-[0_8px_24px_rgba(16,30,20,0.14)] backdrop-blur">
               <div className="flex items-center gap-2">
                 <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" />
                 <p className="text-[12.5px] text-ink">

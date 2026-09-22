@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/auth-context'
-import type { SeccionGuia } from '@/features/guia/pasos'
+import type { MisionId } from '@/features/guia/misiones'
 import { supabase } from '@/lib/supabase/client'
 import { useIsMobile } from '@/lib/use-is-mobile'
 
 // Store externo mínimo (idioma de lib/campo-mode): la burbuja del asistente,
-// el chip de oferta y el overlay viven en árboles distintos del AppShell →
-// sin prop-drilling.
+// la invitación, la misión en curso y la pastilla viven en árboles distintos
+// del AppShell → sin prop-drilling.
 const listeners = new Set<() => void>()
 function subscribe(cb: () => void): () => void {
   listeners.add(cb)
@@ -18,39 +18,7 @@ function avisar() {
 }
 
 // ---------------------------------------------------------------------------
-// Relanzar el recorrido de la sección actual (chip de oferta / panel).
-// `pedida` = contador; el overlay reacciona al cambio.
-// ---------------------------------------------------------------------------
-
-let pedida = 0
-
-export function pedirGuia(): void {
-  pedida++
-  avisar()
-}
-
-export function useGuiaPedida(): number {
-  return useSyncExternalStore(subscribe, () => pedida, () => 0)
-}
-
-// ---------------------------------------------------------------------------
-// Volver a ver el recibimiento (desde el panel del asistente).
-// ---------------------------------------------------------------------------
-
-let recibimientoPedido = 0
-
-export function pedirRecibimiento(): void {
-  recibimientoPedido++
-  avisar()
-}
-
-export function useRecibimientoPedido(): number {
-  return useSyncExternalStore(subscribe, () => recibimientoPedido, () => 0)
-}
-
-// ---------------------------------------------------------------------------
-// Panel del Asistente (preguntas). El recorrido se relanza DESDE el panel
-// (conviven — decisión de Lau, spec del asistente).
+// Panel del Asistente (preguntas + WhatsApp + misión pendiente).
 // ---------------------------------------------------------------------------
 
 let panelAbierto = false
@@ -70,38 +38,45 @@ export function usePanelAbierto(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Escena activa: hay un velo en pantalla (recibimiento o recorrido). La
-// pastilla de puesta a punto y el chip de oferta esperan a que termine — la
-// llegada es UN momento por vez, nunca tres cosas encima (TASK-063).
+// Misión en curso (mision.tsx). Una por vez: mientras dura, la pastilla y
+// los puntitos se corren — el productor está HACIENDO algo y el asistente lo
+// acompaña, no compite (TASK-063).
 // ---------------------------------------------------------------------------
 
-let escenaActiva = false
+let misionActiva: MisionId | null = null
 
-export function setEscenaActiva(v: boolean): void {
-  if (escenaActiva === v) return
-  escenaActiva = v
+export function empezarMision(id: MisionId): void {
+  if (misionActiva === id) return
+  misionActiva = id
   avisar()
 }
 
-export function useEscenaActiva(): boolean {
-  return useSyncExternalStore(subscribe, () => escenaActiva, () => false)
+export function pararMision(): void {
+  if (misionActiva === null) return
+  misionActiva = null
+  avisar()
+}
+
+export function useMisionActiva(): MisionId | null {
+  return useSyncExternalStore(subscribe, () => misionActiva, () => null)
 }
 
 // ---------------------------------------------------------------------------
 // Persistencia "ya lo vio" — tabla `guia_vista` (user_id, clave), RLS propia.
 //
-// En la DB y no en localStorage (como venía de TASK-043) porque el
-// recibimiento es UNA vez por persona, no por navegador: el productor se
+// En la DB y no en localStorage (como venía de TASK-043) porque la
+// invitación es UNA vez por persona, no por navegador: el productor se
 // registra en el teléfono y abre la compu al otro día. Mientras la lista
 // carga, o si no hay red, NADA automático aparece (se trata como "visto"):
-// mejor no recibir que recibir dos veces. Siempre queda el panel para pedirlo.
+// mejor no invitar que invitar dos veces. Siempre queda el panel para pedirlo.
 // ---------------------------------------------------------------------------
 
-export type ClaveGuia = 'recibimiento' | `recorrido.${SeccionGuia}`
-
-export function claveRecorrido(seccion: SeccionGuia): ClaveGuia {
-  return `recorrido.${seccion}`
-}
+/** Vocabulario cerrado (comentado también en la migración):
+ *  - `recibimiento`: la invitación de llegada ya se respondió (Dale o Después).
+ *  - `mision.<id>`: la misión ya se festejó (los datos dicen si está hecha;
+ *    esto evita festejarla dos veces).
+ *  - `spot.<ancla>`: el puntito de ese panel ya se tocó. */
+export type ClaveGuia = 'recibimiento' | `mision.${MisionId}` | `spot.${string}`
 
 function queryKey(userId: string) {
   return ['guia-vista', userId] as const

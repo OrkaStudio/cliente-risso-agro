@@ -182,6 +182,14 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
   const [campoId, setCampoId] = useState(
     (pedido && vms.some((c) => c.id === pedido) ? pedido : vms[0]?.id) ?? '',
   )
+  // Si el pedido cambia con la página ya montada (el asistente lleva a otro
+  // campo desde la misma sección), se obedece — ajuste de estado durante el
+  // render (patrón "state from props"), no un setState en un effect.
+  const [pedidoVisto, setPedidoVisto] = useState(pedido)
+  if (pedido !== pedidoVisto) {
+    setPedidoVisto(pedido)
+    if (pedido && vms.some((c) => c.id === pedido)) setCampoId(pedido)
+  }
   const [ver, setVer] = useState(0)
   const [marcandoContorno, setMarcandoContorno] = useState(false)
   const vm = vms.find((c) => c.id === campoId) ?? vms[0]
@@ -353,6 +361,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
                     type="button"
                     variant={marcandoContorno ? 'default' : 'outline'}
                     size="sm"
+                    data-guia={marcandoContorno ? 'campos-marcando' : 'campos-marcar'}
                     onClick={() => setMarcandoContorno((v) => !v)}
                   >
                     <MapPin className="size-4" />
@@ -533,6 +542,7 @@ function VistaCampoToggle({
         <button
           key={label}
           type="button"
+          data-guia={val ? 'campos-satelital' : undefined}
           onClick={() => setEditar(val)}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
