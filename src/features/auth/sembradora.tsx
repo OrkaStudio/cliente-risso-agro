@@ -18,62 +18,72 @@ import { motion, useReducedMotion } from 'framer-motion'
  * desplazable cuando no hace falta (pasó con unas huellas de ruedas que
  * colgaban 220 px por debajo). El tractor y la soga viven arriba.
  *
- * El desenfoque de la tarjeta mientras sube se SACA del style al terminar,
- * imperativamente por ref. Framer deja `filter: blur(0px)` escrito y eso crea
- * contexto de apilado, que ya encerró una vez la lista de localidades.
+ * Sin `filter` en la tarjeta, a propósito: además de costar por cuadro,
+ * framer deja `blur(0px)` escrito al terminar y eso crea contexto de
+ * apilado, que ya encerró una vez la lista de localidades.
  *
- * Dura 3,7 s. Con `prefers-reduced-motion` la tarjeta aparece y ya.
+ * Dura ~3,5 s según el alto de la pantalla. Con `prefers-reduced-motion` la
+ * tarjeta aparece y ya.
  */
 export function Remolque({ activo, children }: { activo: boolean; children: ReactNode }) {
   const quieto = useReducedMotion()
-  const tarjeta = useRef<HTMLDivElement>(null)
   if (!activo || quieto) return <>{children}</>
 
+  // Todo en píxeles, calculado una vez: el tractor y la tarjeta tienen que
+  // ir a LA MISMA velocidad, y eso no se puede expresar con "100vh" en uno y
+  // una curva en el otro.
+  const H = typeof window === 'undefined' ? 900 : window.innerHeight
   /** Largo de la soga entre el enganche del tractor y el borde de la tarjeta. */
   const SOGA = 58
-  /** Curva pareja: velocidad casi constante en el medio, sin latigazo. */
-  const SUBIDA = [0.42, 0, 0.28, 1] as const
+  /** Alto del tractor. */
+  const TRACTOR = 62
+  /** Segundos que tarda la tarjeta en subir un viewport entero. */
+  const SUBIDA = 2.2
+  /** Velocidad de crucero, px/s. La del tractor de punta a punta. */
+  const V = H / SUBIDA
+  /** Hasta dónde sigue el tractor después de soltar: un buen tramo arriba. */
+  const SALIDA = Math.round(H * 0.6)
+  const tractorDuracion = (H + SALIDA + TRACTOR) / V
+  /** Fracción del recorrido en que la tarjeta empieza a frenar (y el
+   *  tractor la suelta). Hasta ahí, los dos van juntos a velocidad V. */
+  const SUELTA = 0.86
 
   return (
     <div className="relative flex w-full justify-center">
       <RemolqueSinScroll />
+
+      {/* El tractor, a velocidad constante de abajo hacia arriba, sin
+          detenerse nunca: la trabada que se veía era la tarjeta frenando a
+          cero y el tractor volviendo a arrancar desde cero. Ahora pasa de
+          largo. La soga cuelga de él y se suelta cuando la tarjeta frena. */}
       <motion.div
-        ref={tarjeta}
-        className="relative flex w-full justify-center"
-        // Arranca UN VIEWPORT ENTERO por debajo de su lugar: la tarjeta (y el
-        // tractor, que va más arriba) entran desde la base de la pantalla, no
-        // aparecen en el medio de la nada.
-        initial={{ y: '100vh', opacity: 1, filter: 'blur(2px)' }}
-        animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-        transition={{
-          y: { duration: 2.2, delay: 0.1, ease: SUBIDA },
-          filter: { duration: 2.0, delay: 0.3, ease: 'easeOut' },
-        }}
-        onAnimationComplete={() => tarjeta.current?.style.removeProperty('filter')}
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center text-primary"
+        style={{ bottom: '100%', willChange: 'transform' }}
+        initial={{ y: H }}
+        animate={{ y: -SALIDA - TRACTOR }}
+        transition={{ duration: tractorDuracion, delay: 0.1, ease: 'linear' }}
       >
-        {/* Tractor y soga, encima de la tarjeta. Suben con ella; al llegar,
-            el tractor sigue de largo y la soga se va con él. */}
+        <Tractor />
         <motion.div
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center text-primary"
-          style={{ bottom: '100%' }}
-          initial={{ y: 0, opacity: 1 }}
-          animate={{ y: -900, opacity: [1, 1, 0] }}
-          transition={{
-            y: { duration: 1.3, delay: 2.35, ease: [0.5, 0, 0.9, 0.4] },
-            opacity: { duration: 1.3, delay: 2.35, times: [0, 0.75, 1] },
-          }}
-        >
-          <Tractor />
-          {/* La soga: del enganche al borde superior de la tarjeta. */}
-          <motion.div
-            className="w-[2px] rounded-full bg-[#14261a]"
-            style={{ height: SOGA, transformOrigin: 'top' }}
-            initial={{ scaleY: 1, opacity: 0.85 }}
-            animate={{ scaleY: 0.15, opacity: 0 }}
-            transition={{ duration: 0.45, delay: 2.35, ease: 'easeIn' }}
-          />
-        </motion.div>
+          className="w-[2px] rounded-full bg-[#14261a]"
+          style={{ height: SOGA, transformOrigin: 'top' }}
+          initial={{ scaleY: 1, opacity: 0.85 }}
+          animate={{ scaleY: 0.1, opacity: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 + SUBIDA * SUELTA, ease: 'easeIn' }}
+        />
+      </motion.div>
+
+      {/* La tarjeta: sube a la velocidad del tractor y en el último tramo
+          frena suave hasta su lugar. Sin filtros: un blur animado sobre toda
+          la tarjeta en una pantalla retina es lo que más cuesta por cuadro. */}
+      <motion.div
+        className="relative z-10 flex w-full justify-center"
+        style={{ willChange: 'transform' }}
+        initial={{ y: H }}
+        animate={{ y: [H, H * (1 - SUELTA), 0] }}
+        transition={{ duration: SUBIDA, delay: 0.1, times: [0, SUELTA, 1], ease: ['linear', 'easeOut'] }}
+      >
         {children}
       </motion.div>
     </div>
@@ -97,7 +107,7 @@ function RemolqueSinScroll() {
     contenedor.scrollTop = 0
     const t = setTimeout(() => {
       contenedor.style.overflowY = previo
-    }, 2400)
+    }, 2500)
     return () => {
       clearTimeout(t)
       contenedor.style.overflowY = previo
@@ -116,13 +126,7 @@ function RemolqueSinScroll() {
  */
 function Tractor() {
   return (
-    <svg
-      width="44"
-      height="62"
-      viewBox="0 0 44 62"
-      fill="none"
-      className="drop-shadow-[0_3px_6px_rgba(10,20,13,0.35)]"
-    >
+    <svg width="44" height="62" viewBox="0 0 44 62" fill="none">
       {/* Ruedas traseras, grandes, con dibujo en la banda. */}
       <rect x="0" y="33" width="11" height="25" rx="3.5" fill="#14261a" />
       <rect x="33" y="33" width="11" height="25" rx="3.5" fill="#14261a" />

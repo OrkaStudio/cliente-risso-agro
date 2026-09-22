@@ -1903,8 +1903,22 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
   const hectareas = campos.reduce((s, c) => s + c.hectareas, 0)
   const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
   const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
+  // Cuántas columnas y qué densidad, según cuántos campos hay. La tabla
+  // entera, para que se vea TODO lo que cargó sin importar cuánto:
+  //
+  //   1        → una ficha grande
+  //   2 a 4    → dos columnas (la impar, centrada abajo)
+  //   5 a 6    → tres columnas
+  //   7 a 9    → tres columnas, fichas compactas (sin pie)
+  //   10 o más → cuatro columnas, compactas
+  //
+  // Con cinco campos y dos columnas, el quinto quedaba abajo del borde del
+  // panel y no se veía. Y por si igual no entra, la escena scrollea.
+  const n = campos.length
+  const columnas = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4
+  const compacta = n >= 7
   return (
-    <div className={cn('w-full', campos.length === 1 ? 'max-w-[680px]' : 'max-w-[1160px]')}>
+    <div className={cn('w-full', n === 1 ? 'max-w-[680px]' : 'max-w-[1160px]')}>
       {/* Cubre toda la escena (el panel es relative + overflow-hidden), no sólo la ficha. */}
       <div className="pointer-events-none absolute inset-0">
         <Confeti />
@@ -1948,13 +1962,16 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
           scrollea, y acá lo que importa es que se vea lo que armó. */}
       <ul
         className={cn(
-          'mt-5 grid gap-4',
-          campos.length > 1 && 'sm:grid-cols-2',
-          // Con una cantidad impar la última ficha queda sola en su fila.
-          // Alineada a la izquierda parece un error de grilla; centrada bajo
-          // las dos de arriba se lee como el cierre de la pila.
-          campos.length > 1 &&
-            campos.length % 2 === 1 &&
+          'mt-5 grid',
+          compacta ? 'gap-3' : 'gap-4',
+          columnas === 2 && 'sm:grid-cols-2',
+          columnas === 3 && 'sm:grid-cols-3',
+          columnas === 4 && 'sm:grid-cols-4',
+          // Con dos columnas y cantidad impar, la última ficha queda sola en
+          // su fila: centrada bajo las dos de arriba se lee como el cierre de
+          // la pila, alineada a la izquierda parece un error de grilla.
+          columnas === 2 &&
+            n % 2 === 1 &&
             'sm:[&>li:last-child]:col-span-2 sm:[&>li:last-child]:mx-auto sm:[&>li:last-child]:w-[calc(50%-0.5rem)]',
         )}
       >
@@ -1968,17 +1985,25 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.25 + i * 0.15 }}
             >
-              <div className="flex items-center gap-2.5 border-b border-sidebar-foreground/10 px-4 py-3">
+              <div
+                className={cn(
+                  'flex items-center gap-2.5 border-b border-sidebar-foreground/10',
+                  compacta ? 'px-3 py-2' : 'px-4 py-3',
+                )}
+              >
                 <span
-                  className="inline-flex size-6 items-center justify-center rounded-md text-[12px] font-bold text-white"
+                  className={cn(
+                    'inline-flex items-center justify-center rounded-md font-bold text-white',
+                    compacta ? 'size-5 text-[11px]' : 'size-6 text-[12px]',
+                  )}
                   style={{ background: color.hex }}
                 >
                   {color.letra}
                 </span>
-                <span className="truncate text-[15px] font-semibold">{c.nombre}</span>
+                <span className={cn('truncate font-semibold', compacta ? 'text-[13px]' : 'text-[15px]')}>{c.nombre}</span>
                 <span className="ml-auto shrink-0 text-xs text-sidebar-foreground/60">{ha(c.hectareas)} ha</span>
               </div>
-              <div className="px-3 pt-3">
+              <div className={compacta ? 'px-2 pt-2 pb-2' : 'px-3 pt-3'}>
                 <CroquisVivo
                   campo={{
                     nombre: c.nombre,
@@ -1991,6 +2016,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                   }}
                 />
               </div>
+              {!compacta && (
               <div className="flex items-center justify-between gap-2 px-4 pb-3.5 pt-2.5">
                 <p className="text-xs text-sidebar-foreground/60">
                   {c.potreros.length > 0 ? `${c.potreros.length} ${c.potreros.length === 1 ? 'potrero' : 'potreros'}` : 'sin potreros todavía'}
@@ -1998,6 +2024,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                 </p>
                 <ChipActividad actividad={c.actividad} />
               </div>
+              )}
             </motion.li>
           )
         })}

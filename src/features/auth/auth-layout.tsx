@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
 import { Remolque } from '@/features/auth/sembradora'
+import { PistaDeScroll } from '@/features/auth/pista-de-scroll'
 
 /**
  * Shell de las pantallas de auth: escena ambiental a la izquierda (solo
@@ -46,6 +47,8 @@ export function AuthLayout({
         <AuthScene mensaje={escena} />
       </div>
       <div className="relative min-h-0 h-full">
+        {/* Avisa que hay más abajo cuando el contenido no entra. */}
+        <PistaDeScroll />
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
             vista, el desplazamiento es un deslizamiento, no un salto. */}
         <div data-auth-scroll className="flex h-full flex-col overflow-y-auto scroll-smooth">

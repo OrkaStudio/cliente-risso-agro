@@ -244,7 +244,7 @@ export function AuthScene({
           van en ámbar (el color del sol de la escena). */}
       {!compacta && (
       <motion.div
-        className={mensaje ? 'relative mt-5 flex flex-1 flex-col items-center' : 'relative mt-14 max-w-md'}
+        className={mensaje ? 'relative mt-5 flex min-h-0 flex-1 flex-col items-center overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : 'relative mt-14 max-w-md'}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}
