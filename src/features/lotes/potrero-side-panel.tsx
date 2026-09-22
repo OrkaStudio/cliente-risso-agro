@@ -361,6 +361,7 @@ export function PotreroSidePanel({
   onMoverDesde,
   mover,
   edit,
+  sinDibujar,
 }: {
   info: PotreroInfo | null
   campo: CampoVM
@@ -370,6 +371,17 @@ export function PotreroSidePanel({
   /** Con el modo mover activo, el panel se vuelve la guía del paso a paso. */
   mover?: MoverPanel
   edit?: EditarPotrero
+  /**
+   * Potreros cargados (onboarding o lista) que todavía no tienen dibujo. Si
+   * hay, el estado vacío del panel deja de decir "tocá un potrero del mapa" y
+   * pasa a ser la lista de lo que falta asignar: tocás uno y dibujás.
+   */
+  sinDibujar?: {
+    potreros: { id: string; nombre: string; hectareas: number | null; cabezas: number }[]
+    dibujando: { id: string; nombre: string } | null
+    onDibujar: (potreroId: string) => void
+    onCancelar: () => void
+  }
 }) {
   // Snapshot del potrero al abrir edición/carga → el hover no lo cambia mientras
   // el formulario está abierto.
@@ -609,6 +621,54 @@ export function PotreroSidePanel({
               </Button>
             )}
           </div>
+        </div>
+      ) : sinDibujar && sinDibujar.potreros.length > 0 ? (
+        <div className="flex flex-1 flex-col gap-3 p-4">
+          {sinDibujar.dibujando ? (
+            <>
+              <p className="text-[13px] font-semibold text-ink">
+                Dibujando <span className="text-primary">{sinDibujar.dibujando.nombre}</span>
+              </p>
+              <p className="text-[12.5px] leading-snug text-muted-foreground">
+                Hacé clic en las esquinas del potrero sobre el satélite y cerrá en la primera. El
+                dibujo queda asignado a este potrero, con su hacienda.
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={sinDibujar.onCancelar}>
+                Cancelar
+              </Button>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="text-[13px] font-semibold text-ink">
+                  {sinDibujar.potreros.length === 1
+                    ? 'Falta dibujar 1 potrero'
+                    : `Faltan dibujar ${sinDibujar.potreros.length} potreros`}
+                </p>
+                <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+                  Los cargaste con sus hectáreas y su hacienda. Tocá uno y marcalo sobre el satélite:
+                  el dibujo queda asignado a ese potrero.
+                </p>
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {sinDibujar.potreros.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => sinDibujar.onDibujar(p.id)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-left text-[13px] transition-colors hover:border-primary/60 hover:bg-primary/10"
+                    >
+                      <span className="font-semibold text-primary">{p.nombre}</span>
+                      <span className="tnum text-[12px] text-muted-foreground">
+                        {p.hectareas ? `${p.hectareas} ha` : 'sin ha'}
+                        {p.cabezas > 0 ? ` · ${p.cabezas} cab.` : ''}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">

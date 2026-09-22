@@ -37,16 +37,30 @@ export function Remolque({ activo, children }: { activo: boolean; children: Reac
   const SOGA = 58
   /** Alto del tractor. */
   const TRACTOR = 62
-  /** Segundos que tarda la tarjeta en subir un viewport entero. */
-  const SUBIDA = 2.2
-  /** Velocidad de crucero, px/s. La del tractor de punta a punta. */
-  const V = H / SUBIDA
+  /** Velocidad de crucero, px/s: un viewport entero cada 2,2 s. La del
+   *  tractor de punta a punta, y la de la tarjeta hasta que frena. */
+  const V = H / 2.2
   /** Hasta dónde sigue el tractor después de soltar: un buen tramo arriba. */
   const SALIDA = Math.round(H * 0.6)
   const tractorDuracion = (H + SALIDA + TRACTOR) / V
-  /** Fracción del recorrido en que la tarjeta empieza a frenar (y el
-   *  tractor la suelta). Hasta ahí, los dos van juntos a velocidad V. */
-  const SUELTA = 0.86
+  /**
+   * La tarjeta va a velocidad V hasta que le falta el 14 % del camino, y ahí
+   * frena UNIFORMEMENTE hasta cero. Frenar uniforme desde V cubre la mitad
+   * de lo que cubriría a V constante, así que ese último 14 % del camino
+   * lleva el doble de tiempo del que llevaría a crucero.
+   *
+   * Los números salen de eso, no de probar a ojo: si el tramo de frenado
+   * arranca a otra velocidad que la de crucero, la tarjeta pega un tirón en
+   * el enganche — con `easeOut` arrancaba un 70 % más rápido de golpe, y eso
+   * era lo que se veía como "se traba".
+   */
+  const FRENADO = 0.14
+  const tCrucero = (1 - FRENADO) * (H / V)
+  const tFrenado = 2 * FRENADO * (H / V)
+  const tarjetaDuracion = tCrucero + tFrenado
+  /** Frenado uniforme (y = 2x − x²) como bezier cúbica: arranca con la
+   *  pendiente del crucero y termina en cero. */
+  const FRENO = [0.333, 0.667, 0.667, 1] as const
 
   return (
     <div className="relative flex w-full justify-center">
@@ -70,7 +84,7 @@ export function Remolque({ activo, children }: { activo: boolean; children: Reac
           style={{ height: SOGA, transformOrigin: 'top' }}
           initial={{ scaleY: 1, opacity: 0.85 }}
           animate={{ scaleY: 0.1, opacity: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 + SUBIDA * SUELTA, ease: 'easeIn' }}
+          transition={{ duration: 0.4, delay: 0.1 + tCrucero, ease: 'easeIn' }}
         />
       </motion.div>
 
@@ -81,8 +95,13 @@ export function Remolque({ activo, children }: { activo: boolean; children: Reac
         className="relative z-10 flex w-full justify-center"
         style={{ willChange: 'transform' }}
         initial={{ y: H }}
-        animate={{ y: [H, H * (1 - SUELTA), 0] }}
-        transition={{ duration: SUBIDA, delay: 0.1, times: [0, SUELTA, 1], ease: ['linear', 'easeOut'] }}
+        animate={{ y: [H, H * FRENADO, 0] }}
+        transition={{
+          duration: tarjetaDuracion,
+          delay: 0.1,
+          times: [0, tCrucero / tarjetaDuracion, 1],
+          ease: ['linear', FRENO],
+        }}
       >
         {children}
       </motion.div>
@@ -107,7 +126,7 @@ function RemolqueSinScroll() {
     contenedor.scrollTop = 0
     const t = setTimeout(() => {
       contenedor.style.overflowY = previo
-    }, 2500)
+    }, 2700)
     return () => {
       clearTimeout(t)
       contenedor.style.overflowY = previo

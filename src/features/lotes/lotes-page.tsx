@@ -27,7 +27,7 @@ import {
   useCampoMapa,
   type CampoVM,
 } from '@/features/campos/use-campo-mapa'
-import type { CampoConPotreros, LatLng } from '@/features/campos/api'
+import type { CampoConPotreros, LatLng, PotreroMapa } from '@/features/campos/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { CampoFormDialog } from '@/features/campos/campos-dialogs'
 import { PageHeader, Stat } from '@/components/page-header'
@@ -223,13 +223,45 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
   if (!vm) return null
 
   const contorno = mapa.data?.contorno ?? null
-  const potreros = mapa.data?.potreros ?? []
+  // Los potreros salen de la consulta del mapa (que trae los polígonos), pero
+  // mientras esa consulta no respondió —o falló— se usan los de la lista de
+  // campos, que ya están cargados: los mismos potreros, sin polígono. Antes
+  // el encabezado decía "0 potreros · 27 cab" en ese hueco, y los potreros
+  // cargados en el onboarding (todavía sin dibujar) no aparecían para poder
+  // asignarles un dibujo. Los tres números del encabezado vienen ahora de
+  // la misma fuente, así que no pueden contradecirse.
+  const potreros: PotreroMapa[] =
+    mapa.data?.potreros ??
+    (campoData?.potreros ?? []).map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      poligono: null,
+      estadoCiclo: p.estadoCiclo,
+      hectareas: p.hectareas,
+      cultivo: p.cultivo,
+      cabezas: p.cabezas,
+    }))
   const infraRows = infra.data ?? []
   const cabezas = campoData?.totalCabezas ?? 0
   const ha = campoData?.totalHa ?? 0
 
   return (
     <div className="flex flex-col gap-4">
+      {mapa.isError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-2.5 text-sm"
+        >
+          <span>No se pudo cargar el mapa de este campo. Los potreros se muestran sin sus dibujos.</span>
+          <button
+            type="button"
+            className="rounded-md border border-input px-2.5 py-1 text-xs font-medium hover:border-ring"
+            onClick={() => mapa.refetch()}
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
       {/* Selector de campo */}
       <div className="flex flex-wrap gap-2">
         {vms.map((c) => {
@@ -285,7 +317,7 @@ function MapaVista({ campos }: { campos: CampoConPotreros[] }) {
               <ArrowUpRight className="size-4" />
             </Link>
             <span className="tnum text-[13px] text-faint">
-              {potreros.length} potreros · {cabezas} cab · {ha} ha
+              {(campoData?.potreros.length ?? potreros.length)} potreros · {cabezas} cab · {ha} ha
             </span>
           </div>
         </div>

@@ -746,55 +746,27 @@ export function CampoMapaReal({
       <div className="flex flex-col gap-3 lg:flex-row">
         <div className="relative isolate h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-secondary lg:h-[560px] lg:flex-1">
           <div ref={ref} className="absolute inset-0" />
-          {/* "Faltan dibujar": los potreros sin polígono (los del onboarding).
-              Elegís cuál estás marcando y recién ahí dibujás — nada que
-              recordar. Cuando la lista queda vacía, desaparece. */}
-          {(faltanDibujar.length > 0 || dibujando) && (
+          {/* Mientras se dibuja, el recordatorio de QUÉ se está dibujando va
+              pegado al mapa. La lista de los que faltan vive en el panel de
+              la derecha (abajo del mapa quedaba fuera de la vista). */}
+          {dibujando && (
             <div className="absolute bottom-3 left-3 z-[460] max-w-[260px] rounded-xl border border-border bg-white/92 p-2.5 shadow-[0_8px_24px_rgba(16,30,20,0.14)] backdrop-blur">
-              {dibujando ? (
-                <div className="flex items-center gap-2">
-                  <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" />
-                  <p className="text-[12.5px] text-ink">
-                    Dibujando <b>{dibujando.nombre}</b> — cerrá el polígono para guardar.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      mapRef.current?.pm.disableDraw()
-                      setDibujando(null)
-                    }}
-                    className="ml-auto shrink-0 text-[12px] font-medium text-muted-foreground hover:text-ink"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.04em] text-faint">
-                    Faltan dibujar
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {faltanDibujar.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          setDibujando(p)
-                          mapRef.current?.pm.enableDraw('Polygon')
-                        }}
-                        title="Tocá y dibujá este potrero sobre el mapa"
-                        className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[12px] font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
-                      >
-                        {p.nombre}
-                        <span className="ml-1 font-normal text-primary/70">
-                          {p.hectareas ? `· ${p.hectareas} ha` : ''}
-                          {p.cabezas > 0 ? ` · ${p.cabezas} cab.` : ''}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" />
+                <p className="text-[12.5px] text-ink">
+                  Dibujando <b>{dibujando.nombre}</b> — cerrá el polígono para guardar.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    mapRef.current?.pm.disableDraw()
+                    setDibujando(null)
+                  }}
+                  className="ml-auto shrink-0 text-[12px] font-medium text-muted-foreground hover:text-ink"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
         {/* Orientación: N/S/E/O (mapa norte-arriba) + referencia por lado */}
@@ -815,6 +787,20 @@ export function CampoMapaReal({
           info={hover}
           campo={campo}
           onVerPotrero={(id) => verRef.current(id)}
+          sinDibujar={{
+            potreros: faltanDibujar,
+            dibujando,
+            onDibujar: (id) => {
+              const p = faltanDibujar.find((x) => x.id === id)
+              if (!p) return
+              setDibujando(p)
+              mapRef.current?.pm.enableDraw('Polygon')
+            },
+            onCancelar: () => {
+              mapRef.current?.pm.disableDraw()
+              setDibujando(null)
+            },
+          }}
         />
       </div>
       <ReferenciasPotrero campo={campo} />
