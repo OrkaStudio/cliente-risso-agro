@@ -7,6 +7,9 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_MAPS_KEY?: string
   /** Opcional: MapTiler (satélite Maxar, gratis sin tarjeta). Google tiene prioridad. */
   readonly VITE_MAPTILER_KEY?: string
+  /** Opcional: WhatsApp de soporte de Orka, E.164 sin "+" (5492244472369).
+   *  Sin ella, el asistente no ofrece "Hablar con una persona". */
+  readonly VITE_WHATSAPP_SOPORTE?: string
 }
 
 interface ImportMeta {

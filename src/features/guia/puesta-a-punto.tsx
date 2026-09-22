@@ -15,9 +15,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
-import { useChecklist, type ItemChecklist } from '@/features/guia/checklist'
+import {
+  useEstadoPuestaAPunto,
+  type ItemChecklist,
+} from '@/features/guia/checklist'
 import { ejecutarEnAncla } from '@/features/guia/ejecutar'
-import { usePanelAbierto } from '@/features/guia/guia-store'
+import { useEscenaActiva, usePanelAbierto } from '@/features/guia/guia-store'
 import { cn } from '@/lib/utils'
 
 /**
@@ -29,6 +32,8 @@ import { cn } from '@/lib/utils'
  * - Expandida: SOLO el camino de 5 pasos (íconos, detalle de una línea en el
  *   activo, acordeón opcional en el resto).
  * - Misión completa → desaparece para siempre (los ticks salen de la base).
+ * - Espera a que no haya escena (recibimiento / recorrido): la llegada es
+ *   un momento por vez (TASK-063).
  */
 
 const ICONO_PASO: Record<ItemChecklist['id'], LucideIcon> = {
@@ -79,8 +84,9 @@ function Anillo({ hechos, total }: { hechos: number; total: number }) {
 export function PuestaAPunto() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const checklist = useChecklist()
+  const checklist = useEstadoPuestaAPunto()
   const panelAbierto = usePanelAbierto()
+  const escena = useEscenaActiva()
   const userId = user?.id ?? 'anon'
 
   const [colapsada, setColapsada] = React.useState(
@@ -88,13 +94,14 @@ export function PuestaAPunto() {
   )
   const [expandido, setExpandido] = React.useState<string | null>(null)
 
-  const items = checklist.data ?? []
+  const items = checklist.data?.items ?? []
   const hechos = items.filter((i) => i.hecho).length
   const pendientes = items.filter((i) => !i.hecho)
   const siguiente = pendientes[0]
 
-  // Misión completa (o sin datos todavía, o panel del Asistente abierto): nada.
-  if (!checklist.isSuccess || pendientes.length === 0 || panelAbierto) return null
+  // Misión completa (o sin datos todavía, o panel del Asistente abierto, o
+  // una escena en curso): nada.
+  if (!checklist.isSuccess || pendientes.length === 0 || panelAbierto || escena) return null
 
   const setColapso = (v: boolean) => {
     setColapsada(v)
@@ -113,8 +120,10 @@ export function PuestaAPunto() {
   return createPortal(
     <MotionConfig reducedMotion="user">
       {/* Arriba a la derecha, colgando de la topbar: la misión siempre a la
-          vista (decisión de Lau: checklist arriba, chat en burbuja abajo). */}
-      <div className="fixed right-4 top-[86px] z-[65]">
+          vista (decisión de Lau: checklist arriba, chat en burbuja abajo).
+          Debajo de los diálogos (z-50): el CTA abre el catastro y la pastilla
+          no tiene que quedar encima del modal. */}
+      <div className="fixed right-4 top-[86px] z-[40]">
         <AnimatePresence mode="wait" initial={false}>
           {colapsada ? (
             /* ===== Pastilla: progreso + siguiente paso, un toque ===== */

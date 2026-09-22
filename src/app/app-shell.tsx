@@ -15,7 +15,9 @@ import {
 import { useAuth } from '@/features/auth/auth-context'
 import { Guia } from '@/features/guia/guia'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
+import { OfertaRecorrido } from '@/features/guia/oferta-recorrido'
 import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
+import { Recibimiento } from '@/features/guia/recibimiento'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
@@ -275,10 +277,14 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* Guía asistida por sección (tour de primera vez + relanzable) */}
+      {/* La llegada, un momento por vez (TASK-063): el recibimiento una sola
+          vez; los recorridos por sección se ofrecen con un chip y se lanzan a
+          pedido; la pastilla y el chip esperan a que no haya escena. */}
+      <Recibimiento />
       <Guia />
+      <OfertaRecorrido />
 
-      {/* Panel del Asistente (preguntas) + smart checklist de puesta a punto */}
+      {/* Panel del Asistente (preguntas + WhatsApp) + smart checklist */}
       <AsistentePanel />
       <PuestaAPunto />
     </div>

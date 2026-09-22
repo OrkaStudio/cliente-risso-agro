@@ -38,6 +38,14 @@ export const FICHAS: Ficha[] = [
     accion: { label: 'Abrir el formulario de alta', ruta: '/hacienda', ancla: 'hacienda-acciones' },
   },
   {
+    id: 'ubicar-sin-potrero',
+    categoria: 'hacienda',
+    chip: 'Cargué animales sin potrero, ¿cómo los ubico?',
+    respuesta:
+      'Pasa cuando cargás la hacienda antes que los potreros. En Hacienda aparece un aviso con «Ubicar en un potrero»: elegís el campo, el potrero y cuántos de cada categoría van ahí. Los que quedan sin ubicar siguen contando en el stock.',
+    accion: { label: 'Ubicarlos', ruta: '/hacienda', ancla: 'hacienda-ubicar' },
+  },
+  {
     id: 'mover-tropa',
     categoria: 'hacienda',
     chip: '¿Cómo muevo una tropa?',
@@ -56,17 +64,17 @@ export const FICHAS: Ficha[] = [
   {
     id: 'traer-campo',
     categoria: 'campos',
-    chip: 'Quiero traer mi campo',
+    chip: '¿Cómo traigo el contorno de mi campo?',
     respuesta:
-      'Se trae del catastro con la nomenclatura: partido y parcela. La encontrás en la boleta del Inmobiliario Rural de ARBA o en la escritura. El contorno aparece solo; después dibujás los potreros adentro.',
-    accion: { label: 'Traer del catastro', ruta: '/campos', ancla: 'campos-catastro' },
+      'En Buenos Aires se trae del catastro con la nomenclatura: partido, circunscripción y parcela. La encontrás en la boleta del Inmobiliario Rural de ARBA o en la escritura. El contorno aparece solo. En otras provincias se marca sobre el satélite: clic en cada esquina y cerrás en la primera. Después dibujás los potreros adentro.',
+    accion: { label: 'Ir a mi campo', ruta: '/campos', ancla: 'campos-catastro' },
   },
   {
     id: 'dibujar-potreros',
     categoria: 'campos',
     chip: '¿Cómo dibujo los potreros?',
     respuesta:
-      'En Campos, vista satelital: usá la herramienta de polígono (arriba a la izquierda del mapa) para marcar cada potrero y ponerle su número. Los botones de la derecha son para acercarte y ubicarte.',
+      'En Campos, vista satelital: los potreros que cargaste están en la lista; elegís uno y marcás sus esquinas sobre el satélite con los botones de la izquierda. Los de la derecha son para acercarte y ubicarte. Se dibujan una sola vez.',
     accion: { label: 'Ir al mapa', ruta: '/campos', ancla: null },
   },
   {
@@ -92,6 +100,29 @@ export const FICHAS: Ficha[] = [
     respuesta:
       'En la Agenda: el calendario muestra cheques, cuotas y pagos con fecha. Lo vencido aparece primero. Tocá un vencimiento para ver el detalle y marcarlo como pagado cuando lo saldés.',
     accion: { label: 'Ir a la Agenda', ruta: '/agenda', ancla: null },
+  },
+  {
+    id: 'alquiler',
+    categoria: 'plata',
+    chip: '¿Cómo cargo el alquiler del campo?',
+    respuesta:
+      'En Analítica, con «Cargar un alquiler»: elegís el campo y lo cargás como está en el contrato — kilos de novillo, quintales de soja o maíz, dólares o pesos; por hectárea o total; y cada cuánto se paga. Cada pago queda en la Agenda y, cuando lo pagás, se anota lo que pagaste de verdad.',
+    accion: { label: 'Cargar el alquiler', ruta: '/analitica', ancla: 'analitica-alquiler' },
+  },
+  {
+    id: 'precio-novillo',
+    categoria: 'plata',
+    chip: '¿De dónde sale el precio del novillo?',
+    respuesta:
+      'Del Mercado Agroganadero de Cañuelas, todos los días hábiles. Es el que ves arriba en el ticker y el que se usa para pasar a pesos un alquiler pactado en kilos. No hay que cargarlo a mano.',
+  },
+  {
+    id: 'corregir-onboarding',
+    categoria: 'campos',
+    chip: '¿Puedo corregir lo que cargué al empezar?',
+    respuesta:
+      'Sí, todo. El campo y sus potreros se editan desde Campos (hectáreas, nombre, actividad); los animales desde Hacienda (categoría, potrero, baja). Nada de lo del comienzo quedó fijo.',
+    accion: { label: 'Ir a Campos', ruta: '/campos', ancla: null },
   },
   {
     id: 'recorrida',

@@ -2,12 +2,17 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { ChevronRight, Route, Sparkles, X } from 'lucide-react'
+import { ChevronRight, MessageCircle, Route, Sparkles, X } from 'lucide-react'
+import { useAuth } from '@/features/auth/auth-context'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 import { Orbe, TextoStream } from '@/features/guia/guia'
+import { nombreDe } from '@/features/guia/nombre-usuario'
+import { linkWhatsapp } from '@/features/guia/whatsapp'
 import {
   abrirPanel,
   cerrarPanel,
   pedirGuia,
+  pedirRecibimiento,
   usePanelAbierto,
 } from '@/features/guia/guia-store'
 import { ejecutarEnAncla } from '@/features/guia/ejecutar'
@@ -17,14 +22,20 @@ import {
   type CategoriaFicha,
   type Ficha,
 } from '@/features/guia/fichas'
-import { seccionDeRuta, type SeccionGuia } from '@/features/guia/pasos'
+import {
+  NOMBRE_SECCION,
+  seccionDeRuta,
+  type SeccionGuia,
+} from '@/features/guia/pasos'
 import { cn } from '@/lib/utils'
 
 /**
- * Panel del Asistente — SOLO preguntas (fichas guionadas por chips; el chat
- * con modelo es la Fase 2 del spec). La puesta a punto vive aparte, en su
- * smart checklist flotante (features/guia/puesta-a-punto) — decisión de Lau:
- * el productor se centra en la misión sin información alrededor.
+ * Panel del Asistente — preguntas (fichas guionadas por chips; el chat con
+ * modelo es la Fase 2 del spec) + la salida a una PERSONA: "Hablar con
+ * alguien de Orka" abre WhatsApp con quién escribe y desde dónde (TASK-063).
+ * La puesta a punto vive aparte, en su smart checklist flotante
+ * (features/guia/puesta-a-punto) — decisión de Lau: el productor se centra
+ * en la misión sin información alrededor.
  * Spec: [[clientes/risso-agro/especificaciones/2026-07-16-asistente-conversacional-operativo]].
  */
 
@@ -45,7 +56,13 @@ export function AsistentePanel() {
   const location = useLocation()
   // "Recorrer esta sección" solo donde hay recorrido (las 5 secciones).
   const seccion = seccionDeRuta(location.pathname)
-  const hayRecorrido = seccion !== null
+  const { user } = useAuth()
+  const empresa = useEmpresa()
+  const whatsapp = linkWhatsapp({
+    nombre: nombreDe(user?.user_metadata),
+    empresa: empresa.data?.empresa?.nombre ?? null,
+    seccion: seccion ? NOMBRE_SECCION[seccion] : null,
+  })
   const [hilo, setHilo] = React.useState<Burbuja[]>([])
   // Categoría activa del menú de preguntas — arranca en la de la sección actual.
   const [categoria, setCategoria] = React.useState<CategoriaFicha>(() =>
@@ -69,8 +86,13 @@ export function AsistentePanel() {
 
   const verRecorrido = () => {
     cerrarPanel()
-    // El overlay del recorrido reacciona al pedido (misma maquinaria del botón).
+    // El overlay del recorrido reacciona al pedido (misma maquinaria del chip).
     setTimeout(() => pedirGuia(), 150)
+  }
+
+  const verBienvenida = () => {
+    cerrarPanel()
+    setTimeout(() => pedirRecibimiento(), 150)
   }
 
   return createPortal(
@@ -90,7 +112,8 @@ export function AsistentePanel() {
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
             transition={{ type: 'spring', stiffness: 380, damping: 24 }}
-            className="fixed bottom-4 right-4 z-[72] flex size-[54px] items-center justify-center rounded-full shadow-[0_12px_38px_rgba(10,20,14,0.35)]"
+            // Debajo de los diálogos (z-50): un modal abierto tapa la burbuja.
+            className="fixed bottom-4 right-4 z-[42] flex size-[54px] items-center justify-center rounded-full shadow-[0_12px_38px_rgba(10,20,14,0.35)]"
           >
             {/* Anillo degradé girando — la identidad del asistente, en grande */}
             <motion.span
@@ -237,17 +260,43 @@ export function AsistentePanel() {
                       <ChevronRight className="size-3.5 shrink-0 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-field-deep" />
                     </button>
                   ))}
-                  {hayRecorrido && (
-                    <button
-                      type="button"
-                      onClick={verRecorrido}
-                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-full border border-border bg-card py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
-                    >
-                      <Route className="size-3.5" />
-                      Recorrer esta sección con el asistente
-                    </button>
+                  {seccion && (
+                    <div className="mt-2 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={verRecorrido}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-card py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
+                      >
+                        <Route className="size-3.5" />
+                        Recorrer {NOMBRE_SECCION[seccion]}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={verBienvenida}
+                        title="Volver a ver la bienvenida"
+                        className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-faint hover:text-ink"
+                      >
+                        <Sparkles className="size-3.5" />
+                        Bienvenida
+                      </button>
+                    </div>
                   )}
                 </motion.div>
+
+                {/* La salida a una persona: siempre a la vista, abajo de todo.
+                    WhatsApp abre en otra pestaña con el mensaje ya escrito. */}
+                {whatsapp && (
+                  <a
+                    href={whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-guia="asistente-whatsapp"
+                    className="mx-4 mt-2 flex items-center justify-center gap-2 rounded-full bg-[#25D366] py-2 text-[13px] font-bold text-white shadow-[0_2px_10px_rgba(37,211,102,0.35)] transition-opacity hover:opacity-90"
+                  >
+                    <MessageCircle className="size-4" />
+                    Hablar con alguien de Orka
+                  </a>
+                )}
 
                 <p className="mt-2 px-4 text-center text-[10px] text-faint">
                   El asistente nunca carga ni mueve nada sin tu confirmación.

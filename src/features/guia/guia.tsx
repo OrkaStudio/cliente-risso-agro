@@ -3,17 +3,20 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { ChevronLeft, Sparkles } from 'lucide-react'
-import { useAuth } from '@/features/auth/auth-context'
+import { useNavigate } from 'react-router-dom'
+import { useEstadoPuestaAPunto } from '@/features/guia/checklist'
+import { ejecutarEnAncla } from '@/features/guia/ejecutar'
 import {
-  guiaVista,
-  marcarGuiaVista,
+  claveRecorrido,
+  setEscenaActiva,
   useGuiaPedida,
+  useMarcarVista,
 } from '@/features/guia/guia-store'
 import {
-  GUIAS,
+  NOMBRE_SECCION,
+  pasosDe,
   seccionDeRuta,
   type PasoGuia,
-  type SeccionGuia,
 } from '@/features/guia/pasos'
 import { rootZoom } from '@/lib/zoom'
 import { cn } from '@/lib/utils'
@@ -33,11 +36,18 @@ import { cn } from '@/lib/utils'
  * corrido ([[lecciones/2026-06-29-zoom-global-gotchas]] gotcha 2). Acá todas
  * las coordenadas se dividen por rootZoom(), como el Dropdown del sistema.
  *
- * - Auto-arranca la primera vez que el usuario entra a cada sección
- *   (persistencia en localStorage por usuario+sección).
+ * - NUNCA auto-arranca (TASK-063): la primera vez en cada sección se OFRECE
+ *   con un chip junto a la burbuja (oferta-recorrido.tsx) y se lanza a
+ *   pedido (`pedirGuia`). Al cerrarlo se marca visto en la DB (`guia_vista`).
+ *   Antes arrancaba solo a los 700 ms y, después del onboarding, caía
+ *   encima de la pastilla y la burbuja — tres cosas a la vez.
+ * - Los pasos se arman con el estado real de la empresa (`pasosDe`): le
+ *   hablan a "tus 120 cabezas", no a una pantalla vacía.
  * - Un paso cuyo ancla no está en el DOM (panel que no renderiza sin datos)
  *   se saltea solo — el recorrido funciona con la sección vacía.
  * - Navegar a otra sección desmonta el recorrido por `key`.
+ * - El recibimiento (recibimiento.tsx) reusa `Recorrido` con sus propios
+ *   pasos: misma escena, mismo lenguaje.
  * - IMPORTANTE: el bloque de narración se posiciona con left/top que anima
  *   framer — nunca con transform CSS (framer controla `transform` y lo pisa).
  */
@@ -79,32 +89,54 @@ function anclaResoluble(paso: PasoGuia): boolean {
 }
 
 export function Guia() {
-  const { user } = useAuth()
   const location = useLocation()
   const seccion = seccionDeRuta(location.pathname)
-  if (!seccion || !user) return null
-  // key por sección+usuario: cambiar de sección desmonta y resetea todo el
-  // estado del recorrido sin efectos de limpieza manual.
+  const pedida = useGuiaPedida()
+  const estado = useEstadoPuestaAPunto()
+  const marcarVista = useMarcarVista()
+
+  // Cada pedido monta un recorrido nuevo (key = nro de pedido). El contador
+  // arranca en el valor que tenga el store al montar — sólo reaccionamos a
+  // pedidos posteriores.
+  const inicial = React.useRef(pedida)
+  const [activo, setActivo] = React.useState<number | null>(null)
+  React.useEffect(() => {
+    if (pedida === inicial.current) return
+    const t = setTimeout(() => setActivo(pedida), 0)
+    return () => clearTimeout(t)
+  }, [pedida])
+
+  if (!seccion || activo === null) return null
   return (
-    <GuiaSeccion
-      key={`${seccion}:${user.id}`}
-      seccion={seccion}
-      userId={user.id}
+    <Recorrido
+      key={`${seccion}:${activo}`}
+      nombre={NOMBRE_SECCION[seccion]}
+      pasos={pasosDe(seccion, estado.data?.resumen ?? null)}
+      onFin={() => {
+        setActivo(null)
+        marcarVista(claveRecorrido(seccion))
+      }}
     />
   )
 }
 
-function GuiaSeccion({
-  seccion,
-  userId,
+/**
+ * Un recorrido: arranca al montar en el primer paso resoluble y avisa
+ * `onFin` cuando terminó de cerrarse (después de la animación de salida).
+ * Lo montan `Guia` (recorrido de la sección) y `Recibimiento`.
+ */
+export function Recorrido({
+  nombre,
+  pasos,
+  onFin,
 }: {
-  seccion: SeccionGuia
-  userId: string
+  nombre: string
+  pasos: PasoGuia[]
+  onFin: () => void
 }) {
-  const guia = GUIAS[seccion]
-  const pedida = useGuiaPedida()
+  const navigate = useNavigate()
 
-  // Índice del paso activo; null = recorrido cerrado.
+  // Índice del paso activo; null = recorrido cerrado (animando la salida).
   const [idx, setIdx] = React.useState<number | null>(null)
   // Última medición del ancla activa. Cuando el paso cambia, la medición vieja
   // queda como destino provisorio (la luz espera ahí) hasta que el rAF mide la
@@ -113,63 +145,66 @@ function GuiaSeccion({
     null,
   )
 
-  const paso = idx !== null ? guia.pasos[idx] : null
+  const paso = idx !== null ? pasos[idx] : null
   const rect = paso && paso.ancla !== null ? (medida?.rect ?? null) : null
 
   const cerrar = React.useCallback(() => {
     setIdx(null)
-    marcarGuiaVista(seccion, userId)
     // Devolver la página arriba del todo: el recorrido scrolleó buscando
     // anclas y no debe dejar al usuario situado en cualquier lado.
     document
       .querySelector('main')
       ?.scrollTo({ top: 0, behavior: 'smooth' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [seccion, userId])
+  }, [])
 
   // Navegación salteando pasos cuyo ancla no existe (sección vacía).
   const ir = React.useCallback(
     (desde: number, dir: 1 | -1) => {
       let i = desde + dir
-      while (i >= 0 && i < guia.pasos.length && !anclaResoluble(guia.pasos[i])) {
+      while (i >= 0 && i < pasos.length && !anclaResoluble(pasos[i])) {
         i += dir
       }
       if (i < 0) return
-      if (i >= guia.pasos.length) {
+      if (i >= pasos.length) {
         cerrar()
         return
       }
       setIdx(i)
     },
-    [guia, cerrar],
+    [pasos, cerrar],
   )
 
-  const abrir = React.useCallback(() => {
-    const i = guia.pasos.findIndex(anclaResoluble)
-    if (i >= 0) setIdx(i)
-  }, [guia])
-
-  // Primera visita a la sección: auto-arranca tras dejar renderizar la página
-  // (el timeout también difiere el setState — regla del repo). Se marca "vista"
-  // apenas se MUESTRA (no solo al cerrar): así aparece UNA vez por sección, aunque
-  // el usuario navegue a otra pantalla sin cerrarla.
+  // Arranca al montar, tras dejar renderizar la página (el timeout también
+  // difiere el setState — regla del repo). Si ningún paso resuelve, termina.
   React.useEffect(() => {
-    if (guiaVista(seccion, userId)) return
     const t = setTimeout(() => {
-      abrir()
-      marcarGuiaVista(seccion, userId)
-    }, 700)
+      const i = pasos.findIndex(anclaResoluble)
+      if (i >= 0) setIdx(i)
+      else onFin()
+    }, 150)
     return () => clearTimeout(t)
-  }, [seccion, userId, abrir])
+    // Sólo al montar: los pasos de un recorrido no cambian en vuelo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Relanzamiento a pedido (burbuja del asistente). El contador arranca en el
-  // valor que tenga el store al montar — sólo reaccionamos a cambios posteriores.
-  const pedidaInicial = React.useRef(pedida)
+  // Mientras hay velo, la pastilla y el chip de oferta esperan.
   React.useEffect(() => {
-    if (pedida === pedidaInicial.current) return
-    const t = setTimeout(() => abrir(), 0)
-    return () => clearTimeout(t)
-  }, [pedida, abrir])
+    setEscenaActiva(idx !== null)
+    return () => setEscenaActiva(false)
+  }, [idx])
+
+  // Acción de un paso: cerrar y ejecutar el botón real (con navegación si
+  // el botón vive en otra sección — el recibimiento manda a Campos desde
+  // Inicio, por ejemplo).
+  const ejecutar = React.useCallback(
+    (accion: NonNullable<PasoGuia['accion']>) => {
+      cerrar()
+      if (accion.ruta) navigate(accion.ruta)
+      ejecutarEnAncla(accion.click)
+    },
+    [cerrar, navigate],
+  )
 
   // Medir el ancla del paso activo: scrollearla a la vista (suave — la luz
   // sigue el scroll en vivo, parte del viaje) y re-medir en scroll/resize
@@ -206,18 +241,31 @@ function GuiaSeccion({
     return () => document.removeEventListener('keydown', onKey)
   }, [idx, ir, cerrar])
 
+  // `onFin` recién cuando la escena terminó de irse: el padre desmonta y
+  // marca visto sin cortar el fade.
+  const abierto = React.useRef(false)
+  React.useEffect(() => {
+    if (idx !== null) abierto.current = true
+  }, [idx])
+
   return createPortal(
     <MotionConfig reducedMotion="user">
-      <AnimatePresence>
+      <AnimatePresence
+        onExitComplete={() => {
+          if (abierto.current && idx === null) onFin()
+        }}
+      >
         {idx !== null && paso && (
           <Escena
             key="escena"
-            guia={guia}
+            nombre={nombre}
+            pasos={pasos}
             paso={paso}
             idx={idx}
             rect={rect}
             ir={ir}
             cerrar={cerrar}
+            ejecutar={ejecutar}
           />
         )}
       </AnimatePresence>
@@ -228,19 +276,23 @@ function GuiaSeccion({
 
 /** La escena del recorrido: velo con luz viajera + narración escrita encima. */
 function Escena({
-  guia,
+  nombre,
+  pasos,
   paso,
   idx,
   rect,
   ir,
   cerrar,
+  ejecutar,
 }: {
-  guia: (typeof GUIAS)[SeccionGuia]
+  nombre: string
+  pasos: PasoGuia[]
   paso: PasoGuia
   idx: number
   rect: Rect | null
   ir: (desde: number, dir: 1 | -1) => void
   cerrar: () => void
+  ejecutar: (accion: NonNullable<PasoGuia['accion']>) => void
 }) {
   const z = rootZoom()
   const vw = window.innerWidth / z
@@ -307,7 +359,7 @@ function Escena({
     : { x: capX + ancho / 2, y: capY + 40, width: 0, height: 0 }
 
   // Progreso sobre los pasos que existen ahora (los no resolubles no cuentan).
-  const visibles = guia.pasos.filter(anclaResoluble)
+  const visibles = pasos.filter(anclaResoluble)
   const nroActual = visibles.indexOf(paso) + 1
   const esUltimo = nroActual === visibles.length
   const esPrimero = nroActual <= 1
@@ -335,7 +387,7 @@ function Escena({
     <motion.div
       className="fixed inset-0 z-[90]"
       role="dialog"
-      aria-label={`Guía de ${guia.nombre}`}
+      aria-label={`Guía de ${nombre}`}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.3, ease: 'easeOut' } }}
@@ -452,21 +504,7 @@ function Escena({
                     y: finNarracion ? 0 : 4,
                   }}
                   style={{ pointerEvents: finNarracion ? 'auto' : 'none' }}
-                  onClick={() => {
-                    const destino = paso.accion!.click
-                    cerrar()
-                    setTimeout(() => {
-                      const el = document.querySelector<HTMLElement>(
-                        `[data-guia="${destino}"]`,
-                      )
-                      if (!el) return
-                      const btn =
-                        el.tagName === 'BUTTON'
-                          ? el
-                          : (el.querySelector<HTMLElement>('button, a') ?? el)
-                      btn.click()
-                    }, 60)
-                  }}
+                  onClick={() => ejecutar(paso.accion!)}
                   className="mt-3.5 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-field-deep shadow-[0_4px_18px_rgba(0,0,0,0.35)] transition-opacity hover:opacity-90"
                 >
                   <Sparkles className="size-3.5" />
@@ -641,3 +679,4 @@ export function TextoStream({
 
 // El launcher del Asistente es la burbuja flotante (asistente-panel.tsx);
 // el botón de topbar se retiró (decisión de Lau: checklist arriba, chat abajo).
+// El chip que ofrece el recorrido vive en oferta-recorrido.tsx.

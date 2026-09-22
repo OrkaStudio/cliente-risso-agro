@@ -1,44 +1,68 @@
 import { useSyncExternalStore } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/features/auth/auth-context'
 import type { SeccionGuia } from '@/features/guia/pasos'
+import { supabase } from '@/lib/supabase/client'
+import { useIsMobile } from '@/lib/use-is-mobile'
 
-// Store externo mínimo (idioma de lib/campo-mode): el botón "Guía" de la topbar
-// y el overlay viven en árboles distintos del AppShell → sin prop-drilling.
-// `pedida` = el usuario pidió relanzar la guía de la sección actual.
-let pedida = 0
+// Store externo mínimo (idioma de lib/campo-mode): la burbuja del asistente,
+// el chip de oferta y el overlay viven en árboles distintos del AppShell →
+// sin prop-drilling.
 const listeners = new Set<() => void>()
-
-/** Relanza la guía de la sección actual (botón "Guía" de la topbar). */
-export function pedirGuia(): void {
-  pedida++
-  listeners.forEach((l) => l())
-}
-
 function subscribe(cb: () => void): () => void {
   listeners.add(cb)
   return () => listeners.delete(cb)
 }
+function avisar() {
+  listeners.forEach((l) => l())
+}
 
-/** Contador que incrementa con cada pedido manual — el overlay reacciona al cambio. */
+// ---------------------------------------------------------------------------
+// Relanzar el recorrido de la sección actual (chip de oferta / panel).
+// `pedida` = contador; el overlay reacciona al cambio.
+// ---------------------------------------------------------------------------
+
+let pedida = 0
+
+export function pedirGuia(): void {
+  pedida++
+  avisar()
+}
+
 export function useGuiaPedida(): number {
   return useSyncExternalStore(subscribe, () => pedida, () => 0)
 }
 
 // ---------------------------------------------------------------------------
-// Panel del Asistente (checklist + fichas). El botón de la topbar lo abre; el
-// recorrido se relanza DESDE el panel (conviven — decisión de Lau, spec del
-// asistente).
+// Volver a ver el recibimiento (desde el panel del asistente).
+// ---------------------------------------------------------------------------
+
+let recibimientoPedido = 0
+
+export function pedirRecibimiento(): void {
+  recibimientoPedido++
+  avisar()
+}
+
+export function useRecibimientoPedido(): number {
+  return useSyncExternalStore(subscribe, () => recibimientoPedido, () => 0)
+}
+
+// ---------------------------------------------------------------------------
+// Panel del Asistente (preguntas). El recorrido se relanza DESDE el panel
+// (conviven — decisión de Lau, spec del asistente).
 // ---------------------------------------------------------------------------
 
 let panelAbierto = false
 
 export function abrirPanel(): void {
   panelAbierto = true
-  listeners.forEach((l) => l())
+  avisar()
 }
 
 export function cerrarPanel(): void {
   panelAbierto = false
-  listeners.forEach((l) => l())
+  avisar()
 }
 
 export function usePanelAbierto(): boolean {
@@ -46,27 +70,95 @@ export function usePanelAbierto(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Persistencia "ya vio la guía" — localStorage por usuario+sección (decisión de
-// intake TASK-043: sin migración; si se pierde, la guía se muestra una vez más
-// y siempre queda el botón para relanzarla).
+// Escena activa: hay un velo en pantalla (recibimiento o recorrido). La
+// pastilla de puesta a punto y el chip de oferta esperan a que termine — la
+// llegada es UN momento por vez, nunca tres cosas encima (TASK-063).
 // ---------------------------------------------------------------------------
 
-function claveVista(seccion: SeccionGuia, userId: string): string {
-  return `guia.vista.${seccion}.${userId}`
+let escenaActiva = false
+
+export function setEscenaActiva(v: boolean): void {
+  if (escenaActiva === v) return
+  escenaActiva = v
+  avisar()
 }
 
-export function guiaVista(seccion: SeccionGuia, userId: string): boolean {
-  try {
-    return localStorage.getItem(claveVista(seccion, userId)) === '1'
-  } catch {
-    return true // storage bloqueado: mejor no insistir con el auto-arranque
-  }
+export function useEscenaActiva(): boolean {
+  return useSyncExternalStore(subscribe, () => escenaActiva, () => false)
 }
 
-export function marcarGuiaVista(seccion: SeccionGuia, userId: string): void {
-  try {
-    localStorage.setItem(claveVista(seccion, userId), '1')
-  } catch {
-    /* sin storage no persistimos — la guía volvería a auto-abrirse */
-  }
+// ---------------------------------------------------------------------------
+// Persistencia "ya lo vio" — tabla `guia_vista` (user_id, clave), RLS propia.
+//
+// En la DB y no en localStorage (como venía de TASK-043) porque el
+// recibimiento es UNA vez por persona, no por navegador: el productor se
+// registra en el teléfono y abre la compu al otro día. Mientras la lista
+// carga, o si no hay red, NADA automático aparece (se trata como "visto"):
+// mejor no recibir que recibir dos veces. Siempre queda el panel para pedirlo.
+// ---------------------------------------------------------------------------
+
+export type ClaveGuia = 'recibimiento' | `recorrido.${SeccionGuia}`
+
+export function claveRecorrido(seccion: SeccionGuia): ClaveGuia {
+  return `recorrido.${seccion}`
+}
+
+function queryKey(userId: string) {
+  return ['guia-vista', userId] as const
+}
+
+export function useGuiasVistas() {
+  const { user } = useAuth()
+  const userId = user?.id ?? ''
+  return useQuery({
+    queryKey: queryKey(userId),
+    enabled: !!userId,
+    networkMode: 'offlineFirst',
+    staleTime: Infinity,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase.from('guia_vista').select('clave')
+      if (error) throw new Error(error.message)
+      return new Set((data ?? []).map((r) => r.clave))
+    },
+  })
+}
+
+/** `true` cuando se SABE que no la vio. Cargando, sin red o sin usuario →
+ *  `false`: nada automático hasta tener el dato. */
+export function usePendiente(clave: ClaveGuia): boolean {
+  const vistas = useGuiasVistas()
+  return vistas.isSuccess && !vistas.data.has(clave)
+}
+
+/** Marca una clave como vista: upsert en la DB con el cache actualizado
+ *  antes de la respuesta (la UI no espera a la red). Si el upsert falla se
+ *  deja el cache marcado igual — en esta sesión ya la vio; la próxima carga
+ *  la vuelve a ofrecer, que es inofensivo. */
+export function useMarcarVista() {
+  const { user } = useAuth()
+  const qc = useQueryClient()
+  const esMovil = useIsMobile()
+  const userId = user?.id ?? ''
+  return useMutation({
+    mutationFn: async (clave: ClaveGuia) => {
+      if (!userId) return
+      const { error } = await supabase.from('guia_vista').upsert(
+        {
+          user_id: userId,
+          clave,
+          visto_at: new Date().toISOString(),
+          dispositivo: esMovil ? 'movil' : 'escritorio',
+        },
+        { onConflict: 'user_id,clave' },
+      )
+      if (error) throw new Error(error.message)
+    },
+    onMutate: (clave) => {
+      qc.setQueryData<Set<string>>(queryKey(userId), (prev) => {
+        const next = new Set(prev ?? [])
+        next.add(clave)
+        return next
+      })
+    },
+  }).mutate
 }
