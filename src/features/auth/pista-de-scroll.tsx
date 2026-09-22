@@ -19,6 +19,13 @@ export function PistaDeScroll() {
   useEffect(() => {
     if (!contenedor) return
     const revisar = () => {
+      // Mientras el remolque tiene el scroll bloqueado, la tarjeta está
+      // desplazada un viewport entero y eso cuenta como contenido de más:
+      // medir ahí decía "hay más abajo" cuando no había nada. Se espera.
+      if (contenedor.style.overflowY === 'hidden') {
+        setVisible(false)
+        return
+      }
       const sobra = contenedor.scrollHeight - contenedor.clientHeight
       setVisible(sobra > 24 && contenedor.scrollTop < sobra - 24)
     }
@@ -29,9 +36,14 @@ export function PistaDeScroll() {
     const ro = new ResizeObserver(revisar)
     ro.observe(contenedor)
     for (const hijo of Array.from(contenedor.children)) ro.observe(hijo)
+    // Y cuando el remolque suelta el bloqueo (cambia el atributo style),
+    // se mide recién ahí — con la tarjeta ya en su lugar.
+    const mo = new MutationObserver(revisar)
+    mo.observe(contenedor, { attributes: true, attributeFilter: ['style'] })
     return () => {
       contenedor.removeEventListener('scroll', revisar)
       ro.disconnect()
+      mo.disconnect()
     }
   }, [contenedor])
 

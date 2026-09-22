@@ -240,6 +240,7 @@ export function OnboardingPage() {
       // remolque se repita en el festejo.
       entrada={etapa === 'empresa' || etapa === 'fin' ? 'tractor' : 'suave'}
       ciclo={etapa === 'empresa' || etapa === 'fin' ? etapa : 'medio'}
+      pistaDeScroll={etapa === 'fin'}
       escena={
         <EscenaCroquis
           etapa={etapa}
@@ -1960,27 +1961,22 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
           ocho potreros no se lee a un tercio del panel: prefiero que la
           tercera ficha caiga abajo y haya que bajar un poco. La escena ya
           scrollea, y acá lo que importa es que se vea lo que armó. */}
-      <ul
-        className={cn(
-          'mt-5 grid',
-          compacta ? 'gap-3' : 'gap-4',
-          columnas === 2 && 'sm:grid-cols-2',
-          columnas === 3 && 'sm:grid-cols-3',
-          columnas === 4 && 'sm:grid-cols-4',
-          // Con dos columnas y cantidad impar, la última ficha queda sola en
-          // su fila: centrada bajo las dos de arriba se lee como el cierre de
-          // la pila, alineada a la izquierda parece un error de grilla.
-          columnas === 2 &&
-            n % 2 === 1 &&
-            'sm:[&>li:last-child]:col-span-2 sm:[&>li:last-child]:mx-auto sm:[&>li:last-child]:w-[calc(50%-0.5rem)]',
-        )}
-      >
+      {/* Flex con wrap y centrado, no grilla: cuando la última fila queda
+          incompleta (cinco campos en tres columnas), sus fichas se centran
+          bajo las de arriba. Una grilla las deja pegadas a la izquierda y se
+          lee como un error. El ancho de cada ficha sale de las columnas. */}
+      <ul className="mt-5 flex flex-wrap justify-center gap-4">
         {campos.map((c, i) => {
           const color = colorDeCampo(c.colorIdx)
           return (
             <motion.li
               key={c.id}
-              className="overflow-hidden rounded-xl border border-sidebar-foreground/10 bg-[#0b1a10]/70 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm"
+              className={cn(
+                'w-full overflow-hidden rounded-xl border border-sidebar-foreground/10 bg-[#0b1a10]/70 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm',
+                columnas === 2 && 'sm:w-[calc(50%-0.5rem)]',
+                columnas === 3 && 'sm:w-[calc(33.333%-0.667rem)]',
+                columnas === 4 && 'sm:w-[calc(25%-0.75rem)]',
+              )}
               initial={{ opacity: 0, y: 18, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.25 + i * 0.15 }}

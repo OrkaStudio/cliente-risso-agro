@@ -20,6 +20,7 @@ export function AuthLayout({
   escena,
   entrada = 'suave',
   ciclo,
+  pistaDeScroll = false,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
@@ -34,6 +35,12 @@ export function AuthLayout({
   entrada?: 'tractor' | 'suave'
   /** Cambiarlo vuelve a montar la tarjeta y el remolque se repite. */
   ciclo?: string
+  /**
+   * Muestra "Seguí para abajo" cuando el contenido no entra. Sólo donde el
+   * botón que importa puede quedar fuera de la vista (el cierre del
+   * onboarding); en un formulario corto es ruido.
+   */
+  pistaDeScroll?: boolean
 }) {
   return (
     // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
@@ -48,7 +55,7 @@ export function AuthLayout({
       </div>
       <div className="relative min-h-0 h-full">
         {/* Avisa que hay más abajo cuando el contenido no entra. */}
-        <PistaDeScroll />
+        {pistaDeScroll && <PistaDeScroll />}
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
             vista, el desplazamiento es un deslizamiento, no un salto. */}
         <div data-auth-scroll className="flex h-full flex-col overflow-y-auto scroll-smooth">
