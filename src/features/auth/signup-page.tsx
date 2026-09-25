@@ -225,7 +225,7 @@ export function SignupPage() {
             <AuthHeading
               icono={Sprout}
               titulo="Creá tu cuenta"
-              subtitulo="Te lleva un minuto, y después armamos tu campo juntos."
+              subtitulo="Tu hacienda, tus potreros y tu plata, en la palma de la mano. Arrancás en un minuto."
               subtituloSoloEscritorio
             />
 

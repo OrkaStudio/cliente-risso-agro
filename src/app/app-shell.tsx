@@ -1,4 +1,5 @@
-import { Suspense, type ReactNode, useEffect, useState } from 'react'
+import { Suspense, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { prefetch, prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
@@ -117,12 +118,15 @@ export function AppShell() {
   const [bienvenida] = useState(
     () => !quieto && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
   )
+  const contenido = useRef<HTMLDivElement>(null)
+  const contenidoListo = useEntradaDeTarjetas(bienvenida, contenido)
   const entra = (demora: number) =>
     bienvenida
       ? {
           initial: { opacity: 0, y: 10 },
           animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.55, delay: demora, ease: [0.16, 1, 0.3, 1] as const },
+          // La misma curva y duración que la barra (ver `HaciaLaBarra`).
+          transition: { duration: 0.62, delay: demora, ease: [0.65, 0, 0.35, 1] as const },
         }
       : {}
 
@@ -284,7 +288,11 @@ export function AppShell() {
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
             burbuja flotante del Asistente (no tapa la última card). */}
         <main className="flex-1 overflow-y-auto">
-          <motion.div className="w-full px-4 pb-12 pt-7 sm:px-6" {...entra(0.25)}>
+          <div
+            ref={contenido}
+            className="w-full px-4 pb-12 pt-7 sm:px-6"
+            style={bienvenida && !contenidoListo ? { opacity: 0 } : undefined}
+          >
             <Suspense
               fallback={
                 <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -292,7 +300,7 @@ export function AppShell() {
             >
               <Outlet />
             </Suspense>
-          </motion.div>
+          </div>
         </main>
       </div>
 
@@ -308,4 +316,80 @@ export function AppShell() {
       <PuestaAPunto />
     </div>
   )
+}
+
+/** La curva y la duración de la barra que se forma al salir del onboarding. */
+const CURVA_BARRA = 'cubic-bezier(0.65, 0, 0.35, 1)'
+const DURACION_BARRA = 620
+
+/**
+ * La página, al llegar del onboarding, entra con la misma fluidez que la
+ * barra lateral: bloque por bloque (título, tarjetas, secciones), de arriba
+ * abajo, con su curva. Nada aparece de golpe mientras lo otro se funde.
+ *
+ * Antes el contenedor hacía su fundido VACÍO y las tarjetas aparecían de
+ * golpe después, cuando llegaban sus datos (1,28 s, 1,37 s, 1,54 s). Ahora la
+ * página espera lista —datos cargados y el contenido quieto, hasta 1,8 s—
+ * y recién ahí entra cada tarjeta. Las que llegan más tarde entran igual.
+ * Genérico: no depende de cómo esté armada cada página.
+ */
+function useEntradaDeTarjetas(activo: boolean, raiz: RefObject<HTMLDivElement | null>): boolean {
+  const qc = useQueryClient()
+  const [listo, setListo] = useState(!activo)
+  useEffect(() => {
+    if (!activo) return
+    const t0 = performance.now()
+    let anterior = -1
+    let quietos = 0
+    const vistas = new WeakSet<Element>()
+    let orden = 0
+    const animar = (tarjetas: Element[]) => {
+      for (const el of tarjetas) {
+        if (vistas.has(el)) continue
+        vistas.add(el)
+        const i = Math.min(orden++, 8)
+        ;(el as HTMLElement).animate(
+          [
+            { opacity: 0, transform: 'translateY(14px)' },
+            { opacity: 1, transform: 'none' },
+          ],
+          { duration: DURACION_BARRA, delay: i * 70, easing: CURVA_BARRA, fill: 'backwards' },
+        )
+      }
+    }
+    // Los BLOQUES de la página, en orden: títulos, tarjetas, secciones.
+    // Se baja mientras haya un solo hijo (envoltorios) y se toman los hijos
+    // de ahí: así entra todo lo que se ve, no sólo lo que parece tarjeta.
+    const tarjetas = (): Element[] => {
+      let nivel: Element | null | undefined = raiz.current?.firstElementChild
+      while (nivel && nivel.children.length === 1) nivel = nivel.firstElementChild
+      if (!nivel) return []
+      return [...nivel.children].filter((e) => e.getBoundingClientRect().height > 8)
+    }
+    let mo: MutationObserver | null = null
+    let primeraTarjeta = 0
+    const intervalo = window.setInterval(() => {
+      const n = tarjetas().length
+      if (n > 0 && !primeraTarjeta) primeraTarjeta = performance.now()
+      // Quietas y con los datos cargados; datos secundarios (el clima) no
+      // hacen esperar más de 250 ms desde que aparece la primera tarjeta.
+      const datos = qc.isFetching() === 0 || performance.now() - primeraTarjeta > 250
+      quietos = n > 0 && n === anterior && datos ? quietos + 1 : 0
+      anterior = n
+      if (quietos >= 2 || performance.now() - t0 > 1800) {
+        window.clearInterval(intervalo)
+        animar(tarjetas())
+        setListo(true)
+        // Lo que aparece en el siguiente segundo y medio entra igual.
+        mo = new MutationObserver(() => animar(tarjetas()))
+        if (raiz.current) mo.observe(raiz.current, { childList: true, subtree: true })
+        window.setTimeout(() => mo?.disconnect(), 1500)
+      }
+    }, 60)
+    return () => {
+      window.clearInterval(intervalo)
+      mo?.disconnect()
+    }
+  }, [activo, qc, raiz])
+  return listo
 }
