@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ClipboardCheck, Loader2, Mail, MailCheck, ShieldCheck, Smartphone, Sprout } from 'lucide-react'
@@ -41,13 +41,39 @@ const ORDEN: Campo[] = ['nombre', 'apellido', 'celular', 'email', 'password', 'r
 
 type Datos = z.infer<typeof registro>
 
+/**
+ * La pantalla de "¿están bien?" sobrevive a recargar: sin esto volvía al
+ * formulario vacío y quedaba la duda de si la cuenta se había creado. Se
+ * guarda en sessionStorage (esta pestaña) y SIN la contraseña: al recargar,
+ * la misma pantalla la pide de nuevo.
+ */
+type Revision = Omit<Datos, 'password' | 'repetir'>
+const CLAVE_REVISION = 'orka:registro:revision'
+function leerRevision(): Revision | null {
+  try {
+    const c = sessionStorage.getItem(CLAVE_REVISION)
+    return c ? (JSON.parse(c) as Revision) : null
+  } catch {
+    return null
+  }
+}
+function guardarRevision(r: Revision | null) {
+  try {
+    if (r) sessionStorage.setItem(CLAVE_REVISION, JSON.stringify(r))
+    else sessionStorage.removeItem(CLAVE_REVISION)
+  } catch {
+    // sin almacenamiento: al recargar vuelve al formulario, como antes
+  }
+}
+
 export function SignupPage() {
-  const { signUp, resendConfirmation } = useAuth()
+  const { signUp, resendConfirmation, session } = useAuth()
   const navigate = useNavigate()
-  const [nombre, setNombre] = useState('')
-  const [apellido, setApellido] = useState('')
-  const [celular, setCelular] = useState('')
-  const [email, setEmail] = useState('')
+  const [guardada] = useState(leerRevision)
+  const [nombre, setNombre] = useState(guardada?.nombre ?? '')
+  const [apellido, setApellido] = useState(guardada?.apellido ?? '')
+  const [celular, setCelular] = useState(guardada?.celular ?? '')
+  const [email, setEmail] = useState(guardada?.email ?? '')
   const [password, setPassword] = useState('')
   const [repetir, setRepetir] = useState('')
   // Un error por campo, al lado del campo. El de servidor (p. ej. "ya existe
@@ -58,7 +84,11 @@ export function SignupPage() {
   // Datos validados esperando el "sí, están bien" del productor. Email y
   // celular son por donde lo vamos a contactar: se muestran grandes antes de
   // crear la cuenta, como hace WhatsApp con el número.
-  const [revisando, setRevisando] = useState<Datos | null>(null)
+  const [revisando, setRevisando] = useState<Datos | null>(
+    guardada ? { ...guardada, password: '', repetir: '' } : null,
+  )
+  // Recargó en la revisión: la contraseña no se guardó, se pide ahí mismo.
+  const [pedirClave, setPedirClave] = useState(!!guardada)
   // Al confirmar, la tarjeta sale antes de pasar al onboarding (sin corte).
   const [saliendo, setSaliendo] = useState(false)
   const qc = useQueryClient()
@@ -105,18 +135,22 @@ export function SignupPage() {
     setErrores({})
     setYaRevisado(true)
     setRevisando(parsed.data)
+    setPedirClave(false)
+    guardarRevision({ nombre: parsed.data.nombre, apellido: parsed.data.apellido, celular: parsed.data.celular, email: parsed.data.email })
   }
 
-  async function crearCuenta() {
+  async function crearCuenta(claveNueva?: string) {
     if (!revisando) return
     setError(null)
+    const datos = claveNueva ? { ...revisando, password: claveNueva, repetir: claveNueva } : revisando
     setSubmitting(true)
-    const { error, needsConfirmation } = await signUp(revisando)
+    const { error, needsConfirmation } = await signUp(datos)
     setSubmitting(false)
 
     if (error) {
       // Volvemos al form con el mensaje (p. ej. "ya existe una cuenta").
       setRevisando(null)
+      guardarRevision(null)
       if (error === YA_REGISTRADO) setErrores({ email: error })
       else setError(error)
       return
@@ -130,9 +164,14 @@ export function SignupPage() {
     // "Cargando…". La tarjeta sale primero; la escena queda y sólo cambia
     // su mensaje (el onboarding entra con `continua`).
     qc.setQueryData(['empresa'], null)
+    guardarRevision(null)
     setSaliendo(true)
     window.setTimeout(() => navigate('/onboarding', { replace: true, state: { desdeRegistro: true } }), 380)
   }
+
+  // Ya tiene sesión (recargó justo después de crear la cuenta): la cuenta
+  // existe, así que va al onboarding, no a un formulario vacío.
+  if (session && !saliendo && !submitting) return <Navigate to="/onboarding" replace />
 
   if (confirmarEn) {
     return (
@@ -163,8 +202,12 @@ export function SignupPage() {
             <RevisarContacto
               datos={revisando}
               ocupado={submitting || saliendo}
+              pedirClave={pedirClave}
               onConfirmar={crearCuenta}
-              onCorregir={() => setRevisando(null)}
+              onCorregir={() => {
+                setRevisando(null)
+                guardarRevision(null)
+              }}
             />
           </motion.div>
         ) : (
@@ -357,15 +400,25 @@ export function SignupPage() {
 function RevisarContacto({
   datos,
   ocupado,
+  pedirClave,
   onConfirmar,
   onCorregir,
 }: {
   datos: Datos
   ocupado: boolean
-  onConfirmar: () => void
+  /** Recargó en esta pantalla: la contraseña no se guarda, se pide acá. */
+  pedirClave: boolean
+  onConfirmar: (clave?: string) => void
   onCorregir: () => void
 }) {
   const [local, dominio] = datos.email.split('@')
+  const [clave, setClave] = useState('')
+  const [errorClave, setErrorClave] = useState<string | null>(null)
+  function confirmar() {
+    if (!pedirClave) return onConfirmar()
+    if (clave.length < 8) return setErrorClave('Con 8 caracteres o más alcanza')
+    onConfirmar(clave)
+  }
   return (
     <div>
       <AuthHeading
@@ -387,11 +440,11 @@ function RevisarContacto({
             Icono: Mail,
             etiqueta: 'Email',
             valor: (
-              <>
-                {/* Si no entra, corta en la @: el dominio queda entero. */}
+              <TextoQueEntra>
+                {/* Si ni achicado entra, corta en la @: el dominio queda entero. */}
                 <span className="break-all">{local}</span>
                 <span className="whitespace-nowrap">@{dominio}</span>
-              </>
+              </TextoQueEntra>
             ),
           },
         ].map(({ Icono, etiqueta, valor }, i) => (
@@ -431,10 +484,30 @@ function RevisarContacto({
         Con estos dos recuperás el acceso si algún día te olvidás la contraseña.
       </motion.p>
 
+      {pedirClave && (
+        <div className="mt-4 grid gap-1.5">
+          <Label htmlFor="clave-de-nuevo">Tu contraseña</Label>
+          <PasswordInput
+            id="clave-de-nuevo"
+            value={clave}
+            onChange={(e) => {
+              setClave(e.target.value)
+              setErrorClave(null)
+            }}
+            placeholder="La que elegiste recién"
+            autoFocus
+          />
+          <p className="text-xs text-muted-foreground">
+            Por seguridad no la guardamos al recargar: escribila de nuevo y listo.
+          </p>
+          <ErrorCampo mensaje={errorClave} />
+        </div>
+      )}
+
       <div className="mt-5 grid gap-2">
         {/* Mientras crea la cuenta el botón queda entero y con un giro: a
             media opacidad y quieto se leía como que la pantalla se trabó. */}
-        <Button disabled={ocupado} onClick={onConfirmar} className={cn(BOTON_PRINCIPAL, 'disabled:opacity-100')}>
+        <Button disabled={ocupado} onClick={confirmar} className={cn(BOTON_PRINCIPAL, 'disabled:opacity-100')}>
           {ocupado ? (
             <span className="inline-flex items-center gap-2">
               <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
@@ -564,5 +637,46 @@ function ConfirmarCorreo({
         Si no aparece, mirá en correo no deseado.
       </p>
     </motion.div>
+  )
+}
+
+/**
+ * Un dato que tiene que leerse en UNA línea (el mail): si no entra, la letra
+ * se achica lo justo, hasta un 72 %. Recién si ni así entra, se parte donde
+ * el contenido lo permite (en la @). Se mide una copia INVISIBLE a tamaño
+ * normal contra el ancho disponible: medir el texto visible (ya achicado)
+ * daba un número que cambiaba con cada medida y la tarjeta no paraba quieta.
+ */
+const ESCALA_MINIMA = 0.72
+function TextoQueEntra({ children }: { children: ReactNode }) {
+  const caja = useRef<HTMLSpanElement>(null)
+  const medida = useRef<HTMLSpanElement>(null)
+  const [escala, setEscala] = useState(1)
+  useLayoutEffect(() => {
+    const medir = () => {
+      const disponible = caja.current?.clientWidth ?? 0
+      const natural = medida.current?.scrollWidth ?? 0
+      if (!disponible || !natural) return
+      setEscala(Math.min(1, disponible / natural))
+    }
+    medir()
+    void document.fonts?.ready.then(medir)
+    const ro = new ResizeObserver(medir)
+    if (caja.current) ro.observe(caja.current)
+    return () => ro.disconnect()
+  }, [])
+  const partir = escala < ESCALA_MINIMA
+  return (
+    <span ref={caja} className="relative block min-w-0">
+      <span ref={medida} aria-hidden className="invisible absolute top-0 left-0 whitespace-nowrap">
+        {children}
+      </span>
+      <span
+        className={partir ? undefined : 'whitespace-nowrap'}
+        style={{ fontSize: `${Math.max(escala, ESCALA_MINIMA)}em` }}
+      >
+        {children}
+      </span>
+    </span>
   )
 }

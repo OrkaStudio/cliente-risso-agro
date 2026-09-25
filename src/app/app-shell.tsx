@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode, useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { prefetch, prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
 import {
   BarChart3,
@@ -108,6 +109,22 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('side-collapsed') === '1',
   )
+  // Recién llegó del onboarding: la barra ya se formó en su lugar (ver
+  // `HaciaLaBarra`), así que aparece al instante; lo de adentro, el
+  // encabezado y el contenido entran con un fundido escalonado.
+  const location = useLocation()
+  const quieto = useReducedMotion()
+  const [bienvenida] = useState(
+    () => !quieto && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
+  )
+  const entra = (demora: number) =>
+    bienvenida
+      ? {
+          initial: { opacity: 0, y: 10 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.55, delay: demora, ease: [0.16, 1, 0.3, 1] as const },
+        }
+      : {}
 
   // Precarga los chunks de las secciones en reposo → navegar entre Hacienda/
   // Campos/Analítica/Agenda es instantáneo (sin flash de "Cargando…").
@@ -127,6 +144,7 @@ export function AppShell() {
           collapsed ? 'w-[76px]' : 'w-[248px]',
         )}
       >
+        <motion.div className="flex min-h-0 flex-1 flex-col" {...entra(0.05)}>
         {/* Marca + toggle */}
         <div className="flex items-center gap-3 px-4 pb-4 pt-4">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]">
@@ -249,23 +267,24 @@ export function AppShell() {
             <LogOut className="size-[17px]" />
           </button>
         </div>
+        </motion.div>
       </aside>
 
       {/* ===== Columna principal ===== */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
+        <motion.header {...entra(0.15)} className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
           <div className="hidden shrink-0 font-heading text-sm font-semibold text-white sm:block">
             {fechaHoy()}
           </div>
 
           <Ticker />
-        </header>
+        </motion.header>
 
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
             burbuja flotante del Asistente (no tapa la última card). */}
         <main className="flex-1 overflow-y-auto">
-          <div className="w-full px-4 pb-12 pt-7 sm:px-6">
+          <motion.div className="w-full px-4 pb-12 pt-7 sm:px-6" {...entra(0.25)}>
             <Suspense
               fallback={
                 <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -273,7 +292,7 @@ export function AppShell() {
             >
               <Outlet />
             </Suspense>
-          </div>
+          </motion.div>
         </main>
       </div>
 

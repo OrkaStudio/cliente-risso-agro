@@ -62,20 +62,24 @@ export function AuthLayout({
    */
   pistaDeScroll?: boolean
 }) {
+  const escena_ref = useRef<HTMLDivElement>(null)
   return (
     // grid-rows-[minmax(0,1fr)]: la única fila mide lo que mide el root, no lo
     // que mide el contenido. Sin eso la columna crece con el formulario, el
     // overflow-hidden de html/body esconde el resto y NO se puede scrollear
     // (a 748px de alto el botón de Continuar quedaba afuera, sin scroll).
+    <>
+    {/* Fuera del fundido: la barra que se forma NO se desvanece. */}
+    {desvanecer && <HaciaLaBarra escena={escena_ref} />}
     <motion.div
       className="grid h-full grid-rows-[minmax(0,1fr)] lg:grid-cols-[1.15fr_1fr]"
       initial={false}
-      animate={desvanecer ? { opacity: 0, scale: 0.985 } : { opacity: 1, scale: 1 }}
-      transition={{ duration: 0.42, ease: [0.4, 0, 0.2, 1] }}
+      animate={desvanecer ? { opacity: 0 } : { opacity: 1 }}
+      transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
     >
       {/* La sombra ancha y suave hacia la derecha funde el borde entre la
           escena oscura y el panel porcelana (sin línea a cuchillo). */}
-      <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
+      <div ref={escena_ref} className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
         <AuthScene mensaje={escena} continua={continua} saliendo={saliendo} />
       </div>
       <div className="relative min-h-0 h-full">
@@ -131,6 +135,7 @@ export function AuthLayout({
         </div>
       </div>
     </motion.div>
+    </>
   )
 }
 
@@ -237,5 +242,43 @@ function AltoSuave({ children }: { children: ReactNode }) {
     >
       <div ref={adentro}>{children}</div>
     </motion.div>
+  )
+}
+
+/**
+ * Del onboarding a la app, en escritorio: el panel oscuro de la escena se
+ * CONVIERTE en la barra lateral de la app (mismo verde), mientras todo lo
+ * demás se funde. Hay algo que continúa de una pantalla a la otra, en vez de
+ * un cambio de página. Se dibuja por encima (fixed), porque la escena y la
+ * tarjeta se están desvaneciendo abajo. En el teléfono no hay barra: sólo
+ * el fundido.
+ */
+function HaciaLaBarra({ escena }: { escena: React.RefObject<HTMLDivElement | null> }) {
+  const quieto = useReducedMotion()
+  const [desde] = useState(() => {
+    const r = escena.current?.getBoundingClientRect()
+    return r && r.width > 0 ? { x: r.left, y: r.top, w: r.width, h: r.height } : null
+  })
+  if (!desde || quieto) return null
+  // La barra lateral de AppShell: m-4, 248 px (76 si la dejó colapsada), radio 20.
+  let colapsada = false
+  try {
+    colapsada = localStorage.getItem('side-collapsed') === '1'
+  } catch {
+    // sin almacenamiento: la barra arranca abierta
+  }
+  const hasta = { x: 16, y: 16, w: colapsada ? 76 : 248, h: window.innerHeight - 32 }
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none fixed z-[60] bg-sidebar shadow-[0_12px_40px_rgba(16,30,20,0.12)]"
+      style={{ left: 0, top: 0 }}
+      initial={{ x: desde.x, y: desde.y, width: desde.w, height: desde.h, borderRadius: 0, opacity: 0 }}
+      animate={{ x: hasta.x, y: hasta.y, width: hasta.w, height: hasta.h, borderRadius: 20, opacity: 1 }}
+      transition={{
+        opacity: { duration: 0.18 },
+        default: { duration: 0.62, delay: 0.12, ease: [0.65, 0, 0.35, 1] },
+      }}
+    />
   )
 }

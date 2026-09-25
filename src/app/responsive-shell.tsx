@@ -23,8 +23,9 @@ export function ResponsiveShell() {
   // Recién terminó el onboarding: la app entra con un fundido, no de golpe.
   // Se decide una vez al montar (navegar dentro de la app no lo repite).
   const quieto = useReducedMotion()
+  // En escritorio lo resuelve AppShell (la barra ya está en su lugar).
   const [bienvenida] = useState(
-    () => !quieto && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
+    () => !quieto && isMobile && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
   )
 
   // Teléfono, sin override y parado en una ruta de Oficina → al Modo Campo.

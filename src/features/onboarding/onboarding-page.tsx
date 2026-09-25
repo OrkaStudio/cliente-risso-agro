@@ -289,12 +289,12 @@ export function OnboardingPage() {
     if (yendo) return
     // Terminó: ya no hay onboarding que retomar.
     borrarProgreso(user?.id)
-    // La pantalla se desvanece MIENTRAS se refrescan los datos (el guard
-    // RequireEmpresa ve la membresía nueva y las secciones arrancan con la
-    // empresa creada), y la app entra con un fundido. Antes el cambio era un
-    // corte seco: el onboarding desaparecía y la app estaba ahí de golpe.
+    // Mientras se refrescan los datos (el guard RequireEmpresa ve la membresía
+    // nueva), el panel oscuro se convierte en la barra lateral de la app y lo
+    // demás se funde (ver `HaciaLaBarra`); después la app completa el resto.
+    // Antes era un corte seco.
     setYendo(true)
-    await Promise.all([qc.invalidateQueries(), new Promise((r) => window.setTimeout(r, 450))])
+    await Promise.all([qc.invalidateQueries(), new Promise((r) => window.setTimeout(r, 800))])
     navigate(destino, { replace: true, state: { bienvenida: true } })
   }
 
