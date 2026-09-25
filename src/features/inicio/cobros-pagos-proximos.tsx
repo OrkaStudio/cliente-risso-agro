@@ -228,7 +228,7 @@ export function CobrosPagosProximos() {
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2.5 font-heading text-[17px] font-semibold text-ink">
-          <span aria-hidden className="h-[18px] w-[3px] shrink-0 rounded-full bg-field" />
+          <span aria-hidden className="h-[18px] w-[3px] shrink-0 rounded-full bg-marca-titulo" />
           Cobros y pagos que se vienen
           {nVencidos > 0 && (
             <span className="tnum rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-bold text-destructive">

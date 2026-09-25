@@ -4,7 +4,6 @@ import {
   Banknote,
   ClipboardList,
   Home,
-  Leaf,
   LogOut,
   Footprints,
   Syringe,
@@ -14,6 +13,7 @@ import { AvisoEstadoCampo, ChipEstadoCampo } from '@/features/campo/estado-campo
 import { useSeedOffline } from '@/features/campo/use-seed-offline'
 import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
+import { LogoTropero } from '@/components/marca/tropero'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
 
@@ -85,16 +85,16 @@ export function CampoShell() {
     <div className="campo flex h-full flex-col overflow-hidden">
       {/* Header — placa de máquina */}
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-line)] bg-sidebar px-3 py-2.5 text-sidebar-foreground">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-primary">
-          <Leaf className="size-[18px] text-white" strokeWidth={2} />
-        </div>
-        {/* Sólo el nombre. "Modo Campo" lo dice la nav de abajo con más fuerza
-            que un subtítulo, y a 390px —con el zoom 1.06 encima— esa segunda
-            línea le comía el ancho al nombre hasta dejarlo en "Riss…". */}
-        <div className="min-w-0 flex-1">
-          <span className="c-display block truncate text-[16px] leading-none text-white">
-            {MARCA}
-          </span>
+        {/* Sólo la marca. "Modo Campo" lo dice la nav de abajo con más fuerza
+            que un subtítulo, y a 390px —con el zoom 1.06 encima— una segunda
+            línea le come el ancho al nombre. */}
+        <div className="min-w-0 flex-1 pl-1">
+          <LogoTropero
+            className="h-[19px] w-auto"
+            iso="var(--marca-iso)"
+            palabra="var(--marca-palabra)"
+            title={MARCA}
+          />
         </div>
         <ChipEstadoCampo
           estado={seed.estado}
@@ -171,7 +171,7 @@ export function CampoShell() {
                 cn(
                   'flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors',
                   isActive
-                    ? 'bg-[var(--c-ok-soft)] text-[var(--c-ok-deep)]'
+                    ? 'bg-[var(--c-nav-activo-bg)] text-[var(--c-nav-activo)]'
                     : 'text-[var(--c-ink-soft)]',
                 )
               }
@@ -183,7 +183,7 @@ export function CampoShell() {
                     className={cn(
                       'c-label !text-[10.5px]',
                       isActive
-                        ? '!text-[var(--c-ok-deep)]'
+                        ? '!text-[var(--c-nav-activo)]'
                         : '!text-[var(--c-faint)]',
                     )}
                   >

@@ -321,7 +321,7 @@ export function AnaliticaPage() {
           {/* ===== Detalle: todos los movimientos (colapsado) ===== */}
           <details className="group rounded-[14px] border border-border bg-card shadow-[0_1px_2px_rgba(16,24,19,0.05),0_4px_14px_rgba(16,24,19,0.04)]">
             <summary className="flex cursor-pointer list-none items-center gap-2.5 px-6 py-4 [&::-webkit-details-marker]:hidden">
-              <span className="h-[18px] w-[3px] rounded-full bg-field" aria-hidden />
+              <span className="h-[18px] w-[3px] rounded-full bg-marca-titulo" aria-hidden />
               <span className="font-heading text-[17px] font-semibold text-ink">
                 Todos los movimientos
               </span>

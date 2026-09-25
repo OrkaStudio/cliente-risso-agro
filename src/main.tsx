@@ -8,10 +8,16 @@ import { queryClient } from '@/lib/query-client'
 import { AuthProvider } from '@/features/auth/auth-context'
 import { router } from '@/app/router'
 import { Toaster } from '@/components/ui/sonner'
+import { SelectorMarca } from '@/components/marca/selector-marca'
+import { aplicarVarianteMarca, leerVarianteMarca } from '@/lib/marca'
 
 // Commit del build, invisible: se lee con `document.documentElement.dataset.build`
 // (DevTools) para saber qué versión tiene un teléfono con la PWA cacheada.
 document.documentElement.dataset.build = __BUILD_SHA__
+
+// Variante de marca (terracota / monte y trigo) antes del primer render: sin
+// parpadeo de colores.
+aplicarVarianteMarca(leerVarianteMarca())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -23,6 +29,7 @@ createRoot(document.getElementById('root')!).render(
         <MotionConfig reducedMotion="user">
           <RouterProvider router={router} />
           <Toaster richColors position="top-right" />
+          <SelectorMarca />
         </MotionConfig>
       </AuthProvider>
     </QueryClientProvider>

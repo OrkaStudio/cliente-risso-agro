@@ -36,8 +36,8 @@ export default defineConfig({
         'apple-touch-icon.png',
       ],
       manifest: {
-        name: 'Risso Agro — Gestión de campo',
-        short_name: 'Risso Agro',
+        name: 'Tropero — Gestión de campo',
+        short_name: 'Tropero',
         description:
           'Hacienda, recorridas y plata del campo. Funciona sin señal.',
         lang: 'es',
@@ -45,8 +45,10 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#0b5837',
-        theme_color: '#178a55',
+        // Variante predeterminada (terracota). En la app el color de la barra
+        // cambia con la variante elegida (src/lib/marca.ts).
+        background_color: '#7a3a1c',
+        theme_color: '#7a3a1c',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

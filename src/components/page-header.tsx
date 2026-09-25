@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion, MotionConfig, type Variants } from 'framer-motion'
-import { Sprout } from 'lucide-react'
+import { IsotipoTropero } from '@/components/marca/tropero'
 import { cn } from '@/lib/utils'
 
 const wrap: Variants = {
@@ -16,9 +16,9 @@ const letter: Variants = {
   },
 }
 
-/** Título de página con identidad propia: revelado de letras + subrayado verde
- *  campo que se dibuja y termina en un brote (detalle agro). Re-anima al montar
- *  cada página; respeta prefers-reduced-motion. */
+/** Título de página con identidad propia: revelado de letras + subrayado de
+ *  marca que se dibuja y termina en la T de Tropero. Re-anima al montar cada
+ *  página; respeta prefers-reduced-motion. */
 function AnimatedTitle({ text }: { text: string }) {
   const letters = Array.from(text)
   // El subrayado y el brote entran después de las letras.
@@ -51,17 +51,17 @@ function AnimatedTitle({ text }: { text: string }) {
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
         transition={{ delay: tras, duration: 0.5, ease: 'easeOut' }}
-        className="absolute -bottom-2 left-0 h-[3px] w-full origin-left rounded-full bg-gradient-to-r from-field via-field-deep to-lima shadow-[0_1px_8px_rgba(23,138,85,0.45)]"
+        className="absolute -bottom-2 left-0 h-[3px] w-full origin-left rounded-full bg-gradient-to-r from-marca-titulo via-marca-titulo to-marca-acento"
       />
-      {/* Brote: detalle agro al final de la línea */}
+      {/* La T de Tropero al final de la línea */}
       <motion.span
         aria-hidden
         initial={{ opacity: 0, scale: 0.5, rotate: -12 }}
         animate={{ opacity: 1, scale: 1, rotate: 0 }}
         transition={{ delay: tras + 0.42, type: 'spring', stiffness: 360, damping: 18 }}
-        className="absolute -bottom-[13px] left-full ml-1 text-field-deep"
+        className="absolute -bottom-[12px] left-full ml-1.5 flex size-[18px] items-center justify-center rounded-[5px] bg-marca"
       >
-        <Sprout className="size-[18px]" strokeWidth={2.2} />
+        <IsotipoTropero className="h-[9px] w-auto" color="var(--marca-iso)" />
       </motion.span>
     </span>
   )

@@ -65,6 +65,18 @@
     --color-ink-soft: var(--ink-soft);
     --color-faint: var(--faint);
 
+    /* Marca Tropero (varía con data-marca: terracota / monte) */
+    --color-monte: var(--monte);
+    --color-trigo: var(--trigo);
+    --color-hueso: var(--hueso);
+    --color-terracota: var(--terracota);
+    --color-marca: var(--marca-fondo);
+    --color-marca-iso: var(--marca-iso);
+    --color-marca-palabra: var(--marca-palabra);
+    --color-marca-acento: var(--marca-acento);
+    --color-marca-acento-tinta: var(--marca-acento-tinta);
+    --color-marca-titulo: var(--marca-titulo);
+
     /* Serie de datos para gráficos (tonos campo armonizados) */
     --color-g1: var(--g1);
     --color-g2: var(--g2);
@@ -180,6 +192,116 @@
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: rgba(247, 245, 236, 0.10);
     --sidebar-ring: #2fd58b;
+}
+
+/* ============================================================
+   Marca Tropero — dos variantes en prueba (data-marca en <html>,
+   ver src/lib/marca.ts). Lo que cambia es la SUPERFICIE de marca
+   (barra lateral, cabecera, escena de ingreso, header del campo) y
+   el color de acción; los semánticos de campo (sol, cielo, tierra
+   = egreso, lima, ganado) no se tocan: el color sigue siendo dato.
+   Contrastes (WCAG): hueso sobre monte 7,55 · trigo sobre monte
+   5,14 · hueso sobre terracota profunda 7,60 · trigo sobre
+   terracota profunda 5,17 · blanco sobre terracota 4,56.
+   ============================================================ */
+:root {
+    --monte: #0b5837;
+    --trigo: #ecc46a;
+    --hueso: #f4f1e9;
+    --terracota: #b85c2e;
+    --terracota-profunda: #7a3a1c;
+}
+
+/* Monte y trigo al frente, terracota como tercer color. */
+:root[data-marca="monte"] {
+    --sidebar: var(--monte);
+    --sidebar-foreground: var(--hueso);
+    --sidebar-accent: rgba(244, 241, 233, 0.09);
+    --sidebar-border: rgba(244, 241, 233, 0.12);
+    --sidebar-ring: var(--trigo);
+
+    --marca-fondo: var(--monte);
+    --marca-iso: var(--trigo);
+    --marca-palabra: var(--hueso);
+    --marca-acento: var(--trigo);
+    --marca-acento-tinta: #0b3a24;
+    --marca-titulo: var(--field-deep);
+}
+
+/* Terracota al frente: superficie terracota profunda, acción terracota. */
+:root[data-marca="terracota"] {
+    --background: var(--hueso);
+    --secondary: #efeae0;
+    --muted: #efeae0;
+    --border: #e6dfd2;
+    --input: #ddd4c4;
+    --primary: var(--terracota);
+    --ring: var(--terracota);
+
+    --sidebar: var(--terracota-profunda);
+    --sidebar-foreground: var(--hueso);
+    --sidebar-primary: var(--terracota);
+    --sidebar-accent: rgba(244, 241, 233, 0.10);
+    --sidebar-border: rgba(244, 241, 233, 0.14);
+    --sidebar-ring: var(--trigo);
+
+    --marca-fondo: var(--terracota-profunda);
+    --marca-iso: var(--hueso);
+    --marca-palabra: var(--hueso);
+    --marca-acento: var(--trigo);
+    --marca-acento-tinta: #4a200c;
+    --marca-titulo: var(--terracota);
+}
+:root[data-marca="terracota"] .campo {
+    --c-bg: var(--hueso);
+    --c-sunk: #efeae0;
+    --c-line: #e6dfd2;
+    --c-line-strong: #d3c9b8;
+    --c-nav-activo-bg: #f7e9e0;
+    --c-nav-activo: #8e4422;
+}
+
+/* Fondos animados (src/components/marca/fondos.tsx). Lentos, una cosa por
+   vez, la misma curva que el resto de la app; quietos con "reducir
+   movimiento". */
+.fondo-tropero--animado .potrero .marca {
+    animation: tropero-recorrida 14s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 0.5s);
+}
+@keyframes tropero-recorrida {
+    0% { opacity: 0; }
+    3% { opacity: 1; }
+    14% { opacity: 0.7; }
+    24%, 100% { opacity: 0; }
+}
+.fondo-tropero--animado .senda {
+    stroke-dasharray: 1000 1000;
+    stroke-dashoffset: 1000;
+    animation: tropero-trazo 14s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    animation-delay: calc(var(--i, 0) * 0.06s);
+}
+.fondo-tropero--animado .senda-guia { animation-name: tropero-trazo-guia; }
+.fondo-tropero--animado .tropa { animation: tropero-tropa 14s linear infinite; }
+@keyframes tropero-trazo {
+    0% { stroke-dashoffset: 1000; }
+    22%, 86% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -1000; }
+}
+@keyframes tropero-trazo-guia {
+    0%, 14% { stroke-dashoffset: 1000; }
+    32%, 90% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -1000; }
+}
+@keyframes tropero-tropa {
+    0%, 28% { opacity: 0; }
+    34%, 88% { opacity: 1; }
+    94%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fondo-tropero--animado .potrero .marca,
+    .fondo-tropero--animado .senda,
+    .fondo-tropero--animado .tropa { animation: none; }
+    .fondo-tropero--animado .senda { stroke-dashoffset: 0; }
 }
 
 @layer base {

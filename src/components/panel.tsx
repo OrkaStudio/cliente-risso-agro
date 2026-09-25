@@ -55,7 +55,7 @@ export function Panel({
             {/* Acento que ancla el título (no más título aislado) */}
             <span
               aria-hidden
-              className="h-[18px] w-[3px] shrink-0 rounded-full bg-field"
+              className="h-[18px] w-[3px] shrink-0 rounded-full bg-marca-titulo"
             />
             {title}
           </h3>

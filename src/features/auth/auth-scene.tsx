@@ -1,23 +1,22 @@
 import { type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { Leaf } from 'lucide-react'
-import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
-
-/** Tinta de las siluetas (molino, alambrado): casi negro verdoso. */
-const TINTA = '#071609'
+import { MARCA_TAGLINE, useVarianteMarca } from '@/lib/marca'
+import { LogoTropero, IsotipoTropero } from '@/components/marca/tropero'
+import { MARCA_COLOR } from '@/components/marca/geometria'
+import { FondoPotreros, FondoSendas } from '@/components/marca/fondos'
 
 /**
- * Escena ambiental del panel de auth: amanecer en la pampa.
- *
- * Sol con ondas que se expanden (la versión agro del "ripple"), lomadas en
- * capas y un molino multipala girando despacio. Todo SVG + framer-motion,
- * paleta de la app (verde profundo del sidebar, sol #d98a18). Decorativa:
- * `aria-hidden`, sin interacción.
+ * Escena de marca del panel de auth. Reemplaza al amanecer con sol y molino
+ * (TASK-059) por los fondos propios de Tropero, según la variante:
+ * - monte y trigo: el campo visto desde arriba (potreros) y una recorrida
+ *   que los marca de a uno, en trigo. Es la lámina de cierre del manual.
+ * - terracota: las sendas que cruzan el campo y la tropa arreada por la
+ *   senda, en hueso.
+ * Decorativa (`aria-hidden`) y quieta con "reducir movimiento".
  */
 /**
  * `panel`: columna izquierda de escritorio. `fondo`: en el teléfono la escena
- * es TODA la pantalla (cielo y frase arriba, lomas y molino abajo del todo) y
- * la tarjeta del formulario flota encima.
+ * es TODA la pantalla y la tarjeta del formulario flota encima.
  */
 export function AuthScene({
   variante = 'panel',
@@ -25,200 +24,90 @@ export function AuthScene({
   mensaje,
 }: {
   variante?: 'panel' | 'fondo'
-  /** Ondas del sol. En escritorio siempre; en el teléfono sólo donde se pida. */
+  /** Anima el fondo. En escritorio siempre; en el teléfono sólo donde se pida. */
   solAnimado?: boolean
   /** Reemplaza la frase de las tres patas (el onboarding pone acá su mapa). */
   mensaje?: ReactNode
 }) {
   const compacta = variante === 'fondo'
-  const ondas = !compacta || solAnimado
-  const sol = compacta ? 70 : 90
+  const animado = !compacta || solAnimado
+  const marca = useVarianteMarca()
   return (
     <div
       aria-hidden
       className={
         compacta
-          ? 'relative flex h-full flex-col overflow-hidden bg-sidebar px-5 pt-4 text-sidebar-foreground'
-          : 'relative flex h-full flex-col overflow-hidden bg-sidebar p-10 text-sidebar-foreground'
+          ? 'relative flex h-full flex-col overflow-hidden bg-marca px-5 pt-4 text-sidebar-foreground'
+          : 'relative flex h-full flex-col overflow-hidden bg-marca p-10 text-sidebar-foreground'
       }
     >
-      {/* Cielo: resplandor del amanecer detrás del horizonte */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: compacta
-            ? 'radial-gradient(110% 38% at 74% 82%, rgba(217,138,24,0.30) 0%, rgba(217,138,24,0.10) 34%, transparent 66%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)'
-            : 'radial-gradient(135% 95% at 66% 76%, rgba(217,138,24,0.32) 0%, rgba(217,138,24,0.12) 34%, transparent 68%), linear-gradient(to bottom, #10241a 0%, #182c1e 55%, #1e3826 100%)',
-        }}
-      />
-
-      {/* Grilla cartográfica sutil, misma atmósfera técnica que el body */}
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(247,245,236,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(247,245,236,0.045) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }}
-      />
-
-      {/* Sol + ondas expansivas sobre el horizonte */}
-      <div
-        className={
-          compacta
-            ? // Sol apoyado en el horizonte, a la derecha: como en escritorio.
-              'absolute left-[74%] bottom-[19%] -translate-x-1/2 translate-y-1/2'
-            : mensaje
-              ? // Con el croquis del onboarding en el medio, el sol baja a la
-                // esquina: el dibujo tiene que quedar limpio.
-                'absolute left-[87%] top-[79%] -translate-x-1/2 -translate-y-1/2'
-              : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
-        }
-      >
-        {ondas && [0, 1, 2, 3].map((i) => (
-          <motion.span
-            key={i}
-            className="absolute left-1/2 top-1/2 rounded-full border border-accent/40"
-            style={{ width: sol, height: sol, x: '-50%', y: '-50%' }}
-            // initial EXPLÍCITO igual al primer keyframe. Con `initial={false}`
-            // framer arranca en el ÚLTIMO keyframe (opacity 0, scale 3.4) y en
-            // el build de producción se queda ahí: nunca anima. En `vite dev`
-            // parecía andar porque StrictMode monta dos veces.
-            initial={{ scale: 1, opacity: 0 }}
-            // La opacidad entra y sale en fade (0 → 0.5 → 0): si la onda
-            // reaparece de golpe al reiniciar el loop, titila como un error.
-            animate={{ scale: [1, 3.4], opacity: [0, 0.5, 0] }}
-            transition={{
-              duration: 7,
-              delay: i * 1.75,
-              repeat: Infinity,
-              ease: 'easeOut',
-              opacity: {
-                duration: 7,
-                delay: i * 1.75,
-                repeat: Infinity,
-                times: [0, 0.22, 1],
-                ease: 'linear',
-              },
+      {marca === 'monte' ? (
+        <>
+          <FondoPotreros
+            animado={animado}
+            className={
+              compacta
+                ? 'absolute inset-x-0 bottom-0 h-[46%] w-full opacity-60'
+                : 'absolute inset-x-0 bottom-0 h-[72%] w-full opacity-55'
+            }
+            tonos={['#0b5837', '#0f6440', '#12704a', '#0d5a39', '#178a55']}
+            linea={MARCA_COLOR.hueso}
+            realce={MARCA_COLOR.trigo}
+          />
+          {/* Velo: el monte limpio arriba, donde va el texto; el campo abajo. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: compacta
+                ? 'linear-gradient(to bottom, #0b5837 0%, #0b5837 50%, rgba(11,88,55,0.35) 72%, rgba(11,88,55,0) 100%)'
+                : 'linear-gradient(to bottom, #0b5837 0%, #0b5837 30%, rgba(11,88,55,0.55) 48%, rgba(11,88,55,0) 70%)',
             }}
           />
-        ))}
-        <motion.span
-          className="absolute left-1/2 top-1/2 block rounded-full bg-accent"
-          style={{
-            width: sol,
-            height: sol,
-            x: '-50%',
-            y: '-50%',
-            boxShadow: compacta
-              ? '0 0 48px 14px rgba(217,138,24,0.35)'
-              : '0 0 80px 24px rgba(217,138,24,0.35)',
-          }}
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.6, ease: 'easeOut' }}
-        />
-      </div>
+        </>
+      ) : (
+        <>
+          {/* Terracota: la tierra abajo, la terracota profunda arriba (texto). */}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(to bottom, #7a3a1c 0%, #8e4422 45%, #b85c2e 100%)' }}
+          />
+          <FondoSendas
+            animado={animado}
+            className={
+              compacta
+                ? 'absolute inset-x-0 bottom-0 h-[48%] w-full'
+                : 'absolute inset-x-0 bottom-0 h-[78%] w-full'
+            }
+            linea="#e39a6c"
+            realce={MARCA_COLOR.hueso}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: compacta
+                ? 'linear-gradient(to bottom, #7a3a1c 0%, #7a3a1c 48%, rgba(122,58,28,0) 70%)'
+                : 'linear-gradient(to bottom, #7a3a1c 0%, rgba(122,58,28,0.9) 30%, rgba(122,58,28,0) 58%)',
+            }}
+          />
+        </>
+      )}
 
-      {/* Horizonte: lomadas + molino (aspas girando) */}
-      <svg
-        className={
-          compacta
-            ? 'absolute inset-x-0 bottom-0 h-[24%] min-h-[150px] w-full'
-            : mensaje
-              ? // Con la ficha del onboarding encima, el horizonte se agacha.
-                'absolute inset-x-0 bottom-0 h-[30%] w-full'
-              : 'absolute inset-x-0 bottom-0 h-[42%] w-full'
-        }
-        viewBox="0 0 800 340"
-        preserveAspectRatio="xMidYMax slice"
-      >
-        {/* Lomadas en capas, del fondo al frente — más claras que la tinta
-            de las siluetas para que molino y alambrado se lean nítidos */}
-        <path
-          d="M0 190 Q 160 150 340 178 T 800 168 V 340 H 0 Z"
-          fill="#1c3d27"
-        />
-        <path
-          d="M0 235 Q 220 195 430 224 T 800 216 V 340 H 0 Z"
-          fill="#163420"
-        />
-        <path
-          d="M0 285 Q 260 250 520 274 T 800 266 V 340 H 0 Z"
-          fill="#102b19"
-        />
-
-        {/* Molino multipala. Origen del grupo = eje de la rueda, montado
-            sobre la cabeza de la torre. La rueda gira con animateTransform
-            (rotación SVG nativa alrededor de (0,0): framer-motion calcula
-            mal el transform-origin dentro de un SVG y la rueda se separaba
-            de la torre). */}
-        <g
-          transform={mensaje && !compacta ? 'translate(248 150) scale(1)' : 'translate(248 94) scale(1.3)'}
-          stroke={TINTA}
-          fill="none"
+      {/* Sello del otro color, abajo a la derecha: en monte, la terracota
+          (el tercer color); en terracota, el monte. */}
+      {!compacta && !mensaje && (
+        <motion.div
+          className="absolute bottom-8 right-8 flex size-[68px] items-center justify-center rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+          style={{ background: marca === 'monte' ? MARCA_COLOR.terracota : MARCA_COLOR.monte }}
+          initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
+          animate={{ opacity: 1, scale: 1, rotate: -6 }}
+          transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Veleta: barral largo + aleta fina tipo timón */}
-          <line x1="0" y1="0" x2="50" y2="4" strokeWidth="2.6" />
-          <path
-            d="M46 -7 L74 -2.5 Q 76.5 -2 76.5 0.5 L76.5 4.5 Q 76.5 7 74 7.5 L47 10 Z"
-            fill={TINTA}
-            stroke="none"
+          <IsotipoTropero
+            className="h-[30px] w-auto"
+            color={marca === 'monte' ? MARCA_COLOR.hueso : MARCA_COLOR.trigo}
           />
-          {/* Torre reticulada: patas que rematan en el eje */}
-          <path
-            d="M-15 128 L-2.5 7 M15 128 L2.5 7"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-          <path
-            d="M-12.4 100 H12.4 M-9.6 72 H9.6 M-6.8 44 H6.8"
-            strokeWidth="2.2"
-          />
-          <path
-            d="M-12.4 100 L9.6 72 M12.4 100 L-9.6 72 M-9.6 72 L6.8 44 M9.6 72 L-6.8 44"
-            strokeWidth="1.6"
-          />
-          {/* Rueda: 12 aspas en cuña (se leen como aspas, no como rayos) */}
-          <g>
-            <animateTransform
-              attributeName="transform"
-              type="rotate"
-              from="0 0 0"
-              to="360 0 0"
-              dur="30s"
-              repeatCount="indefinite"
-            />
-            <circle r="26.5" strokeWidth="2.4" />
-            {Array.from({ length: 12 }, (_, i) => {
-              const a = (i * 30 * Math.PI) / 180
-              const w1 = (5 * Math.PI) / 180 // media-anchura en el cubo
-              const w2 = (10 * Math.PI) / 180 // media-anchura en la llanta
-              const r1 = 7
-              const r2 = 24.5
-              const p = [
-                [r1 * Math.cos(a - w1), r1 * Math.sin(a - w1)],
-                [r1 * Math.cos(a + w1), r1 * Math.sin(a + w1)],
-                [r2 * Math.cos(a + w2), r2 * Math.sin(a + w2)],
-                [r2 * Math.cos(a - w2), r2 * Math.sin(a - w2)],
-              ]
-                .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
-                .join(' ')
-              return <polygon key={i} points={p} fill={TINTA} stroke="none" />
-            })}
-          </g>
-          <circle r="4" fill={TINTA} stroke="none" />
-        </g>
-
-        {/* Alambrado en el frente */}
-        <g stroke={TINTA}>
-          {[80, 240, 400, 560, 720].map((x) => (
-            <line key={x} x1={x} y1={294} x2={x} y2={330} strokeWidth="3" />
-          ))}
-          <path d="M0 304 Q 400 296 800 302" fill="none" strokeWidth="1.8" />
-          <path d="M0 319 Q 400 312 800 317" fill="none" strokeWidth="1.8" />
-        </g>
-      </svg>
+        </motion.div>
+      )}
 
       {/* Marca + mensaje. En 'fondo' (teléfono) el mensaje NO va acá: lo
           dibuja AuthLayout en el flujo, arriba de la tarjeta, para que la
@@ -228,39 +117,42 @@ export function AuthScene({
           className="relative"
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <p className="font-heading text-2xl font-bold tracking-tight">
-            {MARCA}
-          </p>
-          <p className="mt-1 text-sm text-sidebar-foreground/70">
-            {MARCA_TAGLINE}
-          </p>
+          <LogoTropero
+            className="h-[34px] w-auto"
+            iso="var(--marca-iso)"
+            palabra="var(--marca-palabra)"
+          />
+          <p className="mt-2 text-sm text-sidebar-foreground/70">{MARCA_TAGLINE}</p>
         </motion.div>
       )}
 
-      {/* El mensaje va arriba, debajo de la marca: el horizonte (molino,
-          alambrado) queda despejado abajo. Las tres patas del producto
-          van en ámbar (el color del sol de la escena). */}
       {!compacta && (
-      <motion.div
-        className={mensaje ? 'relative mt-5 flex min-h-0 flex-1 flex-col items-center overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : 'relative mt-14 max-w-md'}
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}
-      >
-        {mensaje ?? (<>
-        <p className="font-heading text-[32px] font-semibold leading-snug tracking-tight">
-          Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
-          <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
-          <span className="text-[#e9b45f]">números</span> — en una sola app.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-sidebar-foreground/70">
-          Recorridas sin señal, caravanas electrónicas, plata al día. Hecho
-          para el productor, no para el contador.
-        </p>
-        </>)}
-      </motion.div>
+        <motion.div
+          className={
+            mensaje
+              ? 'relative mt-5 flex min-h-0 flex-1 flex-col items-center overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+              : 'relative mt-14 max-w-md'
+          }
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {mensaje ?? (
+            <>
+              <p className="font-heading text-[34px] font-bold leading-[1.1] tracking-[-0.025em]">
+                Tu <span className="text-trigo">campo</span>, tu{' '}
+                <span className="text-trigo">hacienda</span> y tus{' '}
+                <span className="text-trigo">números</span>, en una sola app.
+              </p>
+              <p className="mt-4 text-[15px] leading-relaxed text-sidebar-foreground/80">
+                Recorridas sin señal, caravanas electrónicas, plata al día. Hecho
+                para el productor, no para el contador.
+              </p>
+            </>
+          )}
+        </motion.div>
       )}
     </div>
   )
@@ -277,19 +169,18 @@ export function MensajeEscenaMovil({ mensaje }: { mensaje?: ReactNode }) {
       className="relative px-5 pt-4 text-sidebar-foreground"
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="flex items-center gap-2">
-        <span className="flex size-6 items-center justify-center rounded-md bg-primary text-white">
-          <Leaf className="size-3.5" strokeWidth={1.75} />
-        </span>
-        <span className="font-heading text-sm font-bold">{MARCA}</span>
-      </div>
+      <LogoTropero
+        className="h-[22px] w-auto"
+        iso="var(--marca-iso)"
+        palabra="var(--marca-palabra)"
+      />
       {mensaje ?? (
-        <p className="mt-3 max-w-[300px] font-heading text-[22px] font-semibold leading-tight tracking-tight">
-          Tu <span className="text-[#e9b45f]">campo</span>, tu{' '}
-          <span className="text-[#e9b45f]">hacienda</span> y tus{' '}
-          <span className="text-[#e9b45f]">números</span> — en una sola app.
+        <p className="mt-3 max-w-[310px] font-heading text-[23px] font-bold leading-tight tracking-[-0.02em]">
+          Tu <span className="text-trigo">campo</span>, tu{' '}
+          <span className="text-trigo">hacienda</span> y tus{' '}
+          <span className="text-trigo">números</span>, en una sola app.
         </p>
       )}
     </motion.div>

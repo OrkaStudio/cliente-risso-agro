@@ -35,6 +35,10 @@
   --c-bad: #cd3a2c;
   --c-bad-soft: #f7e2de;
 
+  /* Pestaña activa de la nav: sigue a la marca (en terracota cambia en index.css) */
+  --c-nav-activo-bg: var(--c-ok-soft);
+  --c-nav-activo: var(--c-ok-deep);
+
   background-color: var(--c-bg);
   /* La misma grilla cartográfica fina de Oficina — continuidad, no ruido */
   background-image:

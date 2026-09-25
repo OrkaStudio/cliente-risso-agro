@@ -18,13 +18,13 @@ export function Orbe({ className }: { className?: string }) {
         className="absolute inset-0 rounded-full"
         style={{
           background:
-            'conic-gradient(from 0deg, var(--field), var(--lima), var(--sky), var(--field))',
+            'conic-gradient(from 0deg, var(--marca-titulo), var(--marca-acento), var(--sky), var(--marca-titulo))',
         }}
         animate={{ rotate: 360 }}
         transition={{ duration: 5, ease: 'linear', repeat: Infinity }}
       />
       <span className="absolute inset-[2.5px] rounded-full bg-card" />
-      <Sparkles className="relative size-4 text-field-deep" />
+      <Sparkles className="relative size-4 text-marca-titulo" />
     </span>
   )
 }

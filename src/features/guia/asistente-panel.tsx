@@ -139,7 +139,7 @@ export function AsistentePanel() {
                 ease: 'easeOut',
               }}
             />
-            <span className="absolute inset-[3px] rounded-full bg-field-deep" />
+            <span className="absolute inset-[3px] rounded-full bg-marca" />
             <Sparkles className="relative size-[22px] text-white" />
           </motion.button>
         )}

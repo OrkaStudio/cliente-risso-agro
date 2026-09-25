@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   CircleDollarSign,
   LayoutDashboard,
-  Leaf,
   LogOut,
   Map as MapIcon,
 } from 'lucide-react'
@@ -22,7 +21,9 @@ import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { MARCA } from '@/lib/marca'
+import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
+import { IsotipoTropero, LogoTropero } from '@/components/marca/tropero'
+import { TexturaPotreros } from '@/components/marca/fondos'
 import { cn } from '@/lib/utils'
 import { contarHoy, useParaAtender } from '@/features/inicio/para-atender-api'
 
@@ -54,7 +55,7 @@ function Ticker() {
         title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
       >
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-          <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
+          <CircleDollarSign className="size-[15px] text-marca-acento" />
           Blue
         </span>
         <b className="tnum text-sm font-semibold text-white">
@@ -123,22 +124,35 @@ export function AppShell() {
       {/* ===== Sidebar ===== */}
       <aside
         className={cn(
-          'm-4 flex h-[calc(100%-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out',
+          'relative isolate m-4 flex h-[calc(100%-2rem)] shrink-0 flex-col overflow-hidden rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out',
           collapsed ? 'w-[76px]' : 'w-[248px]',
         )}
       >
+        {/* Textura de marca: los alambrados del campo visto desde arriba,
+            muy tenues y sólo abajo (arriba queda limpio para la marca). */}
+        <TexturaPotreros
+          linea="var(--sidebar-foreground)"
+          className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[62%] w-full opacity-[0.07] [mask-image:linear-gradient(to_top,black_35%,transparent)]"
+        />
+
         {/* Marca + toggle */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-4">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]">
-            <Leaf className="size-5 text-white" strokeWidth={1.75} />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate font-heading text-[17px] font-bold text-white">
-                {MARCA}
-              </div>
-              <div className="truncate text-[11px] font-medium text-sidebar-foreground/55">
-                Gestión de campo
+        <div className="flex items-center gap-3 px-4 pb-4 pt-5">
+          {collapsed ? (
+            <IsotipoTropero
+              className="mx-auto h-[26px] w-auto shrink-0"
+              color="var(--marca-iso)"
+              title={MARCA}
+            />
+          ) : (
+            <div className="min-w-0 flex-1 pl-1 leading-tight">
+              <LogoTropero
+                className="h-[25px] w-auto"
+                iso="var(--marca-iso)"
+                palabra="var(--marca-palabra)"
+                title={MARCA}
+              />
+              <div className="mt-1.5 truncate text-[11px] font-medium text-sidebar-foreground/60">
+                {MARCA_TAGLINE}
               </div>
             </div>
           )}
@@ -187,12 +201,12 @@ export function AppShell() {
               {({ isActive }) => (
                 <>
                   {isActive && !collapsed && (
-                    <span className="absolute inset-y-[14%] left-0 w-[3px] rounded-full bg-lima" />
+                    <span className="absolute inset-y-[14%] left-0 w-[3px] rounded-full bg-marca-acento" />
                   )}
                   <Icon
                     className={cn(
                       'size-5 shrink-0',
-                      isActive ? 'text-lima' : 'text-sidebar-foreground/55',
+                      isActive ? 'text-marca-acento' : 'text-sidebar-foreground/55',
                     )}
                     strokeWidth={1.75}
                   />
@@ -204,7 +218,7 @@ export function AppShell() {
                     <span
                       aria-label={`${hoy} para hoy`}
                       className={cn(
-                        'tnum ml-auto shrink-0 rounded-full bg-lima px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-ink',
+                        'tnum ml-auto shrink-0 rounded-full bg-marca-acento px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-marca-acento-tinta',
                         collapsed && 'absolute right-1 top-1 ml-0 px-1',
                       )}
                     >
@@ -225,7 +239,7 @@ export function AppShell() {
           )}
         >
           <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[13px] font-bold text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-marca-acento font-heading text-[13px] font-bold text-marca-acento-tinta"
             title={collapsed ? user?.email : undefined}
           >
             {initials(user?.email)}
