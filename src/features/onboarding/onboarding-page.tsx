@@ -359,7 +359,7 @@ export function OnboardingPage() {
             <AuthHeading
               icono={Building2}
               titulo="¿Cómo se llama tu empresa?"
-              subtitulo="Pusimos tu apellido como sugerencia. Podés cambiarlo por la razón social o el nombre del establecimiento."
+              subtitulo="Tu apellido, la razón social o el nombre del establecimiento."
             />
             <form onSubmit={crearEmpresa} className="mt-5 grid gap-3.5" noValidate>
               <Reveal delay={0.14} className="grid gap-1.5">
@@ -515,7 +515,7 @@ export function OnboardingPage() {
             <AuthHeading
               icono={LandPlot}
               titulo="¿Tenés otro campo?"
-              subtitulo="Cada campo lleva su ubicación, sus potreros y su hacienda. Podés sumarlo ahora o después desde Campos."
+              subtitulo="Podés sumarlo ahora o después."
             />
             <div className="mt-6 grid gap-2">
               <Button className={BOTON_PRINCIPAL} onClick={() => ir('campo')}>
@@ -561,7 +561,7 @@ export function OnboardingPage() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.45 }}
                 >
-                  {campos.length === 1 ? 'Tu cuenta y tu campo quedaron guardados.' : `Tu cuenta y tus ${campos.length} campos quedaron guardados.`}
+                  Todo quedó guardado.
                 </motion.p>
               </div>
             </div>
@@ -582,28 +582,26 @@ export function OnboardingPage() {
               variante={esMovil && primero.potreros.length > 0 ? 'recorrer' : 'dibujar'}
               color={colorDeCampo(primero.colorIdx).hex}
               letra={colorDeCampo(primero.colorIdx).letra}
-              // Con varios campos se habla de todos: nombrar sólo el primero
-              // parecía que los demás no contaban.
+              // Breve: es el cierre de la activación, sin cansar. Con varios
+              // campos no se nombra sólo uno (parecía que los demás no contaban).
               titulo={
                 esMovil && primero.potreros.length > 0
                   ? campos.length > 1
                     ? 'Salí a recorrer tus campos'
                     : `Salí a recorrer ${primero.nombre}`
                   : primero.potreros.length > 0
-                    ? campos.length > 1
-                      ? `Tus ${campos.length} campos, potrero por potrero, sobre el satélite`
-                      : `${primero.nombre}, potrero por potrero, sobre el satélite`
+                    ? 'Dibujá tus potreros en el mapa'
                     : `Los potreros de ${primero.nombre}`
               }
               texto={
                 esMovil && primero.potreros.length > 0
-                  ? 'Pasto y agua de cada potrero, desde el celular y sin señal.'
+                  ? 'Pasto y agua de cada potrero, aunque no haya señal.'
                   : esMovil
-                    ? 'Número y hectáreas de cada uno, desde la compu. El Modo Campo ya está listo en el celular.'
+                    ? 'Número y hectáreas de cada uno, desde la compu.'
                     : primero.potreros.length > 0
                       ? campos.length > 1
-                        ? `Elegís cada potrero y marcás sus esquinas sobre el mapa. Podés empezar por ${primero.nombre}.`
-                        : 'Elegís cada potrero y marcás sus esquinas sobre el mapa.'
+                        ? `Marcás las esquinas de cada potrero. Empezá por ${primero.nombre}.`
+                        : 'Marcás las esquinas de cada potrero.'
                       : `Número y hectáreas de cada uno, desde Campos.${
                           primero.cabezas > 0 ? ` Después las ${primero.cabezas} cabezas van cada una a su potrero.` : ''
                         }`
@@ -771,7 +769,7 @@ function PasoCampo({
             }}
             onEscribir={() => setErrores((x) => ({ ...x, localidad: undefined }))}
             invalido={!!errores.localidad}
-            ayuda="La localidad más cercana al campo (no la de tu casa)."
+            ayuda="La más cercana al campo."
           />
           <ErrorCampo mensaje={errores.localidad} />
         </Reveal>
@@ -991,7 +989,7 @@ function PasoPotreros({
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
-        subtitulo={`Número y hectáreas de cada uno. Entre todos deberían sumar las ${ha(totalCampo)} ha del campo.`}
+        subtitulo={`Número y hectáreas de cada uno. Suman ${ha(totalCampo)} ha en total.`}
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-2.5">
@@ -1228,7 +1226,7 @@ function avisoCarga(
   // de una vez, y por eso se mide en cabezas y no en EV.
   if (cabezas > 2000)
     return {
-      texto: `Se pueden cargar hasta 2.000 por potrero. Las demás, después desde Hacienda.`,
+      texto: `Hasta 2.000 por potrero. El resto, después.`,
       bloquea: true,
     }
   if (!hectareas) return null
@@ -1511,7 +1509,7 @@ function PasoHacienda({
         titulo={campoEntero ? `La hacienda de ${campo.nombre}` : `Qué hay en cada potrero`}
         subtitulo={
           campoEntero
-            ? 'Cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las vas a poder ubicar en cada uno.'
+            ? 'Cuántas cabezas hay hoy en el campo.'
             : 'Potrero por potrero: hacienda o sembrado.'
         }
       />
@@ -1801,8 +1799,7 @@ function PasoHacienda({
                       <div className="mt-3 flex items-center gap-2.5 rounded-lg bg-secondary px-3 py-2.5">
                         <span aria-hidden className="size-5 shrink-0 rounded border border-border bg-muted-foreground/15" />
                         <p className="text-xs leading-snug">
-                          <span className="font-medium">En descanso.</span>{' '}
-                          <span className="text-muted-foreground">Se cambia en el mapa cuando entre hacienda o se siembre.</span>
+                          <span className="font-medium">En descanso.</span>
                         </p>
                       </div>
                     ) : null}
@@ -2386,8 +2383,8 @@ function EscenaFinal({ campos }: { campos: CampoCargado[] }) {
       </motion.p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
         {campos.length === 1
-          ? 'Con lo que cargaste. Cualquier dato se puede cambiar después, desde Campos.'
-          : 'Con lo que cargaste. Cualquier dato se puede cambiar después, desde Campos.'}
+          ? 'Todo se puede cambiar después.'
+          : 'Todo se puede cambiar después.'}
       </p>
 
       {/* La empresa en cifras, contando hacia arriba. */}

@@ -225,7 +225,7 @@ export function SignupPage() {
             <AuthHeading
               icono={Sprout}
               titulo="Creá tu cuenta"
-              subtitulo="Te lleva un minuto. El celular y el email sirven para recuperar el acceso si hace falta."
+              subtitulo="Te lleva un minuto."
               subtituloSoloEscritorio
             />
 
@@ -424,7 +424,7 @@ function RevisarContacto({
       <AuthHeading
         icono={ClipboardCheck}
         titulo={`Ya casi, ${datos.nombre}`}
-        subtitulo="Revisá que estén bien antes de seguir."
+        subtitulo="Revisá que estén bien."
       />
 
       {/* Cada dato con su ícono y un tilde que aparece: se revisa de un
@@ -481,7 +481,7 @@ function RevisarContacto({
         transition={{ delay: 0.45 }}
       >
         <ShieldCheck className="mt-px size-3.5 shrink-0 text-primary" strokeWidth={2.25} />
-        Los vas a usar para recuperar el acceso si olvidás la contraseña.
+        Sirven para recuperar tu cuenta.
       </motion.p>
 
       {pedirClave && (
@@ -498,7 +498,7 @@ function RevisarContacto({
             autoFocus
           />
           <p className="text-xs text-muted-foreground">
-            Por seguridad, la contraseña no se guarda al recargar la página. Por favor, escribila otra vez.
+            Por seguridad, escribila de nuevo.
           </p>
           <ErrorCampo mensaje={errorClave} />
         </div>
@@ -634,7 +634,7 @@ function ConfirmarCorreo({
         </p>
       )}
       <p className="mt-5 text-xs text-muted-foreground">
-        Si no lo ves, revisá la carpeta de correo no deseado.
+        Si no llega, revisá el correo no deseado.
       </p>
     </motion.div>
   )
