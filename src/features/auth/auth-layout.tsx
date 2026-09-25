@@ -5,6 +5,7 @@ import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
 import { Remolque } from '@/features/auth/sembradora'
 import { PistaDeScroll } from '@/features/auth/pista-de-scroll'
+import { cn } from '@/lib/utils'
 
 /**
  * Shell de las pantallas de auth: escena ambiental a la izquierda (solo
@@ -24,6 +25,7 @@ export function AuthLayout({
   pistaDeScroll = false,
   continua = false,
   saliendo = false,
+  anclada = false,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
@@ -45,6 +47,11 @@ export function AuthLayout({
   continua?: boolean
   /** Se va a otra pantalla: la tarjeta y el mensaje se desvanecen antes. */
   saliendo?: boolean
+  /**
+   * La tarjeta arriba en vez de centrada (el onboarding): cambia de alto en
+   * cada paso, y centrada se desplazaba entera con cada cambio.
+   */
+  anclada?: boolean
   /**
    * Muestra "Bajá para continuar" cuando el contenido no entra. Sólo donde el
    * botón que importa puede quedar fuera de la vista (el cierre del
@@ -70,7 +77,10 @@ export function AuthLayout({
             vista, el desplazamiento es un deslizamiento, no un salto. */}
         {/* overscroll-none: sin el rebote elástico al llegar arriba o abajo,
             que se leía como un segundo scroll. */}
-        <div data-auth-scroll className="flex h-full flex-col overflow-y-auto overscroll-none scroll-smooth">
+        {/* overflow-anchor: none — el navegador no corrige el scroll por su
+            cuenta cuando cambia el alto del contenido (eso hacía saltar la
+            tarjeta 170 px al terminar un campo). */}
+        <div data-auth-scroll className="flex h-full flex-col overflow-y-auto overscroll-none [overflow-anchor:none] scroll-smooth">
           {/* min-h-full + relative: la escena de fondo cubre TODO el contenido
               (no sólo la primera pantalla) y se desplaza con él — frase y sol
               se van hacia arriba junto con la tarjeta, las lomas quedan al
@@ -90,7 +100,12 @@ export function AuthLayout({
                 sobra lugar, así que un padding grande sólo servía para crear
                 un scroll que no mostraba nada cuando la tarjeta apenas entra.
                 Scroll únicamente si la tarjeta de verdad no entra. */}
-            <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:px-10 sm:py-4">
+            <div
+              className={cn(
+                'relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:px-10 sm:py-4',
+                anclada ? 'sm:justify-start sm:pt-[clamp(1rem,7vh,4rem)]' : 'sm:justify-center',
+              )}
+            >
               <motion.div
                 className="flex w-full justify-center"
                 initial={false}

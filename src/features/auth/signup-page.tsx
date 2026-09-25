@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ClipboardCheck, Mail, MailCheck, Sprout } from 'lucide-react'
+import { ClipboardCheck, Loader2, Mail, MailCheck, Sprout } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth, YA_REGISTRADO } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatearCelularAR, normalizarCelularAR } from '@/lib/telefono'
+import { cn } from '@/lib/utils'
 
 const registro = z
   .object({
@@ -395,8 +396,17 @@ function RevisarContacto({
       </dl>
 
       <div className="mt-6 grid gap-2">
-        <Button disabled={ocupado} onClick={onConfirmar} className={BOTON_PRINCIPAL}>
-          {ocupado ? 'Creando tu cuenta…' : 'Sí, están bien'}
+        {/* Mientras crea la cuenta el botón queda entero y con un giro: a
+            media opacidad y quieto se leía como que la pantalla se trabó. */}
+        <Button disabled={ocupado} onClick={onConfirmar} className={cn(BOTON_PRINCIPAL, 'disabled:opacity-100')}>
+          {ocupado ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
+              Creando tu cuenta
+            </span>
+          ) : (
+            'Sí, están bien'
+          )}
         </Button>
         <Button
           variant="ghost"

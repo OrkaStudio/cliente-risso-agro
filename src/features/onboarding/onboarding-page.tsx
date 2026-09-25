@@ -33,6 +33,7 @@ import {
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
 import { RevealMudo } from '@/features/auth/reveal-mudo'
+import { borrarProgreso, guardarProgreso, leerProgreso } from '@/features/onboarding/progreso'
 import {
   actualizarActividadCampo,
   actualizarCampo,
@@ -116,6 +117,16 @@ type FilaPotrero = { id?: string; numero: string; hectareas: string }
 
 type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
 
+/** Lo que se guarda para retomar tras recargar (ver `progreso`). */
+type Progreso = {
+  etapa: Etapa
+  nombreEmpresa: string
+  empresaId: string
+  campos: CampoCargado[]
+  campoActual: CampoCargado | null
+  corrigiendo: boolean
+}
+
 /**
  * Lo que se está escribiendo AHORA, antes de guardar: el croquis de la
  * escena lo dibuja en vivo. Cada paso avisa con cada tecla.
@@ -165,7 +176,9 @@ export function OnboardingPage() {
   // segundos del primero.
   const desdeRegistro = !!(useLocation().state as { desdeRegistro?: boolean } | null)?.desdeRegistro
 
-  const [etapa, setEtapa] = useState<Etapa>('empresa')
+  // Recargó a mitad del onboarding: retoma donde estaba (ver `progreso`).
+  const [guardado] = useState(() => leerProgreso<Progreso>(user?.id))
+  const [etapa, setEtapa] = useState<Etapa>(guardado?.etapa ?? 'empresa')
   // Hacia dónde va el cambio de paso: adelante entra desde la derecha,
   // atrás desde la izquierda. Da orientación sin decir nada.
   const [direccion, setDireccion] = useState<1 | -1>(1)
@@ -177,31 +190,49 @@ export function OnboardingPage() {
 
   // Empresa
   const [nombreEmpresa, setNombreEmpresa] = useState(() => {
+    if (guardado) return guardado.nombreEmpresa
     const apellido = (user?.user_metadata as { apellido?: string } | undefined)
       ?.apellido
     return apellido ? `${apellido} Agro` : ''
   })
   const [errorEmpresa, setErrorEmpresa] = useState<string | null>(null)
-  const [empresaId, setEmpresaId] = useState<string | null>(null)
+  const [empresaId, setEmpresaId] = useState<string | null>(guardado?.empresaId ?? null)
 
   // Campos ya cargados + el que se está cargando
-  const [campos, setCampos] = useState<CampoCargado[]>([])
-  const [campoActual, setCampoActual] = useState<CampoCargado | null>(null)
+  const [campos, setCampos] = useState<CampoCargado[]>(guardado?.campos ?? [])
+  const [campoActual, setCampoActual] = useState<CampoCargado | null>(guardado?.campoActual ?? null)
   const [borrador, setBorrador] = useState<Borrador>(BORRADOR_VACIO)
   // Volvió de potreros a corregir el campo (se pasó de hectáreas, etc.).
-  const [corrigiendo, setCorrigiendo] = useState(false)
+  const [corrigiendo, setCorrigiendo] = useState(guardado?.corrigiendo ?? false)
 
-  // Al cambiar de paso, arriba de todo: en el teléfono el croquis está sobre
-  // la tarjeta, y ver cómo quedó lo que acaba de cargar es el premio.
+  // Cada cambio de paso queda guardado: recargar vuelve acá, no a la app.
   useEffect(() => {
-    document.querySelector<HTMLElement>('[data-auth-scroll]')?.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [etapa])
+    if (!empresaId) return
+    guardarProgreso(user?.id, { etapa, nombreEmpresa, empresaId, campos, campoActual, corrigiendo } satisfies Progreso)
+  }, [user?.id, etapa, nombreEmpresa, empresaId, campos, campoActual, corrigiendo])
+
+  // Al cambiar de paso, arriba de todo. En el INSTANTE en que el paso viejo
+  // ya salió y el nuevo todavía no se ve (0,19 s): así no se ve saltar. En el
+  // teléfono, suave: el croquis está sobre la tarjeta y ver cómo quedó lo
+  // que acaba de cargar es el premio.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-auth-scroll]')
+        // 'instant', no 'auto': el contenedor tiene scroll-smooth en el CSS y
+        // 'auto' lo respeta — la vuelta arriba se veía deslizarse sobre el
+        // paso nuevo.
+        ?.scrollTo({ top: 0, behavior: esMovil ? 'smooth' : 'instant' })
+    }, 190)
+    return () => window.clearTimeout(t)
+  }, [etapa, esMovil])
   // El campo por el que sigue: el primero que tiene potreros (si ninguno,
   // el primero cargado). Nunca "el primero" como si fuera toda la empresa.
   const primero = campos.find((c) => c.potreros.length > 0) ?? campos[0]
 
-  // Si ya pertenece a una empresa y no la creó en este wizard, no va acá.
-  if (!isLoading && membresia && !empresaId) {
+  // Si ya pertenece a una empresa y no la creó en este wizard (ni tiene un
+  // onboarding a medias de esa misma empresa), no va acá.
+  if (!isLoading && membresia && (!empresaId || membresia.empresa_id !== empresaId)) {
     return <Navigate to="/" replace />
   }
 
@@ -253,6 +284,8 @@ export function OnboardingPage() {
   }
 
   async function entrar(destino: string) {
+    // Terminó: ya no hay onboarding que retomar.
+    borrarProgreso(user?.id)
     // Recién acá refrescamos todo: el guard RequireEmpresa ve la membresía
     // nueva y las secciones arrancan con datos frescos de la empresa creada.
     await qc.invalidateQueries()
@@ -282,6 +315,9 @@ export function OnboardingPage() {
       ciclo={etapa === 'fin' ? 'fin' : 'armado'}
       // La pista de scroll donde la tarjeta puede ser más alta que la pantalla.
       pistaDeScroll={etapa === 'fin' || etapa === 'hacienda'}
+      // Anclada arriba: al cambiar de paso la tarjeta crece o se achica sólo
+      // por abajo. Centrada, se movía dos veces (arriba y abajo a la vez).
+      anclada
       escena={
         <EscenaCroquis
           etapa={etapa}
@@ -2421,6 +2457,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                 <span className="ml-auto shrink-0 text-xs text-sidebar-foreground/60">{ha(c.hectareas)} ha</span>
               </div>
               <div className={compacta ? 'px-2 pt-2 pb-2' : 'px-3 pt-3'}>
+<CroquisAlAparecer demora={0.35 + i * 0.15}>
                 <CroquisVivo
                   campo={{
                     nombre: c.nombre,
@@ -2439,6 +2476,7 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                     estado: 'hecho',
                   }}
                 />
+                </CroquisAlAparecer>
               </div>
               {!compacta && (
               <div className="flex items-center justify-between gap-2 px-4 pb-3.5 pt-2.5">
@@ -2510,6 +2548,24 @@ function CampoAlFinal({ campo, indice }: { campo: CampoCargado; indice: number }
       )}
     </motion.li>
   )
+}
+
+/**
+ * El croquis de una ficha del final se DIBUJA cuando la ficha aparece, no
+ * antes: la ficha entra con retraso, y si el croquis se montaba con ella los
+ * potreros terminaban de crecer mientras todavía era invisible — se veía un
+ * dibujo estático. El lugar queda reservado (misma proporción que el SVG),
+ * así la ficha no cambia de alto cuando el dibujo llega.
+ */
+function CroquisAlAparecer({ demora, children }: { demora: number; children: ReactNode }) {
+  const quieto = useReducedMotion()
+  const [listo, setListo] = useState(quieto)
+  useEffect(() => {
+    if (quieto) return
+    const t = window.setTimeout(() => setListo(true), demora * 1000)
+    return () => window.clearTimeout(t)
+  }, [demora, quieto])
+  return <div className="aspect-[420/200] w-full">{listo ? children : null}</div>
 }
 
 /**
