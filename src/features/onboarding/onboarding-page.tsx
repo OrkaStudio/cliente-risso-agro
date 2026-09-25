@@ -187,6 +187,8 @@ export function OnboardingPage() {
     setEtapa(sig)
   }
   const [ocupado, setOcupado] = useState(false)
+  // Se va a la app: la pantalla se funde antes del cambio (ver `entrar`).
+  const [yendo, setYendo] = useState(false)
 
   // Empresa
   const [nombreEmpresa, setNombreEmpresa] = useState(() => {
@@ -284,12 +286,16 @@ export function OnboardingPage() {
   }
 
   async function entrar(destino: string) {
+    if (yendo) return
     // Terminó: ya no hay onboarding que retomar.
     borrarProgreso(user?.id)
-    // Recién acá refrescamos todo: el guard RequireEmpresa ve la membresía
-    // nueva y las secciones arrancan con datos frescos de la empresa creada.
-    await qc.invalidateQueries()
-    navigate(destino, { replace: true })
+    // La pantalla se desvanece MIENTRAS se refrescan los datos (el guard
+    // RequireEmpresa ve la membresía nueva y las secciones arrancan con la
+    // empresa creada), y la app entra con un fundido. Antes el cambio era un
+    // corte seco: el onboarding desaparecía y la app estaba ahí de golpe.
+    setYendo(true)
+    await Promise.all([qc.invalidateQueries(), new Promise((r) => window.setTimeout(r, 450))])
+    navigate(destino, { replace: true, state: { bienvenida: true } })
   }
 
   if (isLoading) {
@@ -310,6 +316,7 @@ export function OnboardingPage() {
       // remolque se repita en el festejo.
       entrada={(etapa === 'empresa' && !desdeRegistro) || etapa === 'fin' ? 'tractor' : 'suave'}
       continua={desdeRegistro}
+      desvanecer={yendo}
       // La tarjeta se monta una vez para todo el armado; sólo el festejo la
       // vuelve a montar (y el tractor la trae de nuevo).
       ciclo={etapa === 'fin' ? 'fin' : 'armado'}
@@ -575,11 +582,17 @@ export function OnboardingPage() {
               variante={esMovil && primero.potreros.length > 0 ? 'recorrer' : 'dibujar'}
               color={colorDeCampo(primero.colorIdx).hex}
               letra={colorDeCampo(primero.colorIdx).letra}
+              // Con varios campos se habla de todos: nombrar sólo el primero
+              // parecía que los demás no contaban.
               titulo={
                 esMovil && primero.potreros.length > 0
-                  ? `Salí a recorrer ${primero.nombre}`
+                  ? campos.length > 1
+                    ? 'Salí a recorrer tus campos'
+                    : `Salí a recorrer ${primero.nombre}`
                   : primero.potreros.length > 0
-                    ? `${primero.nombre}, potrero por potrero, sobre el satélite`
+                    ? campos.length > 1
+                      ? `Tus ${campos.length} campos, potrero por potrero, sobre el satélite`
+                      : `${primero.nombre}, potrero por potrero, sobre el satélite`
                     : `Los potreros de ${primero.nombre}`
               }
               texto={
@@ -588,7 +601,9 @@ export function OnboardingPage() {
                   : esMovil
                     ? 'Número y hectáreas de cada uno, desde la compu. El Modo Campo ya está listo en el celular.'
                     : primero.potreros.length > 0
-                      ? 'Elegís cada potrero de la lista y marcás sus esquinas.'
+                      ? campos.length > 1
+                        ? `Elegís cada potrero y marcás sus esquinas. Arrancás por ${primero.nombre} y pasás de un campo al otro desde la lista.`
+                        : 'Elegís cada potrero de la lista y marcás sus esquinas.'
                       : `Número y hectáreas de cada uno, desde Campos.${
                           primero.cabezas > 0 ? ` Después las ${primero.cabezas} cabezas van cada una a su potrero.` : ''
                         }`
@@ -1641,7 +1656,7 @@ function PasoHacienda({
                                 aria-selected={activa}
                                 onClick={() => setEspecieActiva(e)}
                                 className={cn(
-                                  'flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors',
+                                  'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-[13px] font-semibold transition-colors',
                                   activa ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                                 )}
                               >
@@ -1667,17 +1682,17 @@ function PasoHacienda({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
                             transition={{ duration: 0.15 }}
-                            className="mt-3.5 grid gap-3"
+                            className="mt-3 grid gap-2.5"
                           >
                             {GRUPOS_ROL.map(({ rol, nombre }) => {
                               const cats = categoriasPorEspecie[especieActiva].filter((c) => ROL_POR_CATEGORIA[c] === rol)
                               if (cats.length === 0) return null
                               return (
-                                <div key={rol} className="grid grid-cols-2 items-end gap-x-2.5 gap-y-1 sm:grid-cols-[6.75rem_1fr_1fr] sm:gap-y-2.5">
+                                <div key={rol} className="grid grid-cols-2 items-end gap-x-2.5 gap-y-1 sm:grid-cols-[6.25rem_1fr_1fr] sm:gap-y-2">
                                   {/* Letra generosa: la usa gente grande, muchas veces sin anteojos. */}
                                   {/* En el teléfono el grupo va ARRIBA de sus casilleros: al costado
                                       no entraba "Vaquillonas" a este tamaño de letra. */}
-                                  <p className="col-span-2 inline-flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-1 sm:h-11">
+                                  <p className="col-span-2 inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-1 sm:h-10">
                                     <svg width="20" height="16" viewBox="-13 -12 26 21" aria-hidden className="shrink-0">
                                       <MarcaCategoria categoria={cats[0]!} />
                                     </svg>
@@ -1685,7 +1700,7 @@ function PasoHacienda({
                                   </p>
                                     {cats.map((c, k) => (
                                       <label key={c} className="grid min-w-0 gap-1">
-                                        <span className="truncate text-[15px] text-foreground/80">{categoriaPlural[c]}</span>
+                                        <span className="truncate text-sm text-foreground/80">{categoriaPlural[c]}</span>
                                         <Input
                                           inputMode="numeric"
                                           value={cantActual[c] ?? ''}
@@ -1703,7 +1718,7 @@ function PasoHacienda({
                                             avisarCroquis(next, usos)
                                           }}
                                           placeholder="0"
-                                          className="h-11 px-3 text-[17px] tabular-nums md:text-[17px]"
+                                          className="h-10 px-3 text-base tabular-nums md:text-base"
                                         />
                                       </label>
                                     ))}

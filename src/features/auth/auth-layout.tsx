@@ -26,6 +26,7 @@ export function AuthLayout({
   continua = false,
   saliendo = false,
   anclada = false,
+  desvanecer = false,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
@@ -52,6 +53,8 @@ export function AuthLayout({
    * cada paso, y centrada se desplazaba entera con cada cambio.
    */
   anclada?: boolean
+  /** Se va a la app: toda la pantalla se funde con el fondo antes del cambio. */
+  desvanecer?: boolean
   /**
    * Muestra "Bajá para continuar" cuando el contenido no entra. Sólo donde el
    * botón que importa puede quedar fuera de la vista (el cierre del
@@ -64,7 +67,12 @@ export function AuthLayout({
     // que mide el contenido. Sin eso la columna crece con el formulario, el
     // overflow-hidden de html/body esconde el resto y NO se puede scrollear
     // (a 748px de alto el botón de Continuar quedaba afuera, sin scroll).
-    <div className="grid h-full grid-rows-[minmax(0,1fr)] lg:grid-cols-[1.15fr_1fr]">
+    <motion.div
+      className="grid h-full grid-rows-[minmax(0,1fr)] lg:grid-cols-[1.15fr_1fr]"
+      initial={false}
+      animate={desvanecer ? { opacity: 0, scale: 0.985 } : { opacity: 1, scale: 1 }}
+      transition={{ duration: 0.42, ease: [0.4, 0, 0.2, 1] }}
+    >
       {/* La sombra ancha y suave hacia la derecha funde el borde entre la
           escena oscura y el panel porcelana (sin línea a cuchillo). */}
       <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
@@ -122,7 +130,7 @@ export function AuthLayout({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

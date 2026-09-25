@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Tractor } from 'lucide-react'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { setForceOficina, useForceOficina } from '@/lib/campo-mode'
@@ -18,6 +20,12 @@ export function ResponsiveShell() {
   const forceOficina = useForceOficina()
   const location = useLocation()
   const enCampo = location.pathname.startsWith('/campo')
+  // Recién terminó el onboarding: la app entra con un fundido, no de golpe.
+  // Se decide una vez al montar (navegar dentro de la app no lo repite).
+  const quieto = useReducedMotion()
+  const [bienvenida] = useState(
+    () => !quieto && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
+  )
 
   // Teléfono, sin override y parado en una ruta de Oficina → al Modo Campo.
   if (isMobile && !forceOficina && !enCampo) {
@@ -26,7 +34,18 @@ export function ResponsiveShell() {
 
   return (
     <>
-      <Outlet />
+      {bienvenida ? (
+        <motion.div
+          className="h-full"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <Outlet />
+        </motion.div>
+      ) : (
+        <Outlet />
+      )}
       {/* Móvil que se escapó a Oficina: cómo volver al Campo sin tocar el
           AppShell de escritorio. */}
       {isMobile && forceOficina && !enCampo && <VolverACampo />}

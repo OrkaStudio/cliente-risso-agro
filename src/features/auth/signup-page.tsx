@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ClipboardCheck, Loader2, Mail, MailCheck, Sprout } from 'lucide-react'
+import { Check, ClipboardCheck, Loader2, Mail, MailCheck, ShieldCheck, Smartphone, Sprout } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth, YA_REGISTRADO } from '@/features/auth/auth-context'
 import { AuthHeading, AuthLayout, BOTON_PRINCIPAL, ErrorCampo } from '@/features/auth/auth-layout'
@@ -374,28 +374,64 @@ function RevisarContacto({
         subtitulo="Confirmá que estén bien y listo."
       />
 
-      <dl className="mt-6 divide-y divide-border rounded-lg border border-border">
-        <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
-          <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">Celular</dt>
-            <dd className="text-[15px] font-semibold tabular-nums tracking-tight">
-              {formatearCelularAR(datos.celular)}
-            </dd>
-          </div>
-        </div>
-        <div className="flex min-w-0 items-center gap-3 px-3.5 py-3">
-          <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">Email</dt>
-            <dd className="text-[15px] font-semibold tracking-tight">
-              {/* Si no entra, corta en la @: el dominio queda entero. */}
-              <span className="break-all">{local}</span>
-              <span className="whitespace-nowrap">@{dominio}</span>
-            </dd>
-          </div>
-        </div>
+      {/* Cada dato con su ícono y un tilde que aparece: se revisa de un
+          vistazo, y la pantalla deja de ser una tabla gris. */}
+      <dl className="mt-6 overflow-hidden rounded-xl border border-border bg-gradient-to-b from-primary/[0.04] to-transparent">
+        {[
+          {
+            Icono: Smartphone,
+            etiqueta: 'Celular',
+            valor: <span className="tabular-nums">{formatearCelularAR(datos.celular)}</span>,
+          },
+          {
+            Icono: Mail,
+            etiqueta: 'Email',
+            valor: (
+              <>
+                {/* Si no entra, corta en la @: el dominio queda entero. */}
+                <span className="break-all">{local}</span>
+                <span className="whitespace-nowrap">@{dominio}</span>
+              </>
+            ),
+          },
+        ].map(({ Icono, etiqueta, valor }, i) => (
+          <motion.div
+            key={etiqueta}
+            className={cn('flex min-w-0 items-center gap-3 px-3.5 py-3', i > 0 && 'border-t border-border')}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.12 + i * 0.1, ease: 'easeOut' }}
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Icono className="size-[17px]" strokeWidth={2} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
+              <dd className="text-[15px] font-semibold tracking-tight">{valor}</dd>
+            </div>
+            <motion.span
+              aria-hidden
+              className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-white"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 18, delay: 0.3 + i * 0.12 }}
+            >
+              <Check className="size-3" strokeWidth={3.5} />
+            </motion.span>
+          </motion.div>
+        ))}
       </dl>
+      <motion.p
+        className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.45 }}
+      >
+        <ShieldCheck className="mt-px size-3.5 shrink-0 text-primary" strokeWidth={2.25} />
+        Con estos dos recuperás el acceso si algún día te olvidás la contraseña.
+      </motion.p>
 
-      <div className="mt-6 grid gap-2">
+      <div className="mt-5 grid gap-2">
         {/* Mientras crea la cuenta el botón queda entero y con un giro: a
             media opacidad y quieto se leía como que la pantalla se trabó. */}
         <Button disabled={ocupado} onClick={onConfirmar} className={cn(BOTON_PRINCIPAL, 'disabled:opacity-100')}>
