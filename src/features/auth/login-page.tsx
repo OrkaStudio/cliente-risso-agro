@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { EnlaceMudo } from '@/features/auth/enlace-mudo'
 import { DoorOpen } from 'lucide-react'
 import { z } from 'zod'
 import { useAuth } from '@/features/auth/auth-context'
@@ -119,12 +120,12 @@ export function LoginPage() {
       <Reveal delay={0.4} className="mt-5">
         <p className="text-center text-sm text-muted-foreground">
           ¿Primera vez por acá?{' '}
-          <Link
+          <EnlaceMudo
             to="/registro"
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
             Creá tu cuenta
-          </Link>
+          </EnlaceMudo>
         </p>
       </Reveal>
     </AuthLayout>

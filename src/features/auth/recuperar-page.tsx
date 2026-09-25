@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { EnlaceMudo } from '@/features/auth/enlace-mudo'
 import { motion } from 'framer-motion'
 import {MailCheck, KeyRound} from 'lucide-react'
 import { z } from 'zod'
@@ -120,12 +121,12 @@ export function RecuperarPage() {
 
       <Reveal delay={0.32} className="mt-5">
         <p className="text-center text-sm text-muted-foreground">
-          <Link
+          <EnlaceMudo
             to="/login"
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
             Volver a ingresar
-          </Link>
+          </EnlaceMudo>
         </p>
       </Reveal>
     </AuthLayout>

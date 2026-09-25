@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { EnlaceMudo } from '@/features/auth/enlace-mudo'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ClipboardCheck, Loader2, Mail, MailCheck, ShieldCheck, Smartphone, Sprout } from 'lucide-react'
@@ -311,17 +312,17 @@ export function SignupPage() {
                 {errores.email === YA_REGISTRADO ? (
                   <p className="text-xs text-destructive" role="alert">
                     {YA_REGISTRADO}{' '}
-                    <Link to="/login" className="font-medium underline underline-offset-4">
+                    <EnlaceMudo to="/login" className="font-medium underline underline-offset-4">
                       Ingresá
-                    </Link>{' '}
+                    </EnlaceMudo>{' '}
                     o{' '}
-                    <Link
+                    <EnlaceMudo
                       to="/recuperar"
                       state={{ email }}
                       className="font-medium underline underline-offset-4"
                     >
                       recuperá la contraseña
-                    </Link>
+                    </EnlaceMudo>
                     .
                   </p>
                 ) : (
@@ -377,12 +378,12 @@ export function SignupPage() {
             <Reveal delay={0.44} className="mt-5">
               <p className="text-center text-sm text-muted-foreground">
                 ¿Ya tenés cuenta?{' '}
-                <Link
+                <EnlaceMudo
                   to="/login"
                   className="font-medium text-primary underline-offset-4 hover:underline"
                 >
                   Iniciá sesión
-                </Link>
+                </EnlaceMudo>
               </p>
             </Reveal>
           </motion.div>
