@@ -359,7 +359,7 @@ export function OnboardingPage() {
             <AuthHeading
               icono={Building2}
               titulo="¿Cómo se llama tu empresa?"
-              subtitulo="Tu apellido, la razón social o el nombre del establecimiento."
+              subtitulo="Puede ser tu apellido o el nombre del establecimiento, como lo conocen en la zona."
             />
             <form onSubmit={crearEmpresa} className="mt-5 grid gap-3.5" noValidate>
               <Reveal delay={0.14} className="grid gap-1.5">
@@ -392,7 +392,7 @@ export function OnboardingPage() {
             {!corrigiendo && (
               <Logrado>
                 {campos.length === 0
-                  ? `Empresa creada: ${empresa}`
+                  ? `¡Arrancamos, ${empresa}!`
                   : `${campos[campos.length - 1]!.nombre} cargado`}
               </Logrado>
             )}
@@ -515,7 +515,7 @@ export function OnboardingPage() {
             <AuthHeading
               icono={LandPlot}
               titulo="¿Tenés otro campo?"
-              subtitulo="Podés sumarlo ahora o después."
+              subtitulo="Si tenés más, sumalo ahora y ves todo junto. También lo podés hacer después."
             />
             <div className="mt-6 grid gap-2">
               <Button className={BOTON_PRINCIPAL} onClick={() => ir('campo')}>
@@ -561,7 +561,7 @@ export function OnboardingPage() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.45 }}
                 >
-                  Todo quedó guardado.
+                  {campos.length === 1 ? 'Tu campo ya está en la app.' : 'Tus campos ya están en la app.'}
                 </motion.p>
               </div>
             </div>
@@ -590,7 +590,7 @@ export function OnboardingPage() {
                     ? 'Salí a recorrer tus campos'
                     : `Salí a recorrer ${primero.nombre}`
                   : primero.potreros.length > 0
-                    ? 'Dibujá tus potreros en el mapa'
+                    ? 'Ahora, dibujá tus potreros en el mapa'
                     : `Los potreros de ${primero.nombre}`
               }
               texto={
@@ -600,8 +600,8 @@ export function OnboardingPage() {
                     ? 'Número y hectáreas de cada uno, desde la compu.'
                     : primero.potreros.length > 0
                       ? campos.length > 1
-                        ? `Marcás las esquinas de cada potrero. Empezá por ${primero.nombre}.`
-                        : 'Marcás las esquinas de cada potrero.'
+                        ? 'Marcás sus esquinas sobre el satélite y cada uno queda con su hacienda adentro.'
+                        : 'Marcás sus esquinas sobre el satélite y cada uno queda con su hacienda adentro.'
                       : `Número y hectáreas de cada uno, desde Campos.${
                           primero.cabezas > 0 ? ` Después las ${primero.cabezas} cabezas van cada una a su potrero.` : ''
                         }`
@@ -738,7 +738,7 @@ function PasoCampo({
       <AuthHeading
         icono={LandPlot}
         titulo={existente ? `Corregir ${existente.nombre}` : primero ? 'Tu primer campo' : 'Otro campo'}
-        subtitulo="Cómo se llama, dónde está y cuántas hectáreas tiene."
+        subtitulo="Con la ubicación te mostramos el clima de tu campo todos los días."
       />
       <form onSubmit={guardar} className="mt-5 grid gap-3.5" noValidate>
         <Reveal delay={0.14} className="grid gap-1.5">
@@ -769,7 +769,7 @@ function PasoCampo({
             }}
             onEscribir={() => setErrores((x) => ({ ...x, localidad: undefined }))}
             invalido={!!errores.localidad}
-            ayuda="La más cercana al campo."
+            ayuda="El pueblo más cercano al campo."
           />
           <ErrorCampo mensaje={errores.localidad} />
         </Reveal>
@@ -913,7 +913,7 @@ function PasoPotreros({
   const estado = repetido
     ? `El potrero ${repetido} está dos veces`
     : completo
-      ? 'Completo'
+      ? `¡Cierran las ${ha(totalCampo)} ha!`
       : excede
         ? `Se pasan ${ha(redondear1(-diferencia))} ha`
         : sumaHa === 0
@@ -989,7 +989,7 @@ function PasoPotreros({
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
-        subtitulo={`Número y hectáreas de cada uno. Suman ${ha(totalCampo)} ha en total.`}
+        subtitulo={`Con las hectáreas de cada uno vas a ver cuánta hacienda aguanta. Entre todos suman ${ha(totalCampo)} ha.`}
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-2.5">
@@ -1226,16 +1226,16 @@ function avisoCarga(
   // de una vez, y por eso se mide en cabezas y no en EV.
   if (cabezas > 2000)
     return {
-      texto: `Hasta 2.000 por potrero. El resto, después.`,
+      texto: `Acá se cargan hasta 2.000 por potrero; el resto lo sumás después desde Hacienda.`,
       bloquea: true,
     }
   if (!hectareas) return null
   const ev = evDeCabezas(porCategoriaDe(cant))
   const evHa = ev / hectareas
   if (evHa > RECEPTIVIDAD.pasturaImplantada * 2)
-    return { texto: `Para ${ha(hectareas)} ha parecen demasiados. ¿Lo revisás?`, bloquea: true }
+    return { texto: `¿Son ${cabezas} cabezas en ${ha(hectareas)} ha? Parece mucho: revisalo antes de seguir.`, bloquea: true }
   if (evHa > RECEPTIVIDAD.campoNatural.max)
-    return { texto: `Para ${ha(hectareas)} ha son bastantes. Fijate si está bien.`, bloquea: false }
+    return { texto: `¿Son ${cabezas} cabezas en ${ha(hectareas)} ha? Revisalo por las dudas.`, bloquea: false }
   return null
 }
 
@@ -1509,8 +1509,8 @@ function PasoHacienda({
         titulo={campoEntero ? `La hacienda de ${campo.nombre}` : `Qué hay en cada potrero`}
         subtitulo={
           campoEntero
-            ? 'Cuántas cabezas hay hoy en el campo.'
-            : 'Potrero por potrero: hacienda o sembrado.'
+            ? '¿Cuántas cabezas hay hoy? Después las ubicás en cada potrero.'
+            : 'Así cada potrero aparece en el mapa con lo que tiene adentro.'
         }
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
@@ -1799,7 +1799,8 @@ function PasoHacienda({
                       <div className="mt-3 flex items-center gap-2.5 rounded-lg bg-secondary px-3 py-2.5">
                         <span aria-hidden className="size-5 shrink-0 rounded border border-border bg-muted-foreground/15" />
                         <p className="text-xs leading-snug">
-                          <span className="font-medium">En descanso.</span>
+                          <span className="font-medium">Queda en descanso.</span>{' '}
+                          <span className="text-muted-foreground">Cuando entre hacienda o lo siembres, lo cambiás desde el mapa.</span>
                         </p>
                       </div>
                     ) : null}
@@ -2119,7 +2120,7 @@ function EscenaCroquis({
         Armemos tu campo.
       </p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
-        {etapa === 'empresa' ? 'Te lleva unos minutos.' : 'Se va dibujando con lo que cargás.'}
+        {etapa === 'empresa' ? 'En unos minutos lo vas a ver dibujado acá.' : 'Se va dibujando con lo que cargás.'}
       </p>
 
       {/* La ficha del campo: una sola pieza sobre la escena, nada suelto. */}
@@ -2259,12 +2260,14 @@ function Cifra({ valor, unidad, acento = false }: { valor: string; unidad: strin
  */
 const TRAMOS: { etapa: Etapa | 'cuenta'; nombre: string }[] = [
   { etapa: 'cuenta', nombre: 'Tu cuenta' },
-  { etapa: 'empresa', nombre: 'Empresa' },
-  { etapa: 'campo', nombre: 'Campo' },
-  { etapa: 'potreros', nombre: 'Potreros' },
-  { etapa: 'hacienda', nombre: 'Qué hay' },
+  { etapa: 'empresa', nombre: 'Tu empresa' },
+  { etapa: 'campo', nombre: 'Tu campo' },
+  { etapa: 'potreros', nombre: 'Los potreros' },
+  { etapa: 'hacienda', nombre: 'Qué hay en cada potrero' },
   { etapa: 'fin', nombre: 'Listo' },
 ]
+/** Los pasos que el productor recorre (sin la cuenta, ya hecha, ni el final). */
+const PASOS_DEL_ARMADO = 4
 
 function ProgresoOnboarding({ etapa, accion }: { etapa: Etapa; accion?: ReactNode }) {
   // 'otro' (¿otro campo?) cuenta como hacienda terminada.
@@ -2322,17 +2325,19 @@ function ProgresoOnboarding({ etapa, accion }: { etapa: Etapa; accion?: ReactNod
         </ol>
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
-      <p className="text-[11px] text-muted-foreground">
+      {/* "Paso 2 de 4 · Tu campo": dónde está y cuánto falta, dicho simple. */}
+      <p className="text-xs text-muted-foreground">
         {terminado ? (
-          <span className="font-medium text-primary">Todo listo</span>
+          <span className="font-medium text-primary">¡Todo listo!</span>
         ) : (
           <>
             <span className="font-medium text-primary">
-              {hechos === 1 ? 'Cuenta creada' : `${hechos} de ${n} listos`}
+              Paso {etapa === 'otro' ? PASOS_DEL_ARMADO : indice} de {PASOS_DEL_ARMADO}
             </span>
             {' · '}
-            <span className="font-medium text-foreground">{TRAMOS[indice]!.nombre}</span>
-            {indice + 1 < n ? ` · después ${TRAMOS[indice + 1]!.nombre.toLowerCase()}` : ''}
+            <span className="font-medium text-foreground">
+              {etapa === 'otro' ? '¿Otro campo?' : TRAMOS[indice]!.nombre}
+            </span>
           </>
         )}
       </p>
@@ -2379,12 +2384,12 @@ function EscenaFinal({ campos }: { campos: CampoCargado[] }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        {campos.length === 1 ? 'Así quedó tu campo' : `Así quedaron tus ${campos.length} campos`}
+        {campos.length === 1 ? '¡Así quedó tu campo!' : `¡Así quedaron tus ${campos.length} campos!`}
       </motion.p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
         {campos.length === 1
-          ? 'Todo se puede cambiar después.'
-          : 'Todo se puede cambiar después.'}
+          ? 'Cualquier dato lo podés cambiar después.'
+          : 'Cualquier dato lo podés cambiar después.'}
       </p>
 
       {/* La empresa en cifras, contando hacia arriba. */}

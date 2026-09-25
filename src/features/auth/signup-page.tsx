@@ -28,11 +28,11 @@ const registro = z
         message: 'Tienen que ser 10 dígitos, sin el 0 ni el 15',
       }),
     email: z.string().trim().toLowerCase().min(1, 'Falta el email').email('Parece que falta algo en el email'),
-    password: z.string().min(8, 'Tiene que tener 8 caracteres o más'),
+    password: z.string().min(8, 'Usá al menos 8 caracteres'),
     repetir: z.string(),
   })
   .refine((d) => d.password === d.repetir, {
-    message: 'No coincide con la de arriba',
+    message: 'No es igual a la de arriba, ¿la revisás?',
     path: ['repetir'],
   })
 
@@ -225,7 +225,7 @@ export function SignupPage() {
             <AuthHeading
               icono={Sprout}
               titulo="Creá tu cuenta"
-              subtitulo="Te lleva un minuto."
+              subtitulo="Te lleva un minuto, y después armamos tu campo juntos."
               subtituloSoloEscritorio
             />
 
@@ -416,15 +416,15 @@ function RevisarContacto({
   const [errorClave, setErrorClave] = useState<string | null>(null)
   function confirmar() {
     if (!pedirClave) return onConfirmar()
-    if (clave.length < 8) return setErrorClave('Tiene que tener 8 caracteres o más')
+    if (clave.length < 8) return setErrorClave('Usá al menos 8 caracteres')
     onConfirmar(clave)
   }
   return (
     <div>
       <AuthHeading
         icono={ClipboardCheck}
-        titulo={`Ya casi, ${datos.nombre}`}
-        subtitulo="Revisá que estén bien."
+        titulo={`¡Ya casi, ${datos.nombre}!`}
+        subtitulo="Revisá que estén bien antes de seguir."
       />
 
       {/* Cada dato con su ícono y un tilde que aparece: se revisa de un
@@ -481,7 +481,7 @@ function RevisarContacto({
         transition={{ delay: 0.45 }}
       >
         <ShieldCheck className="mt-px size-3.5 shrink-0 text-primary" strokeWidth={2.25} />
-        Sirven para recuperar tu cuenta.
+        Con estos datos vas a poder recuperar tu cuenta si alguna vez lo necesitás.
       </motion.p>
 
       {pedirClave && (
@@ -498,7 +498,7 @@ function RevisarContacto({
             autoFocus
           />
           <p className="text-xs text-muted-foreground">
-            Por seguridad, escribila de nuevo.
+            Por seguridad no la guardamos. ¿Nos la escribís de nuevo?
           </p>
           <ErrorCampo mensaje={errorClave} />
         </div>
@@ -634,7 +634,7 @@ function ConfirmarCorreo({
         </p>
       )}
       <p className="mt-5 text-xs text-muted-foreground">
-        Si no llega, revisá el correo no deseado.
+        Si no te llega, fijate en el correo no deseado.
       </p>
     </motion.div>
   )
