@@ -28,11 +28,11 @@ const registro = z
         message: 'Tienen que ser 10 dígitos, sin el 0 ni el 15',
       }),
     email: z.string().trim().toLowerCase().min(1, 'Falta el email').email('Parece que falta algo en el email'),
-    password: z.string().min(8, 'Con 8 caracteres o más alcanza'),
+    password: z.string().min(8, 'Tiene que tener 8 caracteres o más'),
     repetir: z.string(),
   })
   .refine((d) => d.password === d.repetir, {
-    message: 'Tiene que ser igual a la de arriba',
+    message: 'No coincide con la de arriba',
     path: ['repetir'],
   })
 
@@ -225,7 +225,7 @@ export function SignupPage() {
             <AuthHeading
               icono={Sprout}
               titulo="Creá tu cuenta"
-              subtitulo="Te lleva un minuto. Con tu celular y tu email vas a poder recuperar el acceso cuando haga falta."
+              subtitulo="Te lleva un minuto. El celular y el email sirven para recuperar el acceso si hace falta."
               subtituloSoloEscritorio
             />
 
@@ -416,7 +416,7 @@ function RevisarContacto({
   const [errorClave, setErrorClave] = useState<string | null>(null)
   function confirmar() {
     if (!pedirClave) return onConfirmar()
-    if (clave.length < 8) return setErrorClave('Con 8 caracteres o más alcanza')
+    if (clave.length < 8) return setErrorClave('Tiene que tener 8 caracteres o más')
     onConfirmar(clave)
   }
   return (
@@ -424,7 +424,7 @@ function RevisarContacto({
       <AuthHeading
         icono={ClipboardCheck}
         titulo={`Ya casi, ${datos.nombre}`}
-        subtitulo="Confirmá que estén bien y listo."
+        subtitulo="Revisá que estén bien antes de seguir."
       />
 
       {/* Cada dato con su ícono y un tilde que aparece: se revisa de un
@@ -481,7 +481,7 @@ function RevisarContacto({
         transition={{ delay: 0.45 }}
       >
         <ShieldCheck className="mt-px size-3.5 shrink-0 text-primary" strokeWidth={2.25} />
-        Con estos dos recuperás el acceso si algún día te olvidás la contraseña.
+        Los vas a usar para recuperar el acceso si olvidás la contraseña.
       </motion.p>
 
       {pedirClave && (
@@ -494,11 +494,11 @@ function RevisarContacto({
               setClave(e.target.value)
               setErrorClave(null)
             }}
-            placeholder="La que elegiste recién"
+            placeholder="La misma que elegiste antes"
             autoFocus
           />
           <p className="text-xs text-muted-foreground">
-            Por seguridad no la guardamos al recargar: escribila de nuevo y listo.
+            Por seguridad, la contraseña no se guarda al recargar la página. Por favor, escribila otra vez.
           </p>
           <ErrorCampo mensaje={errorClave} />
         </div>
@@ -634,7 +634,7 @@ function ConfirmarCorreo({
         </p>
       )}
       <p className="mt-5 text-xs text-muted-foreground">
-        Si no aparece, mirá en correo no deseado.
+        Si no lo ves, revisá la carpeta de correo no deseado.
       </p>
     </motion.div>
   )

@@ -359,7 +359,7 @@ export function OnboardingPage() {
             <AuthHeading
               icono={Building2}
               titulo="¿Cómo se llama tu empresa?"
-              subtitulo="Te sugerimos tu apellido. Cambialo si usás la razón social o el nombre del establecimiento."
+              subtitulo="Pusimos tu apellido como sugerencia. Podés cambiarlo por la razón social o el nombre del establecimiento."
             />
             <form onSubmit={crearEmpresa} className="mt-5 grid gap-3.5" noValidate>
               <Reveal delay={0.14} className="grid gap-1.5">
@@ -392,7 +392,7 @@ export function OnboardingPage() {
             {!corrigiendo && (
               <Logrado>
                 {campos.length === 0
-                  ? `¡${empresa} ya tiene su lugar!`
+                  ? `Empresa creada: ${empresa}`
                   : `${campos[campos.length - 1]!.nombre} cargado`}
               </Logrado>
             )}
@@ -561,7 +561,7 @@ export function OnboardingPage() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.45 }}
                 >
-                  {campos.length === 1 ? 'Tu cuenta y tu campo, listos.' : `Tu cuenta y tus ${campos.length} campos, listos.`}
+                  {campos.length === 1 ? 'Tu cuenta y tu campo quedaron guardados.' : `Tu cuenta y tus ${campos.length} campos quedaron guardados.`}
                 </motion.p>
               </div>
             </div>
@@ -602,8 +602,8 @@ export function OnboardingPage() {
                     ? 'Número y hectáreas de cada uno, desde la compu. El Modo Campo ya está listo en el celular.'
                     : primero.potreros.length > 0
                       ? campos.length > 1
-                        ? `Elegís cada potrero y marcás sus esquinas. Arrancás por ${primero.nombre} y pasás de un campo al otro desde la lista.`
-                        : 'Elegís cada potrero de la lista y marcás sus esquinas.'
+                        ? `Elegís cada potrero y marcás sus esquinas sobre el mapa. Podés empezar por ${primero.nombre}.`
+                        : 'Elegís cada potrero y marcás sus esquinas sobre el mapa.'
                       : `Número y hectáreas de cada uno, desde Campos.${
                           primero.cabezas > 0 ? ` Después las ${primero.cabezas} cabezas van cada una a su potrero.` : ''
                         }`
@@ -687,7 +687,7 @@ function PasoCampo({
     if (!localidad) errs.localidad = 'Elegí la localidad de la lista'
     // Obligatorias: de acá sale la cuenta de los potreros.
     const ha = numeroDe(hectareas)
-    if (ha === null) errs.hectareas = 'Necesitamos las hectáreas'
+    if (ha === null) errs.hectareas = 'Faltan las hectáreas'
     else if (!Number.isFinite(ha) || ha <= 0) errs.hectareas = 'Un número mayor que cero'
     setErrores(errs)
     if (Object.keys(errs).length || !localidad || ha === null) return
@@ -771,7 +771,7 @@ function PasoCampo({
             }}
             onEscribir={() => setErrores((x) => ({ ...x, localidad: undefined }))}
             invalido={!!errores.localidad}
-            ayuda="El pueblo más cercano al campo, no tu domicilio."
+            ayuda="La localidad más cercana al campo (no la de tu casa)."
           />
           <ErrorCampo mensaje={errores.localidad} />
         </Reveal>
@@ -915,7 +915,7 @@ function PasoPotreros({
   const estado = repetido
     ? `El potrero ${repetido} está dos veces`
     : completo
-      ? '¡Completo!'
+      ? 'Completo'
       : excede
         ? `Se pasan ${ha(redondear1(-diferencia))} ha`
         : sumaHa === 0
@@ -991,7 +991,7 @@ function PasoPotreros({
       <AuthHeading
         icono={Grid2x2}
         titulo={`Los potreros de ${campo.nombre}`}
-        subtitulo={`Número y hectáreas de cada uno. Entre todos tienen que sumar las ${ha(totalCampo)} ha del campo.`}
+        subtitulo={`Número y hectáreas de cada uno. Entre todos deberían sumar las ${ha(totalCampo)} ha del campo.`}
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
         <Reveal delay={0.14} className="grid gap-2.5">
@@ -1228,7 +1228,7 @@ function avisoCarga(
   // de una vez, y por eso se mide en cabezas y no en EV.
   if (cabezas > 2000)
     return {
-      texto: `Hasta 2.000 por potrero de una vez. Las que sobren, después desde Hacienda.`,
+      texto: `Se pueden cargar hasta 2.000 por potrero. Las demás, después desde Hacienda.`,
       bloquea: true,
     }
   if (!hectareas) return null
@@ -1511,7 +1511,7 @@ function PasoHacienda({
         titulo={campoEntero ? `La hacienda de ${campo.nombre}` : `Qué hay en cada potrero`}
         subtitulo={
           campoEntero
-            ? 'Tus animales: cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las ubicás en cada uno.'
+            ? 'Cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las vas a poder ubicar en cada uno.'
             : 'Potrero por potrero: hacienda o sembrado.'
         }
       />
@@ -2114,7 +2114,7 @@ function EscenaCroquis({
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
 
-  if (etapa === 'fin') return <EscenaFinal empresa={empresa} campos={campos} />
+  if (etapa === 'fin') return <EscenaFinal campos={campos} />
 
   return (
     <div className="w-full max-w-[520px]">
@@ -2122,7 +2122,7 @@ function EscenaCroquis({
         Armemos tu campo.
       </p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
-        {etapa === 'empresa' ? 'Unos minutos y estás adentro.' : 'Se va dibujando con lo que cargás.'}
+        {etapa === 'empresa' ? 'Te lleva unos minutos.' : 'Se va dibujando con lo que cargás.'}
       </p>
 
       {/* La ficha del campo: una sola pieza sobre la escena, nada suelto. */}
@@ -2331,7 +2331,7 @@ function ProgresoOnboarding({ etapa, accion }: { etapa: Etapa; accion?: ReactNod
         ) : (
           <>
             <span className="font-medium text-primary">
-              {hechos === 1 ? 'Tu cuenta ya está' : `${hechos} de ${n} listos`}
+              {hechos === 1 ? 'Cuenta creada' : `${hechos} de ${n} listos`}
             </span>
             {' · '}
             <span className="font-medium text-foreground">{TRAMOS[indice]!.nombre}</span>
@@ -2350,7 +2350,7 @@ function ProgresoOnboarding({ etapa, accion }: { etapa: Etapa; accion?: ReactNod
  * letra y color, en un mini croquis con su hacienda, entrando en cascada
  * bajo una lluvia de confeti. Es el "mirá todo lo que armaste".
  */
-function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargado[] }) {
+function EscenaFinal({ campos }: { campos: CampoCargado[] }) {
   const hectareas = campos.reduce((s, c) => s + c.hectareas, 0)
   const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
   const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
@@ -2382,12 +2382,12 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        ¡{empresa} ya está en marcha!
+        {campos.length === 1 ? 'Así quedó tu campo' : `Así quedaron tus ${campos.length} campos`}
       </motion.p>
       <p className="mt-1 text-sm text-sidebar-foreground/60">
         {campos.length === 1
-          ? 'Así quedó tu campo con lo que cargaste.'
-          : `Así quedaron tus ${campos.length} campos con lo que cargaste.`}
+          ? 'Con lo que cargaste. Cualquier dato se puede cambiar después, desde Campos.'
+          : 'Con lo que cargaste. Cualquier dato se puede cambiar después, desde Campos.'}
       </p>
 
       {/* La empresa en cifras, contando hacia arriba. */}
