@@ -1,6 +1,7 @@
-import { type ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { CURVA } from '@/lib/animacion'
+import { RevealMudo } from '@/features/auth/reveal-mudo'
 
 /**
  * Reveal escalonado para las pantallas de auth y del onboarding: cada bloque
@@ -36,6 +37,8 @@ export function Reveal({
   className?: string
 }) {
   const quieto = useReducedMotion()
+  const mudo = useContext(RevealMudo)
+  if (mudo) return <div className={className}>{children}</div>
   return (
     // `className` va en el motion.div, que es el padre real de los children:
     // un `grid gap-2` tiene que separar label e input, no envolver al bloque.

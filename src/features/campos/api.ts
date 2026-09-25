@@ -231,6 +231,15 @@ export async function actualizarCampo(input: {
 }
 
 /**
+ * Sólo la actividad: el onboarding la calcula de lo que hay en cada potrero
+ * después de guardarlos, y no tiene por qué reescribir el resto del campo.
+ */
+export async function actualizarActividadCampo(id: string, actividad: ActividadCampo | null): Promise<void> {
+  const { error } = await supabase.from('campo').update({ actividad }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/**
  * Edición del potrero desde el mapa (vista satelital/plano): estado de ciclo,
  * hectáreas y cultivo en una sola escritura. `actualizarPotrero` no toca
  * `cultivo`; este sí, porque el panel del mapa lo edita.

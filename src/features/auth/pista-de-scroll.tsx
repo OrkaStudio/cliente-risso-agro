@@ -3,13 +3,14 @@ import { ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 /**
- * "Seguí para abajo": aparece al pie del panel cuando hay contenido que no
+ * "Bajá para continuar": aparece al pie del panel cuando hay contenido que no
  * entra y todavía no se bajó hasta el final. Un formulario largo con el
  * botón de continuar fuera de la vista se ve como una pantalla sin salida —
  * el usuario no scrollea porque nada le dice que hay algo abajo.
  *
  * Se engancha al contenedor `[data-auth-scroll]` hermano. Tocarlo baja
- * hasta el final. Se va solo al llegar.
+ * hasta el final. Se va solo al llegar, o cuando el botón marcado con
+ * `data-cta-principal` ya está a la vista.
  */
 export function PistaDeScroll() {
   const [visible, setVisible] = useState(false)
@@ -27,7 +28,13 @@ export function PistaDeScroll() {
         return
       }
       const sobra = contenedor.scrollHeight - contenedor.clientHeight
-      setVisible(sobra > 24 && contenedor.scrollTop < sobra - 24)
+      // Si el botón principal ya se ve entero, lo
+      // que queda abajo es secundario: la pista y el degradé lo tapaban y el
+      // botón que importa quedaba lavado.
+      const cta = contenedor.querySelector<HTMLElement>('[data-cta-principal]')
+      const ctaALaVista =
+        !!cta && cta.getBoundingClientRect().bottom <= contenedor.getBoundingClientRect().bottom - 8
+      setVisible(!ctaALaVista && sobra > 24 && contenedor.scrollTop < sobra - 24)
     }
     revisar()
     contenedor.addEventListener('scroll', revisar, { passive: true })
@@ -60,8 +67,11 @@ export function PistaDeScroll() {
           // Un degradé al pie: lo que queda cortado se lee como cortado, y la
           // pista no parece pegada encima de un botón.
           <motion.div
+            key="degrade"
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-background to-transparent"
+            // Opaco en la base y alto: la flecha queda sobre fondo limpio,
+            // nunca sobre texto a medio leer (se veía superpuesto).
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-32 bg-gradient-to-t from-background from-35% via-background/85 to-transparent"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -70,21 +80,24 @@ export function PistaDeScroll() {
         )}
         {visible && (
           <motion.button
+            key="pista"
             type="button"
             onClick={() => contenedor?.scrollTo({ top: contenedor.scrollHeight, behavior: quieto ? 'auto' : 'smooth' })}
-            className="absolute bottom-4 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-card/95 py-1.5 pr-3 pl-3.5 text-xs font-medium text-foreground shadow-[0_6px_20px_rgba(16,30,20,0.14)] backdrop-blur"
-            initial={{ opacity: 0, y: 8 }}
+            // En el verde de la marca, grande y con la flecha que empuja: una
+            // pastilla blanca sobre fondo claro no se veía.
+            className="absolute bottom-5 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary py-2.5 pr-4 pl-5 text-[15px] whitespace-nowrap font-semibold text-primary-foreground shadow-[0_10px_28px_-6px_rgba(23,138,85,0.6)] ring-4 ring-primary/15 transition-colors hover:bg-primary/90"
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
+            exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.25 }}
           >
-            Seguí para abajo
+            Bajá para continuar
             <motion.span
               className="inline-flex"
-              animate={quieto ? undefined : { y: [0, 3, 0] }}
-              transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+              animate={quieto ? undefined : { y: [0, 4, 0] }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <ChevronDown className="size-3.5" strokeWidth={2.5} />
+              <ChevronDown className="size-[18px]" strokeWidth={2.75} />
             </motion.span>
           </motion.button>
         )}

@@ -6,6 +6,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
 import { LoginPage } from '@/features/auth/login-page'
 import { SignupPage } from '@/features/auth/signup-page'
+import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
 import { RecuperarPage } from '@/features/auth/recuperar-page'
 import { RestablecerPage } from '@/features/auth/restablecer-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
@@ -85,10 +86,23 @@ const HistorialPage = lazy(() =>
   })),
 )
 const OnboardingPage = lazy(() =>
-  import('@/features/onboarding/onboarding-page').then((m) => ({
-    default: m.OnboardingPage,
-  })),
+  precargarOnboarding().then(() => ({ default: componenteOnboarding() })),
 )
+
+/**
+ * El onboarding: si el registro ya lo bajó (lo normal), se dibuja directo, sin
+ * pasar por Suspense — el pase del registro al onboarding no tiene cortes. Si
+ * se entra por la URL sin haberlo bajado, `lazy` como siempre.
+ */
+function OnboardingRuta() {
+  return (
+    onboardingListo() ?? (
+      <Suspense fallback={null}>
+        <OnboardingPage />
+      </Suspense>
+    )
+  )
+}
 
 export const router = createBrowserRouter([
   {
@@ -119,9 +133,7 @@ export const router = createBrowserRouter([
         // Recién registrado, sin empresa todavía: arma la suya acá.
         path: '/onboarding',
         element: (
-          <Suspense fallback={null}>
-            <OnboardingPage />
-          </Suspense>
+          <OnboardingRuta />
         ),
       },
       {

@@ -1,4 +1,5 @@
-import { type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
@@ -21,6 +22,8 @@ export function AuthLayout({
   entrada = 'suave',
   ciclo,
   pistaDeScroll = false,
+  continua = false,
+  saliendo = false,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
@@ -36,7 +39,14 @@ export function AuthLayout({
   /** Cambiarlo vuelve a montar la tarjeta y el remolque se repite. */
   ciclo?: string
   /**
-   * Muestra "Seguí para abajo" cuando el contenido no entra. Sólo donde el
+   * Llega desde otra pantalla de auth (del registro al onboarding): el
+   * paisaje no vuelve a entrar, sólo cambia el mensaje. Sin cortes.
+   */
+  continua?: boolean
+  /** Se va a otra pantalla: la tarjeta y el mensaje se desvanecen antes. */
+  saliendo?: boolean
+  /**
+   * Muestra "Bajá para continuar" cuando el contenido no entra. Sólo donde el
    * botón que importa puede quedar fuera de la vista (el cierre del
    * onboarding); en un formulario corto es ruido.
    */
@@ -51,14 +61,16 @@ export function AuthLayout({
       {/* La sombra ancha y suave hacia la derecha funde el borde entre la
           escena oscura y el panel porcelana (sin línea a cuchillo). */}
       <div className="relative z-10 hidden shadow-[24px_0_70px_-10px_rgba(7,22,9,0.5)] lg:block">
-        <AuthScene mensaje={escena} />
+        <AuthScene mensaje={escena} continua={continua} saliendo={saliendo} />
       </div>
       <div className="relative min-h-0 h-full">
         {/* Avisa que hay más abajo cuando el contenido no entra. */}
         {pistaDeScroll && <PistaDeScroll />}
         {/* scroll-smooth: cuando el teclado del teléfono empuja el input a la
             vista, el desplazamiento es un deslizamiento, no un salto. */}
-        <div data-auth-scroll className="flex h-full flex-col overflow-y-auto scroll-smooth">
+        {/* overscroll-none: sin el rebote elástico al llegar arriba o abajo,
+            que se leía como un segundo scroll. */}
+        <div data-auth-scroll className="flex h-full flex-col overflow-y-auto overscroll-none scroll-smooth">
           {/* min-h-full + relative: la escena de fondo cubre TODO el contenido
               (no sólo la primera pantalla) y se desplaza con él — frase y sol
               se van hacia arriba junto con la tarjeta, las lomas quedan al
@@ -69,17 +81,24 @@ export function AuthLayout({
             </div>
             {/* Teléfono: marca + mensaje EN EL FLUJO, arriba de la tarjeta. */}
             <div className="relative lg:hidden">
-              <MensajeEscenaMovil mensaje={escena} />
+              <MensajeEscenaMovil mensaje={escena} continua={continua} saliendo={saliendo} />
             </div>
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
-            <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:p-10">
-              <Remolque key={ciclo} activo={entrada === 'tractor'}>
-                <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
-                  {children}
-                </div>
-              </Remolque>
+            <div className="auth-marco relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:p-10">
+              <motion.div
+                className="flex w-full justify-center"
+                initial={false}
+                animate={saliendo ? { opacity: 0, y: -18, scale: 0.98 } : { opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.35, ease: [0.4, 0, 1, 1] }}
+              >
+                <Remolque key={ciclo} activo={entrada === 'tractor'}>
+                  <div className="auth-forms w-full max-w-[430px] rounded-[20px] border border-border bg-card p-5 shadow-[0_18px_50px_rgba(16,30,20,0.09)] sm:p-9">
+                    <AltoSuave>{children}</AltoSuave>
+                  </div>
+                </Remolque>
+              </motion.div>
             </div>
           </div>
         </div>
@@ -141,5 +160,45 @@ export function AuthHeading({
         </Reveal>
       )}
     </div>
+  )
+}
+
+/**
+ * La tarjeta cambia de alto con un resorte, no de un salto. Cada paso mide
+ * distinto (la empresa es un campo, la hacienda una grilla): sin esto, al
+ * cambiar de paso la tarjeta blanca pegaba un tirón y eso era lo brusco.
+ *
+ * El recorte (`overflow: hidden`) va SÓLO mientras anima: con el contenido
+ * quieto tiene que poder salirse, porque la lista de localidades cuelga por
+ * debajo del campo y un recorte fijo la cortaba.
+ */
+function AltoSuave({ children }: { children: ReactNode }) {
+  const quieto = useReducedMotion()
+  const adentro = useRef<HTMLDivElement>(null)
+  const [alto, setAlto] = useState<number | 'auto'>('auto')
+  const [animando, setAnimando] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = adentro.current
+    if (!el || quieto) return
+    const ro = new ResizeObserver(([e]) => {
+      if (e) setAlto(Math.round(e.contentRect.height))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [quieto])
+
+  if (quieto) return <>{children}</>
+  return (
+    <motion.div
+      initial={false}
+      animate={{ height: alto }}
+      transition={{ type: 'spring', stiffness: 220, damping: 30, mass: 0.9 }}
+      onAnimationStart={() => setAnimando(true)}
+      onAnimationComplete={() => setAnimando(false)}
+      style={{ overflow: animando ? 'hidden' : 'visible' }}
+    >
+      <div ref={adentro}>{children}</div>
+    </motion.div>
   )
 }

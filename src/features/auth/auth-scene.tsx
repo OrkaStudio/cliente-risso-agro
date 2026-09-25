@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useState, type ReactNode } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Leaf } from 'lucide-react'
 import { MARCA, MARCA_TAGLINE } from '@/lib/marca'
 
@@ -23,16 +23,30 @@ export function AuthScene({
   variante = 'panel',
   solAnimado = true,
   mensaje,
+  continua = false,
+  saliendo = false,
 }: {
   variante?: 'panel' | 'fondo'
   /** Ondas del sol. En escritorio siempre; en el teléfono sólo donde se pida. */
   solAnimado?: boolean
   /** Reemplaza la frase de las tres patas (el onboarding pone acá su mapa). */
   mensaje?: ReactNode
+  /** Viene de otra pantalla de auth: el paisaje ya estaba, no vuelve a entrar;
+   *  sólo el mensaje cambia, con un fundido. */
+  continua?: boolean
+  /** Se va a otra pantalla: el mensaje se desvanece antes del cambio. */
+  saliendo?: boolean
 }) {
   const compacta = variante === 'fondo'
   const ondas = !compacta || solAnimado
   const sol = compacta ? 70 : 90
+  // Del registro al onboarding (escritorio): el sol baja a la esquina y el
+  // molino se acomoda DESLIZÁNDOSE desde donde estaban, no de un salto. Las
+  // dos pantallas son rutas distintas y la escena se vuelve a montar, así que
+  // la transición se reconstruye acá: arranca en la pose del registro.
+  const desliza = continua && !!mensaje && !compacta
+  const p = useProgreso(desliza, 900)
+  const entre = (a: number, b: number) => a + (b - a) * p
   return (
     <div
       aria-hidden
@@ -68,12 +82,15 @@ export function AuthScene({
           compacta
             ? // Sol apoyado en el horizonte, a la derecha: como en escritorio.
               'absolute left-[74%] bottom-[19%] -translate-x-1/2 translate-y-1/2'
-            : mensaje
-              ? // Con el croquis del onboarding en el medio, el sol baja a la
-                // esquina: el dibujo tiene que quedar limpio.
-                'absolute left-[87%] top-[79%] -translate-x-1/2 -translate-y-1/2'
-              : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
+            : desliza
+              ? 'absolute -translate-x-1/2 -translate-y-1/2'
+              : mensaje
+                ? // Con el croquis del onboarding en el medio, el sol baja a la
+                  // esquina: el dibujo tiene que quedar limpio.
+                  'absolute left-[87%] top-[79%] -translate-x-1/2 -translate-y-1/2'
+                : 'absolute left-[68%] top-[62%] -translate-x-1/2 -translate-y-1/2'
         }
+        style={desliza ? { left: `${entre(68, 87)}%`, top: `${entre(62, 79)}%` } : undefined}
       >
         {ondas && [0, 1, 2, 3].map((i) => (
           <motion.span
@@ -114,7 +131,7 @@ export function AuthScene({
               ? '0 0 48px 14px rgba(217,138,24,0.35)'
               : '0 0 80px 24px rgba(217,138,24,0.35)',
           }}
-          initial={{ opacity: 0, scale: 0.85 }}
+          initial={continua ? false : { opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.6, ease: 'easeOut' }}
         />
@@ -154,7 +171,13 @@ export function AuthScene({
             mal el transform-origin dentro de un SVG y la rueda se separaba
             de la torre). */}
         <g
-          transform={mensaje && !compacta ? 'translate(248 150) scale(1)' : 'translate(248 94) scale(1.3)'}
+          transform={
+            desliza
+              ? `translate(248 ${entre(94, 150)}) scale(${entre(1.3, 1)})`
+              : mensaje && !compacta
+                ? 'translate(248 150) scale(1)'
+                : 'translate(248 94) scale(1.3)'
+          }
           stroke={TINTA}
           fill="none"
         >
@@ -226,7 +249,7 @@ export function AuthScene({
       {!compacta && (
         <motion.div
           className="relative"
-          initial={{ opacity: 0, y: -14 }}
+          initial={continua ? false : { opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
         >
@@ -244,10 +267,17 @@ export function AuthScene({
           van en ámbar (el color del sol de la escena). */}
       {!compacta && (
       <motion.div
-        className={mensaje ? 'relative mt-5 flex min-h-0 flex-1 flex-col items-center overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : 'relative mt-14 max-w-md'}
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}
+        // Si el mensaje no entra, scrollea sin barra; los bordes se desvanecen
+        // (máscara) en vez de cortar en seco, y el padding deja al título y
+        // al pie fuera del desvanecido cuando no hay scroll.
+        className={mensaje ? 'relative mt-1 flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-none pt-4 pb-10 [mask-image:linear-gradient(to_bottom,transparent,black_16px,black_calc(100%-40px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : 'relative mt-14 max-w-md'}
+        initial={{ opacity: 0, y: continua ? 10 : 16 }}
+        animate={saliendo ? { opacity: 0, y: -10 } : { opacity: 1, y: 0 }}
+        transition={
+          saliendo
+            ? { duration: 0.3, ease: 'easeIn' }
+            : { duration: continua ? 0.5 : 0.7, delay: continua ? 0.15 : 0.35, ease: 'easeOut' }
+        }
       >
         {mensaje ?? (<>
         <p className="font-heading text-[32px] font-semibold leading-snug tracking-tight">
@@ -271,13 +301,21 @@ export function AuthScene({
  * la escena): la tarjeta va debajo, nunca encima, tenga el mensaje el alto
  * que tenga (la frase de auth o el mapa del viaje del onboarding).
  */
-export function MensajeEscenaMovil({ mensaje }: { mensaje?: ReactNode }) {
+export function MensajeEscenaMovil({
+  mensaje,
+  continua = false,
+  saliendo = false,
+}: {
+  mensaje?: ReactNode
+  continua?: boolean
+  saliendo?: boolean
+}) {
   return (
     <motion.div
       className="relative px-5 pt-4 text-sidebar-foreground"
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
+      initial={{ opacity: 0, y: continua ? 8 : -10 }}
+      animate={saliendo ? { opacity: 0, y: -8 } : { opacity: 1, y: 0 }}
+      transition={saliendo ? { duration: 0.3, ease: 'easeIn' } : { duration: 0.6, ease: 'easeOut' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex size-6 items-center justify-center rounded-md bg-primary text-white">
@@ -294,4 +332,27 @@ export function MensajeEscenaMovil({ mensaje }: { mensaje?: ReactNode }) {
       )}
     </motion.div>
   )
+}
+
+/**
+ * Un progreso de 0 a 1 en `ms`, con salida suave, para interpolar a mano lo
+ * que framer no anima bien (el atributo `transform` de un SVG, porcentajes).
+ * Sin `activo`, o con movimiento reducido, ya vale 1.
+ */
+function useProgreso(activo: boolean, ms: number): number {
+  const quieto = useReducedMotion()
+  const [p, setP] = useState(activo && !quieto ? 0 : 1)
+  useEffect(() => {
+    if (!activo || quieto) return
+    let raf = 0
+    const t0 = performance.now()
+    const paso = (t: number) => {
+      const x = Math.min(1, (t - t0) / ms)
+      setP(1 - (1 - x) ** 3)
+      if (x < 1) raf = requestAnimationFrame(paso)
+    }
+    raf = requestAnimationFrame(paso)
+    return () => cancelAnimationFrame(raf)
+  }, [activo, quieto, ms])
+  return p
 }

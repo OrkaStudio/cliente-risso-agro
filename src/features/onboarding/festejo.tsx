@@ -82,15 +82,19 @@ export function Contador({ valor, className, sufijo }: { valor: number; classNam
 }
 
 /** El sello del final: tilde que aparece con un rebote y chispas. */
-export function SelloListo() {
+export function SelloListo({ chico = false }: { chico?: boolean }) {
   return (
     <motion.span
-      className="relative mx-auto flex size-16 items-center justify-center rounded-full bg-primary text-white shadow-[0_10px_30px_rgba(31,122,71,0.35)]"
+      className={
+        chico
+          ? 'relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-[0_8px_22px_rgba(31,122,71,0.35)]'
+          : 'relative mx-auto flex size-16 items-center justify-center rounded-full bg-primary text-white shadow-[0_10px_30px_rgba(31,122,71,0.35)]'
+      }
       initial={{ scale: 0.4, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.1 }}
     >
-      <CircleCheck className="size-8" strokeWidth={2.5} />
+      <CircleCheck className={chico ? 'size-6' : 'size-8'} strokeWidth={2.5} />
       <motion.span
         aria-hidden
         className="absolute -right-1 -top-1 text-[#e9b45f]"

@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ClipboardCheck, Mail, MailCheck, Sprout } from 'lucide-react'
 import { z } from 'zod'
@@ -9,6 +10,7 @@ import { enfocarSuave } from '@/features/auth/enfocar'
 import { CelularInput } from '@/features/auth/celular-input'
 import { PasswordInput } from '@/features/auth/password-input'
 import { Reveal } from '@/features/auth/reveal'
+import { precargarOnboarding } from '@/features/onboarding/precarga'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -56,6 +58,15 @@ export function SignupPage() {
   // celular son por donde lo vamos a contactar: se muestran grandes antes de
   // crear la cuenta, como hace WhatsApp con el número.
   const [revisando, setRevisando] = useState<Datos | null>(null)
+  // Al confirmar, la tarjeta sale antes de pasar al onboarding (sin corte).
+  const [saliendo, setSaliendo] = useState(false)
+  const qc = useQueryClient()
+
+  // Mientras revisa sus datos, el onboarding se baja de fondo: al confirmar
+  // no hay pantalla en blanco esperando el código.
+  useEffect(() => {
+    if (revisando) void precargarOnboarding()
+  }, [revisando])
   // true después de pasar por la revisión: la vuelta al form sí se desliza.
   const [yaRevisado, setYaRevisado] = useState(false)
   // Email al que se mandó el link de confirmación (cambia la pantalla).
@@ -113,8 +124,13 @@ export function SignupPage() {
       setConfirmarEn(revisando.email)
       return
     }
-    // Ya hay sesión → directo al onboarding.
-    navigate('/onboarding', { replace: true })
+    // Ya hay sesión → al onboarding, sin cortes. Una cuenta recién creada no
+    // tiene empresa: se sabe sin preguntar, y así el onboarding no pasa por
+    // "Cargando…". La tarjeta sale primero; la escena queda y sólo cambia
+    // su mensaje (el onboarding entra con `continua`).
+    qc.setQueryData(['empresa'], null)
+    setSaliendo(true)
+    window.setTimeout(() => navigate('/onboarding', { replace: true, state: { desdeRegistro: true } }), 380)
   }
 
   if (confirmarEn) {
@@ -133,7 +149,7 @@ export function SignupPage() {
   }
 
   return (
-    <AuthLayout entrada="tractor">
+    <AuthLayout entrada="tractor" saliendo={saliendo}>
       <AnimatePresence mode="wait">
         {revisando ? (
           <motion.div
@@ -145,7 +161,7 @@ export function SignupPage() {
           >
             <RevisarContacto
               datos={revisando}
-              ocupado={submitting}
+              ocupado={submitting || saliendo}
               onConfirmar={crearCuenta}
               onCorregir={() => setRevisando(null)}
             />

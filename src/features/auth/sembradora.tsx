@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /**
@@ -25,9 +25,27 @@ import { motion, useReducedMotion } from 'framer-motion'
  * Dura ~3,5 s según el alto de la pantalla. Con `prefers-reduced-motion` la
  * tarjeta aparece y ya.
  */
-export function Remolque({ activo, children }: { activo: boolean; children: ReactNode }) {
+export function Remolque({ activo: pedido, children }: { activo: boolean; children: ReactNode }) {
   const quieto = useReducedMotion()
-  if (!activo || quieto) return <>{children}</>
+  // Se decide al montar y no cambia: si el remolque pasara de tractor a
+  // suave (o al revés) con la tarjeta ya en pantalla, React desarmaría y
+  // volvería a armar todo lo de adentro, y la tarjeta saltaba de alto.
+  const [activo] = useState(pedido)
+  if (quieto) return <>{children}</>
+  // Sin tractor, la tarjeta igual ENTRA: sube un poco y aparece. Aparecer de
+  // golpe (sobre todo al llegar desde otra pantalla) se veía como un corte.
+  if (!activo) {
+    return (
+      <motion.div
+        className="flex w-full justify-center"
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {children}
+      </motion.div>
+    )
+  }
 
   // Todo en píxeles, calculado una vez: el tractor y la tarjeta tienen que
   // ir a LA MISMA velocidad, y eso no se puede expresar con "100vh" en uno y

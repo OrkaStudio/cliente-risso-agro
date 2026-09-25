@@ -35,7 +35,10 @@ export const useClima = (u: UbicacionClima | null) =>
     enabled: u !== null,
     staleTime: 15 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000,
-    retry: 1,
+    // Un corte de red de un segundo (cambio de wifi, el 4G en el campo) no
+    // puede dejar la ficha sin clima para siempre: reintenta con espera.
+    retry: 4,
+    retryDelay: (n) => Math.min(1000 * 2 ** n, 8000),
   })
 
 /** Pronóstico 7 días del campo elegido (Open-Meteo). Cambia poco → cache 1 h. */

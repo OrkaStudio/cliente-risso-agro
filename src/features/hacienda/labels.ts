@@ -24,7 +24,9 @@ export const especieLabel: Record<Especie, string> = {
  *  categoría principal. Se movió con la base sin un solo animal en esa
  *  categoría, así que no hubo nada que migrar. */
 export const categoriasPorEspecie: Record<Especie, Categoria[]> = {
-  bovino: ['vaca', 'vaquillona', 'novillo', 'ternero', 'ternera', 'toro'],
+  // Toro antes que novillo: primero el reproductor, como en la manga
+  // (`lotes/domain`). Es el orden de toda la app: onboarding, altas, filtros.
+  bovino: ['vaca', 'vaquillona', 'toro', 'novillo', 'ternero', 'ternera'],
   ovino: ['oveja', 'carnero', 'capon', 'cordero', 'cordera'],
   equino: ['yegua', 'padrillo', 'potrillo', 'potranca'],
 }
@@ -50,10 +52,10 @@ export const especiePorCategoria: Record<Categoria, Especie> = {
 export const categoriaLabel: Record<Categoria, string> = {
   vaca: 'Vaca',
   vaquillona: 'Vaquillona',
+  toro: 'Toro',
   novillo: 'Novillo',
   ternero: 'Ternero',
   ternera: 'Ternera',
-  toro: 'Toro',
   capon: 'Capón',
   oveja: 'Oveja',
   carnero: 'Carnero',
@@ -69,10 +71,10 @@ export const categoriaLabel: Record<Categoria, string> = {
 export const categoriaPlural: Record<Categoria, string> = {
   vaca: 'Vacas',
   vaquillona: 'Vaquillonas',
+  toro: 'Toros',
   novillo: 'Novillos',
   ternero: 'Terneros',
   ternera: 'Terneras',
-  toro: 'Toros',
   capon: 'Capones',
   oveja: 'Ovejas',
   carnero: 'Carneros',
@@ -119,7 +121,7 @@ export const categoriaColor: Record<Categoria, string> = {
  * categoría recicla lejos y la etiqueta desambigua.
  */
 /* OCHO, no cinco: el bovino solo ya tiene SIETE categorías (vaca, vaquillona,
- * novillo, ternero, ternera, toro, capón). Con cinco colores, `i % 5` hacía que
+ * toro, novillo, ternero, ternera, capón). Con cinco colores, `i % 5` hacía que
  * la sexta repitiera el color de la primera — en un potrero mixto, Vacas y Toros
  * salían con el MISMO punto verde y la lista mentía. Ocho cubre cualquier
  * potrero de una sola especie; sólo un potrero que mezcle bovino + ovino +

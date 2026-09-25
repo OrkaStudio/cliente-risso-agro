@@ -1,4 +1,5 @@
 import { especiePorCategoria, type Especie } from '@/features/hacienda/labels'
+import type { Uso } from '@/features/campos/use-campo-mapa'
 import type { Database } from '@/lib/supabase/types'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
@@ -11,6 +12,11 @@ export type PotreroCroquis = {
   nombre: string
   hectareas: number | null
   cabezas: CabezasPorCategoria
+  /** Qué hay hoy en el potrero. `null`: todavía no se eligió (se ve como
+   *  vacío). Sin dato (`undefined`), manda la actividad del campo. */
+  uso?: Uso | null
+  /** Lo sembrado, si es agrícola: su marca y su nombre en el croquis. */
+  cultivo?: string | null
 }
 
 export function totalCabezas(c: CabezasPorCategoria): number {

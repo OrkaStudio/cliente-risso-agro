@@ -18,6 +18,21 @@ export const actividadLabel: Record<ActividadCampo, string> = {
 }
 
 /**
+ * La actividad del campo SALE de sus potreros, no se pregunta: qué se hace
+ * lo define cada potrero (un campo mixto no tiene potreros mixtos — cada uno,
+ * en cada momento, tiene hacienda o está sembrado). Sin potreros con uno ni
+ * otro, no se sabe todavía: null.
+ */
+export function actividadDeUsos(usos: Uso[]): ActividadCampo | null {
+  const ganadero = usos.includes('ganadero')
+  const agricola = usos.includes('agricola')
+  if (ganadero && agricola) return 'mixta'
+  if (agricola) return 'agricola'
+  if (ganadero) return 'ganadera'
+  return null
+}
+
+/**
  * Con qué estado nacen los potreros según la actividad del campo: en un
  * campo agrícola arrancan en descanso (el primer estado del ciclo agrícola);
  * ganadero o mixto, en ganadero. Se cambia después por potrero.

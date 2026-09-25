@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -11,12 +11,15 @@ import {
   Droplets,
   Footprints,
   Grid2x2,
+  House,
   OctagonAlert,
   TriangleAlert,
   LandPlot,
+  Loader2,
   PencilRuler,
   Plus,
   Snowflake,
+  Sprout,
   Trash2,
   Wheat,
 } from 'lucide-react'
@@ -29,21 +32,24 @@ import {
   ErrorCampo,
 } from '@/features/auth/auth-layout'
 import { Reveal } from '@/features/auth/reveal'
-import { CURVA } from '@/lib/animacion'
+import { RevealMudo } from '@/features/auth/reveal-mudo'
 import {
+  actualizarActividadCampo,
   actualizarCampo,
   actualizarPotrero,
+  actualizarPotreroMapa,
   crearCampo,
   crearPotrero,
   eliminarPotrero,
   type ActividadCampo,
 } from '@/features/campos/api'
 import { borrarAltaOnboarding, borrarAltaOnboardingSinPotrero } from '@/features/hacienda/api'
-import { colorDeCampo } from '@/features/campos/use-campo-mapa'
+import { colorDeCampo, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
 import { useIsMobile } from '@/lib/use-is-mobile'
-import { actividadLabel, estadoInicialPorActividad } from '@/features/campos/labels'
+import { actividadDeUsos, actividadLabel } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
-import { CroquisVivo, MarcaCategoria, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
+import { CroquisVivo, MarcaCategoria, MarcaCultivo, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
+import { CULTIVOS } from '@/features/onboarding/cultivos-croquis'
 import { Confeti, Contador, SelloListo } from '@/features/onboarding/festejo'
 import {
   ESTILO_ESPECIE,
@@ -65,7 +71,7 @@ import { RECEPTIVIDAD, evDeCabezas } from '@/features/hacienda/carga-animal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Constants, type Database } from '@/lib/supabase/types'
+import type { Database } from '@/lib/supabase/types'
 import type { Localidad } from '@/lib/geocoding'
 import { cn } from '@/lib/utils'
 
@@ -76,7 +82,8 @@ type Categoria = Database['public']['Enums']['categoria_animal']
 type CampoCargado = {
   id: string
   nombre: string
-  actividad: ActividadCampo
+  /** Sale de lo que hay en sus potreros (ver `actividadDeUsos`); null hasta saberlo. */
+  actividad: ActividadCampo | null
   localidad: string
   provincia: string
   lat: number
@@ -85,11 +92,23 @@ type CampoCargado = {
   tipo: TipoCampo
   /** Índice del campo en la empresa (trigger de la DB): letra A/B/C y color. */
   colorIdx: number
-  potreros: { id: string; nombre: string; hectareas: number | null; cabezas: CabezasPorCategoria }[]
+  potreros: PotreroCargado[]
   /** Hacienda cargada sin potrero (el campo entero). */
   sueltas?: CabezasPorCategoria
   cabezas: number
 }
+
+/** Qué hay hoy en el potrero: hacienda, sembrado (y con qué) o nada. `null`
+ *  hasta que el productor lo elige: no se presupone ninguno. */
+type UsoPotrero = { uso: Uso | null; cultivo: string | null }
+type PotreroCargado = {
+  id: string
+  nombre: string
+  hectareas: number | null
+  cabezas: CabezasPorCategoria
+} & UsoPotrero
+/** Un potrero recién creado no tiene nada elegido: lo dice el productor. */
+const USO_INICIAL: UsoPotrero = { uso: null, cultivo: null }
 
 // El campo del onboarding lleva la letra de su orden (A, B, C… la pone la
 // DB). El NÚMERO sí lo elige el productor (hay quien ya tiene su numeración).
@@ -102,18 +121,24 @@ type Etapa = 'empresa' | 'campo' | 'potreros' | 'hacienda' | 'otro' | 'fin'
  * escena lo dibuja en vivo. Cada paso avisa con cada tecla.
  */
 type Borrador = {
-  campo: { nombre: string; hectareas: number | null; actividad: ActividadCampo | null }
-  potreros: { nombre: string; hectareas: number | null }[]
+  campo: { nombre: string; hectareas: number | null }
+  /** `id` si el potrero ya existe: el croquis le pone lo que tiene adentro. */
+  potreros: { id?: string; nombre: string; hectareas: number | null }[]
   /** Por potrero, cabezas por especie: el croquis las dibuja distinto. */
   cabezas: Record<string, CabezasPorCategoria>
+  /** Por potrero, qué hay: el croquis pinta surcos donde está sembrado. */
+  usos: Record<string, UsoPotrero>
+  /** El potrero que se está cargando: el croquis lo resalta. */
+  activo?: string
 }
 /** Clave del pseudo-potrero "todo el campo" en la hacienda sin potreros. */
 const TODO_EL_CAMPO = '__campo__'
 
 const BORRADOR_VACIO: Borrador = {
-  campo: { nombre: '', hectareas: null, actividad: null },
+  campo: { nombre: '', hectareas: null },
   potreros: [],
   cabezas: {},
+  usos: {},
 }
 
 /**
@@ -135,8 +160,19 @@ export function OnboardingPage() {
   const { user } = useAuth()
   const { data: membresia, isLoading } = useEmpresa()
   const esMovil = useIsMobile()
+  // Llegó recién del registro: la escena ya estaba en pantalla, así que no
+  // vuelve a entrar y la tarjeta sube suave — sin un segundo tractor a
+  // segundos del primero.
+  const desdeRegistro = !!(useLocation().state as { desdeRegistro?: boolean } | null)?.desdeRegistro
 
   const [etapa, setEtapa] = useState<Etapa>('empresa')
+  // Hacia dónde va el cambio de paso: adelante entra desde la derecha,
+  // atrás desde la izquierda. Da orientación sin decir nada.
+  const [direccion, setDireccion] = useState<1 | -1>(1)
+  function ir(sig: Etapa) {
+    setDireccion(direccionEntre(etapa, sig))
+    setEtapa(sig)
+  }
   const [ocupado, setOcupado] = useState(false)
 
   // Empresa
@@ -187,14 +223,14 @@ export function OnboardingPage() {
       return
     }
     setEmpresaId(data)
-    setEtapa('campo')
+    ir('campo')
   }
 
   /**
    * "Revisar" el último campo desde ¿Otro campo?: su hacienda ya está
    * guardada, así que se deshace el alta del onboarding (sólo esos
-   * animales) y se vuelve a la hacienda con los potreros intactos. Si era
-   * agrícola o no tenía potreros, vuelve a los potreros / al campo.
+   * animales) y se vuelve a qué hay en cada potrero, con los potreros y lo
+   * sembrado intactos (se reescriben al volver a guardar).
    */
   async function revisarUltimoCampo() {
     const c = campos[campos.length - 1]
@@ -210,7 +246,7 @@ export function OnboardingPage() {
       // se deshizo y se vuelve a guardar al confirmar.
       setCampoActual({ ...c, cabezas: 0 })
       setBorrador(BORRADOR_VACIO)
-      setEtapa(c.actividad === 'agricola' ? 'potreros' : 'hacienda')
+      ir('hacienda')
     } finally {
       setOcupado(false)
     }
@@ -224,10 +260,11 @@ export function OnboardingPage() {
   }
 
   if (isLoading) {
+    // Dentro del mismo marco, no un "Cargando…" suelto en una pantalla vacía.
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        Cargando…
-      </div>
+      <AuthLayout continua={desdeRegistro}>
+        <p className="py-10 text-center text-sm text-muted-foreground">Cargando…</p>
+      </AuthLayout>
     )
   }
 
@@ -238,9 +275,13 @@ export function OnboardingPage() {
       // El tractor remolca la tarjeta sólo al abrir y al cerrar; los pasos
       // del medio entran callados. `ciclo` vuelve a montarla para que el
       // remolque se repita en el festejo.
-      entrada={etapa === 'empresa' || etapa === 'fin' ? 'tractor' : 'suave'}
-      ciclo={etapa === 'empresa' || etapa === 'fin' ? etapa : 'medio'}
-      pistaDeScroll={etapa === 'fin'}
+      entrada={(etapa === 'empresa' && !desdeRegistro) || etapa === 'fin' ? 'tractor' : 'suave'}
+      continua={desdeRegistro}
+      // La tarjeta se monta una vez para todo el armado; sólo el festejo la
+      // vuelve a montar (y el tractor la trae de nuevo).
+      ciclo={etapa === 'fin' ? 'fin' : 'armado'}
+      // La pista de scroll donde la tarjeta puede ser más alta que la pantalla.
+      pistaDeScroll={etapa === 'fin' || etapa === 'hacienda'}
       escena={
         <EscenaCroquis
           etapa={etapa}
@@ -253,8 +294,26 @@ export function OnboardingPage() {
     >
       {/* Progreso con ventaja: la cuenta ya cuenta como hecha (Nunes & Drèze:
           un avance ya dado duplica las ganas de terminar). */}
-      <ProgresoOnboarding etapa={etapa} />
-      <AnimatePresence mode="wait">
+      <ProgresoOnboarding
+        etapa={etapa}
+        // Al terminar, la salida secundaria va ARRIBA, a la vista: al pie de
+        // la tarjeta quedaba abajo del pliegue y nadie sabía que existía.
+        accion={
+          etapa === 'fin' ? (
+            <button
+              type="button"
+              onClick={() => void entrar('/')}
+              // Un botón de verdad (borde, ícono, letra oscura): como texto
+              // gris no se veía.
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-[13px] font-semibold text-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            >
+              <House className="size-3.5" strokeWidth={2.25} />
+              Ver el inicio
+            </button>
+          ) : null
+        }
+      />
+      <AnimatePresence mode="wait" custom={direccion} initial={false}>
         {etapa === 'empresa' && (
           <Paso key="empresa">
             <AuthHeading
@@ -280,8 +339,8 @@ export function OnboardingPage() {
                 <ErrorCampo mensaje={errorEmpresa} />
               </Reveal>
               <Reveal delay={0.22} className="mt-2">
-                <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
-                  {ocupado ? 'Creando…' : 'Crear mi empresa'}
+                <Button type="submit" disabled={ocupado} className={cn(BOTON_PRINCIPAL, ocupado && OCUPADO)}>
+                  {ocupado ? <Guardando>Creando</Guardando> : 'Crear mi empresa'}
                 </Button>
               </Reveal>
             </form>
@@ -307,13 +366,13 @@ export function OnboardingPage() {
               onVolver={() => {
                 setBorrador(BORRADOR_VACIO)
                 setCorrigiendo(false)
-                setEtapa(corrigiendo ? 'potreros' : 'otro')
+                ir(corrigiendo ? 'potreros' : 'otro')
               }}
               onListo={(c) => {
                 setBorrador(BORRADOR_VACIO)
                 setCorrigiendo(false)
                 setCampoActual(c)
-                setEtapa('potreros')
+                ir('potreros')
               }}
             />
           </Paso>
@@ -331,22 +390,16 @@ export function OnboardingPage() {
               onCorregirCampo={() => {
                 setBorrador(BORRADOR_VACIO)
                 setCorrigiendo(true)
-                setEtapa('campo')
+                ir('campo')
               }}
               onListo={(potreros) => {
                 setBorrador(BORRADOR_VACIO)
-                const c = { ...campoActual, potreros }
-                setCampoActual(c)
-                // Sólo el campo agrícola se salta la hacienda. Sin potreros
-                // igual se pide: las cabezas son el dato que más vale, y
+                setCampoActual({ ...campoActual, potreros })
+                // Siempre sigue a qué hay en cada potrero: ahí se dice si
+                // tiene hacienda o está sembrado. Sin potreros igual se pide
+                // la hacienda: las cabezas son el dato que más vale, y
                 // después las ubica desde Hacienda.
-                if (c.actividad === 'agricola') {
-                  setCampos((xs) => [...xs, c])
-                  setCampoActual(null)
-                  setEtapa('otro')
-                } else {
-                  setEtapa('hacienda')
-                }
+                ir('hacienda')
               }}
             />
           </Paso>
@@ -366,29 +419,46 @@ export function OnboardingPage() {
               campo={campoActual}
               ocupado={ocupado}
               setOcupado={setOcupado}
-              onBorrador={(cabezas) => setBorrador({ ...BORRADOR_VACIO, cabezas })}
-              onVolver={() => {
+              onBorrador={(cabezas, usos, activo) => setBorrador({ ...BORRADOR_VACIO, cabezas, usos, activo })}
+              onVolver={(porPotrero, usos) => {
                 setBorrador(BORRADOR_VACIO)
+                // Lo tipeado sin guardar viaja con el campo: al volver a
+                // entrar está todo como lo dejó.
+                setCampoActual({
+                  ...campoActual,
+                  potreros: campoActual.potreros.map((p) => ({
+                    ...p,
+                    ...(usos[p.id] ?? {}),
+                    cabezas: porPotrero[p.id] ?? {},
+                  })),
+                  sueltas: porPotrero[TODO_EL_CAMPO],
+                })
                 if (campoActual.potreros.length === 0) {
                   setCorrigiendo(true)
-                  setEtapa('campo')
+                  ir('campo')
                 } else {
-                  setEtapa('potreros')
+                  ir('potreros')
                 }
               }}
-              onListo={(cabezas, porPotrero) => {
+              onListo={(cabezas, porPotrero, usos, actividad) => {
                 setBorrador(BORRADOR_VACIO)
                 setCampos((xs) => [
                   ...xs,
                   {
                     ...campoActual,
+                    actividad,
                     cabezas,
-                    potreros: campoActual.potreros.map((p) => ({ ...p, cabezas: porPotrero[p.id] ?? {} })),
+                    potreros: campoActual.potreros.map((p) => ({
+                      ...p,
+                      // Lo que no se tocó ("La completo después") queda como estaba.
+                      ...(usos[p.id] ?? {}),
+                      cabezas: porPotrero[p.id] ?? {},
+                    })),
                     sueltas: porPotrero[TODO_EL_CAMPO],
                   },
                 ])
                 setCampoActual(null)
-                setEtapa('otro')
+                ir('otro')
               }}
             />
           </Paso>
@@ -408,13 +478,13 @@ export function OnboardingPage() {
               subtitulo="Cada campo lleva su ubicación, sus potreros y su hacienda. Podés sumarlo ahora o después desde Campos."
             />
             <div className="mt-6 grid gap-2">
-              <Button className={BOTON_PRINCIPAL} onClick={() => setEtapa('campo')}>
+              <Button className={BOTON_PRINCIPAL} onClick={() => ir('campo')}>
                 Sí, cargar otro campo
               </Button>
               <Button
                 variant="outline"
                 className="h-11 w-full text-[15px] font-semibold"
-                onClick={() => setEtapa('fin')}
+                onClick={() => ir('fin')}
               >
                 No, terminar
               </Button>
@@ -432,29 +502,38 @@ export function OnboardingPage() {
 
         {etapa === 'fin' && primero && (
           <Paso key="fin">
-            <div className="text-center">
-              <SelloListo />
-              <motion.h1
-                className="mt-5 text-2xl font-bold tracking-tight"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                ¡Listo, {empresa}!
-              </motion.h1>
-              <motion.p
-                className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.45 }}
-              >
-                {campos.length === 1 ? 'Tu cuenta y tu campo, listos.' : `Tu cuenta y tus ${campos.length} campos, listos.`}
-              </motion.p>
+            {/* Encabezado en una fila: el sello al lado del título. Apilado
+                ocupaba 150 px y empujaba "Lo que sigue" abajo del pliegue. */}
+            <div className="mt-1 flex items-center gap-3.5">
+              <SelloListo chico />
+              <div className="min-w-0">
+                <motion.h1
+                  className="text-[22px] leading-tight font-bold tracking-tight"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  ¡Listo, {empresa}!
+                </motion.h1>
+                <motion.p
+                  className="mt-0.5 text-sm text-muted-foreground"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.45 }}
+                >
+                  {campos.length === 1 ? 'Tu cuenta y tu campo, listos.' : `Tu cuenta y tus ${campos.length} campos, listos.`}
+                </motion.p>
+              </div>
             </div>
 
-            {/* Lo que armó, en tres números que cuentan. */}
+            {/* PRIMERO lo que cargó, en tres números que cuentan: ver su campo
+                armado también es activación (el reconocimiento va antes que el
+                pedido). Después, lo que sigue. */}
+            {/* Los totales sólo suman algo con más de un campo: con uno, la
+                fila del campo ya dice lo mismo. */}
+            {campos.length > 1 && (
             <motion.div
-              className="mt-6 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-primary/5"
+              className="mt-4 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-primary/5"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
@@ -470,61 +549,42 @@ export function OnboardingPage() {
                 </div>
               ))}
             </motion.div>
+            )}
 
             {/* Valor ya, no promesa: cada campo con SU clima de hoy. */}
-            <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+            <ul className={cn('divide-y divide-border rounded-lg border border-border', campos.length > 1 ? 'mt-3' : 'mt-4')}>
               {campos.map((c, i) => (
                 <CampoAlFinal key={c.id} campo={c} indice={i} />
               ))}
             </ul>
-
-            {/* UN solo siguiente paso, nombrado y con su costo en tiempo. */}
-            <div className="mt-5 flex items-start gap-3 rounded-lg bg-primary/5 px-3.5 py-3">
-              {esMovil && primero.potreros.length > 0 ? (
-                <Footprints className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
-              ) : (
-                <PencilRuler className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
-              )}
-              <div className="text-sm">
-                {esMovil && primero.potreros.length > 0 ? (
-                  <>
-                    <p className="font-medium">Lo que sigue: probá la Recorrida</p>
-                    <p className="text-xs text-muted-foreground">
-                      Potrero por potrero, pasto y agua, desde el celular y sin señal. Dibujar los
-                      potreros sobre el satélite queda para cuando estés en la compu.
-                    </p>
-                  </>
-                ) : esMovil ? (
-                  <>
-                    <p className="font-medium">Lo que sigue: cargar los potreros, desde la compu</p>
-                    <p className="text-xs text-muted-foreground">
-                      Número y hectáreas de cada uno. Mientras tanto, el Modo Campo ya está listo en
-                      el celular.
-                    </p>
-                  </>
-                ) : primero.potreros.length > 0 ? (
-                  <>
-                    <p className="font-medium">Lo que sigue: dibujar los potreros sobre el satélite</p>
-                    <p className="text-xs text-muted-foreground">
-                      Cinco minutos, en la compu. Elegís cada potrero de la lista y lo marcás.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium">Lo que sigue: cargar los potreros de {primero.nombre}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Número y hectáreas de cada uno, desde Campos.
-                      {primero.cabezas > 0
-                        ? ` Después ubicás las ${primero.cabezas} cabezas en el suyo desde Hacienda.`
-                        : ''}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="mt-4 grid gap-2">
-              <Button
-                className={BOTON_PRINCIPAL}
+            {/* LO QUE SIGUE, con su dibujo, después de lo que cargó. Si queda
+                abajo del pliegue, la pista de scroll lo anuncia. */}
+            <SiguientePaso
+              variante={esMovil && primero.potreros.length > 0 ? 'recorrer' : 'dibujar'}
+              color={colorDeCampo(primero.colorIdx).hex}
+              letra={colorDeCampo(primero.colorIdx).letra}
+              titulo={
+                esMovil && primero.potreros.length > 0
+                  ? `Salí a recorrer ${primero.nombre}`
+                  : primero.potreros.length > 0
+                    ? `${primero.nombre}, potrero por potrero, sobre el satélite`
+                    : `Los potreros de ${primero.nombre}`
+              }
+              texto={
+                esMovil && primero.potreros.length > 0
+                  ? 'Pasto y agua de cada potrero, desde el celular y sin señal.'
+                  : esMovil
+                    ? 'Número y hectáreas de cada uno, desde la compu. El Modo Campo ya está listo en el celular.'
+                    : primero.potreros.length > 0
+                      ? 'Elegís cada potrero de la lista y marcás sus esquinas.'
+                      : `Número y hectáreas de cada uno, desde Campos.${
+                          primero.cabezas > 0 ? ` Después las ${primero.cabezas} cabezas van cada una a su potrero.` : ''
+                        }`
+              }
+              etiqueta={esMovil && primero.potreros.length > 0 ? 'Sin señal' : esMovil ? 'En la compu' : '5 minutos'}
+            >
+              <BotonCierre
+                icono={esMovil && primero.potreros.length > 0 ? Footprints : PencilRuler}
                 onClick={() =>
                   entrar(
                     esMovil
@@ -542,11 +602,9 @@ export function OnboardingPage() {
                   : primero.potreros.length > 0
                     ? 'Ir a dibujar mis potreros'
                     : 'Ir a cargar mis potreros'}
-              </Button>
-              <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => entrar('/')}>
-                Ver el inicio
-              </Button>
-            </div>
+              </BotonCierre>
+            </SiguientePaso>
+
           </Paso>
         )}
       </AnimatePresence>
@@ -581,7 +639,6 @@ function PasoCampo({
 }) {
   const [nombre, setNombre] = useState(existente?.nombre ?? '')
   const [tipo, setTipo] = useState<TipoCampo>(existente?.tipo ?? 'propio')
-  const [actividad, setActividad] = useState<ActividadCampo | null>(existente?.actividad ?? null)
   const [localidad, setLocalidad] = useState<Localidad | null>(
     existente
       ? { nombre: existente.localidad, provincia: existente.provincia, lat: existente.lat, lon: existente.lon }
@@ -590,7 +647,6 @@ function PasoCampo({
   const [hectareas, setHectareas] = useState(existente ? String(existente.hectareas).replace('.', ',') : '')
   const [errores, setErrores] = useState<{
     nombre?: string
-    actividad?: string
     localidad?: string
     hectareas?: string
     general?: string
@@ -601,14 +657,13 @@ function PasoCampo({
     const errs: typeof errores = {}
     const n = nombre.trim()
     if (n.length < 2) errs.nombre = 'Falta el nombre'
-    if (!actividad) errs.actividad = 'Elegí qué se hace en este campo'
     if (!localidad) errs.localidad = 'Elegí la localidad de la lista'
     // Obligatorias: de acá sale la cuenta de los potreros.
     const ha = numeroDe(hectareas)
     if (ha === null) errs.hectareas = 'Necesitamos las hectáreas'
     else if (!Number.isFinite(ha) || ha <= 0) errs.hectareas = 'Un número mayor que cero'
     setErrores(errs)
-    if (Object.keys(errs).length || !actividad || !localidad || ha === null) return
+    if (Object.keys(errs).length || !localidad || ha === null) return
 
     setOcupado(true)
     try {
@@ -618,10 +673,13 @@ function PasoCampo({
         lat: localidad.lat,
         lon: localidad.lon,
       }
+      // La actividad no se pregunta: sale de los potreros. Corrigiendo, se
+      // conserva la que ya tenía (actualizarCampo la reescribe).
+      const actividad = existente?.actividad ?? null
       const { id, colorIdx } = existente
         ? (await actualizarCampo({ id: existente.id, nombre: n, tipo, hectareas: ha, actividad, ubicacion }),
           { id: existente.id, colorIdx: existente.colorIdx })
-        : await crearCampo({ empresaId, nombre: n, tipo, hectareas: ha, actividad, ubicacion })
+        : await crearCampo({ empresaId, nombre: n, tipo, hectareas: ha, ubicacion })
       onListo({
         id,
         nombre: n,
@@ -633,7 +691,9 @@ function PasoCampo({
         hectareas: ha,
         tipo,
         colorIdx,
-        potreros: [],
+        // Corrigiendo, los potreros ya guardados siguen siendo suyos: si se
+        // perdían acá, el paso siguiente los volvía a crear (duplicados).
+        potreros: existente?.potreros ?? [],
         cabezas: 0,
       })
     } catch (err) {
@@ -653,7 +713,7 @@ function PasoCampo({
       <AuthHeading
         icono={LandPlot}
         titulo={existente ? `Corregir ${existente.nombre}` : primero ? 'Tu primer campo' : 'Otro campo'}
-        subtitulo="Cómo se llama, qué se hace, dónde está y cuántas hectáreas tiene."
+        subtitulo="Cómo se llama, dónde está y cuántas hectáreas tiene."
       />
       <form onSubmit={guardar} className="mt-5 grid gap-3.5" noValidate>
         <Reveal delay={0.14} className="grid gap-1.5">
@@ -663,7 +723,7 @@ function PasoCampo({
             value={nombre}
             onChange={(e) => {
               setNombre(e.target.value)
-              onBorrador({ nombre: e.target.value.trim(), hectareas: numeroDe(hectareas), actividad })
+              onBorrador({ nombre: e.target.value.trim(), hectareas: numeroDe(hectareas) })
               setErrores((x) => ({ ...x, nombre: undefined }))
             }}
             placeholder="Ej: Don Gilberto"
@@ -671,33 +731,6 @@ function PasoCampo({
             autoFocus
           />
           <ErrorCampo mensaje={errores.nombre} />
-        </Reveal>
-
-        <Reveal delay={0.18} className="grid gap-1.5">
-          <Label>¿Qué actividad se hace en este campo?</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {Constants.public.Enums.actividad_campo.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => {
-                  setActividad(a)
-                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(hectareas), actividad: a })
-                  setErrores((x) => ({ ...x, actividad: undefined }))
-                }}
-                className={cn(
-                  'h-9 rounded-lg border text-sm font-medium transition-colors',
-                  actividad === a
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input text-muted-foreground hover:border-ring',
-                  errores.actividad && !actividad && 'border-destructive',
-                )}
-              >
-                {actividadLabel[a]}
-              </button>
-            ))}
-          </div>
-          <ErrorCampo mensaje={errores.actividad} />
         </Reveal>
 
         <Reveal delay={0.22} className="grid gap-1.5">
@@ -752,7 +785,7 @@ function PasoCampo({
                 onChange={(e) => {
                   const v = soloDecimal(e.target.value)
                   setHectareas(v)
-                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(v), actividad })
+                  onBorrador({ nombre: nombre.trim(), hectareas: numeroDe(v) })
                   setErrores((x) => ({ ...x, hectareas: undefined }))
                 }}
                 placeholder="Según el título"
@@ -765,8 +798,8 @@ function PasoCampo({
 
         <ErrorCampo mensaje={errores.general} />
         <Reveal delay={0.32} className="mt-2 grid gap-2">
-          <Button type="submit" disabled={ocupado} className={BOTON_PRINCIPAL}>
-            {ocupado ? 'Guardando…' : existente ? 'Guardar los cambios' : 'Guardar el campo'}
+          <Button type="submit" disabled={ocupado} className={cn(BOTON_PRINCIPAL, ocupado && OCUPADO)}>
+            {ocupado ? <Guardando /> : existente ? 'Guardar los cambios' : 'Guardar el campo'}
           </Button>
         </Reveal>
       </form>
@@ -811,11 +844,20 @@ function PasoPotreros({
   const letra = colorDeCampo(campo.colorIdx).letra
 
   // Cada cambio de filas avisa al croquis de la escena.
+  function avisarCroquis(fs: FilaPotrero[]) {
+    onBorrador(fs.map((f) => ({ id: f.id, nombre: `${f.numero.trim() || '?'}${letra}`, hectareas: haDe(f) })))
+  }
   function cambiarFilas(fn: (fs: FilaPotrero[]) => FilaPotrero[]) {
     const next = fn(filas)
     setFilas(next)
-    onBorrador(next.map((f) => ({ nombre: `${f.numero.trim() || '?'}${letra}`, hectareas: haDe(f) })))
+    avisarCroquis(next)
   }
+  // Volviendo con potreros ya cargados, el croquis los muestra desde que
+  // entra — no recién cuando toca una fila (antes quedaba vacío).
+  useEffect(() => {
+    if (campo.potreros.length > 0) avisarCroquis(filas)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, [])
 
   // La regla es una sola: los potreros suman EXACTAMENTE las hectáreas del
   // campo. Ni "más o menos" ni potreros sin hectáreas — es su negocio. Quien
@@ -873,7 +915,6 @@ function PasoPotreros({
     try {
       const creados: CampoCargado['potreros'] = []
       const letra = colorDeCampo(campo.colorIdx).letra
-      const estadoCiclo = estadoInicialPorActividad(campo.actividad)
       // Los que ya existían y no están más en la lista: se borran (son
       // recién creados en este onboarding, sin historia).
       const vivos = new Set(filas.map((f) => f.id).filter(Boolean))
@@ -882,12 +923,29 @@ function PasoPotreros({
         const hectareas = haDe(f)
         const numero = f.numero.trim()
         if (f.id) {
+          // Lo que ya se dijo que hay (hacienda, sembrado) se conserva: acá
+          // sólo se corrigen número y hectáreas.
+          const prev = campo.potreros.find((p) => p.id === f.id)
+          const uso: UsoPotrero = prev ? { uso: prev.uso, cultivo: prev.cultivo } : USO_INICIAL
           // Se manda el número; la letra la fuerza el trigger de la DB.
-          await actualizarPotrero({ id: f.id, nombre: numero, estadoCiclo, hectareas })
-          creados.push({ id: f.id, nombre: `${numero}${letra}`, hectareas, cabezas: {} })
+          await actualizarPotrero({
+            id: f.id,
+            nombre: numero,
+            estadoCiclo: usoToEstadoCiclo(uso.uso ?? 'ganadero', 'ganadero'),
+            hectareas,
+          })
+          // Las cabezas tipeadas también: sin esto, volver a los potreros y
+          // guardar de nuevo dejaba la hacienda en blanco.
+          creados.push({ id: f.id, nombre: `${numero}${letra}`, hectareas, cabezas: prev?.cabezas ?? {}, ...uso })
         } else {
-          const { id, nombre } = await crearPotrero({ empresaId, campoId: campo.id, nombre: numero, estadoCiclo, hectareas })
-          creados.push({ id, nombre, hectareas, cabezas: {} })
+          const { id, nombre } = await crearPotrero({
+            empresaId,
+            campoId: campo.id,
+            nombre: numero,
+            estadoCiclo: 'ganadero',
+            hectareas,
+          })
+          creados.push({ id, nombre, hectareas, cabezas: {}, ...USO_INICIAL })
         }
       }
       onListo(creados)
@@ -1052,9 +1110,9 @@ function PasoPotreros({
           </p>
         )}
         <Reveal delay={0.26} className="mt-5 grid gap-2">
-          <Button type="submit" disabled={ocupado || !listo} className={BOTON_PRINCIPAL}>
+          <Button type="submit" disabled={ocupado || !listo} className={cn(BOTON_PRINCIPAL, ocupado && OCUPADO)}>
             {ocupado
-              ? 'Guardando…'
+              ? <Guardando />
               : listo
                 ? `Guardar ${filas.length === 1 ? 'el potrero' : `los ${filas.length} potreros`}`
                 : faltaParaGuardar}
@@ -1176,6 +1234,28 @@ function porCategoriaDe(c: Cantidades | undefined): CabezasPorCategoria {
   return out
 }
 
+const OPCIONES_USO: { uso: Uso; nombre: string; Icono: typeof Beef }[] = [
+  { uso: 'ganadero', nombre: 'Hacienda', Icono: Beef },
+  { uso: 'agricola', nombre: 'Sembrado', Icono: Sprout },
+  { uso: 'vacio', nombre: 'Vacío', Icono: Grid2x2 },
+]
+
+function faltaCultivo(u: UsoPotrero | undefined): boolean {
+  return u?.uso === 'agricola' && !u.cultivo?.trim()
+}
+
+/** Lo que le falta a un potrero para poder seguir: qué hay, o con qué está sembrado. */
+function faltaEn(u: UsoPotrero | undefined): 'uso' | 'cultivo' | null {
+  if (!u?.uso) return 'uso'
+  return faltaCultivo(u) ? 'cultivo' : null
+}
+
+/**
+ * Qué hay hoy en cada potrero. La actividad NO se pregunta por campo: en un
+ * campo mixto ningún potrero es mixto — en cada momento tiene hacienda o está
+ * sembrado —, así que se dice potrero por potrero y la del campo sale sola
+ * (`actividadDeUsos`). Reunión con Fran del 22/09.
+ */
 function PasoHacienda({
   empresaId,
   campo,
@@ -1189,19 +1269,28 @@ function PasoHacienda({
   campo: CampoCargado
   ocupado: boolean
   setOcupado: (v: boolean) => void
-  onBorrador: (cabezas: Record<string, CabezasPorCategoria>) => void
-  /** Volver a los potreros para corregirlos (nada de hacienda guardada aún). */
-  onVolver: () => void
-  onListo: (cabezas: number, porPotrero: Record<string, CabezasPorCategoria>) => void
+  onBorrador: (
+    cabezas: Record<string, CabezasPorCategoria>,
+    usos: Record<string, UsoPotrero>,
+    activo: string | undefined,
+  ) => void
+  /** Volver a los potreros (nada guardado aún): devuelve lo tipeado. */
+  onVolver: (porPotrero: Record<string, CabezasPorCategoria>, usos: Record<string, UsoPotrero>) => void
+  onListo: (
+    cabezas: number,
+    porPotrero: Record<string, CabezasPorCategoria>,
+    usos: Record<string, UsoPotrero>,
+    actividad: ActividadCampo | null,
+  ) => void
 }) {
   // Cabezas por categoría, POR POTRERO: la hacienda vive en un lugar. Se
   // recorre un potrero por vez — fichas arriba, el activo abajo — y se
   // guarda todo junto al final. Sin potreros (los dejó para después), el
-  // lugar es el campo entero: se guardan sin potrero, con el campo en el
-  // contexto del alta, y las ubica después desde Hacienda.
+  // lugar es el campo entero: sólo hacienda (lo sembrado necesita un potrero
+  // donde estar), se guarda sin potrero y la ubica después desde Hacienda.
   const campoEntero = campo.potreros.length === 0
   const potreros: CampoCargado['potreros'] = campoEntero
-    ? [{ id: TODO_EL_CAMPO, nombre: campo.nombre, hectareas: campo.hectareas, cabezas: {} }]
+    ? [{ id: TODO_EL_CAMPO, nombre: campo.nombre, hectareas: campo.hectareas, cabezas: {}, uso: 'ganadero', cultivo: null }]
     : campo.potreros
   const [porPotrero, setPorPotrero] = useState<Record<string, Cantidades>>(() => {
     // Revisando: arranca con lo que ya había cargado.
@@ -1212,25 +1301,89 @@ function PasoHacienda({
     if (campo.sueltas && totalCabezas(campo.sueltas) > 0) out[TODO_EL_CAMPO] = aCant(campo.sueltas)
     return out
   })
+  const [usos, setUsos] = useState<Record<string, UsoPotrero>>(() =>
+    Object.fromEntries(potreros.map((p) => [p.id, { uso: p.uso, cultivo: p.cultivo }])),
+  )
+  // "Otro" abierto: el cultivo se escribe. Revisando, abre solo si lo que
+  // tenía no es de la lista.
+  const [otro, setOtro] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      potreros
+        .filter((p) => p.cultivo && !(CULTIVOS as readonly string[]).includes(p.cultivo))
+        .map((p) => [p.id, true]),
+    ),
+  )
   const [especieActiva, setEspecieActiva] = useState<Especie>('bovino')
   const [indice, setIndice] = useState(0)
+  const tarjeta = useRef<HTMLDivElement>(null)
+  const acciones = useRef<HTMLDivElement>(null)
+  const quieto = useReducedMotion()
   const [vistos, setVistos] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const actual = potreros[indice]!
+  const usoActual = usos[actual.id] ?? USO_INICIAL
+  const conHacienda = (id: string) => (usos[id] ?? USO_INICIAL).uso === 'ganadero'
   const cantActual = porPotrero[actual.id] ?? {}
   const totalActual = totalDe(cantActual)
   // Un número que no cierra con las hectáreas se avisa antes de guardar, en
   // EV: la referencia es la receptividad del campo, no un conteo de cabezas.
-  const avisoActual = avisoCarga(cantActual, actual.hectareas)
-  const total = potreros.reduce((s, p) => s + totalDe(porPotrero[p.id]), 0)
+  // Sólo donde hay hacienda: lo tipeado en un potrero que después se marcó
+  // sembrado queda guardado en el formulario pero no cuenta.
+  const avisoActual = usoActual.uso === 'ganadero' ? avisoCarga(cantActual, actual.hectareas) : null
+  const total = potreros.reduce((s, p) => s + (conHacienda(p.id) ? totalDe(porPotrero[p.id]) : 0), 0)
   const esUltimo = indice === potreros.length - 1
+
+  // El croquis dibuja sólo lo que cuenta: cabezas donde hay hacienda, surcos
+  // donde está sembrado.
+  // Y resalta el potrero que se está cargando, para ubicarse de un vistazo.
+  function avisarCroquis(por: Record<string, Cantidades>, us: Record<string, UsoPotrero>, i = indice) {
+    onBorrador(
+      Object.fromEntries(
+        potreros.map((p) => [p.id, (us[p.id] ?? USO_INICIAL).uso === 'ganadero' ? porCategoriaDe(por[p.id]) : {}]),
+      ),
+      us,
+      campoEntero ? undefined : potreros[i]?.id,
+    )
+  }
+  // Al entrar (o volver a entrar) el croquis ya muestra lo que había.
+  useEffect(() => {
+    avisarCroquis(porPotrero, usos)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, [])
+
+  // Scroll que acompaña: al cambiar de potrero o de qué hay, si el botón de
+  // seguir quedó abajo del borde, la tarjeta sube LO JUSTO para mostrarlo —
+  // nunca tanto que se pierda de vista de qué potrero se trata. Si ni así
+  // entra (pantalla baja), queda la pista "Bajá para continuar".
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const contenedor = document.querySelector<HTMLElement>('[data-auth-scroll]')
+      if (!contenedor || !acciones.current || !tarjeta.current) return
+      const c = contenedor.getBoundingClientRect()
+      // Los DOS botones enteros: uno asomando cortado abajo se ve descuidado.
+      const falta = acciones.current.getBoundingClientRect().bottom - (c.bottom - 16)
+      if (falta <= 0) return
+      const hastaLaTarjeta = tarjeta.current.getBoundingClientRect().top - (c.top + 12)
+      const cuanto = Math.min(falta, Math.max(0, hastaLaTarjeta))
+      if (cuanto > 0) contenedor.scrollBy({ top: cuanto, behavior: quieto ? 'auto' : 'smooth' })
+    }, 450)
+    return () => window.clearTimeout(t)
+  }, [indice, usoActual.uso, quieto])
+
+  function cambiarUso(u: UsoPotrero) {
+    const next = { ...usos, [actual.id]: u }
+    setUsos(next)
+    setError(null)
+    avisarCroquis(porPotrero, next)
+  }
 
   function irA(i: number) {
     setVistos((v) => (v.includes(actual.id) ? v : [...v, actual.id]))
     setIndice(i)
     setEspecieActiva('bovino')
     setError(null)
+    avisarCroquis(porPotrero, usos, i)
   }
 
   async function guardar(e: FormEvent) {
@@ -1242,56 +1395,97 @@ function PasoHacienda({
         setError(avisoActual.texto)
         return
       }
+      if (faltaEn(usoActual)) return
       irA(indice + 1)
       return
     }
-    const bloqueado = potreros.find((p) => avisoCarga(porPotrero[p.id], p.hectareas)?.bloquea)
+    const bloqueado = potreros.find((p) => conHacienda(p.id) && avisoCarga(porPotrero[p.id], p.hectareas)?.bloquea)
     if (bloqueado) {
       setError(`Potrero ${bloqueado.nombre}: ${avisoCarga(porPotrero[bloqueado.id], bloqueado.hectareas)!.texto}`)
       return
     }
-    const totales = Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(porPotrero[p.id])]))
-    if (total === 0) {
-      onListo(0, totales)
+    const incompleto = potreros.findIndex((p) => faltaEn(usos[p.id]))
+    if (incompleto >= 0) {
+      const p = potreros[incompleto]!
+      irA(incompleto)
+      setError(
+        faltaEn(usos[p.id]) === 'uso'
+          ? `Falta elegir qué hay en el potrero ${p.nombre}`
+          : `Potrero ${p.nombre}: falta qué está sembrado`,
+      )
+      return
+    }
+    const totales = Object.fromEntries(
+      potreros.map((p) => [p.id, conHacienda(p.id) ? porCategoriaDe(porPotrero[p.id]) : {}]),
+    )
+    if (campoEntero && total === 0) {
+      onListo(0, totales, {}, campo.actividad)
       return
     }
     setError(null)
     setOcupado(true)
-    for (const p of potreros) {
-      const items = (Object.entries(porPotrero[p.id] ?? {}) as [Categoria, string][])
-        .map(([categoria, v]) => ({ categoria, cantidad: parseInt(v, 10) || 0 }))
-        .filter((x) => x.cantidad > 0)
-      if (items.length === 0) continue
-      const { error } = await supabase.rpc('crear_animales_masivo', {
-        p_empresa_id: empresaId,
-        p_potrero_id: p.id === TODO_EL_CAMPO ? undefined : p.id,
-        p_items: items,
-        p_origen: 'onboarding',
-        // Sin potrero, que quede dicho de qué campo son.
-        p_contexto: p.id === TODO_EL_CAMPO ? { campo_id: campo.id, campo: campo.nombre } : undefined,
-      })
-      if (error) {
-        setOcupado(false)
-        setError(`${p.id === TODO_EL_CAMPO ? campo.nombre : `Potrero ${p.nombre}`}: ${error.message}`)
-        return
+    try {
+      if (!campoEntero) {
+        // Qué hay en cada uno, a la base: el estado del ciclo y el cultivo.
+        // Idempotente — revisar y volver a guardar lo reescribe igual.
+        for (const p of potreros) {
+          const u = usos[p.id] ?? USO_INICIAL
+          await actualizarPotreroMapa({
+            id: p.id,
+            estadoCiclo: usoToEstadoCiclo(u.uso ?? 'ganadero', 'ganadero'),
+            hectareas: p.hectareas,
+            cultivo: u.uso === 'agricola' ? u.cultivo!.trim() : null,
+          })
+        }
       }
+      for (const p of potreros) {
+        if (!conHacienda(p.id)) continue
+        const items = (Object.entries(porPotrero[p.id] ?? {}) as [Categoria, string][])
+          .map(([categoria, v]) => ({ categoria, cantidad: parseInt(v, 10) || 0 }))
+          .filter((x) => x.cantidad > 0)
+        if (items.length === 0) continue
+        const { error } = await supabase.rpc('crear_animales_masivo', {
+          p_empresa_id: empresaId,
+          p_potrero_id: p.id === TODO_EL_CAMPO ? undefined : p.id,
+          p_items: items,
+          p_origen: 'onboarding',
+          // Sin potrero, que quede dicho de qué campo son.
+          p_contexto: p.id === TODO_EL_CAMPO ? { campo_id: campo.id, campo: campo.nombre } : undefined,
+        })
+        if (error) throw new Error(`${p.id === TODO_EL_CAMPO ? campo.nombre : `Potrero ${p.nombre}`}: ${error.message}`)
+      }
+      const actividad = campoEntero
+        ? 'ganadera'
+        : actividadDeUsos(potreros.flatMap((p) => usos[p.id]?.uso ?? []))
+      await actualizarActividadCampo(campo.id, actividad)
+      onListo(total, totales, campoEntero ? {} : usos, actividad)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar.')
+    } finally {
+      setOcupado(false)
     }
-    setOcupado(false)
-    onListo(total, totales)
   }
+
+  const falta = faltaEn(usoActual)
+  const bloqueaActual = avisoActual?.bloquea || !!falta
 
   return (
     <>
-      <VolverArriba onClick={onVolver} disabled={ocupado}>
+      <VolverArriba
+        onClick={() =>
+          onVolver(Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(porPotrero[p.id])])), usos)
+        }
+        disabled={ocupado}
+      >
         {campoEntero ? `Los datos de ${campo.nombre}` : `Los potreros de ${campo.nombre}`}
       </VolverArriba>
       <AuthHeading
-        icono={Beef}
-        titulo={`La hacienda de ${campo.nombre}`}
+        icono={campoEntero ? Beef : Sprout}
+        titulo={campoEntero ? `La hacienda de ${campo.nombre}` : `Qué hay en cada potrero`}
         subtitulo={
           campoEntero
             ? 'Tus animales: cuántas cabezas hay hoy en todo el campo. Cuando cargues los potreros, las ubicás en cada uno.'
-            : 'Tus animales: cuántas cabezas hay hoy en cada potrero. Si está vacío, pasás al siguiente.'
+            : 'Potrero por potrero: hacienda o sembrado.'
         }
       />
       <form onSubmit={guardar} className="mt-5" noValidate>
@@ -1316,7 +1510,16 @@ function PasoHacienda({
           </div>
           <div className={cn('mt-2.5 flex flex-wrap gap-1.5', campoEntero && 'hidden')}>
             {potreros.map((p, i) => {
-              const t = totalDe(porPotrero[p.id])
+              const u = usos[p.id] ?? USO_INICIAL
+              const t = u.uso === 'ganadero' ? totalDe(porPotrero[p.id]) : 0
+              const resumen =
+                u.uso === 'agricola'
+                  ? u.cultivo?.trim() || null
+                  : u.uso === 'vacio'
+                    ? 'vacío'
+                    : t > 0
+                      ? String(t)
+                      : null
               const visto = vistos.includes(p.id)
               const activo = i === indice
               return (
@@ -1335,10 +1538,11 @@ function PasoHacienda({
                   )}
                 >
                   {visto && !activo && <Check className="size-3" strokeWidth={3} />}
+                  {u.uso === 'agricola' && <Sprout className="size-3" strokeWidth={2.25} />}
                   {p.nombre}
-                  {t > 0 && (
+                  {resumen && (
                     <span className={cn('font-medium tabular-nums', activo ? 'text-white/80' : 'text-primary/80')}>
-                      · {t}
+                      · {resumen}
                     </span>
                   )}
                 </button>
@@ -1349,115 +1553,231 @@ function PasoHacienda({
 
         {/* El potrero activo. Entra desde la derecha, como pasar una hoja. */}
         <Reveal delay={0.18} className="mt-3">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={actual.id}
-              initial={{ opacity: 0, x: 18 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -18 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="rounded-lg border border-border px-3.5 py-3"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-[15px] font-semibold">
-                  {campoEntero ? campo.nombre : `Potrero ${actual.nombre}`}
-                  {actual.hectareas ? (
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">{ha(actual.hectareas)} ha</span>
-                  ) : null}
-                </p>
-                {campoEntero ? (
-                  <p className={cn('text-xs tabular-nums', totalActual > 0 ? 'font-medium text-primary' : 'text-muted-foreground')}>
-                    {totalActual > 0 ? `${totalActual} ${totalActual === 1 ? 'cabeza' : 'cabezas'}` : 'Todavía vacío'}
+          <div ref={tarjeta}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={actual.id}
+                initial={{ opacity: 0, x: 18 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -18 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="rounded-lg border border-border px-3.5 py-3"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-[15px] font-semibold">
+                    {campoEntero ? campo.nombre : `Potrero ${actual.nombre}`}
+                    {actual.hectareas ? (
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">{ha(actual.hectareas)} ha</span>
+                    ) : null}
                   </p>
-                ) : totalActual === 0 ? (
-                  <p className="text-xs text-muted-foreground">Todavía vacío</p>
-                ) : null}
-              </div>
-              {/* Una especie por vez: pestañas con el conteo de cada una. Casi
-                  todos cargan sólo vacunos; las otras están a un toque. */}
-              <div className="mt-3 flex gap-1 rounded-lg bg-secondary p-1" role="tablist" aria-label="Especie">
-                {ESPECIES.map((e) => {
-                  const t = totalDeEspecie(cantActual, e)
-                  const activa = especieActiva === e
-                  return (
-                    <button
-                      key={e}
-                      type="button"
-                      role="tab"
-                      aria-selected={activa}
-                      onClick={() => setEspecieActiva(e)}
-                      className={cn(
-                        'flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors',
-                        activa ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      <span
-                        className="inline-block size-2 rounded-full"
-                        style={{ background: ESTILO_ESPECIE[e].color, opacity: activa || t > 0 ? 1 : 0.35 }}
-                      />
-                      {especieLabel[e]}s
-                      {t > 0 && <span className="tabular-nums text-primary">{t}</span>}
-                    </button>
-                  )
-                })}
-              </div>
+                  {usoActual.uso === 'ganadero' && (
+                    <p className={cn('text-xs tabular-nums', totalActual > 0 ? 'font-medium text-primary' : 'text-muted-foreground')}>
+                      {totalActual > 0 ? `${totalActual} ${totalActual === 1 ? 'cabeza' : 'cabezas'}` : 'Sin cabezas todavía'}
+                    </p>
+                  )}
+                </div>
 
-              {/* Las categorías, agrupadas como en el croquis: vientres · crías · machos. */}
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={especieActiva}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.15 }}
-                  className="mt-3 grid gap-3"
-                >
-                  {GRUPOS_ROL.map(({ rol, nombre }) => {
-                    const cats = categoriasPorEspecie[especieActiva].filter((c) => ROL_POR_CATEGORIA[c] === rol)
-                    if (cats.length === 0) return null
-                    return (
-                      <div key={rol} className="grid gap-1.5">
-                        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          <svg width="20" height="16" viewBox="-13 -12 26 21" aria-hidden>
-                            <MarcaCategoria categoria={cats[0]!} />
-                          </svg>
+                {/* Qué hay hoy: un toque. Hacienda de entrada, que es lo más común. */}
+                {!campoEntero && (
+                  <div className="mt-3 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Qué hay en el potrero">
+                    {OPCIONES_USO.map(({ uso, nombre, Icono }) => {
+                      const activo = usoActual.uso === uso
+                      return (
+                        <button
+                          key={uso}
+                          type="button"
+                          role="radio"
+                          aria-checked={activo}
+                          onClick={() => cambiarUso({ uso, cultivo: uso === 'agricola' ? usoActual.cultivo : null })}
+                          className={cn(
+                            // En el teléfono los tres tienen ~90 px: letra y aire justos para que entren.
+                            'flex h-9 min-w-0 items-center justify-center gap-1 rounded-lg border px-1 text-[13px] font-medium transition-colors sm:gap-1.5 sm:text-sm',
+                            activo
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-input text-muted-foreground hover:border-ring',
+                          )}
+                        >
+                          <Icono className="hidden size-3.5 shrink-0 min-[400px]:block" strokeWidth={2} />
                           {nombre}
-                        </p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {cats.map((c, k) => (
-                            <label key={c} className="grid gap-1">
-                              <span className="truncate text-xs text-muted-foreground">{categoriaPlural[c]}</span>
-                              <Input
-                                inputMode="numeric"
-                                value={cantActual[c] ?? ''}
-                                autoFocus={rol === 'hembra' && k === 0}
-                                onChange={(ev) => {
-                                  setError(null)
-                                  const next = {
-                                    ...porPotrero,
-                                    [actual.id]: {
-                                      ...(porPotrero[actual.id] ?? {}),
-                                      [c]: soloEntero(ev.target.value),
-                                    },
-                                  }
-                                  setPorPotrero(next)
-                                  onBorrador(
-                                    Object.fromEntries(potreros.map((p) => [p.id, porCategoriaDe(next[p.id])])),
-                                  )
-                                }}
-                                placeholder="0"
-                                className="px-2.5 tabular-nums"
-                              />
-                            </label>
-                          ))}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={usoActual.uso}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {usoActual.uso === 'ganadero' ? (
+                      <>
+                        {/* Una especie por vez: pestañas con el conteo de cada una. Casi
+                            todos cargan sólo vacunos; las otras están a un toque. */}
+                        <div className="mt-3 flex gap-1 rounded-lg bg-secondary p-1" role="tablist" aria-label="Especie">
+                          {ESPECIES.map((e) => {
+                            const t = totalDeEspecie(cantActual, e)
+                            const activa = especieActiva === e
+                            return (
+                              <button
+                                key={e}
+                                type="button"
+                                role="tab"
+                                aria-selected={activa}
+                                onClick={() => setEspecieActiva(e)}
+                                className={cn(
+                                  'flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-semibold transition-colors',
+                                  activa ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                              >
+                                <span
+                                  className="inline-block size-2 rounded-full"
+                                  style={{ background: ESTILO_ESPECIE[e].color, opacity: activa || t > 0 ? 1 : 0.35 }}
+                                />
+                                {especieLabel[e]}s
+                                {t > 0 && <span className="tabular-nums text-primary">{t}</span>}
+                              </button>
+                            )
+                          })}
                         </div>
+
+                        {/* Una FILA por grupo —vientres · crías · machos—: el nombre del
+                            grupo a la izquierda y sus casilleros al lado, todos sobre
+                            la misma grilla. En columnas, las especies con un solo
+                            vientre o un solo macho (ovinos, equinos) dejaban huecos. */}
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.div
+                            key={especieActiva}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.15 }}
+                            className="mt-3.5 grid gap-3"
+                          >
+                            {GRUPOS_ROL.map(({ rol, nombre }) => {
+                              const cats = categoriasPorEspecie[especieActiva].filter((c) => ROL_POR_CATEGORIA[c] === rol)
+                              if (cats.length === 0) return null
+                              return (
+                                <div key={rol} className="grid grid-cols-2 items-end gap-x-2.5 gap-y-1 sm:grid-cols-[6.75rem_1fr_1fr] sm:gap-y-2.5">
+                                  {/* Letra generosa: la usa gente grande, muchas veces sin anteojos. */}
+                                  {/* En el teléfono el grupo va ARRIBA de sus casilleros: al costado
+                                      no entraba "Vaquillonas" a este tamaño de letra. */}
+                                  <p className="col-span-2 inline-flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground sm:col-span-1 sm:h-11">
+                                    <svg width="20" height="16" viewBox="-13 -12 26 21" aria-hidden className="shrink-0">
+                                      <MarcaCategoria categoria={cats[0]!} />
+                                    </svg>
+                                    {nombre}
+                                  </p>
+                                    {cats.map((c, k) => (
+                                      <label key={c} className="grid min-w-0 gap-1">
+                                        <span className="truncate text-[15px] text-foreground/80">{categoriaPlural[c]}</span>
+                                        <Input
+                                          inputMode="numeric"
+                                          value={cantActual[c] ?? ''}
+                                          autoFocus={rol === 'hembra' && k === 0}
+                                          onChange={(ev) => {
+                                            setError(null)
+                                            const next = {
+                                              ...porPotrero,
+                                              [actual.id]: {
+                                                ...(porPotrero[actual.id] ?? {}),
+                                                [c]: soloEntero(ev.target.value),
+                                              },
+                                            }
+                                            setPorPotrero(next)
+                                            avisarCroquis(next, usos)
+                                          }}
+                                          placeholder="0"
+                                          className="h-11 px-3 text-[17px] tabular-nums md:text-[17px]"
+                                        />
+                                      </label>
+                                    ))}
+                                </div>
+                              )
+                            })}
+                          </motion.div>
+                        </AnimatePresence>
+                      </>
+                    ) : usoActual.uso === 'agricola' ? (
+                      <div className="mt-3 grid gap-1.5">
+                        <p className="text-sm text-foreground/80">¿Qué está sembrado?</p>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {CULTIVOS.map((c) => {
+                            const activo = !otro[actual.id] && usoActual.cultivo === c
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  setOtro((o) => ({ ...o, [actual.id]: false }))
+                                  cambiarUso({ uso: 'agricola', cultivo: c })
+                                }}
+                                className={cn(
+                                  'flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg border text-[13px] font-medium transition-colors',
+                                  activo
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-input text-muted-foreground hover:border-ring',
+                                )}
+                              >
+                                <svg
+                                  width="18"
+                                  height="15"
+                                  viewBox="-13 -12 26 21"
+                                  aria-hidden
+                                  className="hidden shrink-0 min-[400px]:block"
+                                >
+                                  <MarcaCultivo cultivo={c} />
+                                </svg>
+                                {c}
+                              </button>
+                            )
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOtro((o) => ({ ...o, [actual.id]: true }))
+                              cambiarUso({ uso: 'agricola', cultivo: '' })
+                            }}
+                            className={cn(
+                              'col-span-2 h-10 rounded-lg border text-[13px] font-medium transition-colors',
+                              otro[actual.id]
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-input text-muted-foreground hover:border-ring',
+                            )}
+                          >
+                            Otro
+                          </button>
+                        </div>
+                        {otro[actual.id] && (
+                          <Input
+                            aria-label="Cultivo"
+                            value={usoActual.cultivo ?? ''}
+                            autoFocus
+                            maxLength={40}
+                            onChange={(e) => cambiarUso({ uso: 'agricola', cultivo: e.target.value })}
+                            placeholder="Ej: Cebada, sorgo, avena…"
+                          />
+                        )}
                       </div>
-                    )
-                  })}
-                </motion.div>
-              </AnimatePresence>
-            </motion.div>
-          </AnimatePresence>
+                    ) : usoActual.uso === 'vacio' ? (
+                      // Corto y con la misma muestra gris del croquis: se ve,
+                      // no hay que leerlo.
+                      <div className="mt-3 flex items-center gap-2.5 rounded-lg bg-secondary px-3 py-2.5">
+                        <span aria-hidden className="size-5 shrink-0 rounded border border-border bg-muted-foreground/15" />
+                        <p className="text-xs leading-snug">
+                          <span className="font-medium">En descanso.</span>{' '}
+                          <span className="text-muted-foreground">Se cambia en el mapa cuando entre hacienda o se siembre.</span>
+                        </p>
+                      </div>
+                    ) : null}
+                  </motion.div>
+                </AnimatePresence>
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </Reveal>
 
         {error ? (
@@ -1465,35 +1785,47 @@ function PasoHacienda({
         ) : avisoActual ? (
           <Aviso tono={avisoActual.bloquea ? 'error' : 'atencion'}>{avisoActual.texto}</Aviso>
         ) : null}
-        <Reveal delay={0.22} className="mt-5 grid gap-2">
-          <Button
-            type="submit"
-            disabled={ocupado || avisoActual?.bloquea}
-            className={cn(BOTON_PRINCIPAL, avisoActual?.bloquea && 'opacity-50')}
-          >
-            {ocupado ? (
-              'Guardando…'
-            ) : !esUltimo ? (
-              <>
-                {totalActual > 0 ? 'Listo, siguiente potrero' : 'Está vacío, siguiente'}
-                <ArrowRight className="size-4" />
-              </>
-            ) : total > 0 ? (
-              `Guardar ${total} ${total === 1 ? 'cabeza' : 'cabezas'}`
-            ) : (
-              'Terminar sin hacienda'
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-full text-[15px] font-medium"
-            disabled={ocupado}
-            onClick={() => onListo(0, {})}
-          >
-            La completo después
-          </Button>
-        </Reveal>
+        {/* El botón de seguir tiene que estar a la vista: la tarjeta entra
+            en la pantalla, y si igual queda abajo (pantalla baja) se acomoda
+            el scroll solo y aparece la pista "Bajá para continuar". */}
+        <div ref={acciones} className="mt-5">
+          <Reveal delay={0.22} className="grid gap-2">
+            <Button
+              data-cta-principal
+              type="submit"
+              disabled={ocupado || bloqueaActual}
+              className={cn(BOTON_PRINCIPAL, bloqueaActual && !ocupado && 'opacity-50', ocupado && OCUPADO)}
+            >
+              {ocupado ? (
+                <Guardando />
+              ) : falta === 'uso' ? (
+                `Elegí qué hay en ${actual.nombre}`
+              ) : falta === 'cultivo' ? (
+                'Elegí qué está sembrado'
+              ) : !esUltimo ? (
+                <>
+                  {usoActual.uso === 'ganadero' && totalActual === 0 ? 'Siguiente potrero' : 'Listo, siguiente potrero'}
+                  <ArrowRight className="size-4" />
+                </>
+              ) : campoEntero && total === 0 ? (
+                'Terminar sin hacienda'
+              ) : (
+                // General a propósito: "Guardar 23 cabezas" en un campo con
+                // siembra se leía como si lo sembrado no se guardara.
+                `Terminar ${campo.nombre}`
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full text-[14px] font-medium"
+              disabled={ocupado}
+              onClick={() => onListo(0, {}, {}, campo.actividad)}
+            >
+              La completo después
+            </Button>
+          </Reveal>
+        </div>
       </form>
     </>
   )
@@ -1544,16 +1876,67 @@ function VolverArriba({
  * y eso crea contexto de apilado, que fue lo que encerró la lista de
  * localidades debajo de los campos siguientes.
  */
+/**
+ * Guardando, sin apagar el botón: el botón a media opacidad se leía como
+ * "algo se cargó" y después el paso volvía a cargar — la doble carga.
+ * Queda entero, con un giro chico y la palabra.
+ */
+const OCUPADO = 'disabled:opacity-100'
+function Guardando({ children = 'Guardando' }: { children?: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
+      {children}
+    </span>
+  )
+}
+
+const ORDEN_ETAPAS: Etapa[] = ['empresa', 'campo', 'potreros', 'hacienda', 'otro', 'fin']
+
+/**
+ * Adelante o atrás, según el recorrido: "otro campo" vuelve a Campo pero es
+ * AVANZAR (un campo nuevo), y arrepentirse de cargar otro campo vuelve a
+ * "¿Tenés otro campo?" pero es RETROCEDER.
+ */
+function direccionEntre(desde: Etapa, hacia: Etapa): 1 | -1 {
+  if (desde === 'otro' && hacia === 'campo') return 1
+  if (desde === 'campo' && hacia === 'otro') return -1
+  return ORDEN_ETAPAS.indexOf(hacia) >= ORDEN_ETAPAS.indexOf(desde) ? 1 : -1
+}
+
+/**
+ * Un paso entrando y saliendo. El que se va sale RÁPIDO y corto hacia el lado
+ * contrario; el que llega se desliza desde el lado del avance con un resorte
+ * sin rebote. Adentro, cada bloque (`Reveal`) sigue escalonado: la tarjeta se
+ * arma, no aparece entera de golpe.
+ */
+const PASO_VARIANTES = {
+  entrar: (dir: 1 | -1) => ({ opacity: 0, x: 28 * dir }),
+  quieto: { opacity: 1, x: 0 },
+  salir: (dir: 1 | -1) => ({ opacity: 0, x: -20 * dir, transition: { duration: 0.18, ease: 'easeIn' as const } }),
+}
+
 function Paso({ children }: { children: ReactNode }) {
   const quieto = useReducedMotion()
+  if (quieto) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <RevealMudo.Provider value>{children}</RevealMudo.Provider>
+      </motion.div>
+    )
+  }
   return (
     <motion.div
-      initial={quieto ? { opacity: 0 } : { opacity: 0, y: 12 }}
-      animate={quieto ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      exit={quieto ? { opacity: 0 } : { opacity: 0, y: -10 }}
-      transition={{ duration: quieto ? 0.2 : 0.42, ease: CURVA }}
+      variants={PASO_VARIANTES}
+      initial="entrar"
+      animate="quieto"
+      exit="salir"
+      transition={{
+        x: { type: 'spring', stiffness: 260, damping: 32, mass: 0.9 },
+        opacity: { duration: 0.3, ease: 'easeOut' },
+      }}
     >
-      {children}
+      <RevealMudo.Provider value>{children}</RevealMudo.Provider>
     </motion.div>
   )
 }
@@ -1604,7 +1987,7 @@ function EscenaCroquis({
       ? {
           nombre: borrador.campo.nombre,
           hectareas: borrador.campo.hectareas,
-          actividad: borrador.campo.actividad,
+          actividad: null,
           potreros: [],
           estado: 'campo',
         }
@@ -1614,12 +1997,19 @@ function EscenaCroquis({
             hectareas: campoActual.hectareas,
             actividad: campoActual.actividad,
             color: colorDeCampo(campoActual.colorIdx).hex,
-            potreros: borrador.potreros.map((p, i) => ({
-              clave: `${i}`,
-              nombre: p.nombre,
-              hectareas: p.hectareas,
-              cabezas: {},
-            })),
+            potreros: borrador.potreros.map((p, i) => {
+              // Volviendo: el potrero ya existe y se dibuja con lo que tiene.
+              const ya = p.id ? campoActual.potreros.find((x) => x.id === p.id) : undefined
+              return {
+                clave: `${i}`,
+                nombre: p.nombre,
+                hectareas: p.hectareas,
+                cabezas: ya?.uso === 'ganadero' ? ya.cabezas : {},
+                // Sin elegir todavía: gris, como vacío (no verde de ganadero).
+                uso: ya?.uso ?? null,
+                cultivo: ya?.cultivo,
+              }
+            }),
             estado: 'potreros',
           }
         : etapa === 'hacienda' && campoActual
@@ -1633,9 +2023,12 @@ function EscenaCroquis({
                 nombre: p.nombre,
                 hectareas: p.hectareas,
                 cabezas: borrador.cabezas[p.id] ?? {},
+                uso: (borrador.usos[p.id] ?? p).uso ?? null,
+                cultivo: (borrador.usos[p.id] ?? p).cultivo,
               })),
               sueltas: borrador.cabezas[TODO_EL_CAMPO],
               estado: 'hacienda',
+              activo: borrador.activo,
             }
           : ultimo
             ? {
@@ -1648,6 +2041,8 @@ function EscenaCroquis({
                   nombre: p.nombre,
                   hectareas: p.hectareas,
                   cabezas: p.cabezas,
+                  uso: p.uso ?? null,
+                  cultivo: p.cultivo,
                 })),
                 sueltas: ultimo.sueltas,
                 estado: 'hecho',
@@ -1657,7 +2052,7 @@ function EscenaCroquis({
   const partes: { etapa: Etapa; nombre: string }[] = [
     { etapa: 'campo', nombre: 'Datos' },
     { etapa: 'potreros', nombre: 'Potreros' },
-    ...(croquis.actividad === 'agricola' ? [] : [{ etapa: 'hacienda' as Etapa, nombre: 'Hacienda' }]),
+    { etapa: 'hacienda', nombre: 'Qué hay' },
   ]
   const indiceParte = partes.findIndex((p) => p.etapa === etapa)
   const cabezasCroquis =
@@ -1672,6 +2067,16 @@ function EscenaCroquis({
       .filter(([, n]) => n > 0)
     return { especie, total: categorias.reduce((s, [, n]) => s + n, 0), categorias }
   }).filter((e) => e.total > 0)
+  // Lo sembrado, por cultivo, con sus hectáreas: la leyenda de la siembra.
+  const porCultivoCroquis = Object.values(
+    croquis.potreros.reduce<Record<string, { cultivo: string; ha: number }>>((acc, p) => {
+      const c = p.uso === 'agricola' ? p.cultivo?.trim() : null
+      if (!c) return acc
+      const k = c.toLowerCase()
+      acc[k] = { cultivo: acc[k]?.cultivo ?? c, ha: (acc[k]?.ha ?? 0) + (p.hectareas ?? 0) }
+      return acc
+    }, {}),
+  )
   const potrerosConHa = croquis.potreros.filter((p) => p.hectareas).length
   const nPotreros = croquis.estado === 'potreros' ? potrerosConHa : croquis.potreros.length
   const anteriores = campos.filter((c) => (enCampo ? true : c.id !== ultimo?.id))
@@ -1754,7 +2159,7 @@ function EscenaCroquis({
           </div>
           {/* Una línea: la silueta y el total de cada especie. El detalle por
               categoría vive en la tarjeta, donde lo está cargando. */}
-          {porEspecieCroquis.length > 0 && (
+          {porEspecieCroquis.length + porCultivoCroquis.length > 0 && (
             <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-sidebar-foreground/10 pt-2.5 text-[13px]">
               {porEspecieCroquis.map(({ especie, total, categorias }) => (
                 <li key={especie} className="inline-flex items-center gap-1.5 tabular-nums">
@@ -1763,6 +2168,15 @@ function EscenaCroquis({
                   </svg>
                   <span className="font-semibold">{total}</span>
                   <span className="text-sidebar-foreground/70">{ESTILO_ESPECIE[especie].nombre}</span>
+                </li>
+              ))}
+              {porCultivoCroquis.map(({ cultivo, ha: hectareas }) => (
+                <li key={`cultivo-${cultivo}`} className="inline-flex items-center gap-1.5 tabular-nums">
+                  <svg width="22" height="18" viewBox="-13 -12 26 21" aria-hidden>
+                    <MarcaCultivo cultivo={cultivo} />
+                  </svg>
+                  <span className="font-semibold">{cultivo}</span>
+                  {hectareas > 0 && <span className="text-sidebar-foreground/70">{ha(hectareas)} ha</span>}
                 </li>
               ))}
             </ul>
@@ -1818,11 +2232,11 @@ const TRAMOS: { etapa: Etapa | 'cuenta'; nombre: string }[] = [
   { etapa: 'empresa', nombre: 'Empresa' },
   { etapa: 'campo', nombre: 'Campo' },
   { etapa: 'potreros', nombre: 'Potreros' },
-  { etapa: 'hacienda', nombre: 'Hacienda' },
+  { etapa: 'hacienda', nombre: 'Qué hay' },
   { etapa: 'fin', nombre: 'Listo' },
 ]
 
-function ProgresoOnboarding({ etapa }: { etapa: Etapa }) {
+function ProgresoOnboarding({ etapa, accion }: { etapa: Etapa; accion?: ReactNode }) {
   // 'otro' (¿otro campo?) cuenta como hacienda terminada.
   const actual = etapa === 'otro' ? 'fin' : etapa
   const indice = Math.max(0, TRAMOS.findIndex((t) => t.etapa === actual))
@@ -1877,7 +2291,8 @@ function ProgresoOnboarding({ etapa }: { etapa: Etapa }) {
           })}
         </ol>
       </div>
-      <p className="mt-1 text-[11px] text-muted-foreground">
+      <div className="mt-1 flex items-center justify-between gap-2">
+      <p className="text-[11px] text-muted-foreground">
         {terminado ? (
           <span className="font-medium text-primary">Todo listo</span>
         ) : (
@@ -1891,6 +2306,8 @@ function ProgresoOnboarding({ etapa }: { etapa: Etapa }) {
           </>
         )}
       </p>
+      {accion}
+      </div>
     </div>
   )
 }
@@ -1905,19 +2322,21 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
   const potreros = campos.reduce((s, c) => s + c.potreros.length, 0)
   const cabezas = campos.reduce((s, c) => s + c.cabezas, 0)
   // Cuántas columnas y qué densidad, según cuántos campos hay. La tabla
-  // entera, para que se vea TODO lo que cargó sin importar cuánto:
+  // entera, para que se vea TODO lo que cargó:
   //
   //   1        → una ficha grande
-  //   2 a 4    → dos columnas (la impar, centrada abajo)
-  //   5 a 6    → tres columnas
-  //   7 a 9    → tres columnas, fichas compactas (sin pie)
+  //   2        → dos columnas
+  //   3 a 4    → dos columnas, fichas compactas (sin pie): con pie, en una
+  //              notebook la segunda fila y el título quedaban cortados
+  //   5 a 9    → tres columnas, compactas
   //   10 o más → cuatro columnas, compactas
   //
-  // Con cinco campos y dos columnas, el quinto quedaba abajo del borde del
-  // panel y no se veía. Y por si igual no entra, la escena scrollea.
+  // Tres columnas con tres campos NO: el panel mide ~690 px y el croquis a
+  // un tercio no se lee. Si igual no entra, la escena scrollea con los
+  // bordes desvanecidos (auth-scene), nunca cortados en seco.
   const n = campos.length
   const columnas = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4
-  const compacta = n >= 7
+  const compacta = n >= 3
   return (
     <div className={cn('w-full', n === 1 ? 'max-w-[680px]' : 'max-w-[1160px]')}>
       {/* Cubre toda la escena (el panel es relative + overflow-hidden), no sólo la ficha. */}
@@ -1957,10 +2376,6 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
       </div>
 
       {/* Cada campo, con su letra y color, en cascada. */}
-      {/* DOS columnas como máximo, nunca tres. El croquis de un campo con
-          ocho potreros no se lee a un tercio del panel: prefiero que la
-          tercera ficha caiga abajo y haya que bajar un poco. La escena ya
-          scrollea, y acá lo que importa es que se vea lo que armó. */}
       {/* Flex con wrap y centrado, no grilla: cuando la última fila queda
           incompleta (cinco campos en tres columnas), sus fichas se centran
           bajo las de arriba. Una grilla las deja pegadas a la izquierda y se
@@ -2006,7 +2421,14 @@ function EscenaFinal({ empresa, campos }: { empresa: string; campos: CampoCargad
                     hectareas: c.hectareas,
                     actividad: c.actividad,
                     color: color.hex,
-                    potreros: c.potreros.map((p) => ({ clave: p.id, nombre: p.nombre, hectareas: p.hectareas, cabezas: p.cabezas })),
+                    potreros: c.potreros.map((p) => ({
+                      clave: p.id,
+                      nombre: p.nombre,
+                      hectareas: p.hectareas,
+                      cabezas: p.cabezas,
+                      uso: p.uso ?? null,
+                      cultivo: p.cultivo,
+                    })),
                     sueltas: c.sueltas,
                     estado: 'hecho',
                   }}
@@ -2081,6 +2503,267 @@ function CampoAlFinal({ campo, indice }: { campo: CampoCargado; indice: number }
         <span className="text-[11px] text-muted-foreground">{clima.isLoading ? 'clima…' : ''}</span>
       )}
     </motion.li>
+  )
+}
+
+/**
+ * La tarjeta de LO QUE SIGUE al cerrar el onboarding: un dibujo que muestra
+ * lo que va a hacer (no lo describe), el nombre de su campo en el título, lo
+ * que cuesta en una etiqueta, y el botón. Va arriba de las cifras: es la
+ * salida, y la salida no se busca scrolleando.
+ */
+function SiguientePaso({
+  variante,
+  color,
+  letra,
+  titulo,
+  texto,
+  etiqueta,
+  children,
+}: {
+  variante: 'dibujar' | 'recorrer'
+  color: string
+  letra: string
+  titulo: string
+  texto: string
+  etiqueta: string
+  children: ReactNode
+}) {
+  return (
+    <motion.div
+      className="mt-3 rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/[0.07] to-transparent p-3"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 240, damping: 24, delay: 0.9 }}
+    >
+      <IlustracionSiguiente variante={variante} color={color} letra={letra} />
+      <div className="px-1 pt-2.5 pb-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Lo que sigue</p>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{etiqueta}</span>
+        </div>
+        <p className="mt-1 text-[15px] leading-snug font-semibold">{titulo}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{texto}</p>
+      </div>
+      {children}
+    </motion.div>
+  )
+}
+
+/**
+ * El dibujo de lo que sigue, animado en loop. `dibujar`: sobre un fondo de
+ * satélite, un potrero se marca esquina por esquina con el color del campo y
+ * se pinta con su nombre. `recorrer`: una vuelta punteada pasa por los
+ * potreros y cada uno queda anotado. Con movimiento reducido, el cuadro final
+ * quieto.
+ */
+function IlustracionSiguiente({
+  variante,
+  color,
+  letra,
+}: {
+  variante: 'dibujar' | 'recorrer'
+  color: string
+  letra: string
+}) {
+  const quieto = useReducedMotion()
+  const ciclo = { duration: 4.2, repeat: Infinity, repeatDelay: 0.8, ease: 'easeInOut' as const }
+  // El potrero que se dibuja y sus esquinas, en orden.
+  const esquinas = [
+    [58, 30],
+    [168, 20],
+    [196, 84],
+    [80, 96],
+  ] as const
+  const trazo = `M${esquinas.map(([x, y]) => `${x} ${y}`).join(' L')} Z`
+  const tiempos = [0, 0.14, 0.28, 0.42, 0.56, 1]
+  return (
+    // Recortado a lo ancho (slice) y más bajo: el dibujo acompaña, no tiene
+    // que empujar el botón abajo del pliegue.
+    <svg
+      viewBox="0 0 320 116"
+      preserveAspectRatio="xMidYMid slice"
+      className="block h-[78px] w-full overflow-hidden rounded-xl"
+      aria-hidden
+    >
+      {/* El satélite: parches de verde, un camino y un arroyo. */}
+      <rect width="320" height="116" fill="#16281b" />
+      <path d="M0 70 C60 58 110 88 170 74 S270 50 320 62 V116 H0 Z" fill="#1d3322" />
+      <path d="M210 0 L320 0 L320 40 C290 46 250 30 214 36 Z" fill="#223a26" />
+      <path d="M0 0 H70 C58 14 30 22 0 20 Z" fill="#203625" />
+      <path d="M0 104 C90 96 170 112 320 100" stroke="#3a4c35" strokeWidth="3" fill="none" />
+      <path d="M232 0 C226 30 246 60 236 116" stroke="#2c4a5a" strokeWidth="2.5" fill="none" opacity="0.8" />
+
+      {variante === 'dibujar' ? (
+        <>
+          {/* Los que faltan, esperando. */}
+          <rect x="214" y="44" width="58" height="42" rx="3" fill="none" stroke="#9fb3a3" strokeOpacity="0.45" strokeDasharray="4 4" />
+          <rect x="254" y="10" width="46" height="26" rx="3" fill="none" stroke="#9fb3a3" strokeOpacity="0.35" strokeDasharray="4 4" />
+          {/* El que se dibuja. */}
+          <motion.path
+            d={trazo}
+            stroke={color}
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            fill={color}
+            initial={quieto ? false : { pathLength: 0, fillOpacity: 0 }}
+            animate={
+              quieto
+                ? { pathLength: 1, fillOpacity: 0.25 }
+                : { pathLength: [0, 1, 1, 1], fillOpacity: [0, 0, 0.25, 0.25] }
+            }
+            transition={quieto ? undefined : { ...ciclo, times: [0, 0.56, 0.7, 1] }}
+          />
+          {esquinas.map(([x, y], i) => (
+            <motion.circle
+              key={i}
+              cx={x}
+              cy={y}
+              r="3.5"
+              fill="#fff"
+              stroke={color}
+              strokeWidth="2"
+              initial={quieto ? false : { scale: 0 }}
+              animate={quieto ? { scale: 1 } : { scale: [0, 0, 1, 1, 0] }}
+              transition={quieto ? undefined : { ...ciclo, times: [0, tiempos[i]!, tiempos[i]! + 0.04, 0.95, 1] }}
+              style={{ transformOrigin: `${x}px ${y}px` }}
+            />
+          ))}
+          <motion.text
+            x="127"
+            y="64"
+            textAnchor="middle"
+            fontSize="12"
+            fontWeight="700"
+            fill="#fff"
+            initial={quieto ? false : { opacity: 0 }}
+            animate={quieto ? { opacity: 1 } : { opacity: [0, 0, 1, 1, 0] }}
+            transition={quieto ? undefined : { ...ciclo, times: [0, 0.62, 0.72, 0.95, 1] }}
+          >
+            1{letra}
+          </motion.text>
+          {/* El lápiz que va marcando. */}
+          {!quieto && (
+            <motion.g
+              animate={{
+                x: [...esquinas.map(([x]) => x), esquinas[0][0], esquinas[0][0]],
+                y: [...esquinas.map(([, y]) => y), esquinas[0][1], esquinas[0][1]],
+              }}
+              transition={{ ...ciclo, times: [0, 0.14, 0.28, 0.42, 0.56, 1] }}
+            >
+              <path d="M0 0 L12 -12 L16 -8 L4 4 Z" fill="#f5f1e6" stroke="#0a140d" strokeWidth="1.2" strokeLinejoin="round" />
+              <path d="M0 0 L4 4 L-1.5 5.5 Z" fill="#0a140d" />
+            </motion.g>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Tres potreros y la vuelta que pasa por todos. */}
+          {[
+            [24, 18, 84, 50],
+            [124, 30, 84, 56],
+            [224, 14, 76, 52],
+          ].map(([x, y, w, h], i) => (
+            <g key={i}>
+              <rect x={x} y={y} width={w} height={h} rx="4" fill={color} fillOpacity="0.14" stroke={color} strokeOpacity="0.8" strokeWidth="1.5" />
+              <motion.g
+                initial={quieto ? false : { opacity: 0, scale: 0.6 }}
+                animate={quieto ? { opacity: 1, scale: 1 } : { opacity: [0, 0, 1, 1, 0], scale: [0.6, 0.6, 1, 1, 0.6] }}
+                transition={quieto ? undefined : { ...ciclo, times: [0, 0.22 + i * 0.25, 0.28 + i * 0.25, 0.95, 1] }}
+                style={{ transformOrigin: `${x! + w! / 2}px ${y! + h! / 2}px` }}
+              >
+                <circle cx={x! + w! / 2} cy={y! + h! / 2} r="9" fill="#fff" />
+                <path
+                  d={`M${x! + w! / 2 - 4} ${y! + h! / 2} l3 3 l5 -6`}
+                  stroke={color}
+                  strokeWidth="2.2"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </motion.g>
+            </g>
+          ))}
+          <path
+            d="M10 100 C40 90 50 50 66 44 S150 70 166 58 S240 30 262 40 S300 90 312 96"
+            stroke="#f5f1e6"
+            strokeOpacity="0.55"
+            strokeWidth="2"
+            strokeDasharray="2 5"
+            strokeLinecap="round"
+            fill="none"
+          />
+          {!quieto && (
+            <motion.circle
+              r="5"
+              fill="#f5f1e6"
+              stroke="#0a140d"
+              strokeWidth="1.5"
+              animate={{ cx: [10, 66, 166, 262, 312], cy: [100, 44, 58, 40, 96] }}
+              transition={{ ...ciclo, times: [0, 0.25, 0.5, 0.75, 1] }}
+            />
+          )}
+        </>
+      )}
+    </svg>
+  )
+}
+
+/**
+ * El botón que cierra el onboarding: es la puerta a la app, no un botón más.
+ * Entra con un rebote cuando terminó el festejo, tiene su ícono, la flecha
+ * empuja para adelante y un brillo lo cruza cada tanto — llama sin gritar.
+ * Con movimiento reducido queda quieto. `data-cta-principal` hace que la
+ * pista de scroll no le pase por encima.
+ */
+function BotonCierre({
+  icono: Icono,
+  onClick,
+  children,
+}: {
+  icono: typeof PencilRuler
+  onClick: () => void
+  children: ReactNode
+}) {
+  const quieto = useReducedMotion()
+  return (
+    <motion.div
+      initial={quieto ? false : { opacity: 0, scale: 0.92, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 18, delay: 1.2 }}
+    >
+      <motion.button
+        type="button"
+        data-cta-principal
+        onClick={onClick}
+        whileHover={quieto ? undefined : { y: -2 }}
+        whileTap={{ scale: 0.98 }}
+        className="group relative flex h-13 w-full items-center gap-3 overflow-hidden rounded-xl bg-primary pr-4 pl-2 text-[15px] font-semibold text-primary-foreground shadow-[0_12px_28px_-10px_rgba(23,138,85,0.75)] transition-shadow hover:shadow-[0_16px_34px_-10px_rgba(23,138,85,0.85)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
+        {/* El brillo que lo cruza. */}
+        {!quieto && (
+          <motion.span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+            initial={{ left: '-40%' }}
+            animate={{ left: ['-40%', '140%'] }}
+            transition={{ duration: 1.1, ease: 'easeInOut', delay: 1.6, repeat: Infinity, repeatDelay: 2.8 }}
+          />
+        )}
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+          <Icono className="size-[18px]" strokeWidth={2} />
+        </span>
+        <span className="flex-1 text-left">{children}</span>
+        <motion.span
+          aria-hidden
+          className="inline-flex"
+          animate={quieto ? undefined : { x: [0, 4, 0] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
+        >
+          <ArrowRight className="size-[18px]" strokeWidth={2.25} />
+        </motion.span>
+      </motion.button>
+    </motion.div>
   )
 }
 

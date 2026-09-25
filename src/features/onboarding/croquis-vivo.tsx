@@ -8,7 +8,16 @@ import {
   type CabezasPorCategoria,
   type PotreroCroquis,
 } from '@/features/onboarding/especies-croquis'
-import { decidirEtiqueta, decidirMarcas, type Etiqueta, type ModoMarcas } from '@/features/onboarding/croquis-layout'
+import {
+  acomodarHacienda,
+  acomodarSiembra,
+  decidirMarcas,
+  repartir,
+  type Marcas,
+  type ModoMarcas,
+  type Rect,
+} from '@/features/onboarding/croquis-layout'
+import { estiloDeCultivo } from '@/features/onboarding/cultivos-croquis'
 import type { Database } from '@/lib/supabase/types'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
@@ -71,6 +80,18 @@ export function MarcaCategoria({ categoria }: { categoria: Categoria }) {
   )
 }
 
+/** La marca de un cultivo, centrada en (0,0). Mismo contorno que la hacienda. */
+export function MarcaCultivo({ cultivo }: { cultivo: string | null | undefined }) {
+  const e = estiloDeCultivo(cultivo)
+  const trazo = { stroke: '#0a140d', strokeWidth: 1.1, strokeLinejoin: 'round' as const, style: { paintOrder: 'stroke' } }
+  return (
+    <g>
+      <path d={e.d} fill={e.color} {...trazo} />
+      {e.centro && <path d={e.centro.d} fill={e.centro.color} {...trazo} />}
+    </g>
+  )
+}
+
 export type CampoCroquis = {
   nombre: string
   hectareas: number | null
@@ -83,70 +104,15 @@ export type CampoCroquis = {
   sueltas?: CabezasPorCategoria
   /** Qué se está dibujando ahora: cambia el acento del croquis. */
   estado: 'vacio' | 'campo' | 'potreros' | 'hacienda' | 'hecho'
+  /** El potrero que se está cargando: se resalta para ubicarse de un vistazo. */
+  activo?: string | null
 }
 
-type Rect = { x: number; y: number; w: number; h: number }
 
 const ANCHO = 420
 const ALTO = 200
 const MARGEN = 14
 
-/**
- * Reparto en tiras (squarified treemap simplificado): los potreros se
- * ordenan de mayor a menor y se van llenando tiras a lo largo del lado
- * corto; cada tira se cierra cuando agregar el siguiente empeoraría la
- * proporción de sus rectángulos. Da cuadrados razonables, sin astillas ni
- * solapamientos, con cualquier mezcla de tamaños.
- */
-function repartir(items: { clave: string; area: number }[], r: Rect): Record<string, Rect> {
-  const out: Record<string, Rect> = {}
-  const validos = items.filter((i) => i.area > 0)
-  if (validos.length === 0) return out
-  const total = validos.reduce((s, i) => s + i.area, 0)
-  // Piso visual: ningún potrero ocupa menos del 5 % del croquis. 2 ha en
-  // 1.000 son reales, pero una astilla de 3 px no le dice nada a nadie; el
-  // resto se reescala para que sigan sumando el campo.
-  const piso = total * 0.05
-  const ajustados = validos.map((i) => ({ clave: i.clave, area: Math.max(i.area, piso) }))
-  const totalAjustado = ajustados.reduce((s, i) => s + i.area, 0)
-  const escala = (r.w * r.h) / totalAjustado
-  const restantes = [...ajustados].sort((x, y) => y.area - x.area).map((i) => ({ clave: i.clave, area: i.area * escala }))
-  let libre: Rect = { ...r }
-
-  const peor = (tira: { area: number }[], lado: number) => {
-    const suma = tira.reduce((s, i) => s + i.area, 0)
-    const grosor = suma / lado
-    let w = 0
-    for (const i of tira) {
-      const largo = i.area / grosor
-      w = Math.max(w, Math.max(largo / grosor, grosor / largo))
-    }
-    return w
-  }
-
-  while (restantes.length > 0) {
-    const horizontal = libre.w >= libre.h
-    const lado = horizontal ? libre.h : libre.w
-    const tira: { clave: string; area: number }[] = [restantes.shift()!]
-    while (restantes.length > 0 && peor([...tira, restantes[0]!], lado) <= peor(tira, lado)) {
-      tira.push(restantes.shift()!)
-    }
-    const suma = tira.reduce((s, i) => s + i.area, 0)
-    const grosor = suma / lado
-    let avance = 0
-    for (const i of tira) {
-      const largo = i.area / grosor
-      out[i.clave] = horizontal
-        ? { x: libre.x, y: libre.y + avance, w: grosor, h: largo }
-        : { x: libre.x + avance, y: libre.y, w: largo, h: grosor }
-      avance += largo
-    }
-    libre = horizontal
-      ? { x: libre.x + grosor, y: libre.y, w: libre.w - grosor, h: libre.h }
-      : { x: libre.x, y: libre.y + grosor, w: libre.w, h: libre.h - grosor }
-  }
-  return out
-}
 
 /**
  * La hacienda de un potrero, resumida: UNA marca por especie, nunca una
@@ -156,12 +122,9 @@ function repartir(items: { clave: string; area: number }[], r: Rect): Record<str
  * etiqueta y en un potrero chico no se lee. Vive en el hover.
  */
 type MarcaResumen = { cx: number; cy: number; categoria: Categoria; color: string }
-function resumenHacienda(
-  r: Rect,
-  cabezas: CabezasPorCategoria,
-  etiqueta: Etiqueta,
-): { modo: ModoMarcas; items: MarcaResumen[] } {
-  const especies = (['bovino', 'ovino', 'equino'] as const)
+/** Las especies presentes, cada una con su categoría principal. */
+function especiesDe(cabezas: CabezasPorCategoria) {
+  return (['bovino', 'ovino', 'equino'] as const)
     .map((e) => {
       const cats = categoriasPorEspecie[e].filter((c) => (cabezas[c] ?? 0) > 0)
       const total = cats.reduce((s, c) => s + (cabezas[c] ?? 0), 0)
@@ -169,9 +132,15 @@ function resumenHacienda(
       return { e, total, principal }
     })
     .filter((x) => x.total > 0 && x.principal)
-  const { modo, posiciones } = decidirMarcas(r, especies.length, etiqueta)
+}
+
+function resumenHacienda(
+  especies: ReturnType<typeof especiesDe>,
+  { modo, posiciones, escala }: Marcas,
+): { modo: ModoMarcas; escala: number; items: MarcaResumen[] } {
   return {
     modo,
+    escala,
     items: posiciones.map((pos, i) => ({
       ...pos,
       categoria: especies[i]!.principal!,
@@ -180,24 +149,6 @@ function resumenHacienda(
   }
 }
 
-/** "9 bovinos · 9 ovinos · 9 equinos" — el desglose que el dibujo no dice. */
-function porEspecie(cabezas: CabezasPorCategoria): string[] {
-  const out: string[] = []
-  for (const e of ['bovino', 'ovino', 'equino'] as const) {
-    const n = categoriasPorEspecie[e].reduce((s, c) => s + (cabezas[c] ?? 0), 0)
-    if (n > 0) out.push(`${n.toLocaleString('es-AR')} ${ESTILO_ESPECIE[e].nombre}`)
-  }
-  return out
-}
-
-/** Lo que dice el hover de un potrero: todo lo que no entra dibujado. */
-function detallePotrero(p: PotreroCroquis): string {
-  const partes = [
-    p.hectareas ? `${p.hectareas.toLocaleString('es-AR')} ha` : null,
-    ...porEspecie(p.cabezas),
-  ].filter(Boolean)
-  return partes.length > 0 ? `Potrero ${p.nombre} — ${partes.join(' · ')}` : `Potrero ${p.nombre}`
-}
 
 /** Un rectángulo con el patrón de la actividad, que sigue al potrero al moverse. */
 function Textura({ r, patron }: { r: Rect; patron: string }) {
@@ -277,40 +228,65 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           .map((p) => {
             const r = rects[p.clave]!
             const t = totalCabezas(p.cabezas)
-            const chico = r.w < 70 || r.h < 40
-            // Etiqueta y marcas: la tabla de casos vive en `croquis-layout`.
-            // Lo que no entra dibujado está en el hover, que existe en todos.
+            // Qué hay en ESTE potrero. Si todavía no se dijo (paso de
+            // potreros), manda la actividad del campo, como antes.
+            // Sin elegir todavía (`null`) se ve como vacío: el verde de
+            // ganadero sólo cuando de verdad hay hacienda.
+            const uso =
+              p.uso === null
+                ? 'vacio'
+                : (p.uso ??
+                  (campo.actividad === 'agricola' ? 'agricola' : campo.actividad === 'mixta' ? 'mixta' : 'ganadero'))
+            // Etiqueta, marcas y siembra: la regla y sus pruebas viven en
+            // `croquis-layout` (probadas contra miles de potreros reales).
             const textoHa = p.hectareas ? `${p.hectareas.toLocaleString('es-AR')} ha` : ''
-            const etiqueta = decidirEtiqueta(r, p.nombre, textoHa)
-            const { modo, items: resumen } = resumenHacienda(r, p.cabezas, etiqueta)
+            // Etiqueta y contenido se deciden JUNTOS: si las hectáreas no
+            // dejan ver lo que hay, se van de la etiqueta. Lo sembrado va como
+            // la hacienda: su marca; si no entra, el nombre; y si tampoco, un punto.
+            const especies = especiesDe(p.cabezas)
+            const acomodo =
+              uso === 'agricola' && p.cultivo
+                ? { ...acomodarSiembra(r, p.nombre, textoHa, p.cultivo), marcas: null }
+                : { ...acomodarHacienda(r, p.nombre, textoHa, especies.length), siembra: null }
+            const { etiqueta, siembra } = acomodo
+            const { modo, escala, items: resumen } = resumenHacienda(
+              especies,
+              acomodo.marcas ?? { modo: 'nada', posiciones: [], escala: 1 },
+            )
+            const enFoco = campo.activo === p.clave
+            const apagado = !!campo.activo && !enFoco
             return (
               <motion.g
                 key={p.clave}
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: apagado ? 0.55 : 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
               >
-                <title>{detallePotrero(p)}</title>
                 <motion.rect
                   rx={6}
+                  // En foco, el borde toma el color del campo (A amarillo, B
+                  // azul, C naranja…): el mismo que su contorno y su letra.
+                  style={enFoco ? { stroke: campo.color ?? '#e9b45f' } : undefined}
                   className={cn(
-                    'stroke-sidebar-foreground/70',
-                    campo.actividad === 'agricola'
+                    !enFoco && 'stroke-sidebar-foreground/70',
+                    uso === 'agricola'
                       ? 'fill-[#e9b45f]/10'
-                      : t > 0
-                        ? 'fill-primary/30'
-                        : 'fill-primary/20',
+                      : uso === 'vacio'
+                        ? 'fill-sidebar-foreground/[0.06]'
+                        : t > 0
+                          ? 'fill-primary/30'
+                          : 'fill-primary/20',
                   )}
-                  strokeWidth={1.25}
+                  strokeWidth={enFoco ? 2.5 : 1.25}
                   initial={{ x: r.x + r.w / 2, y: r.y + r.h / 2, width: 0, height: 0 }}
                   animate={{ x: r.x + 2, y: r.y + 2, width: Math.max(0, r.w - 4), height: Math.max(0, r.h - 4) }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                 />
                 {/* La textura de la actividad, encima del fondo y debajo de la hacienda. */}
                 {/* Ganadera: el verde liso ES el pasto; la hacienda son los puntos. */}
-                {campo.actividad === 'agricola' && <Textura r={r} patron="croquis-surcos" />}
-                {campo.actividad === 'mixta' && (
+                {uso === 'agricola' && <Textura r={r} patron="croquis-surcos" />}
+                {uso === 'mixta' && (
                   <>
                     {/* Mixta: verde arriba de la diagonal, sembrado abajo. */}
                     <clipPath id={`mixta-${p.clave}`}>
@@ -351,14 +327,41 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                     />
                   </>
                 )}
+                {etiqueta.modo === 'parada' ? (
+                  // Astilla donde el nombre no entra acostado: parado, leído
+                  // de abajo arriba, a lo largo del potrero.
+                  <motion.g
+                    initial={false}
+                    animate={{ x: etiqueta.x, y: r.y + etiqueta.base }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                  >
+                    <text
+                      transform="rotate(-90)"
+                      className="fill-sidebar-foreground font-semibold"
+                      fontSize={10}
+                      style={{ paintOrder: 'stroke' }}
+                      stroke="var(--sidebar)"
+                      strokeWidth={3}
+                      strokeLinejoin="round"
+                    >
+                      {p.nombre}
+                      {etiqueta.conHa ? (
+                        <tspan className="fill-sidebar-foreground/60 font-normal" fontSize={10}>
+                          {' '}
+                          {textoHa}
+                        </tspan>
+                      ) : null}
+                    </text>
+                  </motion.g>
+                ) : (
                 <motion.g
                   initial={false}
-                  animate={{ x: etiqueta.x, y: r.y + 16 }}
+                  animate={{ x: etiqueta.x, y: r.y + etiqueta.base }}
                   transition={{ type: 'spring', stiffness: 260, damping: 26 }}
                 >
                   <text
                     className="fill-sidebar-foreground font-semibold"
-                    fontSize={chico ? 10 : 12}
+                    fontSize={etiqueta.tamano}
                     textAnchor={etiqueta.centrada ? 'middle' : 'start'}
                     style={{ paintOrder: 'stroke' }}
                     stroke="var(--sidebar)"
@@ -388,6 +391,51 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                     </text>
                   )}
                 </motion.g>
+                )}
+                {siembra && (
+                  <motion.g
+                    key={`siembra-${p.cultivo}`}
+                    initial={{ scale: 0, opacity: 0, x: siembra.cx, y: siembra.cy }}
+                    animate={{ scale: 1, opacity: 1, x: siembra.cx, y: siembra.cy }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                  >
+                    {siembra.tipo === 'marca' ? (
+                      <g transform={siembra.escala !== 1 ? `scale(${siembra.escala})` : undefined}>
+                        <MarcaCultivo cultivo={p.cultivo} />
+                      </g>
+                    ) : siembra.tipo === 'texto' || siembra.tipo === 'textoParado' ? (
+                      <text
+                        transform={siembra.tipo === 'textoParado' ? 'rotate(-90)' : undefined}
+                        textAnchor="middle"
+                        className="font-semibold"
+                        fill={estiloDeCultivo(p.cultivo).color}
+                        fontSize={10}
+                        style={{ paintOrder: 'stroke' }}
+                        stroke="var(--sidebar)"
+                        strokeWidth={3}
+                        strokeLinejoin="round"
+                      >
+                        {p.cultivo}
+                      </text>
+                    ) : (
+                      <circle r={3} fill={estiloDeCultivo(p.cultivo).color} stroke="var(--sidebar)" strokeWidth={1} />
+                    )}
+                    {siembra.baseNombre !== null && (
+                      <text
+                        y={siembra.baseNombre - siembra.cy}
+                        textAnchor="middle"
+                        className="fill-sidebar-foreground font-semibold"
+                        fontSize={10}
+                        style={{ paintOrder: 'stroke' }}
+                        stroke="var(--sidebar)"
+                        strokeWidth={3}
+                        strokeLinejoin="round"
+                      >
+                        {p.cultivo}
+                      </text>
+                    )}
+                  </motion.g>
+                )}
                 {resumen.map((it, i) => (
                   <motion.g
                     key={it.categoria}
@@ -395,8 +443,10 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
                     animate={{ scale: 1, opacity: 1, x: it.cx, y: it.cy }}
                     transition={{ type: 'spring', stiffness: 400, damping: 22, delay: i * 0.05 }}
                   >
-                    {modo === 'siluetas' ? (
-                      <MarcaCategoria categoria={it.categoria} />
+                    {modo === 'siluetas' || modo === 'siluetasJunto' ? (
+                      <g transform={escala !== 1 ? `scale(${escala})` : undefined}>
+                        <MarcaCategoria categoria={it.categoria} />
+                      </g>
                     ) : (
                       <circle r={3} fill={it.color} stroke="var(--sidebar)" strokeWidth={1} />
                     )}
@@ -451,17 +501,23 @@ export function CroquisVivo({ campo, className }: { campo: CampoCroquis; classNa
           hover dice CUÁNTO. */}
       {conHa.length === 0 && totalCabezas(campo.sueltas ?? {}) > 0 && (
         <g>
-          <title>{porEspecie(campo.sueltas ?? {}).join(' · ')}</title>
           {(() => {
             const zona = { x: interior.x, y: interior.y + ALTO / 2 + 6, w: interior.w, h: interior.h / 2 - 6 }
             // Sin etiqueta: el nombre del campo ya está arriba, fuera de esta zona.
-            const { modo, items } = resumenHacienda(zona, campo.sueltas ?? {}, {
-              modo: 'nombre',
-              centrada: true,
-              x: zona.x + zona.w / 2,
-              alto: 0,
-              ancho: 0,
-            })
+            const especies = especiesDe(campo.sueltas ?? {})
+            const { modo, items } = resumenHacienda(
+              especies,
+              decidirMarcas(zona, especies.length, {
+                modo: 'nombre',
+                centrada: true,
+                x: zona.x + zona.w / 2,
+                base: 0,
+                tamano: 12,
+                alto: 0,
+                ancho: 0,
+                conHa: false,
+              }),
+            )
             return items.map((it, i) => (
               <motion.g
                 key={`suelta-${it.categoria}`}
