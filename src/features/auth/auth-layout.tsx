@@ -194,14 +194,24 @@ export function AuthHeading({
 function AltoSuave({ children }: { children: ReactNode }) {
   const quieto = useReducedMotion()
   const adentro = useRef<HTMLDivElement>(null)
-  const [alto, setAlto] = useState<number | 'auto'>('auto')
+  // null hasta la primera medida: la primera se aplica SIN animar. Animarla
+  // hacía crecer la tarjeta al aparecer (de 667 a 702 px), y como está
+  // centrada, se movía entera.
+  const [alto, setAlto] = useState<number | null>(null)
+  const [animar, setAnimar] = useState(false)
   const [animando, setAnimando] = useState(false)
 
   useLayoutEffect(() => {
     const el = adentro.current
     if (!el || quieto) return
+    let primera = true
     const ro = new ResizeObserver(([e]) => {
-      if (e) setAlto(Math.round(e.contentRect.height))
+      if (!e) return
+      setAlto(Math.round(e.contentRect.height))
+      if (primera) {
+        primera = false
+        requestAnimationFrame(() => setAnimar(true))
+      }
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -211,9 +221,9 @@ function AltoSuave({ children }: { children: ReactNode }) {
   return (
     <motion.div
       initial={false}
-      animate={{ height: alto }}
-      transition={{ type: 'spring', stiffness: 220, damping: 30, mass: 0.9 }}
-      onAnimationStart={() => setAnimando(true)}
+      animate={alto === null ? undefined : { height: alto }}
+      transition={animar ? { type: 'spring', stiffness: 220, damping: 30, mass: 0.9 } : { duration: 0 }}
+      onAnimationStart={() => animar && setAnimando(true)}
       onAnimationComplete={() => setAnimando(false)}
       style={{ overflow: animando ? 'hidden' : 'visible' }}
     >

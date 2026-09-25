@@ -315,9 +315,6 @@ export function OnboardingPage() {
       ciclo={etapa === 'fin' ? 'fin' : 'armado'}
       // La pista de scroll donde la tarjeta puede ser más alta que la pantalla.
       pistaDeScroll={etapa === 'fin' || etapa === 'hacienda'}
-      // Anclada arriba: al cambiar de paso la tarjeta crece o se achica sólo
-      // por abajo. Centrada, se movía dos veces (arriba y abajo a la vez).
-      anclada
       escena={
         <EscenaCroquis
           etapa={etapa}
@@ -562,33 +559,12 @@ export function OnboardingPage() {
               </div>
             </div>
 
-            {/* PRIMERO lo que cargó, en tres números que cuentan: ver su campo
-                armado también es activación (el reconocimiento va antes que el
-                pedido). Después, lo que sigue. */}
-            {/* Los totales sólo suman algo con más de un campo: con uno, la
-                fila del campo ya dice lo mismo. */}
-            {campos.length > 1 && (
-            <motion.div
-              className="mt-4 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-primary/5"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              {[
-                { v: campos.reduce((s, c) => s + c.hectareas, 0), l: 'hectáreas' },
-                { v: campos.reduce((s, c) => s + c.potreros.length, 0), l: 'potreros' },
-                { v: campos.reduce((s, c) => s + c.cabezas, 0), l: 'cabezas' },
-              ].map((x) => (
-                <div key={x.l} className="px-2 py-3 text-center">
-                  <Contador valor={x.v} className="block text-[22px] font-bold leading-none text-primary" />
-                  <span className="mt-1 block text-[11px] uppercase tracking-wide text-muted-foreground">{x.l}</span>
-                </div>
-              ))}
-            </motion.div>
-            )}
-
+            {/* Lo que cargó, campo por campo con su clima: ver su campo armado
+                también es activación. Los totales (ha · potreros · cabezas) ya
+                están grandes en la escena de al lado: repetirlos sólo hacía
+                que la tarjeta no entrara en la pantalla. */}
             {/* Valor ya, no promesa: cada campo con SU clima de hoy. */}
-            <ul className={cn('divide-y divide-border rounded-lg border border-border', campos.length > 1 ? 'mt-3' : 'mt-4')}>
+            <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
               {campos.map((c, i) => (
                 <CampoAlFinal key={c.id} campo={c} indice={i} />
               ))}
@@ -2613,12 +2589,18 @@ function SiguientePaso({
 }
 
 /**
- * El dibujo de lo que sigue, animado en loop. `dibujar`: sobre un fondo de
- * satélite, un potrero se marca esquina por esquina con el color del campo y
- * se pinta con su nombre. `recorrer`: una vuelta punteada pasa por los
- * potreros y cada uno queda anotado. Con movimiento reducido, el cuadro final
- * quieto.
+ * El dibujo de lo que sigue, en loop. `dibujar`: sobre un fondo de satélite,
+ * un lápiz marca las esquinas de un potrero con el color del campo, el
+ * potrero se pinta y aparece su nombre. `recorrer`: una vuelta punteada pasa
+ * por los potreros y los va tildando.
+ *
+ * Animado con SVG nativo (`<animate>`, `<animateMotion>`), como el molino de
+ * la escena, y NO con framer: los keyframes en loop de framer quedaban
+ * congelados en el build de producción (el lápiz en la primera esquina, el
+ * potrero ya pintado). Con movimiento reducido, el cuadro final quieto.
  */
+const CICLO = '5s'
+
 function IlustracionSiguiente({
   variante,
   color,
@@ -2629,8 +2611,6 @@ function IlustracionSiguiente({
   letra: string
 }) {
   const quieto = useReducedMotion()
-  const ciclo = { duration: 4.2, repeat: Infinity, repeatDelay: 0.8, ease: 'easeInOut' as const }
-  // El potrero que se dibuja y sus esquinas, en orden.
   const esquinas = [
     [58, 30],
     [168, 20],
@@ -2638,14 +2618,28 @@ function IlustracionSiguiente({
     [80, 96],
   ] as const
   const trazo = `M${esquinas.map(([x, y]) => `${x} ${y}`).join(' L')} Z`
-  const tiempos = [0, 0.14, 0.28, 0.42, 0.56, 1]
+  // Fracciones del ciclo: el lápiz recorre las esquinas hasta 0,47; el
+  // potrero se pinta y se nombra; queda a la vista hasta 0,88 y se apaga.
+  const llegada = [0, 0.12, 0.24, 0.36]
+  const loop = (valores: string, tiempos: string, atributo: string) =>
+    quieto ? null : (
+      <animate
+        attributeName={atributo}
+        values={valores}
+        keyTimes={tiempos}
+        dur={CICLO}
+        repeatCount="indefinite"
+        calcMode="linear"
+      />
+    )
+
   return (
     // Recortado a lo ancho (slice) y más bajo: el dibujo acompaña, no tiene
     // que empujar el botón abajo del pliegue.
     <svg
       viewBox="0 0 320 116"
       preserveAspectRatio="xMidYMid slice"
-      className="block h-[78px] w-full overflow-hidden rounded-xl"
+      className="block h-[78px] w-full overflow-hidden rounded-xl [@media(max-height:700px)]:hidden"
       aria-hidden
     >
       {/* El satélite: parches de verde, un camino y un arroyo. */}
@@ -2661,61 +2655,50 @@ function IlustracionSiguiente({
           {/* Los que faltan, esperando. */}
           <rect x="214" y="44" width="58" height="42" rx="3" fill="none" stroke="#9fb3a3" strokeOpacity="0.45" strokeDasharray="4 4" />
           <rect x="254" y="10" width="46" height="26" rx="3" fill="none" stroke="#9fb3a3" strokeOpacity="0.35" strokeDasharray="4 4" />
-          {/* El que se dibuja. */}
-          <motion.path
+          {/* El que se dibuja: el trazo avanza con el lápiz y después se pinta. */}
+          <path
             d={trazo}
+            pathLength={1}
             stroke={color}
             strokeWidth="2.5"
             strokeLinejoin="round"
+            strokeDasharray="1"
+            strokeDashoffset={quieto ? 0 : 1}
             fill={color}
-            initial={quieto ? false : { pathLength: 0, fillOpacity: 0 }}
-            animate={
-              quieto
-                ? { pathLength: 1, fillOpacity: 0.25 }
-                : { pathLength: [0, 1, 1, 1], fillOpacity: [0, 0, 0.25, 0.25] }
-            }
-            transition={quieto ? undefined : { ...ciclo, times: [0, 0.56, 0.7, 1] }}
-          />
-          {esquinas.map(([x, y], i) => (
-            <motion.circle
-              key={i}
-              cx={x}
-              cy={y}
-              r="3.5"
-              fill="#fff"
-              stroke={color}
-              strokeWidth="2"
-              initial={quieto ? false : { scale: 0 }}
-              animate={quieto ? { scale: 1 } : { scale: [0, 0, 1, 1, 0] }}
-              transition={quieto ? undefined : { ...ciclo, times: [0, tiempos[i]!, tiempos[i]! + 0.04, 0.95, 1] }}
-              style={{ transformOrigin: `${x}px ${y}px` }}
-            />
-          ))}
-          <motion.text
-            x="127"
-            y="64"
-            textAnchor="middle"
-            fontSize="12"
-            fontWeight="700"
-            fill="#fff"
-            initial={quieto ? false : { opacity: 0 }}
-            animate={quieto ? { opacity: 1 } : { opacity: [0, 0, 1, 1, 0] }}
-            transition={quieto ? undefined : { ...ciclo, times: [0, 0.62, 0.72, 0.95, 1] }}
+            fillOpacity={quieto ? 0.25 : 0}
           >
+            {loop('1;0;0;0;1', '0;0.47;0.88;0.97;1', 'stroke-dashoffset')}
+            {loop('0;0;0.25;0.25;0;0', '0;0.47;0.58;0.88;0.97;1', 'fill-opacity')}
+          </path>
+          {esquinas.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={quieto ? 3.5 : 0} fill="#fff" stroke={color} strokeWidth="2">
+              {loop(
+                '0;0;3.5;3.5;0;0',
+                `0;${llegada[i]};${(llegada[i]! + 0.03).toFixed(2)};0.88;0.95;1`,
+                'r',
+              )}
+            </circle>
+          ))}
+          <text x="127" y="64" textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff" opacity={quieto ? 1 : 0}>
             1{letra}
-          </motion.text>
-          {/* El lápiz que va marcando. */}
+            {loop('0;0;1;1;0;0', '0;0.52;0.6;0.88;0.95;1', 'opacity')}
+          </text>
+          {/* El lápiz: va de esquina en esquina y vuelve a la primera. */}
           {!quieto && (
-            <motion.g
-              animate={{
-                x: [...esquinas.map(([x]) => x), esquinas[0][0], esquinas[0][0]],
-                y: [...esquinas.map(([, y]) => y), esquinas[0][1], esquinas[0][1]],
-              }}
-              transition={{ ...ciclo, times: [0, 0.14, 0.28, 0.42, 0.56, 1] }}
-            >
-              <path d="M0 0 L12 -12 L16 -8 L4 4 Z" fill="#f5f1e6" stroke="#0a140d" strokeWidth="1.2" strokeLinejoin="round" />
-              <path d="M0 0 L4 4 L-1.5 5.5 Z" fill="#0a140d" />
-            </motion.g>
+            <g>
+              <animateMotion
+                dur={CICLO}
+                repeatCount="indefinite"
+                path={`M0 0 ${esquinas.map(([x, y]) => `L${x - 58} ${y - 30}`).join(' ')} L0 0`}
+                keyPoints="0;0;1;1"
+                keyTimes="0;0.02;0.47;1"
+                calcMode="linear"
+              />
+              <g transform="translate(58 30)">
+                <path d="M0 0 L12 -12 L16 -8 L4 4 Z" fill="#f5f1e6" stroke="#0a140d" strokeWidth="1.2" strokeLinejoin="round" />
+                <path d="M0 0 L4 4 L-1.5 5.5 Z" fill="#0a140d" />
+              </g>
+            </g>
           )}
         </>
       ) : (
@@ -2728,12 +2711,8 @@ function IlustracionSiguiente({
           ].map(([x, y, w, h], i) => (
             <g key={i}>
               <rect x={x} y={y} width={w} height={h} rx="4" fill={color} fillOpacity="0.14" stroke={color} strokeOpacity="0.8" strokeWidth="1.5" />
-              <motion.g
-                initial={quieto ? false : { opacity: 0, scale: 0.6 }}
-                animate={quieto ? { opacity: 1, scale: 1 } : { opacity: [0, 0, 1, 1, 0], scale: [0.6, 0.6, 1, 1, 0.6] }}
-                transition={quieto ? undefined : { ...ciclo, times: [0, 0.22 + i * 0.25, 0.28 + i * 0.25, 0.95, 1] }}
-                style={{ transformOrigin: `${x! + w! / 2}px ${y! + h! / 2}px` }}
-              >
+              <g opacity={quieto ? 1 : 0}>
+                {loop('0;0;1;1;0;0', `0;${(0.22 + i * 0.22).toFixed(2)};${(0.26 + i * 0.22).toFixed(2)};0.88;0.95;1`, 'opacity')}
                 <circle cx={x! + w! / 2} cy={y! + h! / 2} r="9" fill="#fff" />
                 <path
                   d={`M${x! + w! / 2 - 4} ${y! + h! / 2} l3 3 l5 -6`}
@@ -2743,7 +2722,7 @@ function IlustracionSiguiente({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-              </motion.g>
+              </g>
             </g>
           ))}
           <path
@@ -2756,14 +2735,16 @@ function IlustracionSiguiente({
             fill="none"
           />
           {!quieto && (
-            <motion.circle
-              r="5"
-              fill="#f5f1e6"
-              stroke="#0a140d"
-              strokeWidth="1.5"
-              animate={{ cx: [10, 66, 166, 262, 312], cy: [100, 44, 58, 40, 96] }}
-              transition={{ ...ciclo, times: [0, 0.25, 0.5, 0.75, 1] }}
-            />
+            <circle r="5" fill="#f5f1e6" stroke="#0a140d" strokeWidth="1.5">
+              <animateMotion
+                dur={CICLO}
+                repeatCount="indefinite"
+                path="M10 100 C40 90 50 50 66 44 S150 70 166 58 S240 30 262 40 S300 90 312 96"
+                keyPoints="0;1;1"
+                keyTimes="0;0.88;1"
+                calcMode="linear"
+              />
+            </circle>
           )}
         </>
       )}

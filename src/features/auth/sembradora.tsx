@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /**
@@ -25,12 +25,44 @@ import { motion, useReducedMotion } from 'framer-motion'
  * Dura ~3,5 s según el alto de la pantalla. Con `prefers-reduced-motion` la
  * tarjeta aparece y ya.
  */
+/** Las tipografías que cambian el alto de la tarjeta: títulos y cuerpo. */
+const FUENTES = ['700 24px Archivo', '400 15px Inter', '600 15px Inter']
+function fuentesListas(): boolean {
+  if (typeof document === 'undefined' || !document.fonts) return true
+  try {
+    return FUENTES.every((f) => document.fonts.check(f))
+  } catch {
+    return true
+  }
+}
+
 export function Remolque({ activo: pedido, children }: { activo: boolean; children: ReactNode }) {
   const quieto = useReducedMotion()
   // Se decide al montar y no cambia: si el remolque pasara de tractor a
   // suave (o al revés) con la tarjeta ya en pantalla, React desarmaría y
   // volvería a armar todo lo de adentro, y la tarjeta saltaba de alto.
   const [activo] = useState(pedido)
+  // Arranca cuando están las tipografías. Con `font-display: swap` la letra
+  // cambiaba de tamaño a mitad del viaje; la tarjeta está centrada, así que
+  // cambiaba de alto y el tractor y la tarjeta daban un salto juntos (10 px a
+  // los 90 ms, 4 px a los 690 ms): la "breve traba". Máximo 1,2 s de espera.
+  // `document.fonts.status` NO sirve: vale 'loaded' antes de que el navegador
+  // pida ninguna tipografía (todavía no pintó texto). Se piden explícitas.
+  const [fuentes, setFuentes] = useState(() => fuentesListas())
+  useEffect(() => {
+    if (fuentes) return
+    let vivo = true
+    const listo = () => vivo && setFuentes(true)
+    // Cargada no es aplicada: el texto cambia de medida uno o dos cuadros
+    // DESPUÉS de que la fuente termina de bajar. Se esperan dos cuadros más.
+    const aplicada = () => requestAnimationFrame(() => requestAnimationFrame(listo))
+    void Promise.all(FUENTES.map((f) => document.fonts.load(f))).then(aplicada, aplicada)
+    const t = window.setTimeout(listo, 1200)
+    return () => {
+      vivo = false
+      window.clearTimeout(t)
+    }
+  }, [fuentes])
   if (quieto) return <>{children}</>
   // Sin tractor, la tarjeta igual ENTRA: sube un poco y aparece. Aparecer de
   // golpe (sobre todo al llegar desde otra pantalla) se veía como un corte.
@@ -92,8 +124,11 @@ export function Remolque({ activo: pedido, children }: { activo: boolean; childr
         aria-hidden
         className="pointer-events-none absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center text-primary"
         style={{ bottom: '100%', willChange: 'transform' }}
+        // Mientras cargan las tipografías todo espera abajo, fuera de la vista.
+        // El árbol es el MISMO antes y después: sólo arranca la animación (si
+        // se cambiaba de árbol, la tarjeta se volvía a montar y saltaba).
         initial={{ y: H }}
-        animate={{ y: -SALIDA - TRACTOR }}
+        animate={fuentes ? { y: -SALIDA - TRACTOR } : { y: H }}
         transition={{ duration: tractorDuracion, delay: 0.1, ease: 'linear' }}
       >
         <Tractor />
@@ -101,7 +136,7 @@ export function Remolque({ activo: pedido, children }: { activo: boolean; childr
           className="w-[2px] rounded-full bg-[#14261a]"
           style={{ height: SOGA, transformOrigin: 'top' }}
           initial={{ scaleY: 1, opacity: 0.85 }}
-          animate={{ scaleY: 0.1, opacity: 0 }}
+          animate={fuentes ? { scaleY: 0.1, opacity: 0 } : { scaleY: 1, opacity: 0.85 }}
           transition={{ duration: 0.4, delay: 0.1 + tCrucero, ease: 'easeIn' }}
         />
       </motion.div>
@@ -113,7 +148,7 @@ export function Remolque({ activo: pedido, children }: { activo: boolean; childr
         className="relative z-10 flex w-full justify-center"
         style={{ willChange: 'transform' }}
         initial={{ y: H }}
-        animate={{ y: [H, H * FRENADO, 0] }}
+        animate={fuentes ? { y: [H, H * FRENADO, 0] } : { y: H }}
         transition={{
           duration: tarjetaDuracion,
           delay: 0.1,
