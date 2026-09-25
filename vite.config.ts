@@ -59,10 +59,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache de todo el bundle: js/css/html + fuentes self-hosted (ttf) +
+        // Precache de todo el bundle: js/css/html + fuentes self-hosted (woff2) +
         // svg + los íconos png. Así la app entera (Oficina y Campo) queda
         // disponible offline tras la primera visita con señal.
-        globPatterns: ['**/*.{js,css,html,svg,ttf,png,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,woff2,png,webmanifest}'],
         // Cualquier navegación SPA sin red cae al shell cacheado (index.html);
         // React Router resuelve la ruta desde ahí.
         navigateFallback: '/index.html',

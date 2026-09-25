@@ -11,9 +11,14 @@ import { RecuperarPage } from '@/features/auth/recuperar-page'
 import { RestablecerPage } from '@/features/auth/restablecer-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { RequireEmpresa } from '@/features/auth/require-empresa'
-import { AppShell } from '@/app/app-shell'
-import { CampoShell } from '@/app/campo-shell'
 import { ResponsiveShell } from '@/app/responsive-shell'
+
+// Los shells también se cargan al entrar: el login, el registro y el
+// onboarding no necesitan la barra de Oficina ni el Modo Campo (manga, RFID,
+// base offline), y antes bajaban todo eso de entrada. Offline no cambia nada:
+// el service worker precachea todos los chunks.
+const AppShell = lazy(() => import('@/app/app-shell').then((m) => ({ default: m.AppShell })))
+const CampoShell = lazy(() => import('@/app/campo-shell').then((m) => ({ default: m.CampoShell })))
 
 // Code-splitting por ruta: el código de cada sección se carga al entrar, no en
 // el bundle inicial (login). El AppShell envuelve el <Outlet> en <Suspense>.
@@ -147,7 +152,11 @@ export const router = createBrowserRouter([
             children: [
           {
             // Modo Oficina (escritorio) — shell con sidebar.
-            element: <AppShell />,
+            element: (
+              <Suspense fallback={null}>
+                <AppShell />
+              </Suspense>
+            ),
             children: [
               { index: true, element: <InicioPage /> },
               { path: 'hacienda', element: <AnimalesPage /> },
@@ -165,7 +174,11 @@ export const router = createBrowserRouter([
           },
               {
                 // Modo Campo (móvil) — shell con nav inferior.
-                element: <CampoShell />,
+                element: (
+                  <Suspense fallback={null}>
+                    <CampoShell />
+                  </Suspense>
+                ),
                 children: [
                   { path: 'campo', element: <CampoInicioPage /> },
                   { path: 'campo/manga', element: <MangaPage /> },

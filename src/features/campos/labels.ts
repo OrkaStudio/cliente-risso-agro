@@ -33,17 +33,6 @@ export function actividadDeUsos(usos: Uso[]): ActividadCampo | null {
 }
 
 /**
- * Con qué estado nacen los potreros según la actividad del campo: en un
- * campo agrícola arrancan en descanso (el primer estado del ciclo agrícola);
- * ganadero o mixto, en ganadero. Se cambia después por potrero.
- */
-export function estadoInicialPorActividad(
-  a: ActividadCampo | null | undefined,
-): Database['public']['Enums']['estado_ciclo_potrero'] {
-  return a === 'agricola' ? 'descanso' : 'ganadero'
-}
-
-/**
  * El vocabulario ÚNICO de qué se hace en un potrero: ganadero, agrícola o
  * vacío. Tres estados, en todos lados.
  *

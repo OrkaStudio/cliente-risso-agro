@@ -414,10 +414,15 @@ function RevisarContacto({
 }) {
   const [local, dominio] = datos.email.split('@')
   const [clave, setClave] = useState('')
+  const [claveOtraVez, setClaveOtraVez] = useState('')
   const [errorClave, setErrorClave] = useState<string | null>(null)
+  const [errorOtraVez, setErrorOtraVez] = useState<string | null>(null)
+  // Se escribe dos veces, como en el formulario: un error de tipeo no puede
+  // colarse justo en la contraseña con la que va a entrar.
   function confirmar() {
     if (!pedirClave) return onConfirmar()
     if (clave.length < 8) return setErrorClave('Usá al menos 8 caracteres')
+    if (clave !== claveOtraVez) return setErrorOtraVez('No es igual a la de arriba, ¿la revisás?')
     onConfirmar(clave)
   }
   return (
@@ -498,10 +503,22 @@ function RevisarContacto({
             placeholder="La misma que elegiste antes"
             autoFocus
           />
+          <ErrorCampo mensaje={errorClave} />
+          <Label htmlFor="clave-otra-vez" className="mt-1.5">
+            Repetila
+          </Label>
+          <PasswordInput
+            id="clave-otra-vez"
+            value={claveOtraVez}
+            onChange={(e) => {
+              setClaveOtraVez(e.target.value)
+              setErrorOtraVez(null)
+            }}
+          />
+          <ErrorCampo mensaje={errorOtraVez} />
           <p className="text-xs text-muted-foreground">
             Por seguridad no la guardamos. ¿Nos la escribís de nuevo?
           </p>
-          <ErrorCampo mensaje={errorClave} />
         </div>
       )}
 

@@ -5,7 +5,6 @@ import { AuthScene, MensajeEscenaMovil } from '@/features/auth/auth-scene'
 import { Reveal } from '@/features/auth/reveal'
 import { Remolque } from '@/features/auth/sembradora'
 import { PistaDeScroll } from '@/features/auth/pista-de-scroll'
-import { cn } from '@/lib/utils'
 
 /**
  * Shell de las pantallas de auth: escena ambiental a la izquierda (solo
@@ -25,7 +24,6 @@ export function AuthLayout({
   pistaDeScroll = false,
   continua = false,
   saliendo = false,
-  anclada = false,
   desvanecer = false,
   sinTarjeta = false,
 }: {
@@ -49,11 +47,6 @@ export function AuthLayout({
   continua?: boolean
   /** Se va a otra pantalla: la tarjeta y el mensaje se desvanecen antes. */
   saliendo?: boolean
-  /**
-   * La tarjeta arriba en vez de centrada (el onboarding): cambia de alto en
-   * cada paso, y centrada se desplazaba entera con cada cambio.
-   */
-  anclada?: boolean
   /** Se va a la app: toda la pantalla se funde con el fondo antes del cambio. */
   desvanecer?: boolean
   /** Todavía no hay qué mostrar: la escena sola; la tarjeta entra una vez, después. */
@@ -115,12 +108,7 @@ export function AuthLayout({
                 sobra lugar, así que un padding grande sólo servía para crear
                 un scroll que no mostraba nada cuando la tarjeta apenas entra.
                 Scroll únicamente si la tarjeta de verdad no entra. */}
-            <div
-              className={cn(
-                'relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:px-10 sm:py-4',
-                anclada ? 'sm:justify-start sm:pt-[clamp(1rem,7vh,4rem)]' : 'sm:justify-center',
-              )}
-            >
+            <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:px-10 sm:py-4">
               {!sinTarjeta && (
               <motion.div
                 className="flex w-full justify-center"

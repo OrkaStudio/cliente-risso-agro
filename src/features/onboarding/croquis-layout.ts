@@ -157,14 +157,14 @@ export type Marcas = {
  * Los tamaños que prueban las siluetas antes de rendirse a los puntos. La
  * más chica, en pantalla, sigue midiendo ~17 px: se reconoce.
  */
-export const ESCALAS = [1, 0.78, 0.66] as const
+const ESCALAS = [1, 0.78, 0.66] as const
 
 /**
  * El espacio libre a la derecha de una etiqueta de una línea, y dónde
  * centrar algo de `ancho` ahí: en el centro del potrero si entra sin pisar
  * la etiqueta, si no en el centro del espacio libre.
  */
-export function centroJunto(r: Rect, etiqueta: Etiqueta, ancho: number): number | null {
+function centroJunto(r: Rect, etiqueta: Etiqueta, ancho: number): number | null {
   if (etiqueta.centrada || (etiqueta.modo !== 'lado' && etiqueta.modo !== 'nombre')) return null
   const x0 = etiqueta.x + etiqueta.ancho + 6
   const x1 = r.x + r.w - BORDE
@@ -279,7 +279,7 @@ export type Siembra = {
  *      punto de color que nadie sabe qué es;
  *   3. y sólo si tampoco entra el texto, un punto centrado.
  */
-export function decidirSiembra(r: Rect, etiqueta: Etiqueta, cultivo: string): Siembra | null {
+function decidirSiembra(r: Rect, etiqueta: Etiqueta, cultivo: string): Siembra | null {
   const { modo, posiciones, escala } = decidirMarcas(r, 1, etiqueta)
   const pos = posiciones[0]
   const wT = anchoTexto(cultivo, 10, true)

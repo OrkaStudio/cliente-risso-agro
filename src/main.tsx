@@ -28,3 +28,7 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+// El color de espera de index.html (sin el blanco al recargar) sale apenas
+// React pintó el primer cuadro: desde ahí manda la escena de verdad.
+requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('pre-auth')))

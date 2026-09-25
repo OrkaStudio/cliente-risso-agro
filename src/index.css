@@ -13,10 +13,13 @@
    Guía visual: design/dashboard-agro-ai.html
    ============================================================ */
 
-/* Archivo SIN tabla DSIG (la original la trae y Chrome la rechaza). */
+/* WOFF2 recortadas al español (latín + signos que usa la app): 245 KB en vez
+   de 1,8 MB de TTF, con los ejes variables intactos. Se regeneran desde las
+   TTF originales con fontTools.subset (ver el commit del 25/09/2026).
+   Archivo SIN tabla DSIG (la original la trae y Chrome la rechaza). */
 @font-face {
   font-family: "Archivo";
-  src: url("./assets/fonts/Archivo-Variable.ttf") format("truetype-variations");
+  src: url("./assets/fonts/Archivo-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-stretch: 62% 125%;
   font-style: normal;
@@ -24,14 +27,14 @@
 }
 @font-face {
   font-family: "Inter";
-  src: url("./assets/fonts/Inter-Variable.ttf") format("truetype-variations");
+  src: url("./assets/fonts/Inter-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("./assets/fonts/JetBrainsMono-Variable.ttf") format("truetype-variations");
+  src: url("./assets/fonts/JetBrainsMono-Variable.woff2") format("woff2");
   font-weight: 100 800;
   font-style: normal;
   font-display: swap;

@@ -16,6 +16,23 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Risso Agro" />
     <title>Risso Agro</title>
+    <!-- Antes de que baje el JavaScript la página ya tiene sus colores: sin
+         esto, al recargar se veía un blanco y después la escena de golpe.
+         En login/registro/onboarding se pinta el verde de la escena (a la
+         izquierda en escritorio, de fondo en el teléfono); en la app, la
+         porcelana. main.tsx saca la clase apenas React dibuja. -->
+    <style>
+      html.pre-auth body { background: #182c1e !important; }
+      @media (min-width: 1024px) {
+        html.pre-auth body {
+          background: linear-gradient(to right, #16281c 0, #1d3524 53.49%, #eef0eb 53.49%) !important;
+        }
+      }
+    </style>
+    <script>
+      if (/^\/(login|registro|recuperar|restablecer|onboarding)/.test(location.pathname))
+        document.documentElement.classList.add('pre-auth')
+    </script>
   </head>
   <body>
     <div id="root"></div>
