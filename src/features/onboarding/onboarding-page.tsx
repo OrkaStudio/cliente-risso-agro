@@ -1757,7 +1757,13 @@ function PasoHacienda({
                             value={usoActual.cultivo ?? ''}
                             autoFocus
                             maxLength={40}
-                            onChange={(e) => cambiarUso({ uso: 'agricola', cultivo: e.target.value })}
+                            // Primera letra en mayúscula, como los de la lista: "Sorgo".
+                            onChange={(e) =>
+                              cambiarUso({
+                                uso: 'agricola',
+                                cultivo: e.target.value.charAt(0).toLocaleUpperCase('es-AR') + e.target.value.slice(1),
+                              })
+                            }
                             placeholder="Ej: Cebada, sorgo, avena…"
                           />
                         )}

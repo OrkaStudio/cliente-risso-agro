@@ -86,7 +86,11 @@ export function AuthLayout({
             {/* En móvil la tarjeta va ARRIBA (debajo de la frase), no centrada:
                 al abrir el teclado la pantalla se achica y una tarjeta centrada
                 se re-centra de golpe (el "sacudón"). */}
-            <div className="auth-marco relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:p-10">
+            {/* Aire vertical mínimo (1 rem): la tarjeta ya se centra sola cuando
+                sobra lugar, así que un padding grande sólo servía para crear
+                un scroll que no mostraba nada cuando la tarjeta apenas entra.
+                Scroll únicamente si la tarjeta de verdad no entra. */}
+            <div className="relative flex flex-1 flex-col items-center px-5 pt-5 pb-3 sm:justify-center sm:px-10 sm:py-4">
               <motion.div
                 className="flex w-full justify-center"
                 initial={false}
