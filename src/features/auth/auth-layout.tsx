@@ -27,6 +27,7 @@ export function AuthLayout({
   saliendo = false,
   anclada = false,
   desvanecer = false,
+  sinTarjeta = false,
 }: {
   children: ReactNode
   /** Ondas del sol en el teléfono (en escritorio siempre van). */
@@ -55,6 +56,8 @@ export function AuthLayout({
   anclada?: boolean
   /** Se va a la app: toda la pantalla se funde con el fondo antes del cambio. */
   desvanecer?: boolean
+  /** Todavía no hay qué mostrar: la escena sola; la tarjeta entra una vez, después. */
+  sinTarjeta?: boolean
   /**
    * Muestra "Bajá para continuar" cuando el contenido no entra. Sólo donde el
    * botón que importa puede quedar fuera de la vista (el cierre del
@@ -118,6 +121,7 @@ export function AuthLayout({
                 anclada ? 'sm:justify-start sm:pt-[clamp(1rem,7vh,4rem)]' : 'sm:justify-center',
               )}
             >
+              {!sinTarjeta && (
               <motion.div
                 className="flex w-full justify-center"
                 initial={false}
@@ -130,6 +134,7 @@ export function AuthLayout({
                   </div>
                 </Remolque>
               </motion.div>
+              )}
             </div>
           </div>
         </div>

@@ -179,6 +179,11 @@ export function OnboardingPage() {
   // Recargó a mitad del onboarding: retoma donde estaba (ver `progreso`).
   const [guardado] = useState(() => leerProgreso<Progreso>(user?.id))
   const [etapa, setEtapa] = useState<Etapa>(guardado?.etapa ?? 'empresa')
+  // Con qué paso arrancó esta carga de la página, y si fue una recarga.
+  const [inicio] = useState(() => ({
+    etapa: guardado?.etapa ?? 'empresa',
+    recarga: !!guardado || esRecargaDePagina(),
+  }))
   // Hacia dónde va el cambio de paso: adelante entra desde la derecha,
   // atrás desde la izquierda. Da orientación sin decir nada.
   const [direccion, setDireccion] = useState<1 | -1>(1)
@@ -298,14 +303,11 @@ export function OnboardingPage() {
     navigate(destino, { replace: true, state: { bienvenida: true } })
   }
 
-  if (isLoading) {
-    // Dentro del mismo marco, no un "Cargando…" suelto en una pantalla vacía.
-    return (
-      <AuthLayout continua={desdeRegistro}>
-        <p className="py-10 text-center text-sm text-muted-foreground">Cargando…</p>
-      </AuthLayout>
-    )
-  }
+  // Cargando sin un paso guardado: se ve la escena sola, sin tarjeta. Antes
+  // había una tarjeta chica de "Cargando…" que a los 100 ms la reemplazaba
+  // de golpe la del paso, con otro alto: eso se veía al recargar. Con un paso
+  // guardado no hay nada que esperar: se muestra directo.
+  const esperando = isLoading && !guardado
 
   const empresa = nombreEmpresa.trim()
 
@@ -314,7 +316,14 @@ export function OnboardingPage() {
       // El tractor remolca la tarjeta sólo al abrir y al cerrar; los pasos
       // del medio entran callados. `ciclo` vuelve a montarla para que el
       // remolque se repita en el festejo.
-      entrada={(etapa === 'empresa' && !desdeRegistro) || etapa === 'fin' ? 'tractor' : 'suave'}
+      // Al recargar, el paso en el que estaba entra suave: el tractor es
+      // para llegar, no para volver a aparecer.
+      entrada={
+        !(inicio.recarga && etapa === inicio.etapa) && ((etapa === 'empresa' && !desdeRegistro) || etapa === 'fin')
+          ? 'tractor'
+          : 'suave'
+      }
+      sinTarjeta={esperando}
       continua={desdeRegistro}
       desvanecer={yendo}
       // La tarjeta se monta una vez para todo el armado; sólo el festejo la
@@ -1920,6 +1929,16 @@ function Guardando({ children = 'Guardando' }: { children?: ReactNode }) {
       {children}
     </span>
   )
+}
+
+/** ¿La página se abrió recargando (F5), y no navegando hasta acá? */
+function esRecargaDePagina(): boolean {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    return nav?.type === 'reload'
+  } catch {
+    return false
+  }
 }
 
 const ORDEN_ETAPAS: Etapa[] = ['empresa', 'campo', 'potreros', 'hacienda', 'otro', 'fin']

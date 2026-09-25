@@ -189,7 +189,8 @@ export function SignupPage() {
   }
 
   return (
-    <AuthLayout entrada="tractor" saliendo={saliendo}>
+    // Recargó en la revisión: la tarjeta entra suave, sin volver a traer el tractor.
+    <AuthLayout entrada={guardada ? 'suave' : 'tractor'} saliendo={saliendo}>
       <AnimatePresence mode="wait">
         {revisando ? (
           <motion.div
