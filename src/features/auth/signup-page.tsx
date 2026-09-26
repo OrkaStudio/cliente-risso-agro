@@ -15,6 +15,7 @@ import { precargarOnboarding } from '@/features/onboarding/precarga'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { registrar } from '@/lib/telemetria'
 import { formatearCelularAR, normalizarCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
 
@@ -165,6 +166,7 @@ export function SignupPage() {
     // "Cargando…". La tarjeta sale primero; la escena queda y sólo cambia
     // su mensaje (el onboarding entra con `continua`).
     qc.setQueryData(['empresa'], null)
+    registrar('registro_completado', { via: 'email' })
     guardarRevision(null)
     setSaliendo(true)
     window.setTimeout(() => navigate('/onboarding', { replace: true, state: { desdeRegistro: true } }), 380)
