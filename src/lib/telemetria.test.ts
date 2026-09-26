@@ -129,7 +129,7 @@ describe('medicion del onboarding', () => {
     medicion.onboardingIniciado()
     medicion.onboardingIniciado()
     await vi.advanceTimersByTimeAsync(90_000)
-    medicion.onboardingCompletado({ campos: 1, potreros: 2, cabezas: 10, con_alquiler: false })
+    medicion.onboardingCompletado({ campos: 1, potreros: 2, cabezas: 10, potreros_sembrados: 0, con_alquiler: false })
     await enviar()
     expect(enviadas().filter((f) => f.nombre === 'onboarding_iniciado')).toHaveLength(1)
     const fin = enviadas().find((f) => f.nombre === 'onboarding_completado')!
@@ -137,7 +137,7 @@ describe('medicion del onboarding', () => {
   })
 
   it('sin inicio en esta página (recargó a mitad), el total queda nulo', async () => {
-    medicion.onboardingCompletado({ campos: 1, potreros: 0, cabezas: 0, con_alquiler: false })
+    medicion.onboardingCompletado({ campos: 1, potreros: 0, cabezas: 0, potreros_sembrados: 0, con_alquiler: false })
     await enviar()
     expect(enviadas()[0]!.props.duracion_total_ms).toBeNull()
   })

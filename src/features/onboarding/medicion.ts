@@ -35,7 +35,10 @@ export function pasoVisto(paso: PasoOnboarding, indice: number): void {
   registrar('paso_visto', { paso, indice })
 }
 
-export function pasoCompletado(paso: PasoOnboarding, resumen: Record<string, string | number | boolean | null> = {}): void {
+export function pasoCompletado(
+  paso: PasoOnboarding,
+  resumen: Record<string, string | number | boolean | null | string[]> = {},
+): void {
   if (salteado.has(paso)) return
   registrar('paso_completado', { paso, duracion_ms: desde(paso), ...resumen })
 }
@@ -54,6 +57,7 @@ export function onboardingCompletado(resumen: {
   campos: number
   potreros: number
   cabezas: number
+  potreros_sembrados: number
   con_alquiler: boolean
 }): void {
   registrar('onboarding_completado', {

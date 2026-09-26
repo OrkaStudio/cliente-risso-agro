@@ -519,11 +519,17 @@ export function OnboardingPage() {
                 }
               }}
               onListo={(cabezas, porPotrero, usos, actividad) => {
+                // El paso es "qué hay en cada potrero": la siembra cuenta
+                // tanto como la hacienda (un campo agrícola no tiene cabezas).
+                const sembrados = Object.values(usos).filter((u) => u.uso === 'agricola')
                 pasoCompletado('hacienda', {
                   cabezas,
                   potreros_con_hacienda: Object.values(porPotrero).filter((c) =>
                     Object.values(c).some((n) => (n ?? 0) > 0),
                   ).length,
+                  potreros_sembrados: sembrados.length,
+                  potreros_vacios: Object.values(usos).filter((u) => u.uso === 'vacio').length,
+                  cultivos: [...new Set(sembrados.map((u) => u.cultivo?.trim()).filter((c): c is string => !!c))],
                   actividad,
                 })
                 setBorrador(BORRADOR_VACIO)
@@ -581,6 +587,7 @@ export function OnboardingPage() {
                     campos: campos.length,
                     potreros: campos.reduce((s, c) => s + c.potreros.length, 0),
                     cabezas: campos.reduce((s, c) => s + c.cabezas, 0),
+                    potreros_sembrados: campos.flatMap((c) => c.potreros).filter((p) => p.uso === 'agricola').length,
                     con_alquiler: campos.some((c) => c.tipo === 'alquilado'),
                   })
                   ir('fin')
