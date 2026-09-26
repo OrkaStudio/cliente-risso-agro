@@ -15,6 +15,9 @@ function getSnapshot(): boolean {
   return window.matchMedia(QUERY).matches
 }
 
+/** Lo mismo, fuera de React (la telemetría lo lee al registrar cada evento). */
+export const esViewportMovil = getSnapshot
+
 /** `true` cuando el viewport es de teléfono. Reactivo a resize/rotación. */
 export function useIsMobile(): boolean {
   // getServerSnapshot → false: en SSR/prerender asumimos desktop (no hay window).

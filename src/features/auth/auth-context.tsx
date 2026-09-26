@@ -9,6 +9,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 import { leerSesionPersistida } from '@/lib/supabase/persisted-session'
+import { registrarSesionIniciada } from '@/lib/telemetria'
 
 type AuthState = {
   session: Session | null
@@ -102,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       if (next) setSession(next)
+      // Sólo encola: el envío sale después. Llamar a supabase dentro de este
+      // callback lo traba.
+      if (event === 'SIGNED_IN' && next) registrarSesionIniciada(next.user.id)
       // Link de "olvidé mi contraseña" abierto en cualquier ruta (p. ej. si la
       // URL de redirect no está en la lista blanca de Supabase y cayó en la
       // raíz): llevamos al formulario de contraseña nueva igual. Recarga

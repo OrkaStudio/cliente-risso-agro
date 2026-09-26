@@ -398,6 +398,50 @@ export type Database = {
           },
         ]
       }
+      evento_producto: {
+        Row: {
+          created_at: string
+          dispositivo: string | null
+          empresa_id: string | null
+          id: number
+          nombre: string
+          props: Json
+          sesion_id: string
+          ts_cliente: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dispositivo?: string | null
+          empresa_id?: string | null
+          id?: never
+          nombre: string
+          props?: Json
+          sesion_id: string
+          ts_cliente: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          dispositivo?: string | null
+          empresa_id?: string | null
+          id?: never
+          nombre?: string
+          props?: Json
+          sesion_id?: string
+          ts_cliente?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evento_producto_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guia_vista: {
         Row: {
           clave: string

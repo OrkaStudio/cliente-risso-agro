@@ -47,6 +47,15 @@ import {
 import { borrarAltaOnboarding, borrarAltaOnboardingSinPotrero } from '@/features/hacienda/api'
 import { colorDeCampo, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
 import { useIsMobile } from '@/lib/use-is-mobile'
+import { setEmpresaTelemetria } from '@/lib/telemetria'
+import {
+  onboardingCompletado,
+  onboardingIniciado,
+  pasoCompletado,
+  pasoError,
+  pasoSalteado,
+  pasoVisto,
+} from '@/features/onboarding/medicion'
 import { actividadDeUsos, actividadLabel } from '@/features/campos/labels'
 import { LocalidadInput } from '@/features/campos/localidad-input'
 import { CroquisVivo, MarcaCategoria, MarcaCultivo, type CampoCroquis } from '@/features/onboarding/croquis-vivo'
@@ -212,6 +221,15 @@ export function OnboardingPage() {
   // Volvió de potreros a corregir el campo (se pasó de hectáreas, etc.).
   const [corrigiendo, setCorrigiendo] = useState(guardado?.corrigiendo ?? false)
 
+  // Telemetría: arranque (no en una recarga a mitad), empresa y cada paso visto.
+  useEffect(() => {
+    if (!guardado) onboardingIniciado()
+  }, [guardado])
+  useEffect(() => setEmpresaTelemetria(empresaId), [empresaId])
+  useEffect(() => {
+    if (etapa !== 'fin') pasoVisto(etapa, ORDEN_ETAPAS.indexOf(etapa) + 1)
+  }, [etapa])
+
   // Cada cambio de paso queda guardado: recargar vuelve acá, no a la app.
   useEffect(() => {
     if (!empresaId) return
@@ -249,6 +267,7 @@ export function OnboardingPage() {
     const nombre = nombreEmpresa.trim()
     if (nombre.length < 2) {
       setErrorEmpresa('Falta el nombre')
+      pasoError('empresa', 'nombre')
       return
     }
     setOcupado(true)
@@ -258,9 +277,12 @@ export function OnboardingPage() {
     setOcupado(false)
     if (error) {
       setErrorEmpresa(error.message)
+      pasoError('empresa', 'servidor')
       return
     }
     setEmpresaId(data)
+    setEmpresaTelemetria(data)
+    pasoCompletado('empresa')
     ir('campo')
   }
 
@@ -418,6 +440,12 @@ export function OnboardingPage() {
                 ir(corrigiendo ? 'potreros' : 'otro')
               }}
               onListo={(c) => {
+                pasoCompletado('campo', {
+                  tenencia: c.tipo,
+                  ha: c.hectareas,
+                  numero: campos.length + 1,
+                  corrigiendo,
+                })
                 setBorrador(BORRADOR_VACIO)
                 setCorrigiendo(false)
                 setCampoActual(c)
@@ -442,6 +470,7 @@ export function OnboardingPage() {
                 ir('campo')
               }}
               onListo={(potreros) => {
+                pasoCompletado('potreros', { cantidad: potreros.length })
                 setBorrador(BORRADOR_VACIO)
                 setCampoActual({ ...campoActual, potreros })
                 // Siempre sigue a qué hay en cada potrero: ahí se dice si
@@ -490,6 +519,13 @@ export function OnboardingPage() {
                 }
               }}
               onListo={(cabezas, porPotrero, usos, actividad) => {
+                pasoCompletado('hacienda', {
+                  cabezas,
+                  potreros_con_hacienda: Object.values(porPotrero).filter((c) =>
+                    Object.values(c).some((n) => (n ?? 0) > 0),
+                  ).length,
+                  actividad,
+                })
                 setBorrador(BORRADOR_VACIO)
                 setCampos((xs) => [
                   ...xs,
@@ -527,13 +563,28 @@ export function OnboardingPage() {
               subtitulo="Si tenés más, sumalo ahora y ves todo junto. También lo podés hacer después."
             />
             <div className="mt-6 grid gap-2">
-              <Button className={BOTON_PRINCIPAL} onClick={() => ir('campo')}>
+              <Button
+                className={BOTON_PRINCIPAL}
+                onClick={() => {
+                  pasoCompletado('otro', { otro_campo: true })
+                  ir('campo')
+                }}
+              >
                 Sí, cargar otro campo
               </Button>
               <Button
                 variant="outline"
                 className="h-11 w-full text-[15px] font-semibold"
-                onClick={() => ir('fin')}
+                onClick={() => {
+                  pasoCompletado('otro', { otro_campo: false })
+                  onboardingCompletado({
+                    campos: campos.length,
+                    potreros: campos.reduce((s, c) => s + c.potreros.length, 0),
+                    cabezas: campos.reduce((s, c) => s + c.cabezas, 0),
+                    con_alquiler: campos.some((c) => c.tipo === 'alquilado'),
+                  })
+                  ir('fin')
+                }}
               >
                 No, terminar
               </Button>
@@ -697,6 +748,7 @@ function PasoCampo({
     if (ha === null) errs.hectareas = 'Faltan las hectáreas'
     else if (!Number.isFinite(ha) || ha <= 0) errs.hectareas = 'Un número mayor que cero'
     setErrores(errs)
+    for (const campo of Object.keys(errs)) pasoError('campo', campo)
     if (Object.keys(errs).length || !localidad || ha === null) return
 
     setOcupado(true)
@@ -732,6 +784,7 @@ function PasoCampo({
       })
     } catch (err) {
       setErrores({ general: err instanceof Error ? err.message : 'No se pudo crear el campo.' })
+      pasoError('campo', 'servidor')
     } finally {
       setOcupado(false)
     }
@@ -985,6 +1038,7 @@ function PasoPotreros({
       onListo(creados)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron crear los potreros.')
+      pasoError('potreros', 'servidor')
     } finally {
       setOcupado(false)
     }
@@ -1156,7 +1210,10 @@ function PasoPotreros({
             variant="outline"
             className="h-11 w-full text-[15px] font-medium"
             disabled={ocupado}
-            onClick={() => onListo([])}
+            onClick={() => {
+              pasoSalteado('potreros')
+              onListo([])
+            }}
           >
             Los completo después
           </Button>
@@ -1427,6 +1484,7 @@ function PasoHacienda({
     if (!esUltimo) {
       if (avisoActual?.bloquea) {
         setError(avisoActual.texto)
+        pasoError('hacienda', 'carga_excesiva')
         return
       }
       if (faltaEn(usoActual)) return
@@ -1436,12 +1494,14 @@ function PasoHacienda({
     const bloqueado = potreros.find((p) => conHacienda(p.id) && avisoCarga(porPotrero[p.id], p.hectareas)?.bloquea)
     if (bloqueado) {
       setError(`Potrero ${bloqueado.nombre}: ${avisoCarga(porPotrero[bloqueado.id], bloqueado.hectareas)!.texto}`)
+      pasoError('hacienda', 'carga_excesiva')
       return
     }
     const incompleto = potreros.findIndex((p) => faltaEn(usos[p.id]))
     if (incompleto >= 0) {
       const p = potreros[incompleto]!
       irA(incompleto)
+      pasoError('hacienda', faltaEn(usos[p.id]) === 'uso' ? 'falta_uso' : 'falta_cultivo')
       setError(
         faltaEn(usos[p.id]) === 'uso'
           ? `Falta elegir qué hay en el potrero ${p.nombre}`
@@ -1495,6 +1555,7 @@ function PasoHacienda({
       onListo(total, totales, campoEntero ? {} : usos, actividad)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar.')
+      pasoError('hacienda', 'servidor')
     } finally {
       setOcupado(false)
     }
@@ -1860,7 +1921,10 @@ function PasoHacienda({
               variant="outline"
               className="h-10 w-full text-[14px] font-medium"
               disabled={ocupado}
-              onClick={() => onListo(0, {}, {}, campo.actividad)}
+              onClick={() => {
+                pasoSalteado('hacienda')
+                onListo(0, {}, {}, campo.actividad)
+              }}
             >
               La completo después
             </Button>
