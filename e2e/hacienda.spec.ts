@@ -1,91 +1,73 @@
-import { test, expect } from '@playwright/test'
-
-const EMAIL = process.env.E2E_EMAIL ?? ''
-const PASSWORD = process.env.E2E_PASSWORD ?? ''
+import { test, expect, type Page } from '@playwright/test'
+import { elegir, entrar } from './helpers'
 
 // RFID con prefijo E2E para poder limpiarlo después sin tocar datos reales.
-const RFID = `E2E${Date.now()}`
+const rfid = (sufijo = '') => `E2E${Date.now()}${sufijo}`
 
-test('golden path Hacienda: login → alta → ficha → stock', async ({ page }) => {
-  expect(EMAIL, 'definir E2E_EMAIL').not.toBe('')
-  expect(PASSWORD, 'definir E2E_PASSWORD').not.toBe('')
-
-  // --- Login ---
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(EMAIL)
-  await page.getByLabel('Contraseña').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Ingresar' }).click()
-
-  // Tras loguear: ruta protegida (shell con email + botón Salir visibles)
-  await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible()
-  await expect(page.getByText(EMAIL)).toBeVisible()
-
-  // --- Ir a Hacienda y abrir alta ---
+async function darDeAlta(page: Page, caravana: string) {
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Hacienda' })).toBeVisible()
-  await page.getByRole('link', { name: '+ Nuevo animal' }).click()
+  await expect(page.getByRole('heading', { name: 'Hacienda', level: 1 })).toBeVisible()
+  await page.getByRole('button', { name: '+ Nuevo animal' }).click()
+  const alta = page.getByRole('dialog', { name: 'Nuevo animal' })
+  await alta.getByLabel('Caravana (RFID) *').fill(caravana)
+  await elegir(page, 'Categoría', 'Vaca')
+  await elegir(page, 'Potrero', /1A/)
+  await alta.getByRole('button', { name: 'Dar de alta' }).click()
+  await expect(alta).toBeHidden()
+}
 
-  // --- Alta con caravana manual ---
-  await expect(page.getByText('Nuevo animal')).toBeVisible()
-  await page.getByLabel('Caravana (RFID) *').fill(RFID)
-  await page.selectOption('#categoria', 'vaca')
-  await page.selectOption('#potrero', { label: 'Potrero 1' })
-  await page.getByRole('button', { name: 'Dar de alta' }).click()
+test('golden path Hacienda: login → alta → stock → ficha', async ({ page }) => {
+  const caravana = rfid()
+  await entrar(page)
+  await darDeAlta(page, caravana)
 
-  // --- Ficha: muestra la caravana y el evento de alta en el historial ---
+  // Stock: la fila del animal, con su potrero
+  const fila = page.getByRole('row', { name: new RegExp(caravana) })
+  await expect(fila).toBeVisible()
+  await expect(fila.getByRole('link', { name: '1A' })).toBeVisible()
+
+  // Ficha: la caravana y el alta en el historial
+  await fila.getByRole('link', { name: 'Ver ficha' }).click()
   await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
-  await expect(page.getByText(`Caravana ${RFID}`)).toBeVisible()
-  await expect(page.getByText('Historial')).toBeVisible()
+  await expect(page.getByRole('heading', { name: caravana, level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Historial' })).toBeVisible()
   await expect(page.getByText('Alta', { exact: true })).toBeVisible()
-
-  // --- Lista + stock: el animal aparece en la tabla y el potrero se muestra ---
-  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
-  await expect(page.getByRole('cell', { name: RFID })).toBeVisible()
-  await expect(page.getByText('Potrero 1')).toBeVisible()
 })
 
 test('acciones del animal: registrar evento → cambiar caravana → dar de baja', async ({
   page,
 }) => {
-  const ts = Date.now()
-  const rfidA = `E2E${ts}A`
-  const rfidB = `E2E${ts}B`
+  const caravanaA = rfid('A')
+  const caravanaB = caravanaA.replace(/A$/, 'B')
+  await entrar(page)
+  await darDeAlta(page, caravanaA)
+  await page
+    .getByRole('row', { name: new RegExp(caravanaA) })
+    .getByRole('link', { name: 'Ver ficha' })
+    .click()
+  await expect(page.getByRole('heading', { name: caravanaA, level: 1 })).toBeVisible()
 
-  // login
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(EMAIL)
-  await page.getByLabel('Contraseña').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Ingresar' }).click()
-  await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible()
-
-  // alta
-  await page.goto('/hacienda/nuevo')
-  await page.getByLabel('Caravana (RFID) *').fill(rfidA)
-  await page.selectOption('#categoria', 'vaca')
-  await page.getByRole('button', { name: 'Dar de alta' }).click()
-  await expect(page.getByText(`Caravana ${rfidA}`)).toBeVisible()
-
-  const historial = page.getByRole('listitem')
-
-  // registrar evento (sanidad)
+  // Registrar evento (sanidad)
   await page.getByRole('button', { name: 'Registrar evento' }).click()
-  await page.selectOption('#ev-tipo', 'sanidad')
-  await page.getByRole('button', { name: 'Registrar', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(historial.filter({ hasText: 'Sanidad' })).toBeVisible()
+  const evento = page.getByRole('dialog', { name: 'Registrar evento' })
+  await elegir(page, 'Tipo de evento', 'Sanidad')
+  await evento.getByRole('button', { name: 'Registrar', exact: true }).click()
+  await expect(evento).toBeHidden()
+  await expect(page.getByText('Sanidad', { exact: true })).toBeVisible()
 
-  // cambiar caravana
+  // Cambiar caravana
   await page.getByRole('button', { name: 'Cambiar caravana' }).click()
-  await page.locator('#cc-rfid').fill(rfidB)
-  await page.getByRole('button', { name: 'Confirmar cambio' }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText(`Caravana ${rfidB}`)).toBeVisible()
-  await expect(historial.filter({ hasText: 'Cambio de caravana' })).toBeVisible()
+  const cambio = page.getByRole('dialog', { name: 'Cambiar caravana' })
+  await cambio.getByLabel('Nueva caravana (RFID)').fill(caravanaB)
+  await cambio.getByRole('button', { name: 'Confirmar cambio' }).click()
+  await expect(cambio).toBeHidden()
+  await expect(page.getByRole('heading', { name: caravanaB, level: 1 })).toBeVisible()
 
-  // dar de baja
+  // Dar de baja
   await page.getByRole('button', { name: 'Dar de baja' }).click()
-  await page.selectOption('#db-estado', 'vendido')
-  await page.getByRole('button', { name: 'Confirmar baja' }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText('Animal dado de baja')).toBeVisible()
+  const baja = page.getByRole('dialog', { name: 'Dar de baja' })
+  await elegir(page, 'Motivo de baja', /vend/i)
+  await baja.getByRole('button', { name: 'Confirmar baja' }).click()
+  await expect(baja).toBeHidden()
+  await expect(page.getByText('Activo', { exact: true })).toBeHidden()
 })

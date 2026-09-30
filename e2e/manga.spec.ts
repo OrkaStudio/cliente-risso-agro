@@ -537,6 +537,10 @@ test.describe('manga — trabajos sobre animales caravaneados', () => {
     // aplican VARIAS vacunas en la misma pasada (meter el rodeo es caro), así
     // que se marcan todas y cada una queda como un hecho propio.
     await expect(page.getByText('¿Qué se aplica?')).toBeVisible()
+    // Nada viene marcado: una vacuna premarcada que no se destilda quedaba
+    // registrada como aplicada.
+    await expect(page.getByRole('button', { name: 'Empezar a vacunar' })).toBeDisabled()
+    await page.getByRole('button', { name: 'Aftosa' }).click()
     await page.getByRole('button', { name: 'Brucelosis' }).click()
     await page.getByPlaceholder('Quién lo aplica').fill('Dr. Gómez')
     await page.getByRole('button', { name: '30 d', exact: true }).click()

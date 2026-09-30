@@ -38,17 +38,20 @@ Variables de entorno (ver `.env.example`):
 | `pnpm typecheck` | Sólo chequeo de tipos. |
 | `pnpm lint` | ESLint. |
 | `pnpm preview` | Sirve el build de `dist/` localmente. |
-| `pnpm test:e2e` | E2E con Playwright (golden path Hacienda en navegador real). |
+| `pnpm test:e2e` | E2E con login real (hacienda, campos, analítica) contra el dev server. |
+| `pnpm test:e2e:offline` | E2E de manga y offline contra el build de producción (sin credenciales). |
+| `pnpm test:e2e:todo` | Las dos suites. |
 
 ### Tests E2E
 
-`pnpm test:e2e` corre el golden path (login → alta de animal → ficha → stock) en un navegador real contra Supabase. Necesita credenciales seed por env (no se hardcodean):
+Los tests con login usan una cuenta **exclusiva para tests** (`e2e@orkastudio.test`, empresa "E2E Pruebas"), porque escriben datos: nunca la de un productor. Las credenciales van en `.env.e2e.local` (ignorado por git), que `playwright.config.ts` carga solo:
 
 ```bash
-E2E_EMAIL="orka.arg@gmail.com" E2E_PASSWORD="..." pnpm test:e2e
+E2E_EMAIL=e2e@orkastudio.test
+E2E_PASSWORD=...
 ```
 
-El test usa caravanas con prefijo `E2E` para poder limpiarlas sin tocar datos reales.
+Las caravanas y los campos que crean llevan el prefijo `E2E`.
 
 ## Capacitor (móvil)
 
