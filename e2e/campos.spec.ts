@@ -1,41 +1,35 @@
 import { test, expect } from '@playwright/test'
-
-const EMAIL = process.env.E2E_EMAIL ?? ''
-const PASSWORD = process.env.E2E_PASSWORD ?? ''
+import { entrar } from './helpers'
 
 test('campos y potreros: crear campo + crear potrero', async ({ page }) => {
-  const ts = Date.now()
-  const campo = `E2E Campo ${ts}`
-  const potrero = `E2E Potrero ${ts}`
+  const campo = `E2E Campo ${Date.now()}`
+  await entrar(page)
 
-  // login
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(EMAIL)
-  await page.getByLabel('Contraseña').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Ingresar' }).click()
-  await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible()
-
-  // ir a Campos
   await page.getByRole('link', { name: 'Campos', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Campos' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Campos', level: 1 })).toBeVisible()
 
-  // crear campo
+  // Crear campo: la localidad sale del buscador (Open-Meteo), nunca texto suelto
   await page.getByRole('button', { name: '+ Nuevo campo' }).click()
-  await page.locator('#campo-nombre').fill(campo)
-  await page.locator('#campo-ha').fill('50')
-  await page.getByRole('button', { name: 'Crear campo' }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByRole('link', { name: campo })).toBeVisible()
+  const alta = page.getByRole('dialog', { name: 'Nuevo campo' })
+  await alta.getByLabel('Nombre').fill(campo)
+  await alta.getByRole('button', { name: 'Ganadera' }).click()
+  await alta.getByRole('combobox', { name: '¿Dónde está el campo?' }).fill('Chascomús')
+  await page.getByRole('option', { name: /Chascom/ }).first().click()
+  await alta.getByLabel('Hectáreas (opcional)').fill('50')
+  await alta.getByRole('button', { name: 'Crear campo' }).click()
+  await expect(alta).toBeHidden()
 
-  // entrar al campo
-  await page.getByRole('link', { name: campo }).click()
-  await expect(page.getByRole('heading', { name: campo })).toBeVisible()
+  // Entrar al campo: se elige en el mapa y se abre su resumen
+  await page.getByRole('button', { name: campo, exact: true }).click()
+  await page.getByRole('link', { name: 'Resumen del campo' }).click()
+  await expect(page.getByRole('heading', { name: campo, level: 1 })).toBeVisible()
 
-  // crear potrero
+  // Crear potrero: el número lo pone el productor, la letra es del campo
   await page.getByRole('button', { name: '+ Nuevo potrero' }).click()
-  await page.locator('#potrero-nombre').fill(potrero)
-  await page.selectOption('#potrero-estado', 'descanso')
-  await page.getByRole('button', { name: 'Crear potrero' }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByText(potrero)).toBeVisible()
+  const potrero = page.getByRole('dialog', { name: 'Nuevo potrero' })
+  await potrero.getByLabel('Número de potrero').fill('7')
+  await potrero.getByLabel('Hectáreas (opcional)').fill('20')
+  await potrero.getByRole('button', { name: 'Crear potrero' }).click()
+  await expect(potrero).toBeHidden()
+  await expect(page.getByRole('link', { name: /^7[A-Z] / })).toBeVisible()
 })
