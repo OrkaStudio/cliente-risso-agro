@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
+import { ymd } from '@/lib/fecha'
 
 // ===== Agrupación por semana (registro de "qué se hizo/cargó") =====
 
@@ -47,7 +48,7 @@ export function agruparPorSemana<T>(
   for (const it of items) {
     const d = new Date(fecha(it))
     if (Number.isNaN(d.getTime())) continue
-    const key = inicioSemana(d).toISOString().slice(0, 10)
+    const key = ymd(inicioSemana(d))
     const arr = map.get(key)
     if (arr) arr.push(it)
     else map.set(key, [it])

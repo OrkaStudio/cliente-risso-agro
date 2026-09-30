@@ -43,6 +43,7 @@ import { Panel } from '@/components/panel'
 import { PageHeader, Stat } from '@/components/page-header'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
+import { hoyLocal } from '@/lib/fecha'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 type Estado = Database['public']['Enums']['estado_animal']
@@ -167,7 +168,7 @@ export function AnimalesPage() {
   const coloresCat = coloresPorCategoria(porCategoria.map((c) => c.categoria))
 
   // Señales: qué dice el historial (evento.datos) de cada animal activo.
-  const hoyISO = new Date().toISOString().slice(0, 10)
+  const hoyISO = hoyLocal()
   const resumen = useMemo(
     () => resumirEventos(eventosSenales.data ?? []),
     [eventosSenales.data],

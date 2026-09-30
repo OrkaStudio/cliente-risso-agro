@@ -13,6 +13,7 @@ import {
   type CampoRec,
   type Observacion,
 } from './api'
+import { hoyLocal } from '@/lib/fecha'
 
 // Lock a nivel módulo: un solo drenado a la vez (cliente único). `rerun` reintenta
 // si llegó trabajo nuevo mientras drenaba; `drainPromise` deja que el que llega
@@ -89,7 +90,7 @@ function useOnline(): boolean {
   return online
 }
 
-const hoyISO = () => new Date().toISOString().slice(0, 10)
+const hoyISO = hoyLocal
 
 /** Orden natural 1A, 2A … 10A (numeric evita que "10A" quede antes que "1A"). */
 const ordenNatural = (a: string, b: string) =>

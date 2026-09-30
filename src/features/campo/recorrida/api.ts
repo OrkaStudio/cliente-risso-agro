@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { hoyLocal } from '@/lib/fecha'
 
 export type PastoEstado = Database['public']['Enums']['pasto_estado']
 export type AguaEstado = Database['public']['Enums']['agua_estado']
@@ -80,7 +81,7 @@ export type Observacion = {
   audio_url: string | null
 }
 
-const hoyISO = () => new Date().toISOString().slice(0, 10)
+const hoyISO = hoyLocal
 
 /** Días desde la última observación de un potrero. null = nunca se recorrió. */
 export function diasDesde(fecha: string | undefined | null): number | null {

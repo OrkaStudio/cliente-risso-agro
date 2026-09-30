@@ -22,8 +22,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CampoFecha } from '@/components/ui/campo-fecha'
+import { hoyLocal } from '@/lib/fecha'
 
-const hoy = () => new Date().toISOString().slice(0, 10)
+const hoy = hoyLocal
 
 /** Shell de diálogo controlado: un botón que abre + el contenido del form. */
 function AccionDialog({

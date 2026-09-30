@@ -40,6 +40,7 @@ import {
 } from '@/features/hacienda/acciones-animal'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
+import { hoyLocal } from '@/lib/fecha'
 
 type TipoEvento = Database['public']['Enums']['tipo_evento']
 
@@ -154,7 +155,7 @@ export function FichaAnimalPage() {
       : null
 
   // Resumen del historial → datos clave + señales de ESTE animal.
-  const hoyISO = new Date().toISOString().slice(0, 10)
+  const hoyISO = hoyLocal()
   const resumen: ResumenAnimal | undefined = useMemo(() => {
     if (!eventos.data) return undefined
     return resumirEventos(

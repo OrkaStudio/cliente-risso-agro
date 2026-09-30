@@ -42,6 +42,7 @@ import {
 } from '@/components/form-dialog'
 import { cn } from '@/lib/utils'
 import { CampoFecha } from '@/components/ui/campo-fecha'
+import { hoyLocal } from '@/lib/fecha'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
@@ -56,7 +57,7 @@ const medioPagoLabel: Record<MedioPago, string> = {
   otro: 'Otro',
 }
 
-const hoy = () => new Date().toISOString().slice(0, 10)
+const hoy = hoyLocal
 const OFFSET: Record<Frecuencia, number> = {
   mensual: 1,
   bimestral: 2,
