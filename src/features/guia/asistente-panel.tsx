@@ -29,6 +29,7 @@ import {
   type SeccionGuia,
 } from '@/features/guia/secciones'
 import { cn } from '@/lib/utils'
+import { registrar } from '@/lib/telemetria'
 
 /**
  * Panel del Asistente — preguntas (fichas guionadas por chips; el chat con
@@ -80,6 +81,7 @@ export function AsistentePanel() {
   }, [hilo])
 
   const responder = (f: Ficha) => {
+    registrar('asistente_pregunta', { ficha: f.id })
     setHilo((h) => [
       ...h,
       { rol: 'user', texto: f.chip },
@@ -90,7 +92,7 @@ export function AsistentePanel() {
   const irALaMision = () => {
     if (!mision) return
     cerrarPanel()
-    setTimeout(() => empezarMision(mision.id), 150)
+    setTimeout(() => empezarMision(mision.id, 'asistente'), 150)
   }
 
   return createPortal(
@@ -290,6 +292,7 @@ export function AsistentePanel() {
                     target="_blank"
                     rel="noopener noreferrer"
                     data-guia="asistente-whatsapp"
+                    onClick={() => registrar('soporte_whatsapp', { seccion })}
                     className="mx-4 mt-2 flex items-center justify-center gap-2 rounded-full bg-[#25D366] py-2 text-[13px] font-bold text-white shadow-[0_2px_10px_rgba(37,211,102,0.35)] transition-opacity hover:opacity-90"
                   >
                     <MessageCircle className="size-4" />

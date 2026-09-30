@@ -21,6 +21,7 @@ import {
 import { Orbe } from '@/features/guia/orbe'
 import { seccionDeRuta } from '@/features/guia/secciones'
 import { MAX_SPOTS, SPOTS } from '@/features/guia/spots-texto'
+import { registrar } from '@/lib/telemetria'
 
 /**
  * Los puntitos del asistente: un punto lima que respira en la esquina de
@@ -98,7 +99,10 @@ function SpotsDeSeccion() {
             type="button"
             aria-label={`Qué es esto: ${p.ancla}`}
             title="¿Qué es esto?"
-            onClick={() => setAbierto((a) => (a === p.ancla ? null : p.ancla))}
+            onClick={() => {
+              if (abierto !== p.ancla) registrar('spot_tocado', { ancla: p.ancla })
+              setAbierto((a) => (a === p.ancla ? null : p.ancla))
+            }}
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1, left: p.rect.left + p.rect.width - 10, top: p.rect.top - 6 }}
             exit={{ opacity: 0, scale: 0.5 }}

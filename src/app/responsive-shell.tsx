@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Tractor } from 'lucide-react'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { setForceOficina, useForceOficina } from '@/lib/campo-mode'
+import { useMedirUso } from '@/features/guia/medir'
 
 /**
  * Gate de navegación por dispositivo. La app es UNA sola web; lo que cambia
@@ -16,6 +17,7 @@ import { setForceOficina, useForceOficina } from '@/lib/campo-mode'
  * (ver router). Acá solo decidimos a cuál mandar a un móvil parado en Oficina.
  */
 export function ResponsiveShell() {
+  useMedirUso()
   const isMobile = useIsMobile()
   const forceOficina = useForceOficina()
   const location = useLocation()
