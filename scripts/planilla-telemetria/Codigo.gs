@@ -269,13 +269,32 @@ function dibujarTabla(h, t, fila, color, reglas, conFiltro) {
 }
 
 /** Inserta en `destino` el gráfico de la tabla que está en `origen`. */
-function grafico(destino, origen, pos, fila, col) {
+function grafico(destino, origen, pos, fila, col, datosOcultos) {
   var g = pos.tabla.grafico
   var alto = pos.nFilas + 1
   var b = destino.newChart()
     .setChartType(g.tipo === 'barras' ? Charts.ChartType.BAR : Charts.ChartType.COLUMN)
     .addRange(origen.getRange(pos.filaEncabezado, g.x + 1, alto, 1))
   g.series.forEach(function (s) { b.addRange(origen.getRange(pos.filaEncabezado, s + 1, alto, 1)) })
+  if (datosOcultos) b.setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
+
+  // El eje de los números arranca en 0 y va de a enteros; sin datos, hasta 5
+  // (si no, Sheets dibuja -1…1).
+  var maximo = 0
+  pos.tabla.filas.forEach(function (f) {
+    var suma = 0
+    g.series.forEach(function (s) {
+      var v = Number(f[s]) || 0
+      suma = g.apilado ? suma + v : Math.max(suma, v)
+    })
+    maximo = Math.max(maximo, suma)
+  })
+  var texto = { fontName: FUENTE, fontSize: 10, color: GRIS }
+  var numeros = { textStyle: texto, format: '#,##0', minValue: 0, viewWindow: { min: 0 }, gridlines: { color: '#eceff0' } }
+  if (maximo === 0) numeros.viewWindow.max = 5
+  var categorias = { textStyle: texto }
+  if (g.tipo === 'columnas') categorias.format = 'dd/MM'
+
   b.setMergeStrategy(Charts.ChartMergeStrategy.MERGE_COLUMNS)
     .setNumHeaders(1)
     .setOption('title', g.titulo)
@@ -283,8 +302,8 @@ function grafico(destino, origen, pos, fila, col) {
     .setOption('colors', g.colores)
     .setOption('isStacked', g.apilado)
     .setOption('legend', { position: g.series.length > 1 ? 'top' : 'none', textStyle: { fontName: FUENTE } })
-    .setOption('hAxis', { textStyle: { fontName: FUENTE, fontSize: 10 } })
-    .setOption('vAxis', { textStyle: { fontName: FUENTE, fontSize: 10 } })
+    .setOption('hAxis', g.tipo === 'barras' ? numeros : categorias)
+    .setOption('vAxis', g.tipo === 'barras' ? categorias : numeros)
     .setOption('backgroundColor', '#ffffff')
     .setOption('width', ANCHO_GRAFICO)
     .setOption('height', ALTO_GRAFICO)
@@ -337,17 +356,39 @@ function dibujarResumen(libro, h, datos, dibujadas) {
     h.setRowHeight(8 + t * 4, 14)
   }
 
-  // El embudo de activación, el mismo gráfico que en su pestaña.
+  // El embudo de activación. Graficar desde otra pestaña confunde a Sheets
+  // (toma la primera fila de datos como encabezado), así que los datos se
+  // copian acá, en columnas ocultas a la derecha.
   var ref = datos.graficoResumen
   var origen = ref && dibujadas[ref.hoja]
   var pos = origen && origen.tablas[ref.tabla]
   if (pos && pos.nFilas > 0 && pos.tabla.grafico) {
-    try {
-      grafico(h, origen.hoja, pos, filaGrafico, 2)
-    } catch (e) {
-      // Si Sheets no deja graficar desde otra hoja, el embudo queda en su pestaña.
-      h.getRange(filaGrafico, 2).setValue('El embudo está en la pestaña ' + ref.hoja + '.').setFontColor(GRIS)
+    var g = pos.tabla.grafico
+    var usadas = [g.x].concat(g.series)
+    var copia = [usadas.map(function (i) { return pos.tabla.columnas[i].etiqueta })].concat(
+      pos.tabla.filas.map(function (f) { return usadas.map(function (i) { return f[i] === null ? 0 : f[i] }) }))
+    var colDatos = 8
+    tamano(h, Math.max(h.getMaxRows(), filaGrafico + copia.length), colDatos + usadas.length)
+    h.getRange(filaGrafico, colDatos, copia.length, usadas.length).setValues(copia)
+    h.hideColumns(colDatos, usadas.length)
+    var posCopia = {
+      filaEncabezado: filaGrafico,
+      nFilas: pos.nFilas,
+      tabla: {
+        grafico: { tipo: g.tipo, titulo: g.titulo, colores: g.colores, apilado: g.apilado, x: 0,
+          series: g.series.map(function (_, i) { return i + 1 }) },
+        filas: copia.slice(1),
+      },
     }
+    // Las columnas de datos arrancan en `colDatos`: se corre el origen.
+    posCopia.tabla.grafico.x += colDatos - 1
+    posCopia.tabla.grafico.series = posCopia.tabla.grafico.series.map(function (i) { return i + colDatos - 1 })
+    posCopia.tabla.filas = copia.slice(1).map(function (f) {
+      var fila = []
+      f.forEach(function (v, i) { fila[i + colDatos - 1] = v })
+      return fila
+    })
+    grafico(h, h, posCopia, filaGrafico, 2, true)
   }
 
   // Índice: qué hay en cada hoja, con link.
