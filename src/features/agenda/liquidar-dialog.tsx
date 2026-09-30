@@ -23,8 +23,9 @@ import { formField, formLabel } from '@/components/form-dialog'
 import { formatearNumero } from '@/features/onboarding/numeros'
 import { cn } from '@/lib/utils'
 import { CampoFecha } from '@/components/ui/campo-fecha'
+import { hoyLocal } from '@/lib/fecha'
 
-const hoy = () => new Date().toISOString().slice(0, 10)
+const hoy = hoyLocal
 const ddmmaaaa = (f: string) => f.split('-').reverse().join('/')
 
 function diasChip(fecha: string): { texto: string; urgente: boolean } {

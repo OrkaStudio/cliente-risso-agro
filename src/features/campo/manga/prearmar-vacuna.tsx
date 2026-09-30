@@ -4,6 +4,7 @@ import { Check, Syringe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CChip, CLabel } from '../ui'
 import { Encabezado, Seguir } from './ui-manga'
+import { enDiasLocal } from '@/lib/fecha'
 
 /**
  * Prearmado de la vacunación: se define UNA vez y vale para todos los animales
@@ -80,7 +81,7 @@ export function PrearmarVacuna({
     recordar(vete)
     const hasta =
       retiro > 0
-        ? new Date(Date.now() + retiro * 86_400_000).toISOString().slice(0, 10)
+        ? enDiasLocal(retiro)
         : null
     onListo({
       vacunas,

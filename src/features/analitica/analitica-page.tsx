@@ -33,6 +33,7 @@ import { Panel } from '@/components/panel'
 import { PageHeader } from '@/components/page-header'
 import { Dropdown } from '@/components/ui/dropdown'
 import { cn } from '@/lib/utils'
+import { ymd } from '@/lib/fecha'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -115,9 +116,9 @@ export function AnaliticaPage() {
   const proyeccion = useMemo(() => {
     const flujo = proyeccionFlujo(pendientesScope)
     const hastaMes = (() => {
-      const d = new Date()
-      d.setMonth(d.getMonth() + 12)
-      return d.toISOString().slice(0, 7)
+      // Desde el día 1: setMonth() desde un 31 desborda al mes siguiente.
+      const hoy = new Date()
+      return ymd(new Date(hoy.getFullYear(), hoy.getMonth() + 12, 1)).slice(0, 7)
     })()
     return flujo.filter((f) => f.mes <= hastaMes)
   }, [pendientesScope])

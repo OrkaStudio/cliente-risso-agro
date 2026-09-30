@@ -11,6 +11,7 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { LABORES, laborPorTipo, type TipoLabor } from '@/features/potrero/labores'
 import { useRegistrarLabor } from '@/features/potrero/hooks'
 import { CampoFecha } from '@/components/ui/campo-fecha'
+import { hoyLocal } from '@/lib/fecha'
 
 /**
  * Cargar una labor agrícola.
@@ -42,7 +43,7 @@ export function CargarLaborDialog({
   const registrar = useRegistrarLabor(potreroId)
 
   const [tipo, setTipo] = useState<TipoLabor>('siembra')
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10))
+  const [fecha, setFecha] = useState(() => hoyLocal())
   const [cultivo, setCultivo] = useState('')
   const [kg, setKg] = useState('')
   const [nota, setNota] = useState('')

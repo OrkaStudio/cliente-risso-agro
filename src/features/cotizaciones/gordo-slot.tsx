@@ -11,8 +11,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CampoFecha } from '@/components/ui/campo-fecha'
+import { hoyLocal } from '@/lib/fecha'
 
-const hoy = () => new Date().toISOString().slice(0, 10)
+const hoy = hoyLocal
 
 function fmtFecha(f: string) {
   const [y, m, d] = f.split('-')
