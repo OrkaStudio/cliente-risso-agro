@@ -148,7 +148,7 @@ export function CampoInicioPage() {
           to="/campo/manga"
           icon={<Syringe className="size-7" strokeWidth={2} />}
           titulo="Manga"
-          detalle="Caravanear, pesar, sanidad"
+          detalle="Caravanear, vacunar, apartar"
           acento="ink"
         />
       </div>

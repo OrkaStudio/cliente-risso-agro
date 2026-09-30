@@ -81,7 +81,13 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
-    supabase.from('v_flujo_caja').select('neto'),
+    // Sólo el año en curso: sin este filtro la tarjeta "Resultado del año"
+    // sumaba todo el histórico de caja.
+    supabase
+      .from('v_flujo_caja')
+      .select('neto')
+      .gte('mes', `${new Date().getFullYear()}-01-01`)
+      .lt('mes', `${new Date().getFullYear() + 1}-01-01`),
     supabase
       .from('v_pendientes')
       .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')

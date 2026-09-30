@@ -42,6 +42,9 @@ function mesLabel(yyyymm: string): string {
   return `${MESES[m - 1] ?? yyyymm} ${yyyymm.slice(2, 4)}`
 }
 
+/** Movimientos a la vista antes de «Ver los restantes». */
+const MOVS_A_LA_VISTA = 15
+
 const estadoMov: Record<string, { label: string; cls: string }> = {
   liquidado: { label: 'Liquidado', cls: 'bg-field-soft text-field-deep' },
   pendiente: { label: 'Pendiente', cls: 'bg-sol-soft text-sol-deep' },
@@ -61,6 +64,7 @@ export function AnaliticaPage() {
   )
   const [periodo, setPeriodo] = useState<Periodo>('12m')
   const [alquilerAbierto, setAlquilerAbierto] = useState(false)
+  const [verTodos, setVerTodos] = useState(false)
 
   const nombreCampo =
     (campos.data ?? []).find((c) => c.id === campoF)?.nombre ?? null
@@ -364,7 +368,7 @@ export function AnaliticaPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {detalle.slice(0, 15).map((m) => {
+                      {(verTodos ? detalle : detalle.slice(0, MOVS_A_LA_VISTA)).map((m) => {
                         const est = estadoMov[m.estado] ?? {
                           label: m.estado,
                           cls: 'bg-secondary text-faint',
@@ -418,6 +422,20 @@ export function AnaliticaPage() {
                       })}
                     </tbody>
                   </table>
+                  {detalle.length > MOVS_A_LA_VISTA && (
+                    <button
+                      type="button"
+                      onClick={() => setVerTodos((v) => !v)}
+                      className="mt-3 flex items-center gap-1 text-[13px] font-semibold text-field-deep hover:underline"
+                    >
+                      {verTodos
+                        ? 'Ver menos'
+                        : `Ver los ${detalle.length - MOVS_A_LA_VISTA} restantes`}
+                      <ChevronDown
+                        className={cn('size-3.5 transition-transform', verTodos && 'rotate-180')}
+                      />
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -68,7 +68,9 @@ export function PrearmarVacuna({
   onListo: (d: DatosVacuna) => void
   onVolver: () => void
 }) {
-  const [vacunas, setVacunas] = useState<string[]>([VACUNAS[0]])
+  // Nada marcado de entrada: una vacuna premarcada que no se destilda queda
+  // registrada como aplicada, y para SENASA eso es un dato falso.
+  const [vacunas, setVacunas] = useState<string[]>([])
   const [producto, setProducto] = useState('')
   const [vete, setVete] = useState('')
   const [retiro, setRetiro] = useState<number>(0)
