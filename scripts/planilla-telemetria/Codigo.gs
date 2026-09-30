@@ -165,7 +165,6 @@ function dibujarHoja(h, d) {
   h.getRange(2, 1).setValue(d.descripcion).setFontColor(GRIS)
   h.setRowHeight(1, 34)
   h.setRowHeight(2, 22)
-  h.setRowHeight(3, 10)
 
   // Anchos: el mayor que pida cada columna en cualquiera de las tablas.
   for (var c = 0; c < cols; c++) {
@@ -326,7 +325,6 @@ function dibujarResumen(libro, h, datos, dibujadas) {
   h.setColumnWidth(6, 24)
   h.getRange(1, 1, total, 6).setFontFamily(FUENTE).setFontColor(TINTA).setVerticalAlignment('middle')
 
-  h.setRowHeight(1, 16)
   h.getRange('B2').setValue('Tropero · Telemetría').setFontSize(20).setFontWeight('bold').setFontColor(VERDE)
   h.getRange('B3')
     .setValue('Actualizado el ' + Utilities.formatDate(new Date(datos.generado), HUSO, "dd/MM/yyyy 'a las' HH:mm") +
@@ -353,7 +351,6 @@ function dibujarResumen(libro, h, datos, dibujadas) {
     h.setRowHeight(5 + t * 4, 52)
     h.setRowHeight(6 + t * 4, 24)
     h.setRowHeight(7 + t * 4, 34)
-    h.setRowHeight(8 + t * 4, 14)
   }
 
   // El embudo de activación. Graficar desde otra pestaña confunde a Sheets
