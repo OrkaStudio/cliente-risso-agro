@@ -306,6 +306,9 @@ export function InicioPage() {
 
   const campos = new Set(data.potreros.map((p) => p.campoNombre)).size
   const superficie = data.potreros.reduce((s, p) => s + (p.hectareas ?? 0), 0)
+  // Sólo los pagos: el monto de la tarjeta ya es de gastos, y contar los
+  // cobros ahí mostraba "4 pendientes" con 3 cuentas por pagar.
+  const pagosPendientes = data.vencimientos.filter((v) => v.tipo === 'gasto').length
 
   // Posición de IVA — misma cuenta que el panel de Analítica: débito − crédito
   // − saldo a favor arrastrado (dato del contador; v1 vive en localStorage).
@@ -365,9 +368,9 @@ export function InicioPage() {
           iconColor="var(--tierra)"
           value={data.porPagarTotal === 0 ? '—' : fmtCompact(data.porPagarTotal)}
           detail={
-            data.vencimientos.length === 0
+            pagosPendientes === 0
               ? 'al día'
-              : `${data.vencimientos.length} pendiente${data.vencimientos.length === 1 ? '' : 's'}`
+              : `${pagosPendientes} pendiente${pagosPendientes === 1 ? '' : 's'}`
           }
         />
         <Kpi
