@@ -21,6 +21,25 @@ var GRIS = '#6b7570'
 var ROJO_SUAVE = '#fbe4e0'
 var ROJO = '#b3261e'
 var FUENTE = 'Inter'
+var BORDE = '#e3e8e5'
+
+// Estado de cada etapa del tablero: fondo y color del texto.
+var ESTADOS = {
+  bien: { fondo: '#e3f2e9', tinta: '#1e7a4c', texto: 'En meta' },
+  atencion: { fondo: '#fdf3dc', tinta: '#8a6100', texto: 'Atención' },
+  mal: { fondo: '#fbe6e2', tinta: '#b3261e', texto: 'Lejos de la meta' },
+  pocos: { fondo: '#f1f3f2', tinta: '#6b7570', texto: 'Pocos datos' },
+  base: { fondo: '#eef3f8', tinta: '#2f6f9f', texto: '' },
+}
+
+/** El color de la hoja, aclarado: para encabezados suaves. */
+function tinte(hex, cuanto) {
+  var n = parseInt(hex.slice(1), 16)
+  var c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+    return Math.round(v + (255 - v) * cuanto)
+  })
+  return '#' + c.map(function (v) { return ('0' + v.toString(16)).slice(-2) }).join('')
+}
 
 // Un gráfico ocupa este alto en filas vacías debajo de su tabla.
 var FILAS_GRAFICO = 16
@@ -158,6 +177,7 @@ function dibujarHoja(h, d) {
   var filas = 3 + d.tablas.reduce(function (s, t) { return s + filasDeTabla(t) }, 0)
   limpiar(h, filas + 3, Math.max(cols + 1, 6))
   h.setTabColor(d.color)
+  h.setHiddenGridlines(true)
   h.getRange(1, 1, h.getMaxRows(), h.getMaxColumns())
     .setFontFamily(FUENTE).setFontColor(TINTA).setFontSize(10).setVerticalAlignment('middle')
 
@@ -209,8 +229,9 @@ function dibujarTabla(h, t, fila, color, reglas, conFiltro) {
   var filaEnc = fila
   h.getRange(filaEnc, 1, 1, cols)
     .setValues([t.columnas.map(function (c) { return c.etiqueta })])
-    .setBackground(color).setFontColor('#ffffff').setFontWeight('bold')
+    .setBackground(tinte(color, 0.86)).setFontColor(color).setFontWeight('bold')
     .setWrap(true).setVerticalAlignment('middle')
+    .setBorder(null, null, true, null, null, null, color, SpreadsheetApp.BorderStyle.SOLID)
   h.setRowHeight(filaEnc, 40)
   t.columnas.forEach(function (c, i) {
     if (esNumero(c.tipo)) h.getRange(filaEnc, i + 1).setHorizontalAlignment('right')
@@ -256,7 +277,7 @@ function dibujarTabla(h, t, fila, color, reglas, conFiltro) {
 
   var tabla = h.getRange(filaEnc, 1, nFilas + 1, cols)
   tabla.applyRowBanding(SpreadsheetApp.BandingTheme.GREEN, true, false)
-    .setHeaderRowColor(color).setFirstRowColor('#ffffff').setSecondRowColor('#f6f8f7')
+    .setHeaderRowColor(tinte(color, 0.86)).setFirstRowColor('#ffffff').setSecondRowColor('#f8faf9')
   if (conFiltro) tabla.createFilter()
 
   var pos = { filaEncabezado: filaEnc, nFilas: nFilas, tabla: t, siguiente: filaEnc + nFilas + 3 }
@@ -310,97 +331,116 @@ function grafico(destino, origen, pos, fila, col, datosOcultos) {
   destino.insertChart(b.build())
 }
 
-// ── Resumen ────────────────────────────────────────────────────────────────
+// ── Tablero ────────────────────────────────────────────────────────────────
+// La primera hoja responde, sin recorrer las demás: ¿funciona el onboarding?,
+// ¿dónde se pierde?, ¿a quién hay que escribirle hoy?
 
 function dibujarResumen(libro, h, datos, dibujadas) {
-  var filasTarjetas = Math.ceil(datos.resumen.length / 4)
-  var filaGrafico = 5 + filasTarjetas * 4 + 1
-  var filaIndice = filaGrafico + FILAS_GRAFICO + 2
-  var total = filaIndice + datos.hojas.length + 4
-  limpiar(h, total, 6)
+  var t = datos.tablero
+  var nFrases = t.frases.length
+  var nTrabados = Math.max(t.trabados.length, 1)
+  var total = 12 + 6 + nFrases + 4 + nTrabados + 4 + datos.hojas.length + 4
+  limpiar(h, total, 8)
   h.setHiddenGridlines(true)
   h.setTabColor(VERDE)
   h.setColumnWidth(1, 24)
-  for (var c = 2; c <= 5; c++) h.setColumnWidth(c, 230)
-  h.setColumnWidth(6, 24)
-  h.getRange(1, 1, total, 6).setFontFamily(FUENTE).setFontColor(TINTA).setVerticalAlignment('middle')
+  for (var c = 2; c <= 7; c++) h.setColumnWidth(c, 158)
+  h.setColumnWidth(8, 24)
+  h.getRange(1, 1, total, 8).setFontFamily(FUENTE).setFontColor(TINTA).setFontSize(10)
+    .setVerticalAlignment('middle')
 
-  h.getRange('B2').setValue('Tropero · Telemetría').setFontSize(20).setFontWeight('bold').setFontColor(VERDE)
+  h.getRange('B2').setValue('¿Funciona el onboarding?').setFontSize(20).setFontWeight('bold').setFontColor(VERDE)
   h.getRange('B3')
-    .setValue('Actualizado el ' + Utilities.formatDate(new Date(datos.generado), HUSO, "dd/MM/yyyy 'a las' HH:mm") +
-      ' · se actualiza sola cada hora · menú Orka → Actualizar ahora')
-    .setFontColor(GRIS).setFontSize(10)
+    .setValue('Tropero · actualizado el ' + Utilities.formatDate(new Date(datos.generado), HUSO, "dd/MM/yyyy 'a las' HH:mm") +
+      ' · se actualiza sola cada hora')
+    .setFontColor(GRIS)
+  h.setRowHeight(2, 40)
 
-  // Tarjetas: 4 por fila, cada una en 3 filas (número, qué es, aclaración).
-  datos.resumen.forEach(function (k, i) {
-    var f = 5 + Math.floor(i / 4) * 4
-    var col = 2 + (i % 4)
-    var v = aValor(k.valor, k.tipo)
-    var celda = h.getRange(f, col)
-    celda.setValue(v === '' ? 'Nunca' : v)
-      .setFontSize(k.tipo === 'fechahora' ? 16 : 28).setFontWeight('bold').setFontColor(VERDE)
-      .setHorizontalAlignment('left')
-    if (FORMATOS[k.tipo]) celda.setNumberFormat(FORMATOS[k.tipo])
-    h.getRange(f + 1, col).setValue(k.etiqueta).setFontWeight('bold').setWrap(true)
-    h.getRange(f + 2, col).setValue(k.detalle).setFontColor(GRIS).setFontSize(9).setWrap(true)
-      .setVerticalAlignment('top')
-    h.getRange(f, col, 3, 1).setBackground(VERDE_SUAVE)
-      .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID_THICK)
+  // Estado general: tres tarjetas de dos columnas.
+  t.estado.forEach(function (k, i) {
+    var col = 2 + i * 2
+    h.getRange(5, col, 1, 2).merge().setValue(k.valor).setNumberFormat('#,##0')
+      .setFontSize(22).setFontWeight('bold').setFontColor(TINTA).setHorizontalAlignment('left')
+    h.getRange(6, col, 1, 2).merge().setValue(k.etiqueta).setFontWeight('bold')
+    h.getRange(7, col, 1, 2).merge().setValue(k.detalle).setFontColor(GRIS).setFontSize(9).setWrap(true)
+    tarjeta(h.getRange(5, col, 3, 2), '#f5f7f6')
   })
-  for (var t = 0; t < filasTarjetas; t++) {
-    h.setRowHeight(5 + t * 4, 52)
-    h.setRowHeight(6 + t * 4, 24)
-    h.setRowHeight(7 + t * 4, 34)
-  }
+  h.setRowHeight(5, 40)
+  h.setRowHeight(7, 30)
 
-  // El embudo de activación. Graficar desde otra pestaña confunde a Sheets
-  // (toma la primera fila de datos como encabezado), así que los datos se
-  // copian acá, en columnas ocultas a la derecha.
-  var ref = datos.graficoResumen
-  var origen = ref && dibujadas[ref.hoja]
-  var pos = origen && origen.tablas[ref.tabla]
-  if (pos && pos.nFilas > 0 && pos.tabla.grafico) {
-    var g = pos.tabla.grafico
-    var usadas = [g.x].concat(g.series)
-    var copia = [usadas.map(function (i) { return pos.tabla.columnas[i].etiqueta })].concat(
-      pos.tabla.filas.map(function (f) { return usadas.map(function (i) { return f[i] === null ? 0 : f[i] }) }))
-    var colDatos = 8
-    tamano(h, Math.max(h.getMaxRows(), filaGrafico + copia.length), colDatos + usadas.length)
-    h.getRange(filaGrafico, colDatos, copia.length, usadas.length).setValues(copia)
-    h.hideColumns(colDatos, usadas.length)
-    var posCopia = {
-      filaEncabezado: filaGrafico,
-      nFilas: pos.nFilas,
-      tabla: {
-        grafico: { tipo: g.tipo, titulo: g.titulo, colores: g.colores, apilado: g.apilado, x: 0,
-          series: g.series.map(function (_, i) { return i + 1 }) },
-        filas: copia.slice(1),
-      },
-    }
-    // Las columnas de datos arrancan en `colDatos`: se corre el origen.
-    posCopia.tabla.grafico.x += colDatos - 1
-    posCopia.tabla.grafico.series = posCopia.tabla.grafico.series.map(function (i) { return i + colDatos - 1 })
-    posCopia.tabla.filas = copia.slice(1).map(function (f) {
-      var fila = []
-      f.forEach(function (v, i) { fila[i + colDatos - 1] = v })
-      return fila
-    })
-    grafico(h, h, posCopia, filaGrafico, 2, true)
-  }
+  // El camino: seis tarjetas, una por etapa, con su color según la meta.
+  seccion(h, 9, 'El camino del productor',
+    'Qué porcentaje pasa de cada etapa a la siguiente, contra su meta. En gris, menos de 5 personas: todavía no se puede concluir.')
+  t.etapas.forEach(function (e, i) {
+    var col = 2 + i
+    var est = ESTADOS[e.estado] || ESTADOS.pocos
+    h.getRange(12, col).setValue(e.etapa).setFontWeight('bold').setFontSize(9).setWrap(true)
+    var valor = h.getRange(13, col)
+    if (e.pct === null && e.estado === 'base') valor.setValue(e.cantidad).setNumberFormat('#,##0')
+    else if (e.pct === null) valor.setValue('—')
+    else valor.setValue(e.pct / 100).setNumberFormat('0%')
+    valor.setFontSize(24).setFontWeight('bold').setFontColor(est.tinta).setHorizontalAlignment('left')
+    h.getRange(14, col).setValue(e.detalle).setFontColor(GRIS).setFontSize(9).setWrap(true)
+      .setVerticalAlignment('top')
+    h.getRange(15, col).setValue(est.texto).setFontColor(est.tinta).setFontSize(9).setFontWeight('bold')
+    tarjeta(h.getRange(12, col, 4, 1), est.fondo)
+  })
+  h.setRowHeight(12, 34)
+  h.setRowHeight(13, 44)
+  h.setRowHeight(14, 34)
 
-  // Índice: qué hay en cada hoja, con link.
-  h.getRange(filaIndice, 2).setValue('Qué hay en cada hoja').setFontSize(13).setFontWeight('bold')
+  // Lo que hay que mirar: frases armadas con los datos.
+  var f = 17
+  seccion(h, f, 'Lo que hay que mirar', null)
+  t.frases.forEach(function (frase, i) {
+    h.getRange(f + 1 + i, 2, 1, 6).merge().setValue('•  ' + frase).setWrap(true)
+    h.setRowHeight(f + 1 + i, 30)
+  })
+
+  // A quién escribirle: los trabados, con qué hacer.
+  f = f + 1 + nFrases + 1
+  seccion(h, f, 'A quién escribirle',
+    'Productores trabados: dónde quedaron y qué hacer. Se arma solo según los días que pasaron desde el registro.')
+  var enc = f + 2
+  var titulos = ['Productor', 'Email', 'Días desde el registro', 'Dónde quedó', 'Qué hacer']
+  titulos.forEach(function (x, i) { h.getRange(enc, 2 + i).setValue(x) })
+  h.getRange(enc, 6, 1, 2).merge()
+  h.getRange(enc, 2, 1, 6).setFontWeight('bold').setFontColor(VERDE).setBackground(tinte(VERDE, 0.86))
+    .setBorder(null, null, true, null, null, null, VERDE, SpreadsheetApp.BorderStyle.SOLID)
+  h.setRowHeight(enc, 30)
+  if (t.trabados.length === 0) {
+    h.getRange(enc + 1, 2, 1, 6).merge().setValue('Nadie trabado por ahora.').setFontColor(GRIS).setFontStyle('italic')
+  }
+  t.trabados.forEach(function (fila, i) {
+    var r = enc + 1 + i
+    h.getRange(r, 2, 1, 4).setValues([fila.slice(0, 4)])
+    h.getRange(r, 6, 1, 2).merge().setValue(fila[4]).setWrap(true)
+    h.getRange(r, 2).setFontWeight('bold')
+    h.getRange(r, 4).setHorizontalAlignment('center')
+    h.getRange(r, 2, 1, 6).setBorder(null, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID)
+    h.setRowHeight(r, 32)
+  })
+
+  // Para ver el detalle: las demás hojas, con link.
+  f = enc + 1 + nTrabados + 1
+  seccion(h, f, 'Para ver el detalle', null)
   datos.hojas.forEach(function (d, i) {
     var gid = dibujadas[d.nombre].hoja.getSheetId()
-    var r = filaIndice + 1 + i
+    var r = f + 1 + i
     h.getRange(r, 2)
       .setRichTextValue(SpreadsheetApp.newRichTextValue().setText(d.titulo).setLinkUrl('#gid=' + gid).build())
-      .setFontWeight('bold')
-    h.getRange(r, 3, 1, 3).merge().setValue(d.descripcion).setFontColor(GRIS).setWrap(true)
-    h.setRowHeight(r, 36)
+    h.getRange(r, 3, 1, 5).merge().setValue(d.descripcion).setFontColor(GRIS).setFontSize(9).setWrap(true)
+    h.setRowHeight(r, 30)
   })
-  var fn = filaIndice + datos.hojas.length + 2
-  h.getRange(fn, 2, 1, 4).merge()
-    .setValue('No se edita a mano: cada actualización reescribe todas las hojas. Para anotar algo, usá una hoja aparte.')
-    .setFontColor(GRIS).setFontSize(9).setFontStyle('italic')
+}
+
+function seccion(h, fila, titulo, texto) {
+  h.getRange(fila, 2).setValue(titulo).setFontSize(13).setFontWeight('bold').setFontColor(TINTA)
+  h.setRowHeight(fila, 30)
+  if (texto) h.getRange(fila + 1, 2, 1, 6).merge().setValue(texto).setFontColor(GRIS).setFontSize(9)
+}
+
+function tarjeta(rango, fondo) {
+  rango.setBackground(fondo)
+    .setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID_THICK)
 }

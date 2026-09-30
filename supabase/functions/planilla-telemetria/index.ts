@@ -1,7 +1,7 @@
 // Edge function: planilla-telemetria
 //
 // Alimenta la planilla viva de telemetría en Google Sheets: el Apps Script de
-// la planilla la llama cada hora y dibuja un resumen y una hoja por vista.
+// la planilla la llama cada hora y dibuja el tablero y una hoja por tema.
 // Spec: clientes/risso-agro/especificaciones/2026-09-19-telemetria-onboarding-activacion
 //
 // POST con header `x-clave-planilla`. Sin JWT (Apps Script no tiene sesión de
@@ -415,6 +415,84 @@ const RESUMEN_SQL = `
     (select count(*) from interno.v_evento where ts_cliente > now() - interval '24 hours') as eventos_24h
 `
 
+// ── Tablero (la primera hoja) ──────────────────────────────────────────────
+// Responde de un vistazo si el onboarding funciona: cada etapa contra una
+// meta, frases con lo que hay que mirar y a quién escribirle hoy.
+
+/**
+ * Qué porcentaje de la etapa anterior tendría que pasar. Las de la literatura
+ * (Setup→Aha, Aha→Hábito) son el piso del rango; las demás son provisorias
+ * hasta tener datos propios.
+ */
+const METAS: Record<number, { meta: number; fuente: string }> = {
+  2: { meta: 70, fuente: 'provisoria' },
+  3: { meta: 60, fuente: 'provisoria' },
+  4: { meta: 50, fuente: 'literatura: 50–70 %' },
+  5: { meta: 50, fuente: 'provisoria' },
+  6: { meta: 30, fuente: 'literatura: 30–50 %' },
+}
+/** Con menos de esto en la etapa anterior, un porcentaje no dice nada. */
+const MINIMO = 5
+
+const ETAPA_CORTA: Record<number, string> = {
+  1: 'Se registraron',
+  2: 'Terminaron el alta',
+  3: 'Llegaron a la compu',
+  4: 'Aha: su campo',
+  5: 'Primera anotación',
+  6: 'Hábito',
+}
+
+// Los trabados: qué hacer según dónde quedaron y cuánto hace que se registraron.
+const TRABADOS_SQL = `
+  select
+    e.nombre,
+    r.emails,
+    e.dias_desde_registro,
+    e.nivel,
+    e.dispositivo_registro,
+    x.salida_onboarding,
+    concat_ws(' · ',
+      case when a.campos = 0 then 'cargar un campo'
+           when a.campos_con_contorno < a.campos
+             then (a.campos - a.campos_con_contorno) || ' de ' || a.campos || ' campos sin contorno' end,
+      case when a.potreros_alta > 0 and a.potreros_alta_asignados < a.potreros_alta
+             then (a.potreros_alta - a.potreros_alta_asignados) || ' de ' || a.potreros_alta || ' potreros del alta sin asignar'
+           when a.potreros_alta = 0 and a.potreros_dibujados = 0 then 'dibujar un potrero' end
+    ) as falta_aha
+  from interno.v_activacion_etapas e
+  join interno.v_aha_hoy a using (empresa_id)
+  join interno.v_empresa_real r using (empresa_id)
+  left join interno.v_onboarding_x_activacion x using (empresa_id)
+  where e.tiene_telemetria
+    and (
+      (e.nivel = 1 and e.dias_desde_registro >= 1) or
+      (e.nivel = 2 and e.dias_desde_registro >= 1) or
+      (e.nivel = 3 and e.dias_desde_registro >= 2) or
+      (e.nivel = 4 and e.dias_desde_registro >= 3) or
+      (e.nivel = 5 and e.dias_desde_registro >= 5 and e.dias_desde_registro <= 14)
+    )
+  order by e.nivel, e.dias_desde_registro desc
+  limit 15
+`
+
+function queHacer(t: Record<string, unknown>): string {
+  switch (Number(t.nivel)) {
+    case 1:
+      return `Retomar el alta: ${String(t.salida_onboarding ?? 'se fue a mitad de camino')}`
+    case 2:
+      return 'Mandarle el link para seguir en la compu'
+    case 3:
+      return `Le falta para ver su campo: ${String(t.falta_aha || 'revisar')}`
+    case 4:
+      return 'Proponerle su primera recorrida o cargar una factura'
+    default:
+      return 'Recordarle anotar lo del día: le falta volver'
+  }
+}
+
+const pct = (a: number, b: number) => (b > 0 ? Math.round((100 * a) / b) : null)
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
@@ -440,7 +518,6 @@ function celda(v: unknown, tipo: Tipo): string | number | null {
 }
 
 const n = (v: unknown) => Number(v ?? 0)
-const deTotal = (total: number) => `de ${total} productor${total === 1 ? '' : 'es'}`
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'método' }, 405)
@@ -454,57 +531,98 @@ Deno.serve(async (req) => {
 
     const [r] = await sql.unsafe(RESUMEN_SQL)
     const total = n(r.productores)
-    const resumen = [
-      { etiqueta: 'Productores', valor: total, tipo: 'entero', detalle: 'Cuentas reales, sin las de prueba' },
-      {
-        etiqueta: 'Usaron la app esta semana',
-        valor: n(r.activos_7d),
-        tipo: 'entero',
-        detalle: `Abrieron la app en los últimos 7 días, ${deTotal(total)}`,
-      },
-      {
-        etiqueta: 'Llegaron al aha',
-        valor: n(r.aha),
-        tipo: 'entero',
-        detalle: `Campos con contorno y potreros del alta asignados, ${deTotal(total)}`,
-      },
-      {
-        etiqueta: 'Hábito',
-        valor: n(r.habito),
-        tipo: 'entero',
-        detalle: 'Otra anotación en otro día, antes del día 14',
-      },
-      {
-        etiqueta: 'Terminaron el onboarding',
-        valor: n(r.onboarding_completo),
-        tipo: 'entero',
-        detalle:
-          n(r.sin_telemetria) > 0
-            ? `${n(r.sin_telemetria) === 1 ? 'Uno se registró' : `${n(r.sin_telemetria)} se registraron`} antes de que se midiera`
-            : `Completo o con salteos, ${deTotal(total)}`,
-      },
-      {
-        etiqueta: 'Del celular a la compu',
-        valor: n(r.celular_a_compu),
-        tipo: 'entero',
-        detalle:
-          n(r.del_celular) === 0
-            ? 'Todavía nadie se registró desde el celular'
-            : `Abrieron la app en la compu, de ${n(r.del_celular)} que se registraron en el celular`,
-      },
-      {
-        etiqueta: 'Última apertura de un productor',
-        valor: r.ultima_apertura ? (r.ultima_apertura as Date).toISOString() : null,
-        tipo: 'fechahora',
-        detalle: 'Sirve para ver de un vistazo si hay uso',
-      },
-      {
-        etiqueta: 'Eventos en las últimas 24 h',
-        valor: n(r.eventos_24h),
-        tipo: 'entero',
-        detalle: 'Si da 0 y hubo productores usando la app, algo se rompió',
-      },
-    ]
+
+    // El camino, etapa por etapa, contra su meta.
+    const embudo = await sql.unsafe('select orden, total from interno.v_activacion_embudo order by orden')
+    const cant = embudo.map((e) => n(e.total))
+    const etapas = cant.map((c, i) => {
+      const orden = i + 1
+      if (orden === 1) return { etapa: ETAPA_CORTA[1], cantidad: c, pct: null, meta: null, fuente: null, estado: 'base', detalle: 'con la telemetría puesta' }
+      const previo = cant[i - 1]
+      const p = pct(c, previo)
+      const m = METAS[orden]
+      const estado =
+        previo < MINIMO ? 'pocos' : p! >= m.meta ? 'bien' : p! >= m.meta * 0.7 ? 'atencion' : 'mal'
+      return {
+        etapa: ETAPA_CORTA[orden],
+        cantidad: c,
+        pct: p,
+        meta: m.meta,
+        fuente: m.fuente,
+        estado,
+        detalle: previo === 0 ? 'todavía nadie llegó a la anterior' : `${c} de ${previo} · meta ${m.meta} %`,
+      }
+    })
+
+    const trabados = await sql.unsafe(TRABADOS_SQL)
+    const [alta] = await sql.unsafe(`
+      select paso, sum(se_cayeron_aca)::int as se_fueron
+      from interno.v_onboarding_funnel group by paso
+      having sum(se_cayeron_aca) > 0 order by 2 desc limit 1`)
+
+    // Lo que hay que mirar, en castellano.
+    const frases: string[] = []
+    const registrados = cant[0]
+    if (registrados === 0) {
+      frases.push(
+        'Todavía no se registró nadie con la telemetría puesta: el tablero se llena solo con los primeros registros después del deploy.',
+      )
+    } else {
+      const deDiez = (c: number) => Math.round((10 * c) / registrados)
+      frases.push(
+        `De cada 10 que se registran, ${deDiez(cant[3])} llegan a ver su campo (el aha) y ${deDiez(cant[5])} forman el hábito.`,
+      )
+      const medibles = etapas.filter((e) => e.estado !== 'base' && e.estado !== 'pocos' && e.pct !== null)
+      if (medibles.length > 0) {
+        const peor = medibles.reduce((a, b) => ((a.pct! - a.meta!) <= (b.pct! - b.meta!) ? a : b))
+        frases.push(
+          peor.pct! >= peor.meta!
+            ? 'Todas las etapas con datos suficientes están en meta.'
+            : `Donde más se pierde: «${peor.etapa}». Pasa el ${peor.pct} % y la meta es ${peor.meta} %.`,
+        )
+      } else {
+        frases.push(`Todavía hay menos de ${MINIMO} productores por etapa: los porcentajes no alcanzan para concluir.`)
+      }
+      if (alta) frases.push(`En el alta, el paso donde más se van es «${alta.paso}» (${alta.se_fueron}).`)
+      frases.push(
+        n(r.del_celular) === 0
+          ? 'Nadie se registró desde el celular todavía.'
+          : `Del celular a la compu: ${n(r.celular_a_compu)} de ${n(r.del_celular)} ya la abrieron.`,
+      )
+    }
+    frases.push(
+      trabados.length === 0
+        ? 'Nadie está trabado: no hay a quién escribirle hoy.'
+        : `${trabados.length === 1 ? 'Hay un productor trabado' : `Hay ${trabados.length} productores trabados`}: están abajo, con qué hacer.`,
+    )
+
+    const tablero = {
+      estado: [
+        { etiqueta: 'Productores', valor: total, detalle: 'cuentas reales, sin las de prueba' },
+        {
+          etiqueta: 'Usaron la app esta semana',
+          valor: n(r.activos_7d),
+          detalle: `de ${total} · abrieron la app en los últimos 7 días`,
+        },
+        {
+          etiqueta: 'La telemetría',
+          valor: n(r.eventos_24h),
+          detalle:
+            n(r.eventos_24h) > 0
+              ? 'eventos en las últimas 24 h: está llegando'
+              : 'eventos en las últimas 24 h: si hubo uso, algo se rompió',
+        },
+      ],
+      etapas,
+      frases,
+      trabados: trabados.map((t) => [
+        String(t.nombre),
+        String(t.emails ?? ''),
+        n(t.dias_desde_registro),
+        ETAPA_CORTA[n(t.nivel)],
+        queHacer(t),
+      ]),
+    }
 
     const hojas = []
     for (const h of HOJAS) {
@@ -525,13 +643,8 @@ Deno.serve(async (req) => {
       }
       hojas.push({ nombre: h.nombre, titulo: h.titulo, descripcion: h.descripcion, color: h.color, tablas })
     }
-    return json({
-      generado: new Date().toISOString(),
-      resumen,
-      // El embudo de activación se repite en el Resumen.
-      graficoResumen: { hoja: 'Activación', tabla: 0 },
-      hojas,
-    })
+    // `resumen` vacío: el script anterior a este tablero lo sigue leyendo.
+    return json({ generado: new Date().toISOString(), tablero, resumen: [], hojas })
   } catch (err) {
     console.error('[planilla-telemetria]', err)
     return json({ error: 'falló la lectura' }, 500)
