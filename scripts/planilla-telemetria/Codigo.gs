@@ -28,8 +28,8 @@ var ALTO_GRAFICO = 320
 var ANCHO_GRAFICO = 720
 
 var ANCHOS = {
-  texto: 150, largo: 300, email: 220, entero: 104, decimal: 104, pct: 104,
-  fecha: 104, fechahora: 138, sino: 96, puntaje: 112, dispositivo: 104, activo: 104,
+  texto: 160, largo: 300, email: 220, entero: 124, decimal: 124, pct: 124,
+  fecha: 116, fechahora: 144, sino: 116, puntaje: 124, dispositivo: 124, activo: 124,
 }
 var FORMATOS = {
   entero: '#,##0', decimal: '#,##0.0', pct: '0"%"', fecha: 'dd/mm/yyyy',
