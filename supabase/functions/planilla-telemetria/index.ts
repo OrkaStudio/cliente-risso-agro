@@ -1,16 +1,23 @@
 // Edge function: planilla-telemetria
 //
 // Alimenta la planilla viva de telemetría en Google Sheets: el Apps Script de
-// la planilla la llama cada hora y dibuja el tablero y una hoja por tema.
+// la planilla la llama cada hora y dibuja dos hojas.
 // Spec: clientes/risso-agro/especificaciones/2026-09-19-telemetria-onboarding-activacion
+//
+//  · Tablero: lo que miramos juntos para decidir. Cinco preguntas:
+//    1. ¿El que llega, llega a ver su campo? (el camino, contra metas)
+//    2. ¿Dónde se traba? (las fugas más grandes, con qué hacer)
+//    3. ¿A quién ayudamos hoy? (los trabados, con qué hacer)
+//    4. ¿Mejora con el tiempo? (por día de registro: % y cuánto tarda)
+//    5. ¿Vuelven? (productores activos por día)
+//  · Productores: una fila por productor con toda su historia.
+//
+// Cada sección existe porque responde una decisión; no se agregan datos
+// porque sí. El detalle fino (tiempos por paso, eventos) se consulta en la
+// base cuando el tablero señala un problema.
 //
 // POST con header `x-clave-planilla`. Sin JWT (Apps Script no tiene sesión de
 // Supabase): la barrera es la clave, cuyo hash está en interno.planilla_clave.
-//
-// El contenido (títulos, columnas en castellano, tipos, qué muestra cada hoja)
-// vive acá; el Apps Script sólo dibuja. Cambiar una columna = redeployar esto,
-// sin tocar la planilla.
-//
 // Lee con la conexión directa (SUPABASE_DB_URL) porque `interno` no está
 // expuesto por la API, y así tiene que seguir.
 
@@ -23,475 +30,180 @@ type Tipo =
   | 'email'
   | 'entero'
   | 'decimal'
-  | 'pct' // 0–100
   | 'fecha'
   | 'fechahora'
-  | 'sino'
-  | 'puntaje' // puesta a punto, 0–5
+  | 'puntaje' // Setup, 0–5
   | 'dispositivo'
   | 'activo' // días activos: 0 se marca
 
 type Columna = [clave: string, etiqueta: string, tipo: Tipo]
 
-/** Un gráfico debajo de la tabla: el eje es una columna, las series otras. */
-type Grafico = {
-  tipo: 'barras' | 'columnas'
-  titulo: string
-  x: string
-  series: string[]
-  colores: string[]
-  apilado: boolean
-}
-
-type Tabla = {
-  subtitulo?: string
-  descripcion?: string
-  vacia: string
-  sql: string
-  columnas: Columna[]
-  grafico?: Grafico
-}
-
-type Hoja = {
-  nombre: string
-  titulo: string
-  descripcion: string
-  color: string
-  tablas: Tabla[]
-}
-
 const VERDE = '#178a55'
-const AZUL = '#2f6f9f'
-const TIERRA = '#b85c2e'
-const GRIS = '#8a8a8a'
-const CORAL = '#e07b67'
 
-const HOJAS: Hoja[] = [
-  {
-    nombre: 'Productores',
-    titulo: 'Productores',
-    descripcion:
-      'Una fila por productor real: en qué etapa está, cuánto usa la app y cuánto cargó de su campo.',
-    color: VERDE,
-    tablas: [
-      {
-        vacia: 'Todavía no hay productores reales registrados.',
-        sql: `select p.*,
-                case when not e.tiene_telemetria then 'Sin telemetría (se registró antes)' else e.etapa end as etapa,
-                e.aha_dia
-              from interno.v_productores p
-              left join interno.v_activacion_etapas e using (empresa_id)
-              order by p.registro desc`,
-        columnas: [
-          ['nombre', 'Productor', 'texto'],
-          ['emails', 'Email', 'email'],
-          ['registro', 'Se registró', 'fecha'],
-          ['dias_desde_registro', 'Días desde el registro', 'entero'],
-          ['etapa', 'Etapa', 'texto'],
-          ['aha_dia', 'Llegó al aha', 'fecha'],
-          ['ultima_apertura', 'Última vez que abrió', 'fechahora'],
-          ['dias_activos_7d', 'Días activos (7 d)', 'activo'],
-          ['dias_activos_30d', 'Días activos (30 d)', 'activo'],
-          ['aperturas_movil', 'Aperturas en celular', 'entero'],
-          ['aperturas_escritorio', 'Aperturas en compu', 'entero'],
-          ['perfil', 'Perfil', 'texto'],
-          ['puesta_a_punto', 'Setup (puesta a punto)', 'puntaje'],
-          ['activada_7d', 'Setup 5 de 5 en 7 días', 'sino'],
-          ['salida_onboarding', 'Onboarding', 'texto'],
-          ['dispositivo_alta', 'Se registró desde', 'dispositivo'],
-          ['bienvenida', 'Bienvenida', 'texto'],
-          ['misiones_completadas', 'Misiones completadas', 'entero'],
-          ['misiones_abandonadas', 'Misiones abandonadas', 'entero'],
-          ['pidio_ayuda', 'Pidió ayuda por WhatsApp', 'entero'],
-          ['cabezas', 'Cabezas', 'entero'],
-          ['potreros', 'Potreros', 'entero'],
-          ['potreros_dibujados', 'Potreros dibujados', 'entero'],
-          ['recorridas', 'Recorridas', 'entero'],
-          ['trabajos_manga', 'Trabajos de manga', 'entero'],
-          ['movimientos_plata', 'Movimientos de plata', 'entero'],
-          ['labores', 'Labores', 'entero'],
-          ['pantallas_mas_vistas', 'Pantallas más vistas', 'largo'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Activación',
-    titulo: 'Activación',
-    descripcion:
-      'Del registro al hábito. El aha es ver su campo de verdad: todos los campos con contorno y los potreros del alta asignados a los dibujados. Sólo se logra en la compu: el celular tiene que llevarlo ahí.',
-    color: VERDE,
-    tablas: [
-      {
-        subtitulo: 'El embudo',
-        descripcion:
-          'Cada etapa pide la anterior. Sólo cuentan quienes se registraron con la telemetría puesta; los de los últimos 14 días todavía pueden avanzar.',
-        vacia: '',
-        sql: 'select * from interno.v_activacion_embudo order by orden',
-        columnas: [
-          ['etapa', 'Etapa', 'largo'],
-          ['total', 'Productores', 'entero'],
-          ['compu', 'Se registraron en la compu', 'entero'],
-          ['celular', 'Se registraron en el celular', 'entero'],
-          ['pct_del_total', '% del total', 'pct'],
-          ['pct_de_la_anterior', '% de la etapa anterior', 'pct'],
-          ['pct_celular', '% de los del celular', 'pct'],
-          ['referencia', 'Referencia (literatura)', 'texto'],
-        ],
-        grafico: {
-          tipo: 'barras',
-          titulo: 'Embudo de activación',
-          x: 'etapa',
-          series: ['compu', 'celular'],
-          colores: [VERDE, AZUL],
-          apilado: true,
-        },
-      },
-      {
-        subtitulo: 'Productor por productor',
-        descripcion: 'En qué etapa está cada uno, cuándo llegó a cada paso y qué le falta para el aha.',
-        vacia: 'Todavía no hay productores reales registrados.',
-        sql: `select e.*,
-                case when not e.tiene_telemetria then 'Sin telemetría (se registró antes)' else e.etapa end as etapa_txt,
-                case when e.aha_dia is not null then 'Nada: ya llegó'
-                  else nullif(concat_ws(' · ',
-                    case when a.campos = 0 then 'cargar un campo'
-                         when a.campos_con_contorno < a.campos
-                           then (a.campos - a.campos_con_contorno) || ' de ' || a.campos || ' campos sin contorno' end,
-                    case when a.potreros_alta > 0 and a.potreros_alta_asignados < a.potreros_alta
-                           then (a.potreros_alta - a.potreros_alta_asignados) || ' de ' || a.potreros_alta || ' potreros del alta sin asignar'
-                         when a.potreros_alta = 0 and a.potreros_dibujados = 0 then 'dibujar un potrero' end
-                  ), '') end as falta_aha,
-                case when a.potreros_alta > 0 then a.potreros_alta_asignados || ' de ' || a.potreros_alta else '—' end as asignados_txt
-              from interno.v_activacion_etapas e
-              join interno.v_aha_hoy a using (empresa_id)
-              order by e.registro desc`,
-        columnas: [
-          ['nombre', 'Productor', 'texto'],
-          ['etapa_txt', 'Etapa', 'texto'],
-          ['dispositivo_registro', 'Se registró desde', 'dispositivo'],
-          ['registro', 'Se registró', 'fechahora'],
-          ['dias_desde_registro', 'Días desde el registro', 'entero'],
-          ['onboarding_fin', 'Terminó el onboarding', 'fechahora'],
-          ['compu_desde', 'Llegó a la compu', 'fechahora'],
-          ['dias_hasta_compu', 'Días hasta la compu', 'decimal'],
-          ['aha_dia', 'Llegó al aha', 'fecha'],
-          ['dias_hasta_aha', 'Días hasta el aha', 'entero'],
-          ['falta_aha', 'Qué le falta para el aha', 'largo'],
-          ['asignados_txt', 'Potreros del alta asignados', 'texto'],
-          ['primera', 'Primera anotación', 'fechahora'],
-          ['tipo_primera', 'Qué anotó', 'texto'],
-          ['segunda', 'Otra anotación otro día', 'fechahora'],
-          ['setup', 'Setup (puesta a punto)', 'puntaje'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Uso',
-    titulo: 'Uso de la app',
-    descripcion: 'Cuándo y desde dónde abre la app cada productor, y si vuelven día a día.',
-    color: AZUL,
-    tablas: [
-      {
-        subtitulo: 'Por productor',
-        vacia: 'Todavía no hay aperturas registradas.',
-        sql: 'select * from interno.v_uso order by ultima_apertura desc nulls last',
-        columnas: [
-          ['nombre', 'Productor', 'texto'],
-          ['ultima_apertura', 'Última vez que abrió', 'fechahora'],
-          ['dias_activos_7d', 'Días activos (7 d)', 'activo'],
-          ['dias_activos_30d', 'Días activos (30 d)', 'activo'],
-          ['aperturas', 'Aperturas', 'entero'],
-          ['aperturas_movil', 'En celular', 'entero'],
-          ['aperturas_escritorio', 'En compu', 'entero'],
-          ['pantallas_mas_vistas', 'Pantallas más vistas', 'largo'],
-        ],
-      },
-      {
-        subtitulo: 'Día por día (últimos 30 días)',
-        descripcion: 'Productores distintos que abrieron la app cada día.',
-        vacia: '',
-        sql: 'select * from interno.v_uso_diario order by dia',
-        columnas: [
-          ['dia', 'Día', 'fecha'],
-          ['productores', 'Productores', 'entero'],
-          ['en_compu', 'En la compu', 'entero'],
-          ['en_celular', 'En el celular', 'entero'],
-        ],
-        grafico: {
-          tipo: 'columnas',
-          titulo: 'Productores que abrieron la app, por día',
-          x: 'dia',
-          series: ['productores'],
-          colores: [VERDE],
-          apilado: false,
-        },
-      },
-    ],
-  },
-  {
-    nombre: 'Tutoriales',
-    titulo: 'Tutoriales',
-    descripcion:
-      'De la bienvenida al final de «Tu campo, en marcha»: qué misiones hizo, cuánta ayuda pidió y en qué orden completó la puesta a punto.',
-    color: AZUL,
-    tablas: [
-      {
-        vacia: 'Todavía no hay productores reales registrados.',
-        sql: 'select * from interno.v_tutoriales order by nombre',
-        columnas: [
-          ['nombre', 'Productor', 'texto'],
-          ['puesta_a_punto_hoy', 'Setup hoy', 'puntaje'],
-          ['bienvenida', 'Bienvenida', 'texto'],
-          ['misiones_iniciadas', 'Misiones empezadas', 'entero'],
-          ['misiones_completadas', 'Completadas', 'entero'],
-          ['misiones_abandonadas', 'Abandonadas', 'entero'],
-          ['cuales_completo', 'Cuáles completó', 'largo'],
-          ['puntitos_tocados', 'Puntitos de ayuda tocados', 'entero'],
-          ['asistente_abierto', 'Abrió el asistente', 'entero'],
-          ['preguntas', 'Preguntas al asistente', 'entero'],
-          ['whatsapp', 'WhatsApp de soporte', 'entero'],
-          ['orden_puesta_a_punto', 'Orden en que completó la puesta a punto', 'largo'],
-          ['horas_hasta_completa', 'Horas hasta completarla', 'decimal'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Misiones',
-    titulo: 'Misiones',
-    descripcion:
-      'Cada misión de la puesta a punto: cuántos la empiezan, cuántos la terminan, cuánto tardan y en qué paso la dejan.',
-    color: AZUL,
-    tablas: [
-      {
-        vacia: 'Todavía nadie empezó una misión.',
-        sql: 'select * from interno.v_misiones order by iniciadas desc',
-        columnas: [
-          ['mision', 'Misión', 'texto'],
-          ['iniciadas', 'Empezadas', 'entero'],
-          ['completadas', 'Completadas', 'entero'],
-          ['abandonadas', 'Abandonadas', 'entero'],
-          ['pct_completadas', '% completadas', 'pct'],
-          ['mediana_min', 'Minutos (mediana)', 'decimal'],
-          ['paso_mas_abandonado', 'Paso donde más la dejan', 'entero'],
-          ['desde_bienvenida', 'Desde la bienvenida', 'entero'],
-          ['desde_pastilla', 'Desde la pastilla', 'entero'],
-          ['desde_asistente', 'Desde el asistente', 'entero'],
-        ],
-        grafico: {
-          tipo: 'barras',
-          titulo: 'Misiones: completadas y abandonadas',
-          x: 'mision',
-          series: ['completadas', 'abandonadas'],
-          colores: [VERDE, CORAL],
-          apilado: true,
-        },
-      },
-    ],
-  },
-  {
-    nombre: 'Embudo onboarding',
-    titulo: 'Embudo del onboarding',
-    descripcion: 'Paso por paso del registro: cuántos llegan, cuántos pasan y dónde se caen.',
-    color: TIERRA,
-    tablas: [
-      {
-        vacia: 'Todavía ningún productor real hizo el onboarding con la telemetría puesta.',
-        sql: 'select * from interno.v_onboarding_funnel',
-        columnas: [
-          ['orden', 'Nº', 'entero'],
-          ['paso', 'Paso', 'texto'],
-          ['dispositivo', 'Dispositivo', 'dispositivo'],
-          ['iniciaron', 'Empezaron', 'entero'],
-          ['vieron', 'Vieron el paso', 'entero'],
-          ['completaron', 'Lo completaron', 'entero'],
-          ['saltearon', 'Lo saltearon', 'entero'],
-          ['se_cayeron_aca', 'Se fueron acá', 'entero'],
-          ['pct_vieron', '% que llegó', 'pct'],
-          ['pct_pasaron', '% que pasó', 'pct'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Tiempos onboarding',
-    titulo: 'Tiempos del onboarding',
-    descripcion: 'Cuánto tarda cada paso del registro. La mediana es el caso típico; el p75, el lento.',
-    color: TIERRA,
-    tablas: [
-      {
-        vacia: 'Todavía ningún productor real hizo el onboarding con la telemetría puesta.',
-        sql: 'select * from interno.v_onboarding_tiempos',
-        columnas: [
-          ['orden', 'Nº', 'entero'],
-          ['paso', 'Paso', 'texto'],
-          ['resultado', 'Resultado', 'texto'],
-          ['dispositivo', 'Dispositivo', 'dispositivo'],
-          ['n', 'Veces', 'entero'],
-          ['mediana_s', 'Segundos (mediana)', 'decimal'],
-          ['p75_s', 'Segundos (p75)', 'decimal'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Sesiones onboarding',
-    titulo: 'Sesiones del onboarding',
-    descripcion: 'Cada vez que alguien hizo el registro: hasta dónde llegó, qué salteó y cuánto tardó.',
-    color: TIERRA,
-    tablas: [
-      {
-        vacia: 'Todavía ningún productor real hizo el onboarding con la telemetría puesta.',
-        sql: 'select * from interno.v_onboarding_sesiones order by inicio desc',
-        columnas: [
-          ['email', 'Email', 'email'],
-          ['inicio', 'Empezó', 'fechahora'],
-          ['dispositivo', 'Dispositivo', 'dispositivo'],
-          ['completado', 'Lo terminó', 'sino'],
-          ['ultimo_paso_visto', 'Último paso visto', 'texto'],
-          ['salteados', 'Salteó', 'texto'],
-          ['errores', 'Errores', 'entero'],
-          ['duracion_s', 'Duración (s)', 'entero'],
-          ['arranco_aca', 'Empezó en esta sesión', 'sino'],
-          ['ultimo_evento', 'Último evento', 'fechahora'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Eventos recientes',
-    titulo: 'Eventos recientes',
-    descripcion: 'Los últimos 1000 eventos de productores reales, del más nuevo al más viejo.',
-    color: GRIS,
-    tablas: [
-      {
-        vacia: 'Todavía no llegó ningún evento de un productor real.',
-        sql: 'select * from interno.v_eventos_recientes',
-        columnas: [
-          ['ts_cliente', 'Cuándo', 'fechahora'],
-          ['empresa', 'Productor', 'texto'],
-          ['email', 'Email', 'email'],
-          ['evento', 'Evento', 'texto'],
-          ['detalle', 'Detalle', 'largo'],
-          ['dispositivo', 'Dispositivo', 'dispositivo'],
-        ],
-      },
-    ],
-  },
-  {
-    nombre: 'Cuentas de prueba',
-    titulo: 'Cuentas de prueba',
-    descripcion:
-      'Cuentas de Orka (e2e, pruebas de telemetría). No cuentan en ninguna otra hoja; sirven para ver que los eventos llegan.',
-    color: GRIS,
-    tablas: [
-      {
-        vacia: 'No hay eventos de cuentas de prueba.',
-        sql: 'select * from interno.v_pruebas order by ultimo desc',
-        columnas: [
-          ['email', 'Email', 'email'],
-          ['eventos', 'Eventos', 'entero'],
-          ['ultimo', 'Último evento', 'fechahora'],
-          ['tipos', 'Tipos de evento', 'largo'],
-        ],
-      },
-    ],
-  },
-]
-
-const RESUMEN_SQL = `
-  select
-    (select count(*) from interno.v_productores) as productores,
-    (select count(*) from interno.v_productores where dias_activos_7d > 0) as activos_7d,
-    (select count(*) from interno.v_productores where salida_onboarding like 'completo%') as onboarding_completo,
-    (select count(*) from interno.v_productores where salida_onboarding = 'sin telemetría') as sin_telemetria,
-    (select count(*) from interno.v_activacion_etapas where aha_dia is not null) as aha,
-    (select count(*) from interno.v_activacion_etapas where dispositivo_registro = 'movil') as del_celular,
-    (select count(*) from interno.v_activacion_etapas where dispositivo_registro = 'movil' and compu_desde is not null) as celular_a_compu,
-    (select count(*) from interno.v_activacion_etapas where nivel = 6) as habito,
-    (select max(ultima_apertura) from interno.v_productores) as ultima_apertura,
-    (select count(*) from interno.v_evento where ts_cliente > now() - interval '24 hours') as eventos_24h
-`
-
-// ── Tablero (la primera hoja) ──────────────────────────────────────────────
-// Responde de un vistazo si el onboarding funciona: cada etapa contra una
-// meta, frases con lo que hay que mirar y a quién escribirle hoy.
+// ── Metas ──────────────────────────────────────────────────────────────────
 
 /**
  * Qué porcentaje de la etapa anterior tendría que pasar. Las de la literatura
  * (Setup→Aha, Aha→Hábito) son el piso del rango; las demás son provisorias
- * hasta tener datos propios.
+ * hasta tener datos propios. A afinar con Fran.
  */
-const METAS: Record<number, { meta: number; fuente: string }> = {
-  2: { meta: 70, fuente: 'provisoria' },
-  3: { meta: 60, fuente: 'provisoria' },
-  4: { meta: 50, fuente: 'literatura: 50–70 %' },
-  5: { meta: 50, fuente: 'provisoria' },
-  6: { meta: 30, fuente: 'literatura: 30–50 %' },
-}
+const METAS: Record<number, number> = { 2: 70, 3: 60, 4: 50, 5: 50, 6: 30 }
 /** Con menos de esto en la etapa anterior, un porcentaje no dice nada. */
 const MINIMO = 5
 
-const ETAPA_CORTA: Record<number, string> = {
+const ETAPAS: Record<number, string> = {
   1: 'Se registraron',
   2: 'Terminaron el alta',
   3: 'Llegaron a la compu',
-  4: 'Aha: su campo',
-  5: 'Primera anotación',
-  6: 'Hábito',
+  4: 'Aha: vieron su campo',
+  5: 'Primera anotación (7 d)',
+  6: 'Hábito (14 d)',
 }
 
-// Los trabados: qué hacer según dónde quedaron y cuánto hace que se registraron.
-const TRABADOS_SQL = `
+// ── Consultas ──────────────────────────────────────────────────────────────
+
+const GENERAL_SQL = `
   select
-    e.nombre,
-    r.emails,
-    e.dias_desde_registro,
-    e.nivel,
-    e.dispositivo_registro,
-    x.salida_onboarding,
-    concat_ws(' · ',
-      case when a.campos = 0 then 'cargar un campo'
-           when a.campos_con_contorno < a.campos
-             then (a.campos - a.campos_con_contorno) || ' de ' || a.campos || ' campos sin contorno' end,
-      case when a.potreros_alta > 0 and a.potreros_alta_asignados < a.potreros_alta
-             then (a.potreros_alta - a.potreros_alta_asignados) || ' de ' || a.potreros_alta || ' potreros del alta sin asignar'
-           when a.potreros_alta = 0 and a.potreros_dibujados = 0 then 'dibujar un potrero' end
-    ) as falta_aha
+    (select count(*) from interno.v_productores) as productores,
+    (select count(*) from interno.v_activacion_etapas where tiene_telemetria) as medidos,
+    (select count(*) from interno.v_activacion_etapas where dispositivo_registro = 'movil') as del_celular,
+    (select count(*) from interno.v_activacion_etapas
+      where dispositivo_registro = 'movil' and compu_desde is null and dias_desde_registro >= 1) as celular_sin_compu,
+    (select count(*) from interno.v_evento where ts_cliente > now() - interval '24 hours') as eventos_24h,
+    (select max(ts_cliente) from public.evento_producto) as ultimo_evento
+`
+
+/** Qué le falta para el aha, en palabras. Se usa en el tablero y en Productores. */
+const FALTA_SQL = `
+  concat_ws(' · ',
+    case when a.campos = 0 then 'cargar un campo'
+         when a.campos_con_contorno < a.campos
+           then (a.campos - a.campos_con_contorno) || ' de ' || a.campos || ' campos sin contorno' end,
+    case when a.potreros_alta > 0 and a.potreros_alta_asignados < a.potreros_alta
+           then (a.potreros_alta - a.potreros_alta_asignados) || ' de ' || a.potreros_alta || ' potreros del alta sin asignar'
+         when a.potreros_alta = 0 and a.potreros_dibujados = 0 then 'dibujar un potrero' end
+  )`
+
+/** Qué hacer con cada productor según dónde quedó. */
+const QUE_HACER_SQL = `
+  case
+    when not e.tiene_telemetria then 'Se registró antes de la medición · para el aha le falta: ' || coalesce(nullif(${FALTA_SQL}, ''), 'nada')
+    when e.nivel = 1 then 'Retomar el alta: ' || coalesce(x.salida_onboarding, 'se fue a mitad de camino')
+    when e.nivel = 2 then 'Mandarle el link para seguir en la compu'
+    when e.nivel = 3 then 'Le falta para ver su campo: ' || coalesce(nullif(${FALTA_SQL}, ''), 'revisar')
+    when e.nivel = 4 then 'Proponerle su primera recorrida o cargar una factura'
+    when e.nivel = 5 then 'Recordarle anotar lo del día: le falta volver'
+    else 'Al día'
+  end`
+
+const AYUDAR_SQL = `
+  select e.nombre, r.emails, e.dias_desde_registro, e.nivel, ${QUE_HACER_SQL} as que_hacer
   from interno.v_activacion_etapas e
   join interno.v_aha_hoy a using (empresa_id)
   join interno.v_empresa_real r using (empresa_id)
   left join interno.v_onboarding_x_activacion x using (empresa_id)
   where e.tiene_telemetria
     and (
-      (e.nivel = 1 and e.dias_desde_registro >= 1) or
-      (e.nivel = 2 and e.dias_desde_registro >= 1) or
+      (e.nivel in (1, 2) and e.dias_desde_registro >= 1) or
       (e.nivel = 3 and e.dias_desde_registro >= 2) or
       (e.nivel = 4 and e.dias_desde_registro >= 3) or
-      (e.nivel = 5 and e.dias_desde_registro >= 5 and e.dias_desde_registro <= 14)
+      (e.nivel = 5 and e.dias_desde_registro between 5 and 14)
     )
   order by e.nivel, e.dias_desde_registro desc
-  limit 15
+  limit 12
 `
 
-function queHacer(t: Record<string, unknown>): string {
-  switch (Number(t.nivel)) {
-    case 1:
-      return `Retomar el alta: ${String(t.salida_onboarding ?? 'se fue a mitad de camino')}`
-    case 2:
-      return 'Mandarle el link para seguir en la compu'
-    case 3:
-      return `Le falta para ver su campo: ${String(t.falta_aha || 'revisar')}`
-    case 4:
-      return 'Proponerle su primera recorrida o cargar una factura'
-    default:
-      return 'Recordarle anotar lo del día: le falta volver'
-  }
+/** Las fugas posibles, cada una con cuántos afecta y qué hacer. */
+const FUGAS_SQL = `
+  with trabados_aha as (
+    select a.* from interno.v_activacion_etapas e join interno.v_aha_hoy a using (empresa_id)
+    where e.tiene_telemetria and e.nivel = 3 and e.dias_desde_registro >= 1
+  )
+  select 'Aha: les falta marcar el contorno del campo' as que,
+         (select count(*) from trabados_aha where campos = 0 or campos_con_contorno < campos)::int as n,
+         'Revisar la guía del contorno (boleta de ARBA o a mano)' as hacer
+  union all
+  select 'Aha: tienen potreros del alta sin asignar a uno dibujado',
+         (select count(*) from trabados_aha where potreros_alta > 0 and potreros_alta_asignados < potreros_alta)::int,
+         'Revisar cómo se elige qué potrero es el dibujado'
+  union all
+  select 'Celular: nunca abrieron la compu',
+         (select count(*) from interno.v_activacion_etapas
+           where tiene_telemetria and dispositivo_registro = 'movil' and compu_desde is null and dias_desde_registro >= 1)::int,
+         'Link a la compu por WhatsApp y recordatorio a las 48 h'
+  union all
+  (select 'Alta: se fueron en el paso «' || paso || '»', sum(se_cayeron_aca)::int,
+          'Simplificar ese paso o permitir saltearlo'
+   from interno.v_onboarding_funnel group by paso order by 2 desc limit 1)
+  union all
+  (select 'Tutorial: dejaron la misión «' || mision || '» (en el paso ' || coalesce(paso_mas_abandonado::text, '?') || ')',
+          abandonadas::int, 'Revisar ese paso de la misión'
+   from interno.v_misiones order by abandonadas desc limit 1)
+  union all
+  select 'Después del aha: vieron su campo y no anotaron nada',
+         (select count(*) from interno.v_activacion_etapas
+           where tiene_telemetria and nivel = 4 and dias_desde_registro >= 3)::int,
+         'Proponerles la primera recorrida o cargar una factura'
+`
+
+/** Esta semana contra la anterior: mediana de cuánto tardan. */
+const COMPARA_SQL = `
+  with t as (
+    select *, (now() at time zone 'America/Argentina/Buenos_Aires')::date - cohorte as dias
+    from interno.v_tiempos where tiene_telemetria
+  )
+  select
+    percentile_cont(0.5) within group (order by alta_min) filter (where dias between 0 and 6) as alta_ahora,
+    percentile_cont(0.5) within group (order by alta_min) filter (where dias between 7 and 13) as alta_antes,
+    percentile_cont(0.5) within group (order by aha_horas) filter (where dias between 0 and 6) as aha_ahora,
+    percentile_cont(0.5) within group (order by aha_horas) filter (where dias between 7 and 13) as aha_antes,
+    count(*) filter (where dias between 0 and 6) as n_ahora,
+    count(*) filter (where dias between 7 and 13) as n_antes
+  from t
+`
+
+const PRODUCTORES: { sql: string; columnas: Columna[] } = {
+  sql: `
+    select
+      p.nombre, p.emails, p.registro,
+      e.dispositivo_registro,
+      case when not e.tiene_telemetria then 'Sin medición' else e.etapa end as etapa,
+      ${QUE_HACER_SQL} as que_hacer,
+      t.alta_min, t.aha_horas, e.setup, t.setup_horas, e.tipo_primera,
+      p.ultima_apertura, p.dias_activos_7d,
+      tu.misiones_completadas || ' hechas · ' || tu.misiones_abandonadas || ' dejadas' as misiones,
+      tu.whatsapp + tu.preguntas as ayuda,
+      p.cabezas,
+      a.potreros_dibujados || ' de ' || p.potreros as potreros
+    from interno.v_productores p
+    join interno.v_activacion_etapas e using (empresa_id)
+    join interno.v_aha_hoy a using (empresa_id)
+    left join interno.v_tiempos t using (empresa_id)
+    left join interno.v_tutoriales tu using (empresa_id)
+    left join interno.v_onboarding_x_activacion x using (empresa_id)
+    order by p.registro desc`,
+  columnas: [
+    ['nombre', 'Productor', 'texto'],
+    ['emails', 'Email', 'email'],
+    ['registro', 'Se registró', 'fecha'],
+    ['dispositivo_registro', 'Desde', 'dispositivo'],
+    ['etapa', 'Etapa', 'texto'],
+    ['que_hacer', 'Qué le falta / qué hacer', 'largo'],
+    ['alta_min', 'Alta (min)', 'decimal'],
+    ['aha_horas', 'Horas hasta el aha', 'decimal'],
+    ['setup', 'Setup', 'puntaje'],
+    ['setup_horas', 'Horas hasta el Setup', 'decimal'],
+    ['tipo_primera', 'Primera anotación', 'texto'],
+    ['ultima_apertura', 'Última vez que abrió', 'fechahora'],
+    ['dias_activos_7d', 'Días activos (7 d)', 'activo'],
+    ['misiones', 'Misiones', 'texto'],
+    ['ayuda', 'Pidió ayuda', 'entero'],
+    ['cabezas', 'Cabezas', 'entero'],
+    ['potreros', 'Potreros dibujados', 'texto'],
+  ],
 }
 
-const pct = (a: number, b: number) => (b > 0 ? Math.round((100 * a) / b) : null)
+// ── Armado ─────────────────────────────────────────────────────────────────
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -500,16 +212,15 @@ const DISPOSITIVO: Record<string, string> = { movil: 'Celular', escritorio: 'Com
 
 /** El valor crudo de la base, listo para la celda según el tipo de columna. */
 function celda(v: unknown, tipo: Tipo): string | number | null {
-  if (v === null || v === undefined) return tipo === 'sino' ? '—' : null
+  if (v === null || v === undefined) return null
   if (Array.isArray(v)) return v.join(', ')
-  if (tipo === 'sino') return v ? 'Sí' : 'No'
   if (tipo === 'dispositivo') return DISPOSITIVO[String(v)] ?? String(v)
   // Fechas: la fecha sola como AAAA-MM-DD (sin corrimiento de huso), el
   // instante como ISO; el Apps Script las convierte a fechas de la planilla.
   if (v instanceof Date) return tipo === 'fecha' ? v.toISOString().slice(0, 10) : v.toISOString()
   if (typeof v === 'bigint') return Number(v)
   if (typeof v === 'number') return v
-  if (tipo === 'entero' || tipo === 'decimal' || tipo === 'pct' || tipo === 'puntaje' || tipo === 'activo') {
+  if (['entero', 'decimal', 'puntaje', 'activo'].includes(tipo)) {
     const n = Number(v)
     return Number.isFinite(n) ? n : String(v)
   }
@@ -518,6 +229,23 @@ function celda(v: unknown, tipo: Tipo): string | number | null {
 }
 
 const n = (v: unknown) => Number(v ?? 0)
+const pct = (a: number, b: number) => (b > 0 ? Math.round((100 * a) / b) : null)
+const num = (v: unknown) => (v === null || v === undefined ? null : Math.round(Number(v) * 10) / 10)
+
+/** "18 h", "2,5 días", "6 min": lo más legible para cada magnitud. */
+function duracion(horas: number | null): string {
+  if (horas === null) return '—'
+  if (horas < 1) return `${Math.round(horas * 60)} min`
+  if (horas < 48) return `${Math.round(horas)} h`
+  return `${(horas / 24).toFixed(1).replace('.', ',')} días`
+}
+
+function compara(ahora: number | null, antes: number | null, nAhora: number, nAntes: number, que: string, unidad: 'min' | 'h') {
+  if (ahora === null || antes === null || nAhora < 3 || nAntes < 3) return null
+  const fmt = (v: number) => (unidad === 'min' ? `${Math.round(v)} min` : duracion(v))
+  const cambio = ahora < antes * 0.9 ? 'más rápido' : ahora > antes * 1.1 ? 'más lento' : 'igual'
+  return `${que}: ${fmt(ahora)} esta semana contra ${fmt(antes)} la anterior (mediana) → ${cambio}.`
+}
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'método' }, 405)
@@ -529,122 +257,101 @@ Deno.serve(async (req) => {
     const [{ ok }] = await sql`select interno.planilla_clave_ok(${clave}) as ok`
     if (!ok) return json({ error: 'no autorizado' }, 401)
 
-    const [r] = await sql.unsafe(RESUMEN_SQL)
-    const total = n(r.productores)
+    const [g] = await sql.unsafe(GENERAL_SQL)
+    const ultimo = g.ultimo_evento ? (g.ultimo_evento as Date) : null
+    const horasDesdeUltimo = ultimo ? (Date.now() - ultimo.getTime()) / 3600000 : null
+    const salud = {
+      ok: horasDesdeUltimo !== null && horasDesdeUltimo < 24,
+      texto:
+        horasDesdeUltimo === null
+          ? 'No llegó nunca un evento'
+          : horasDesdeUltimo < 24
+            ? `La medición anda · último evento hace ${duracion(horasDesdeUltimo)}`
+            : `Sin eventos hace ${duracion(horasDesdeUltimo)}: si hubo uso, algo se rompió`,
+    }
 
-    // El camino, etapa por etapa, contra su meta.
+    // 1 · El camino, etapa por etapa, contra su meta.
     const embudo = await sql.unsafe('select orden, total from interno.v_activacion_embudo order by orden')
     const cant = embudo.map((e) => n(e.total))
-    const etapas = cant.map((c, i) => {
+    const camino = cant.map((c, i) => {
       const orden = i + 1
-      if (orden === 1) return { etapa: ETAPA_CORTA[1], cantidad: c, pct: null, meta: null, fuente: null, estado: 'base', detalle: 'con la telemetría puesta' }
+      if (orden === 1) return { etapa: ETAPAS[1], cantidad: c, pct: null, meta: null, estado: 'base' }
       const previo = cant[i - 1]
       const p = pct(c, previo)
-      const m = METAS[orden]
-      const estado =
-        previo < MINIMO ? 'pocos' : p! >= m.meta ? 'bien' : p! >= m.meta * 0.7 ? 'atencion' : 'mal'
-      return {
-        etapa: ETAPA_CORTA[orden],
-        cantidad: c,
-        pct: p,
-        meta: m.meta,
-        fuente: m.fuente,
-        estado,
-        detalle: previo === 0 ? 'todavía nadie llegó a la anterior' : `${c} de ${previo} · meta ${m.meta} %`,
-      }
+      const meta = METAS[orden]
+      const estado = previo < MINIMO ? 'pocos' : p! >= meta ? 'bien' : p! >= meta * 0.7 ? 'atencion' : 'mal'
+      return { etapa: ETAPAS[orden], cantidad: c, pct: p, meta, estado }
     })
 
-    const trabados = await sql.unsafe(TRABADOS_SQL)
-    const [alta] = await sql.unsafe(`
-      select paso, sum(se_cayeron_aca)::int as se_fueron
-      from interno.v_onboarding_funnel group by paso
-      having sum(se_cayeron_aca) > 0 order by 2 desc limit 1`)
+    // 2 · Dónde se traba: las tres fugas que más gente afectan.
+    const fugas = (await sql.unsafe(FUGAS_SQL))
+      .map((f) => ({ que: String(f.que), n: n(f.n), hacer: String(f.hacer) }))
+      .filter((f) => f.n > 0)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 3)
 
-    // Lo que hay que mirar, en castellano.
-    const frases: string[] = []
-    const registrados = cant[0]
-    if (registrados === 0) {
-      frases.push(
-        'Todavía no se registró nadie con la telemetría puesta: el tablero se llena solo con los primeros registros después del deploy.',
-      )
-    } else {
-      const deDiez = (c: number) => Math.round((10 * c) / registrados)
-      frases.push(
-        `De cada 10 que se registran, ${deDiez(cant[3])} llegan a ver su campo (el aha) y ${deDiez(cant[5])} forman el hábito.`,
-      )
-      const medibles = etapas.filter((e) => e.estado !== 'base' && e.estado !== 'pocos' && e.pct !== null)
-      if (medibles.length > 0) {
-        const peor = medibles.reduce((a, b) => ((a.pct! - a.meta!) <= (b.pct! - b.meta!) ? a : b))
-        frases.push(
-          peor.pct! >= peor.meta!
-            ? 'Todas las etapas con datos suficientes están en meta.'
-            : `Donde más se pierde: «${peor.etapa}». Pasa el ${peor.pct} % y la meta es ${peor.meta} %.`,
-        )
-      } else {
-        frases.push(`Todavía hay menos de ${MINIMO} productores por etapa: los porcentajes no alcanzan para concluir.`)
-      }
-      if (alta) frases.push(`En el alta, el paso donde más se van es «${alta.paso}» (${alta.se_fueron}).`)
-      frases.push(
-        n(r.del_celular) === 0
-          ? 'Nadie se registró desde el celular todavía.'
-          : `Del celular a la compu: ${n(r.celular_a_compu)} de ${n(r.del_celular)} ya la abrieron.`,
-      )
-    }
-    frases.push(
-      trabados.length === 0
-        ? 'Nadie está trabado: no hay a quién escribirle hoy.'
-        : `${trabados.length === 1 ? 'Hay un productor trabado' : `Hay ${trabados.length} productores trabados`}: están abajo, con qué hacer.`,
+    // 3 · A quién ayudar hoy.
+    const ayudar = (await sql.unsafe(AYUDAR_SQL)).map((t) => ({
+      nombre: String(t.nombre),
+      email: String(t.emails ?? ''),
+      dias: n(t.dias_desde_registro),
+      etapa: ETAPAS[n(t.nivel)],
+      hacer: String(t.que_hacer),
+    }))
+
+    // 4 · ¿Mejora con el tiempo? Por día de registro.
+    const cohortes = (await sql.unsafe('select * from interno.v_cohortes order by dia desc limit 14')).map((c) => ({
+      dia: (c.dia as Date).toISOString().slice(0, 10),
+      enCurso: n(c.dias) < 7,
+      registrados: n(c.registrados),
+      alta: { pct: num(c.alta_pct), valor: num(c.alta_min) },
+      aha: { pct: num(c.aha_pct), valor: num(c.aha_horas) },
+      setup: { pct: num(c.setup_pct), valor: num(c.setup_horas) },
+      anoto: num(c.anoto_pct),
+    }))
+    const [cmp] = await sql.unsafe(COMPARA_SQL)
+    const comparaciones = [
+      compara(num(cmp.alta_ahora), num(cmp.alta_antes), n(cmp.n_ahora), n(cmp.n_antes), 'El alta', 'min'),
+      compara(num(cmp.aha_ahora), num(cmp.aha_antes), n(cmp.n_ahora), n(cmp.n_antes), 'Llegar al aha', 'h'),
+    ].filter((x): x is string => x !== null)
+
+    // 5 · ¿Vuelven? Productores activos por día, 30 días.
+    const vuelven = (await sql.unsafe('select dia, productores from interno.v_uso_diario order by dia')).map((d) =>
+      n(d.productores),
     )
 
-    const tablero = {
-      estado: [
-        { etiqueta: 'Productores', valor: total, detalle: 'cuentas reales, sin las de prueba' },
-        {
-          etiqueta: 'Usaron la app esta semana',
-          valor: n(r.activos_7d),
-          detalle: `de ${total} · abrieron la app en los últimos 7 días`,
-        },
-        {
-          etiqueta: 'La telemetría',
-          valor: n(r.eventos_24h),
-          detalle:
-            n(r.eventos_24h) > 0
-              ? 'eventos en las últimas 24 h: está llegando'
-              : 'eventos en las últimas 24 h: si hubo uso, algo se rompió',
-        },
-      ],
-      etapas,
-      frases,
-      trabados: trabados.map((t) => [
-        String(t.nombre),
-        String(t.emails ?? ''),
-        n(t.dias_desde_registro),
-        ETAPA_CORTA[n(t.nivel)],
-        queHacer(t),
-      ]),
+    // En una frase, lo que dice todo junto.
+    const titular =
+      cant[0] === 0
+        ? 'Todavía no se registró nadie con la medición puesta: el tablero se llena solo con los primeros registros después del deploy.'
+        : `De cada 10 que se registran, ${Math.round((10 * cant[3]) / cant[0])} llegan a ver su campo y ${Math.round((10 * cant[5]) / cant[0])} forman el hábito.` +
+          (n(g.del_celular) > 0 ? ` Del celular, ${n(g.del_celular) - n(g.celular_sin_compu)} de ${n(g.del_celular)} ya pasaron a la compu.` : '')
+
+    const filas = await sql.unsafe(PRODUCTORES.sql)
+    const productores = {
+      columnas: PRODUCTORES.columnas.map(([, etiqueta, tipo]) => ({ etiqueta, tipo })),
+      filas: filas.map((f) => PRODUCTORES.columnas.map(([c, , tipo]) => celda(f[c], tipo))),
     }
 
-    const hojas = []
-    for (const h of HOJAS) {
-      const tablas = []
-      for (const t of h.tablas) {
-        const filas = await sql.unsafe(t.sql)
-        const claves = t.columnas.map(([c]) => c)
-        tablas.push({
-          subtitulo: t.subtitulo ?? null,
-          descripcion: t.descripcion ?? null,
-          vacia: t.vacia,
-          columnas: t.columnas.map(([, etiqueta, tipo]) => ({ etiqueta, tipo })),
-          filas: filas.map((f) => t.columnas.map(([c, , tipo]) => celda(f[c], tipo))),
-          grafico: t.grafico
-            ? { ...t.grafico, x: claves.indexOf(t.grafico.x), series: t.grafico.series.map((s) => claves.indexOf(s)) }
-            : null,
-        })
-      }
-      hojas.push({ nombre: h.nombre, titulo: h.titulo, descripcion: h.descripcion, color: h.color, tablas })
-    }
-    // `resumen` vacío: el script anterior a este tablero lo sigue leyendo.
-    return json({ generado: new Date().toISOString(), tablero, resumen: [], hojas })
+    return json({
+      generado: new Date().toISOString(),
+      version: 2,
+      tablero: {
+        salud,
+        titular,
+        productores: n(g.productores),
+        medidos: n(g.medidos),
+        camino,
+        minimo: MINIMO,
+        fugas,
+        ayudar,
+        cohortes,
+        comparaciones,
+        vuelven,
+        color: VERDE,
+      },
+      productores,
+    })
   } catch (err) {
     console.error('[planilla-telemetria]', err)
     return json({ error: 'falló la lectura' }, 500)
