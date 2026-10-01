@@ -15,7 +15,13 @@ import {
 } from '@/features/guia/burbuja'
 import { useEstadoPuestaAPunto } from '@/features/guia/checklist'
 import { type Resumen } from '@/features/guia/estado'
-import { pararMision, useMarcarVista, useMisionActiva } from '@/features/guia/guia-store'
+import {
+  avanzoPasoMision,
+  pararMision,
+  terminoMision,
+  useMarcarVista,
+  useMisionActiva,
+} from '@/features/guia/guia-store'
 import { MISIONES, type Mision as MisionDef, type PasoMision } from '@/features/guia/misiones'
 import { Orbe } from '@/features/guia/orbe'
 import { cn } from '@/lib/utils'
@@ -135,9 +141,15 @@ function MisionEnCurso({ mision, inicial }: { mision: MisionDef; inicial: Resume
     }
   }, [fase, idx, pasos, ancla, destino, location.pathname])
 
+  // Telemetría: cada paso que se da por hecho (el 0 es el arranque).
+  React.useEffect(() => {
+    if (fase === 'pasos' && pasos[idx]) avanzoPasoMision(idx, pasos[idx]!.ancla)
+  }, [fase, idx, pasos])
+
   // Festejo: se marca (para no festejar dos veces) y se va solo.
   React.useEffect(() => {
     if (fase !== 'festejo') return
+    terminoMision()
     marcarVista(`mision.${mision.id}`)
     const t = setTimeout(() => pararMision(), 8000)
     return () => clearTimeout(t)

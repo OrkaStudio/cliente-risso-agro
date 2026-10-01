@@ -19,6 +19,7 @@ import { nombreDe } from '@/features/guia/nombre-usuario'
 import { Orbe } from '@/features/guia/orbe'
 import { saludo } from '@/features/guia/saludo'
 import { seccionDeRuta } from '@/features/guia/secciones'
+import { registrar } from '@/lib/telemetria'
 
 /**
  * La invitación de llegada — lo primero que dice el asistente después del
@@ -68,10 +69,21 @@ export function Invitacion() {
   const nombre = nombreDe(user?.user_metadata)
   const nombreEmpresa = empresa.data?.empresa?.nombre ?? null
 
+  // Telemetría: una vez que se muestra de verdad (no en cada render).
+  React.useEffect(() => {
+    if (visible) registrar('bienvenida_vista', { mision: proxima?.id ?? null })
+    // Sólo al aparecer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
   const responder = (empezar: boolean) => {
+    registrar('bienvenida_respondida', {
+      respuesta: empezar ? 'dale' : 'despues',
+      mision: proxima?.id ?? null,
+    })
     setVisible(false)
     marcarVista('recibimiento')
-    if (empezar && proxima) setTimeout(() => empezarMision(proxima.id), 250)
+    if (empezar && proxima) setTimeout(() => empezarMision(proxima.id, 'bienvenida'), 250)
   }
 
   return createPortal(

@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/features/auth/auth-context'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { Invitacion } from '@/features/guia/invitacion'
+import { useMedirPuestaAPunto } from '@/features/guia/medir'
 import { Mision } from '@/features/guia/mision'
 import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
 import { Spots } from '@/features/guia/spots'
@@ -101,6 +102,7 @@ function initials(email?: string) {
 }
 
 export function AppShell() {
+  useMedirPuestaAPunto()
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
 

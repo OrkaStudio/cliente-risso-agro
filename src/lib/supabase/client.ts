@@ -14,6 +14,18 @@ import type { Database } from '@/lib/supabase/types'
  * Capacitor conviene migrar a un storage seguro nativo — pendiente, anotado
  * en el CLAUDE.md del repo (no es bloqueante para Track 1 web).
  */
+/**
+ * La telemetría se manda también al cerrar o recargar la pestaña, y un fetch
+ * común se cancela con la página ("Failed to fetch"): el lote se perdía. Con
+ * `keepalive` el navegador lo termina de mandar. Sólo para `evento_producto`,
+ * cuyos lotes son chicos (el límite de keepalive es 64 KB).
+ */
+export const fetchConKeepalive: typeof fetch = (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (url.includes('/rest/v1/evento_producto')) return fetch(input, { ...init, keepalive: true })
+  return fetch(input, init)
+}
+
 export const supabase = createClient<Database>(
   env.supabaseUrl,
   env.supabasePublishableKey,
@@ -23,5 +35,6 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
+    global: { fetch: fetchConKeepalive },
   },
 )

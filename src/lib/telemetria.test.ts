@@ -6,7 +6,15 @@ vi.mock('@/lib/supabase/client', () => ({
 }))
 vi.mock('@/lib/use-is-mobile', () => ({ esViewportMovil: () => true }))
 
-const { registrar, enviar, setEmpresaTelemetria, registrarSesionIniciada, CLAVE_SOPORTE, _reiniciarTelemetria } =
+const {
+  registrar,
+  enviar,
+  setEmpresaTelemetria,
+  registrarSesionIniciada,
+  registrarAppAbierta,
+  CLAVE_SOPORTE,
+  _reiniciarTelemetria,
+} =
   await import('@/lib/telemetria')
 const medicion = await import('@/features/onboarding/medicion')
 
@@ -94,6 +102,13 @@ describe('telemetria', () => {
     registrarSesionIniciada('u2')
     await enviar()
     expect(enviadas()).toHaveLength(2)
+  })
+
+  it('app_abierta una sola vez por pestaña y usuario, aunque no haya login', async () => {
+    registrarAppAbierta('u1')
+    registrarAppAbierta('u1')
+    await enviar()
+    expect(enviadas().map((f) => f.nombre)).toEqual(['app_abierta'])
   })
 })
 

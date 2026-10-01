@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/auth-context'
 import type { MisionId } from '@/features/guia/misiones'
 import { supabase } from '@/lib/supabase/client'
+import { registrar } from '@/lib/telemetria'
 import { useIsMobile } from '@/lib/use-is-mobile'
 
 // Store externo mínimo (idioma de lib/campo-mode): la burbuja del asistente,
@@ -24,6 +25,7 @@ function avisar() {
 let panelAbierto = false
 
 export function abrirPanel(): void {
+  if (!panelAbierto) registrar('asistente_abierto')
   panelAbierto = true
   avisar()
 }
@@ -45,14 +47,60 @@ export function usePanelAbierto(): boolean {
 
 let misionActiva: MisionId | null = null
 
-export function empezarMision(id: MisionId): void {
+// Para la telemetría: cuándo arrancó, en qué paso va y si llegó al festejo.
+// "Después" (o pasar a otra misión) sin festejo es un abandono.
+let misionDesde = 0
+let misionPaso = 0
+let misionTerminada = false
+
+/** Desde dónde se lanzó la misión. */
+export type OrigenMision = 'bienvenida' | 'pastilla' | 'asistente'
+
+export function empezarMision(id: MisionId, origen: OrigenMision): void {
   if (misionActiva === id) return
+  cerrarMisionEnCurso()
   misionActiva = id
+  misionDesde = Date.now()
+  misionPaso = 0
+  misionTerminada = false
+  registrar('mision_iniciada', { mision: id, origen })
   avisar()
+}
+
+/** El motor avanzó de paso (se da por hecho cuando pasó lo que esperaba). */
+export function avanzoPasoMision(indice: number, ancla: string): void {
+  if (misionActiva === null || indice === misionPaso) return
+  misionPaso = indice
+  registrar('mision_paso', {
+    mision: misionActiva,
+    indice,
+    ancla,
+    duracion_ms: Date.now() - misionDesde,
+  })
+}
+
+/** Llegó al festejo: la misión está hecha. */
+export function terminoMision(): void {
+  if (misionActiva === null || misionTerminada) return
+  misionTerminada = true
+  registrar('mision_completada', {
+    mision: misionActiva,
+    duracion_ms: Date.now() - misionDesde,
+  })
+}
+
+function cerrarMisionEnCurso(): void {
+  if (misionActiva === null || misionTerminada) return
+  registrar('mision_abandonada', {
+    mision: misionActiva,
+    indice: misionPaso,
+    duracion_ms: Date.now() - misionDesde,
+  })
 }
 
 export function pararMision(): void {
   if (misionActiva === null) return
+  cerrarMisionEnCurso()
   misionActiva = null
   avisar()
 }

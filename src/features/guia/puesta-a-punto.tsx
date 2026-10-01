@@ -128,7 +128,7 @@ export function PuestaAPunto() {
   const irA = (item: ItemChecklist) => {
     const m = resumen ? misionDeItem(item.id, resumen) : null
     if (m) {
-      empezarMision(m.id)
+      empezarMision(m.id, 'pastilla')
       return
     }
     navigate(item.ruta)

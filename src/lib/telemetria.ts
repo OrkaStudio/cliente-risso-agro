@@ -2,7 +2,9 @@ import { supabase } from '@/lib/supabase/client'
 import { esViewportMovil } from '@/lib/use-is-mobile'
 
 /**
- * Telemetría de producto: por ahora sólo el onboarding y el inicio de sesión.
+ * Telemetría de producto: onboarding, uso (abrir la app, secciones) y los
+ * tutoriales hasta que termina la puesta a punto (bienvenida, misiones,
+ * puntitos, asistente).
  * Spec: [[clientes/risso-agro/especificaciones/2026-09-19-telemetria-onboarding-activacion]].
  *
  * Escribe en `evento_producto`, que es insert-only (la app no la puede leer).
@@ -21,6 +23,22 @@ export type NombreEvento =
   | 'paso_salteado'
   | 'paso_error'
   | 'onboarding_completado'
+  // Uso: cada vez que abre la app (con o sin login) y por dónde anda.
+  | 'app_abierta'
+  | 'pantalla_vista'
+  // Tutoriales, hasta que termina la puesta a punto.
+  | 'bienvenida_vista'
+  | 'bienvenida_respondida'
+  | 'mision_iniciada'
+  | 'mision_paso'
+  | 'mision_completada'
+  | 'mision_abandonada'
+  | 'puesta_a_punto_item'
+  | 'puesta_a_punto_completa'
+  | 'spot_tocado'
+  | 'asistente_abierto'
+  | 'asistente_pregunta'
+  | 'soporte_whatsapp'
 
 type Props = Record<string, string | number | boolean | null | string[]>
 
@@ -130,6 +148,22 @@ export function registrarSesionIniciada(userId: string): void {
     // Sin almacenamiento se registra igual: mejor de más que nunca.
   }
   registrar('sesion_iniciada')
+}
+
+/**
+ * `app_abierta` una vez por pestaña y usuario, haya login o no: quien vuelve
+ * con la sesión guardada no pasa por SIGNED_IN, y sin esto su uso no dejaba
+ * rastro (el 26/09 un productor real usó la app y quedó en 0 eventos).
+ */
+export function registrarAppAbierta(userId: string): void {
+  const clave = `orka:telemetria:app-abierta:${userId}`
+  try {
+    if (sessionStorage.getItem(clave)) return
+    sessionStorage.setItem(clave, '1')
+  } catch {
+    // Sin almacenamiento se registra igual: mejor de más que nunca.
+  }
+  registrar('app_abierta')
 }
 
 /** Sólo para tests. */
