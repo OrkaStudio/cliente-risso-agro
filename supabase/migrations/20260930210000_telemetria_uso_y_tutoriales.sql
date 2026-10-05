@@ -112,7 +112,7 @@ select
   round(100.0 * count(*) filter (where nombre = 'mision_completada')
         / nullif(count(*) filter (where nombre = 'mision_iniciada'), 0)) as pct_completadas,
   round((percentile_cont(0.5) within group (order by (props ->> 'duracion_ms')::numeric)
-         filter (where nombre = 'mision_completada')) / 60000, 1) as mediana_min,
+         filter (where nombre = 'mision_completada'))::numeric / 60000, 1) as mediana_min,
   mode() within group (order by (props ->> 'indice')::int) filter (where nombre = 'mision_abandonada') as paso_mas_abandonado,
   count(*) filter (where nombre = 'mision_iniciada' and props ->> 'origen' = 'bienvenida') as desde_bienvenida,
   count(*) filter (where nombre = 'mision_iniciada' and props ->> 'origen' = 'pastilla') as desde_pastilla,
