@@ -49,9 +49,24 @@ Al no haber servidor (Server Actions), el cliente habla directo con Postgres:
 - **Code-splitting:** el bundle inicial supera 500 kB (warning de Vite). Dividir con `import()` dinámico cuando crezca.
 - **Build iOS:** requiere macOS/Xcode o CI con runner Mac (Lau desarrolla en Windows). Las plataformas `ios/` y `android/` no están agregadas todavía (gitignoreadas).
 - **Operaciones de Hacienda = RPCs transaccionales** (`SECURITY INVOKER`, RLS del usuario): `crear_animal`, `cambiar_caravana`, `dar_baja_animal`. Las multi-tabla (alta, cambio de caravana, baja) son atómicas. `registrar_evento` es un insert directo (append-only). Migración `hacienda_rpcs`.
-- **Verificación E2E:** `pnpm test:e2e:todo` (Playwright). Los tests con login usan la cuenta **`e2e@orkastudio.test`** → empresa **"E2E Pruebas"**, sólo para tests (escriben datos). Credenciales en `.env.e2e.local` (ignorado por git; pedírselas a Lau). **Nunca** credenciales en este archivo: el repo es público. Manga y offline corren contra el build con sesión fabricada, sin credenciales.
-  > ⚠️ **Los tests NO corren contra "Risso Agro"**: desde el 06/08 esa empresa es del productor (`rissodaniel23@gmail.com`) y quedó vacía a propósito para que cargue él. Escribirle desde un test sería ensuciarle los datos. Ver [[TASK-056]].
+- **Verificación E2E:** `pnpm test:e2e:todo` (Playwright) corre contra el **Supabase local**, nunca contra prod. La cuenta de prueba sale de `supabase/seed.sql` (empresa «E2E Pruebas», campo «E2E Campo base» con el 1A) y entra con el celular `+54 9 2240 00-0001` y el código fijo de `[auth.sms.test_otp]`, que sólo existe en local. Manga y sin señal corren contra `pnpm build:local` (build apuntado a la base local).
+  > ⚠️ **Los tests NO corren contra "Risso Agro"** ni contra prod: desde el 06/08 esa empresa es del productor (`rissodaniel23@gmail.com`). Ver [[TASK-056]].
+- **Acceso sin contraseñas (rediseño Tropero):** se entra con el celular y un código de 6 números. Supabase Auth genera el código (login por teléfono) y el hook «Send SMS» llama a `supabase/functions/enviar-codigo`, que lo manda por WhatsApp con la plantilla de autenticación de Meta. Para activarlo en prod hace falta: la plantilla aprobada en Meta, los secrets `SEND_SMS_HOOK_SECRETS`, `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_PLANTILLA_CODIGO`, el hook en Auth → Hooks, el proveedor de teléfono prendido con «SMS OTP Expiry» en 600 s, y pasarle el celular a los usuarios que hoy entran con mail.
 - **Auth — leaked password protection:** desactivado (advisor de Supabase). Activar en el dashboard (Auth → Password security, HaveIBeenPwned). Toggle de consola, no código.
+
+## Desarrollo local (sin tocar prod)
+
+Hace falta OrbStack (o Docker) y la CLI de Supabase (`brew install supabase/tap/supabase`).
+
+```
+supabase start          # base, login y funciones en la Mac; aplica las migraciones y seed.sql
+pnpm dev                # la app apunta a la base local por .env.development.local
+supabase db reset       # vuelve la base local a cero (migraciones + seed)
+```
+
+- `.env.development.local` y `.env.localdb.local` (ignorados) tienen `VITE_SUPABASE_URL=http://127.0.0.1:54321` y la clave pública local que imprime `supabase status`. `.env.local` sigue apuntando a prod para `pnpm build`.
+- `supabase/.env` y `supabase/functions/.env` (ignorados) llevan `SEND_SMS_HOOK_SECRETS=v1,whsec_…` (cualquier secreto de 32 bytes en base64). Sin `WA_*`, el código para entrar se ve en `docker logs supabase_edge_runtime_cliente-risso-agro`.
+- `/estilo` (sólo en dev) muestra los componentes de Tropero para compararlos con la página 34 del Figma.
 
 ## Flujo de trabajo
 
