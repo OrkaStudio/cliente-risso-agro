@@ -11,7 +11,13 @@ import { supabase } from '@/lib/supabase/client'
 export type Membresia = {
   empresa_id: string
   rol: string
-  empresa: { id: string; nombre: string } | null
+  empresa: {
+    id: string
+    nombre: string
+    /** null = el dueño todavía no terminó el onboarding. Una membresía
+     *  guardada de antes de este campo no lo trae: cuenta como terminado. */
+    onboarding_completo_at?: string | null
+  } | null
 }
 
 // Última membresía conocida, cacheada en localStorage. Sin red no podemos
@@ -51,7 +57,7 @@ export function useEmpresa() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('miembro_empresa')
-        .select('empresa_id, rol, empresa:empresa(id, nombre)')
+        .select('empresa_id, rol, empresa:empresa(id, nombre, onboarding_completo_at)')
         .limit(1)
         .maybeSingle()
       if (error) throw error

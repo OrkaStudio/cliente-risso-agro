@@ -279,16 +279,19 @@ export type Database = {
       }
       empresa: {
         Row: {
+          onboarding_completo_at: string | null
           created_at: string
           id: string
           nombre: string
         }
         Insert: {
+          onboarding_completo_at?: string | null
           created_at?: string
           id?: string
           nombre: string
         }
         Update: {
+          onboarding_completo_at?: string | null
           created_at?: string
           id?: string
           nombre?: string
@@ -1131,6 +1134,7 @@ export type Database = {
       }
       potrero: {
         Row: {
+          descanso_desde: string | null
           aprovechamiento:
             | Database["public"]["Enums"]["aprovechamiento_forraje"]
             | null
@@ -1150,6 +1154,7 @@ export type Database = {
           variedad: string | null
         }
         Insert: {
+          descanso_desde?: string | null
           aprovechamiento?:
             | Database["public"]["Enums"]["aprovechamiento_forraje"]
             | null
@@ -1169,6 +1174,7 @@ export type Database = {
           variedad?: string | null
         }
         Update: {
+          descanso_desde?: string | null
           aprovechamiento?:
             | Database["public"]["Enums"]["aprovechamiento_forraje"]
             | null
@@ -1489,6 +1495,7 @@ export type Database = {
         Returns: number
       }
       celular_tiene_cuenta: { Args: { p_celular: string }; Returns: boolean }
+      terminar_onboarding: { Args: never; Returns: string }
       crear_invitacion: {
         Args: { p_celular: string; p_nombre: string; p_rol: string }
         Returns: string

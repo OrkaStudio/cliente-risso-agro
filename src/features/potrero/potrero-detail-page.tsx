@@ -289,6 +289,7 @@ export function PotreroDetailPage() {
                 nombre: data.nombre,
                 estado_ciclo: data.estadoCiclo,
                 hectareas: data.hectareas,
+                descanso_desde: null,
                 campo_id: data.campoId,
                 empresa_id: empresaId,
                 establecimiento_id: null,

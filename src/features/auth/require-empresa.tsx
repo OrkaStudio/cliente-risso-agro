@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { WifiOff } from 'lucide-react'
-import { leerMembresiaPersistida, useEmpresa } from '@/features/empresa/use-empresa'
+import { leerMembresiaPersistida, useEmpresa, type Membresia } from '@/features/empresa/use-empresa'
 
 /**
  * Guard de membresía: un usuario autenticado sin empresa (recién registrado)
@@ -13,12 +13,20 @@ import { leerMembresiaPersistida, useEmpresa } from '@/features/empresa/use-empr
  * empresa entra al campo sin señal en vez de rebotar al onboarding.
  * Ver [[clientes/risso-agro/tareas/TASK-042-2026-07-15]].
  */
+/** `=== null` a propósito: una membresía guardada de antes no trae el campo. */
+function onboardingPendiente(m: Membresia): boolean {
+  return m.rol === 'dueno' && m.empresa?.onboarding_completo_at === null
+}
+
 export function RequireEmpresa() {
   const { data: membresia, isSuccess, isError, fetchStatus } = useEmpresa()
 
   // Consulta exitosa: la verdad del servidor manda.
   if (isSuccess) {
     if (!membresia) return <Navigate to="/onboarding" replace />
+    // El dueño que dejó el onboarding por la mitad vuelve al paso donde quedó,
+    // no a una app a medio cargar (regla de destino de Acceso).
+    if (onboardingPendiente(membresia)) return <Navigate to="/onboarding" replace />
     return <Outlet />
   }
 
@@ -30,7 +38,8 @@ export function RequireEmpresa() {
   // onboarding.
   const sinRed = typeof navigator !== 'undefined' && navigator.onLine === false
   const persistida = leerMembresiaPersistida()
-  if (persistida && (sinRed || isError || fetchStatus !== 'fetching')) return <Outlet />
+  if (persistida && (sinRed || isError || fetchStatus !== 'fetching'))
+    return onboardingPendiente(persistida) ? <Navigate to="/onboarding" replace /> : <Outlet />
 
   // Buscando activamente con red: esperar.
   if (fetchStatus === 'fetching') {
