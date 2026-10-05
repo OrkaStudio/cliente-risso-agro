@@ -109,7 +109,15 @@ function OnboardingRuta() {
   )
 }
 
+const MuestraPage = lazy(() =>
+  import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
+)
+
 export const router = createBrowserRouter([
+  // Sólo en desarrollo: los componentes de Tropero juntos (/estilo).
+  ...(import.meta.env.DEV
+    ? [{ path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> }]
+    : []),
   {
     path: '/login',
     errorElement: <ErrorNuevaVersion />,
