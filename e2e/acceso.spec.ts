@@ -99,3 +99,36 @@ test('A4: un link que no es de una invitación avisa', async ({ page }) => {
   await page.goto('/invitacion/no-existe')
   await expect(page.getByText('Ese link no es de una invitación')).toBeVisible()
 })
+
+test('A5 afuera: explica los tres caminos, sin pedir el CUIT', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Te ayudamos' }).click()
+  await expect(page).toHaveURL(/\/cambie-de-numero$/)
+  await expect(page.getByText('¿Seguís adentro en la compu o en otro celular?')).toBeVisible()
+  await expect(page.getByText('¿Te invitaron?')).toBeVisible()
+  await expect(page.getByText('¿Sos el dueño y no entrás desde ningún lado?')).toBeVisible()
+  await expect(page.getByText(/CUIT/)).toHaveCount(0)
+})
+
+test('A5 adentro: con la sesión abierta, el número se cambia con un código al número nuevo', async ({ page }) => {
+  const viejo = `22417${String(Date.now()).slice(-5)}`
+  const nuevo = `22418${String(Date.now()).slice(-5)}`
+  await page.setViewportSize({ width: 390, height: 844 })
+  // Una cuenta nueva (no la de prueba, que usan los demás tests).
+  await page.goto('/registro')
+  await page.getByLabel('Tu nombre').fill('Cambio Número')
+  await page.getByLabel('Tu celular').fill(viejo)
+  await page.getByRole('button', { name: 'Seguir, mandame el código' }).click()
+  await page.waitForURL('**/login/codigo')
+  await page.waitForTimeout(800)
+  await page.locator('#codigo').fill(codigoDelLog(`549${viejo}`))
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'))
+
+  await page.goto('/mi-cuenta/numero')
+  await page.getByLabel('Tu número nuevo, el que tiene WhatsApp').fill(nuevo)
+  await page.getByRole('button', { name: 'Mandame el código' }).click()
+  await expect(page.locator('#codigo-nuevo')).toBeVisible()
+  await page.waitForTimeout(800)
+  await page.locator('#codigo-nuevo').fill(codigoDelLog(`549${nuevo}`))
+  await expect(page.getByText('Listo, ya entrás con el número nuevo')).toBeVisible()
+})

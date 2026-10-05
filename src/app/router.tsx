@@ -6,6 +6,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
+import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
+import { CambieDeNumeroPage } from '@/features/acceso/cambie-de-numero-page'
 import { EntrarPage } from '@/features/acceso/entrar-page'
 import { TeInvitaronPage } from '@/features/acceso/te-invitaron-page'
 import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
@@ -140,6 +142,12 @@ export const router = createBrowserRouter([
     errorElement: <ErrorNuevaVersion />,
     element: <TeInvitaronPage />,
   },
+  {
+    // A5 (afuera): qué hacer si cambiaste de número.
+    path: '/cambie-de-numero',
+    errorElement: <ErrorNuevaVersion />,
+    element: <CambieDeNumeroPage />,
+  },
   // Sin contraseñas no hay nada que recuperar: los links viejos van a entrar.
   { path: '/recuperar', element: <Navigate to="/login" replace /> },
   { path: '/restablecer', element: <Navigate to="/login" replace /> },
@@ -147,6 +155,11 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     errorElement: <ErrorNuevaVersion />,
     children: [
+      {
+        // A5 (adentro): cambiar el número con la sesión abierta y un código al nuevo.
+        path: '/mi-cuenta/numero',
+        element: <CambiarNumeroPage />,
+      },
       {
         // Recién registrado, sin empresa todavía: arma la suya acá.
         path: '/onboarding',

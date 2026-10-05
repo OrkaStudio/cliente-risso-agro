@@ -20,7 +20,9 @@ import { Webhook } from 'npm:standardwebhooks@1.0.0'
 
 type Payload = {
   user: { id: string; phone: string }
-  sms: { otp: string }
+  // `phone` es el DESTINO: en un cambio de número es el número nuevo, que
+  // todavía no es el del usuario. Por eso no se usa user.phone.
+  sms: { otp: string; phone?: string }
 }
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
@@ -82,7 +84,7 @@ Deno.serve(async (req) => {
     return fallo(401, 'Firma inválida.')
   }
 
-  const telefono = datos.user?.phone
+  const telefono = datos.sms?.phone || datos.user?.phone
   const codigo = datos.sms?.otp
   if (!telefono || !codigo) return fallo(400, 'Faltan el teléfono o el código.')
 

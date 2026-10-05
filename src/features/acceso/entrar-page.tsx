@@ -102,6 +102,11 @@ export function EntrarPage() {
           </BotonChico>
         </Pregunta>
       )}
+      <Pregunta texto="¿Cambiaste de número?">
+        <BotonChico type="button" onClick={() => navigate('/cambie-de-numero')}>
+          Te ayudamos
+        </BotonChico>
+      </Pregunta>
       {estado === 'sin-cuenta' && e164 && (
         <p className="sr-only" role="status">
           {formatearCelularAR(e164)} no tiene cuenta.

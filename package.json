@@ -19,7 +19,8 @@
     "cap": "cap",
     "test": "TZ=America/Argentina/Buenos_Aires vitest run",
     "test:watch": "TZ=America/Argentina/Buenos_Aires vitest",
-    "build:local": "tsc -b && vite build --mode localdb"
+    "build:local": "tsc -b && vite build --mode localdb",
+    "codigo": "docker logs --tail 200 supabase_edge_runtime_cliente-risso-agro 2>&1 | grep 'enviar-codigo] sin WhatsApp' | tail -3"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

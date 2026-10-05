@@ -258,8 +258,9 @@ otp_expiry = 3600
 [auth.sms]
 # Tropero: se entra sólo con el celular (código por WhatsApp). Alta incluida.
 enable_signup = true
-# If enabled, users need to confirm their phone number before signing in.
-enable_confirmations = false
+# Prendido: sin esto, cambiar el número (A5) se aplica sin verificar el número
+# nuevo. En prod: Auth → Providers → Phone → «Confirm phone» prendido.
+enable_confirmations = true
 # Template for sending OTP to users
 template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
