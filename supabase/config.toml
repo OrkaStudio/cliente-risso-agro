@@ -273,6 +273,16 @@ max_frequency = "5s"
 # en local. En producción no existe.
 [auth.sms.test_otp]
 5492240000001 = "123456"
+# Para probar a mano el alta y el onboarding sin WhatsApp (sólo local):
+# cuentas nuevas con estos números entran con 123456.
+5492240000002 = "123456"
+5492240000003 = "123456"
+5492240000004 = "123456"
+5492240000005 = "123456"
+5492240000006 = "123456"
+5492240000007 = "123456"
+5492240000008 = "123456"
+5492240000009 = "123456"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
