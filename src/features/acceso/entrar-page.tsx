@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { useAuth } from '@/features/auth/auth-context'
 import { formatearCelularAR, formatearMientrasEscribe, normalizarCelularAR } from '@/lib/telefono'
-import { AccesoLayout, Pregunta, TarjetaWhatsApp } from './acceso-layout'
+import { AccesoLayout, Preguntas, TarjetaWhatsApp } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { leerEnvio, marcarEnviado, pedirCodigo } from './envio'
 
@@ -92,21 +92,33 @@ export function EntrarPage() {
           {principal.texto}
         </BotonPrincipal>
       </form>
-      {estado !== 'sin-cuenta' && (
-        <Pregunta texto="¿Primera vez?">
-          <BotonChico
-            type="button"
-            onClick={() => navigate('/registro', { state: { celular: e164 ?? undefined } })}
-          >
-            Creá tu cuenta
-          </BotonChico>
-        </Pregunta>
-      )}
-      <Pregunta texto="¿Cambiaste de número?">
-        <BotonChico type="button" onClick={() => navigate('/cambie-de-numero')}>
-          Te ayudamos
-        </BotonChico>
-      </Pregunta>
+      <Preguntas
+        filas={[
+          ...(estado !== 'sin-cuenta'
+            ? [
+                {
+                  texto: '¿Primera vez?',
+                  boton: (
+                    <BotonChico
+                      type="button"
+                      onClick={() => navigate('/registro', { state: { celular: e164 ?? undefined } })}
+                    >
+                      Creá tu cuenta
+                    </BotonChico>
+                  ),
+                },
+              ]
+            : []),
+          {
+            texto: '¿Cambiaste de número?',
+            boton: (
+              <BotonChico type="button" onClick={() => navigate('/cambie-de-numero')}>
+                Te ayudamos
+              </BotonChico>
+            ),
+          },
+        ]}
+      />
       {estado === 'sin-cuenta' && e164 && (
         <p className="sr-only" role="status">
           {formatearCelularAR(e164)} no tiene cuenta.

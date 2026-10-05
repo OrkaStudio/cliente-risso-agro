@@ -1,7 +1,7 @@
 import { Icono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
-import fotoCampo from '@/assets/tropero/campo-entrada.jpg'
-import fotoRollos from '@/assets/tropero/rollos.jpg'
+// Foto aérea del Figma (nodo 217:40587): caminos de tierra, la aguada y la hacienda.
+import fotoCampo from '@/assets/tropero/campo-aereo.webp'
 
 // Marco de las pantallas de Acceso (página 35, sección Acceso).
 // Compu (≥ md): foto a la izquierda (760 de 1440) con el título grande abajo y
@@ -9,7 +9,7 @@ import fotoRollos from '@/assets/tropero/rollos.jpg'
 // Celular: foto arriba con el título, y la hoja redondeada abajo con el
 // formulario, que se superpone 32 px a la foto.
 
-const FOTOS = { campo: fotoCampo, rollos: fotoRollos } as const
+const FOTOS = { campo: fotoCampo } as const
 
 export function AccesoLayout({
   foto = 'campo',
@@ -35,7 +35,7 @@ export function AccesoLayout({
         <img src={src} alt="" className="absolute inset-0 size-full object-cover" />
         <div
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-b from-[rgba(19,27,22,0.35)] to-[rgba(19,27,22,0.85)] md:bg-[linear-gradient(180deg,rgba(19,27,22,0.35)_0%,rgba(19,27,22,0)_35%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.9)_100%)]"
+          className="absolute inset-0 bg-gradient-to-b from-[rgba(19,27,22,0.35)] to-[rgba(19,27,22,0.85)] md:bg-[linear-gradient(180deg,rgba(19,27,22,0.5)_0%,rgba(19,27,22,0)_30%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.9)_100%)]"
         />
         <div className="relative px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:px-14 md:pt-[52px]">
           <Logo tono="hueso" alto={26} className="md:hidden" />
@@ -72,9 +72,27 @@ export function AccesoLayout({
 /** «¿Primera vez? [Creá tu cuenta]»: pregunta en texto suave + Botón chico. */
 export function Pregunta({ texto, children }: { texto: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1.5 text-[14.5px] text-texto-suave md:text-[15px]">
+    <div className="flex flex-wrap items-center justify-center gap-2 text-[14.5px] text-texto-suave md:text-[15px]">
       <span>{texto}</span>
       {children}
+    </div>
+  )
+}
+
+/**
+ * Varias preguntas juntas, alineadas sobre el mismo eje: las preguntas terminan
+ * en el centro y los botones arrancan ahí, así forman dos columnas prolijas en
+ * vez de filas centradas cada una por su lado.
+ */
+export function Preguntas({ filas }: { filas: { texto: string; boton: React.ReactNode }[] }) {
+  return (
+    <div className="grid grid-cols-2 items-center gap-x-2 gap-y-2.5 border-t border-borde pt-[18px] text-[14.5px] text-texto-suave md:text-[15px]">
+      {filas.map((f) => (
+        <div key={f.texto} className="contents">
+          <span className="justify-self-end text-right">{f.texto}</span>
+          <span className="justify-self-start">{f.boton}</span>
+        </div>
+      ))}
     </div>
   )
 }

@@ -70,7 +70,6 @@ export function CrearCuentaPage() {
 
   return (
     <AccesoLayout
-      foto="rollos"
       tituloCompu="En un minuto arrancás."
       tituloCelu="En un minuto arrancás."
       encabezado={{

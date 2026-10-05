@@ -76,13 +76,13 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           onClick={abrir}
           disabled={!empresaId}
           title={`Gordo — $${gordo.data.valor.toLocaleString('es-AR')}/kg · ${fmtFecha(gordo.data.fecha)}${gordo.data.auto ? ' · Cañuelas, promedio novillos' : ' · cargado a mano'} · tocá para actualizar`}
-          className="flex shrink-0 items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-white/[0.07]"
+          className="flex shrink-0 items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-sidebar-accent"
         >
           <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-            <Beef className="size-[15px] text-[#d4b896]" />
+            <Beef className="size-[15px] text-principal" />
             Gordo
           </span>
-          <b className="tnum text-sm font-semibold text-white">
+          <b className="tnum text-sm font-semibold text-sidebar-foreground">
             ${gordo.data.valor.toLocaleString('es-AR')}
             <span className="ml-0.5 text-[11px] font-medium text-sidebar-foreground/55">
               /kg
@@ -95,9 +95,9 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           onClick={abrir}
           disabled={!empresaId}
           title="Cargar el precio del gordo"
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.1] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-borde px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
         >
-          <Beef className="size-[15px] text-[#d4b896]" />+ Gordo
+          <Beef className="size-[15px] text-principal" />+ Gordo
         </button>
       )}
 

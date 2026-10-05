@@ -4,12 +4,12 @@ import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
 import { AccesoLayout, Pregunta } from './acceso-layout'
+import { CampoCodigo } from './campo-codigo'
 import { aceptarInvitacion, borrarEnvio, guardarEnvio, leerEnvio, marcarEnviado, pedirCodigo, verificarCodigo, type Envio } from './envio'
 import {
   codigoDeLoPegado,
   estadoDelCodigo,
   limpiarCodigo,
-  mostrarCodigo,
   relojMinutos,
   segundosParaReenviar,
   WHATSAPP_TROPERO,
@@ -152,41 +152,23 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
             <span className="md:hidden">El código que te mandamos al {numero}</span>
             <span className="hidden md:inline">El código</span>
           </label>
-          <div
-            className={cn(
-              'rounded-2xl border-[1.5px] bg-superficie px-[18px] transition-colors focus-within:border-principal',
-              mensaje ? 'border-estado-problema' : 'border-borde',
-            )}
-          >
-            <input
-              ref={campo}
-              id="codigo"
-              name="codigo"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              autoFocus
-              disabled={vencido || entrando}
-              value={vencido ? '' : mostrarCodigo(codigo)}
-              placeholder={vencido ? '— — —  — — —' : ''}
-              onChange={(e) => escribir(e.target.value)}
-              onPaste={(e) => {
-                const encontrado = codigoDeLoPegado(e.clipboardData.getData('text'))
-                if (encontrado) {
-                  e.preventDefault()
-                  escribir(encontrado)
-                }
-              }}
-              aria-invalid={mensaje ? true : undefined}
-              aria-describedby="codigo-ayuda"
-              className="cifra w-full bg-transparent py-3 text-[30px] font-bold tracking-[0.18em] text-texto outline-none placeholder:text-texto-suave/70 disabled:opacity-100"
-            />
-          </div>
+          <CampoCodigo
+            ref={campo}
+            id="codigo"
+            valor={vencido ? '' : codigo}
+            onCambio={escribir}
+            error={!!mensaje}
+            deshabilitado={vencido || entrando}
+            vencido={vencido}
+            describedBy="codigo-ayuda"
+            autoFocus
+          />
           {!vencido && (
-            <div className="flex flex-wrap gap-2.5 pt-1">
+            <div className="grid grid-cols-2 gap-2.5 pt-1.5">
               <BotonChico
                 type="button"
                 icono="Celular"
-                className="py-[9px] pr-4 pl-3.5 text-[14px]"
+                className="w-full py-2.5 text-[14px]"
                 onClick={() => window.open(`https://wa.me/${WHATSAPP_TROPERO}`, '_blank', 'noopener')}
               >
                 Abrir WhatsApp
@@ -194,7 +176,7 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
               <BotonChico
                 type="button"
                 icono="Comprobante"
-                className="py-[9px] pr-4 pl-3.5 text-[14px]"
+                className="w-full py-2.5 text-[14px]"
                 onClick={() => void pegar()}
               >
                 Pegar el código
@@ -204,7 +186,10 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
           <p
             id="codigo-ayuda"
             role={mensaje || aviso ? 'alert' : undefined}
-            className={cn('pt-1 text-[14px] md:text-[13px]', mensaje || aviso ? 'text-estado-problema-texto' : 'text-texto-suave')}
+            className={cn(
+              'pt-1 text-center text-[13.5px] text-pretty',
+              mensaje || aviso ? 'text-estado-problema-texto' : 'text-texto-suave',
+            )}
           >
             {aviso ?? mensaje ?? (
               <>

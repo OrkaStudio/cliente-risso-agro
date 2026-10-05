@@ -57,10 +57,10 @@ function Ticker() {
         title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
       >
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-          <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
+          <CircleDollarSign className="size-[15px] text-estado-bien" />
           Blue
         </span>
-        <b className="tnum text-sm font-semibold text-white">
+        <b className="tnum text-sm font-semibold text-sidebar-foreground">
           ${blue.data.venta.toLocaleString('es-AR')}
         </b>
       </div>
@@ -154,11 +154,11 @@ export function AppShell() {
         {/* Marca + toggle */}
         <div className="flex items-center gap-3 px-4 pb-4 pt-4">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]">
-            <Leaf className="size-5 text-white" strokeWidth={1.75} />
+            <Leaf className="size-5 text-[var(--principal-texto)]" strokeWidth={1.75} />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate font-heading text-[17px] font-bold text-white">
+              <div className="truncate font-heading text-[17px] font-bold text-sidebar-foreground">
                 {MARCA}
               </div>
               <div className="truncate text-[11px] font-medium text-sidebar-foreground/55">
@@ -171,7 +171,7 @@ export function AppShell() {
             onClick={toggle}
             title={collapsed ? 'Expandir' : 'Colapsar'}
             className={cn(
-              'flex size-7 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white',
+              'flex size-7 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground',
               collapsed && 'mx-auto',
             )}
           >
@@ -203,8 +203,8 @@ export function AppShell() {
                   'relative flex items-center gap-3 rounded-[10px] py-2.5 text-sm font-medium transition-colors',
                   collapsed ? 'justify-center px-0' : 'px-3',
                   isActive
-                    ? 'bg-white/[0.07] text-white'
-                    : 'text-sidebar-foreground/65 hover:bg-white/[0.05] hover:text-white',
+                    ? 'bg-sidebar-accent text-sidebar-foreground'
+                    : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                 )
               }
             >
@@ -216,7 +216,7 @@ export function AppShell() {
                   <Icon
                     className={cn(
                       'size-5 shrink-0',
-                      isActive ? 'text-lima' : 'text-sidebar-foreground/55',
+                      isActive ? 'text-principal' : 'text-sidebar-foreground/55',
                     )}
                     strokeWidth={1.75}
                   />
@@ -249,7 +249,7 @@ export function AppShell() {
           )}
         >
           <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[13px] font-bold text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[13px] font-bold text-primary-foreground"
             title={collapsed ? user?.email : undefined}
           >
             {initials(user?.email)}
@@ -268,7 +268,7 @@ export function AppShell() {
             type="button"
             onClick={() => void signOut()}
             title="Salir"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
             <LogOut className="size-[17px]" />
           </button>
@@ -280,7 +280,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
         <motion.header {...entra(0.15)} className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
-          <div className="hidden shrink-0 font-heading text-sm font-semibold text-white sm:block">
+          <div className="hidden shrink-0 font-heading text-sm font-semibold text-sidebar-foreground sm:block">
             {fechaHoy()}
           </div>
 

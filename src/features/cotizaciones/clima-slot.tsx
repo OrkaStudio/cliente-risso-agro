@@ -25,7 +25,7 @@ export function ClimaSlot() {
         className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55 hover:text-sidebar-foreground"
         title="Cargá la localidad del campo para ver su clima"
       >
-        <MapPin className="size-[15px] text-[#e8b75c]" />
+        <MapPin className="size-[15px] text-estado-atencion" />
         Ubicá tu campo
       </Link>
     )
@@ -38,7 +38,7 @@ export function ClimaSlot() {
       title={`${d.descripcion} · ${d.lugar} · lluvia ${d.lluviaProb}%${d.lluviaMm > 0 ? ` (${d.lluviaMm} mm)` : ''}`}
     >
       <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-        <WmoIcon code={d.code} className="size-[15px] text-[#e8b75c]" />
+        <WmoIcon code={d.code} className="size-[15px] text-estado-atencion" />
         {opciones.length > 1 ? (
           // Selector nativo, sin estilo propio: en la barra oscura basta con el
           // nombre y la flechita; el menú lo pinta el sistema.
@@ -61,12 +61,12 @@ export function ClimaSlot() {
           d.lugar
         )}
       </span>
-      <b className="tnum text-sm font-semibold text-white">{d.temp}°</b>
+      <b className="tnum text-sm font-semibold text-sidebar-foreground">{d.temp}°</b>
       <span className="tnum hidden text-[11px] font-medium text-sidebar-foreground/45 md:inline">
         {d.max}° / {d.min}°
       </span>
       {d.helada && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#2779c4]/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#8cc2f0]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#2779c4]/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#215a7e]">
           <Snowflake className="size-3" />
           Helada
         </span>

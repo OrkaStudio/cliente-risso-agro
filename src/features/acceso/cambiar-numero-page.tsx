@@ -4,10 +4,10 @@ import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { useAuth } from '@/features/auth/auth-context'
 import { supabase } from '@/lib/supabase/client'
 import { formatearCelularAR, normalizarCelularAR } from '@/lib/telefono'
-import { cn } from '@/lib/utils'
 import { AccesoLayout, Pregunta } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
-import { codigoDeLoPegado, errorAlPedir, limpiarCodigo, mostrarCodigo } from './reglas'
+import { CampoCodigo } from './campo-codigo'
+import { errorAlPedir, limpiarCodigo } from './reglas'
 
 /**
  * Cambiar mi número, desde ADENTRO (A5, decisión de Lau del 05/10): hace falta
@@ -132,29 +132,7 @@ export function CambiarNumeroPage() {
             <label htmlFor="codigo-nuevo" className="text-[14px] font-semibold text-texto">
               El código que te mandamos al {e164 ? formatearCelularAR(e164) : ''}
             </label>
-            <div
-              className={cn(
-                'rounded-2xl border-[1.5px] bg-superficie px-[18px] focus-within:border-principal',
-                error ? 'border-estado-problema' : 'border-borde',
-              )}
-            >
-              <input
-                id="codigo-nuevo"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoFocus
-                value={mostrarCodigo(codigo)}
-                onChange={(e) => escribir(e.target.value)}
-                onPaste={(e) => {
-                  const c = codigoDeLoPegado(e.clipboardData.getData('text'))
-                  if (c) {
-                    e.preventDefault()
-                    escribir(c)
-                  }
-                }}
-                className="cifra w-full bg-transparent py-3 text-[30px] font-bold tracking-[0.18em] text-texto outline-none"
-              />
-            </div>
+            <CampoCodigo id="codigo-nuevo" valor={codigo} onCambio={escribir} error={!!error} autoFocus />
             {error && <p className="text-[14px] text-estado-problema-texto" role="alert">{error}</p>}
           </div>
           <BotonPrincipal type="submit" icono="Guardar" cargando={ocupado} disabled={codigo.length !== 6 || ocupado}>

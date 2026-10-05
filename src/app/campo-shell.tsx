@@ -61,7 +61,7 @@ function SalirDeLaCuenta() {
         'flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-semibold transition-colors',
         armado
           ? 'bg-[var(--c-warn)] text-[#1c1400]'
-          : 'min-w-11 text-sidebar-foreground/55 hover:bg-white/[0.07] hover:text-white',
+          : 'min-w-11 text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground',
       )}
     >
       <LogOut className="size-[17px]" />
@@ -86,13 +86,13 @@ export function CampoShell() {
       {/* Header — placa de máquina */}
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-line)] bg-sidebar px-3 py-2.5 text-sidebar-foreground">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-primary">
-          <Leaf className="size-[18px] text-white" strokeWidth={2} />
+          <Leaf className="size-[18px] text-[var(--principal-texto)]" strokeWidth={2} />
         </div>
         {/* Sólo el nombre. "Modo Campo" lo dice la nav de abajo con más fuerza
             que un subtítulo, y a 390px —con el zoom 1.06 encima— esa segunda
             línea le comía el ancho al nombre hasta dejarlo en "Riss…". */}
         <div className="min-w-0 flex-1">
-          <span className="c-display block truncate text-[16px] leading-none text-white">
+          <span className="c-display block truncate text-[16px] leading-none text-sidebar-foreground">
             {MARCA}
           </span>
         </div>
@@ -110,8 +110,8 @@ export function CampoShell() {
             cn(
               'flex h-11 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-semibold transition-colors',
               isActive
-                ? 'bg-white/[0.12] text-white'
-                : 'text-sidebar-foreground/60 hover:bg-white/[0.07] hover:text-white',
+                ? 'bg-sidebar-accent text-sidebar-foreground'
+                : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
             )
           }
         >
