@@ -43,7 +43,10 @@ test('A2: pegar el mensaje entero de WhatsApp completa el código y entra', asyn
   await page.getByRole('button', { name: 'Mandame el código' }).click()
   await page.waitForURL('**/login/codigo')
   await page.evaluate(
-    (c) => navigator.clipboard.writeText(`${c.slice(0, 3)} ${c.slice(3)} es tu código para entrar a Tropero.`),
+    (c) =>
+      navigator.clipboard.writeText(
+        `Tu código de verificación es ${c}. Por tu seguridad, no lo compartas. Este código caduca en 10 minutos.`,
+      ),
     CODIGO_E2E,
   )
   await page.getByRole('button', { name: 'Pegar el código' }).click()

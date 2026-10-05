@@ -115,7 +115,7 @@ export function TarjetaWhatsApp({
       <div aria-hidden className="flex flex-col gap-1 rounded-[14px] bg-estado-bien-suave px-3.5 py-2.5">
         <p className="text-[13px] font-bold text-estado-bien-texto">Tropero</p>
         <p className="text-[14px] text-estado-bien-texto">
-          482 913 es tu código para entrar a Tropero. Vence en 10 minutos.
+          Tu código de verificación es 482913. Por tu seguridad, no lo compartas. Este código caduca en 10 minutos.
         </p>
         <span className="flex items-center justify-center gap-1.5 rounded-[10px] bg-white/70 px-3 py-[7px] text-[13px] font-bold text-estado-bien-texto">
           <Icono nombre="Comprobante" tamano={16} />

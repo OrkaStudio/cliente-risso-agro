@@ -12,8 +12,8 @@
 //   SEND_SMS_HOOK_SECRETS   v1,whsec_…  (el mismo que se carga en el hook)
 //   WA_TOKEN                token permanente de tropero-bot (el del bot)
 //   WA_PHONE_NUMBER_ID      1415816181604916
-//   WA_PLANTILLA_CODIGO     nombre de la plantilla aprobada (p. ej. codigo_tropero)
-//   WA_PLANTILLA_IDIOMA     es_AR (por defecto)
+//   WA_PLANTILLA_CODIGO     nombre de la plantilla aprobada (code_login)
+//   WA_PLANTILLA_IDIOMA     es (por defecto; «Spanish» en WhatsApp Manager)
 // Sin WA_* (desarrollo local) el código se escribe en el log y no sale nada.
 
 import { Webhook } from 'npm:standardwebhooks@1.0.0'
@@ -52,7 +52,7 @@ async function mandarPorWhatsApp(telefono: string, codigo: string) {
       type: 'template',
       template: {
         name: plantilla,
-        language: { code: Deno.env.get('WA_PLANTILLA_IDIOMA') ?? 'es_AR' },
+        language: { code: Deno.env.get('WA_PLANTILLA_IDIOMA') ?? 'es' },
         components: [
           { type: 'body', parameters: [{ type: 'text', text: codigo }] },
           // Botón «Copiar código» de las plantillas de autenticación.

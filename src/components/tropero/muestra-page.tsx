@@ -13,8 +13,8 @@ import { Logo } from "./logo"
 export function MuestraPage() {
   const [noche, setNoche] = useState(false)
   return (
-    <div className={noche ? "dark" : undefined}>
-      <div className="h-full min-h-screen overflow-auto bg-fondo p-10 text-texto">
+    <div className={noche ? "dark h-full" : "h-full"}>
+      <div className="h-full overflow-y-auto bg-fondo p-10 text-texto">
         <div className="mx-auto flex max-w-5xl flex-col gap-10">
           <header className="flex items-center justify-between">
             <Logo alto={32} />

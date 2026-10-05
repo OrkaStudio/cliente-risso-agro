@@ -55,6 +55,13 @@ describe('pegar el código', () => {
       codigoDeLoPegado('482 913 es tu código para entrar a Tropero. Vence en 10 minutos.'),
     ).toBe('482913')
   })
+  it('toma el código del mensaje real de la plantilla de Meta', () => {
+    expect(
+      codigoDeLoPegado(
+        'Tu código de verificación es 482913. Por tu seguridad, no lo compartas. Este código caduca en 10 minutos.',
+      ),
+    ).toBe('482913')
+  })
   it('no pega si no hay un código claro', () => {
     expect(codigoDeLoPegado('hola')).toBeNull()
     expect(codigoDeLoPegado('12345')).toBeNull()
