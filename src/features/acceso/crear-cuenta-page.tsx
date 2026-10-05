@@ -5,7 +5,7 @@ import { CampoTexto } from '@/components/tropero/campo-texto'
 import { useAuth } from '@/features/auth/auth-context'
 import { formatearMientrasEscribe, normalizarCelularAR } from '@/lib/telefono'
 import { useIsMobile } from '@/lib/use-is-mobile'
-import { AccesoLayout, Pregunta, TarjetaWhatsApp } from './acceso-layout'
+import { AccesoLayout, Preguntas, TarjetaWhatsApp } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { celularTieneCuenta, marcarEnviado, pedirCodigo } from './envio'
 import { mailValido, separarNombre } from './reglas'
@@ -151,11 +151,18 @@ export function CrearCuentaPage() {
           {mandando ? 'Mandando el código…' : 'Seguir, mandame el código'}
         </BotonPrincipal>
       </form>
-      <Pregunta texto="¿Ya tenés cuenta?">
-        <BotonChico type="button" onClick={() => navigate('/login', { state: { celular: e164 ?? undefined } })}>
-          Entrá
-        </BotonChico>
-      </Pregunta>
+      <Preguntas
+        filas={[
+          {
+            texto: '¿Ya tenés cuenta?',
+            boton: (
+              <BotonChico type="button" onClick={() => navigate('/login', { state: { celular: e164 ?? undefined } })}>
+                Entrá
+              </BotonChico>
+            ),
+          },
+        ]}
+      />
     </AccesoLayout>
   )
 }

@@ -69,18 +69,9 @@ export function AccesoLayout({
   )
 }
 
-/** «¿Primera vez? [Creá tu cuenta]»: pregunta en texto suave + Botón chico. */
-export function Pregunta({ texto, children }: { texto: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-2 text-[14.5px] text-texto-suave md:text-[15px]">
-      <span>{texto}</span>
-      {children}
-    </div>
-  )
-}
-
 /**
- * Varias preguntas juntas, alineadas sobre el mismo eje: las preguntas terminan
+ * Las preguntas al pie («¿Primera vez? [Creá tu cuenta]»), una o varias,
+ * alineadas sobre el mismo eje: las preguntas terminan
  * en el centro y los botones arrancan ahí, así forman dos columnas prolijas en
  * vez de filas centradas cada una por su lado.
  */

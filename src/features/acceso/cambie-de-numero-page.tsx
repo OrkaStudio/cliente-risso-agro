@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
-import { AccesoLayout, Pregunta } from './acceso-layout'
+import { AccesoLayout, Preguntas } from './acceso-layout'
 
 /** WhatsApp de una PERSONA de Orka (no el del bot). Sin la variable no se ofrece. */
 const SOPORTE = (import.meta.env.VITE_WHATSAPP_SOPORTE as string | undefined)?.replace(/\D/g, '')
@@ -52,11 +52,18 @@ export function CambieDeNumeroPage() {
           Escribirle a Tropero
         </BotonPrincipal>
       )}
-      <Pregunta texto="¿Tenés el número de siempre?">
-        <BotonChico type="button" onClick={() => navigate('/login')}>
-          Entrá
-        </BotonChico>
-      </Pregunta>
+      <Preguntas
+        filas={[
+          {
+            texto: '¿Tenés el número de siempre?',
+            boton: (
+              <BotonChico type="button" onClick={() => navigate('/login')}>
+                Entrá
+              </BotonChico>
+            ),
+          },
+        ]}
+      />
     </AccesoLayout>
   )
 }

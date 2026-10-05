@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
-import { AccesoLayout, Pregunta } from './acceso-layout'
+import { AccesoLayout, Preguntas } from './acceso-layout'
 import { CampoCodigo } from './campo-codigo'
 import { aceptarInvitacion, borrarEnvio, guardarEnvio, leerEnvio, marcarEnviado, pedirCodigo, verificarCodigo, type Envio } from './envio'
 import {
@@ -214,11 +214,18 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
         )}
       </form>
       {!vencido && (
-        <Pregunta texto="¿No llegó?">
-          <BotonChico type="button" disabled={faltan > 0 || reenviando} onClick={() => void mandarOtro()}>
-            {faltan > 0 ? `Mandarlo de nuevo en ${relojMinutos(faltan)}` : 'Mandarlo de nuevo'}
-          </BotonChico>
-        </Pregunta>
+        <Preguntas
+          filas={[
+            {
+              texto: '¿No llegó?',
+              boton: (
+                <BotonChico type="button" disabled={faltan > 0 || reenviando} onClick={() => void mandarOtro()}>
+                  {faltan > 0 ? `Mandarlo de nuevo en ${relojMinutos(faltan)}` : 'Mandarlo de nuevo'}
+                </BotonChico>
+              ),
+            },
+          ]}
+        />
       )}
     </AccesoLayout>
   )

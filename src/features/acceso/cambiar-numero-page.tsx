@@ -4,7 +4,7 @@ import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { useAuth } from '@/features/auth/auth-context'
 import { supabase } from '@/lib/supabase/client'
 import { formatearCelularAR, normalizarCelularAR } from '@/lib/telefono'
-import { AccesoLayout, Pregunta } from './acceso-layout'
+import { AccesoLayout, Preguntas } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { CampoCodigo } from './campo-codigo'
 import { errorAlPedir, limpiarCodigo } from './reglas'
@@ -138,25 +138,39 @@ export function CambiarNumeroPage() {
           <BotonPrincipal type="submit" icono="Guardar" cargando={ocupado} disabled={codigo.length !== 6 || ocupado}>
             {ocupado ? 'Cambiando…' : 'Cambiar el número'}
           </BotonPrincipal>
-          <Pregunta texto="¿Te equivocaste de número?">
-            <BotonChico
-              type="button"
-              onClick={() => {
-                setPaso('numero')
-                setCodigo('')
-                setError(null)
-              }}
-            >
-              Corregirlo
-            </BotonChico>
-          </Pregunta>
+          <Preguntas
+            filas={[
+              {
+                texto: '¿Te equivocaste de número?',
+                boton: (
+                  <BotonChico
+                    type="button"
+                    onClick={() => {
+                      setPaso('numero')
+                      setCodigo('')
+                      setError(null)
+                    }}
+                  >
+                    Corregirlo
+                  </BotonChico>
+                ),
+              },
+            ]}
+          />
         </form>
       )}
-      <Pregunta texto="¿Lo dejás como está?">
-        <BotonChico type="button" onClick={() => navigate(-1)}>
-          Volver
-        </BotonChico>
-      </Pregunta>
+      <Preguntas
+        filas={[
+          {
+            texto: '¿Lo dejás como está?',
+            boton: (
+              <BotonChico type="button" onClick={() => navigate(-1)}>
+                Volver
+              </BotonChico>
+            ),
+          },
+        ]}
+      />
     </AccesoLayout>
   )
 }
