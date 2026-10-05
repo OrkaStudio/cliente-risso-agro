@@ -14,6 +14,8 @@ export type Envio = {
   fallidos: number
   /** Viene de «Crear cuenta»: al entrar va al onboarding. */
   alta: boolean
+  /** Token de la invitación (A4): al entrar se acepta y queda en la empresa. */
+  invitacion?: string
 }
 
 export function leerEnvio(): Envio | null {
@@ -48,19 +50,24 @@ export function borrarEnvio() {
  */
 export function marcarEnviado(
   celular: string,
-  { alta, esperaSegundos }: { alta: boolean; esperaSegundos?: number },
+  {
+    alta,
+    esperaSegundos,
+    invitacion,
+  }: { alta: boolean; esperaSegundos?: number; invitacion?: string },
 ): Envio {
   const ahora = Date.now()
   const previo = leerEnvio()
   const mismo = previo?.celular === celular
   const envio: Envio =
     esperaSegundos === undefined
-      ? { celular, enviadoMs: ahora, fallidos: 0, alta }
+      ? { celular, enviadoMs: ahora, fallidos: 0, alta, invitacion }
       : {
           celular,
           enviadoMs: mismo ? previo.enviadoMs : ahora - (REENVIO_MS - esperaSegundos * 1000),
           fallidos: mismo ? previo.fallidos : 0,
           alta: mismo ? previo.alta || alta : alta,
+          invitacion: invitacion ?? (mismo ? previo.invitacion : undefined),
         }
   guardarEnvio(envio)
   return envio
@@ -127,4 +134,31 @@ export async function verificarCodigo(
 export async function celularTieneCuenta(celular: string): Promise<boolean> {
   const { data } = await supabase.rpc('celular_tiene_cuenta', { p_celular: celular })
   return data === true
+}
+
+export type Invitacion = {
+  empresa: string
+  invita: string
+  nombre: string
+  rol: 'encargado' | 'peon' | 'vet'
+  /** E.164 */
+  celular: string
+  vencida: boolean
+  usada: boolean
+}
+
+/** A4: lo que muestra el link de invitación (sin sesión). null si no existe. */
+export async function leerInvitacion(token: string): Promise<Invitacion | null | 'sin-senal'> {
+  const { data, error } = await supabase.rpc('invitacion_por_token', { p_token: token })
+  if (error) return errorAlPedir(error).tipo === 'sin-senal' ? 'sin-senal' : null
+  const fila = data?.[0]
+  if (!fila) return null
+  return { ...fila, rol: fila.rol as Invitacion['rol'], celular: `+${fila.celular}` }
+}
+
+/** Ya con la sesión del celular invitado: queda en la empresa con su rol. */
+export async function aceptarInvitacion(token: string): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  const { error } = await supabase.rpc('aceptar_invitacion', { p_token: token })
+  if (error) return { ok: false, mensaje: error.message }
+  return { ok: true }
 }

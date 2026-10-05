@@ -4,7 +4,7 @@ import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
 import { AccesoLayout, Pregunta } from './acceso-layout'
-import { borrarEnvio, guardarEnvio, leerEnvio, marcarEnviado, pedirCodigo, verificarCodigo, type Envio } from './envio'
+import { aceptarInvitacion, borrarEnvio, guardarEnvio, leerEnvio, marcarEnviado, pedirCodigo, verificarCodigo, type Envio } from './envio'
 import {
   codigoDeLoPegado,
   estadoDelCodigo,
@@ -52,6 +52,15 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
     setAviso(null)
     const r = await verificarCodigo(envio.celular, valor)
     if (r === 'ok') {
+      if (envio.invitacion) {
+        // A4: el código probó que el número es suyo; ahora queda en la empresa.
+        const a = await aceptarInvitacion(envio.invitacion)
+        if (!a.ok) {
+          setEntrando(false)
+          setAviso(`Entraste, pero no pudimos sumarte a la empresa: ${a.mensaje}`)
+          return
+        }
+      }
       borrarEnvio()
       // La regla de destino la aplican los guardas: sin empresa → onboarding.
       navigate('/', { replace: true })

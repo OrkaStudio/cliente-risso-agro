@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { expect, type Page } from '@playwright/test'
 
 /**
@@ -44,6 +45,31 @@ export async function sesionDePrueba(): Promise<Record<string, unknown>> {
   const sesion = (await r.json()) as Record<string, unknown>
   if (!sesion.access_token) throw new Error(`no hubo sesión de prueba: ${JSON.stringify(sesion)}`)
   return sesion
+}
+
+/** El dueño de prueba invita a alguien (lo que hará Configuración → Personas). */
+export async function invitarComoDueno(celular: string, nombre: string, rol: 'vet' | 'encargado' | 'peon') {
+  const sesion = await sesionDePrueba()
+  const r = await fetch(`${SUPABASE_LOCAL}/rest/v1/rpc/crear_invitacion`, {
+    method: 'POST',
+    headers: {
+      apikey: CLAVE_PUBLICA_LOCAL,
+      Authorization: `Bearer ${sesion.access_token as string}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ p_celular: celular, p_nombre: nombre, p_rol: rol }),
+  })
+  if (!r.ok) throw new Error(`no se pudo invitar: ${await r.text()}`)
+  return (await r.json()) as string
+}
+
+/** El código que mandó enviar-codigo (en local sale al log, no por WhatsApp). */
+export function codigoDelLog(celularSinMas: string): string {
+  const log = execSync('docker logs --tail 80 supabase_edge_runtime_cliente-risso-agro 2>&1').toString()
+  const m = [...log.matchAll(new RegExp(`${celularSinMas} → (\\d{6})`, 'g'))]
+  const codigo = m.at(-1)?.[1]
+  if (!codigo) throw new Error(`no hay código en el log para ${celularSinMas}`)
+  return codigo
 }
 
 /** La bienvenida del asistente aparece una vez por usuario y puede llegar

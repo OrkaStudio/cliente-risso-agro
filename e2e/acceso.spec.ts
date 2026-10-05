@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { CELULAR_E2E, CODIGO_E2E, entrar } from './helpers'
+import { CELULAR_E2E, CODIGO_E2E, codigoDelLog, entrar, invitarComoDueno } from './helpers'
 
 // Acceso (spec «Tropero para código», 1 · Acceso): se entra con un código por
 // WhatsApp. La cuenta E2E usa el código fijo de la base local.
@@ -74,4 +74,28 @@ test('A3: el mail es opcional, pero si se escribe tiene que estar completo', asy
   await page.getByRole('button', { name: 'Seguir, mandame el código' }).click()
   await expect(page.getByText('Ese mail no parece completo')).toBeVisible()
   await expect(page).toHaveURL(/\/registro$/)
+})
+
+test('A4: el invitado entra por el link con su código y queda en la empresa, sin onboarding', async ({ page }) => {
+  const numero = `22416${String(Date.now()).slice(-5)}`
+  const token = await invitarComoDueno(numero, 'Dra. Paula Ríos', 'vet')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`/invitacion/${token}`)
+  await expect(page.getByRole('heading', { name: 'Prueba te sumó a E2E Pruebas.' })).toBeVisible()
+  await expect(page.getByText('Veterinaria · Dra. Paula Ríos')).toBeVisible()
+  await page.getByRole('button', { name: 'Entrar con mi celular' }).click()
+  await page.waitForURL('**/login/codigo')
+  await page.waitForTimeout(800)
+  await page.locator('#codigo').fill(codigoDelLog(`549${numero}`))
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'))
+  await expect(page).not.toHaveURL(/\/onboarding/)
+
+  // El link ya no sirve otra vez.
+  await page.goto(`/invitacion/${token}`)
+  await expect(page.getByText('Esta invitación ya se usó')).toBeVisible()
+})
+
+test('A4: un link que no es de una invitación avisa', async ({ page }) => {
+  await page.goto('/invitacion/no-existe')
+  await expect(page.getByText('Ese link no es de una invitación')).toBeVisible()
 })

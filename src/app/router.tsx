@@ -7,6 +7,7 @@ import { ErrorNuevaVersion } from '@/app/error-nueva-version'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
 import { EntrarPage } from '@/features/acceso/entrar-page'
+import { TeInvitaronPage } from '@/features/acceso/te-invitaron-page'
 import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { RequireEmpresa } from '@/features/auth/require-empresa'
@@ -132,6 +133,12 @@ export const router = createBrowserRouter([
     path: '/registro',
     errorElement: <ErrorNuevaVersion />,
     element: <CrearCuentaPage />,
+  },
+  {
+    // A4: el link que manda el dueño desde Personas.
+    path: '/invitacion/:token',
+    errorElement: <ErrorNuevaVersion />,
+    element: <TeInvitaronPage />,
   },
   // Sin contraseñas no hay nada que recuperar: los links viejos van a entrar.
   { path: '/recuperar', element: <Navigate to="/login" replace /> },
