@@ -1488,6 +1488,7 @@ export type Database = {
         }
         Returns: number
       }
+      celular_tiene_cuenta: { Args: { p_celular: string }; Returns: boolean }
       crear_empresa_con_dueno: { Args: { p_nombre: string }; Returns: string }
       crear_lote_repartido: {
         Args: {

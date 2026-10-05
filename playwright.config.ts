@@ -1,11 +1,9 @@
 import { existsSync } from 'node:fs'
 import { defineConfig } from '@playwright/test'
 
-// E2E contra Supabase real, con el dev server de Vite.
-// Credenciales seed por env (no hardcodear): E2E_EMAIL / E2E_PASSWORD.
-// Localmente viven en `.env.e2e.local` (ignorado por git): la cuenta
-// e2e@orkastudio.test, con su propia empresa "E2E Pruebas" — nunca la de un
-// productor ni la de Orka Pruebas, porque los tests escriben datos.
+// E2E contra el Supabase LOCAL (supabase start), con el dev server de Vite.
+// La cuenta de prueba sale de supabase/seed.sql: entra con un celular y un
+// código fijo que sólo existen en local. Producción no se toca.
 if (existsSync('.env.e2e.local')) process.loadEnvFile('.env.e2e.local')
 export default defineConfig({
   testDir: './e2e',

@@ -265,9 +265,10 @@ template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
 max_frequency = "60s"
 
-# Use pre-defined map of phone number to OTP for testing.
-# [auth.sms.test_otp]
-# 4152127777 = "123456"
+# Cuenta de los tests de punta a punta (supabase/seed.sql): código fijo, sólo
+# en local. En producción no existe.
+[auth.sms.test_otp]
+5492240000001 = "123456"
 
 # Configure logged in session timeouts.
 # [auth.sessions]

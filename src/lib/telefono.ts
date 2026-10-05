@@ -15,7 +15,7 @@
 /**
  * Códigos de área de 3 dígitos (ENACOM). El 11 es el único de 2; todo lo
  * que no está acá y no es 11 tiene 4 dígitos. Sirve para poner el guion
- * en el lugar correcto: 11-5555-4444 · 351-123-4567 · 2923-456789.
+ * en el lugar correcto: 11 5555-4444 · 351 123-4567 · 2241 55-8820.
  */
 const AREAS_3 = new Set([
   '220', '221', '223', '230', '236', '237', '249', '260', '261', '264', '266',
@@ -59,9 +59,9 @@ export function normalizarCelularAR(entrada: string): string | null {
 }
 
 /**
- * Formato "mientras escribe" para el input: dígitos locales con el guion
- * después de la característica (y otro en el medio para el 11 y los de 3,
- * que tienen 8 y 7 dígitos de número). Corta en 10 dígitos.
+ * Formato "mientras escribe", el de las pantallas de Tropero: característica,
+ * espacio y el número con un guion antes de los últimos 4 dígitos
+ * (2241 55-8820 · 351 123-4567 · 11 5555-4444). Corta en 10 dígitos.
  */
 export function formatearMientrasEscribe(entrada: string): string {
   const d = digitosLocales(entrada).slice(0, 10)
@@ -70,14 +70,13 @@ export function formatearMientrasEscribe(entrada: string): string {
   if (d.length <= largo) return d
   const area = d.slice(0, largo)
   const resto = d.slice(largo)
-  // 11-5555-4444 y 351-123-4567 llevan un segundo guion; 2923-456789 no.
-  const corte = largo === 2 ? 4 : largo === 3 ? 3 : 0
-  if (corte && resto.length > corte)
-    return `${area}-${resto.slice(0, corte)}-${resto.slice(corte)}`
-  return `${area}-${resto}`
+  // El guion va antes de los últimos 4 del número completo (6, 7 u 8 dígitos).
+  const corte = 10 - largo - 4
+  if (resto.length > corte) return `${area} ${resto.slice(0, corte)}-${resto.slice(corte)}`
+  return `${area} ${resto}`
 }
 
-/** `+5492923456789` → `+54 9 2923-456789` (para mostrar; no se guarda así). */
+/** `+5492241558820` → `+54 9 2241 55-8820` (para mostrar; no se guarda así). */
 export function formatearCelularAR(e164: string): string {
   const m = /^\+549(\d{10})$/.exec(e164)
   if (!m) return e164

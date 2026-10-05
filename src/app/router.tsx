@@ -4,11 +4,10 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
-import { LoginPage } from '@/features/auth/login-page'
-import { SignupPage } from '@/features/auth/signup-page'
+import { CodigoPage } from '@/features/acceso/codigo-page'
+import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
+import { EntrarPage } from '@/features/acceso/entrar-page'
 import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
-import { RecuperarPage } from '@/features/auth/recuperar-page'
-import { RestablecerPage } from '@/features/auth/restablecer-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { RequireEmpresa } from '@/features/auth/require-empresa'
 import { ResponsiveShell } from '@/app/responsive-shell'
@@ -118,30 +117,29 @@ export const router = createBrowserRouter([
   ...(import.meta.env.DEV
     ? [{ path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> }]
     : []),
+  // Acceso (A1–A3): se entra con un código por WhatsApp, sin contraseñas.
   {
     path: '/login',
     errorElement: <ErrorNuevaVersion />,
-    element: <LoginPage />,
+    element: <EntrarPage />,
+  },
+  {
+    path: '/login/codigo',
+    errorElement: <ErrorNuevaVersion />,
+    element: <CodigoPage />,
   },
   {
     path: '/registro',
     errorElement: <ErrorNuevaVersion />,
-    element: <SignupPage />,
+    element: <CrearCuentaPage />,
   },
-  {
-    path: '/recuperar',
-    errorElement: <ErrorNuevaVersion />,
-    element: <RecuperarPage />,
-  },
+  // Sin contraseñas no hay nada que recuperar: los links viejos van a entrar.
+  { path: '/recuperar', element: <Navigate to="/login" replace /> },
+  { path: '/restablecer', element: <Navigate to="/login" replace /> },
   {
     element: <ProtectedRoute />,
     errorElement: <ErrorNuevaVersion />,
     children: [
-      {
-        // Llega con la sesión del link de recuperación; elige contraseña nueva.
-        path: '/restablecer',
-        element: <RestablecerPage />,
-      },
       {
         // Recién registrado, sin empresa todavía: arma la suya acá.
         path: '/onboarding',

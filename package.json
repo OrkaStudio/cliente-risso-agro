@@ -15,10 +15,11 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:offline": "playwright test -c playwright.offline.config.ts",
-    "test:e2e:todo": "playwright test && pnpm build && playwright test -c playwright.offline.config.ts",
+    "test:e2e:todo": "playwright test && pnpm build:local && playwright test -c playwright.offline.config.ts",
     "cap": "cap",
     "test": "TZ=America/Argentina/Buenos_Aires vitest run",
-    "test:watch": "TZ=America/Argentina/Buenos_Aires vitest"
+    "test:watch": "TZ=America/Argentina/Buenos_Aires vitest",
+    "build:local": "tsc -b && vite build --mode localdb"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

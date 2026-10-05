@@ -14,9 +14,9 @@ import { test, expect, type Page } from '@playwright/test'
  * con auth real.
  */
 
-// Ref del proyecto Supabase (voippiczkxbxsreiqiqu) → key por defecto de
-// supabase-js para la sesión en localStorage.
-const AUTH_KEY = 'sb-voippiczkxbxsreiqiqu-auth-token'
+// Key por defecto de supabase-js para la sesión en localStorage: sale del host
+// del proyecto. Los E2E corren contra el Supabase local (127.0.0.1).
+const AUTH_KEY = 'sb-127-auth-token'
 // Última membresía conocida que persiste use-empresa.ts (capa 2 del fix).
 const MEMBRESIA_KEY = 'risso.membresia.v1'
 
@@ -83,7 +83,7 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     await page.reload()
 
     // Sin red, el SW sirve el shell → el login renderiza igual.
-    await expect(page.getByLabel('Email')).toBeVisible()
+    await expect(page.getByLabel('Tu celular, el que tiene WhatsApp')).toBeVisible()
 
     await context.close()
   })
@@ -129,7 +129,7 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
 
     await page.goto('/')
     await expect(page).toHaveURL(/\/login/)
-    await expect(page.getByLabel('Email')).toBeVisible()
+    await expect(page.getByLabel('Tu celular, el que tiene WhatsApp')).toBeVisible()
 
     await context.close()
   })
@@ -174,7 +174,7 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     /* OJO con el orden: `route` matchea en orden INVERSO de registro, así que el
      * genérico va PRIMERO y el específico al final — si no, el genérico se come
      * el POST que este test necesita observar (lección route-gotchas #1). */
-    await context.route(/supabase\.co\/(rest|auth|storage)\//, (route) =>
+    await context.route(/(?:supabase\.co|127\.0\.0\.1:54321)\/(rest|auth|storage)\//, (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -184,7 +184,7 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     )
     /* Sin membresía el guard manda a /onboarding y el shell del campo nunca
      * monta — por lo tanto nunca drena. `maybeSingle()` espera un objeto. */
-    await context.route(/supabase\.co\/rest\/v1\/miembro_empresa/, (route) =>
+    await context.route(/(?:supabase\.co|127\.0\.0\.1:54321)\/rest\/v1\/miembro_empresa/, (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -192,7 +192,7 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
         body: JSON.stringify(membresiaFabricada),
       }),
     )
-    await context.route(/supabase\.co\/rest\/v1\/movimiento_financiero/, (route) => {
+    await context.route(/(?:supabase\.co|127\.0\.0\.1:54321)\/rest\/v1\/movimiento_financiero/, (route) => {
       if (route.request().method() === 'POST') insertados.push(route.request().url())
       return route.fulfill({
         status: 201,

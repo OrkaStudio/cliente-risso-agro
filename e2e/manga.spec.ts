@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { sesionDePrueba } from './helpers'
 
 /**
  * Manga: elección de alcance + escaneo rápido con el bastón.
@@ -15,49 +16,9 @@ import { test, expect, type Page } from '@playwright/test'
  * caravanear y una lectura perdida).
  */
 
-const AUTH_KEY = 'sb-voippiczkxbxsreiqiqu-auth-token'
-const MEMBRESIA_KEY = 'risso.membresia.v1'
+const AUTH_KEY = 'sb-127-auth-token' // Supabase local (127.0.0.1)
 const EMPRESA = '00000000-0000-4000-8000-00000000000e'
 const MOVIL = { width: 390, height: 844 }
-
-function fakeJwt(payload: Record<string, unknown>): string {
-  const b64 = (obj: Record<string, unknown>) =>
-    Buffer.from(JSON.stringify(obj)).toString('base64url')
-  return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64(payload)}.firma-fake`
-}
-
-function sesionFabricada() {
-  const ahora = Math.floor(Date.now() / 1000)
-  const userId = '00000000-0000-4000-8000-000000000001'
-  return {
-    access_token: fakeJwt({
-      sub: userId,
-      exp: ahora + 3_600,
-      role: 'authenticated',
-      aud: 'authenticated',
-      session_id: '00000000-0000-4000-8000-000000000002',
-    }),
-    refresh_token: 'refresh-fake-e2e',
-    token_type: 'bearer',
-    expires_in: 3_600,
-    expires_at: ahora + 3_600,
-    user: {
-      id: userId,
-      aud: 'authenticated',
-      role: 'authenticated',
-      email: 'offline@e2e.local',
-      app_metadata: { provider: 'email', providers: ['email'] },
-      user_metadata: { nombre: 'Offline', apellido: 'E2E' },
-      created_at: '2026-01-01T00:00:00.000Z',
-    },
-  }
-}
-
-const membresiaFabricada = {
-  empresa_id: EMPRESA,
-  rol: 'dueno',
-  empresa: { id: EMPRESA, nombre: 'E2E Offline' },
-}
 
 /**
  * Tres animales en la tropa que va a pasar por la manga y uno en OTRO potrero.
@@ -256,12 +217,12 @@ async function prepararManga(page: Page) {
     const reg = await navigator.serviceWorker.ready
     if (!reg.active) throw new Error('service worker sin activar')
   })
+  // Sesión real de la cuenta de prueba (Supabase local): con red, la app
+  // confirma la membresía contra el servidor como lo hace con un productor.
+  const sesion = await sesionDePrueba()
   await page.evaluate(
-    ([authKey, sesion, membKey, memb]) => {
-      localStorage.setItem(authKey as string, JSON.stringify(sesion))
-      localStorage.setItem(membKey as string, JSON.stringify(memb))
-    },
-    [AUTH_KEY, sesionFabricada(), MEMBRESIA_KEY, membresiaFabricada],
+    ([authKey, ses]) => localStorage.setItem(authKey as string, JSON.stringify(ses)),
+    [AUTH_KEY, sesion] as const,
   )
   // Una visita a la manga CON red deja la base creada por Dexie con su schema
   // real. Recién después se siembra: así el test no tiene que replicar (ni
