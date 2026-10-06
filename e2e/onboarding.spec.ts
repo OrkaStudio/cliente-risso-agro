@@ -56,6 +56,9 @@ test('de punta a punta: empresa, campo, potreros, qué hay en cada uno y el cier
   await page.getByLabel('Terneros').fill('18')
   await page.getByRole('radio', { name: 'Ovinos' }).click()
   await page.getByLabel('Ovejas').fill('10')
+  // El potrero muestra un ícono por especie.
+  await expect(page.getByRole('img', { name: 'Vacunos' }).first()).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Ovinos' }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Siguiente potrero' }).click()
 
   await expect(page.getByRole('heading', { name: '¿Qué hay en el 8A?' })).toBeVisible()
@@ -66,7 +69,10 @@ test('de punta a punta: empresa, campo, potreros, qué hay en cada uno y el cier
 
   await expect(page.getByRole('heading', { name: '¿Qué hay en el 3A?' })).toBeVisible()
   await page.getByRole('radio', { name: 'Descanso' }).click()
-  await page.getByRole('radio', { name: 'Más de dos meses' }).click()
+  // Sin fecha no avanza; con un atajo, sí (la fecha es aproximada).
+  await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
+  await expect(page.getByText('Elegí desde cuándo descansa, aunque sea aproximado.')).toBeVisible()
+  await page.getByRole('button', { name: 'Hace dos meses' }).click()
   await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
 
   await expect(page.getByRole('heading', { name: '¿Tenés otro campo?' })).toBeVisible()

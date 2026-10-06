@@ -2,6 +2,7 @@
 // código», sección 2). Se prueban solas en modelo.test.ts.
 import type { Database } from '@/lib/supabase/types'
 import type { Uso } from '@/features/campos/use-campo-mapa'
+import { especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 
 export type Categoria = Database['public']['Enums']['categoria_animal']
 export type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -9,20 +10,20 @@ export type TipoCampo = Database['public']['Enums']['tipo_campo']
 
 // ===== Lo que hay en un potrero (B4) =====
 
-export type Descanso = 'reciente' | 'mes' | 'dos-meses'
-
 export type Contenido =
   | { tipo: 'hacienda'; cabezas: Partial<Record<Categoria, number>> }
   | { tipo: 'sembrado'; cultivo: string }
-  | { tipo: 'descanso'; desde: Descanso }
+  /** `desde`: fecha aproximada, 'YYYY-MM-DD' en hora local. */
+  | { tipo: 'descanso'; desde: string }
 
 /** Los chips de cultivo de la 35 («Otro» abre un campo de texto). */
 export const CULTIVOS = ['Trigo', 'Maíz', 'Soja', 'Girasol', 'Pastura', 'Verdeo'] as const
 
-export const DESCANSOS: { valor: Descanso; nombre: string }[] = [
-  { valor: 'reciente', nombre: 'Recién' },
-  { valor: 'mes', nombre: 'Hace un mes' },
-  { valor: 'dos-meses', nombre: 'Más de dos meses' },
+/** Atajos para «desde cuándo descansa» (la fecha es aproximada). */
+export const ATAJOS_DESCANSO: { nombre: string; dias: number }[] = [
+  { nombre: 'Hace una semana', dias: 7 },
+  { nombre: 'Hace un mes', dias: 30 },
+  { nombre: 'Hace dos meses', dias: 60 },
 ]
 
 export type PotreroOnb = {
@@ -64,26 +65,39 @@ export function usoDe(c: Contenido): Uso {
   return c.tipo === 'hacienda' ? 'ganadero' : c.tipo === 'sembrado' ? 'agricola' : 'vacio'
 }
 
-/** «Desde cuándo descansa» como fecha aproximada (lo que se guarda). */
-export function fechaDeDescanso(desde: Descanso, hoy: Date): string {
-  const d = new Date(hoy)
-  if (desde === 'mes') d.setDate(d.getDate() - 30)
-  if (desde === 'dos-meses') d.setDate(d.getDate() - 60)
-  return d.toISOString().slice(0, 10)
+/** Date → 'YYYY-MM-DD' en hora local (toISOString corre el día después de las 21). */
+export function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Al revés: de la fecha guardada a la opción, para volver a mostrarla. */
-export function descansoDeFecha(fecha: string, hoy: Date): Descanso {
-  const dias = Math.round((hoy.getTime() - new Date(`${fecha}T12:00:00`).getTime()) / 86_400_000)
-  if (dias >= 45) return 'dos-meses'
-  if (dias >= 15) return 'mes'
-  return 'reciente'
+/** La fecha de hace N días, para los atajos de «desde cuándo descansa». */
+export function haceDias(dias: number, hoy: Date): string {
+  const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - dias)
+  return ymd(d)
+}
+
+/** «desde el 5/9» — como se lee en el dibujo del potrero. */
+export function desdeCorto(fecha: string): string {
+  const [, m, d] = fecha.split('-').map(Number)
+  return `desde el ${d}/${m}`
+}
+
+/** El ícono del set de Tropero para cada especie. */
+export const ICONO_ESPECIE = { bovino: 'Vaca', ovino: 'Oveja', equino: 'Caballo' } as const satisfies Record<Especie, string>
+
+/** Las especies que hay en un potrero (para dibujar un ícono por cada una). */
+export function especiesDe(c: Contenido | null): Especie[] {
+  if (!c || c.tipo !== 'hacienda') return []
+  const hay = new Set<Especie>()
+  for (const [cat, n] of Object.entries(c.cabezas) as [Categoria, number][]) if (n > 0) hay.add(especiePorCategoria[cat])
+  return (['bovino', 'ovino', 'equino'] as const).filter((e) => hay.has(e))
 }
 
 /** Falta algo para poder guardar este potrero (B4). */
 export function faltaEnContenido(c: Contenido | null): string | null {
   if (!c) return 'Elegí qué hay: hacienda, sembrado o descanso.'
   if (c.tipo === 'sembrado' && !c.cultivo.trim()) return 'Elegí qué está sembrado.'
+  if (c.tipo === 'descanso' && !c.desde) return 'Elegí desde cuándo descansa, aunque sea aproximado.'
   return null
 }
 

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   cabezasDe,
-  descansoDeFecha,
   despuesDePotrero,
+  desdeCorto,
+  especiesDe,
   estadoDe,
+  haceDias,
   faltaEnContenido,
-  fechaDeDescanso,
   leerHectareas,
   filasRepetidas,
   nombresPrevistos,
@@ -66,7 +67,7 @@ describe('qué hay en cada potrero (B4)', () => {
   it('lo que va a la base', () => {
     expect(estadoDe({ tipo: 'hacienda', cabezas: {} })).toEqual({ estadoCiclo: 'ganadero', cultivo: null })
     expect(estadoDe({ tipo: 'sembrado', cultivo: ' Trigo ' })).toEqual({ estadoCiclo: 'cultivo', cultivo: 'Trigo' })
-    expect(estadoDe({ tipo: 'descanso', desde: 'mes' })).toEqual({ estadoCiclo: 'descanso', cultivo: null })
+    expect(estadoDe({ tipo: 'descanso', desde: '2026-09-05' })).toEqual({ estadoCiclo: 'descanso', cultivo: null })
   })
   it('no se guarda sin elegir, ni un sembrado sin cultivo («Otro» vacío)', () => {
     expect(faltaEnContenido(null)).not.toBeNull()
@@ -74,14 +75,18 @@ describe('qué hay en cada potrero (B4)', () => {
     expect(faltaEnContenido({ tipo: 'sembrado', cultivo: 'Cebada' })).toBeNull()
     expect(faltaEnContenido({ tipo: 'hacienda', cabezas: {} })).toBeNull()
   })
-  it('desde cuándo descansa: va y vuelve de la fecha', () => {
-    const hoy = new Date('2026-10-05T12:00:00')
-    expect(fechaDeDescanso('reciente', hoy)).toBe('2026-10-05')
-    expect(fechaDeDescanso('mes', hoy)).toBe('2026-09-05')
-    expect(fechaDeDescanso('dos-meses', hoy)).toBe('2026-08-06')
-    for (const d of ['reciente', 'mes', 'dos-meses'] as const) {
-      expect(descansoDeFecha(fechaDeDescanso(d, hoy), hoy)).toBe(d)
-    }
+  it('desde cuándo descansa: atajos y cómo se lee', () => {
+    const hoy = new Date(2026, 9, 5, 23, 30) // 5/10 a las 23:30: no corre el día
+    expect(haceDias(0, hoy)).toBe('2026-10-05')
+    expect(haceDias(7, hoy)).toBe('2026-09-28')
+    expect(haceDias(30, hoy)).toBe('2026-09-05')
+    expect(desdeCorto('2026-09-05')).toBe('desde el 5/9')
+    expect(faltaEnContenido({ tipo: 'descanso', desde: '' })).not.toBeNull()
+  })
+  it('un ícono por cada especie que hay', () => {
+    expect(especiesDe({ tipo: 'hacienda', cabezas: { vaca: 3, oveja: 2, padrillo: 1 } })).toEqual(['bovino', 'ovino', 'equino'])
+    expect(especiesDe({ tipo: 'hacienda', cabezas: { yegua: 2, vaca: 0 } })).toEqual(['equino'])
+    expect(especiesDe({ tipo: 'sembrado', cultivo: 'Trigo' })).toEqual([])
   })
 })
 
@@ -123,7 +128,7 @@ describe('los pasos', () => {
     expect(pasoDesdeLaBase([])).toEqual({ etapa: 'campo' })
     expect(pasoDesdeLaBase([campo([])])).toEqual({ etapa: 'potreros', campoId: 'c1' })
     expect(pasoDesdeLaBase([tres])).toEqual({ etapa: 'que-hay', campoId: 'c1', indice: 0 })
-    const listo = campo(tres.potreros.map((p) => ({ ...p, contenido: { tipo: 'descanso' as const, desde: 'mes' as const } })))
+    const listo = campo(tres.potreros.map((p) => ({ ...p, contenido: { tipo: 'descanso' as const, desde: '2026-09-05' } })))
     expect(pasoDesdeLaBase([listo])).toEqual({ etapa: 'otro' })
   })
 })

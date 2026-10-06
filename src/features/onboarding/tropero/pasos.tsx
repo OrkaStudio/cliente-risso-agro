@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Aviso } from '@/components/tropero/aviso'
 import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { useClima } from '@/features/cotizaciones/hooks'
@@ -14,8 +15,9 @@ import { LocalidadCampo } from './localidad-campo'
 import {
   cabezasDe,
   CULTIVOS,
-  DESCANSOS,
+  ATAJOS_DESCANSO,
   faltaEnContenido,
+  haceDias,
   ha,
   leerHectareas,
   letraDeCampo,
@@ -26,7 +28,6 @@ import {
   type CampoOnb,
   type Categoria,
   type Contenido,
-  type Descanso,
   type TipoCampo,
 } from './modelo'
 import { OnboardingLayout } from './onboarding-layout'
@@ -467,7 +468,7 @@ export function PasoQueHay({
   const [otro, setOtro] = useState(
     previo?.tipo === 'sembrado' && !(CULTIVOS as readonly string[]).includes(previo.cultivo),
   )
-  const [desde, setDesde] = useState<Descanso | null>(previo?.tipo === 'descanso' ? previo.desde : null)
+  const [desde, setDesde] = useState(previo?.tipo === 'descanso' ? previo.desde : '')
   const [intento, setIntento] = useState(false)
   const { error, ocupado, correr } = useError()
 
@@ -476,10 +477,10 @@ export function PasoQueHay({
       ? { tipo, cabezas }
       : tipo === 'sembrado'
         ? { tipo, cultivo }
-        : tipo === 'descanso' && desde
+        : tipo === 'descanso'
           ? { tipo, desde }
           : null
-  const falta = tipo === 'descanso' && !desde ? 'Elegí desde cuándo descansa.' : faltaEnContenido(contenido)
+  const falta = faltaEnContenido(contenido)
   const ultimo = indice === campo.potreros.length - 1
 
   const potrerosVivos = campo.potreros.map((p, i) => (i === indice ? { ...p, contenido } : p))
@@ -621,14 +622,38 @@ export function PasoQueHay({
       )}
 
       {tipo === 'descanso' && (
-        <div className="flex flex-col gap-2">
-          <span className="text-[14px] font-semibold text-texto md:text-[14.5px]">Desde cuándo descansa</span>
-          <Segmentos
-            etiqueta="Desde cuándo descansa"
-            valor={desde}
-            onCambio={setDesde}
-            opciones={DESCANSOS.map((d) => ({ valor: d.valor, texto: d.nombre }))}
+        <div className="flex flex-col gap-2.5">
+          <span className="text-[14px] font-semibold text-texto md:text-[14.5px]">
+            Desde cuándo descansa <span className="font-normal text-texto-suave">(aproximado)</span>
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {ATAJOS_DESCANSO.map((a) => {
+              const fecha = haceDias(a.dias, new Date())
+              const elegido = desde === fecha
+              return (
+                <button
+                  key={a.dias}
+                  type="button"
+                  aria-pressed={elegido}
+                  onClick={() => setDesde(fecha)}
+                  className={cn(
+                    'rounded-full border-[1.5px] px-4 py-2 text-[14.5px] font-semibold transition-colors',
+                    elegido ? 'border-principal bg-principal text-principal-texto' : 'border-borde bg-superficie text-texto hover:border-texto-suave/50',
+                  )}
+                >
+                  {a.nombre}
+                </button>
+              )
+            })}
+          </div>
+          <CampoFecha
+            value={desde}
+            onChange={setDesde}
+            max={haceDias(0, new Date())}
+            ariaLabel="Desde cuándo descansa"
+            className="h-14 rounded-2xl border-[1.5px] border-borde bg-superficie px-[18px] text-[16px] font-normal text-texto"
           />
+          <p className="text-[12.5px] text-texto-suave">Con una fecha aproximada alcanza: sirve para saber cuántos días lleva descansando.</p>
         </div>
       )}
       {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}

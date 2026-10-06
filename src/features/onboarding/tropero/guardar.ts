@@ -14,10 +14,9 @@ import {
 import { actividadDeUsos } from '@/features/campos/labels'
 import { borrarAltaOnboarding } from '@/features/hacienda/api'
 import {
-  descansoDeFecha,
   estadoDe,
-  fechaDeDescanso,
   usoDe,
+  ymd,
   type CampoOnb,
   type Categoria,
   type Contenido,
@@ -148,14 +147,13 @@ export async function guardarContenido(
   empresaId: string,
   potrero: PotreroOnb,
   contenido: Contenido,
-  hoy: Date,
 ): Promise<void> {
   await borrarAltaOnboarding([potrero.id])
   const { estadoCiclo, cultivo } = estadoDe(contenido)
   await actualizarPotreroMapa({ id: potrero.id, estadoCiclo, hectareas: potrero.hectareas, cultivo })
   const { error: e1 } = await supabase
     .from('potrero')
-    .update({ descanso_desde: contenido.tipo === 'descanso' ? fechaDeDescanso(contenido.desde, hoy) : null })
+    .update({ descanso_desde: contenido.tipo === 'descanso' ? contenido.desde : null })
     .eq('id', potrero.id)
   if (e1) throw new Error(e1.message)
   if (contenido.tipo !== 'hacienda') return
@@ -225,7 +223,7 @@ export async function leerDeLaBase(empresaId: string, hoy: Date): Promise<CampoO
         const cabezas = porPotrero.get(p.id)
         const contenido: Contenido | null =
           p.estado_ciclo === 'descanso'
-            ? { tipo: 'descanso', desde: descansoDeFecha(p.descanso_desde ?? hoy.toISOString().slice(0, 10), hoy) }
+            ? { tipo: 'descanso', desde: p.descanso_desde ?? ymd(hoy) }
             : p.cultivo
               ? { tipo: 'sembrado', cultivo: p.cultivo }
               : cabezas

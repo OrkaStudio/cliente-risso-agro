@@ -4,7 +4,10 @@ import { Icono } from '@/components/tropero/icono'
 import { repartir } from '@/features/onboarding/croquis-layout'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
-import { cabezasDe, ha, type PotreroOnb } from './modelo'
+import type { Especie } from '@/features/hacienda/labels'
+import { cabezasDe, desdeCorto, especiesDe, ha, ICONO_ESPECIE, type PotreroOnb } from './modelo'
+
+const NOMBRE_ESPECIE: Record<Especie, string> = { bovino: 'Vacunos', ovino: 'Ovinos', equino: 'Equinos' }
 
 // La escena del onboarding (página 35): el campo se va dibujando a medida que
 // se carga. Los potreros son un mosaico proporcional a sus hectáreas
@@ -193,12 +196,17 @@ function Potrero({ potrero, activo, compacta }: { potrero: PotreroOnb; activo: b
   // El número grande (cabezas o cultivo) sólo si hay lugar de verdad.
   const grande = Math.min(h * 0.32, w * 0.3, compacta ? 40 : 64)
   const hectareas = potrero.hectareas > 0 ? `${ha(potrero.hectareas)} ha` : '— ha'
+  // El cultivo en grande, si entra; si no, va en la línea chica (nunca los dos).
+  const cultivoGrande = c?.tipo === 'sembrado' && grande >= 22
   const detalle =
     c?.tipo === 'sembrado'
-      ? `${ha(potrero.hectareas)} ha, ${c.cultivo.toLowerCase()}`
+      ? cultivoGrande
+        ? hectareas
+        : `${hectareas}, ${c.cultivo.toLowerCase()}`
       : c?.tipo === 'descanso'
-        ? `${ha(potrero.hectareas)} ha, en descanso`
+        ? `${hectareas}, en descanso ${c.desde ? desdeCorto(c.desde) : ''}`.trim()
         : hectareas
+  const especies = especiesDe(c)
   return (
     <div
       ref={ref}
@@ -227,7 +235,13 @@ function Potrero({ potrero, activo, compacta }: { potrero: PotreroOnb; activo: b
         <p className={cn('truncate font-heading font-extrabold', chico ? 'text-[12px]' : compacta ? 'text-[15px]' : 'text-[22px]')}>
           {potrero.nombre}
         </p>
-        {c?.tipo === 'hacienda' && !chico && <Icono nombre="Vaca" tamano={compacta ? 16 : 24} className="shrink-0" />}
+        {especies.length > 0 && !chico && (
+          <span className="flex shrink-0 gap-1">
+            {especies.map((e) => (
+              <Icono key={e} nombre={ICONO_ESPECIE[e]} tamano={compacta ? 16 : 24} titulo={NOMBRE_ESPECIE[e]} />
+            ))}
+          </span>
+        )}
       </div>
       {!chico && (
         <p className={cn('truncate font-semibold opacity-80', compacta ? 'text-[11.5px]' : 'text-[14px]')}>{detalle}</p>
@@ -237,7 +251,7 @@ function Potrero({ potrero, activo, compacta }: { potrero: PotreroOnb; activo: b
           {cabezas}
         </p>
       )}
-      {grande >= 22 && c?.tipo === 'sembrado' && (
+      {cultivoGrande && (
         <p className="titulo-display mt-auto truncate leading-none" style={{ fontSize: grande * 0.9 }}>
           {c.cultivo}
         </p>
