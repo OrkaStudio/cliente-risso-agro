@@ -214,7 +214,7 @@ function Flujo({
           atras={atras}
           onGuardar={async (contenido: Contenido) => {
             const potrero = campo.potreros[paso.indice]!
-            await guardarContenido(empresaId!, potrero, contenido, new Date())
+            await guardarContenido(empresaId!, potrero, contenido)
             const actualizado = {
               ...campo,
               potreros: campo.potreros.map((p, i) => (i === paso.indice ? { ...p, contenido } : p)),

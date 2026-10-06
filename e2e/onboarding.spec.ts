@@ -56,6 +56,9 @@ test('de punta a punta: empresa, campo, potreros, qué hay en cada uno y el cier
   await page.getByLabel('Terneros').fill('18')
   await page.getByRole('radio', { name: 'Ovinos' }).click()
   await page.getByLabel('Ovejas').fill('10')
+  // El potrero muestra un ícono por especie.
+  await expect(page.getByRole('img', { name: 'Vacunos' }).first()).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Ovinos' }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Siguiente potrero' }).click()
 
   await expect(page.getByRole('heading', { name: '¿Qué hay en el 8A?' })).toBeVisible()
@@ -66,7 +69,10 @@ test('de punta a punta: empresa, campo, potreros, qué hay en cada uno y el cier
 
   await expect(page.getByRole('heading', { name: '¿Qué hay en el 3A?' })).toBeVisible()
   await page.getByRole('radio', { name: 'Descanso' }).click()
-  await page.getByRole('radio', { name: 'Más de dos meses' }).click()
+  // Sin fecha no avanza; con un atajo, sí (la fecha es aproximada).
+  await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
+  await expect(page.getByText('Elegí desde cuándo descansa, aunque sea aproximado.')).toBeVisible()
+  await page.getByRole('button', { name: 'Hace dos meses' }).click()
   await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
 
   await expect(page.getByRole('heading', { name: '¿Tenés otro campo?' })).toBeVisible()
@@ -143,4 +149,31 @@ test('corregir un potrero ya cargado no duplica la hacienda', async ({ page }) =
   await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
   await page.getByRole('button', { name: 'No, con La Porteña está' }).click()
   await expect(page.getByText('Propio · 100 ha · 2 potreros · 26 cabezas')).toBeVisible()
+})
+
+test('los potreros no repiten número: los nuevos toman el siguiente y uno repetido no deja guardar', async ({ page }) => {
+  await cuentaNueva(page)
+  await empresaYCampo(page, '100')
+  await page.locator('input[inputmode=decimal]').nth(0).fill('40')
+  await page.getByRole('button', { name: 'Sumar otro potrero' }).click()
+  await page.getByRole('button', { name: 'Sumar otro potrero' }).click()
+  // Cada fila nueva ya trae su número.
+  await expect(page.getByLabel('Número del potrero 2')).toHaveValue('2')
+  await expect(page.getByLabel('Número del potrero 3')).toHaveValue('3')
+  await page.locator('input[inputmode=decimal]').nth(1).fill('30')
+  await page.locator('input[inputmode=decimal]').nth(2).fill('30')
+  // Repetido: se marca y no guarda.
+  await page.getByLabel('Número del potrero 3').fill('1')
+  await expect(page.getByText('Ya hay un 1A')).toBeVisible()
+  await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
+  await expect(page.getByRole('heading', { name: '¿Cómo lo tenés dividido?' })).toBeVisible()
+  // Se arregla y se guarda; después se intercambian dos números sin chocar.
+  await page.getByLabel('Número del potrero 3').fill('3')
+  await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
+  await expect(page.getByRole('heading', { name: '¿Qué hay en el 1A?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Atrás' }).click()
+  await page.getByLabel('Número del potrero 1').fill('2')
+  await page.getByLabel('Número del potrero 2').fill('1')
+  await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
+  await expect(page.getByRole('heading', { name: '¿Qué hay en el 2A?' })).toBeVisible()
 })

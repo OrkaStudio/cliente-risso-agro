@@ -6,7 +6,7 @@ import { Logo } from '@/components/tropero/logo'
 import { repartir } from '@/features/onboarding/croquis-layout'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
-import { cabezasDe, ha, totales, type CampoOnb, type PotreroOnb } from './modelo'
+import { cabezasDe, especiesDe, ha, ICONO_ESPECIE, totales, type CampoOnb, type PotreroOnb } from './modelo'
 
 // B6 · Cierre (página 35, «Onboarding · Cierre»). Sobrio: el campo cargado es
 // el protagonista y el movimiento está en los detalles (spec, «Movimiento»):
@@ -119,7 +119,11 @@ function MiniCampo({
           >
             {!chico && <div className="flex items-start justify-between">
               <span className="font-heading text-[12px] font-extrabold">{p.nombre}</span>
-              {c?.tipo === 'hacienda' && <Icono nombre="Vaca" tamano={16} className="size-3" />}
+              <span className="flex gap-0.5">
+                {especiesDe(c).map((e) => (
+                  <Icono key={e} nombre={ICONO_ESPECIE[e]} tamano={16} className="size-3" />
+                ))}
+              </span>
             </div>}
             {!chico && grande >= 16 && c?.tipo === 'hacienda' && cabezasDe(c) > 0 && (
               <span className="titulo-display mt-auto leading-none" style={{ fontSize: grande }}>
