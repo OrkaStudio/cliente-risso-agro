@@ -144,3 +144,30 @@ test('corregir un potrero ya cargado no duplica la hacienda', async ({ page }) =
   await page.getByRole('button', { name: 'No, con La Porteña está' }).click()
   await expect(page.getByText('Propio · 100 ha · 2 potreros · 26 cabezas')).toBeVisible()
 })
+
+test('los potreros no repiten número: los nuevos toman el siguiente y uno repetido no deja guardar', async ({ page }) => {
+  await cuentaNueva(page)
+  await empresaYCampo(page, '100')
+  await page.locator('input[inputmode=decimal]').nth(0).fill('40')
+  await page.getByRole('button', { name: 'Sumar otro potrero' }).click()
+  await page.getByRole('button', { name: 'Sumar otro potrero' }).click()
+  // Cada fila nueva ya trae su número.
+  await expect(page.getByLabel('Número del potrero 2')).toHaveValue('2')
+  await expect(page.getByLabel('Número del potrero 3')).toHaveValue('3')
+  await page.locator('input[inputmode=decimal]').nth(1).fill('30')
+  await page.locator('input[inputmode=decimal]').nth(2).fill('30')
+  // Repetido: se marca y no guarda.
+  await page.getByLabel('Número del potrero 3').fill('1')
+  await expect(page.getByText('Ya hay un 1A')).toBeVisible()
+  await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
+  await expect(page.getByRole('heading', { name: '¿Cómo lo tenés dividido?' })).toBeVisible()
+  // Se arregla y se guarda; después se intercambian dos números sin chocar.
+  await page.getByLabel('Número del potrero 3').fill('3')
+  await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
+  await expect(page.getByRole('heading', { name: '¿Qué hay en el 1A?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Atrás' }).click()
+  await page.getByLabel('Número del potrero 1').fill('2')
+  await page.getByLabel('Número del potrero 2').fill('1')
+  await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
+  await expect(page.getByRole('heading', { name: '¿Qué hay en el 2A?' })).toBeVisible()
+})

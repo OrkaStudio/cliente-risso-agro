@@ -19,7 +19,9 @@ import {
   ha,
   leerHectareas,
   letraDeCampo,
+  filasRepetidas,
   nombresPrevistos,
+  siguienteNumero,
   sumaDePotreros,
   type CampoOnb,
   type Categoria,
@@ -237,7 +239,8 @@ export function PasoCampo({
 
 type Fila = { clave: string; id?: string; numero: string; hectareas: string }
 let claves = 0
-const nuevaFila = (hectareas = ''): Fila => ({ clave: `n${++claves}`, numero: '', hectareas })
+/** Una fila nueva ya trae su número: el siguiente al más alto (estándar 1, 2, 3…). */
+const nuevaFila = (numero: string, hectareas = ''): Fila => ({ clave: `n${++claves}`, numero, hectareas })
 
 export function PasoPotreros({
   campo,
@@ -260,7 +263,7 @@ export function PasoPotreros({
           numero: p.nombre.replace(/\D/g, ''),
           hectareas: String(p.hectareas).replace('.', ','),
         }))
-      : [nuevaFila()],
+      : [nuevaFila('1')],
   )
   const [intento, setIntento] = useState(false)
   const { error, ocupado, correr } = useError()
@@ -272,6 +275,8 @@ export function PasoPotreros({
     letra,
   )
   const cantidad = filas.length
+  const repetidas = filasRepetidas(nombres)
+  const siguiente = () => siguienteNumero(filas.map((f) => f.numero))
 
   function cambiar(clave: string, cambio: Partial<Fila>) {
     setFilas((xs) => xs.map((f) => (f.clave === clave ? { ...f, ...cambio } : f)))
@@ -279,7 +284,7 @@ export function PasoPotreros({
 
   function guardar() {
     setIntento(true)
-    if (suma.estado === 'incompleto') return
+    if (suma.estado === 'incompleto' || repetidas.size > 0) return
     void correr(() =>
       onGuardar(filas.map((f, i) => ({ id: f.id, numero: f.numero, hectareas: hs[i]! }))),
     )
@@ -290,7 +295,7 @@ export function PasoPotreros({
     potreros: filas.map((f, i) => ({
       id: f.clave,
       nombre: nombres[i]!,
-      hectareas: hs[i] && hs[i]! > 0 ? hs[i]! : 1,
+      hectareas: hs[i] && hs[i]! > 0 ? hs[i]! : 0,
       contenido: campo.potreros.find((p) => p.id === f.id)?.contenido ?? null,
     })),
   }
@@ -326,14 +331,21 @@ export function PasoPotreros({
         </div>
         {filas.map((f, i) => {
           const sinHa = intento && !(hs[i] && hs[i]! > 0)
+          const repetida = repetidas.has(i)
           return (
             <div key={f.clave} className="grid grid-cols-[1fr_150px_auto] items-center gap-x-3 py-[7px]">
-              <label className="flex items-center gap-1 rounded-2xl border-[1.5px] border-borde bg-superficie px-[18px] focus-within:border-principal">
+              <label
+                className={cn(
+                  'flex items-center gap-1 rounded-2xl border-[1.5px] bg-superficie px-[18px] focus-within:border-principal',
+                  repetida ? 'border-estado-problema' : 'border-borde',
+                )}
+              >
                 <span className="sr-only">Número del potrero {i + 1}</span>
                 <input
                   inputMode="numeric"
                   value={f.numero}
                   placeholder={nombres[i]!.replace(letra, '')}
+                  aria-invalid={repetida || undefined}
                   onChange={(e) => cambiar(f.clave, { numero: e.target.value.replace(/\D/g, '').slice(0, 3) })}
                   className="w-full min-w-0 bg-transparent py-4 text-[16px] text-texto outline-none placeholder:text-texto-suave/60"
                 />
@@ -371,16 +383,21 @@ export function PasoPotreros({
           )
         })}
       </div>
-      <BotonChico type="button" icono="Agregar" className="self-start" onClick={() => setFilas((xs) => [...xs, nuevaFila()])}>
+      <BotonChico type="button" icono="Agregar" className="self-start" onClick={() => setFilas((xs) => [...xs, nuevaFila(siguiente())])}>
         Sumar otro potrero
       </BotonChico>
 
+      {repetidas.size > 0 && (
+        <Aviso tipo="problema" icono="Cerrar" titulo={`Ya hay un ${nombres[[...repetidas][0]!]}`}>
+          Cada potrero lleva su propio número. Cambiá uno de los que están marcados.
+        </Aviso>
+      )}
       {suma.estado === 'incompleto' && intento && (
         <Aviso tipo="problema" icono="Cerrar" titulo="Faltan hectáreas">
           Cada potrero necesita sus hectáreas.
         </Aviso>
       )}
-      {suma.estado === 'cierran' && (
+      {suma.estado === 'cierran' && repetidas.size === 0 && (
         <Aviso tipo="bien" icono="Guardar" titulo={`${cantidad} ${cantidad === 1 ? 'potrero' : 'potreros'}, ${ha(suma.suma)} de ${ha(campo.hectareas)} ha: cierran justo`} />
       )}
       {suma.estado === 'sobran' && (
@@ -408,7 +425,7 @@ export function PasoPotreros({
             <BotonChico
               type="button"
               icono="Agregar"
-              onClick={() => setFilas((xs) => [...xs, nuevaFila(ha(suma.diferencia))])}
+              onClick={() => setFilas((xs) => [...xs, nuevaFila(siguiente(), ha(suma.diferencia))])}
             >
               Sumar el potrero que falta
             </BotonChico>

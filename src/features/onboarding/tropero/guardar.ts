@@ -97,6 +97,21 @@ export async function guardarPotreros(empresaId: string, campo: CampoOnb, filas:
     await borrarAltaOnboarding(sacados)
     for (const id of sacados) await eliminarPotrero(id)
   }
+  // El nombre es único por campo: los que cambian de número pasan primero por
+  // uno provisorio, así cambiar el 1 por el 2 no choca a mitad de camino.
+  const cambian = filas.filter((f) => {
+    const previo = f.id ? campo.potreros.find((p) => p.id === f.id) : undefined
+    return previo && f.numero.trim() && previo.nombre.replace(/\D/g, '') !== f.numero.trim()
+  })
+  for (const [i, f] of cambian.entries()) {
+    const previo = campo.potreros.find((p) => p.id === f.id)!
+    await actualizarPotrero({
+      id: previo.id,
+      nombre: String(90000 + i),
+      estadoCiclo: previo.contenido ? estadoDe(previo.contenido).estadoCiclo : 'ganadero',
+      hectareas: f.hectareas,
+    })
+  }
   const out: PotreroOnb[] = []
   for (const f of filas) {
     const previo = f.id ? campo.potreros.find((p) => p.id === f.id) : undefined

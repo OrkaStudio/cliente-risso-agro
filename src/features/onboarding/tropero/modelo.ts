@@ -226,3 +226,16 @@ export function nombresPrevistos(numeros: string[], letra: string): string[] {
     return `${siguiente}${letra}`
   })
 }
+
+/** El número que toma un potrero nuevo: el siguiente al más alto usado. */
+export function siguienteNumero(numeros: string[]): string {
+  const usados = numeros.map((n) => parseInt(n.replace(/\D/g, ''), 10)).filter((n) => n > 0)
+  return String((usados.length ? Math.max(...usados) : 0) + 1)
+}
+
+/** Las filas cuyo nombre se repite con otra (B3 no deja guardar así). */
+export function filasRepetidas(nombres: string[]): Set<number> {
+  const vistos = new Map<string, number[]>()
+  nombres.forEach((n, i) => vistos.set(n, [...(vistos.get(n) ?? []), i]))
+  return new Set([...vistos.values()].filter((is) => is.length > 1).flat())
+}

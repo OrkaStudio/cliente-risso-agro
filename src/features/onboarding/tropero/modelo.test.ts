@@ -7,7 +7,9 @@ import {
   faltaEnContenido,
   fechaDeDescanso,
   leerHectareas,
+  filasRepetidas,
   nombresPrevistos,
+  siguienteNumero,
   numeroDePaso,
   pasoAnterior,
   pasoDesdeLaBase,
@@ -143,5 +145,18 @@ describe('nombres de los potreros mientras se escriben (B3)', () => {
     expect(nombresPrevistos(['', '', ''], 'A')).toEqual(['1A', '2A', '3A'])
     expect(nombresPrevistos(['2', '', ''], 'A')).toEqual(['2A', '1A', '3A'])
     expect(nombresPrevistos(['5B', ''], 'B')).toEqual(['5B', '1B'])
+  })
+})
+
+describe('potreros sin nombres repetidos (B3)', () => {
+  it('un potrero nuevo toma el siguiente número', () => {
+    expect(siguienteNumero([])).toBe('1')
+    expect(siguienteNumero(['1', '2'])).toBe('3')
+    expect(siguienteNumero(['11', '', '3'])).toBe('12')
+  })
+  it('marca las filas que se repiten', () => {
+    expect([...filasRepetidas(['1A', '1A', '1A'])]).toEqual([0, 1, 2])
+    expect([...filasRepetidas(['1A', '2A', '1A'])]).toEqual([0, 2])
+    expect(filasRepetidas(['1A', '2A', '3A']).size).toBe(0)
   })
 })

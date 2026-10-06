@@ -192,12 +192,13 @@ function Potrero({ potrero, activo, compacta }: { potrero: PotreroOnb; activo: b
   const cabezas = cabezasDe(c)
   // El número grande (cabezas o cultivo) sólo si hay lugar de verdad.
   const grande = Math.min(h * 0.32, w * 0.3, compacta ? 40 : 64)
+  const hectareas = potrero.hectareas > 0 ? `${ha(potrero.hectareas)} ha` : '— ha'
   const detalle =
     c?.tipo === 'sembrado'
       ? `${ha(potrero.hectareas)} ha, ${c.cultivo.toLowerCase()}`
       : c?.tipo === 'descanso'
         ? `${ha(potrero.hectareas)} ha, en descanso`
-        : `${ha(potrero.hectareas)} ha`
+        : hectareas
   return (
     <div
       ref={ref}
