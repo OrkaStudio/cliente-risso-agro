@@ -9,6 +9,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
+import { useAuth } from '@/features/auth/auth-context'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import type { CategoriaConteo } from '@/features/inicio/api'
@@ -17,7 +18,6 @@ import { ParaAtenderCampo } from '@/features/inicio/para-atender'
 import { HoyCabecera } from '@/features/inicio/hoy-cabecera'
 import { PronosticoPanel } from '@/features/cotizaciones/pronostico-panel'
 import { Panel } from '@/components/panel'
-import { PageHeader, Stat } from '@/components/page-header'
 import { fmtCompact } from '@/features/analitica/compute'
 import { cn } from '@/lib/utils'
 
@@ -291,6 +291,7 @@ function RodeoStock({ data, total }: { data: CategoriaConteo[]; total: number })
 export function InicioPage() {
   const { data, isLoading, error } = usePanoramaInicio()
   const empresa = useEmpresa()
+  const { user } = useAuth()
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -319,22 +320,44 @@ export function InicioPage() {
   })()
   const ivaEstimado = data.iva.debito - data.iva.credito - saldoIvaInicial
 
+  const nombre = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0]
+  const saludo = nombre ? `Buen día, ${nombre}.` : 'Buen día.'
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Encabezado */}
-      <PageHeader
-        title="La empresa hoy"
-        meta={
-          <>
-            {fechaLarga()} · <Stat>{campos}</Stat>{' '}
-            {campos === 1 ? 'campo' : 'campos'} ·{' '}
-            <Stat>{data.potreros.length}</Stat> potreros
-          </>
-        }
-        /* Lo urgente va acá, en el hueco al lado del título: antes vivía al
-           final de la página, debajo del pronóstico del tiempo. */
-        action={<HoyCabecera />}
-      />
+      <section className="relative isolate flex min-h-[260px] overflow-hidden rounded-[18px] bg-ink text-white sm:min-h-[300px]">
+        <img
+          src="/inicio-bienvenida.png"
+          alt="Paisaje de un campo ganadero"
+          className="absolute inset-0 -z-20 size-full object-cover"
+          fetchPriority="high"
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/75 via-black/35 to-black/5" />
+        <div className="flex max-w-2xl flex-col items-start justify-center gap-4 px-6 py-8 sm:px-10 sm:py-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/80">
+            {fechaLarga()} · {campos} {campos === 1 ? 'campo' : 'campos'} · {data.potreros.length} potreros
+          </p>
+          <h1 className="font-heading text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
+            {saludo}
+          </h1>
+          <p className="max-w-xl text-sm leading-relaxed text-white/90 sm:text-base">
+            {data.totalCabezas.toLocaleString('es-AR')} animales registrados y {data.vencimientos.length} vencimientos por revisar.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link to="/agenda" className="inline-flex min-h-10 items-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-95">
+              Ver la agenda <span aria-hidden="true" className="ml-2">→</span>
+            </Link>
+            <Link to="/campo" className="inline-flex min-h-10 items-center rounded-full border border-white/65 bg-black/15 px-5 text-sm font-semibold text-white transition hover:bg-white/15">
+              Pasar al Modo Campo
+            </Link>
+            <HoyCabecera />
+          </div>
+        </div>
+      </section>
+
+      <div id="para-atender" className="scroll-mt-6" data-guia="inicio-atender">
+        <ParaAtenderCampo />
+      </div>
 
       {/* KPIs — barra instrumental con celdas divididas por hairline */}
       <div
@@ -424,11 +447,6 @@ export function InicioPage() {
         <RodeoStock data={data.porCategoria} total={data.totalCabezas} />
       </Panel>
 
-      {/* Para atender en el campo — lo accionable de las últimas recorridas
-          (la grilla de potreros vive en Campos, donde está el mapa) */}
-      <div id="para-atender" className="scroll-mt-6" data-guia="inicio-atender">
-        <ParaAtenderCampo />
-      </div>
     </div>
   )
 }
