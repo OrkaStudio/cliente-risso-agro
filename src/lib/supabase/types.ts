@@ -279,18 +279,21 @@ export type Database = {
       }
       empresa: {
         Row: {
+          mapa_completo_at: string | null
           onboarding_completo_at: string | null
           created_at: string
           id: string
           nombre: string
         }
         Insert: {
+          mapa_completo_at?: string | null
           onboarding_completo_at?: string | null
           created_at?: string
           id?: string
           nombre: string
         }
         Update: {
+          mapa_completo_at?: string | null
           onboarding_completo_at?: string | null
           created_at?: string
           id?: string
@@ -1496,6 +1499,7 @@ export type Database = {
       }
       celular_tiene_cuenta: { Args: { p_celular: string }; Returns: boolean }
       terminar_onboarding: { Args: never; Returns: string }
+      terminar_mapa: { Args: never; Returns: string }
       crear_invitacion: {
         Args: { p_celular: string; p_nombre: string; p_rol: string }
         Returns: string

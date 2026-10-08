@@ -255,7 +255,7 @@ export function Cierre({
   const primero = campos[0]!
   const hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
   const [mandado, setMandado] = useState(false)
-  const alMapa = `/campos/${primero.id}`
+  const alMapa = `/mapa/${primero.id}`
 
   function mandarALaCompu() {
     const link = `${window.location.origin}${alMapa}`

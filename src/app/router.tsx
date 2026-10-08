@@ -13,6 +13,7 @@ import { TeInvitaronPage } from '@/features/acceso/te-invitaron-page'
 import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { RequireEmpresa } from '@/features/auth/require-empresa'
+import { RequireMapa } from '@/features/mapa/require-mapa'
 import { ResponsiveShell } from '@/app/responsive-shell'
 
 // Los shells también se cargan al entrar: el login, el registro y el
@@ -111,6 +112,9 @@ function OnboardingRuta() {
   )
 }
 
+const TutorialMapaPage = lazy(() =>
+  import('@/features/mapa/tutorial-page').then((m) => ({ default: m.TutorialMapaPage })),
+)
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -172,6 +176,27 @@ export const router = createBrowserRouter([
         element: <RequireEmpresa />,
         children: [
           {
+            // Módulo 3 · el tutorial para ubicar los campos y potreros en el mapa.
+            path: 'mapa',
+            element: (
+              <Suspense fallback={null}>
+                <TutorialMapaPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'mapa/:campoId',
+            element: (
+              <Suspense fallback={null}>
+                <TutorialMapaPage />
+              </Suspense>
+            ),
+          },
+          {
+            // Primero el campo: sin el mapa sólo andan el Inicio y Campos.
+            element: <RequireMapa />,
+            children: [
+          {
             // Gate por dispositivo: misma web, distinta navegación según el equipo.
             // Un móvil cae al Modo Campo; escritorio ve el Modo Oficina completo.
             element: <ResponsiveShell />,
@@ -216,6 +241,8 @@ export const router = createBrowserRouter([
                   { path: 'campo/historial', element: <HistorialPage /> },
                 ],
               },
+            ],
+          },
             ],
           },
         ],

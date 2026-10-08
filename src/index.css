@@ -677,3 +677,44 @@
   box-shadow: none;
   border-color: transparent;
 }
+
+/* ===== Tutorial del mapa (Tropero): etiqueta de cada potrero ===== */
+.tropero-etiqueta.leaflet-tooltip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #7a3a1c;
+  text-align: center;
+  white-space: nowrap;
+}
+.tropero-etiqueta.leaflet-tooltip::before {
+  display: none;
+}
+.tropero-etiqueta b {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+}
+.tropero-etiqueta span {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.tropero-etiqueta--activa.leaflet-tooltip {
+  color: #fbfaf6;
+}
+.tropero-etiqueta--activa b {
+  font-size: 16px;
+}
+/* El punto donde se toca cada esquina del dibujo. */
+.leaflet-container .marker-icon.leaflet-pm-draggable,
+.leaflet-container .leaflet-marker-icon.marker-icon {
+  border: 2.5px solid #b85c2e;
+  background: #fbfaf6;
+}

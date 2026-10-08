@@ -34,8 +34,8 @@ insert into auth.identities (
   now(), now(), now()
 );
 
-insert into public.empresa (id, nombre, onboarding_completo_at)
-values ('e2e00000-0000-4000-8000-0000000000e1', 'E2E Pruebas', now());
+insert into public.empresa (id, nombre, onboarding_completo_at, mapa_completo_at)
+values ('e2e00000-0000-4000-8000-0000000000e1', 'E2E Pruebas', now(), now());
 
 insert into public.miembro_empresa (user_id, empresa_id, rol)
 values ('e2e00000-0000-4000-8000-000000000001', 'e2e00000-0000-4000-8000-0000000000e1', 'dueno');

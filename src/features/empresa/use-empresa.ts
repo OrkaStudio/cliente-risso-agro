@@ -17,6 +17,8 @@ export type Membresia = {
     /** null = el dueño todavía no terminó el onboarding. Una membresía
      *  guardada de antes de este campo no lo trae: cuenta como terminado. */
     onboarding_completo_at?: string | null
+    /** null = todavía no ubicó sus campos en el mapa (la app queda cerrada). */
+    mapa_completo_at?: string | null
   } | null
 }
 
@@ -57,7 +59,7 @@ export function useEmpresa() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('miembro_empresa')
-        .select('empresa_id, rol, empresa:empresa(id, nombre, onboarding_completo_at)')
+        .select('empresa_id, rol, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at)')
         .limit(1)
         .maybeSingle()
       if (error) throw error
