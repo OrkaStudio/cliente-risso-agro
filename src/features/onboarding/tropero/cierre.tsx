@@ -152,22 +152,36 @@ function resumenDe(c: CampoOnb): string {
   ].join(' · ')
 }
 
+/** El logro: un anillo de 3 tramos (el arranque) que se completa en el primero. */
 function Arranque() {
   const reducir = useReducedMotion()
+  const r = 34
+  const c = 2 * Math.PI * r
+  const tramo = c / 3 - 6
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[13.5px] font-semibold text-texto-suave md:text-[14px]">El arranque · paso 1 de 3 completo</p>
-      <div className="flex gap-1.5" aria-hidden>
-        <span className="h-1.5 flex-1 overflow-hidden rounded-[3px] bg-superficie-hundida">
-          <motion.span
-            className="block h-full origin-left rounded-[3px] bg-principal"
-            initial={reducir ? false : { scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 0.4, delay: 1.0, ease: CURVA }}
-          />
-        </span>
-        <span className="h-1.5 flex-1 rounded-[3px] bg-superficie-hundida" />
-        <span className="h-1.5 flex-1 rounded-[3px] bg-superficie-hundida" />
+    <div className="flex items-center gap-4">
+      <div className="relative size-[88px] shrink-0">
+        <svg viewBox="0 0 88 88" className="size-full -rotate-90" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <circle key={i} cx={44} cy={44} r={r} fill="none" stroke="var(--superficie-hundida)" strokeWidth={9} strokeLinecap="round"
+              strokeDasharray={`${tramo} ${c}`} strokeDashoffset={-(i * c) / 3} />
+          ))}
+          <motion.circle cx={44} cy={44} r={r} fill="none" stroke="var(--principal)" strokeWidth={9} strokeLinecap="round"
+            strokeDasharray={`${tramo} ${c}`}
+            initial={reducir ? false : { pathLength: 0 }} animate={{ pathLength: 1 }}
+            transition={{ duration: 0.6, delay: 0.8, ease: CURVA }} />
+        </svg>
+        <motion.span
+          initial={reducir ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.35, delay: 1.3, ease: CURVA }}
+          className="absolute inset-[22px] grid place-items-center rounded-full bg-estado-bien text-superficie shadow-[0_0_0_6px_color-mix(in_srgb,var(--estado-bien)_18%,transparent)]"
+        >
+          <Icono nombre="Guardar" />
+        </motion.span>
+      </div>
+      <div>
+        <p className="titulo-display text-[22px] leading-tight text-texto">¡Primer paso logrado!</p>
+        <p className="text-[14px] font-semibold text-texto-suave">El arranque · 1 de 3</p>
       </div>
     </div>
   )
@@ -179,6 +193,7 @@ const ABRE: { icono: NombreIcono; texto: string }[] = [
   { icono: 'Hacienda', texto: 'Hacienda por potrero' },
 ]
 
+/** Lo que se desbloquea con el mapa: candados que se abren en el paso 2. */
 function LoQueSigue() {
   const reducir = useReducedMotion()
   return (
@@ -186,19 +201,21 @@ function LoQueSigue() {
       initial={reducir ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 1.4, ease: CURVA }}
-      className="flex flex-col gap-3 rounded-[20px] border border-borde bg-superficie px-[22px] py-5"
+      className="flex flex-col gap-3 rounded-[20px] border border-borde bg-superficie px-5 py-4"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[16px] font-bold text-texto md:text-[17px]">Paso 2 · Ubicarlos en el mapa</p>
-        <p className="shrink-0 text-[13.5px] font-semibold text-texto-suave">≈ 15 min</p>
+        <p className="text-[16px] font-bold text-texto">Paso 2 · el mapa desbloquea</p>
+        <p className="shrink-0 rounded-full bg-acento px-2.5 py-0.5 text-[13px] font-bold text-acento-texto">≈ 15 min</p>
       </div>
-      <p className="text-[14px] text-texto-suave">Con el mapa se abren:</p>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {ABRE.map((a) => (
-          <span key={a.texto} className="inline-flex items-center gap-1.5 rounded-full bg-superficie-hundida py-1.5 pr-3 pl-2.5 text-[13px] font-semibold text-texto">
-            <Icono nombre={a.icono} tamano={16} />
-            {a.texto}
-          </span>
+          <div key={a.texto} className="relative flex flex-col items-center gap-1.5 rounded-[14px] bg-superficie-hundida px-2 py-3 text-center">
+            <span className="absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full bg-texto/80 text-superficie">
+              <Icono nombre="Candado" tamano={16} className="size-3" />
+            </span>
+            <Icono nombre={a.icono} />
+            <span className="text-[12.5px] font-semibold leading-tight text-texto">{a.texto}</span>
+          </div>
         ))}
       </div>
     </motion.div>
@@ -330,10 +347,7 @@ export function Cierre({
         <div className="flex w-full max-w-[476px] flex-col gap-[22px]">
           <Arranque />
           <h1 className="titulo-display text-[34px] leading-[1.02] text-texto md:text-[48px]">Tus campos están cargados.</h1>
-          <p className="text-[15.5px] text-texto-suave md:text-[18px]">
-            Quedaron guardados con sus potreros y su hacienda. El último paso es ubicarlos en el mapa: con eso se abre
-            toda la app.
-          </p>
+          <p className="text-[15.5px] text-texto-suave md:text-[17px]">Falta ubicarlos en el mapa y se abre toda la app.</p>
           <LoQueSigue />
 
           {/* Compu: al mapa ahora. */}

@@ -44,7 +44,7 @@ test('de punta a punta: empresa, campo, potreros, qué hay en cada uno y el cier
   await expect(page.getByText('Paso 1 de 4')).toBeVisible()
   await empresaYCampo(page)
   await potreros(page, [['11', '116'], ['8', '45'], ['3', '192']])
-  await expect(page.getByText('3 potreros, 353 de 353 ha: cierran justo')).toBeVisible()
+  await expect(page.getByText('Cierran justo')).toBeVisible()
   await page.getByRole('button', { name: 'Guardar los 3 potreros' }).click()
 
   await expect(page.getByRole('heading', { name: '¿Qué hay en el 11A?' })).toBeVisible()
@@ -118,14 +118,14 @@ test('hectáreas que sobran y que faltan', async ({ page }) => {
   await cuentaNueva(page)
   await empresaYCampo(page, '100')
   await potreros(page, [['1', '70'], ['2', '50']])
-  await expect(page.getByText('sobran 20')).toBeVisible()
-  await page.getByRole('button', { name: 'El campo tiene 120 ha' }).click()
-  await expect(page.getByText('2 potreros, 120 de 120 ha: cierran justo')).toBeVisible()
+  await expect(page.getByText('Sobran 20 ha')).toBeVisible()
+  await page.getByRole('button', { name: 'Sí, tiene 120 ha' }).click()
+  await expect(page.getByText('Cierran justo')).toBeVisible()
 
   await page.locator('input[inputmode=decimal]').nth(1).fill('30')
-  await expect(page.getByText('Faltan 20 ha: 100 de 120')).toBeVisible()
-  await page.getByRole('button', { name: 'Sumar el potrero que falta' }).click()
-  await expect(page.getByText('3 potreros, 120 de 120 ha: cierran justo')).toBeVisible()
+  await expect(page.getByText('Faltan 20 ha')).toBeVisible()
+  await page.getByRole('button', { name: /Sumar otro potrero con las 20 ha/ }).click()
+  await expect(page.getByText('Cierran justo')).toBeVisible()
 })
 
 test('corregir un potrero ya cargado no duplica la hacienda', async ({ page }) => {

@@ -3,12 +3,14 @@ import {
   cabezasDe,
   despuesDePotrero,
   desdeCorto,
+  diasDesde,
   especiesDe,
   estadoDe,
   haceDias,
   faltaEnContenido,
   leerHectareas,
   filasRepetidas,
+  nombrePropio,
   nombresPrevistos,
   siguienteNumero,
   numeroDePaso,
@@ -163,5 +165,18 @@ describe('potreros sin nombres repetidos (B3)', () => {
     expect([...filasRepetidas(['1A', '1A', '1A'])]).toEqual([0, 1, 2])
     expect([...filasRepetidas(['1A', '2A', '1A'])]).toEqual([0, 2])
     expect(filasRepetidas(['1A', '2A', '3A']).size).toBe(0)
+  })
+})
+
+describe('nombres propios', () => {
+  it('mayúscula en cada palabra, salvo preposiciones del medio', () => {
+    expect(nombrePropio('la porteña')).toBe('La Porteña')
+    expect(nombrePropio('estancia de los pinos')).toBe('Estancia de los Pinos')
+    expect(nombrePropio('risso agro SRL')).toBe('Risso Agro SRL')
+    expect(nombrePropio('el ombú ')).toBe('El Ombú ')
+  })
+  it('días de descanso', () => {
+    expect(diasDesde('2026-08-25', new Date(2026, 9, 8, 22, 0))).toBe(44)
+    expect(diasDesde('2026-10-08', new Date(2026, 9, 8))).toBe(0)
   })
 })

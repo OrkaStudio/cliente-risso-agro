@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Aviso } from '@/components/tropero/aviso'
 import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
-import { CampoFecha } from '@/components/ui/campo-fecha'
+import { Calendario } from '@/components/tropero/calendario'
 import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { useClima } from '@/features/cotizaciones/hooks'
@@ -12,16 +12,19 @@ import { cn } from '@/lib/utils'
 import { Escena, type Lamina } from './escena'
 import type { DatosCampo, FilaPotrero } from './guardar'
 import { LocalidadCampo } from './localidad-campo'
+import { MedidorHectareas } from './medidor'
 import {
   cabezasDe,
   CULTIVOS,
   ATAJOS_DESCANSO,
+  diasDesde,
   faltaEnContenido,
   haceDias,
   ha,
   leerHectareas,
   letraDeCampo,
   filasRepetidas,
+  nombrePropio,
   nombresPrevistos,
   siguienteNumero,
   sumaDePotreros,
@@ -114,7 +117,7 @@ export function PasoEmpresa({ inicial, onCrear }: { inicial: string; onCrear: (n
           autoFocus
           placeholder="Risso Agro"
           onChange={(e) => {
-            setNombre(e.target.value)
+            setNombre(nombrePropio(e.target.value))
             setFalta(false)
           }}
           error={falta ? 'Falta el nombre de la empresa.' : (error ?? undefined)}
@@ -202,19 +205,19 @@ export function PasoCampo({
           placeholder="La Porteña"
           maxLength={60}
           autoFocus={!existente}
-          onChange={(e) => setNombre(e.target.value)}
+          onChange={(e) => setNombre(nombrePropio(e.target.value))}
           error={intento ? errores.nombre : undefined}
         />
         <LocalidadCampo valor={localidad} onCambio={setLocalidad} error={intento ? errores.localidad : undefined} />
         <div className="flex flex-col gap-2">
-          <span className="text-[14px] font-semibold text-texto md:text-[14.5px]">Es</span>
+          <span className="text-[14px] font-semibold text-texto md:text-[14.5px]">¿Es tuyo o lo alquilás?</span>
           <Segmentos
             etiqueta="El campo es"
             valor={tipo}
             onCambio={setTipo}
             opciones={[
-              { valor: 'propio', texto: 'Propio' },
-              { valor: 'alquilado', texto: 'Alquilado' },
+              { valor: 'propio', texto: 'Es mío' },
+              { valor: 'alquilado', texto: 'Lo alquilo' },
             ]}
           />
           {tipo === 'alquilado' && (
@@ -384,55 +387,31 @@ export function PasoPotreros({
           )
         })}
       </div>
-      <BotonChico type="button" icono="Agregar" className="self-start" onClick={() => setFilas((xs) => [...xs, nuevaFila(siguiente())])}>
-        Sumar otro potrero
+      {/* Un solo botón: si faltan hectáreas, el potrero nuevo ya trae las que faltan. */}
+      <BotonChico
+        type="button"
+        icono="Agregar"
+        className="self-start"
+        onClick={() =>
+          setFilas((xs) => [...xs, nuevaFila(siguiente(), suma.estado === 'faltan' ? ha(suma.diferencia) : '')])
+        }
+      >
+        {suma.estado === 'faltan' ? `Sumar otro potrero con las ${ha(suma.diferencia)} ha que faltan` : 'Sumar otro potrero'}
       </BotonChico>
 
       {repetidas.size > 0 && (
-        <Aviso tipo="problema" icono="Cerrar" titulo={`Ya hay un ${nombres[[...repetidas][0]!]}`}>
-          Cada potrero lleva su propio número. Cambiá uno de los que están marcados.
-        </Aviso>
+        <Aviso tipo="problema" icono="Cerrar" titulo={`Ya hay un ${nombres[[...repetidas][0]!]}: cambiá uno de los marcados`} />
       )}
       {suma.estado === 'incompleto' && intento && (
-        <Aviso tipo="problema" icono="Cerrar" titulo="Faltan hectáreas">
-          Cada potrero necesita sus hectáreas.
-        </Aviso>
+        <Aviso tipo="problema" icono="Cerrar" titulo="Cada potrero necesita sus hectáreas" />
       )}
-      {suma.estado === 'cierran' && repetidas.size === 0 && (
-        <Aviso tipo="bien" icono="Guardar" titulo={`${cantidad} ${cantidad === 1 ? 'potrero' : 'potreros'}, ${ha(suma.suma)} de ${ha(campo.hectareas)} ha: cierran justo`} />
-      )}
-      {suma.estado === 'sobran' && (
-        <Aviso
-          tipo="atencion"
-          icono="Ayuda"
-          titulo={`Los potreros suman ${ha(suma.suma)} ha y el campo tiene ${ha(campo.hectareas)}: sobran ${ha(suma.diferencia)}`}
-        >
-          <span>¿El campo es más grande o sobra un potrero?</span>
-          <span className="mt-2.5 flex flex-wrap gap-2">
-            <BotonChico type="button" disabled={ocupado} onClick={() => void correr(() => onCorregirHectareas(suma.suma))}>
-              El campo tiene {ha(suma.suma)} ha
-            </BotonChico>
-          </span>
-        </Aviso>
-      )}
-      {suma.estado === 'faltan' && (
-        <Aviso
-          tipo="atencion"
-          icono="Ayuda"
-          titulo={`Faltan ${ha(suma.diferencia)} ha: ${ha(suma.suma)} de ${ha(campo.hectareas)}`}
-        >
-          <span>Si guardás así, quedan sin potrero y las dibujás en el mapa.</span>
-          <span className="mt-2.5 flex flex-wrap gap-2">
-            <BotonChico
-              type="button"
-              icono="Agregar"
-              onClick={() => setFilas((xs) => [...xs, nuevaFila(siguiente(), ha(suma.diferencia))])}
-            >
-              Sumar el potrero que falta
-            </BotonChico>
-          </span>
-        </Aviso>
-      )}
+      <MedidorHectareas
+        total={campo.hectareas}
+        potreros={filas.map((_, i) => ({ nombre: nombres[i]!, hectareas: hs[i] && hs[i]! > 0 ? hs[i]! : 0 }))}
+        suma={suma}
+        ocupado={ocupado}
+        onCampoMasGrande={(n) => void correr(() => onCorregirHectareas(n))}
+      />
       {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
     </OnboardingLayout>
   )
@@ -624,7 +603,7 @@ export function PasoQueHay({
       {tipo === 'descanso' && (
         <div className="flex flex-col gap-2.5">
           <span className="text-[14px] font-semibold text-texto md:text-[14.5px]">
-            Desde cuándo descansa <span className="font-normal text-texto-suave">(aproximado)</span>
+            ¿Desde cuándo descansa? <span className="font-normal text-texto-suave">Aproximado alcanza</span>
           </span>
           <div className="flex flex-wrap gap-2">
             {ATAJOS_DESCANSO.map((a) => {
@@ -646,14 +625,13 @@ export function PasoQueHay({
               )
             })}
           </div>
-          <CampoFecha
-            value={desde}
-            onChange={setDesde}
-            max={haceDias(0, new Date())}
-            ariaLabel="Desde cuándo descansa"
-            className="h-14 rounded-2xl border-[1.5px] border-borde bg-superficie px-[18px] text-[16px] font-normal text-texto"
-          />
-          <p className="text-[12.5px] text-texto-suave">Con una fecha aproximada alcanza: sirve para saber cuántos días lleva descansando.</p>
+          {desde && (
+            <p className="text-texto">
+              <span className="titulo-display text-[30px]">{diasDesde(desde, new Date())} días</span>
+              <span className="text-[15px] font-semibold text-texto-suave"> descansando</span>
+            </p>
+          )}
+          <Calendario valor={desde} onCambio={setDesde} max={haceDias(0, new Date())} etiqueta="Desde cuándo descansa" />
         </div>
       )}
       {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}

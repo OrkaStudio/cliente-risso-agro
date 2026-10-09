@@ -253,3 +253,26 @@ export function filasRepetidas(nombres: string[]): Set<number> {
   nombres.forEach((n, i) => vistos.set(n, [...(vistos.get(n) ?? []), i]))
   return new Set([...vistos.values()].filter((is) => is.length > 1).flat())
 }
+
+const MINUSCULAS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en'])
+
+/**
+ * Nombres propios (empresa, campo) con mayúscula, como se escriben:
+ * «la porteña» → «La Porteña», «estancia de los pinos» → «Estancia de los Pinos».
+ * La primera palabra siempre va con mayúscula; las preposiciones y artículos
+ * del medio, no. Lo que ya viene en mayúscula se respeta (siglas como «SRL»).
+ */
+export function nombrePropio(texto: string): string {
+  return texto.replace(/[^\s]+/g, (p, i: number) => {
+    if (i > 0 && MINUSCULAS.has(p.toLowerCase())) return p.toLowerCase()
+    return p.charAt(0).toLocaleUpperCase('es-AR') + p.slice(1)
+  })
+}
+
+/** Días entre la fecha guardada y hoy (para «descansa hace 44 días»). */
+export function diasDesde(fecha: string, hoy: Date): number {
+  const [a, m, d] = fecha.split('-').map(Number)
+  const desde = new Date(a!, m! - 1, d!)
+  const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  return Math.max(0, Math.round((h.getTime() - desde.getTime()) / 86_400_000))
+}

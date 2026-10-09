@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Icono } from '@/components/tropero/icono'
+import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { repartir } from '@/features/onboarding/croquis-layout'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import type { Especie } from '@/features/hacienda/labels'
-import { cabezasDe, desdeCorto, especiesDe, ha, ICONO_ESPECIE, type PotreroOnb } from './modelo'
+import { MarcaCultivo } from './marcas'
+import { cabezasDe, diasDesde, especiesDe, ha, ICONO_ESPECIE, type PotreroOnb } from './modelo'
 
 const NOMBRE_ESPECIE: Record<Especie, string> = { bovino: 'Vacunos', ovino: 'Ovinos', equino: 'Equinos' }
 
@@ -191,72 +192,98 @@ function Mosaico({
 function Potrero({ potrero, activo, compacta }: { potrero: PotreroOnb; activo: boolean; compacta: boolean }) {
   const [ref, { w, h }] = useMedida<HTMLDivElement>()
   const c = potrero.contenido
-  const chico = w < 70 || h < 46
+  const pad = compacta ? 10 : 18
+  const chico = w < 64 || h < 44
   const cabezas = cabezasDe(c)
-  // El número grande (cabezas o cultivo) sólo si hay lugar de verdad.
-  const grande = Math.min(h * 0.32, w * 0.3, compacta ? 40 : 64)
-  const hectareas = potrero.hectareas > 0 ? `${ha(potrero.hectareas)} ha` : '— ha'
-  // El cultivo en grande, si entra; si no, va en la línea chica (nunca los dos).
-  const cultivoGrande = c?.tipo === 'sembrado' && grande >= 22
-  const detalle =
-    c?.tipo === 'sembrado'
-      ? cultivoGrande
-        ? hectareas
-        : `${hectareas}, ${c.cultivo.toLowerCase()}`
-      : c?.tipo === 'descanso'
-        ? `${hectareas}, en descanso ${c.desde ? desdeCorto(c.desde) : ''}`.trim()
-        : hectareas
   const especies = especiesDe(c)
+  // Lo que se dibuja (íconos, número, cultivo) se mide contra el lugar que hay:
+  // aparece siempre, más chico en un potrero angosto.
+  const libreW = Math.max(0, w - pad * 2)
+  const libreH = Math.max(0, h - pad * 2)
+  const icono = Math.max(14, Math.min(compacta ? 22 : 30, libreW * 0.32, (libreH - 6) / Math.max(1, especies.length) - 6))
+  const grande = Math.max(16, Math.min(libreH * 0.34, libreW * 0.42, compacta ? 40 : 64))
+  const hectareas = potrero.hectareas > 0 ? `${ha(potrero.hectareas)} ha` : '— ha'
+  const dias = c?.tipo === 'descanso' && c.desde ? diasDesde(c.desde, new Date()) : null
   return (
     <div
       ref={ref}
       className={cn(
-        'relative flex size-full flex-col overflow-hidden rounded-2xl border-2 transition-colors duration-300',
-        compacta ? 'p-2.5' : 'p-[18px]',
+        'relative flex size-full overflow-hidden rounded-2xl border-2 transition-colors duration-300',
         c?.tipo === 'hacienda'
           ? 'border-principal bg-principal text-principal-texto'
           : c?.tipo === 'sembrado'
             ? 'border-acento bg-acento text-acento-texto'
             : c?.tipo === 'descanso'
-              ? 'border-estado-bien-suave bg-estado-bien-suave text-texto'
+              ? 'border-estado-bien/30 bg-estado-bien-suave text-estado-bien-texto'
               : 'border-borde bg-superficie text-texto',
         activo && (c ? 'ring-[3px] ring-terracota-700 ring-inset' : 'border-[4px] border-principal'),
       )}
-      style={
-        c?.tipo === 'sembrado'
+      style={{
+        padding: pad,
+        ...(c?.tipo === 'sembrado'
           ? {
               backgroundImage:
                 'repeating-linear-gradient(-55deg, transparent 0 22px, color-mix(in srgb, var(--acento-texto) 14%, transparent) 22px 24px)',
             }
-          : undefined
-      }
+          : c?.tipo === 'descanso'
+            ? {
+                // Pasto que crece: matas suaves, sin texto encima.
+                backgroundImage:
+                  'radial-gradient(circle at 20% 80%, color-mix(in srgb, var(--estado-bien) 16%, transparent) 0 3px, transparent 4px), radial-gradient(circle at 70% 40%, color-mix(in srgb, var(--estado-bien) 12%, transparent) 0 2.5px, transparent 3.5px)',
+                backgroundSize: '28px 28px, 22px 22px',
+              }
+            : {}),
+      }}
     >
-      <div className="flex items-start justify-between gap-1">
-        <p className={cn('truncate font-heading font-extrabold', chico ? 'text-[12px]' : compacta ? 'text-[15px]' : 'text-[22px]')}>
+      {/* Izquierda: nombre, hectáreas y el dato grande. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <p className={cn('truncate font-heading font-extrabold leading-tight', chico ? 'text-[12px]' : compacta ? 'text-[15px]' : 'text-[22px]')}>
           {potrero.nombre}
         </p>
-        {especies.length > 0 && !chico && (
-          <span className="flex shrink-0 gap-1">
-            {especies.map((e) => (
-              <Icono key={e} nombre={ICONO_ESPECIE[e]} tamano={compacta ? 16 : 24} titulo={NOMBRE_ESPECIE[e]} />
-            ))}
-          </span>
+        {!chico && (
+          <p className={cn('truncate font-semibold opacity-80', compacta ? 'text-[11.5px]' : 'text-[14px]')}>{hectareas}</p>
+        )}
+        {c?.tipo === 'hacienda' && cabezas > 0 && libreH > 60 && (
+          <p className="titulo-display mt-auto leading-none" style={{ fontSize: grande }}>
+            {cabezas}
+          </p>
+        )}
+        {c?.tipo === 'sembrado' && libreH > 60 && libreW > 70 && (
+          <p className="titulo-display mt-auto truncate leading-none" style={{ fontSize: Math.min(grande, libreW / Math.max(4, c.cultivo.length) * 1.6) }}>
+            {c.cultivo}
+          </p>
+        )}
+        {dias !== null && libreH > 60 && (
+          <div className="mt-auto">
+            <p className="titulo-display leading-none" style={{ fontSize: grande }}>
+              {dias} {dias === 1 ? 'día' : 'días'}
+            </p>
+            <p className={cn('font-semibold opacity-80', compacta ? 'text-[11px]' : 'text-[13.5px]')}>descansando</p>
+          </div>
         )}
       </div>
-      {!chico && (
-        <p className={cn('truncate font-semibold opacity-80', compacta ? 'text-[11.5px]' : 'text-[14px]')}>{detalle}</p>
-      )}
-      {grande >= 22 && c?.tipo === 'hacienda' && cabezas > 0 && (
-        <p className="titulo-display mt-auto leading-none" style={{ fontSize: grande }}>
-          {cabezas}
-        </p>
-      )}
-      {cultivoGrande && (
-        <p className="titulo-display mt-auto truncate leading-none" style={{ fontSize: grande * 0.9 }}>
-          {c.cultivo}
-        </p>
+      {/* Derecha: una columna con lo que hay (cada especie, o el cultivo). */}
+      {(especies.length > 0 || c?.tipo === 'sembrado' || c?.tipo === 'descanso') && (
+        <div className="flex shrink-0 flex-col items-center gap-1.5 pl-1">
+          {especies.map((e) => (
+            <span key={e} className="grid place-items-center rounded-full bg-black/10" style={{ width: icono + 8, height: icono + 8 }}>
+              <IconoEscalado nombre={ICONO_ESPECIE[e]} tamano={icono} titulo={NOMBRE_ESPECIE[e]} />
+            </span>
+          ))}
+          {c?.tipo === 'sembrado' && <MarcaCultivo cultivo={c.cultivo} tamano={Math.max(18, icono * 1.2)} />}
+          {c?.tipo === 'descanso' && <IconoEscalado nombre="Agua" tamano={icono} titulo="En descanso" />}
+        </div>
       )}
     </div>
+  )
+}
+
+/** Un ícono del set a cualquier tamaño (el set viene en 16 y 24). */
+function IconoEscalado({ nombre, tamano, titulo }: { nombre: NombreIcono; tamano: number; titulo?: string }) {
+  return (
+    <span style={{ width: tamano, height: tamano }} className="grid place-items-center">
+      <Icono nombre={nombre} titulo={titulo} className="size-full" />
+    </span>
   )
 }
 
