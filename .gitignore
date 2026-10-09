@@ -49,3 +49,4 @@ dist-ssr
 *.local.mjs
 auditoria-shots/
 *.local.py
+.vitest/
