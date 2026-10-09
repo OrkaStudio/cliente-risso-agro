@@ -84,6 +84,7 @@ export function FormDialog({
   footer,
   children,
   className,
+  sidePanel = false,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -96,13 +97,16 @@ export function FormDialog({
   children: ReactNode
   /** Override del ancho del diálogo (por defecto sm:max-w-[470px]). */
   className?: string
+  sidePanel?: boolean
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
+        sidePanel={sidePanel}
         className={cn(
           'flex max-h-[90svh] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[470px]',
+          sidePanel && 'h-[100dvh] max-h-[100dvh] max-w-[540px] rounded-l-2xl rounded-r-none sm:max-w-[540px]',
           className,
         )}
       >

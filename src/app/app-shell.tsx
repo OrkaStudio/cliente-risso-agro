@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Leaf,
   LogOut,
+  Menu,
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
@@ -26,6 +27,8 @@ import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { MARCA } from '@/lib/marca'
+import { useIsMobile } from '@/lib/use-is-mobile'
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { contarHoy, useParaAtender } from '@/features/inicio/para-atender-api'
 
@@ -103,6 +106,7 @@ function initials(email?: string) {
 
 export function AppShell() {
   useMedirPuestaAPunto()
+  const isMobile = useIsMobile()
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
 
@@ -146,7 +150,7 @@ export function AppShell() {
       {/* ===== Sidebar ===== */}
       <aside
         className={cn(
-          'm-4 flex h-[calc(100%-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out',
+          'm-4 hidden h-[calc(100%-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out md:flex',
           collapsed ? 'w-[76px]' : 'w-[248px]',
         )}
       >
@@ -277,19 +281,25 @@ export function AppShell() {
       </aside>
 
       {/* ===== Columna principal ===== */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Topbar */}
         <motion.header {...entra(0.15)} className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
           <div className="hidden shrink-0 font-heading text-sm font-semibold text-sidebar-foreground sm:block">
             {fechaHoy()}
           </div>
 
+          {isMobile && (
+            <OficinaMobileMenu
+              empresaNombre={membresia?.empresa?.nombre ?? MARCA}
+              onSignOut={signOut}
+            />
+          )}
           <Ticker />
         </motion.header>
 
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
             burbuja flotante del Asistente (no tapa la última card). */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
             className="w-full px-4 pb-12 pt-7 sm:px-6"
@@ -317,6 +327,53 @@ export function AppShell() {
       <AsistentePanel />
       <PuestaAPunto />
     </div>
+  )
+}
+
+/** La Oficina es una opción explícita en teléfono; su menú no ocupa el ancho del contenido. */
+function OficinaMobileMenu({ empresaNombre, onSignOut }: {
+  empresaNombre: string
+  onSignOut: () => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        aria-label="Abrir menú de Oficina"
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground hover:bg-sidebar-accent"
+      >
+        <Menu className="size-5" aria-hidden="true" />
+      </DialogTrigger>
+      <DialogContent>
+        <DialogTitle>Modo Oficina</DialogTitle>
+        <DialogDescription>{empresaNombre}</DialogDescription>
+        <nav aria-label="Secciones de Oficina" className="flex flex-col gap-1">
+          {NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={() => setOpen(false)}
+              className={({ isActive }) => cn(
+                'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold',
+                isActive ? 'bg-secondary text-principal' : 'text-ink hover:bg-secondary',
+              )}
+            >
+              <Icon className="size-5" aria-hidden="true" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); void onSignOut() }}
+          className="flex items-center gap-3 border-t border-border px-3 pt-3 text-sm text-texto-suave"
+        >
+          <LogOut className="size-5" aria-hidden="true" />
+          Cerrar sesión
+        </button>
+      </DialogContent>
+    </Dialog>
   )
 }
 

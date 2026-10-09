@@ -14,6 +14,7 @@ function invalidarMovs(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['movimientos'] })
   qc.invalidateQueries({ queryKey: ['pendientes'] })
   qc.invalidateQueries({ queryKey: ['cheques'] })
+  qc.invalidateQueries({ queryKey: ['vencimientos'] })
   qc.invalidateQueries({ queryKey: ['panorama-inicio'] })
 }
 

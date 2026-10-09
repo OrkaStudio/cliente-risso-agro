@@ -22,6 +22,8 @@ export function ResponsiveShell() {
   const forceOficina = useForceOficina()
   const location = useLocation()
   const enCampo = location.pathname.startsWith('/campo')
+  const rutaOficina = `${location.pathname}${location.search}${location.hash}`
+  const regresoResponsive = (location.state as { regresoResponsive?: string } | null)?.regresoResponsive
   // Recién terminó el onboarding: la app entra con un fundido, no de golpe.
   // Se decide una vez al montar (navegar dentro de la app no lo repite).
   const quieto = useReducedMotion()
@@ -30,9 +32,13 @@ export function ResponsiveShell() {
     () => !quieto && isMobile && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
   )
 
+  if (!isMobile && !forceOficina && enCampo && regresoResponsive) {
+    return <Navigate to={regresoResponsive} replace state={null} />
+  }
+
   // Teléfono, sin override y parado en una ruta de Oficina → al Modo Campo.
   if (isMobile && !forceOficina && !enCampo) {
-    return <Navigate to="/campo" replace />
+    return <Navigate to="/campo" replace state={{ regresoResponsive: rutaOficina }} />
   }
 
   return (
