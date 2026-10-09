@@ -66,11 +66,15 @@ test('de punta a punta: borde a mano, los dos potreros y se abre la app', async 
   await page.getByRole('button', { name: 'Empezar' }).click()
   await expect(page.getByRole('heading', { name: 'Encontrá tu campo' })).toBeVisible()
   await page.getByRole('button', { name: 'Ya lo veo' }).click()
-  await page.getByRole('button', { name: 'No la tengo: lo marco en el mapa' }).click()
+  await page.getByRole('button', { name: 'Lo marco a mano' }).click()
   await expect(page.getByRole('heading', { name: 'Clic en cada esquina' })).toBeVisible()
 
   await dibujar(page, [[260, 260], [680, 240], [700, 640], [280, 660]])
   await expect(page.getByRole('heading', { name: /La Porteña mide unas \d+ ha/ })).toBeVisible()
+  // Dibujado a mano no cuadra con las 100 ha del alta: no deja seguir sin decidir.
+  await expect(page.getByText('No cuadra con el alta')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Seguir con los potreros' })).toHaveCount(0)
+  await page.getByRole('button', { name: /Sí, mide \d+ ha: lo corrijo/ }).click()
   await page.getByRole('button', { name: 'Seguir con los potreros' }).click()
 
   await expect(page.getByRole('heading', { name: 'Dibujá un potrero' })).toBeVisible()
@@ -97,4 +101,39 @@ test('de punta a punta: borde a mano, los dos potreros y se abre la app', async 
   // La app quedó abierta.
   await page.goto('/hacienda')
   await expect(page).toHaveURL(/\/hacienda$/)
+})
+
+test('tocando el campo trae el borde del catastro y lo compara con el alta', async ({ page }) => {
+  // ARBA simulado: devuelve una parcela de 1 km de lado (100 ha) alrededor del punto tocado.
+  await page.route('**/geo.arba.gov.ar/**', async (route) => {
+    const cql = new URL(route.request().url()).searchParams.get('CQL_FILTER') ?? ''
+    const [lng, lat] = cql.match(/POINT\(([-\d.]+) ([-\d.]+)\)/)!.slice(1).map(Number) as [number, number]
+    const dLat = 0.5 / 111.32
+    const dLng = 0.5 / (111.32 * Math.cos((lat * Math.PI) / 180))
+    const anillo = [
+      [lng - dLng, lat - dLat],
+      [lng + dLng, lat - dLat],
+      [lng + dLng, lat + dLat],
+      [lng - dLng, lat + dLat],
+      [lng - dLng, lat - dLat],
+    ]
+    await route.fulfill({
+      json: {
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', properties: { cca: '999', ara1: 1_000_000 }, geometry: { type: 'MultiPolygon', coordinates: [[anillo]] } }],
+      },
+    })
+  })
+  await empresaConOnboarding(page)
+  await page.getByRole('button', { name: 'Ubicar La Porteña en el mapa' }).click()
+  await page.getByRole('button', { name: 'Empezar' }).click()
+  await page.getByRole('button', { name: 'Ya lo veo' }).click()
+  await expect(page.getByRole('heading', { name: 'Hacé clic en tu campo' })).toBeVisible()
+  await page.mouse.click(480, 450)
+  await expect(page.getByRole('heading', { name: '¿Es este tu campo?' })).toBeVisible()
+  await expect(page.getByText('Coincide con el alta')).toBeVisible()
+  await page.getByRole('button', { name: 'Sí, es este' }).click()
+  await expect(page.getByRole('heading', { name: /La Porteña mide unas 100 ha/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Seguir con los potreros' }).click()
+  await expect(page.getByRole('heading', { name: 'Dibujá un potrero' })).toBeVisible()
 })

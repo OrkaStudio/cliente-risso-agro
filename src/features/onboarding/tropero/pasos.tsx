@@ -625,8 +625,9 @@ export function PasoQueHay({
               )
             })}
           </div>
+          {/* En compu el potrero de la escena ya lo dice en grande. */}
           {desde && (
-            <p className="text-texto">
+            <p className="text-texto md:hidden">
               <span className="titulo-display text-[30px]">{diasDesde(desde, new Date())} días</span>
               <span className="text-[15px] font-semibold text-texto-suave"> descansando</span>
             </p>

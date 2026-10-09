@@ -6,6 +6,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 // campo-mapa-real.tsx, mismo motivo).
 if (typeof window !== 'undefined') (window as unknown as { L: typeof L }).L = L
 await import('@geoman-io/leaflet-geoman-free')
+import { cn } from '@/lib/utils'
 import type { LatLng, PotreroMapa } from './reglas'
 import { ponerSatelite } from './satelite'
 
@@ -15,7 +16,10 @@ const TRIGO = '#ecc46a'
 const HUESO = '#fbfaf6'
 const SUAVE = '#f5e2d8'
 
-export type ModoMapa = 'mirar' | 'borde' | 'ajustar' | 'potrero'
+export type ModoMapa = 'mirar' | 'tocar' | 'borde' | 'ajustar' | 'potrero'
+
+/** La guía animada sobre el mapa: dónde y qué gesto hacer. Sin `en`, va al centro. */
+export type Guia = { tipo: 'tocar' | 'arrastrar' | 'esquinas'; en?: LatLng; texto?: string }
 
 export type MapaTutorialApi = {
   /** Saca el último punto del dibujo en curso. */
@@ -46,17 +50,24 @@ export const MapaTutorial = forwardRef<
     onDibujo?: (p: LatLng[]) => void
     onPuntos?: (n: number) => void
     onAjuste?: (p: LatLng[]) => void
+    /** Modo «tocar»: el punto donde tocó (para buscar la parcela). */
+    onToque?: (lat: number, lng: number) => void
+    /** Una parcela propuesta (catastro), en trigo, esperando confirmación. */
+    candidato?: LatLng[] | null
+    guia?: Guia | null
     className?: string
   }
 >(function MapaTutorial(
-  { centro, contorno, potreros, borrador, borradorNombre, modo, onDibujo, onPuntos, onAjuste, className },
+  { centro, contorno, potreros, borrador, borradorNombre, modo, onDibujo, onPuntos, onAjuste, onToque, candidato, guia, className },
   api,
 ) {
   const host = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
   const capas = useRef<L.LayerGroup | null>(null)
-  const cb = useRef({ onDibujo, onPuntos, onAjuste })
-  cb.current = { onDibujo, onPuntos, onAjuste }
+  const cb = useRef({ onDibujo, onPuntos, onAjuste, onToque })
+  cb.current = { onDibujo, onPuntos, onAjuste, onToque }
+  const modoRef = useRef(modo)
+  modoRef.current = modo
 
   // Montar una sola vez.
   useEffect(() => {
@@ -87,6 +98,9 @@ export const MapaTutorial = forwardRef<
         const n = ((e.workingLayer as L.Polyline).getLatLngs() as L.LatLng[]).length
         cb.current.onPuntos?.(n)
       })
+    })
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      if (modoRef.current === 'tocar') cb.current.onToque?.(e.latlng.lat, e.latlng.lng)
     })
     map.on('pm:create', (e: { layer: L.Layer }) => {
       const p = ring(e.layer as L.Polygon)
@@ -129,12 +143,18 @@ export const MapaTutorial = forwardRef<
         })
         .addTo(g)
     }
+    if (candidato) {
+      L.polygon(candidato, { color: TRIGO, weight: 4, dashArray: '10 8', fillColor: TRIGO, fillOpacity: 0.28, interactive: false }).addTo(g)
+    }
+    if (guia?.en) {
+      L.marker(guia.en, { icon: L.divIcon({ className: 'tropero-guia-ancla', html: htmlGuia(guia), iconSize: [0, 0] }), interactive: false }).addTo(g)
+    }
     if (borrador) {
       const l = L.polygon(borrador, { color: HUESO, weight: 2.5, fillColor: TERRACOTA, fillOpacity: 0.88, interactive: false }).addTo(g)
       if (borradorNombre)
         l.bindTooltip(`<b>${borradorNombre}</b>`, { permanent: true, direction: 'center', className: 'tropero-etiqueta tropero-etiqueta--activa' })
     }
-  }, [contorno, potreros, borrador, borradorNombre, modo])
+  }, [contorno, potreros, borrador, borradorNombre, modo, candidato, guia])
 
   // El modo: dibujar el borde o un potrero, o ajustar el borde arrastrando puntos.
   useEffect(() => {
@@ -180,5 +200,27 @@ export const MapaTutorial = forwardRef<
     },
   }))
 
-  return <div ref={host} className={className} />
+  return (
+    <div className={cn('relative', modo === 'tocar' && '[&_.leaflet-container]:cursor-pointer', className)}>
+      {/* La clase del host no cambia nunca: Leaflet le agrega las suyas y un re-render las borraría. */}
+      <div ref={host} className="size-full" />
+      {guia && !guia.en && (
+        <div
+          className="pointer-events-none absolute top-1/2 left-1/2 z-[450]"
+          dangerouslySetInnerHTML={{ __html: htmlGuia(guia) }}
+        />
+      )}
+    </div>
+  )
 })
+
+/** El gesto animado (CSS en index.css, «Guía sobre el mapa»). */
+function htmlGuia(g: Guia): string {
+  const mano =
+    '<svg class="guia-mano" viewBox="0 0 24 24" width="44" height="44"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0-1.5a1.5 1.5 0 0 1 3 0V11m0-1a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-1a6 6 0 0 1-4.9-2.6L4.3 14a1.6 1.6 0 0 1 2.5-2l2.2 2.3" fill="#fbfaf6" stroke="#131b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  const texto = g.texto ? `<span class="guia-texto">${g.texto}</span>` : ''
+  if (g.tipo === 'esquinas') {
+    return `<div class="guia guia--esquinas"><svg class="guia-forma" viewBox="0 0 140 100" width="140" height="100"><path d="M10 10 L130 14 L126 90 L14 86 Z" /></svg>${mano}${texto}</div>`
+  }
+  return `<div class="guia guia--${g.tipo}"><span class="guia-onda"></span>${mano}${texto}</div>`
+}

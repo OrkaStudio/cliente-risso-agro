@@ -8,7 +8,7 @@ import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { useAuth } from '@/features/auth/auth-context'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { buscarParcelaRural } from '@/features/lotes/catastro'
+import { buscarParcelaRural, parcelaEnPunto } from '@/features/lotes/catastro'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
 import ejemplo from '@/assets/tropero/campo-armado-ejemplo.webp'
@@ -16,16 +16,16 @@ import {
   asignarDibujo,
   buscarLugar,
   campoDeUnSoloPotrero,
+  corregirHectareasCampo,
   crearPotreroDibujado,
   guardarBorde,
   terminarMapa,
   useMapa,
   type Lugar,
 } from './api'
-import { Demo } from './demo'
 import { LayoutMapa, PasoDe, Pista } from './layout'
 import { abrirSoporte } from './soporte'
-import { MapaTutorial, type MapaTutorialApi, type ModoMapa } from './mapa-tutorial'
+import { MapaTutorial, type Guia, type MapaTutorialApi, type ModoMapa } from './mapa-tutorial'
 import {
   campoPendiente,
   candidatos,
@@ -54,10 +54,11 @@ type Paso =
   | { e: 'celu' }
   | { e: 'bienvenida' }
   | { e: 'encontrar'; buscando: boolean }
-  | { e: 'como-borde' }
+  | { e: 'tocar'; buscando: boolean; aviso?: string }
+  | { e: 'parcela'; borde: LatLng[] }
   | { e: 'boleta' }
   | { e: 'marcar' }
-  | { e: 'borde-listo'; borde: LatLng[]; ajustando: boolean }
+  | { e: 'borde-listo'; borde: LatLng[]; ajustando: boolean; altaCorregida?: boolean }
   | { e: 'sin-potreros' }
   | { e: 'dibujar'; aviso?: string }
   | { e: 'cual'; dibujo: LatLng[] }
@@ -146,7 +147,9 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
 
   // ===== El mapa, según el paso =====
   const modo: ModoMapa =
-    paso.e === 'marcar'
+    paso.e === 'tocar' || paso.e === 'parcela'
+      ? 'tocar'
+      : paso.e === 'marcar'
       ? 'borde'
       : paso.e === 'borde-listo' && paso.ajustando
         ? 'ajustar'
@@ -154,6 +157,33 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           ? 'potrero'
           : 'mirar'
   const contornoVisible = paso.e === 'borde-listo' ? paso.borde : (campo?.contorno ?? null)
+  const esBA = !!campo?.provincia.includes('Buenos Aires')
+  // La guía animada sobre el mapa real: qué gesto hacer y dónde.
+  const guia: Guia | null =
+    paso.e === 'encontrar' && !paso.buscando
+      ? { tipo: 'arrastrar', texto: 'Arrastrá hasta ver tus alambrados' }
+      : paso.e === 'tocar' && !paso.buscando
+        ? { tipo: 'tocar', texto: movil ? 'Tocá adentro de tu campo' : 'Hacé clic adentro de tu campo' }
+        : paso.e === 'marcar' && puntos === 0
+          ? { tipo: 'esquinas', texto: 'Esquina por esquina, siguiendo el alambrado' }
+          : paso.e === 'dibujar' && puntos === 0 && ubicados.length === 0 && campo?.contorno
+            ? { tipo: 'esquinas', en: centroDe(campo.contorno), texto: 'Dibujá un potrero acá adentro' }
+            : null
+
+  async function alTocar(lat: number, lng: number) {
+    setPaso({ e: 'tocar', buscando: true })
+    try {
+      const p = await parcelaEnPunto(lat, lng)
+      if (!p) {
+        setPaso({ e: 'tocar', buscando: false, aviso: 'Ahí no hay una parcela del catastro. Tocá más adentro del campo.' })
+        return
+      }
+      mapa.current?.encuadrar(p.anillo as LatLng[])
+      setPaso({ e: 'parcela', borde: p.anillo as LatLng[] })
+    } catch (e) {
+      setPaso({ e: 'tocar', buscando: false, aviso: e instanceof Error ? e.message : 'No pudimos buscar la parcela.' })
+    }
+  }
   const borrador = paso.e === 'cual' || paso.e === 'nuevo' ? paso.dibujo : null
   const listo = paso.e === 'potrero-listo' ? campo?.potreros.find((p) => p.id === paso.id) : undefined
 
@@ -184,9 +214,10 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
   const mapaEl =
     paso.e === 'bienvenida' || paso.e === 'celu' ? (
       <div className="relative size-full">
-        <img src={ejemplo} alt="Ejemplo de un campo armado: el borde, los potreros y lo que hay en cada uno" className="size-full object-cover" />
-        <span className="absolute bottom-6 left-6 rounded-full bg-acento px-3.5 py-1.5 text-[13px] font-bold text-acento-texto max-md:hidden">
-          Ejemplo: así queda un campo armado
+        <img src={ejemplo} alt="Ejemplo de un campo armado: el borde, los potreros y lo que hay en cada uno" className="size-full object-cover object-[50%_40%]" />
+        {/* El cartel va arriba a la derecha: abajo lo tapa la hoja en el celular. */}
+        <span className="absolute top-4 right-4 rounded-full bg-acento px-3.5 py-1.5 text-[13px] font-bold text-texto shadow-[0_4px_14px_rgba(19,27,22,0.25)] md:top-6 md:right-6">
+          Ejemplo
         </span>
       </div>
     ) : (
@@ -206,6 +237,9 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
         onDibujo={alDibujar}
         onPuntos={setPuntos}
         onAjuste={(b) => paso.e === 'borde-listo' && setPaso({ ...paso, borde: b })}
+        onToque={(lat, lng) => void alTocar(lat, lng)}
+        candidato={paso.e === 'parcela' ? paso.borde : null}
+        guia={guia}
       />
     )
 
@@ -261,10 +295,9 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               ? 'Escribí un camino o un paraje que conozcas, y el mapa va ahí.'
               : `El mapa arranca en ${campo?.lat != null ? 'el pueblo de tu campo' : 'Chascomús'}. Arrastralo y acercate hasta ver tus alambrados.`}
           </p>
-          {!paso.buscando && <Demo tipo="arrastrar" />}
           <BotonPrincipal
             icono="Siguiente"
-            onClick={() => ir(campo?.provincia.includes('Buenos Aires') ? { e: 'como-borde' } : { e: 'marcar' })}
+            onClick={() => ir(esBA ? { e: 'tocar', buscando: false } : { e: 'marcar' })}
           >
             Ya lo veo
           </BotonPrincipal>
@@ -277,25 +310,47 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               ¿No lo encontrás? Buscá un camino
             </BotonChico>
           )}
-          {!paso.buscando && <Pista>Arrastrá el mapa hasta ver tu campo</Pista>}
         </LayoutMapa>
       )
 
-    case 'como-borde':
+    case 'tocar':
       return (
-        <LayoutMapa {...comun} encima={<PasoDe n={2} texto="marcar el borde" />} titulo="¿Cómo marcamos el borde?">
-          <p className="text-[15.5px] text-texto-suave">
-            El borde va por donde está el alambrado. Sirve para medir el campo y ubicar los potreros.
-          </p>
-          <BotonPrincipal icono="Comprobante" onClick={() => ir({ e: 'boleta' })}>
-            Tengo la boleta de ARBA
-          </BotonPrincipal>
-          <Boton tipo="secundario" tamano="grande" className="w-full rounded-full" onClick={() => ir({ e: 'marcar' })}>
-            No la tengo: lo marco en el mapa
-          </Boton>
-          <Pista>El borde va por el alambrado</Pista>
+        <LayoutMapa {...comun} encima={<PasoDe n={2} texto="el borde" />} titulo={movil ? 'Tocá tu campo' : 'Hacé clic en tu campo'}>
+          <p className="text-[15.5px] text-texto-suave">Traemos el borde del catastro, como figura en la boleta.</p>
+          {paso.buscando && (
+            <div role="status" className="flex items-center gap-3 rounded-[16px] bg-superficie px-4 py-3">
+              <span className="size-5 animate-spin rounded-full border-2 border-principal/25 border-t-principal" />
+              <span className="text-[15px] font-semibold text-texto">Buscando la parcela…</span>
+            </div>
+          )}
+          {paso.aviso && <Aviso tipo="atencion" icono="Ayuda" titulo={paso.aviso} />}
+          <div className="flex flex-wrap gap-2">
+            <BotonChico type="button" icono="Editar" onClick={() => ir({ e: 'marcar' })}>
+              Lo marco a mano
+            </BotonChico>
+            <BotonChico type="button" icono="Comprobante" onClick={() => ir({ e: 'boleta' })}>
+              Tengo la boleta
+            </BotonChico>
+          </div>
         </LayoutMapa>
       )
+
+    case 'parcela': {
+      const ha = haRedondo(hectareasDe(paso.borde))
+      const comp = compararBorde(ha, campo?.hectareas ?? null)
+      return (
+        <LayoutMapa {...comun} encima={<PasoDe n={2} texto="el borde" />} titulo="¿Es este tu campo?">
+          <Comparacion medido={ha} alta={campo?.hectareas ?? null} comp={comp} />
+          <BotonPrincipal icono="Guardar" onClick={() => ir({ e: 'borde-listo', borde: paso.borde, ajustando: false })}>
+            Sí, es este
+          </BotonPrincipal>
+          <p className="text-[14px] text-texto-suave">¿No es? {movil ? 'Tocá' : 'Hacé clic en'} otra parte del mapa.</p>
+          <BotonChico type="button" icono="Editar" className="self-start" onClick={() => ir({ e: 'marcar' })}>
+            Lo marco a mano
+          </BotonChico>
+        </LayoutMapa>
+      )
+    }
 
     case 'boleta':
       return (
@@ -325,9 +380,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           titulo={movil ? 'Tocá cada esquina' : 'Clic en cada esquina'}
         >
           <p className="text-[15.5px] text-texto-suave">
-            Seguí el alambrado. Para cerrar, {movil ? 'tocá' : 'hacé clic en'} el primer punto. Los puntos se pueden arrastrar.
+            Seguí el alambrado. Para cerrar, volvé al primer punto.
           </p>
-          <Demo tipo="esquinas" />
           <div className="flex flex-wrap gap-2">
             <BotonChico type="button" icono="Atrás" disabled={puntos === 0} onClick={() => mapa.current?.deshacer()}>
               Deshacer
@@ -346,30 +400,47 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
 
     case 'borde-listo': {
       const ha = haRedondo(hectareasDe(paso.borde))
-      const alta = campo?.hectareas ?? null
+      const alta = paso.altaCorregida ? ha : (campo?.hectareas ?? null)
       const comp = compararBorde(ha, alta)
+      // Si el borde no cuadra con el alta, no se sigue sin decidir: o se
+      // corrige el alta, o se corrige el borde.
+      const trabado = comp === 'muy-distinto'
       return (
-        <LayoutMapa
-          {...comun}
-          encima={<PasoDe n={2} texto="marcar el borde" />}
-          titulo={`${campo?.nombre} mide unas ${ha} ha`}
-        >
-          <p className="text-[15.5px] text-texto-suave">
-            {paso.ajustando
-              ? 'Arrastrá los puntos hasta que el borde siga el alambrado.'
-              : {
-                  'sin-alta': 'Así quedó el borde del campo.',
-                  coincide: `Coincide con lo que pusiste en el alta (${alta} ha).`,
-                  adentro: `En el alta pusiste ${alta}. Es común que el borde quede un poco adentro del alambrado.`,
-                  afuera: `En el alta pusiste ${alta}. Fijate que el borde no se pase del alambrado.`,
-                  'muy-distinto': `En el alta pusiste ${alta}: es bastante distinto. Revisá que el borde vaya por tu alambrado, o ajustalo.`,
-                }[comp]}
-          </p>
+        <LayoutMapa {...comun} encima={<PasoDe n={2} texto="el borde" />} titulo={`${campo?.nombre} mide unas ${ha} ha`}>
+          {paso.ajustando ? (
+            <p className="text-[15.5px] text-texto-suave">Arrastrá los puntos hasta que el borde siga el alambrado.</p>
+          ) : (
+            <Comparacion medido={ha} alta={alta} comp={comp} />
+          )}
           {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
           {paso.ajustando ? (
             <BotonPrincipal icono="Guardar" onClick={() => setPaso({ ...paso, ajustando: false })}>
               Listo, así queda
             </BotonPrincipal>
+          ) : trabado ? (
+            <>
+              <BotonPrincipal
+                icono="Guardar"
+                cargando={ocupado}
+                disabled={ocupado}
+                onClick={() =>
+                  correr(async () => {
+                    await corregirHectareasCampo(campo!.id, ha)
+                    setPaso({ ...paso, altaCorregida: true })
+                  })
+                }
+              >
+                Sí, mide {ha} ha: lo corrijo
+              </BotonPrincipal>
+              <div className="flex flex-wrap gap-2">
+                <BotonChico type="button" icono="Editar" onClick={() => setPaso({ ...paso, ajustando: true })}>
+                  Ajustar el borde
+                </BotonChico>
+                <BotonChico type="button" icono="Reintentar" onClick={() => ir(esBA ? { e: 'tocar', buscando: false } : { e: 'marcar' })}>
+                  Elegir otro borde
+                </BotonChico>
+              </div>
+            </>
           ) : (
             <>
               <BotonPrincipal
@@ -390,8 +461,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
                 <BotonChico type="button" icono="Editar" onClick={() => setPaso({ ...paso, ajustando: true })}>
                   Ajustar el borde
                 </BotonChico>
-                <BotonChico type="button" onClick={() => ir({ e: 'marcar' })}>
-                  Marcarlo de nuevo
+                <BotonChico type="button" icono="Reintentar" onClick={() => ir(esBA ? { e: 'tocar', buscando: false } : { e: 'marcar' })}>
+                  Elegir otro borde
                 </BotonChico>
               </div>
             </>
@@ -442,7 +513,6 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
             El que quieras{ubicados.length ? '' : ' primero'}. Después te preguntamos cuál es de los que cargaste.
           </p>
           {paso.aviso && <Aviso tipo="atencion" icono="Ayuda" titulo={paso.aviso} />}
-          {!ubicados.length && <Demo tipo="potrero" />}
           {faltan.length > 0 && (
             <ListaPotreros titulo={ubicados.length ? 'Faltan' : 'Los que cargaste en el alta'} potreros={faltan} />
           )}
@@ -578,6 +648,48 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
 }
 
 // ===== Piezas de cada paso =====
+
+function centroDe(p: LatLng[]): LatLng {
+  const n = p.length
+  return [p.reduce((s, x) => s + x[0], 0) / n, p.reduce((s, x) => s + x[1], 0) / n]
+}
+
+/** Lo medido contra lo cargado en el alta, de un vistazo: dos números y un veredicto. */
+function Comparacion({ medido, alta, comp }: { medido: number; alta: number | null; comp: ReturnType<typeof compararBorde> }) {
+  const tono = comp === 'muy-distinto' ? 'problema' : comp === 'coincide' || comp === 'sin-alta' ? 'bien' : 'atencion'
+  const veredicto = {
+    'sin-alta': 'Borde listo',
+    coincide: 'Coincide con el alta',
+    adentro: 'Un poco más chico que el alta',
+    afuera: 'Un poco más grande que el alta',
+    'muy-distinto': 'No cuadra con el alta',
+  }[comp]
+  return (
+    <div className={cn('flex flex-col gap-3 rounded-[20px] border-[1.5px] bg-superficie px-5 py-4',
+      tono === 'problema' ? 'border-estado-problema/60' : tono === 'bien' ? 'border-estado-bien' : 'border-estado-atencion/60')}>
+      <div className="flex items-end gap-6">
+        <div>
+          <p className="titulo-display text-[34px] leading-none text-texto">{medido}</p>
+          <p className="mt-1 text-[13px] font-semibold text-texto-suave">ha en el mapa</p>
+        </div>
+        {alta !== null && (
+          <div>
+            <p className="titulo-display text-[34px] leading-none text-texto-suave">{alta}</p>
+            <p className="mt-1 text-[13px] font-semibold text-texto-suave">ha en el alta</p>
+          </div>
+        )}
+      </div>
+      <p className={cn('inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[14px] font-bold',
+        tono === 'problema' ? 'bg-estado-problema-suave text-estado-problema-texto' : tono === 'bien' ? 'bg-estado-bien text-superficie' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
+        <Icono nombre={tono === 'problema' ? 'Ayuda' : 'Guardar'} tamano={16} />
+        {veredicto}
+      </p>
+      {comp === 'muy-distinto' && (
+        <p className="text-[14px] text-texto-suave">Revisá que sea tu campo. Si el campo mide eso, corregimos el alta.</p>
+      )}
+    </div>
+  )
+}
 
 type Comun = { mapa: React.ReactNode; onSalir: () => void; ayuda: string }
 

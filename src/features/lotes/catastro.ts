@@ -79,3 +79,37 @@ export async function buscarParcelaRural(input: {
   // las parcelas más grandes primero (suelen ser la rural buscada)
   return out.sort((a, b) => b.areaHa - a.areaHa)
 }
+
+/**
+ * La parcela rural que está debajo de un punto del mapa (el productor toca su
+ * campo). En WFS 2.0 con SRID 4326 el punto va como (lng lat): verificado
+ * contra geo.arba.gov.ar el 09/10. null si ahí no hay parcela (lagunas, rutas,
+ * otra provincia).
+ */
+export async function parcelaEnPunto(lat: number, lng: number): Promise<ParcelaCatastro | null> {
+  const cql = `INTERSECTS(geom, SRID=4326;POINT(${lng} ${lat}))`
+  const url =
+    `${WFS}?service=WFS&version=2.0.0&request=GetFeature` +
+    `&typeNames=idera:Parcela&outputFormat=application/json` +
+    `&srsName=EPSG:4326&count=1&CQL_FILTER=${encodeURIComponent(cql)}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('El catastro no respondió. Probá de nuevo o marcalo a mano.')
+  const json = (await res.json()) as {
+    features?: {
+      geometry: { type: string; coordinates: number[][][] | number[][][][] }
+      properties?: { cca?: string; ara1?: number }
+    }[]
+  }
+  const f = json.features?.[0]
+  if (!f?.geometry) return null
+  const g = f.geometry
+  const ring = (
+    g.type === 'MultiPolygon' ? (g.coordinates as number[][][][])[0]?.[0] : (g.coordinates as number[][][])[0]
+  ) as number[][] | undefined
+  if (!ring || ring.length < 3) return null
+  return {
+    cca: f.properties?.cca ?? '',
+    areaHa: Math.round(((f.properties?.ara1 ?? 0) / 10000) * 100) / 100,
+    anillo: ring.map((p) => [p[1], p[0]] as LatLng),
+  }
+}

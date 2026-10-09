@@ -56,6 +56,12 @@ export const useMapa = (empresaId: string | undefined) =>
   })
 
 export const guardarBorde = setCampoContorno
+
+/** «Sí, mide 198 ha: lo corrijo»: el alta toma lo medido en el mapa. */
+export async function corregirHectareasCampo(campoId: string, hectareas: number): Promise<void> {
+  const { error } = await supabase.from('campo').update({ hectareas }).eq('id', campoId)
+  if (error) throw new Error(error.message)
+}
 export const asignarDibujo = setPotreroPoligono
 
 /** Un potrero dibujado que no estaba en el alta («No está en la lista: es uno nuevo»). */

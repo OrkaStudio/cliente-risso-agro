@@ -49,7 +49,7 @@ export function Calendario({
 
   return (
     <div className="rounded-[20px] border-[1.5px] border-borde bg-superficie p-3" role="group" aria-label={etiqueta}>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <button
           type="button"
           aria-label="Mes anterior"
@@ -95,7 +95,7 @@ export function Calendario({
               aria-label={`${i + 1} de ${MESES[mes.getMonth()]}`}
               onClick={() => onCambio(f)}
               className={cn(
-                'cifra grid h-11 place-items-center rounded-[12px] text-[18px] font-bold transition-colors disabled:opacity-25',
+                'cifra grid h-11 place-items-center md:h-10 rounded-[12px] text-[18px] font-bold transition-colors disabled:opacity-25',
                 elegido
                   ? 'bg-principal text-principal-texto'
                   : esHoy
