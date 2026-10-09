@@ -24,6 +24,8 @@ export type CampoMapa = {
   id: string
   nombre: string
   provincia: string
+  /** Su color en la app (el mismo índice de siempre). */
+  colorIdx?: number | null
   /** El pueblo que se puso en el alta: «Chascomús». */
   localidad?: string | null
   lat: number | null

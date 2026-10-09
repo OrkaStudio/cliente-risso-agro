@@ -36,6 +36,7 @@ export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
     nombre: c.nombre,
     provincia: c.provincia ?? '',
     localidad: c.localidad,
+    colorIdx: c.color_idx,
     lat: c.lat,
     lon: c.lon,
     hectareas: c.hectareas === null ? null : Number(c.hectareas),

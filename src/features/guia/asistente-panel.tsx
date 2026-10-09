@@ -113,7 +113,8 @@ export function AsistentePanel() {
             whileTap={{ scale: 0.94 }}
             transition={{ type: 'spring', stiffness: 380, damping: 24 }}
             // Debajo de los diálogos (z-50): un modal abierto tapa la burbuja.
-            className="fixed bottom-4 right-4 z-[42] flex size-[54px] items-center justify-center rounded-full shadow-[0_12px_38px_rgba(10,20,14,0.35)]"
+            // En la compu se abre desde la barra lateral («Preguntale al asistente»).
+            className="fixed bottom-4 right-4 z-[42] flex size-[54px] items-center justify-center rounded-full shadow-[0_12px_38px_rgba(10,20,14,0.35)] md:hidden"
           >
             {/* Anillo degradé girando — la identidad del asistente, en grande */}
             <motion.span

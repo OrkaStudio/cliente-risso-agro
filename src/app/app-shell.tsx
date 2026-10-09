@@ -2,15 +2,13 @@ import { Suspense, type ReactNode, type RefObject, useEffect, useRef, useState }
 import { useQueryClient } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { prefetch, prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
+import { prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
 import {
   BarChart3,
   Beef,
   CalendarClock,
-  ChevronLeft,
   CircleDollarSign,
   LayoutDashboard,
-  Leaf,
   Lock,
   LogOut,
   Menu,
@@ -18,10 +16,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
-import { Invitacion } from '@/features/guia/invitacion'
 import { useMedirPuestaAPunto } from '@/features/guia/medir'
 import { Mision } from '@/features/guia/mision'
-import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
 import { Spots } from '@/features/guia/spots'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
@@ -32,7 +28,8 @@ import { MARCA } from '@/lib/marca'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { contarHoy, useParaAtender } from '@/features/inicio/para-atender-api'
+import { BarraLateral } from './barra-lateral'
+import { useCuantasHoy } from '@/features/inicio/tropero/use-dia'
 
 function fechaHoy(): string {
   const s = new Date().toLocaleDateString('es-AR', {
@@ -98,28 +95,19 @@ const NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/hacienda', label: 'Hacienda', icon: Beef, end: false },
   { to: '/campos', label: 'Campos', icon: MapIcon, end: false },
-  { to: '/analitica', label: 'Analítica', icon: BarChart3, end: false },
+  { to: '/analitica', label: 'Plata', icon: BarChart3, end: false },
   { to: '/agenda', label: 'Agenda', icon: CalendarClock, end: false },
 ]
-
-function initials(email?: string) {
-  return email ? email.slice(0, 1).toUpperCase() : 'R'
-}
 
 export function AppShell() {
   useMedirPuestaAPunto()
   const isMobile = useIsMobile()
-  const { user, signOut } = useAuth()
+  const { signOut } = useAuth()
   const { data: membresia } = useEmpresa()
-  // Hasta terminar el mapa, lo que no está abierto lleva al tutorial: se ve con candado.
-  const mapaPendiente = useMapaPendiente()
 
   /* Una sola consulta compartida con el Inicio (misma queryKey): el contador y la
    * cabecera "Hoy" no pueden decir números distintos. */
-  const hoy = contarHoy(useParaAtender().data)
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('side-collapsed') === '1',
-  )
+  const hoy = useCuantasHoy()
   // Recién llegó del onboarding: la barra ya se formó en su lugar (ver
   // `HaciaLaBarra`), así que aparece al instante; lo de adentro, el
   // encabezado y el contenido entran con un fundido escalonado.
@@ -143,162 +131,18 @@ export function AppShell() {
   // Precarga los chunks de las secciones en reposo → navegar entre Hacienda/
   // Campos/Analítica/Agenda es instantáneo (sin flash de "Cargando…").
   useEffect(() => prefetchEnReposo(Object.values(CHUNKS_OFICINA)), [])
-  const toggle = () =>
-    setCollapsed((c) => {
-      localStorage.setItem('side-collapsed', c ? '0' : '1')
-      return !c
-    })
-
   return (
-    <div className="flex h-full overflow-hidden bg-background">
-      {/* ===== Sidebar ===== */}
-      <aside
-        className={cn(
-          'm-4 hidden h-[calc(100%-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out md:flex',
-          collapsed ? 'w-[76px]' : 'w-[248px]',
-        )}
-      >
-        <motion.div className="flex min-h-0 flex-1 flex-col" {...entra(0.05)}>
-        {/* Marca + toggle */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-4">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]">
-            <Leaf className="size-5 text-[var(--principal-texto)]" strokeWidth={1.75} />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate font-heading text-[17px] font-bold text-sidebar-foreground">
-                {MARCA}
-              </div>
-              <div className="truncate text-[11px] font-medium text-sidebar-foreground/55">
-                Gestión de campo
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={toggle}
-            title={collapsed ? 'Expandir' : 'Colapsar'}
-            className={cn(
-              'flex size-7 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground',
-              collapsed && 'mx-auto',
-            )}
-          >
-            <ChevronLeft
-              className={cn('size-4 transition-transform', collapsed && 'rotate-180')}
-            />
-          </button>
-        </div>
-
-        {/* Navegación (scrollea si no entra) */}
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1">
-          {!collapsed && (
-            <div className="px-2 pb-1 pt-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-sidebar-foreground/45">
-              Oficina
-            </div>
-          )}
-          {NAV.map(({ to, label, icon: Icon, end }) => {
-            const bloqueada = mapaPendiente && !abiertoSinMapa(to)
-            return (
-            <NavLink
-              key={to}
-              to={bloqueada ? '/mapa' : to}
-              state={bloqueada ? { bloqueada: seccionBloqueada(to) } : undefined}
-              end={end}
-              title={collapsed ? (bloqueada ? `${label}: se abre al terminar el mapa` : label) : undefined}
-              onMouseEnter={() => {
-                const t = CHUNKS_OFICINA[to]
-                if (t) prefetch(t)
-              }}
-              className={({ isActive }) =>
-                cn(
-                  'relative flex items-center gap-3 rounded-[10px] py-2.5 text-sm font-medium transition-colors',
-                  collapsed ? 'justify-center px-0' : 'px-3',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-foreground'
-                    : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && !collapsed && (
-                    <span className="absolute inset-y-[14%] left-0 w-[3px] rounded-full bg-lima" />
-                  )}
-                  <Icon
-                    className={cn(
-                      'size-5 shrink-0',
-                      isActive ? 'text-principal' : 'text-sidebar-foreground/55',
-                    )}
-                    strokeWidth={1.75}
-                  />
-                  {!collapsed && <span>{label}</span>}
-                  {bloqueada && (
-                    <Lock
-                      aria-label="Se abre al terminar el mapa"
-                      className={cn('size-3.5 shrink-0 text-sidebar-foreground/45', collapsed ? 'absolute right-2 top-2' : 'ml-auto')}
-                    />
-                  )}
-                  {/* Señala dónde mirar, no repite el contenido: descartamos una
-                      campanita con panel propio porque duplicaba la verdad en dos
-                      lugares (mismo problema que los cheques antes de la Agenda). */}
-                  {to === '/' && hoy > 0 && (
-                    <span
-                      aria-label={`${hoy} para hoy`}
-                      className={cn(
-                        'tnum ml-auto shrink-0 rounded-full bg-lima px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-ink',
-                        collapsed && 'absolute right-1 top-1 ml-0 px-1',
-                      )}
-                    >
-                      {hoy}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-            )
-          })}
-        </nav>
-
-        {/* Usuario */}
-        <div
-          className={cn(
-            'flex items-center border-t border-sidebar-border px-3 py-3',
-            collapsed ? 'flex-col gap-2' : 'gap-2.5',
-          )}
-        >
-          <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[13px] font-bold text-primary-foreground"
-            title={collapsed ? user?.email : undefined}
-          >
-            {initials(user?.email)}
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-[13px] font-semibold text-sidebar-foreground">
-                {membresia?.empresa?.nombre ?? '—'}
-              </div>
-              <div className="truncate text-[11px] text-sidebar-foreground/55">
-                {user?.email}
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            title="Salir"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          >
-            <LogOut className="size-[17px]" />
-          </button>
-        </div>
-        </motion.div>
-      </aside>
+    <div className="flex h-full overflow-hidden bg-fondo">
+      {/* ===== Barra lateral (página 35, «Barra lateral · Oficina») ===== */}
+      <motion.div className="flex h-full" {...entra(0.05)}>
+        <BarraLateral hoy={hoy} />
+      </motion.div>
 
       {/* ===== Columna principal ===== */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <motion.header {...entra(0.15)} className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
-          <div className="hidden shrink-0 font-heading text-sm font-semibold text-sidebar-foreground sm:block">
+        <motion.header {...entra(0.15)} className="flex h-14 shrink-0 items-center gap-4 border-b border-borde bg-fondo px-4 text-texto sm:px-10">
+          <div className="hidden shrink-0 text-[14px] font-semibold text-texto sm:block">
             {fechaHoy()}
           </div>
 
@@ -316,7 +160,7 @@ export function AppShell() {
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
-            className="w-full px-4 pb-12 pt-7 sm:px-6"
+            className="w-full px-4 pb-12 pt-7 sm:px-10 sm:pt-8"
             style={bienvenida && !contenidoListo ? { opacity: 0 } : undefined}
           >
             <Suspense
@@ -330,16 +174,15 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* El asistente enseña haciendo (TASK-063): la invitación una sola
-          vez, la misión en curso pegada al botón real, y un puntito por
-          panel la primera vez. Nada tapa la página. */}
-      <Invitacion />
+      {/* El asistente enseña haciendo (TASK-063): la misión en curso pegada al
+          botón real y un puntito por panel la primera vez. La invitación y la
+          lista «Tu campo, en marcha» se reemplazaron por el Inicio «Antes del
+          mapa» de Tropero, que muestra los mismos pasos en un solo lugar. */}
       <Mision />
       <Spots />
 
-      {/* Panel del Asistente (preguntas + WhatsApp) + smart checklist */}
+      {/* Panel del Asistente (preguntas + WhatsApp): se abre desde la barra lateral. */}
       <AsistentePanel />
-      <PuestaAPunto />
     </div>
   )
 }

@@ -5,7 +5,7 @@ test('analitica: cargar un gasto y verlo en la lista', async ({ page }) => {
   const desc = `E2E gasto ${Date.now()}`
   await entrar(page)
 
-  await page.getByRole('link', { name: 'Analítica', exact: true }).click()
+  await page.getByRole('link', { name: 'Plata', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Analítica', level: 1 })).toBeVisible()
 
   await page.getByRole('button', { name: '+ Cargar' }).click()

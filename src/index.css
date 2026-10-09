@@ -779,3 +779,16 @@
 @utility scroll-difuminado {
   mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
 }
+
+/* ===== Inicio: el croquis de lo que dejó la recorrida ===== */
+.inicio-croquis-etiqueta.leaflet-tooltip {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 0; border: none; background: transparent; box-shadow: none;
+  color: #fbfaf6; font: 700 12px/1 Inter, sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.inicio-croquis-etiqueta.leaflet-tooltip::before { display: none; }
+.inicio-croquis-etiqueta b { font-weight: 800; }
+.inicio-croquis-chip {
+  padding: 5px 10px; border-radius: 9999px; color: #fbfaf6; font: 700 12px/1 Inter, sans-serif;
+  text-shadow: none; box-shadow: 0 2px 8px rgba(0,0,0,.3); white-space: nowrap;
+}
