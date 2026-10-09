@@ -23,7 +23,7 @@ export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
   const [{ data: campos, error }, { data: stock, error: e2 }] = await Promise.all([
     supabase
       .from('campo')
-      .select('id, nombre, provincia, lat, lon, hectareas, contorno, color_idx, potrero(id, nombre, hectareas, poligono, estado_ciclo, cultivo, created_at)')
+      .select('id, nombre, provincia, localidad, lat, lon, hectareas, contorno, color_idx, potrero(id, nombre, hectareas, poligono, estado_ciclo, cultivo, created_at)')
       .eq('empresa_id', empresaId)
       .order('color_idx'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
@@ -35,6 +35,7 @@ export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
     id: c.id,
     nombre: c.nombre,
     provincia: c.provincia ?? '',
+    localidad: c.localidad,
     lat: c.lat,
     lon: c.lon,
     hectareas: c.hectareas === null ? null : Number(c.hectareas),

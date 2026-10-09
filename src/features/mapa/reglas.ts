@@ -24,6 +24,8 @@ export type CampoMapa = {
   id: string
   nombre: string
   provincia: string
+  /** El pueblo que se puso en el alta: «Chascomús». */
+  localidad?: string | null
   lat: number | null
   lon: number | null
   hectareas: number | null

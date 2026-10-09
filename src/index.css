@@ -721,6 +721,17 @@
 .tropero-etiqueta--activa b {
   font-size: 16px;
 }
+/* El pueblo donde arranca el mapa: un punto y su nombre. */
+.tropero-pueblo { pointer-events: none; }
+.tropero-pueblo-punto {
+  position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 9999px;
+  background: #b85c2e; border: 3px solid #fbfaf6; box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.tropero-pueblo-texto {
+  position: absolute; left: 14px; top: -14px; white-space: nowrap;
+  background: #fbfaf6; color: #131b16; font: 700 13px/1 Inter, sans-serif;
+  padding: 7px 10px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+}
 /* «Cerrá acá»: el primer punto late cuando ya se puede cerrar el dibujo. */
 .tropero-cerrar { pointer-events: none; }
 .tropero-cerrar-onda {
@@ -743,7 +754,7 @@
 /* ===== Guía sobre el mapa (tutorial del mapa) =====
    Un gesto animado sobre el mapa real: dónde tocar y cómo arrastrar. Se repite solo; con «menos movimiento» queda quieto. */
 .tropero-guia-ancla { pointer-events: none; }
-.guia { position: relative; transform: translate(-22px, -10px); pointer-events: none; }
+.guia { position: relative; transform: translate(-22px, -6px); pointer-events: none; overflow: visible; }
 .guia-mano { position: relative; z-index: 2; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); }
 .guia-onda {
   position: absolute; left: 6px; top: -2px; width: 22px; height: 22px; border-radius: 9999px;

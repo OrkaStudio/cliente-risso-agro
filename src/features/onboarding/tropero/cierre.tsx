@@ -6,7 +6,9 @@ import { Logo } from '@/components/tropero/logo'
 import { repartir } from '@/features/onboarding/croquis-layout'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
-import { cabezasDe, especiesDe, ha, ICONO_ESPECIE, totales, type CampoOnb, type PotreroOnb } from './modelo'
+import { cabezasDe, ha, totales, type CampoOnb, type PotreroOnb } from './modelo'
+import { fondoPotrero } from './disposicion'
+import { ContenidoPotrero } from './potrero-croquis'
 
 // B6 · Cierre (página 35, «Onboarding · Cierre»). Sobrio: el campo cargado es
 // el protagonista y el movimiento está en los detalles (spec, «Movimiento»):
@@ -85,56 +87,18 @@ function MiniCampo({
       {vista.map((p, i) => {
         const r = rects[p.id]
         if (!r) return null
-        const c = p.contenido
-        const grande = Math.min((r.h - gap) * 0.3, (r.w - gap) * 0.3, 32)
+        const f = fondoPotrero(p.contenido)
         return (
           <motion.div
             key={p.id}
             initial={reducir ? false : { opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: reducir ? 0 : demora + i * 0.04, ease: CURVA }}
-            className={cn(
-              'absolute flex flex-col overflow-hidden',
-              chico ? 'rounded-[4px]' : 'rounded-lg p-2.5',
-              c?.tipo === 'hacienda'
-                ? 'bg-destacado text-destacado-texto'
-                : c?.tipo === 'sembrado'
-                  ? 'bg-acento text-acento-texto'
-                  : c?.tipo === 'descanso'
-                    ? 'bg-estado-bien-suave text-texto'
-                    : 'bg-superficie text-texto',
-            )}
-            style={{
-              left: r.x,
-              top: r.y,
-              width: r.w - gap,
-              height: r.h - gap,
-              ...(c?.tipo === 'sembrado'
-                ? {
-                    backgroundImage:
-                      'repeating-linear-gradient(-60deg, transparent 0 10px, color-mix(in srgb, var(--acento-texto) 14%, transparent) 10px 11.5px)',
-                  }
-                : {}),
-            }}
+            className={cn('absolute overflow-hidden', chico ? 'rounded-[4px]' : 'rounded-[12px]', f.clase)}
+            style={{ left: r.x, top: r.y, width: r.w - gap, height: r.h - gap, ...f.estilo }}
           >
-            {!chico && <div className="flex items-start justify-between">
-              <span className="font-heading text-[12px] font-extrabold">{p.nombre}</span>
-              <span className="flex gap-0.5">
-                {especiesDe(c).map((e) => (
-                  <Icono key={e} nombre={ICONO_ESPECIE[e]} tamano={16} className="size-3" />
-                ))}
-              </span>
-            </div>}
-            {!chico && grande >= 16 && c?.tipo === 'hacienda' && cabezasDe(c) > 0 && (
-              <span className="titulo-display mt-auto leading-none" style={{ fontSize: grande }}>
-                {cabezasDe(c)}
-              </span>
-            )}
-            {!chico && grande >= 16 && c?.tipo === 'sembrado' && (
-              <span className="titulo-display mt-auto truncate leading-none" style={{ fontSize: grande * 0.9 }}>
-                {c.cultivo}
-              </span>
-            )}
+            {/* Miniatura (la fila del celular): sólo los colores. */}
+            {!chico && <ContenidoPotrero potrero={p} />}
           </motion.div>
         )
       })}
@@ -301,27 +265,37 @@ export function Cierre({
         <TusCamposCelu campos={campos} total={t} />
         <section
           aria-label="Tus campos"
-          className="relative isolate hidden overflow-hidden rounded-[32px] bg-superficie-hundida p-[52px] md:block md:w-[57%] md:max-w-[820px] md:shrink-0"
+          className={cn(
+            'relative isolate hidden overflow-hidden rounded-[32px] bg-superficie-hundida md:block md:w-[57%] md:max-w-[820px] md:shrink-0',
+            campos.length > 2 ? 'p-10' : 'p-[52px]',
+          )}
         >
           <img src={textura} alt="" className="absolute inset-0 -z-10 size-full object-cover opacity-[0.18]" />
           <div className={cn('grid gap-x-10 gap-y-7', campos.length > 1 && 'md:grid-cols-2')}>
             {campos.map((c, i) => (
-              <div key={c.id} className="flex min-w-0 flex-col gap-3">
+              <div
+                key={c.id}
+                className={cn(
+                  'flex min-w-0 flex-col gap-3',
+                  // Impares: el último va centrado debajo de los de arriba.
+                  campos.length > 1 && campos.length % 2 === 1 && i === campos.length - 1 && 'md:col-span-2 md:w-[calc(50%-20px)] md:justify-self-center',
+                )}
+              >
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <Tilde demora={0.5 + i * 0.1} />
-                    <h2 className="truncate font-heading text-[20px] font-extrabold text-texto md:text-[22px]">{c.nombre}</h2>
+                    <h2 className="truncate font-heading text-[19px] font-extrabold text-texto">{c.nombre}</h2>
                   </div>
-                  <p className="text-[13.5px] text-texto-suave md:text-[14px]">{resumenDe(c)}</p>
+                  <p className="text-[13px] text-texto-suave">{resumenDe(c)}</p>
                 </div>
                 <MiniCampo
                   potreros={c.potreros}
                   demora={0.1 + i * 0.15}
-                  className={cn('hidden md:block', campos.length > 1 ? 'h-[200px]' : 'h-[280px]')}
+                  className={cn('hidden md:block', campos.length > 2 ? 'h-[150px]' : campos.length > 1 ? 'h-[200px]' : 'h-[280px]')}
                 />
                 {c.potreros.length > POTREROS_A_LA_VISTA && (
                   <p className="text-[13.5px] font-semibold text-texto-suave md:text-[14px]">
-                    y {c.potreros.length - POTREROS_A_LA_VISTA} potreros más
+                    y {c.potreros.length - POTREROS_A_LA_VISTA} {c.potreros.length - POTREROS_A_LA_VISTA === 1 ? 'potrero' : 'potreros'} más
                   </p>
                 )}
               </div>

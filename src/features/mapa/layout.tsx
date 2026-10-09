@@ -49,6 +49,7 @@ export function LayoutMapa({
   onSalir,
   ayuda,
   nota,
+  ficha,
 }: {
   mapa: React.ReactNode
   /** Buscador y pistas, encima del mapa. */
@@ -63,6 +64,8 @@ export function LayoutMapa({
   ayuda: string
   /** Por qué está acá: «La Agenda se abre cuando tu campo esté en el mapa». */
   nota?: string
+  /** Qué campo es y dónde queda. */
+  ficha?: React.ReactNode
 }) {
   const reducir = useReducedMotion()
   return (
@@ -90,6 +93,7 @@ export function LayoutMapa({
               {nota}
             </p>
           )}
+          {ficha}
           {encima}
           <h1 className="titulo-display text-[28px] leading-[1.04] text-texto md:text-[38px]">{titulo}</h1>
           {children}

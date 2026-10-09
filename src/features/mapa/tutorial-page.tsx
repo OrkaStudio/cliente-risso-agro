@@ -204,12 +204,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
       return
     }
     if (paso.e !== 'dibujar' || !campo) return
-    // Un dibujo rechazado no termina el paso: se avisa y el dibujo arranca de nuevo.
-    const rechazar = (aviso: string) => {
-      setPaso({ e: 'dibujar', aviso })
-      // Después de que Geoman termine de cerrar el dibujo rechazado.
-      window.setTimeout(() => mapa.current?.reiniciar(), 0)
-    }
+    // Un dibujo rechazado no termina el paso: se avisa y el mapa ya está listo para el siguiente.
+    const rechazar = (aviso: string) => setPaso({ e: 'dibujar', aviso })
     if (campo.contorno && fueraDelBorde(p, campo.contorno) > 0.3) {
       rechazar('Ese dibujo se sale del borde del campo. Dibujalo adentro.')
       return
@@ -241,6 +237,11 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
         borradorQue={paso.e === 'potrero-listo' ? listo?.que : undefined}
         foco={foco}
         pistaCursor={pistaCursor}
+        pueblo={
+          (paso.e === 'encontrar' || paso.e === 'tocar') && campo?.lat != null && campo.lon != null && campo.localidad
+            ? { lat: campo.lat, lon: campo.lon, nombre: campo.localidad }
+            : null
+        }
         modo={modo}
         onDibujo={alDibujar}
         onPuntos={setPuntos}
@@ -263,7 +264,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
     )
   }
 
-  const comun = { mapa: mapaEl, onSalir: salir, ayuda, nota: bloqueada ? `${bloqueada} se abre cuando tu campo esté en el mapa.` : undefined }
+  const ficha = campo && <FichaCampo campo={campo} n={campos.indexOf(campo) + 1} de={campos.length} />
+  const comun = { mapa: mapaEl, onSalir: salir, ayuda, ficha, nota: bloqueada ? `${bloqueada} se abre cuando tu campo esté en el mapa.` : undefined }
 
   switch (paso.e) {
     case 'bienvenida':
@@ -301,7 +303,9 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           <p className="text-[15.5px] text-texto-suave">
             {paso.buscando
               ? 'Escribí un camino o un paraje que conozcas, y el mapa va ahí.'
-              : `El mapa arranca en ${campo?.lat != null ? 'el pueblo de tu campo' : 'Chascomús'}. Arrastralo y acercate hasta ver tus alambrados.`}
+              : campo?.lat != null
+                ? `El mapa arranca en ${campo.localidad ?? 'el pueblo de tu campo'}, el pueblo que pusiste en el alta. Arrastralo hacia tu campo y acercate hasta ver los alambrados.`
+                : 'No sabemos el pueblo del campo: el mapa arranca en Chascomús. Buscá un camino o un paraje que conozcas.'}
           </p>
           <BotonPrincipal
             icono="Siguiente"
@@ -387,7 +391,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           encima={<PasoDe n={2} texto="marcar el borde" />}
           titulo={movil ? 'Tocá cada esquina' : 'Clic en cada esquina'}
         >
-          <ComoSeDibuja puntos={puntos} movil={movil} que="el campo" />
+          <ComoSeDibuja puntos={puntos} movil={movil} que="del campo" />
           <div className="flex flex-wrap gap-2">
             <BotonChico type="button" icono="Atrás" disabled={puntos === 0} onClick={() => mapa.current?.deshacer()}>
               Deshacer
@@ -511,7 +515,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           titulo={ubicados.length ? 'Dibujá el siguiente' : 'Dibujá un potrero'}
         >
           {paso.aviso && <Aviso tipo="atencion" icono="Ayuda" titulo={paso.aviso} />}
-          <ComoSeDibuja puntos={puntos} movil={movil} que="un potrero, el que quieras" />
+          <ComoSeDibuja puntos={puntos} movil={movil} que="de un potrero, el que quieras" />
           {puntos > 0 && (
             <div className="flex flex-wrap gap-2">
               <BotonChico type="button" icono="Atrás" onClick={() => mapa.current?.deshacer()}>
@@ -656,7 +660,7 @@ function ComoSeDibuja({ puntos, movil, que }: { puntos: number; movil: boolean; 
   const verbo = movil ? 'Tocá' : 'Hacé clic en'
   const actual = puntos === 0 ? 0 : puntos < 3 ? 1 : 2
   const pasos = [
-    `${verbo} una esquina de ${que}`,
+    `${verbo} una esquina ${que}`,
     puntos > 0 ? `Seguí el alambrado: van ${puntos} ${puntos === 1 ? 'esquina' : 'esquinas'}` : 'Seguí el alambrado, esquina por esquina',
     'Cerrá en el primer punto',
   ]
@@ -692,6 +696,33 @@ function ComoSeDibuja({ puntos, movil, que }: { puntos: number; movil: boolean; 
 /** La esquina de más arriba a la izquierda del borde: ahí señala la mano. */
 function esquinaDe(p: LatLng[]): LatLng {
   return p.reduce((a, b) => (b[0] - b[1] > a[0] - a[1] ? b : a))
+}
+
+/** Qué campo se está armando y dónde queda: siempre a la vista arriba del panel. */
+function FichaCampo({ campo, n, de }: { campo: CampoMapa; n: number; de: number }) {
+  const lugar = [campo.localidad, campo.provincia].filter(Boolean).join(', ')
+  return (
+    <div className="flex flex-col gap-1 rounded-[16px] border border-borde bg-superficie px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-heading text-[17px] leading-tight font-extrabold text-texto">{campo.nombre}</p>
+        {de > 1 && (
+          <span className="shrink-0 rounded-full bg-superficie-hundida px-2.5 py-0.5 text-[12.5px] font-bold text-texto-suave">
+            {n} de {de}
+          </span>
+        )}
+      </div>
+      <p className="text-[13.5px] font-semibold text-texto-suave">
+        {campo.hectareas ? `${haTexto(campo.hectareas)} ha · ` : ''}
+        {campo.potreros.length} {campo.potreros.length === 1 ? 'potrero' : 'potreros'}
+      </p>
+      {lugar && (
+        <p className="flex items-center gap-1.5 text-[13.5px] text-texto-suave">
+          <Icono nombre="Ubicación" tamano={16} className="shrink-0 text-principal" />
+          Cerca de {lugar}
+        </p>
+      )}
+    </div>
+  )
 }
 
 /** Lo medido contra lo cargado en el alta, de un vistazo: dos números y un veredicto. */
@@ -742,7 +773,7 @@ function Comparacion({
   )
 }
 
-type Comun = { mapa: React.ReactNode; onSalir: () => void; ayuda: string; nota?: string }
+type Comun = { mapa: React.ReactNode; onSalir: () => void; ayuda: string; nota?: string; ficha?: React.ReactNode }
 
 function ListaPotreros({ titulo, potreros }: { titulo: string; potreros: CampoMapa['potreros'] }) {
   const vista = [...potreros].sort((a, b) => (b.hectareas ?? 0) - (a.hectareas ?? 0)).slice(0, 4)
