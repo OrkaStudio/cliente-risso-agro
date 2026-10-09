@@ -154,3 +154,38 @@ export function porDondeVaElMapa(campos: CampoMapa[]): string {
   const despues = resto.length ? ` Después, ${resto.map((c) => c.nombre).join(' y ')}.` : ''
   return `${actual!.nombre}: ${donde}.${despues} Unos ${Math.max(2, minutos)} minutos`
 }
+
+/** Un dato del día en la cabecera: lo más importante, de un vistazo, y adónde lleva. */
+export type Chip = { key: string; texto: string; tono: Tono | 'bien' | 'info'; destino: string }
+
+/**
+ * Lo que dice la cabecera, en orden de importancia (como mucho tres): lo que
+ * hay que atender, lo vencido, y la lluvia de mañana si es probable. Sin nada
+ * urgente, lo dice: también es información que el productor quiere.
+ */
+export function chipsDelDia({
+  cosas,
+  vencimientos,
+  lluviaManana,
+}: {
+  cosas: Cosa[]
+  vencimientos: Vencimiento[]
+  /** Probabilidad de lluvia de mañana (%), si hay pronóstico. */
+  lluviaManana: number | null
+}): Chip[] {
+  const chips: Chip[] = []
+  const atender = cosas.filter((c) => !c.key.startsWith('v-')).length
+  if (atender > 0)
+    chips.push({ key: 'atender', texto: `${atender} ${atender === 1 ? 'cosa' : 'cosas'} en el campo`, tono: 'problema', destino: '#para-atender' })
+  const vencidos = vencimientos.filter((v) => (v.diasParaVencer ?? 0) < 0)
+  if (vencidos.length > 0)
+    chips.push({ key: 'vencidos', texto: `${vencidos.length} ${vencidos.length === 1 ? 'pago vencido' : 'pagos vencidos'}`, tono: 'problema', destino: '/agenda' })
+  else {
+    const semana = vencimientos.filter((v) => v.diasParaVencer !== null && v.diasParaVencer >= 0 && v.diasParaVencer <= 7).length
+    if (semana > 0) chips.push({ key: 'semana', texto: `${semana} ${semana === 1 ? 'vence' : 'vencen'} esta semana`, tono: 'atencion', destino: '/agenda' })
+  }
+  if (lluviaManana !== null && lluviaManana >= 40)
+    chips.push({ key: 'lluvia', texto: `${lluviaManana} % de lluvia mañana`, tono: 'info', destino: '#clima' })
+  if (chips.length === 0) chips.push({ key: 'ok', texto: 'Todo en orden hoy', tono: 'bien', destino: '#para-atender' })
+  return chips.slice(0, 3)
+}

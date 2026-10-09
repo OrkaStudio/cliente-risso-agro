@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
@@ -88,5 +88,18 @@ describe('por dónde va el mapa', () => {
       'La Porteña: vas por el borde. Después, Los Pampas. Unos 11 minutos',
     )
     expect(porDondeVaElMapa([c('La Porteña', true, [true, false])])).toBe('La Porteña: falta un potrero. Unos 2 minutos')
+  })
+})
+
+describe('los chips de la cabecera', () => {
+  const cosa = (key: string): import('./dia').Cosa => ({ key, tono: 'problema', titulo: '', detalle: '', accion: { texto: '', to: '' } })
+  it('lo del campo, lo vencido y la lluvia, en ese orden', () => {
+    const cs = chipsDelDia({ cosas: [cosa('p-1'), cosa('p-2'), cosa('v-1')], vencimientos: [venc('a', -2)], lluviaManana: 82 })
+    expect(cs.map((c) => c.texto)).toEqual(['2 cosas en el campo', '1 pago vencido', '82 % de lluvia mañana'])
+    expect(cs[1]!.destino).toBe('/agenda')
+  })
+  it('sin vencidos avisa lo de la semana; sin nada, que está todo en orden', () => {
+    expect(chipsDelDia({ cosas: [], vencimientos: [venc('a', 4)], lluviaManana: 10 }).map((c) => c.texto)).toEqual(['1 vence esta semana'])
+    expect(chipsDelDia({ cosas: [], vencimientos: [], lluviaManana: null })[0]!.texto).toBe('Todo en orden hoy')
   })
 })

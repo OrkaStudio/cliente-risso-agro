@@ -28,6 +28,7 @@ import { MARCA } from '@/lib/marca'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { PILDORA } from '@/features/cotizaciones/pildora'
 import { BarraLateral } from './barra-lateral'
 import { useCuantasHoy } from '@/features/inicio/tropero/use-dia'
 
@@ -39,8 +40,6 @@ function fechaHoy(): string {
   })
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
-
-const TickerDivider = () => <span className="h-6 w-px bg-sidebar-border" />
 
 /** Strip de mercado: gordo (manual), dólar blue (dolarapi) y clima
  *  (open-meteo). Si una fuente falla, no muestra ese dato (nunca un valor
@@ -55,16 +54,12 @@ function Ticker() {
     blue.data ? (
       <div
         key="blue"
-        className="flex shrink-0 items-center gap-2"
-        title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
+        className={PILDORA}
+        title={`Dólar blue: compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
       >
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-          <CircleDollarSign className="size-[15px] text-estado-bien" />
-          Blue
-        </span>
-        <b className="tnum text-sm font-semibold text-sidebar-foreground">
-          ${blue.data.venta.toLocaleString('es-AR')}
-        </b>
+        <CircleDollarSign className="size-4 text-estado-bien" />
+        <span className="text-[13px] text-texto-suave">Blue</span>
+        <b className="cifra text-[15px] font-bold text-texto">${blue.data.venta.toLocaleString('es-AR')}</b>
       </div>
     ) : null,
     // El slot del clima decide solo si tiene algo que mostrar (campo elegido
@@ -72,16 +67,7 @@ function Ticker() {
     <ClimaSlot key="clima" />,
   ].filter(Boolean)
 
-  return (
-    <div className="ml-auto flex min-w-0 items-center gap-3 overflow-hidden text-sidebar-foreground">
-      {slots.map((slot, i) => (
-        <div key={i} className="flex items-center gap-3">
-          {i > 0 && <TickerDivider />}
-          {slot}
-        </div>
-      ))}
-    </div>
-  )
+  return <div className="ml-auto flex min-w-0 items-center gap-2">{slots}</div>
 }
 
 /**

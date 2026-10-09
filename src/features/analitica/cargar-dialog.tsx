@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -142,12 +142,15 @@ export function CargarDialog({
   potreroInicial,
   triggerLabel = '+ Cargar',
   triggerVariant,
+  renderTrigger,
 }: {
   empresaId: string
   campoInicial?: string
   potreroInicial?: string
   triggerLabel?: string
   triggerVariant?: 'outline'
+  /** Un botón propio (p. ej. el acceso rápido del Inicio) en lugar del de la app. */
+  renderTrigger?: (abrir: () => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [paso, setPaso] = useState(1)
@@ -388,13 +391,13 @@ export function CargarDialog({
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        disabled={!empresaId}
-        variant={triggerVariant}
-      >
-        {triggerLabel}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : (
+        <Button onClick={() => setOpen(true)} disabled={!empresaId} variant={triggerVariant}>
+          {triggerLabel}
+        </Button>
+      )}
       <FormDialog
         open={open}
         onOpenChange={(v) => {

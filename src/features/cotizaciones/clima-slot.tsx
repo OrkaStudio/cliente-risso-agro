@@ -1,75 +1,76 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronDown, MapPin, Snowflake } from 'lucide-react'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
-import { Link } from 'react-router-dom'
+import { cn } from '@/lib/utils'
+import { PILDORA } from './pildora'
 
 /**
- * Slot del clima en el ticker (Open-Meteo): temperatura actual, máx/mín del
- * día y aviso de helada (clave para el productor). Lluvia en el tooltip.
- *
- * El clima es DEL CAMPO ELEGIDO: con varios campos, el nombre es un selector
- * (la elección se comparte con el panel del Inicio). Sin ningún campo con
- * ubicación, en vez de un clima ajeno muestra "Ubicá tu campo" → Campos.
- * Si la fuente falla, no muestra nada (nunca un valor de muestra).
+ * El clima en la barra superior (Open-Meteo): temperatura, máx/mín y aviso de
+ * helada, del campo elegido. Con varios campos, el nombre abre un menú para
+ * elegir (la elección se comparte con el Inicio). Sin campo ubicado, lleva a
+ * Campos. Si la fuente falla, no muestra nada (nunca un valor de muestra).
  */
 export function ClimaSlot() {
   const { opciones, actual, elegir, cargando } = useCampoClima()
   const clima = useClima(actual?.ubicacion ?? null)
+  const navigate = useNavigate()
+  const [abierto, setAbierto] = useState(false)
 
   if (cargando) return null
   if (!actual) {
     return (
-      <Link
-        to="/campos"
-        className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55 hover:text-sidebar-foreground"
-        title="Cargá la localidad del campo para ver su clima"
-      >
-        <MapPin className="size-[15px] text-estado-atencion" />
-        Ubicá tu campo
-      </Link>
+      <button type="button" onClick={() => navigate('/campos')} className={cn(PILDORA, 'text-[13px] font-semibold text-principal')}>
+        <MapPin className="size-4" />
+        Ubicá tu campo para ver el clima
+      </button>
     )
   }
   if (!clima.data) return null
   const d = clima.data
+  const varios = opciones.length > 1
   return (
-    <div
-      className="flex shrink-0 items-center gap-2.5"
-      title={`${d.descripcion} · ${d.lugar} · lluvia ${d.lluviaProb}%${d.lluviaMm > 0 ? ` (${d.lluviaMm} mm)` : ''}`}
-    >
-      <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-        <WmoIcon code={d.code} className="size-[15px] text-estado-atencion" />
-        {opciones.length > 1 ? (
-          // Selector nativo, sin estilo propio: en la barra oscura basta con el
-          // nombre y la flechita; el menú lo pinta el sistema.
-          <span className="relative inline-flex items-center gap-0.5">
-            <select
-              aria-label="Campo del clima"
-              value={actual.id}
-              onChange={(e) => elegir(e.target.value)}
-              className="cursor-pointer appearance-none bg-transparent pr-3.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/70 outline-none hover:text-sidebar-foreground"
-            >
-              {opciones.map((o) => (
-                <option key={o.id} value={o.id} className="text-ink">
-                  {o.nombre}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-0 size-3" />
-          </span>
-        ) : (
-          d.lugar
-        )}
-      </span>
-      <b className="tnum text-sm font-semibold text-sidebar-foreground">{d.temp}°</b>
-      <span className="tnum hidden text-[11px] font-medium text-sidebar-foreground/45 md:inline">
-        {d.max}° / {d.min}°
-      </span>
-      {d.helada && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#2779c4]/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#215a7e]">
-          <Snowflake className="size-3" />
-          Helada
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => varios && setAbierto((v) => !v)}
+        aria-expanded={varios ? abierto : undefined}
+        title={`${d.descripcion} · lluvia ${d.lluviaProb} %${d.lluviaMm > 0 ? ` (${d.lluviaMm} mm)` : ''}`}
+        className={cn(PILDORA, !varios && 'cursor-default hover:border-borde')}
+      >
+        <WmoIcon code={d.code} className="size-4 text-estado-atencion" />
+        <span className="text-[13px] text-texto-suave">{actual.nombre}</span>
+        <b className="cifra text-[15px] font-bold text-texto">{d.temp}°</b>
+        <span className="cifra hidden text-[12.5px] text-texto-suave lg:inline">
+          {d.max}° / {d.min}°
         </span>
+        {d.helada && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#e1ebf2] px-2 py-0.5 text-[11.5px] font-bold text-[#215a7e]">
+            <Snowflake className="size-3" />
+            Helada
+          </span>
+        )}
+        {varios && <ChevronDown className="size-3.5 text-texto-suave" />}
+      </button>
+      {abierto && (
+        <ul className="absolute top-11 right-0 z-50 min-w-[200px] overflow-hidden rounded-[14px] border border-borde bg-superficie py-1.5 shadow-lg">
+          {opciones.map((o) => (
+            <li key={o.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  elegir(o.id)
+                  setAbierto(false)
+                }}
+                className={cn('w-full px-4 py-2.5 text-left text-[14.5px] text-texto hover:bg-superficie-hundida', o.id === actual.id && 'font-bold')}
+              >
+                {o.nombre}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

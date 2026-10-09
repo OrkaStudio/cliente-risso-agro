@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dialog'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { hoyLocal } from '@/lib/fecha'
+import { cn } from '@/lib/utils'
+import { PILDORA } from './pildora'
 
 const hoy = hoyLocal
 
@@ -76,17 +78,13 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           onClick={abrir}
           disabled={!empresaId}
           title={`Gordo — $${gordo.data.valor.toLocaleString('es-AR')}/kg · ${fmtFecha(gordo.data.fecha)}${gordo.data.auto ? ' · Cañuelas, promedio novillos' : ' · cargado a mano'} · tocá para actualizar`}
-          className="flex shrink-0 items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-sidebar-accent"
+          className={PILDORA}
         >
-          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-            <Beef className="size-[15px] text-principal" />
-            Gordo
-          </span>
-          <b className="tnum text-sm font-semibold text-sidebar-foreground">
-            ${gordo.data.valor.toLocaleString('es-AR')}
-            <span className="ml-0.5 text-[11px] font-medium text-sidebar-foreground/55">
-              /kg
-            </span>
+          <Beef className="size-4 text-principal" />
+          <span className="text-[13px] text-texto-suave">Gordo</span>
+          <b className="cifra text-[15px] font-bold text-texto">
+            ${Math.round(gordo.data.valor).toLocaleString('es-AR')}
+            <span className="ml-0.5 text-[12px] font-medium text-texto-suave">/kg</span>
           </b>
         </button>
       ) : (
@@ -95,9 +93,10 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           onClick={abrir}
           disabled={!empresaId}
           title="Cargar el precio del gordo"
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-borde px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className={cn(PILDORA, 'text-[13px] font-semibold text-principal')}
         >
-          <Beef className="size-[15px] text-principal" />+ Gordo
+          <Beef className="size-4 text-principal" />
+          Cargar el gordo
         </button>
       )}
 

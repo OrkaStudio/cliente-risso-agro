@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
 import { BotonChico } from '@/components/tropero/boton'
-import { Icono } from '@/components/tropero/icono'
+import { Icono, type NombreIcono } from '@/components/tropero/icono'
+import { CargarDialog } from '@/features/analitica/cargar-dialog'
+import lotes from '@/assets/tropero/lotes-del-campo.webp'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
@@ -20,16 +22,18 @@ import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender, type Aviso, type PotreroAtencion } from '../para-atender-api'
 import { CroquisRecorrida } from './croquis-recorrida'
-import { cosasParaHoy, fraseDelDia, franjasDelRodeo, plataCorta, proximos30, saludo, type Cosa } from './dia'
+import { chipsDelDia, cosasParaHoy, franjasDelRodeo, plataCorta, proximos30, saludo, type Chip, type Cosa } from './dia'
 import { useGanadoCampania, useLluvia60 } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const TARJETA = 'rounded-[18px] border border-borde bg-superficie p-6'
 
 /**
- * Inicio · El día (página 35): el saludo con lo del día, lo que hay para
- * atender, el rodeo con la plata, lo que dejó la recorrida sobre el campo,
- * los cobros y pagos, el clima y la estructura del rodeo.
+ * Inicio · El día (página 35). Pensado desde el productor que abre la compu a
+ * la mañana: primero, si hay algo que atender (y qué); después, el pulso del
+ * campo en cuatro números que llevan a su lugar (hacienda, plata, lluvia,
+ * recorrida); y a la vista, sin bajar, la lista para atender y los cobros y
+ * pagos. El detalle (croquis, rodeo, clima) va abajo, para el que lo busca.
  */
 export function ElDia() {
   const { user } = useAuth()
@@ -39,11 +43,12 @@ export function ElDia() {
   const { data: campos } = useMapa(membresia?.empresa_id)
   const { actual } = useCampoClima()
   const clima = useClima(actual?.ubicacion ?? null)
+  const pronostico = usePronostico(actual?.ubicacion ?? null)
   const lluvia = useLluvia60(actual?.id ?? null)
   const ganado = useGanadoCampania()
   const reducir = useReducedMotion()
 
-  if (panorama.isLoading || atender.isLoading) return <div className="h-[340px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
+  if (panorama.isLoading || atender.isLoading) return <div className="h-[132px] animate-pulse rounded-[22px] bg-superficie-hundida" aria-busy />
   if (panorama.error || !panorama.data) return <p className="text-texto-suave">No pudimos cargar el Inicio. Revisá la conexión y probá de nuevo.</p>
 
   const p = panorama.data
@@ -51,72 +56,247 @@ export function ElDia() {
   const cosas = cosasParaHoy(a?.potreros ?? [], p.vencimientos, a?.sinRecorrer ?? [])
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
-  const frase = fraseDelDia({
-    temp: clima.data?.temp ?? null,
-    lugar: actual?.nombre ?? null,
-    lluvia60: lluvia.data?.total ?? null,
-    cosas: cosas.length,
-  })
+  const manana = pronostico.data?.[1]
+  const chips = chipsDelDia({ cosas, vencimientos: p.vencimientos, lluviaManana: manana ? manana.lluviaProb : null })
   const entra = (i: number) =>
     reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-9">
+    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
       <motion.div {...entra(0)}>
-        <Bienvenida titulo={saludo(new Date().getHours(), nombre)} frase={frase} />
+        <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} empresaId={membresia?.empresa_id ?? ''} />
       </motion.div>
 
-      <motion.div {...entra(1)} className="grid gap-10 lg:grid-cols-[minmax(0,668px)_minmax(0,380px)] lg:justify-between">
+      <motion.div {...entra(1)} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <PulsoHacienda total={p.totalCabezas} campos={campos?.length ?? 0} cats={p.porCategoria} nacimientos={(a?.nacimientos ?? []).reduce((s, n) => s + n.total, 0)} />
+        <PulsoPlata vencimientos={p.vencimientos} ganado={ganado.data ?? null} />
+        <PulsoLluvia lugar={actual?.nombre ?? null} mm={lluvia.data?.total ?? null} temp={clima.data?.temp ?? null} manana={manana ?? null} />
+        <PulsoRecorrida ultima={a?.ultimaRecorridaHace ?? null} potreros={a?.potreros.length ?? 0} sinRecorrer={a?.sinRecorrer ?? []} />
+      </motion.div>
+
+      <motion.div {...entra(2)} className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <ParaAtenderHoy cosas={cosas} />
-        <Rodeo total={p.totalCabezas} campos={campos?.length ?? 0} cats={p.porCategoria} ganado={ganado.data ?? null} proximos={proximos30(p.vencimientos)} />
+        <CobrosYPagos vencimientos={p.vencimientos} />
       </motion.div>
 
-      <motion.div {...entra(2)}>
+      <motion.div {...entra(3)} className="mt-3">
         <LoQueDejoLaRecorrida campos={campos ?? []} atencion={a?.potreros ?? []} ultima={a?.ultimaRecorridaHace ?? null} empresaId={membresia?.empresa_id ?? ''} />
       </motion.div>
 
-      <motion.div {...entra(3)} className="grid gap-5 lg:grid-cols-[minmax(0,684px)_minmax(0,400px)] lg:justify-between">
-        <CobrosYPagos vencimientos={p.vencimientos} />
-        <Clima />
-      </motion.div>
-
-      <motion.div {...entra(4)}>
+      <motion.div {...entra(4)} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <EstructuraDelRodeo cats={p.porCategoria} total={p.totalCabezas} />
+        <Clima />
       </motion.div>
     </div>
   )
 }
 
-// ===== El saludo =====
-
-function Bienvenida({ titulo, frase }: { titulo: string; frase: string }) {
+/** Ir a una sección del Inicio («#clima») o a otra pantalla («/agenda»). */
+function useIr() {
   const navigate = useNavigate()
+  return (destino: string) => {
+    if (destino.startsWith('#')) document.getElementById(destino.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else navigate(destino)
+  }
+}
+
+// ===== La cabecera: el saludo, lo importante en chips y los accesos =====
+
+const CHIP: Record<Chip['tono'], string> = {
+  problema: 'bg-estado-problema-suave text-estado-problema-texto',
+  atencion: 'bg-estado-atencion-suave text-estado-atencion-texto',
+  aviso: 'bg-acento/40 text-acento-texto',
+  info: 'bg-[#e1ebf2] text-[#215a7e]',
+  bien: 'bg-estado-bien-suave text-estado-bien-texto',
+}
+const PUNTO: Record<Chip['tono'], string> = {
+  problema: 'bg-estado-problema',
+  atencion: 'bg-estado-atencion',
+  aviso: 'bg-acento-texto',
+  info: 'bg-[#2779c4]',
+  bien: 'bg-estado-bien',
+}
+
+function Cabecera({ titulo, chips, empresaId }: { titulo: string; chips: Chip[]; empresaId: string }) {
+  const ir = useIr()
+  const navigate = useNavigate()
+  const acceso =
+    'inline-flex h-11 items-center gap-2 rounded-full bg-superficie px-4 text-[14.5px] font-bold text-texto shadow-[0_2px_10px_rgba(19,27,22,0.12)] transition-transform hover:-translate-y-px'
   return (
-    <section className="relative isolate flex h-[340px] flex-col justify-center overflow-hidden rounded-[24px] bg-tinta px-12">
-      <img src="/inicio-bienvenida.png" alt="" className="absolute inset-0 -z-20 size-full object-cover" fetchPriority="high" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[rgba(19,27,22,0.82)] via-[rgba(19,27,22,0.35)] to-transparent" />
-      <h1 className="font-heading text-[64px] leading-[1.05] font-extrabold tracking-[-0.02em] text-superficie">{titulo}</h1>
-      <p className="mt-4 max-w-[540px] text-[18px] leading-[1.45] font-medium text-superficie/90">{frase}</p>
-      <div className="mt-7 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/agenda')}
-          className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1.5 pr-1.5 pl-6 text-[16px] font-bold text-principal-texto hover:bg-terracota-600"
-        >
-          Ver la agenda
-          <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
-            <Icono nombre="Siguiente" tamano={16} />
-          </span>
+    <section className="relative isolate flex min-h-[132px] items-center gap-6 overflow-hidden rounded-[22px] border border-borde bg-superficie px-8 py-6">
+      {/* La ilustración de la 31 («Lotes y sombra de nube»), a la derecha, fundida con el fondo. */}
+      <img src={lotes} alt="" className="absolute inset-y-0 right-0 -z-20 h-full w-[62%] object-cover object-[50%_35%]" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,var(--superficie)_38%,color-mix(in_srgb,var(--superficie)_70%,transparent)_58%,transparent_85%)]" />
+      <div className="min-w-0 flex-1">
+        <h1 className="font-heading text-[34px] leading-tight font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {chips.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => ir(c.destino)}
+              className={cn('inline-flex h-8 items-center gap-2 rounded-full px-3 text-[13.5px] font-bold transition-transform hover:-translate-y-px', CHIP[c.tono])}
+            >
+              <span className={cn('size-2 rounded-full', PUNTO[c.tono])} />
+              {c.texto}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="hidden shrink-0 flex-wrap justify-end gap-2.5 md:flex">
+        <CargarDialog
+          empresaId={empresaId}
+          renderTrigger={(abrir) => (
+            <button type="button" onClick={abrir} disabled={!empresaId} className={acceso}>
+              <Icono nombre="Plata" tamano={16} /> Anotar un gasto
+            </button>
+          )}
+        />
+        <button type="button" onClick={() => navigate('/agenda')} className={acceso}>
+          <Icono nombre="Agenda" tamano={16} /> Agenda
         </button>
-        <button
-          type="button"
-          onClick={() => navigate('/campo')}
-          className="inline-flex h-12 items-center rounded-full border-[1.5px] border-superficie/70 bg-black/15 px-6 text-[16px] font-semibold text-superficie hover:bg-white/15"
-        >
-          Pasar al Modo Campo
+        <button type="button" onClick={() => navigate('/campo')} className={cn(acceso, 'bg-principal text-principal-texto')}>
+          <Icono nombre="Celular" tamano={16} /> Modo Campo
         </button>
       </div>
     </section>
+  )
+}
+
+// ===== El pulso del campo: cuatro números, cada uno lleva a su lugar =====
+
+const NUMERO = 'titulo-display text-[40px] leading-none tracking-[-0.02em] text-texto'
+
+function Pulso({
+  titulo,
+  icono,
+  destino,
+  pie,
+  children,
+}: {
+  titulo: string
+  icono: NombreIcono
+  destino: string
+  pie: React.ReactNode
+  children: React.ReactNode
+}) {
+  const ir = useIr()
+  return (
+    <button
+      type="button"
+      onClick={() => ir(destino)}
+      className="group flex min-h-[148px] flex-col rounded-[18px] border border-borde bg-superficie p-5 text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(19,27,22,0.08)]"
+    >
+      <span className="flex items-center gap-2 text-[13.5px] font-semibold text-texto-suave">
+        <Icono nombre={icono} tamano={16} />
+        {titulo}
+        <span className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
+          <Icono nombre="Siguiente" tamano={16} />
+        </span>
+      </span>
+      <span className="mt-2 flex-1">{children}</span>
+      <span className="mt-2 text-[13px] leading-snug text-texto-suave">{pie}</span>
+    </button>
+  )
+}
+
+function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; campos: number; cats: CategoriaConteo[]; nacimientos: number }) {
+  const franjas = franjasDelRodeo(cats)
+  return (
+    <Pulso
+      titulo="Hacienda"
+      icono="Vaca"
+      destino="/hacienda"
+      pie={nacimientos > 0 ? <b className="text-estado-bien-texto">+{nacimientos} nacimientos sin caravana</b> : campos > 1 ? `En ${campos} campos` : 'Ver por potrero'}
+    >
+      <span className="flex items-baseline gap-2">
+        <span className={NUMERO}>{total.toLocaleString('es-AR')}</span>
+        <span className="text-[15px] font-semibold text-texto-suave">cabezas</span>
+      </span>
+      {franjas.length > 0 && (
+        <span className="mt-3 flex h-1.5 gap-1">
+          {franjas.map((f) => (
+            <span key={f.nombre} className={cn('rounded-full', f.clase)} style={{ flexGrow: f.cabezas }} />
+          ))}
+        </span>
+      )}
+    </Pulso>
+  )
+}
+
+function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; ganado: number | null }) {
+  const p30 = proximos30(vencimientos)
+  const vencidos = vencimientos.filter((v) => (v.diasParaVencer ?? 0) < 0)
+  const deuda = vencidos.reduce((s, v) => s + (v.tipo === 'gasto' ? v.monto ?? 0 : 0), 0)
+  return (
+    <Pulso
+      titulo="Próximos 30 días"
+      icono="Plata"
+      destino="/agenda"
+      pie={
+        vencidos.length > 0 ? (
+          <b className="text-estado-problema-texto">
+            {vencidos.length === 1 ? '1 vencido' : `${vencidos.length} vencidos`}
+            {deuda > 0 ? ` · ${plataCorta(deuda)}` : ''}
+          </b>
+        ) : ganado !== null && ganado !== 0 ? (
+          `Desde julio: ${plataCorta(ganado, true)}`
+        ) : (
+          'Nada vencido'
+        )
+      }
+    >
+      <span className={cn(NUMERO, p30 > 0 ? 'text-estado-bien' : p30 < 0 ? 'text-estado-problema-texto' : 'text-texto')}>
+        {p30 === 0 ? '$0' : plataCorta(p30, true)}
+      </span>
+      <span className="mt-1 block truncate text-[13px] text-texto-suave">cobros menos pagos</span>
+    </Pulso>
+  )
+}
+
+function PulsoLluvia({ lugar, mm, temp, manana }: { lugar: string | null; mm: number | null; temp: number | null; manana: DiaPronostico | null }) {
+  return (
+    <Pulso
+      titulo={lugar ? `Lluvia en ${lugar}` : 'Lluvia'}
+      icono="Lluvia"
+      destino="#clima"
+      pie={manana ? (manana.lluviaProb >= 40 ? <b className="text-[#215a7e]">Mañana {manana.lluviaProb} % de lluvia</b> : `Mañana ${manana.max}°, sin lluvia`) : 'Pronóstico abajo'}
+    >
+      <span className="flex items-baseline gap-2">
+        <span className={NUMERO}>{mm === null ? '—' : Math.round(mm)}</span>
+        <span className="text-[15px] font-semibold text-texto-suave">mm</span>
+      </span>
+      <span className="mt-1 block truncate text-[13px] text-texto-suave">en 60 días{temp !== null ? ` · ahora ${temp}°` : ''}</span>
+    </Pulso>
+  )
+}
+
+function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | null; potreros: number; sinRecorrer: { campo: string }[] }) {
+  return (
+    <Pulso
+      titulo="Última recorrida"
+      icono="Recorrida"
+      destino="#recorrida"
+      pie={
+        potreros > 0 ? (
+          <b className="text-estado-problema-texto">Dejó {potreros} {potreros === 1 ? 'potrero' : 'potreros'} para mirar</b>
+        ) : sinRecorrer.length > 0 ? (
+          `${sinRecorrer[0]!.campo} sin recorrer`
+        ) : (
+          'Todo en orden'
+        )
+      }
+    >
+      {ultima === null || ultima <= 1 ? (
+        <span className={NUMERO}>{ultima === null ? 'Nunca' : ultima === 0 ? 'Hoy' : 'Ayer'}</span>
+      ) : (
+        <span className="flex items-baseline gap-2">
+          <span className="text-[15px] font-semibold text-texto-suave">hace</span>
+          <span className={NUMERO}>{ultima}</span>
+          <span className="text-[15px] font-semibold text-texto-suave">días</span>
+        </span>
+      )}
+    </Pulso>
   )
 }
 
@@ -127,10 +307,11 @@ const BARRA: Record<Cosa['tono'], string> = { problema: 'bg-[#b3372a]', atencion
 function ParaAtenderHoy({ cosas }: { cosas: Cosa[] }) {
   const navigate = useNavigate()
   return (
-    <section aria-labelledby="atender-hoy">
-      <h2 id="atender-hoy" className="font-heading text-[22px] font-extrabold text-texto">
+    <section id="para-atender" aria-labelledby="atender-hoy" className={cn(TARJETA, 'scroll-mt-6')}>
+      <h2 id="atender-hoy" className="font-heading text-[20px] font-extrabold text-texto">
         Para atender hoy
       </h2>
+      <p className="text-[13.5px] text-texto-suave">Lo urgente primero, con el botón para resolverlo.</p>
       {cosas.length === 0 ? (
         <div className="mt-4 flex items-center gap-3 rounded-[16px] bg-estado-bien-suave px-5 py-4 text-estado-bien-texto">
           <span className="grid size-8 place-items-center rounded-full bg-estado-bien text-superficie">
@@ -141,7 +322,7 @@ function ParaAtenderHoy({ cosas }: { cosas: Cosa[] }) {
       ) : (
         <ul className="mt-2 flex flex-col">
           {cosas.map((c) => (
-            <li key={c.key} className="flex items-center gap-4 border-b border-borde py-4 last:border-b-0">
+            <li key={c.key} className="flex items-center gap-4 border-b border-borde py-3.5 last:border-b-0 last:pb-0">
               <span aria-hidden className={cn('w-1 self-stretch rounded-full', BARRA[c.tono])} />
               <div className="min-w-0 flex-1">
                 <p className="text-[16.5px] font-semibold text-texto">{c.titulo}</p>
@@ -154,51 +335,6 @@ function ParaAtenderHoy({ cosas }: { cosas: Cosa[] }) {
           ))}
         </ul>
       )}
-    </section>
-  )
-}
-
-// ===== El rodeo y la plata =====
-
-function Rodeo({
-  total,
-  campos,
-  cats,
-  ganado,
-  proximos,
-}: {
-  total: number
-  campos: number
-  cats: CategoriaConteo[]
-  ganado: number | null
-  proximos: number
-}) {
-  const franjas = franjasDelRodeo(cats)
-  return (
-    <section aria-label="El rodeo" className="flex flex-col">
-      <p className="titulo-display text-[150px] leading-[0.95] tracking-[-0.04em] text-texto">{total.toLocaleString('es-AR')}</p>
-      <p className="mt-2 text-[18px] font-semibold text-texto-suave">
-        cabezas{campos > 0 ? ` en ${campos === 1 ? 'tu campo' : `${campos} campos`}` : ''}
-      </p>
-      {franjas.length > 0 && (
-        <div className="mt-2 flex h-2 gap-1" aria-label={franjas.map((f) => `${f.nombre} ${f.cabezas}`).join(', ')}>
-          {franjas.map((f) => (
-            <span key={f.nombre} className={cn('rounded-full', f.clase)} style={{ flexGrow: f.cabezas }} title={`${f.nombre}: ${f.cabezas}`} />
-          ))}
-        </div>
-      )}
-      <div className="mt-5 flex gap-8">
-        <div>
-          <p className="text-[13.5px] text-texto-suave">Ganado desde julio</p>
-          <p className="font-heading text-[26px] font-extrabold text-texto">{ganado === null ? '—' : plataCorta(ganado)}</p>
-        </div>
-        <div>
-          <p className="text-[13.5px] text-texto-suave">Próximos 30 días</p>
-          <p className={cn('font-heading text-[26px] font-extrabold', proximos >= 0 ? 'text-estado-bien' : 'text-estado-problema-texto')}>
-            {proximos === 0 ? '—' : plataCorta(proximos, true)}
-          </p>
-        </div>
-      </div>
     </section>
   )
 }
@@ -221,11 +357,14 @@ function LoQueDejoLaRecorrida({
   const campo = campos.find((c) => c.nombre === atencion[0]?.campo) ?? campos[0]
   const [abierto, setAbierto] = useState<string | null>(atencion[0]?.nivel === 'atender' ? atencion[0].key : null)
   return (
-    <section className={TARJETA} aria-labelledby="recorrida">
+    <section id="recorrida" className={cn(TARJETA, 'scroll-mt-6')} aria-labelledby="recorrida-titulo">
       <div className="flex items-center justify-between gap-4">
-        <h2 id="recorrida" className="font-heading text-[20px] font-extrabold text-texto">
-          Lo que dejó la recorrida
-        </h2>
+        <div>
+          <h2 id="recorrida-titulo" className="font-heading text-[20px] font-extrabold text-texto">
+            Lo que dejó la recorrida
+          </h2>
+          <p className="text-[13.5px] text-texto-suave">Cada potrero como lo vio el que recorrió. Si ya se arregló, marcalo.</p>
+        </div>
         <BotonChico type="button" onClick={() => navigate('/campo/historial')}>
           Historial
         </BotonChico>
@@ -389,10 +528,13 @@ function CobrosYPagos({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const vista = vencimientos.filter((v) => v.diasParaVencer !== null && v.diasParaVencer <= 30).slice(0, 4)
   return (
     <section className={TARJETA} aria-labelledby="cobros-pagos">
-      <div className="flex items-center justify-between gap-4 border-b border-borde pb-4">
-        <h2 id="cobros-pagos" className="font-heading text-[20px] font-extrabold text-texto">
-          Cobros y pagos que se vienen
-        </h2>
+      <div className="flex items-start justify-between gap-4 border-b border-borde pb-4">
+        <div>
+          <h2 id="cobros-pagos" className="font-heading text-[20px] font-extrabold text-texto">
+            Cobros y pagos
+          </h2>
+          <p className="text-[13.5px] text-texto-suave">Lo que vence en 30 días</p>
+        </div>
         <BotonChico type="button" onClick={() => navigate('/agenda')}>
           Ver en Agenda
         </BotonChico>
@@ -406,13 +548,13 @@ function CobrosYPagos({ vencimientos }: { vencimientos: Vencimiento[] }) {
             const f = v.fechaVencimiento ? new Date(`${v.fechaVencimiento}T12:00:00`) : null
             const cobro = v.tipo === 'ingreso'
             return (
-              <li key={v.id} className="flex items-center gap-4 border-b border-borde py-4 last:border-b-0">
+              <li key={v.id} className="flex items-center gap-4 border-b border-borde py-3.5 last:border-b-0 last:pb-0">
                 <span className={cn('flex w-12 shrink-0 flex-col items-center rounded-[10px] py-1.5', d < 0 ? 'bg-estado-problema-suave' : 'bg-superficie-hundida')}>
                   <span className="cifra text-[19px] leading-none font-bold text-texto">{f ? f.getDate() : '—'}</span>
                   <span className="text-[11px] text-texto-suave">{f ? MES[f.getMonth()] : ''}</span>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold text-texto">{v.descripcion}</p>
+                  <p className="line-clamp-2 text-[15px] leading-snug font-semibold text-texto">{v.descripcion}</p>
                   <span
                     className={cn(
                       'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[12.5px] font-bold',
@@ -459,7 +601,7 @@ function Clima() {
   const dias = (pronostico.data ?? []).slice(0, 5)
   const ultima = lluvia.data?.ultima
   return (
-    <section aria-label={`El clima en ${actual.nombre}`} className="overflow-hidden rounded-[18px] border border-borde bg-superficie">
+    <section id="clima" aria-label={`El clima en ${actual.nombre}`} className="scroll-mt-6 overflow-hidden rounded-[18px] border border-borde bg-superficie">
       {/* Escena del Figma: el molino al atardecer, con la rueda girando despacio. */}
       <div className="relative h-[120px] overflow-hidden bg-[#e8c0ae]">
         <div className="absolute top-[-120px] left-[-150px] h-[320px] w-[569px]">
@@ -544,9 +686,12 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
   return (
     <section className={TARJETA} aria-labelledby="estructura">
       <div className="flex items-center justify-between gap-4">
-        <h2 id="estructura" className="font-heading text-[20px] font-extrabold text-texto">
-          Estructura del rodeo
-        </h2>
+        <div>
+          <h2 id="estructura" className="font-heading text-[20px] font-extrabold text-texto">
+            Estructura del rodeo
+          </h2>
+          <p className="text-[13.5px] text-texto-suave">Hembras y machos por edad, y cómo viene la cría.</p>
+        </div>
         <BotonChico type="button" onClick={() => navigate('/hacienda')}>
           Ver hacienda
         </BotonChico>
