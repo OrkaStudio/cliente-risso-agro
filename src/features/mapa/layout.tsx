@@ -48,6 +48,7 @@ export function LayoutMapa({
   salidas = true,
   onSalir,
   ayuda,
+  nota,
 }: {
   mapa: React.ReactNode
   /** Buscador y pistas, encima del mapa. */
@@ -60,6 +61,8 @@ export function LayoutMapa({
   onSalir: () => void
   /** Qué decir en el WhatsApp de «¿Dudas? Escribinos». */
   ayuda: string
+  /** Por qué está acá: «La Agenda se abre cuando tu campo esté en el mapa». */
+  nota?: string
 }) {
   const reducir = useReducedMotion()
   return (
@@ -81,6 +84,12 @@ export function LayoutMapa({
         className="z-[600] -mt-6 max-h-[var(--alto-hoja)] min-h-[var(--alto-hoja)] overflow-y-auto rounded-t-[28px] bg-fondo px-[18px] pt-6 pb-[max(18px,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(19,27,22,0.12)] md:mt-0 md:flex md:h-full md:max-h-none md:w-[480px] md:shrink-0 md:flex-col md:rounded-none md:px-10 md:shadow-none"
       >
         <div className="flex flex-col gap-5 md:my-auto md:py-8">
+          {nota && (
+            <p className="flex w-fit items-center gap-2 rounded-full bg-estado-atencion-suave px-3.5 py-1.5 text-[13.5px] font-semibold text-estado-atencion-texto">
+              <Icono nombre="Ayuda" tamano={16} />
+              {nota}
+            </p>
+          )}
           {encima}
           <h1 className="titulo-display text-[28px] leading-[1.04] text-texto md:text-[38px]">{titulo}</h1>
           {children}

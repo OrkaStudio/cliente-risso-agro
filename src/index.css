@@ -708,14 +708,31 @@
   font-weight: 600;
   opacity: 0.85;
 }
+/* Cada potrero con el color de lo que tiene, como en el ejemplo. */
+.tropero-etiqueta--hacienda.leaflet-tooltip { background: #b85c2e; color: #fbfaf6; }
+.tropero-etiqueta--sembrado.leaflet-tooltip { background: #ecc46a; color: #7a3a1c; }
+.tropero-etiqueta--descanso.leaflet-tooltip { color: #3e6339; }
+/* El que se acaba de ubicar: oscuro, para que se distinga del resto. */
 .tropero-etiqueta--activa.leaflet-tooltip {
-  background: transparent;
-  box-shadow: none;
+  padding: 6px 12px 7px;
+  background: #7a3a1c;
   color: #fbfaf6;
 }
 .tropero-etiqueta--activa b {
   font-size: 16px;
 }
+/* «Cerrá acá»: el primer punto late cuando ya se puede cerrar el dibujo. */
+.tropero-cerrar { pointer-events: none; }
+.tropero-cerrar-onda {
+  position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; border-radius: 9999px;
+  border: 3px solid #ecc46a; animation: cerrar-onda 1.3s ease-out infinite;
+}
+.tropero-cerrar-texto {
+  position: absolute; left: 0; top: -46px; transform: translateX(-50%); white-space: nowrap;
+  background: #ecc46a; color: #7a3a1c; font: 700 13px/1 Inter, sans-serif;
+  padding: 7px 11px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+@keyframes cerrar-onda { 0% { opacity: 1; transform: scale(.55); } 100% { opacity: 0; transform: scale(1.7); } }
 /* El punto donde se toca cada esquina del dibujo. */
 .leaflet-container .marker-icon.leaflet-pm-draggable,
 .leaflet-container .leaflet-marker-icon.marker-icon {
@@ -724,8 +741,7 @@
 }
 
 /* ===== Guía sobre el mapa (tutorial del mapa) =====
-   Un gesto animado sobre el mapa real: dónde tocar, cómo arrastrar, cómo
-   dibujar las esquinas. Se repite solo; con «menos movimiento» queda quieto. */
+   Un gesto animado sobre el mapa real: dónde tocar y cómo arrastrar. Se repite solo; con «menos movimiento» queda quieto. */
 .tropero-guia-ancla { pointer-events: none; }
 .guia { position: relative; transform: translate(-22px, -10px); pointer-events: none; }
 .guia-mano { position: relative; z-index: 2; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); }
@@ -741,22 +757,14 @@
   background: rgba(19,27,22,.88); color: #fbfaf6; font: 600 14px/1 Inter, sans-serif;
   padding: 9px 14px; border-radius: 9999px; box-shadow: 0 6px 18px rgba(0,0,0,.25);
 }
-.guia--esquinas { transform: translate(-70px, -50px); width: 140px; height: 100px; }
-.guia--esquinas .guia-forma path {
-  fill: rgba(184,92,46,.18); stroke: #ecc46a; stroke-width: 3; stroke-dasharray: 420; stroke-dashoffset: 420;
-  stroke-linejoin: round; animation: guia-trazo 4s ease-in-out infinite;
-}
-.guia--esquinas .guia-mano { position: absolute; left: 0; top: 0; animation: guia-esquinas 4s ease-in-out infinite; }
-.guia--esquinas .guia-texto { top: 112px; left: 70px; transform: translateX(-50%); }
 @keyframes guia-onda { 0%,40% { opacity: 0; transform: scale(.6); } 50% { opacity: 1; transform: scale(.8); } 100% { opacity: 0; transform: scale(2.4); } }
 @keyframes guia-tocar { 0%,100% { transform: translateY(0) scale(1); } 45% { transform: translateY(-10px) scale(1.05); } 55% { transform: translateY(2px) scale(.92); } }
 @keyframes guia-arrastrar { 0%,100% { transform: translate(0,0); } 20% { transform: translate(0,0) scale(.92); } 70% { transform: translate(90px,-30px) scale(.92); } 85% { transform: translate(90px,-30px) scale(1); } }
-@keyframes guia-trazo { 0% { stroke-dashoffset: 420; } 70%,100% { stroke-dashoffset: 0; } }
-@keyframes guia-esquinas {
-  0% { transform: translate(-12px,-4px); } 17% { transform: translate(108px,0); } 34% { transform: translate(104px,76px); }
-  51% { transform: translate(-8px,72px); } 68%,100% { transform: translate(-12px,-4px); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .guia-mano, .guia-onda, .guia-forma path { animation: none !important; }
-  .guia--esquinas .guia-forma path { stroke-dashoffset: 0; }
+  .guia-mano, .guia-onda, .tropero-cerrar-onda { animation: none !important; }
+}
+
+/* Una columna que scrollea no se corta en seco: arriba y abajo se difumina. */
+@utility scroll-difuminado {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
 }

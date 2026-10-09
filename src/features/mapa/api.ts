@@ -1,14 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { crearPotrero, setCampoContorno, setPotreroPoligono } from '@/features/campos/api'
-import type { CampoMapa, LatLng } from './reglas'
+import type { CampoMapa, LatLng, PotreroMapa } from './reglas'
 
-/** Lo que se ve de cada potrero para reconocerlo: «60 cabezas», «trigo», «en descanso». */
+/** Lo que se ve de cada potrero para reconocerlo: «60 cabezas», «Trigo», «En descanso». */
 function queTiene(estado: string, cultivo: string | null, cabezas: number): string {
   if (cabezas > 0) return `${cabezas} ${cabezas === 1 ? 'cabeza' : 'cabezas'}`
-  if (cultivo) return cultivo.toLowerCase()
-  if (estado === 'descanso') return 'en descanso'
-  return 'vacío'
+  if (cultivo) return cultivo.charAt(0).toLocaleUpperCase('es-AR') + cultivo.slice(1)
+  if (estado === 'descanso') return 'En descanso'
+  return 'Vacío'
+}
+
+function tipoDe(estado: string, cultivo: string | null, cabezas: number): PotreroMapa['tipo'] {
+  if (cabezas > 0) return 'hacienda'
+  if (cultivo || estado === 'cultivo') return 'sembrado'
+  if (estado === 'descanso') return 'descanso'
+  return 'vacio'
 }
 
 /** Los campos de la empresa con su borde y sus potreros, desde la base. */
@@ -43,6 +50,7 @@ export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
           poligono: (p.poligono as LatLng[] | null) ?? null,
           cabezas,
           que: queTiene(p.estado_ciclo, p.cultivo, cabezas),
+          tipo: tipoDe(p.estado_ciclo, p.cultivo, cabezas),
         }
       }),
   }))

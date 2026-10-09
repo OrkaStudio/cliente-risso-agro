@@ -55,6 +55,10 @@ test('primero el campo: sin el mapa sólo andan el Inicio y Campos', async ({ pa
   await page.goto('/hacienda')
   await expect(page).toHaveURL(/\/mapa$/)
   await expect(page.getByRole('heading', { name: 'Armemos La Porteña en el mapa' })).toBeVisible()
+  // Dice por qué está acá; al dar el primer paso ya no hace falta.
+  await expect(page.getByText('La Hacienda se abre cuando tu campo esté en el mapa.')).toBeVisible()
+  await page.getByRole('button', { name: 'Empezar' }).click()
+  await expect(page.getByText('La Hacienda se abre cuando tu campo esté en el mapa.')).toBeHidden()
   await page.goto('/campos')
   await expect(page).toHaveURL(/\/campos$/)
 })

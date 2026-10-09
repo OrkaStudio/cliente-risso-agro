@@ -15,12 +15,12 @@ import { LocalidadCampo } from './localidad-campo'
 import { MedidorHectareas } from './medidor'
 import {
   cabezasDe,
+  conMayuscula,
   CULTIVOS,
   ATAJOS_DESCANSO,
   diasDesde,
   faltaEnContenido,
   haceDias,
-  ha,
   leerHectareas,
   letraDeCampo,
   filasRepetidas,
@@ -387,16 +387,10 @@ export function PasoPotreros({
           )
         })}
       </div>
-      {/* Un solo botón: si faltan hectáreas, el potrero nuevo ya trae las que faltan. */}
-      <BotonChico
-        type="button"
-        icono="Agregar"
-        className="self-start"
-        onClick={() =>
-          setFilas((xs) => [...xs, nuevaFila(siguiente(), suma.estado === 'faltan' ? ha(suma.diferencia) : '')])
-        }
-      >
-        {suma.estado === 'faltan' ? `Sumar otro potrero con las ${ha(suma.diferencia)} ha que faltan` : 'Sumar otro potrero'}
+      {/* Vacío a propósito: con varios potreros por cargar, precargar lo que
+          falta obliga a borrar. Lo que falta lo dice el medidor. */}
+      <BotonChico type="button" icono="Agregar" className="self-start" onClick={() => setFilas((xs) => [...xs, nuevaFila(siguiente(), '')])}>
+        Sumar otro potrero
       </BotonChico>
 
       {repetidas.size > 0 && (
@@ -591,7 +585,7 @@ export function PasoQueHay({
               autoFocus
               placeholder="Cebada"
               maxLength={40}
-              onChange={(e) => setCultivo(e.target.value)}
+              onChange={(e) => setCultivo(conMayuscula(e.target.value))}
             />
           )}
           <p className="text-[13px] text-texto-suave">

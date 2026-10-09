@@ -262,6 +262,11 @@ const MINUSCULAS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en
  * La primera palabra siempre va con mayúscula; las preposiciones y artículos
  * del medio, no. Lo que ya viene en mayúscula se respeta (siglas como «SRL»).
  */
+/** «cebada de primavera» → «Cebada de primavera»: la primera, siempre en mayúscula. */
+export function conMayuscula(texto: string): string {
+  return texto.charAt(0).toLocaleUpperCase('es-AR') + texto.slice(1)
+}
+
 export function nombrePropio(texto: string): string {
   return texto.replace(/[^\s]+/g, (p, i: number) => {
     if (i > 0 && MINUSCULAS.has(p.toLowerCase())) return p.toLowerCase()

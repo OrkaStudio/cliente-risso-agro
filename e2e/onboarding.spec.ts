@@ -119,12 +119,16 @@ test('hectáreas que sobran y que faltan', async ({ page }) => {
   await empresaYCampo(page, '100')
   await potreros(page, [['1', '70'], ['2', '50']])
   await expect(page.getByText('Sobran 20 ha')).toBeVisible()
-  await page.getByRole('button', { name: 'Sí, tiene 120 ha' }).click()
+  await expect(page.getByText('100 ha del campo')).toBeVisible()
+  await page.getByRole('button', { name: 'El campo tiene 120 ha' }).click()
   await expect(page.getByText('Cierran justo')).toBeVisible()
 
   await page.locator('input[inputmode=decimal]').nth(1).fill('30')
   await expect(page.getByText('Faltan 20 ha')).toBeVisible()
-  await page.getByRole('button', { name: /Sumar otro potrero con las 20 ha/ }).click()
+  // El potrero nuevo llega vacío: lo que falta lo dice el medidor, no se precarga.
+  await page.getByRole('button', { name: 'Sumar otro potrero' }).click()
+  await expect(page.locator('input[inputmode=decimal]').nth(2)).toHaveValue('')
+  await page.locator('input[inputmode=decimal]').nth(2).fill('20')
   await expect(page.getByText('Cierran justo')).toBeVisible()
 })
 

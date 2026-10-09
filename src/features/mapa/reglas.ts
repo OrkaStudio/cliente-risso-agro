@@ -14,8 +14,10 @@ export type PotreroMapa = {
   hectareas: number | null
   poligono: LatLng[] | null
   cabezas: number
-  /** «60 cabezas», «trigo», «en descanso»: lo que ayuda a reconocerlo. */
+  /** «60 cabezas», «Trigo», «En descanso»: lo que ayuda a reconocerlo. */
   que: string
+  /** Lo que tiene, para el color en el mapa (el mismo que el ejemplo). */
+  tipo?: 'hacienda' | 'sembrado' | 'descanso' | 'vacio'
 }
 
 export type CampoMapa = {

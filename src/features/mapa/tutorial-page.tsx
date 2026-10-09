@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Aviso } from '@/components/tropero/aviso'
 import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
@@ -11,7 +11,6 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { buscarParcelaRural, parcelaEnPunto } from '@/features/lotes/catastro'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
-import ejemplo from '@/assets/tropero/campo-armado-ejemplo.webp'
 import {
   asignarDibujo,
   buscarLugar,
@@ -24,7 +23,8 @@ import {
   useMapa,
   type Lugar,
 } from './api'
-import { LayoutMapa, PasoDe, Pista } from './layout'
+import { EjemploCampo } from './ejemplo'
+import { LayoutMapa, PasoDe } from './layout'
 import { abrirSoporte } from './soporte'
 import { MapaTutorial, type Guia, type MapaTutorialApi, type ModoMapa } from './mapa-tutorial'
 import {
@@ -104,6 +104,9 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
   const { user } = useAuth()
   const { campoId } = useParams()
   const mapa = useRef<MapaTutorialApi>(null)
+  // Llegó tocando una sección que todavía no se abrió (la Agenda, la Hacienda…): se dice por qué.
+  // Se dice al entrar; al dar el primer paso ya no hace falta.
+  const [bloqueada, setBloqueada] = useState((useLocation().state as { bloqueada?: string } | null)?.bloqueada)
 
   // El campo en curso: el de la URL si todavía falta, si no el primero pendiente.
   const [actualId, setActualId] = useState(() => {
@@ -130,6 +133,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
     }
   }
   function ir(p: Paso) {
+    setBloqueada(undefined)
     setError(null)
     setPuntos(0)
     setPaso(p)
@@ -167,10 +171,15 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
       : paso.e === 'tocar' && !paso.buscando
         ? { tipo: 'tocar', texto: movil ? 'Tocá adentro de tu campo' : 'Hacé clic adentro de tu campo' }
         : paso.e === 'marcar' && puntos === 0
-          ? { tipo: 'esquinas', texto: 'Esquina por esquina, siguiendo el alambrado' }
+          ? { tipo: 'tocar', texto: 'Empezá por una esquina del alambrado' }
           : paso.e === 'dibujar' && puntos === 0 && ubicados.length === 0 && campo?.contorno
-            ? { tipo: 'esquinas', en: centroDe(campo.contorno), texto: 'Dibujá un potrero acá adentro' }
+            ? { tipo: 'tocar', en: esquinaDe(campo.contorno), texto: 'Empezá por una esquina' }
             : null
+  // Mientras se dibuja, con mouse: la pastilla al lado del cursor dice en qué esquina va.
+  const pistaCursor =
+    puntos === 0 ? 'Primera esquina' : puntos < 3 ? `Esquina ${puntos + 1}` : `Esquina ${puntos + 1}, o cerrá en el primer punto`
+  // Desde que hay borde, lo de afuera se apaga: los potreros van adentro.
+  const foco = ['sin-potreros', 'dibujar', 'cual', 'nuevo', 'potrero-listo'].includes(paso.e)
 
   async function alTocar(lat: number, lng: number) {
     setPaso({ e: 'tocar', buscando: true })
@@ -215,13 +224,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
 
   const mapaEl =
     paso.e === 'bienvenida' || paso.e === 'celu' ? (
-      <div className="relative size-full">
-        <img src={ejemplo} alt="Ejemplo de un campo armado: el borde, los potreros y lo que hay en cada uno" className="size-full object-cover object-[50%_40%]" />
-        {/* El cartel va arriba a la derecha: abajo lo tapa la hoja en el celular. */}
-        <span className="absolute top-4 right-4 rounded-full bg-acento px-3.5 py-1.5 text-[13px] font-bold text-texto shadow-[0_4px_14px_rgba(19,27,22,0.25)] md:top-6 md:right-6">
-          Ejemplo
-        </span>
-      </div>
+      <EjemploCampo />
     ) : (
       <MapaTutorial
         ref={mapa}
@@ -235,6 +238,9 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
         potreros={campo?.potreros ?? []}
         borrador={borrador ?? listo?.poligono ?? null}
         borradorNombre={paso.e === 'potrero-listo' ? listo?.nombre : undefined}
+        borradorQue={paso.e === 'potrero-listo' ? listo?.que : undefined}
+        foco={foco}
+        pistaCursor={pistaCursor}
         modo={modo}
         onDibujo={alDibujar}
         onPuntos={setPuntos}
@@ -257,7 +263,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
     )
   }
 
-  const comun = { mapa: mapaEl, onSalir: salir, ayuda }
+  const comun = { mapa: mapaEl, onSalir: salir, ayuda, nota: bloqueada ? `${bloqueada} se abre cuando tu campo esté en el mapa.` : undefined }
 
   switch (paso.e) {
     case 'bienvenida':
@@ -381,9 +387,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           encima={<PasoDe n={2} texto="marcar el borde" />}
           titulo={movil ? 'Tocá cada esquina' : 'Clic en cada esquina'}
         >
-          <p className="text-[15.5px] text-texto-suave">
-            Seguí el alambrado. Para cerrar, volvé al primer punto.
-          </p>
+          <ComoSeDibuja puntos={puntos} movil={movil} que="el campo" />
           <div className="flex flex-wrap gap-2">
             <BotonChico type="button" icono="Atrás" disabled={puntos === 0} onClick={() => mapa.current?.deshacer()}>
               Deshacer
@@ -392,7 +396,6 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               Empezar de nuevo
             </BotonChico>
           </div>
-          {!guia && <Pista>{pistaEsquinas(puntos, movil)}</Pista>}
         </LayoutMapa>
       )
 
@@ -507,13 +510,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           encima={<PasoDe n={3} texto={ubicados.length ? `${ubicados.length} de ${campo?.potreros.length} potreros` : 'dibujar los potreros'} />}
           titulo={ubicados.length ? 'Dibujá el siguiente' : 'Dibujá un potrero'}
         >
-          <p className="text-[15.5px] text-texto-suave">
-            El que quieras{ubicados.length ? '' : ' primero'}. Después te preguntamos cuál es de los que cargaste.
-          </p>
           {paso.aviso && <Aviso tipo="atencion" icono="Ayuda" titulo={paso.aviso} />}
-          {faltan.length > 0 && (
-            <ListaPotreros titulo={ubicados.length ? 'Faltan' : 'Los que cargaste en el alta'} potreros={faltan} />
-          )}
+          <ComoSeDibuja puntos={puntos} movil={movil} que="un potrero, el que quieras" />
           {puntos > 0 && (
             <div className="flex flex-wrap gap-2">
               <BotonChico type="button" icono="Atrás" onClick={() => mapa.current?.deshacer()}>
@@ -524,14 +522,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               </BotonChico>
             </div>
           )}
-          {!guia && (
-            <Pista>
-              {puntos === 0
-                ? movil
-                  ? 'Tocá las esquinas de cualquier potrero'
-                  : 'Clic en las esquinas de cualquier potrero'
-                : pistaEsquinas(puntos, movil)}
-            </Pista>
+          {faltan.length > 0 && (
+            <ListaPotreros titulo={ubicados.length ? 'Faltan' : 'Los que cargaste en el alta'} potreros={faltan} />
           )}
         </LayoutMapa>
       )
@@ -656,17 +648,50 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
 
 // ===== Piezas de cada paso =====
 
-/** Lo que dice la pastilla mientras se marcan esquinas: cuántas van y cómo se cierra. */
-function pistaEsquinas(puntos: number, movil: boolean): string {
-  const verbo = movil ? 'Tocá' : 'Clic en'
-  if (puntos === 0) return `${verbo} la primera esquina`
-  if (puntos < 3) return `${verbo} la próxima esquina · ${puntos} ${puntos === 1 ? 'punto' : 'puntos'}`
-  return `${puntos} puntos · para cerrar, ${movil ? 'tocá' : 'clic en'} el primero`
+/**
+ * Cómo se dibuja, en tres pasos que se van tildando a medida que se marcan
+ * esquinas: siempre se ve en qué va y qué sigue.
+ */
+function ComoSeDibuja({ puntos, movil, que }: { puntos: number; movil: boolean; que: string }) {
+  const verbo = movil ? 'Tocá' : 'Hacé clic en'
+  const actual = puntos === 0 ? 0 : puntos < 3 ? 1 : 2
+  const pasos = [
+    `${verbo} una esquina de ${que}`,
+    puntos > 0 ? `Seguí el alambrado: van ${puntos} ${puntos === 1 ? 'esquina' : 'esquinas'}` : 'Seguí el alambrado, esquina por esquina',
+    'Cerrá en el primer punto',
+  ]
+  return (
+    <ol className="flex flex-col gap-1 rounded-[18px] bg-superficie p-2" aria-live="polite">
+      {pasos.map((t, i) => {
+        const hecho = i < actual
+        const ahora = i === actual
+        return (
+          <li
+            key={i}
+            className={cn(
+              'flex items-center gap-3 rounded-[12px] px-2.5 py-2 text-[15px] transition-colors duration-300',
+              ahora ? 'bg-principal-suave font-bold text-texto' : hecho ? 'text-texto-suave' : 'text-texto-suave/70',
+            )}
+          >
+            <span
+              className={cn(
+                'grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-extrabold transition-colors duration-300',
+                hecho ? 'bg-estado-bien text-superficie' : ahora ? 'bg-principal text-principal-texto' : 'border-[1.5px] border-borde',
+              )}
+            >
+              {hecho ? <Icono nombre="Guardar" tamano={16} /> : i + 1}
+            </span>
+            {t}
+          </li>
+        )
+      })}
+    </ol>
+  )
 }
 
-function centroDe(p: LatLng[]): LatLng {
-  const n = p.length
-  return [p.reduce((s, x) => s + x[0], 0) / n, p.reduce((s, x) => s + x[1], 0) / n]
+/** La esquina de más arriba a la izquierda del borde: ahí señala la mano. */
+function esquinaDe(p: LatLng[]): LatLng {
+  return p.reduce((a, b) => (b[0] - b[1] > a[0] - a[1] ? b : a))
 }
 
 /** Lo medido contra lo cargado en el alta, de un vistazo: dos números y un veredicto. */
@@ -717,7 +742,7 @@ function Comparacion({
   )
 }
 
-type Comun = { mapa: React.ReactNode; onSalir: () => void; ayuda: string }
+type Comun = { mapa: React.ReactNode; onSalir: () => void; ayuda: string; nota?: string }
 
 function ListaPotreros({ titulo, potreros }: { titulo: string; potreros: CampoMapa['potreros'] }) {
   const vista = [...potreros].sort((a, b) => (b.hectareas ?? 0) - (a.hectareas ?? 0)).slice(0, 4)
@@ -728,7 +753,7 @@ function ListaPotreros({ titulo, potreros }: { titulo: string; potreros: CampoMa
         <div key={p.id} className="flex items-baseline gap-3 rounded-[14px] border border-borde bg-superficie px-4 py-2.5">
           <span className="font-heading text-[17px] font-extrabold text-texto">{p.nombre}</span>
           <span className="text-[13.5px] text-texto-suave">
-            {p.hectareas ? `${haTexto(p.hectareas)} ha, ` : ''}
+            {p.hectareas ? `${haTexto(p.hectareas)} ha · ` : ''}
             {p.que}
           </span>
         </div>
@@ -923,7 +948,7 @@ function Cual({
             >
               <span className={cn('font-heading text-[17px] font-extrabold', activo ? 'text-principal' : 'text-texto')}>{c.nombre}</span>
               <span className="min-w-0 flex-1 truncate text-[13.5px] text-texto-suave">
-                {c.hectareas ? `${haTexto(c.hectareas)} ha, ` : ''}
+                {c.hectareas ? `${haTexto(c.hectareas)} ha · ` : ''}
                 {c.que}
               </span>
               {c.parecido && (
@@ -1082,7 +1107,12 @@ function PrimeroEnLaCompu({
       </div>
       <div className="mx-auto mt-6 w-full max-w-[330px]">
         <div className="rounded-[14px] border-[7px] border-tinta bg-tinta">
-          <img src={ejemplo} alt="" className="aspect-[16/10] w-full rounded-[7px] object-cover" />
+          {/* El mismo ejemplo que en la compu, a escala de pantalla de notebook. */}
+          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[7px]">
+            <div className="absolute top-0 left-0 h-[200%] w-[200%] origin-top-left scale-50">
+              <EjemploCampo />
+            </div>
+          </div>
         </div>
         <div className="mx-[-14px] h-2.5 rounded-b-lg bg-tinta" />
       </div>

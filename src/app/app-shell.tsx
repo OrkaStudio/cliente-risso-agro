@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   LayoutDashboard,
   Leaf,
+  Lock,
   LogOut,
   Menu,
   Map as MapIcon,
@@ -26,6 +27,7 @@ import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { abiertoSinMapa, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
 import { MARCA } from '@/lib/marca'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -109,6 +111,8 @@ export function AppShell() {
   const isMobile = useIsMobile()
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
+  // Hasta terminar el mapa, lo que no está abierto lleva al tutorial: se ve con candado.
+  const mapaPendiente = useMapaPendiente()
 
   /* Una sola consulta compartida con el Inicio (misma queryKey): el contador y la
    * cabecera "Hoy" no pueden decir números distintos. */
@@ -192,12 +196,15 @@ export function AppShell() {
               Oficina
             </div>
           )}
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {NAV.map(({ to, label, icon: Icon, end }) => {
+            const bloqueada = mapaPendiente && !abiertoSinMapa(to)
+            return (
             <NavLink
               key={to}
-              to={to}
+              to={bloqueada ? '/mapa' : to}
+              state={bloqueada ? { bloqueada: seccionBloqueada(to) } : undefined}
               end={end}
-              title={collapsed ? label : undefined}
+              title={collapsed ? (bloqueada ? `${label}: se abre al terminar el mapa` : label) : undefined}
               onMouseEnter={() => {
                 const t = CHUNKS_OFICINA[to]
                 if (t) prefetch(t)
@@ -225,6 +232,12 @@ export function AppShell() {
                     strokeWidth={1.75}
                   />
                   {!collapsed && <span>{label}</span>}
+                  {bloqueada && (
+                    <Lock
+                      aria-label="Se abre al terminar el mapa"
+                      className={cn('size-3.5 shrink-0 text-sidebar-foreground/45', collapsed ? 'absolute right-2 top-2' : 'ml-auto')}
+                    />
+                  )}
                   {/* Señala dónde mirar, no repite el contenido: descartamos una
                       campanita con panel propio porque duplicaba la verdad en dos
                       lugares (mismo problema que los cheques antes de la Agenda). */}
@@ -242,7 +255,8 @@ export function AppShell() {
                 </>
               )}
             </NavLink>
-          ))}
+            )
+          })}
         </nav>
 
         {/* Usuario */}
@@ -336,6 +350,7 @@ function OficinaMobileMenu({ empresaNombre, onSignOut }: {
   onSignOut: () => Promise<void>
 }) {
   const [open, setOpen] = useState(false)
+  const mapaPendiente = useMapaPendiente()
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
@@ -348,10 +363,13 @@ function OficinaMobileMenu({ empresaNombre, onSignOut }: {
         <DialogTitle>Modo Oficina</DialogTitle>
         <DialogDescription>{empresaNombre}</DialogDescription>
         <nav aria-label="Secciones de Oficina" className="flex flex-col gap-1">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {NAV.map(({ to, label, icon: Icon, end }) => {
+            const bloqueada = mapaPendiente && !abiertoSinMapa(to)
+            return (
             <NavLink
               key={to}
-              to={to}
+              to={bloqueada ? '/mapa' : to}
+              state={bloqueada ? { bloqueada: seccionBloqueada(to) } : undefined}
               end={end}
               onClick={() => setOpen(false)}
               className={({ isActive }) => cn(
@@ -361,8 +379,10 @@ function OficinaMobileMenu({ empresaNombre, onSignOut }: {
             >
               <Icon className="size-5" aria-hidden="true" />
               {label}
+              {bloqueada && <Lock aria-label="Se abre al terminar el mapa" className="ml-auto size-4 text-texto-suave" />}
             </NavLink>
-          ))}
+            )
+          })}
         </nav>
         <button
           type="button"

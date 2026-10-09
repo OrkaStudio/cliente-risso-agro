@@ -67,10 +67,10 @@ export function OnboardingLayout({
           initial={reducir ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="flex min-h-0 flex-1 flex-col px-[18px] pt-5 md:overflow-y-auto md:px-0 md:pt-0"
+          className="flex min-h-0 flex-1 flex-col px-[18px] pt-5 md:scroll-difuminado md:overflow-y-auto md:px-0 md:pt-0"
         >
           {/* my-auto: centrado si entra; si no, arranca arriba y scrollea. */}
-          <div className="flex w-full max-w-[476px] flex-1 flex-col gap-5 md:my-auto md:flex-none md:gap-[22px] md:py-2">
+          <div className="flex w-full max-w-[476px] flex-1 flex-col gap-5 md:my-auto md:flex-none md:gap-[22px] md:py-8">
             {atras && (
               <BotonChico type="button" icono="Atrás" className="self-start py-1.5 text-[13.5px]" onClick={atras.onClick}>
                 {atras.texto}

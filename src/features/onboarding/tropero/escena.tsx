@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import type { Especie } from '@/features/hacienda/labels'
 import { MarcaCultivo } from './marcas'
-import { cabezasDe, diasDesde, especiesDe, ha, ICONO_ESPECIE, type PotreroOnb } from './modelo'
+import { cabezasDe, conMayuscula, diasDesde, especiesDe, ha, ICONO_ESPECIE, type PotreroOnb } from './modelo'
 
 const NOMBRE_ESPECIE: Record<Especie, string> = { bovino: 'Vacunos', ovino: 'Ovinos', equino: 'Equinos' }
 
@@ -248,9 +248,14 @@ function Potrero({ potrero, activo, compacta }: { potrero: PotreroOnb; activo: b
             {cabezas}
           </p>
         )}
-        {c?.tipo === 'sembrado' && libreH > 60 && libreW > 70 && (
-          <p className="titulo-display mt-auto truncate leading-none" style={{ fontSize: Math.min(grande, libreW / Math.max(4, c.cultivo.length) * 1.6) }}>
-            {c.cultivo}
+        {/* El cultivo siempre, a la medida del potrero: entra en el ancho y
+            nunca grita más que el nombre. */}
+        {c?.tipo === 'sembrado' && c.cultivo.trim() && libreH > 30 && (
+          <p
+            className="mt-auto truncate font-heading font-extrabold leading-tight"
+            style={{ fontSize: Math.max(11, Math.min(compacta ? 15 : 24, libreW / (Math.max(3, c.cultivo.trim().length) * 0.62))) }}
+          >
+            {conMayuscula(c.cultivo.trim())}
           </p>
         )}
         {dias !== null && libreH > 60 && (
