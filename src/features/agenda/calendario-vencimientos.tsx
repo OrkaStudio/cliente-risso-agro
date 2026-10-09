@@ -271,7 +271,7 @@ function VencChip({ v }: { v: Vencimiento }) {
       onMouseEnter={abrir}
       onMouseLeave={cerrarDif}
       className={cn(
-        'flex w-full flex-col gap-px rounded-md border-l-[3px] px-1.5 py-[3px] text-left transition-[filter]',
+        'flex w-full flex-col gap-0.5 rounded-md border-l-[3px] px-2 py-1 text-left transition-[filter]',
         liquidado
           ? 'border-field-deep/40 bg-secondary hover:brightness-[0.98]'
           : cobro
@@ -283,7 +283,7 @@ function VencChip({ v }: { v: Vencimiento }) {
       <span className="flex items-center gap-1">
         <Icono className={cn('size-3 shrink-0', iconColor)} />
         <span
-          className={cn('truncate text-[10.5px] font-bold leading-tight', tono)}
+          className={cn('truncate text-xs font-bold leading-tight', tono)}
         >
           {titulo}
         </span>
@@ -294,12 +294,12 @@ function VencChip({ v }: { v: Vencimiento }) {
         )}
       </span>
       <span className="flex items-baseline justify-between gap-1">
-        <span className={cn('tnum text-[12px] font-bold leading-tight', tono)}>
+        <span className={cn('tnum text-[13px] font-bold leading-tight', tono)}>
           {cobro ? '+' : '−'}
           {fmtCompact(v.monto)}
         </span>
         {sub && (
-          <span className="truncate text-[9px] font-medium leading-tight text-ink/50">
+          <span className="truncate text-[10px] font-medium leading-tight text-ink/50">
             {sub}
           </span>
         )}
@@ -406,12 +406,12 @@ function DiaContenido({
   }
 
   const tieneItems = items.length > 0
-  const ocultos = items.length - 2
+  const ocultos = items.length - 3
 
   const numClass = cn(
-    'tnum flex items-center justify-center text-[14px] font-bold leading-none',
+    'tnum flex items-center justify-center text-base font-bold leading-none',
     hoyCell
-      ? 'size-[26px] rounded-full bg-field-deep text-[13px] text-white shadow-[0_2px_6px_rgba(16,30,20,0.28)]'
+      ? 'size-8 rounded-full bg-field-deep text-sm text-white shadow-[0_2px_6px_rgba(16,30,20,0.28)]'
       : pasado
         ? 'text-faint'
         : 'text-ink',
@@ -440,14 +440,14 @@ function DiaContenido({
       </div>
 
       <div className="flex flex-col gap-0.5">
-        {items.slice(0, 2).map((v) => (
+        {items.slice(0, 3).map((v) => (
           <VencChip key={v.id} v={v} />
         ))}
         {ocultos > 0 && (
           <button
             type="button"
             onClick={(e) => abrir(e.currentTarget)}
-            className="mt-0.5 flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] font-bold text-field-deep transition-colors hover:bg-field-soft/70"
+            className="mt-0.5 flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] font-bold text-field-deep transition-colors hover:bg-field-soft/70"
           >
             <ChevronDown className="size-3" />+{ocultos} más
           </button>
@@ -588,7 +588,7 @@ export function CalendarioVencimientos({ items }: { items: Vencimiento[] }) {
             <div
               key={d}
               className={cn(
-                'px-2 py-2 text-center text-[11px] font-bold uppercase tracking-[0.05em]',
+                'px-2 py-3 text-center text-xs font-bold uppercase tracking-[0.05em]',
                 i >= 5 ? 'text-faint/70' : 'text-muted-foreground',
               )}
             >
@@ -609,7 +609,7 @@ export function CalendarioVencimientos({ items }: { items: Vencimiento[] }) {
                   <div
                     key={j}
                     className={cn(
-                      'relative min-h-[92px] border-b border-r border-white/45 p-1.5 backdrop-blur-md transition-colors last:border-r-0',
+                      'relative min-h-[124px] border-b border-r border-white/45 p-2 backdrop-blur-md transition-colors last:border-r-0 xl:min-h-[136px]',
                       !cel && 'bg-white/10',
                       cel &&
                         !hoyCell &&

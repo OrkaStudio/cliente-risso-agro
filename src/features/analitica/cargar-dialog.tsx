@@ -405,7 +405,7 @@ export function CargarDialog({
         title="Cargar"
         subtitle={`Paso ${paso} de 3 · ${PASO_SUB[paso - 1]}`}
         onSubmit={onSubmit}
-        className="sm:max-w-[480px]"
+        sidePanel
         footer={
           <div className="flex gap-2.5">
             {paso > 1 && (

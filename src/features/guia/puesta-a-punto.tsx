@@ -101,7 +101,7 @@ export function PuestaAPunto() {
   const userId = user?.id ?? 'anon'
 
   const [colapsada, setColapsada] = React.useState(
-    () => localStorage.getItem(claveColapsada(userId)) === '1',
+    () => localStorage.getItem(claveColapsada(userId)) !== '0',
   )
   const [expandido, setExpandido] = React.useState<string | null>(null)
 
@@ -141,21 +141,22 @@ export function PuestaAPunto() {
           vista (decisión de Lau: checklist arriba, chat en burbuja abajo).
           Debajo de los diálogos (z-50): el CTA abre el catastro y la pastilla
           no tiene que quedar encima del modal. */}
-      <div className="fixed right-4 top-[86px] z-[40]">
+      <div className="fixed right-4 top-[76px] z-[40]">
         <AnimatePresence mode="wait" initial={false}>
           {colapsada ? (
             /* ===== Pastilla: progreso + siguiente paso, un toque ===== */
             <motion.button
               key="pill"
               type="button"
+              aria-label={`Tu campo, en marcha · ${hechos} de ${items.length}. Siguiente: ${siguiente?.titulo ?? 'Ver puesta a punto'}`}
               onClick={() => setColapso(false)}
               initial={{ opacity: 0, y: -10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}
-              className="flex items-center gap-2.5 rounded-full border border-border bg-card py-2 pl-3 pr-4 shadow-[0_10px_36px_rgba(10,20,14,0.22)] transition-shadow hover:shadow-[0_12px_42px_rgba(10,20,14,0.3)]"
+              className="flex items-center gap-2.5 rounded-full border border-border bg-card p-2 md:py-2 md:pl-3 md:pr-4 shadow-[0_10px_36px_rgba(10,20,14,0.22)] transition-shadow hover:shadow-[0_12px_42px_rgba(10,20,14,0.3)]"
             >
               <Anillo hechos={hechos} total={items.length} />
-              <span className="text-left leading-tight">
+              <span className="hidden text-left leading-tight md:block">
                 <span className="block text-[10px] font-bold uppercase tracking-[0.09em] text-field-deep">
                   Tu campo, en marcha · {hechos} de {items.length}
                 </span>
@@ -305,4 +306,3 @@ export function PuestaAPunto() {
     document.body,
   )
 }
-
