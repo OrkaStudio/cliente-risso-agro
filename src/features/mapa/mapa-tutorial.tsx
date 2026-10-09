@@ -80,6 +80,8 @@ export const MapaTutorial = forwardRef<
       wheelPxPerZoomLevel: 120,
     })
     mapa.current = map
+    // Algunos pasos montan el mapa de nuevo: si ya hay borde, arranca encuadrado en él.
+    if (contorno) map.fitBounds(L.latLngBounds(contorno), { padding: [48, 48] })
     const quitarSatelite = ponerSatelite(map)
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     capas.current = L.layerGroup().addTo(map)

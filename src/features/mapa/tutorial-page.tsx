@@ -17,6 +17,7 @@ import {
   buscarLugar,
   campoDeUnSoloPotrero,
   corregirHectareasCampo,
+  corregirHectareasPotrero,
   crearPotreroDibujado,
   guardarBorde,
   terminarMapa,
@@ -33,6 +34,7 @@ import {
   estadoDe,
   fueraDelBorde,
   haRedondo,
+  haTexto,
   hectareasDe,
   nadaUbicado,
   pisaA,
@@ -390,11 +392,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               Empezar de nuevo
             </BotonChico>
           </div>
-          <Pista>
-            {puntos === 0
-              ? `${movil ? 'Tocá' : 'Clic en'} la primera esquina`
-              : `${movil ? 'Tocá' : 'Clic en'} la próxima esquina, ${puntos} ${puntos === 1 ? 'punto' : 'puntos'}`}
-          </Pista>
+          {!guia && <Pista>{pistaEsquinas(puntos, movil)}</Pista>}
         </LayoutMapa>
       )
 
@@ -406,7 +404,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
       // corrige el alta, o se corrige el borde.
       const trabado = comp === 'muy-distinto'
       return (
-        <LayoutMapa {...comun} encima={<PasoDe n={2} texto="el borde" />} titulo={`${campo?.nombre} mide unas ${ha} ha`}>
+        <LayoutMapa {...comun} encima={<PasoDe n={2} texto="el borde" />} titulo={`${campo?.nombre} mide unas ${haTexto(ha)} ha`}>
           {paso.ajustando ? (
             <p className="text-[15.5px] text-texto-suave">Arrastrá los puntos hasta que el borde siga el alambrado.</p>
           ) : (
@@ -430,7 +428,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
                   })
                 }
               >
-                Sí, mide {ha} ha: lo corrijo
+                Sí, mide {haTexto(ha)} ha: lo corrijo
               </BotonPrincipal>
               <div className="flex flex-wrap gap-2">
                 <BotonChico type="button" icono="Editar" onClick={() => setPaso({ ...paso, ajustando: true })}>
@@ -475,7 +473,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
       const ha = campo?.contorno ? haRedondo(hectareasDe(campo.contorno)) : 0
       return (
         <LayoutMapa {...comun} encima={<PasoDe n={3} texto="dibujar los potreros" />} titulo="¿Está dividido en potreros?">
-          <p className="text-[15.5px] text-texto-suave">{ha} ha, todavía sin potreros.</p>
+          <p className="text-[15.5px] text-texto-suave">{haTexto(ha)} ha, todavía sin potreros.</p>
           {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
           <BotonPrincipal icono="Siguiente" onClick={() => ir({ e: 'dibujar' })}>
             Sí, los dibujo ahora
@@ -526,7 +524,15 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               </BotonChico>
             </div>
           )}
-          <Pista>{movil ? 'Tocá las esquinas de cualquier potrero' : 'Clic en las esquinas de cualquier potrero'}</Pista>
+          {!guia && (
+            <Pista>
+              {puntos === 0
+                ? movil
+                  ? 'Tocá las esquinas de cualquier potrero'
+                  : 'Clic en las esquinas de cualquier potrero'
+                : pistaEsquinas(puntos, movil)}
+            </Pista>
+          )}
         </LayoutMapa>
       )
 
@@ -538,9 +544,10 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           faltan={faltan}
           ocupado={ocupado}
           error={error}
-          onEs={(id) =>
+          onEs={(id, corregirA) =>
             correr(async () => {
               await asignarDibujo(id, paso.dibujo)
+              if (corregirA !== undefined) await corregirHectareasPotrero(id, corregirA)
               await recargar()
               ir({ e: 'potrero-listo', id })
             })
@@ -585,8 +592,8 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           titulo={`El ${p?.nombre} ya está`}
         >
           <p className="text-[15.5px] text-texto-suave">
-            {p?.hectareas ? `${p.hectareas} ha` : 'Sus hectáreas'}
-            {p && p.cabezas > 0 ? ` y sus ${p.cabezas} cabezas entraron solas` : ' quedaron'}, como lo cargaste en el alta.
+            {p?.hectareas ? `${haTexto(p.hectareas)} ha en el mapa` : 'Quedó en el mapa'}
+            {p && p.cabezas > 0 ? `, con sus ${p.cabezas} cabezas adentro.` : '.'}
           </p>
           {faltan.length > 0 ? (
             <>
@@ -649,13 +656,32 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
 
 // ===== Piezas de cada paso =====
 
+/** Lo que dice la pastilla mientras se marcan esquinas: cuántas van y cómo se cierra. */
+function pistaEsquinas(puntos: number, movil: boolean): string {
+  const verbo = movil ? 'Tocá' : 'Clic en'
+  if (puntos === 0) return `${verbo} la primera esquina`
+  if (puntos < 3) return `${verbo} la próxima esquina · ${puntos} ${puntos === 1 ? 'punto' : 'puntos'}`
+  return `${puntos} puntos · para cerrar, ${movil ? 'tocá' : 'clic en'} el primero`
+}
+
 function centroDe(p: LatLng[]): LatLng {
   const n = p.length
   return [p.reduce((s, x) => s + x[0], 0) / n, p.reduce((s, x) => s + x[1], 0) / n]
 }
 
 /** Lo medido contra lo cargado en el alta, de un vistazo: dos números y un veredicto. */
-function Comparacion({ medido, alta, comp }: { medido: number; alta: number | null; comp: ReturnType<typeof compararBorde> }) {
+function Comparacion({
+  medido,
+  alta,
+  comp,
+  revisar = 'Revisá que sea tu campo. Si el campo mide eso, corregimos el alta.',
+}: {
+  medido: number
+  alta: number | null
+  comp: ReturnType<typeof compararBorde>
+  /** Qué hacer si no cuadra. */
+  revisar?: string
+}) {
   const tono = comp === 'muy-distinto' ? 'problema' : comp === 'coincide' || comp === 'sin-alta' ? 'bien' : 'atencion'
   const veredicto = {
     'sin-alta': 'Borde listo',
@@ -669,12 +695,12 @@ function Comparacion({ medido, alta, comp }: { medido: number; alta: number | nu
       tono === 'problema' ? 'border-estado-problema/60' : tono === 'bien' ? 'border-estado-bien' : 'border-estado-atencion/60')}>
       <div className="flex items-end gap-6">
         <div>
-          <p className="titulo-display text-[34px] leading-none text-texto">{medido}</p>
+          <p className="titulo-display text-[34px] leading-none text-texto">{haTexto(medido)}</p>
           <p className="mt-1 text-[13px] font-semibold text-texto-suave">ha en el mapa</p>
         </div>
         {alta !== null && (
           <div>
-            <p className="titulo-display text-[34px] leading-none text-texto-suave">{alta}</p>
+            <p className="titulo-display text-[34px] leading-none text-texto-suave">{haTexto(alta)}</p>
             <p className="mt-1 text-[13px] font-semibold text-texto-suave">ha en el alta</p>
           </div>
         )}
@@ -685,7 +711,7 @@ function Comparacion({ medido, alta, comp }: { medido: number; alta: number | nu
         {veredicto}
       </p>
       {comp === 'muy-distinto' && (
-        <p className="text-[14px] text-texto-suave">Revisá que sea tu campo. Si el campo mide eso, corregimos el alta.</p>
+        <p className="text-[14px] text-texto-suave">{revisar}</p>
       )}
     </div>
   )
@@ -702,7 +728,7 @@ function ListaPotreros({ titulo, potreros }: { titulo: string; potreros: CampoMa
         <div key={p.id} className="flex items-baseline gap-3 rounded-[14px] border border-borde bg-superficie px-4 py-2.5">
           <span className="font-heading text-[17px] font-extrabold text-texto">{p.nombre}</span>
           <span className="text-[13.5px] text-texto-suave">
-            {p.hectareas ? `${p.hectareas} ha, ` : ''}
+            {p.hectareas ? `${haTexto(p.hectareas)} ha, ` : ''}
             {p.que}
           </span>
         </div>
@@ -861,7 +887,8 @@ function Cual({
   faltan: CampoMapa['potreros']
   ocupado: boolean
   error: string | null
-  onEs: (id: string) => void
+  /** `corregirA`: las hectáreas medidas, cuando el productor confirma que el alta estaba mal. */
+  onEs: (id: string, corregirA?: number) => void
   onNuevo: () => void
   onRedibujar: () => void
 }) {
@@ -870,9 +897,15 @@ function Cual({
   const [elegido, setElegido] = useState<string | null>(preseleccion(cs))
   const dos = cs.filter((c) => c.parecido).length > 1
   const sel = cs.find((c) => c.id === elegido)
+  // Lo dibujado contra lo que dice el alta de ese potrero: que no se cuele uno mal dibujado.
+  const comp = sel?.hectareas ? compararBorde(ha, sel.hectareas) : null
+  const noCuadra = comp === 'muy-distinto'
   return (
-    <LayoutMapa {...comun} encima={<PasoDe n={3} texto="dibujar los potreros" />} titulo={`Mide unas ${ha} ha. ¿Cuál es?`}>
-      {dos && <p className="text-[15.5px] text-texto-suave">Hay dos de tamaño parecido. Mirá qué tiene cada uno.</p>}
+    <LayoutMapa {...comun} encima={<PasoDe n={3} texto="dibujar los potreros" />} titulo="¿Cuál de estos es?">
+      <p className="text-[15.5px] text-texto-suave">
+        Lo que dibujaste mide unas <b className="text-texto">{haTexto(ha)} ha</b>.
+        {dos && ' Hay dos de tamaño parecido: mirá qué tiene cada uno.'}
+      </p>
       <div role="radiogroup" aria-label="Qué potrero es" className="flex flex-col gap-2">
         {cs.slice(0, 6).map((c) => {
           const activo = c.id === elegido
@@ -890,7 +923,7 @@ function Cual({
             >
               <span className={cn('font-heading text-[17px] font-extrabold', activo ? 'text-principal' : 'text-texto')}>{c.nombre}</span>
               <span className="min-w-0 flex-1 truncate text-[13.5px] text-texto-suave">
-                {c.hectareas ? `${c.hectareas} ha, ` : ''}
+                {c.hectareas ? `${haTexto(c.hectareas)} ha, ` : ''}
                 {c.que}
               </span>
               {c.parecido && (
@@ -902,10 +935,23 @@ function Cual({
           )
         })}
       </div>
+      {sel && comp && (
+        <Comparacion
+          medido={ha}
+          alta={sel.hectareas}
+          comp={comp}
+          revisar={`Revisá que hayas seguido el alambrado del ${sel.nombre}. Si mide eso, corregimos el alta.`}
+        />
+      )}
       {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
       {sel ? (
-        <BotonPrincipal icono="Siguiente" cargando={ocupado} disabled={ocupado} onClick={() => onEs(sel.id)}>
-          {ocupado ? 'Guardando…' : `Es el ${sel.nombre}`}
+        <BotonPrincipal
+          icono="Siguiente"
+          cargando={ocupado}
+          disabled={ocupado}
+          onClick={() => onEs(sel.id, noCuadra ? ha : undefined)}
+        >
+          {ocupado ? 'Guardando…' : noCuadra ? `Sí, el ${sel.nombre} mide ${haTexto(ha)} ha: lo corrijo` : `Es el ${sel.nombre}`}
         </BotonPrincipal>
       ) : (
         <p className="text-[14px] font-semibold text-texto-suave">Elegí uno para seguir</p>
@@ -946,7 +992,7 @@ function Nuevo({
   const letra = campo.potreros[0]?.nombre.replace(/\d/g, '') ?? ''
   const repetido = campo.potreros.some((p) => p.nombre === `${numero}${letra}`)
   return (
-    <LayoutMapa {...comun} encima={<PasoDe n={3} texto="dibujar los potreros" />} titulo={`Potrero nuevo: ${ha} ha`}>
+    <LayoutMapa {...comun} encima={<PasoDe n={3} texto="dibujar los potreros" />} titulo={`Potrero nuevo: ${haTexto(ha)} ha`}>
       <CampoTexto
         etiqueta="Número"
         inputMode="numeric"

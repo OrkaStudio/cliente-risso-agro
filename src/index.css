@@ -684,10 +684,12 @@
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 0;
+  /* Pastilla propia: se lee aunque el potrero sea chico y el texto se salga. */
+  padding: 4px 9px 5px;
   border: none;
-  background: transparent;
-  box-shadow: none;
+  border-radius: 10px;
+  background: rgb(251 250 246 / 0.94);
+  box-shadow: 0 2px 8px rgb(19 27 22 / 0.22);
   color: #7a3a1c;
   text-align: center;
   white-space: nowrap;
@@ -707,6 +709,8 @@
   opacity: 0.85;
 }
 .tropero-etiqueta--activa.leaflet-tooltip {
+  background: transparent;
+  box-shadow: none;
   color: #fbfaf6;
 }
 .tropero-etiqueta--activa b {

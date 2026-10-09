@@ -49,6 +49,9 @@ export function haRedondo(n: number): number {
   return n >= 20 ? Math.round(n) : Math.round(n * 10) / 10
 }
 
+/** Como se lee: «8,5», «1.015». */
+export const haTexto = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: 1 })
+
 /** Hectáreas que dos dibujos comparten. */
 function compartidas(a: LatLng[], b: LatLng[]): number {
   try {

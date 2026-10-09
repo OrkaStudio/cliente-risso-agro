@@ -70,20 +70,22 @@ test('de punta a punta: borde a mano, los dos potreros y se abre la app', async 
   await expect(page.getByRole('heading', { name: 'Clic en cada esquina' })).toBeVisible()
 
   await dibujar(page, [[260, 260], [680, 240], [700, 640], [280, 660]])
-  await expect(page.getByRole('heading', { name: /La Porteña mide unas \d+ ha/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /La Porteña mide unas [\d.,]+ ha/ })).toBeVisible()
   // Dibujado a mano no cuadra con las 100 ha del alta: no deja seguir sin decidir.
   await expect(page.getByText('No cuadra con el alta')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Seguir con los potreros' })).toHaveCount(0)
-  await page.getByRole('button', { name: /Sí, mide \d+ ha: lo corrijo/ }).click()
+  await page.getByRole('button', { name: /Sí, mide [\d.,]+ ha: lo corrijo/ }).click()
   await page.getByRole('button', { name: 'Seguir con los potreros' }).click()
 
   await expect(page.getByRole('heading', { name: 'Dibujá un potrero' })).toBeVisible()
   await dibujar(page, [[300, 300], [500, 290], [510, 620], [310, 630]])
-  await expect(page.getByRole('heading', { name: /¿Cuál es\?/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '¿Cuál de estos es?' })).toBeVisible()
   // Ninguno de tamaño parecido: hay que elegir.
   await expect(page.getByText('Elegí uno para seguir')).toBeVisible()
   await page.getByRole('radio', { name: /1A/ }).click()
-  await page.getByRole('button', { name: 'Es el 1A' }).click()
+  // Lo dibujado no cuadra con las 60 ha del alta: se avisa y hay que confirmar la corrección.
+  await expect(page.getByText('No cuadra con el alta')).toBeVisible()
+  await page.getByRole('button', { name: /Sí, el 1A mide [\d.,]+ ha: lo corrijo/ }).click()
   await expect(page.getByRole('heading', { name: 'El 1A ya está' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Dibujar otro' }).click()
@@ -92,7 +94,7 @@ test('de punta a punta: borde a mano, los dos potreros y se abre la app', async 
   await expect(page.getByText('Se pisa con el 1A. Dibujalo al lado.')).toBeVisible()
   await dibujar(page, [[560, 300], [660, 290], [675, 600], [570, 605]])
   // Queda uno solo: va elegido.
-  await page.getByRole('button', { name: 'Es el 2A' }).click()
+  await page.getByRole('button', { name: /Es el 2A|Sí, el 2A mide/ }).click()
   await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
   await expect(page.getByRole('heading', { name: 'Tu campo, en el mapa' })).toBeVisible()
   await page.getByRole('button', { name: 'Ir al Inicio' }).click()

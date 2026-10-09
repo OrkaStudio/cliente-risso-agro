@@ -64,6 +64,12 @@ export async function corregirHectareasCampo(campoId: string, hectareas: number)
 }
 export const asignarDibujo = setPotreroPoligono
 
+/** «Sí, el 1A mide 8,5 ha: lo corrijo»: el potrero toma lo medido en el mapa. */
+export async function corregirHectareasPotrero(potreroId: string, hectareas: number): Promise<void> {
+  const { error } = await supabase.from('potrero').update({ hectareas }).eq('id', potreroId)
+  if (error) throw new Error(error.message)
+}
+
 /** Un potrero dibujado que no estaba en el alta («No está en la lista: es uno nuevo»). */
 export async function crearPotreroDibujado(input: {
   empresaId: string
