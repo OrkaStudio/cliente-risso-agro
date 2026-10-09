@@ -1,7 +1,8 @@
 import { useEmpresa } from '@/features/empresa/use-empresa'
 
-/** Lo que anda antes del mapa (decisión del 30/09): el Inicio y Campos. */
-const ABIERTO = [/^\/$/, /^\/campos(\/|$)/]
+/** Lo que anda antes del mapa (decisión del 30/09): el Inicio y Campos; en el
+ *  celular, el Hoy del Modo Campo («Hoy, sin campo»). */
+const ABIERTO = [/^\/$/, /^\/campos(\/|$)/, /^\/campo$/]
 
 export const abiertoSinMapa = (ruta: string) => ABIERTO.some((r) => r.test(ruta))
 

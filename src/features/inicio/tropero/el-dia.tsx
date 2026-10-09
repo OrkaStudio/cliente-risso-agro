@@ -313,8 +313,8 @@ function PotreroDeLaRecorrida({
           {n.texto}
           {p.hace > 0 ? ` · hace ${p.hace} ${p.hace === 1 ? 'día' : 'días'}` : ''}
         </span>
-        <span className={cn('shrink-0 text-texto-suave transition-transform', abierto ? 'rotate-90' : '-rotate-90')}>
-          <Icono nombre="Atrás" tamano={16} />
+        <span className={cn('shrink-0 text-texto-suave transition-transform', abierto && 'rotate-180')}>
+          <Icono nombre="Desplegar" tamano={16} />
         </span>
       </button>
       {abierto && (

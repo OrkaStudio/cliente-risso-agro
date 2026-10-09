@@ -1,262 +1,369 @@
-import { Link, useNavigate } from 'react-router-dom'
-import {
-  AlertTriangle,
-  ArrowLeftRight,
-  Banknote,
-  ChevronRight,
-  CloudOff,
-  Footprints,
-  PencilRuler,
-  RefreshCw,
-  ScanLine,
-  Syringe,
-  Trash2,
-} from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
+import { BotonPrincipal } from '@/components/tropero/boton'
+import { Icono } from '@/components/tropero/icono'
+import { Logo } from '@/components/tropero/logo'
+import { useAuth } from '@/features/auth/auth-context'
+import { colorDeCampo } from '@/features/campos/use-campo-mapa'
+import { useCampoClima } from '@/features/cotizaciones/campo-clima'
+import { useClima } from '@/features/cotizaciones/hooks'
+import { useEmpresa } from '@/features/empresa/use-empresa'
+import { usePanoramaInicio } from '@/features/inicio/hooks'
+import { useParaAtender } from '@/features/inicio/para-atender-api'
+import { cosasParaHoy, fraseDelDia, franjasDelRodeo, saludo, type Cosa } from '@/features/inicio/tropero/dia'
+import { useLluvia60 } from '@/features/inicio/tropero/use-dia'
+import { useMapa } from '@/features/mapa/api'
+import { useMapaPendiente } from '@/features/mapa/bloqueo'
+import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
+import textura from '@/assets/tropero/textura-campo.webp'
 import { useRecorrida } from './recorrida/use-recorrida'
-import { CLabel } from './ui'
+
+const CURVA = [0.22, 1, 0.36, 1] as const
+const BARRA: Record<Cosa['tono'], string> = { problema: 'bg-[#b3372a]', atencion: 'bg-[#d38f1d]', aviso: 'bg-acento' }
 
 /**
- * Landing del Modo Campo. NO pregunta en abstracto: refleja el estado.
- *
- * Antes, entrar al Modo Campo caía en Manga por una ruta fija — el productor
- * llegaba a una pantalla que no había pedido y tenía que navegar a Recorrida.
- * Ahora, si hay una recorrida abierta se ofrece retomarla; si no, se eligen
- * las dos sesiones de trabajo. Plata NO va acá: no es una jornada que se
- * elige, es una interrupción de 20 segundos que ya vive en la barra inferior.
+ * Hoy · El día en el celular (página 35): la foto con el campo elegido, lo
+ * que hay para hacer hoy en ese campo y sus cabezas. Antes, lo que no puede
+ * esperar del Modo Campo: sin señal, lo que falta subir y las recorridas
+ * abiertas para retomar. Sin el mapa armado, «Hoy, sin campo».
  */
 export function CampoInicioPage() {
-  const r = useRecorrida()
+  return useMapaPendiente() ? <HoySinCampo /> : <Hoy />
+}
+
+function Hoy() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { data: membresia } = useEmpresa()
+  const r = useRecorrida()
+  const panorama = usePanoramaInicio()
+  const atender = useParaAtender()
+  const { data: campos } = useMapa(membresia?.empresa_id)
+  const clima = useCampoClima()
+  // El campo de Hoy es el mismo que el del clima: se elige una vez para los dos.
+  const campo = campos?.find((c) => c.id === clima.actual?.id) ?? campos?.[0]
+  const tiempo = useClima(clima.actual?.ubicacion ?? null)
+  const lluvia = useLluvia60(campo?.id ?? null)
+  const reducir = useReducedMotion()
+  const [eligiendo, setEligiendo] = useState(false)
 
-  if (r.cargando) {
-    return (
-      <div className="c-label flex h-full items-center justify-center !text-[13px]">
-        Cargando…
-      </div>
-    )
-  }
-
-  // Cuenta nueva / campo sin dibujar: sin polígonos no hay croquis, que es
-  // justamente lo que el productor usa para ubicarse. Se avisa acá y en
-  // Oficina (que es donde se dibuja) para que la lógica cierre por los dos lados.
-  const sinCroquis =
-    r.potrerosRef.length > 0 &&
-    r.potrerosRef.every((p) => !p.poligono || p.poligono.length < 3)
-
-  const hayAbiertas = r.abiertas.length > 0
+  const potreros = (atender.data?.potreros ?? []).filter((p) => !campo || p.campo === campo.nombre)
+  // En el celular, cada cosa va a su pantalla del Modo Campo.
+  const cosas = cosasParaHoy(potreros, panorama.data?.vencimientos ?? [], (atender.data?.sinRecorrer ?? []).filter((c) => c.campo === campo?.nombre), 3).map(
+    (c): Cosa => ({
+      ...c,
+      accion: c.key.startsWith('v-')
+        ? { texto: 'Anotar', to: '/campo/plata' }
+        : { texto: c.key.startsWith('r-') ? 'Recorrer' : 'Ver', to: '/campo/recorrida' },
+    }),
+  )
+  const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
+  const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
+  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluvia60: lluvia.data?.total ?? null, cosas: cosas.length })
+  const tempTexto = tiempo.data ? `${tiempo.data.temp} grados. ` : ''
+  const cabezas = campo ? campo.potreros.reduce((s, p) => s + p.cabezas, 0) : (panorama.data?.totalCabezas ?? 0)
+  const color = campo ? colorDeCampo(campo.colorIdx ?? 0) : null
+  const franjas = franjasDelRodeo(panorama.data?.porCategoria ?? [])
+  const entra = (i: number) =>
+    reducir ? {} : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35, delay: i * 0.06, ease: CURVA } }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto p-4">
-      <div>
-        <h1 className="c-display text-[26px] text-[var(--c-ink)]">
-          {hayAbiertas
-            ? r.abiertas.length === 1
-              ? 'Tenés una recorrida abierta'
-              : `Tenés ${r.abiertas.length} recorridas abiertas`
-            : '¿Qué vas a hacer?'}
-        </h1>
-      </div>
+    <div className="h-full overflow-y-auto bg-fondo pb-8">
+      {/* La foto con el saludo */}
+      <section className="relative isolate flex min-h-[330px] flex-col px-[22px] pt-[max(16px,env(safe-area-inset-top))] pb-5 text-superficie">
+        <img src="/inicio-bienvenida.png" alt="" className="absolute inset-0 -z-20 size-full object-cover object-[30%_50%]" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/30 via-black/10 to-black/70" />
+        <div className="flex items-center gap-2.5">
+          <Logo alto={26} soloIsotipo tono="hueso" />
+          {campos && campos.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setEligiendo((v) => !v)}
+                aria-expanded={eligiendo}
+                className="flex h-9 items-center gap-2 rounded-full border border-white/40 bg-white/20 pr-3 pl-1.5 text-[14px] font-semibold backdrop-blur-sm"
+              >
+                {color && (
+                  <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: color.hex }}>
+                    {color.letra}
+                  </span>
+                )}
+                {campo?.nombre}
+                {campos.length > 1 && (
+                  <Icono nombre="Desplegar" tamano={16} />
+                )}
+              </button>
+              {eligiendo && campos.length > 1 && (
+                <ul className="absolute top-11 left-0 z-20 min-w-[200px] overflow-hidden rounded-[14px] bg-superficie py-1.5 text-texto shadow-lg">
+                  {campos.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clima.elegir(c.id)
+                          setEligiendo(false)
+                        }}
+                        className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', c.id === campo?.id && 'font-bold')}
+                      >
+                        <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: colorDeCampo(c.colorIdx ?? 0).hex }}>
+                          {colorDeCampo(c.colorIdx ?? 0).letra}
+                        </span>
+                        {c.nombre}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <MenuCuenta inicial={(nombre || membresia?.empresa?.nombre || 'T').charAt(0)} />
+        </div>
+        <motion.div {...entra(0)} className="mt-auto pt-16">
+          <h1 className="font-heading text-[42px] leading-[1.02] font-extrabold tracking-[-0.02em]">{saludo(new Date().getHours(), nombre)}</h1>
+          <p className="mt-2 text-[15px] leading-snug text-superficie/90">
+            {tempTexto}
+            {frase}
+          </p>
+        </motion.div>
+      </section>
 
+      <div className="flex flex-col gap-5 px-[22px] pt-6">
+        <Pendientes r={r} />
+
+        {r.abiertas.map((a) => (
+          <motion.button
+            {...entra(1)}
+            key={a.recorridaId}
+            type="button"
+            onClick={async () => {
+              await r.activar(a.recorridaId)
+              navigate('/campo/recorrida')
+            }}
+            className="flex items-center gap-3.5 rounded-[18px] border-2 bg-superficie px-4 py-4 text-left"
+            style={{ borderColor: a.color.hex }}
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] font-heading text-[20px] font-extrabold text-white" style={{ background: a.color.hex }}>
+              {a.color.letra}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-heading text-[18px] font-extrabold text-texto">Seguí la recorrida de {a.campoNombre}</span>
+              <span className="text-[13.5px] text-texto-suave">
+                {a.hechos} de {a.total} potreros hechos
+              </span>
+            </span>
+            <Icono nombre="Siguiente" />
+          </motion.button>
+        ))}
+
+        <motion.section {...entra(2)} aria-labelledby="hoy-cosas">
+          <h2 id="hoy-cosas" className="font-heading text-[21px] font-extrabold text-texto">
+            {cosas.length === 0 ? 'Hoy no hay nada urgente' : `Hoy hay ${['', 'una cosa', 'dos cosas', 'tres cosas'][cosas.length]}`}
+          </h2>
+          {cosas.length === 0 ? (
+            <p className="mt-2 text-[15px] text-texto-suave">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
+          ) : (
+            <ul className="mt-1">
+              {cosas.map((c) => (
+                <li key={c.key} className="flex items-center gap-3 border-b border-borde py-3.5 last:border-b-0">
+                  <span aria-hidden className={cn('w-1 self-stretch rounded-full', BARRA[c.tono])} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[16px] leading-snug font-semibold text-texto">{c.titulo}</p>
+                    <p className="text-[13.5px] leading-snug text-texto-suave">{c.detalle}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(c.accion.to)}
+                    className="h-10 shrink-0 rounded-full bg-superficie-hundida px-4 text-[15px] font-bold text-principal"
+                  >
+                    {c.accion.texto}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </motion.section>
+
+        <motion.section {...entra(3)} aria-label="Las cabezas" className="pt-2">
+          <div className="flex items-end gap-3">
+            <p className="titulo-display text-[110px] leading-[0.9] tracking-[-0.04em] text-texto">{cabezas}</p>
+            <p className="pb-3 text-[16px] leading-tight font-semibold text-texto-suave">
+              cabezas en
+              <br />
+              {campo?.nombre ?? 'tus campos'}
+            </p>
+          </div>
+          {franjas.length > 0 && (
+            <div className="mt-3 flex h-2 gap-1">
+              {franjas.map((f) => (
+                <span key={f.nombre} className={cn('rounded-full', f.clase)} style={{ flexGrow: f.cabezas }} />
+              ))}
+            </div>
+          )}
+        </motion.section>
+
+        <button
+          type="button"
+          onClick={() => navigate('/campo/lector')}
+          className="flex items-center gap-2 self-center py-2 text-[13.5px] font-semibold text-texto-suave"
+        >
+          <Icono nombre="Bastón lector" tamano={16} />
+          Probar un lector de caravana
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Lo que el Modo Campo no puede callar: sin señal, lo que falta subir y lo que se rechazó. */
+function Pendientes({ r }: { r: ReturnType<typeof useRecorrida> }) {
+  return (
+    <>
       {!r.online && (
-        <p className="c-hazard flex items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-semibold text-[var(--c-ink)]">
-          <CloudOff className="size-4 shrink-0" /> Sin señal: podés trabajar
-          igual, sube solo cuando vuelva.
+        <p className="flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
+          <Icono nombre="Sin señal" tamano={16} /> Sin señal: trabajás igual y se sube solo cuando vuelva.
         </p>
       )}
-
-      {/* Lo que quedó sin subir AVISA, no bloquea: se puede arrancar otra
-          recorrida aunque lo anterior siga esperando señal. */}
       {(r.sinSubir > 0 || r.lluviaPendiente) && (
-        <div className="flex items-center gap-2 rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3 py-2.5">
-          <RefreshCw
-            className={cn(
-              'size-4 shrink-0 text-[var(--c-ink-soft)]',
-              r.sincronizando && 'animate-spin',
-            )}
-          />
-          <span className="text-[13px] text-[var(--c-ink-soft)]">
-            <span className="font-bold text-[var(--c-ink)]">
-              {r.sinSubir > 0
-                ? r.sinSubir === 1
-                  ? '1 observación'
-                  : `${r.sinSubir} observaciones`
-                : 'La lluvia'}
-            </span>{' '}
-            sin subir — se sube sola.
+        <p className="flex items-center gap-2.5 rounded-[14px] bg-superficie px-4 py-3 text-[14px] text-texto-suave">
+          <span className={cn('inline-flex', r.sincronizando && 'animate-spin')}>
+            <Icono nombre="Reintentar" tamano={16} />
           </span>
-        </div>
+          <span>
+            <b className="text-texto">
+              {r.sinSubir > 0 ? (r.sinSubir === 1 ? '1 observación' : `${r.sinSubir} observaciones`) : 'La lluvia'}
+            </b>{' '}
+            sin subir: se sube sola.
+          </span>
+        </p>
       )}
-
-      {/* Retomar: una tarjeta por campo abierto. Cada uno conserva su avance —
-          el productor recorre varios campos cercanos en la misma salida y salta
-          entre ellos sin perder nada. Tocar activa esa recorrida y va al croquis. */}
-      {r.abiertas.map((a) => (
-        <button
-          key={a.recorridaId}
-          type="button"
-          onClick={async () => {
-            await r.activar(a.recorridaId)
-            navigate('/campo/recorrida')
-          }}
-          // Acento con el color IDENTIDAD del campo (mismo que Modo Oficina):
-          // borde izquierdo grueso + chip con la letra. El campo se reconoce por
-          // su color de un vistazo, igual que en el mapa de Oficina.
-          className="c-hard flex items-center gap-3.5 rounded-2xl border-2 border-l-[6px] bg-[var(--c-panel)] px-4 py-5 text-left active:scale-[0.99]"
-          style={{ borderColor: a.color.hex }}
-        >
-          <span
-            className="c-display flex size-14 shrink-0 items-center justify-center rounded-2xl text-[24px] text-white shadow-[0_2px_8px_rgba(16,30,20,0.22)]"
-            style={{ background: a.color.hex }}
-          >
-            {a.color.letra}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="c-display block truncate text-[20px] text-[var(--c-ink)]">
-              Seguí en {a.campoNombre}
-            </span>
-            <span className="mt-0.5 flex items-center gap-1.5">
-              <span className="c-mono text-[13px] font-bold text-[var(--c-ok-deep)]">
-                {a.hechos}/{a.total}
-              </span>
-              <CLabel className="!text-[11px]">potreros hechos</CLabel>
-            </span>
-          </span>
-          <ChevronRight className="size-6 shrink-0 text-[var(--c-faint)]" />
-        </button>
-      ))}
-
-      <div className="flex flex-col gap-2.5">
-        <AccionGrande
-          to={hayAbiertas ? '/campo/recorrida?cambiar=1' : '/campo/recorrida'}
-          icon={
-            hayAbiertas ? (
-              <ArrowLeftRight className="size-6" strokeWidth={2} />
-            ) : (
-              <Footprints className="size-7" strokeWidth={2} />
-            )
-          }
-          titulo={hayAbiertas ? 'Recorrer otro campo' : 'Recorrer'}
-          detalle={
-            hayAbiertas
-              ? 'Las abiertas quedan guardadas'
-              : 'Potrero por potrero, sobre el croquis'
-          }
-          acento="ok"
-        />
-        <AccionGrande
-          to="/campo/manga"
-          icon={<Syringe className="size-7" strokeWidth={2} />}
-          titulo="Manga"
-          detalle="Caravanear, vacunar, apartar"
-          acento="ink"
-        />
-      </div>
-
-      {/* Plata no es una jornada que se elige — es la interrupción de la
-          estación de servicio o la veterinaria. Vive en la barra de abajo y se
-          puede meter en cualquier momento, también con la recorrida abierta:
-          al volver, se retoma donde estaba. */}
-      <Link
-        to="/campo/plata"
-        className="flex items-center gap-2.5 rounded-xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] px-3.5 py-3 text-left active:scale-[0.99]"
-      >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--c-sunk)] text-[var(--c-ink)]">
-          <Banknote className="size-[18px]" />
-        </span>
-        <span className="flex-1 text-[13px] leading-snug text-[var(--c-ink-soft)]">
-          ¿Cargaste nafta o pagaste algo?{' '}
-          <span className="font-bold text-[var(--c-ink)]">Anotalo en Plata</span>
-          {hayAbiertas && ' — la recorrida te espera'}.
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
-      </Link>
-
-      {/* Herramienta de laboratorio, no una tarea del campo: probar un bastón
-          RFID antes de comprarlo. Va discreta y al pie a propósito. */}
-      <Link
-        to="/campo/lector"
-        className="flex items-center gap-2 self-center py-1 text-[12px] text-[var(--c-ink-soft)] underline underline-offset-2"
-      >
-        <ScanLine className="size-3.5" />
-        Probar un lector de caravana
-      </Link>
-
-      {/* Lo que el servidor RECHAZÓ no se descarta nunca en silencio: se
-          muestra y se pide confirmación explícita para tirarlo. */}
       {r.errores.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-xl border border-[var(--c-bad)]/45 bg-[var(--c-bad-soft)] p-3.5">
-          <div className="c-label flex items-center gap-1.5 !text-[12px] !text-[var(--c-bad)]">
-            <AlertTriangle className="size-4" />
-            {r.errores.length === 1
-              ? '1 observación que el servidor rechazó'
-              : `${r.errores.length} observaciones que el servidor rechazó`}
-          </div>
-          <ul className="flex flex-col gap-1 text-[12.5px] text-[var(--c-ink-soft)]">
-            {r.errores.slice(0, 4).map((e) => (
-              <li key={`${e.recorrida_id}-${e.potrero_id}`}>
-                {e.error ?? 'error al subir'}
-              </li>
+        <div className="flex flex-col gap-2 rounded-[14px] bg-estado-problema-suave px-4 py-3">
+          <p className="text-[14px] font-bold text-estado-problema-texto">
+            {r.errores.length === 1 ? 'Una observación no se pudo guardar' : `${r.errores.length} observaciones no se pudieron guardar`}
+          </p>
+          <ul className="text-[13px] text-estado-problema-texto">
+            {r.errores.slice(0, 3).map((e) => (
+              <li key={`${e.recorrida_id}-${e.potrero_id}`}>{e.error ?? 'Error al subir'}</li>
             ))}
           </ul>
           <button
             type="button"
             onClick={() => void r.descartarErrores()}
-            className="c-label mt-1 inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-[var(--c-bad)]/45 bg-[var(--c-panel)] px-3 !text-[12px] !text-[var(--c-bad)] active:scale-[0.98]"
+            className="h-10 self-start rounded-full border-[1.5px] border-estado-problema-texto/50 bg-superficie px-4 text-[14px] font-bold text-estado-problema-texto"
           >
-            <Trash2 className="size-4" />
-            Descartar los que fallaron
+            Descartarlas
           </button>
         </div>
       )}
+    </>
+  )
+}
 
-      {sinCroquis && (
-        <div className="c-hazard flex items-start gap-2.5 rounded-xl border px-3 py-3">
-          <PencilRuler className="mt-0.5 size-4 shrink-0 text-[var(--c-ink)]" />
-          <p className="text-[13px] leading-snug text-[var(--c-ink)]">
-            <span className="font-bold">Todavía no hay potreros dibujados.</span>{' '}
-            Vas a poder recorrer igual, por lista, pero sin el croquis para
-            ubicarte. Se dibujan una sola vez desde Modo Oficina, en Campos.
-          </p>
-        </div>
+/** El avatar: el historial, la Oficina en el celular y salir (con confirmación de dos toques). */
+function MenuCuenta({ inicial }: { inicial: string }) {
+  const navigate = useNavigate()
+  const { signOut } = useAuth()
+  const [abierto, setAbierto] = useState(false)
+  const [salir, setSalir] = useState(false)
+  return (
+    <div className="relative ml-auto">
+      <button
+        type="button"
+        aria-label="Tu cuenta"
+        aria-expanded={abierto}
+        onClick={() => setAbierto((v) => !v)}
+        className="grid size-10 place-items-center rounded-full bg-acento font-heading text-[16px] font-extrabold text-acento-texto"
+      >
+        {inicial.toUpperCase()}
+      </button>
+      {abierto && (
+        <ul className="absolute top-12 right-0 z-20 min-w-[210px] overflow-hidden rounded-[14px] bg-superficie py-1.5 text-texto shadow-lg">
+          <li>
+            <button type="button" onClick={() => navigate('/campo/historial')} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]">
+              <Icono nombre="Agenda" tamano={16} /> Historial
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                setForceOficina(true)
+                navigate('/')
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]"
+            >
+              <Icono nombre="Oficina" tamano={16} /> Ir a la Oficina
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => (salir ? void signOut() : setSalir(true))}
+              className={cn('flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]', salir && 'bg-estado-problema-suave font-bold text-estado-problema-texto')}
+            >
+              <Icono nombre="Salir" tamano={16} /> {salir ? '¿Seguro? Tocá de nuevo' : 'Cerrar sesión'}
+            </button>
+          </li>
+        </ul>
       )}
     </div>
   )
 }
 
-function AccionGrande({
-  to,
-  icon,
-  titulo,
-  detalle,
-  acento,
-}: {
-  to: string
-  icon: React.ReactNode
-  titulo: string
-  detalle: string
-  acento: 'ok' | 'ink'
-}) {
+/** Celu · Hoy, sin campo (página 35): el campo se arma mejor en la compu. */
+function HoySinCampo() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { data: membresia } = useEmpresa()
+  const { data: campos } = useMapa(membresia?.empresa_id)
+  const [mandado, setMandado] = useState(false)
+  const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
+  const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
+  const primero = campos?.find((c) => !c.contorno) ?? campos?.[0]
   return (
-    <Link
-      to={to}
-      className="c-hard-sm flex items-center gap-3.5 rounded-2xl border-2 border-[var(--c-line-strong)] bg-[var(--c-panel)] px-4 py-4 text-left active:scale-[0.99]"
-    >
-      <span
-        className={cn(
-          'flex size-14 shrink-0 items-center justify-center rounded-2xl text-white',
-          acento === 'ok' ? 'bg-[var(--c-ok)]' : 'bg-[var(--c-ink)]',
+    <div className="flex h-full flex-col overflow-y-auto bg-fondo px-[18px] pt-[max(20px,env(safe-area-inset-top))] pb-6">
+      <h1 className="titulo-display text-[34px] leading-tight text-texto">{saludo(new Date().getHours(), nombre).replace(/\.$/, '')}</h1>
+      <div className="relative mt-4 grid h-[260px] place-items-center overflow-hidden rounded-[24px] bg-superficie-hundida">
+        <img src={textura} alt="" className="absolute inset-0 size-full object-cover opacity-30" />
+        <div className="relative grid h-[160px] w-[78%] place-items-center rounded-[18px] border-2 border-dashed border-texto-suave/50">
+          <p className="font-heading text-[16px] font-extrabold text-texto-suave">Tu campo va a estar acá</p>
+        </div>
+      </div>
+      <h2 className="mt-7 font-heading text-[22px] font-extrabold text-texto">Todavía no armaste tu campo</h2>
+      <p className="mt-2 text-[15px] leading-snug text-texto-suave">
+        Con el campo y sus potreros cargados, el celular te ubica en cada uno en la recorrida y en la manga.
+      </p>
+      <p className="mt-5 flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
+        <Icono nombre="Campos" tamano={16} /> Lo primero es armar el campo. Después se abre todo.
+      </p>
+      <div className="mt-auto flex flex-col gap-3 pt-6">
+        {mandado ? (
+          <p role="status" className="rounded-[18px] bg-estado-bien-suave px-4 py-3 text-center text-[15px] font-semibold text-estado-bien-texto">
+            Listo: abrí el link en la compu.
+          </p>
+        ) : (
+          <BotonPrincipal
+            icono="Mail"
+            onClick={() => {
+              const link = `${window.location.origin}/mapa${primero ? `/${primero.id}` : ''}`
+              const celular = (user?.phone ?? '').replace(/\D/g, '')
+              window.open(`https://wa.me/${celular}?text=${encodeURIComponent(`Tropero: abrí este link en la compu para armar tu campo en el mapa ${link}`)}`, '_blank', 'noopener')
+              setMandado(true)
+            }}
+          >
+            Mandame el link a la compu
+          </BotonPrincipal>
         )}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="c-display block truncate text-[19px] text-[var(--c-ink)]">
-          {titulo}
-        </span>
-        <CLabel className="!text-[11.5px]">{detalle}</CLabel>
-      </span>
-      <ChevronRight className="size-6 shrink-0 text-[var(--c-faint)]" />
-    </Link>
+        <button
+          type="button"
+          onClick={() => navigate(primero ? `/mapa/${primero.id}` : '/mapa')}
+          className="h-14 rounded-full border-[1.5px] border-principal text-[16.5px] font-bold text-principal"
+        >
+          Armarlo desde el celular
+        </button>
+      </div>
+    </div>
   )
 }
