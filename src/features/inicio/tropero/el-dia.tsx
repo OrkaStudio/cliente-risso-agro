@@ -632,11 +632,15 @@ function Clima() {
   }
   const dias = (pronostico.data ?? []).slice(0, 7)
   const ultima = lluvia.data?.ultima
+  // La escala de la semana, para que cada barra de temperatura se compare con las otras.
+  const minSemana = Math.min(...dias.map((d) => d.min))
+  const maxSemana = Math.max(...dias.map((d) => d.max))
   return (
     <section id="clima" aria-label={`El clima en ${actual.nombre}`} className="flex h-full scroll-mt-6 flex-col">
-      {/* Escena del Figma: el molino al atardecer, con la rueda girando despacio. */}
-      <div className="relative h-[140px] shrink-0 overflow-hidden bg-[#e8c0ae]">
-        <div className="absolute top-[-120px] left-[-150px] h-[320px] w-[569px]">
+      {/* Escena del Figma: el molino al atardecer. Los datos van en el cielo, sobre una
+          banda que los deja leer; el campo y las vacas quedan libres abajo. */}
+      <div className="relative h-[150px] shrink-0 overflow-hidden bg-[#e8c0ae]">
+        <div className="absolute top-[-110px] left-[-60px] h-[320px] w-[569px]">
           <img src={cielo} alt="" className="absolute inset-0 size-full" />
           <img src={campoMolino} alt="" className="absolute inset-0 size-full" />
           <motion.img
@@ -647,30 +651,45 @@ function Clima() {
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
           />
         </div>
-        <div className="relative px-5 pt-4 text-superficie [text-shadow:0_1px_3px_rgba(0,0,0,0.25)]">
-          <p className="text-[15px] font-semibold">{actual.nombre}</p>
-          <p className="cifra text-[44px] leading-tight font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
-          {clima.data && <p className="text-[14px] font-medium">Mín {clima.data.min}° · Máx {clima.data.max}°</p>}
-        </div>
-      </div>
-      <ul className="px-5 pt-3">
-        {dias.map((d, i) => (
-          <FilaPronostico key={d.fecha} d={d} hoy={i === 0} />
-        ))}
-      </ul>
-      <div className="px-5 pt-2 pb-5">
-        {lluvia.data && lluvia.data.total > 0 ? (
-          <>
-            <p className="text-[16px] font-semibold text-texto">Llovieron {Math.round(lluvia.data.total)} mm en los últimos 60 días</p>
-            {ultima && (
-              <p className={T.chico}>
-                La última: {Math.round(ultima.mm)} mm el {new Date(`${ultima.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}
-                {ultima.fuente === 'manual' ? ', anotada en la recorrida' : ''}
+        <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-[#b9734d]/85 via-[#c98d68]/55 to-transparent" />
+        <div className="relative flex h-full flex-col justify-center px-6 pb-6 text-superficie">
+          <p className="text-[14px] font-semibold opacity-90">{actual.nombre} · ahora</p>
+          <div className="flex items-baseline gap-3">
+            <p className="cifra text-[48px] leading-none font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
+            {clima.data && (
+              <p className="cifra text-[15px] font-semibold opacity-90">
+                {clima.data.max}° / {clima.data.min}°
               </p>
             )}
-          </>
+          </div>
+          {clima.data && <p className="mt-1 text-[14px] font-medium opacity-90">{clima.data.descripcion}</p>}
+        </div>
+      </div>
+
+      {/* La semana: día · ícono · lluvia · la barra de mínima a máxima. */}
+      <ul className="flex-1 divide-y divide-borde/70 px-6 py-2">
+        {dias.map((d, i) => (
+          <FilaPronostico key={d.fecha} d={d} hoy={i === 0} min={minSemana} max={maxSemana} />
+        ))}
+      </ul>
+
+      <div className="mx-6 mb-6 flex items-center gap-3 rounded-[14px] bg-[#e6f1fa] px-4 py-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2779c4] text-superficie">
+          <Icono nombre="Lluvia" />
+        </span>
+        {lluvia.data && lluvia.data.total > 0 ? (
+          <div className="min-w-0">
+            <p className="text-[16px] text-[#1d4f7a]">
+              <b className="cifra text-[20px]">{Math.round(lluvia.data.total)} mm</b> en los últimos 60 días
+            </p>
+            {ultima && (
+              <p className="truncate text-[13.5px] text-[#215a7e]/80">
+                La última, {Math.round(ultima.mm)} mm el {new Date(`${ultima.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}
+              </p>
+            )}
+          </div>
         ) : (
-          <p className="text-[13.5px] text-texto-suave">Sin lluvia anotada en los últimos 60 días.</p>
+          <p className="text-[15px] text-[#1d4f7a]">Sin lluvia anotada en los últimos 60 días.</p>
         )}
       </div>
     </section>
@@ -682,33 +701,40 @@ function IconoDia({ d }: { d: DiaPronostico }) {
   const c = d.code
   const tono =
     c >= 95
-      ? 'bg-[#ece4f5] text-[#6a4c9c]'
+      ? 'text-[#6a4c9c]'
       : (c >= 51 && c <= 67) || (c >= 80 && c <= 82)
-        ? 'bg-[#dcebf6] text-[#2779c4]'
+        ? 'text-[#2779c4]'
         : (c >= 71 && c <= 77) || c === 85 || c === 86 || d.helada
-          ? 'bg-[#e6f1fa] text-[#4a90c8]'
+          ? 'text-[#4a90c8]'
           : c <= 1
-            ? 'bg-acento/35 text-[#b07a10]'
-            : 'bg-superficie-hundida text-texto-suave'
+            ? 'text-[#d39b1c]'
+            : 'text-texto-suave'
   return (
-    <span className={cn('grid size-10 shrink-0 place-items-center rounded-full', tono)} title={d.descripcion}>
-      <WmoIcon code={c} className="size-[22px]" />
+    <span className={cn('grid size-8 shrink-0 place-items-center', tono)} title={d.descripcion}>
+      <WmoIcon code={c} className="size-[24px]" />
     </span>
   )
 }
 
-function FilaPronostico({ d, hoy }: { d: DiaPronostico; hoy: boolean }) {
+function FilaPronostico({ d, hoy, min, max }: { d: DiaPronostico; hoy: boolean; min: number; max: number }) {
   const f = new Date(`${d.fecha}T12:00:00`)
-  const llueve = d.lluviaProb >= 20
+  const rango = Math.max(1, max - min)
   return (
-    <li className="flex items-center gap-3 py-1.5">
-      <span className={cn('w-12', T.texto, hoy ? 'font-bold' : 'font-medium')}>{hoy ? 'Hoy' : DIA_CORTO[f.getDay()]}</span>
+    <li className="grid grid-cols-[44px_32px_52px_1fr] items-center gap-3 py-2.5">
+      <span className={cn(T.texto, hoy ? 'font-bold' : 'font-medium')}>{hoy ? 'Hoy' : DIA_CORTO[f.getDay()]}</span>
       <IconoDia d={d} />
-      <span className={cn('min-w-0 flex-1 truncate', T.chico, llueve && 'font-semibold text-[#2779c4]')}>
-        {llueve ? `${d.lluviaProb} %${d.lluviaMm >= 1 ? ` · ${Math.round(d.lluviaMm)} mm` : ''}` : d.helada ? 'Helada' : d.descripcion}
+      {/* La lluvia sólo si es probable: un número vacío no aporta. */}
+      <span className="cifra text-[15px] font-bold text-[#2779c4]">{d.lluviaProb >= 20 ? `${d.lluviaProb} %` : ''}</span>
+      <span className="flex items-center gap-2.5">
+        <span className="cifra w-7 text-right text-[16px] text-texto-suave">{d.min}°</span>
+        <span className="relative h-2 flex-1 rounded-full bg-superficie-hundida">
+          <span
+            className="absolute inset-y-0 rounded-full bg-gradient-to-r from-[#7fb3d9] to-[#e0a24a]"
+            style={{ left: `${((d.min - min) / rango) * 100}%`, right: `${((max - d.max) / rango) * 100}%` }}
+          />
+        </span>
+        <span className="cifra w-7 text-[16px] font-bold text-texto">{d.max}°</span>
       </span>
-      <span className="cifra w-10 text-right text-[17px] font-bold text-texto">{d.max}°</span>
-      <span className="cifra w-9 text-right text-[17px] text-texto-suave">{d.min}°</span>
     </li>
   )
 }
