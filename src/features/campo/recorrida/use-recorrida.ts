@@ -212,6 +212,7 @@ export async function drenarRecorrida(onEstado?: (v: boolean) => void): Promise<
                 campoId: sL.campo_id,
                 empresaId: sL.empresa_id,
                 mm: sL.lluvia_mm,
+                fecha: sL.lluvia_fecha ?? sL.fecha,
               })
               await recdb.recorridas.update(sL.recorrida_id, { lluvia_ok: 1 })
             } catch {
@@ -447,7 +448,7 @@ export function useRecorrida() {
     async (mm: number | null) => {
       const rid = (await recdb.meta.get('actual'))?.recorrida_id
       if (!rid) return
-      await recdb.recorridas.update(rid, { lluvia_mm: mm, lluvia_ok: 0 })
+      await recdb.recorridas.update(rid, { lluvia_mm: mm, lluvia_fecha: hoyISO(), lluvia_ok: 0 })
       void sincronizar()
     },
     [sincronizar],

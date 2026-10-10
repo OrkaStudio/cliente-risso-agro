@@ -18,10 +18,9 @@ import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender } from '../para-atender-api'
-import { escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
-import { guardarLluvia } from '@/features/campo/recorrida/api'
+import { escenaDelClima, mmTexto, origenDeLaLluvia, type Lluvia60, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { EscenaClima } from './escena-clima'
-import { useGanadoCampania, useLluvia60, useLluviaEstimada } from './use-dia'
+import { useGanadoCampania, useLluvia60 } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const TARJETA = 'rounded-[20px] border border-borde bg-superficie p-6'
@@ -60,7 +59,7 @@ export function ElDia() {
   const { actual } = useCampoClima()
   const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(actual?.id ?? null)
+  const lluvia = useLluvia60(actual?.id ?? null, actual?.ubicacion ?? null)
   const ganado = useGanadoCampania()
   const reducir = useReducedMotion()
 
@@ -90,7 +89,7 @@ export function ElDia() {
       >
         <PulsoHacienda total={p.totalCabezas} campos={campos?.length ?? 0} cats={p.porCategoria} nacimientos={(a?.nacimientos ?? []).reduce((s, n) => s + n.total, 0)} />
         <PulsoPlata vencimientos={p.vencimientos} ganado={ganado.data ?? null} />
-        <PulsoLluvia lugar={actual?.nombre ?? null} mm={lluvia.data?.total ?? null} temp={clima.data?.temp ?? null} manana={manana ?? null} />
+        <PulsoLluvia lugar={actual?.nombre ?? null} lluvia={lluvia.data ?? null} temp={clima.data?.temp ?? null} manana={manana ?? null} />
         <PulsoRecorrida ultima={a?.ultimaRecorridaHace ?? null} potreros={a?.potreros.length ?? 0} sinRecorrer={a?.sinRecorrer ?? []} />
       </motion.div>
 
@@ -275,7 +274,7 @@ function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; gan
   )
 }
 
-function PulsoLluvia({ lugar, mm, temp, manana }: { lugar: string | null; mm: number | null; temp: number | null; manana: DiaPronostico | null }) {
+function PulsoLluvia({ lugar, lluvia, temp, manana }: { lugar: string | null; lluvia: Lluvia60 | null; temp: number | null; manana: DiaPronostico | null }) {
   return (
     <Pulso
       titulo={lugar ? `Lluvia en ${lugar}` : 'Lluvia'}
@@ -284,10 +283,14 @@ function PulsoLluvia({ lugar, mm, temp, manana }: { lugar: string | null; mm: nu
       pie={manana ? (manana.lluviaProb >= 40 ? <b className="text-[#215a7e]">Mañana {manana.lluviaProb} % de lluvia</b> : `Mañana ${manana.max}°, sin lluvia`) : 'Pronóstico abajo'}
     >
       <span className="flex items-baseline gap-2">
-        <span className={NUMERO}>{mm === null ? '—' : Math.round(mm)}</span>
+        <span className={NUMERO}>
+          {lluvia === null ? '—' : `${lluvia.diasEstimados > 0 ? '≈' : ''}${Math.round(lluvia.total)}`}
+        </span>
         <span className="text-[15px] font-semibold text-texto-suave">mm</span>
       </span>
-      <span className="mt-1 block truncate text-[13px] text-texto-suave">en 60 días{temp !== null ? ` · ahora ${temp}°` : ''}</span>
+      <span className="mt-1 block truncate text-[13px] text-texto-suave">
+        en 60 días{temp !== null ? ` · ahora ${temp}°` : ''}
+      </span>
     </Pulso>
   )
 }
@@ -618,7 +621,7 @@ function Clima() {
   const navigate = useNavigate()
   const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(actual?.id ?? null)
+  const lluvia = useLluvia60(actual?.id ?? null, actual?.ubicacion ?? null)
   if (!actual) {
     return (
       <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
@@ -659,92 +662,31 @@ function Clima() {
         ))}
       </ul>
 
-      <LluviaDelCampo campoId={actual.id} ubicacion={actual.ubicacion} anotada={lluvia.data?.total ?? 0} />
+      <LluviaDelCampo lluvia={lluvia.data} />
     </section>
   )
 }
 
 /**
- * Lo que llovió en 60 días: lo del pluviómetro si hay; si no, lo que dice el
- * pronóstico (marcado como estimado). Y el botón para anotar la de hoy.
+ * Lo que llovió en 60 días y de dónde sale el número. No se carga acá: la
+ * lluvia se mide en la recorrida o se manda por WhatsApp.
  */
-function LluviaDelCampo({ campoId, ubicacion, anotada }: { campoId: string; ubicacion: { lat: number; lon: number }; anotada: number }) {
-  const { data: membresia } = useEmpresa()
-  const qc = useQueryClient()
-  const estimada = useLluviaEstimada(ubicacion)
-  const [abierto, setAbierto] = useState(false)
-  const [mm, setMm] = useState('')
-  const [guardando, setGuardando] = useState(false)
-  const conPluviometro = anotada > 0
-  const total = conPluviometro ? anotada : estimada.data
-  async function guardar() {
-    const n = Number(mm.replace(',', '.'))
-    if (!membresia?.empresa_id || !Number.isFinite(n) || n <= 0) return
-    setGuardando(true)
-    try {
-      await guardarLluvia({ campoId, empresaId: membresia.empresa_id, mm: n })
-      await qc.invalidateQueries({ queryKey: ['inicio', 'lluvia60'] })
-      setAbierto(false)
-      setMm('')
-    } finally {
-      setGuardando(false)
-    }
-  }
+function LluviaDelCampo({ lluvia }: { lluvia: Lluvia60 | undefined }) {
   return (
-    <div className="mt-auto border-t border-borde px-6 py-4">
-      {abierto ? (
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void guardar()
-          }}
-        >
-          <span className="text-[#2779c4]">
-            <Icono nombre="Lluvia" />
+    <div className="mt-auto flex items-center gap-3 border-t border-borde px-6 py-4">
+      <span className="text-[#2779c4]">
+        <Icono nombre="Lluvia" />
+      </span>
+      {lluvia ? (
+        <p className="text-[15px] text-texto-suave">
+          <b className={cn(T.numeroChico, 'text-texto')}>{mmTexto(lluvia)}</b> en 60 días
+          <span className="block text-[13.5px]">
+            {origenDeLaLluvia(lluvia)}
+            {lluvia.diasMedidos === 0 && !lluvia.sinPronostico ? '. Medila en la recorrida y se ajusta.' : ''}
           </span>
-          <label className="flex h-11 flex-1 items-center gap-2 rounded-[12px] border-[1.5px] border-borde bg-superficie px-3 focus-within:border-principal">
-            <span className="sr-only">Milímetros de hoy</span>
-            <input
-              autoFocus
-              inputMode="decimal"
-              value={mm}
-              onChange={(e) => setMm(e.target.value.replace(/[^\d.,]/g, ''))}
-              placeholder="0"
-              className="cifra w-full bg-transparent text-[20px] font-bold text-texto outline-none"
-            />
-            <span className="text-[15px] font-semibold whitespace-nowrap text-texto-suave">mm</span>
-          </label>
-          <BotonChico type="submit" disabled={guardando || !mm}>
-            {guardando ? 'Guardando…' : 'Guardar la de hoy'}
-          </BotonChico>
-          <button type="button" aria-label="Cancelar" onClick={() => setAbierto(false)} className="grid size-9 place-items-center rounded-full text-texto-suave hover:bg-superficie-hundida">
-            <Icono nombre="Cerrar" tamano={16} />
-          </button>
-        </form>
+        </p>
       ) : (
-        <div className="flex items-center gap-3">
-          <span className="text-[#2779c4]">
-            <Icono nombre="Lluvia" />
-          </span>
-          <p className="min-w-0 flex-1 text-[15px] text-texto-suave">
-            {total !== undefined ? (
-              <>
-                <b className={cn(T.numeroChico, 'text-texto')}>
-                  {conPluviometro ? '' : '≈ '}
-                  {Math.round(total)} mm
-                </b>{' '}
-                en 60 días
-                <span className="block text-[13.5px]">{conPluviometro ? 'Según tu pluviómetro' : 'Estimado por el pronóstico'}</span>
-              </>
-            ) : (
-              'Sin datos de lluvia'
-            )}
-          </p>
-          <BotonChico type="button" onClick={() => setAbierto(true)}>
-            Anotar lluvia
-          </BotonChico>
-        </div>
+        <p className="text-[15px] text-texto-suave">Calculando la lluvia…</p>
       )}
     </div>
   )

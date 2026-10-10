@@ -335,13 +335,19 @@ export async function guardarObservacion(input: {
   }
 }
 
-/** Lluvia del campo (mm) del día — única por campo+fecha (upsert manual). */
+/**
+ * Lluvia del campo (mm) de un día, leída del pluviómetro — única por
+ * campo+fecha (upsert manual). `fecha`: el día de la lectura (el de la
+ * recorrida). Sin ella, hoy: una recorrida sin señal que sube al otro día no
+ * puede guardar la lluvia en el día equivocado.
+ */
 export async function guardarLluvia(input: {
   campoId: string
   empresaId: string
   mm: number
+  fecha?: string
 }): Promise<void> {
-  const fecha = hoyISO()
+  const fecha = input.fecha ?? hoyISO()
   const { data: ex } = await supabase
     .from('lluvia')
     .select('id')

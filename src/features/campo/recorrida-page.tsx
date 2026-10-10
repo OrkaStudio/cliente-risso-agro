@@ -752,6 +752,8 @@ function LluviaSheet({
   const [mm, setMm] = useState(valor ?? 10)
   return (
     <CSheet open={open} title="Lluvia de hoy" onClose={onCerrar}>
+      {/* Cada lectura es la lluvia de UN día: así se combina con el pronóstico sin contar dos veces. */}
+      <p className="mb-3 text-[14px] text-[var(--c-ink-soft)]">Lo que marca el pluviómetro de las últimas 24 horas.</p>
       <button
         type="button"
         onClick={() => onGuardar(0)}

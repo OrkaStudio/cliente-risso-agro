@@ -50,6 +50,8 @@ export type RecSesion = {
   empresa_id: string
   fecha: string
   lluvia_mm: number | null
+  /** El día en que se leyó el pluviómetro (la recorrida puede seguir abierta varios días). */
+  lluvia_fecha?: string
   lluvia_ok: 0 | 1
   /** 1 = la fila `recorrida` ya existe en el servidor. 0 = se arrancó offline
    *  con UUID de cliente; el drenado la crea (o adopta la del día) antes de

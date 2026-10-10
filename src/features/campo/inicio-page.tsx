@@ -45,7 +45,9 @@ function Hoy() {
   // El campo de Hoy es el mismo que el del clima: se elige una vez para los dos.
   const campo = campos?.find((c) => c.id === clima.actual?.id) ?? campos?.[0]
   const tiempo = useClima(clima.actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(campo?.id ?? null)
+  // La ubicación del campo de Hoy (el mismo que el del clima, o su centro).
+  const ubicacion = campo && clima.actual?.id === campo.id ? clima.actual.ubicacion : campo?.lat != null && campo.lon != null ? { lat: campo.lat, lon: campo.lon } : null
+  const lluvia = useLluvia60(campo?.id ?? null, ubicacion)
   const reducir = useReducedMotion()
   const [eligiendo, setEligiendo] = useState(false)
 
@@ -61,7 +63,7 @@ function Hoy() {
   )
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
-  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluvia60: lluvia.data?.total ?? null, cosas: cosas.length })
+  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluvia60: lluvia.data ? { mm: lluvia.data.total, aprox: lluvia.data.diasEstimados > 0 } : null, cosas: cosas.length })
   const tempTexto = tiempo.data ? `${tiempo.data.temp} grados. ` : ''
   const cabezas = campo ? campo.potreros.reduce((s, p) => s + p.cabezas, 0) : (panorama.data?.totalCabezas ?? 0)
   const color = campo ? colorDeCampo(campo.colorIdx ?? 0) : null
