@@ -288,7 +288,7 @@ function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number |
         <span className="text-[15px] font-semibold text-texto-suave">mm</span>
       </span>
       <span className="mt-1 block truncate text-[13px] text-texto-suave">
-        en 60 días, según el pronóstico
+        en 30 días, según el pronóstico
       </span>
     </Pulso>
   )
@@ -625,7 +625,7 @@ function Clima() {
     return (
       <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
         <h2 className={cn(T.titulo)}>El clima de tu campo</h2>
-        <p className="text-[15px] text-texto-suave">Con el campo en el mapa, acá ves el pronóstico y la lluvia de los últimos dos meses.</p>
+        <p className="text-[15px] text-texto-suave">Con el campo en el mapa, acá ves el pronóstico y la lluvia del último mes.</p>
         <BotonChico type="button" icono="Campos" onClick={() => navigate('/campos')}>
           Ver mis campos
         </BotonChico>
@@ -666,7 +666,7 @@ function Clima() {
   )
 }
 
-/** Lo que llovió en 60 días, según el pronóstico (no se carga a mano). */
+/** Lo que llovió en el último mes, según el pronóstico (no se carga a mano). */
 function LluviaDelCampo({ mm }: { mm: number | undefined }) {
   return (
     <div className="mt-auto flex items-center gap-3 border-t border-borde px-6 py-4">
@@ -678,7 +678,7 @@ function LluviaDelCampo({ mm }: { mm: number | undefined }) {
           'Calculando la lluvia…'
         ) : (
           <>
-            <b className={cn(T.numeroChico, 'text-texto')}>≈ {mm} mm</b> en 60 días
+            <b className={cn(T.numeroChico, 'text-texto')}>≈ {mm} mm</b> en 30 días
             <span className="block text-[13.5px]">Según el pronóstico para tu campo</span>
           </>
         )}

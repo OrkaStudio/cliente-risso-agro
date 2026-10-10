@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { lluviaDe60Dias, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { lluviaDelMes, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
@@ -49,11 +49,11 @@ describe('lo que dice arriba', () => {
     expect(saludo(21, '')).toBe('Buenas noches.')
   })
   it('arma la frase con lo que hay', () => {
-    expect(fraseDelDia({ temp: 17, lugar: 'La Porteña', lluvia60: 142, cosas: 4 })).toBe(
-      '17 grados en La Porteña. Llovieron unos 142 mm en dos meses y hay cuatro cosas para atender.',
+    expect(fraseDelDia({ temp: 17, lugar: 'La Porteña', lluviaMes: 42, cosas: 4 })).toBe(
+      '17 grados en La Porteña. Llovieron unos 42 mm en el último mes y hay cuatro cosas para atender.',
     )
-    expect(fraseDelDia({ temp: null, lugar: null, lluvia60: null, cosas: 0 })).toBe('No hay nada urgente.')
-    expect(fraseDelDia({ temp: 9, lugar: 'Los Pampas', lluvia60: 0, cosas: 1 })).toBe('9 grados en Los Pampas. Hay una cosa para atender.')
+    expect(fraseDelDia({ temp: null, lugar: null, lluviaMes: null, cosas: 0 })).toBe('No hay nada urgente.')
+    expect(fraseDelDia({ temp: 9, lugar: 'Los Pampas', lluviaMes: 0, cosas: 1 })).toBe('9 grados en Los Pampas. Hay una cosa para atender.')
   })
 })
 
@@ -129,16 +129,16 @@ describe('la escena del clima', () => {
   })
 })
 
-describe('la lluvia de 60 días', () => {
-  it('suma los 60 días que terminan ayer; hoy y lo anterior no cuentan', () => {
+describe('la lluvia del último mes', () => {
+  it('suma los 30 días que terminan ayer; hoy y lo anterior no cuentan', () => {
     const hoy = '2026-10-10'
-    const est = Array.from({ length: 62 }, (_, i) => {
-      const f = new Date(2026, 9, 10 - 61 + i)
+    const est = Array.from({ length: 32 }, (_, i) => {
+      const f = new Date(2026, 9, 10 - 31 + i)
       const ymd = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
       return { fecha: ymd, mm: ymd === hoy ? 50 : 2 }
     })
-    // 62 días: el más viejo queda afuera, hoy no cuenta → 60 días × 2 mm.
-    expect(lluviaDe60Dias(est, hoy)).toBe(120)
-    expect(lluviaDe60Dias([], hoy)).toBe(0)
+    // 32 días: el más viejo queda afuera, hoy no cuenta → 30 días × 2 mm.
+    expect(lluviaDelMes(est, hoy)).toBe(60)
+    expect(lluviaDelMes([], hoy)).toBe(0)
   })
 })

@@ -110,23 +110,23 @@ export function saludo(hora: number, nombre: string): string {
   return nombre ? `${s}, ${nombre}.` : `${s}.`
 }
 
-/** «17 grados en La Porteña. Llovieron 142 mm en dos meses y hay cuatro cosas para atender.» */
+/** «17 grados en La Porteña. Llovieron unos 42 mm en el último mes y hay cuatro cosas para atender.» */
 export function fraseDelDia({
   temp,
   lugar,
-  lluvia60,
+  lluviaMes,
   cosas,
 }: {
   temp: number | null
   lugar: string | null
-  /** mm de 60 días según el pronóstico («unos»: es una estimación). */
-  lluvia60: number | null
+  /** mm del último mes según el pronóstico («unos»: es una estimación). */
+  lluviaMes: number | null
   cosas: number
 }): string {
   const partes: string[] = []
   if (temp !== null && lugar) partes.push(`${temp} ${Math.abs(temp) === 1 ? 'grado' : 'grados'} en ${lugar}.`)
   const atender = cosas === 0 ? 'no hay nada urgente' : `hay ${enLetras(cosas)} ${cosas === 1 ? 'cosa' : 'cosas'} para atender`
-  if (lluvia60 !== null && lluvia60 > 0) partes.push(`Llovieron unos ${lluvia60} mm en dos meses y ${atender}.`)
+  if (lluviaMes !== null && lluviaMes > 0) partes.push(`Llovieron unos ${lluviaMes} mm en el último mes y ${atender}.`)
   else partes.push(`${atender.charAt(0).toUpperCase()}${atender.slice(1)}.`)
   return partes.join(' ')
 }
@@ -267,18 +267,20 @@ export function escenaDelClima(code: number, viento: number, dia: boolean): { ci
   return { cielo: 'sol', ventoso }
 }
 
-// ===== La lluvia de 60 días =====
+// ===== La lluvia del último mes =====
 
 export type DiaLluvia = { fecha: string; mm: number }
 
 /**
- * Lo que llovió en el campo en los 60 días que terminan ayer, según Open-Meteo
+ * Lo que llovió en el campo en los 30 días que terminan ayer, según Open-Meteo
  * (sus días pasados). Hoy no cuenta: el pronóstico de hoy incluye horas que
  * todavía no pasaron. Es una estimación del modelo para la ubicación del campo:
  * así se dice en pantalla.
  */
-export function lluviaDe60Dias(estimado: DiaLluvia[], hoy: string): number {
-  const desde = sumarDias(hoy, -60)
+export const DIAS_DE_LLUVIA = 30
+
+export function lluviaDelMes(estimado: DiaLluvia[], hoy: string): number {
+  const desde = sumarDias(hoy, -DIAS_DE_LLUVIA)
   const total = estimado.filter((x) => x.fecha >= desde && x.fecha < hoy).reduce((s, x) => s + x.mm, 0)
   return Math.round(total)
 }

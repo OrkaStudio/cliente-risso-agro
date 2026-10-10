@@ -63,7 +63,7 @@ function Hoy() {
   )
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
-  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluvia60: lluvia.data ?? null, cosas: cosas.length })
+  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluviaMes: lluvia.data ?? null, cosas: cosas.length })
   const tempTexto = tiempo.data ? `${tiempo.data.temp} grados. ` : ''
   const cabezas = campo ? campo.potreros.reduce((s, p) => s + p.cabezas, 0) : (panorama.data?.totalCabezas ?? 0)
   const color = campo ? colorDeCampo(campo.colorIdx ?? 0) : null

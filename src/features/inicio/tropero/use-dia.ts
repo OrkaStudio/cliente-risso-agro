@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { usePanoramaInicio } from '../hooks'
 import { useParaAtender } from '../para-atender-api'
-import { cosasParaHoy, inicioDeCampania, lluviaDe60Dias, type DiaLluvia } from './dia'
+import { cosasParaHoy, DIAS_DE_LLUVIA, inicioDeCampania, lluviaDelMes, type DiaLluvia } from './dia'
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 /**
- * La lluvia de 60 días en la ubicación del campo, según Open-Meteo. Es la
+ * La lluvia del último mes (30 días) en la ubicación del campo, según Open-Meteo. Es la
  * única fuente de la lluvia: el saludo, la tarjeta, el clima y el Hoy dicen el
  * mismo número. No se carga a mano (decisión del 10/10).
  */
@@ -19,12 +19,12 @@ export const useLluvia60 = (ubicacion: { lat: number; lon: number } | null) =>
     retry: 1,
     queryFn: async (): Promise<number> => {
       const r = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${ubicacion!.lat}&longitude=${ubicacion!.lon}&daily=precipitation_sum&past_days=61&forecast_days=1&timezone=America/Argentina/Buenos_Aires`,
+        `https://api.open-meteo.com/v1/forecast?latitude=${ubicacion!.lat}&longitude=${ubicacion!.lon}&daily=precipitation_sum&past_days=${DIAS_DE_LLUVIA + 1}&forecast_days=1&timezone=America/Argentina/Buenos_Aires`,
       )
       if (!r.ok) throw new Error(`open-meteo ${r.status}`)
       const j = (await r.json()) as { daily: { time: string[]; precipitation_sum: (number | null)[] } }
       const dias: DiaLluvia[] = j.daily.time.flatMap((fecha, i) => (j.daily.precipitation_sum[i] == null ? [] : [{ fecha, mm: j.daily.precipitation_sum[i]! }]))
-      return lluviaDe60Dias(dias, ymd(new Date()))
+      return lluviaDelMes(dias, ymd(new Date()))
     },
   })
 
