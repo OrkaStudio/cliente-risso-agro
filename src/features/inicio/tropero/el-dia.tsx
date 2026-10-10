@@ -19,8 +19,9 @@ import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender } from '../para-atender-api'
 import { escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { guardarLluvia } from '@/features/campo/recorrida/api'
 import { EscenaClima } from './escena-clima'
-import { useGanadoCampania, useLluvia60 } from './use-dia'
+import { useGanadoCampania, useLluvia60, useLluviaEstimada } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const TARJETA = 'rounded-[20px] border border-borde bg-superficie p-6'
@@ -39,6 +40,8 @@ const T = {
   chico: 'text-[14px] text-texto-suave',
   /** Un número destacado dentro de un panel. */
   numero: 'titulo-display leading-none tracking-[-0.02em]',
+  /** Un número de fila (pronóstico, montos de una lista). */
+  numeroChico: 'cifra text-[24px] leading-none font-bold',
 } as const
 
 /**
@@ -656,19 +659,94 @@ function Clima() {
         ))}
       </ul>
 
-      <p className="mt-auto flex items-center gap-2 border-t border-borde px-6 py-4 text-[15px] text-texto-suave">
-        <span className="text-[#2779c4]">
-          <Icono nombre="Lluvia" tamano={16} />
-        </span>
-        {lluvia.data && lluvia.data.total > 0 ? (
-          <span>
-            <b className="cifra text-[17px] text-texto">{Math.round(lluvia.data.total)} mm</b> en los últimos 60 días
-          </span>
-        ) : (
-          'Sin lluvia anotada en 60 días'
-        )}
-      </p>
+      <LluviaDelCampo campoId={actual.id} ubicacion={actual.ubicacion} anotada={lluvia.data?.total ?? 0} />
     </section>
+  )
+}
+
+/**
+ * Lo que llovió en 60 días: lo del pluviómetro si hay; si no, lo que dice el
+ * pronóstico (marcado como estimado). Y el botón para anotar la de hoy.
+ */
+function LluviaDelCampo({ campoId, ubicacion, anotada }: { campoId: string; ubicacion: { lat: number; lon: number }; anotada: number }) {
+  const { data: membresia } = useEmpresa()
+  const qc = useQueryClient()
+  const estimada = useLluviaEstimada(ubicacion)
+  const [abierto, setAbierto] = useState(false)
+  const [mm, setMm] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const conPluviometro = anotada > 0
+  const total = conPluviometro ? anotada : estimada.data
+  async function guardar() {
+    const n = Number(mm.replace(',', '.'))
+    if (!membresia?.empresa_id || !Number.isFinite(n) || n <= 0) return
+    setGuardando(true)
+    try {
+      await guardarLluvia({ campoId, empresaId: membresia.empresa_id, mm: n })
+      await qc.invalidateQueries({ queryKey: ['inicio', 'lluvia60'] })
+      setAbierto(false)
+      setMm('')
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <div className="mt-auto border-t border-borde px-6 py-4">
+      {abierto ? (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void guardar()
+          }}
+        >
+          <span className="text-[#2779c4]">
+            <Icono nombre="Lluvia" />
+          </span>
+          <label className="flex h-11 flex-1 items-center gap-2 rounded-[12px] border-[1.5px] border-borde bg-superficie px-3 focus-within:border-principal">
+            <span className="sr-only">Milímetros de hoy</span>
+            <input
+              autoFocus
+              inputMode="decimal"
+              value={mm}
+              onChange={(e) => setMm(e.target.value.replace(/[^\d.,]/g, ''))}
+              placeholder="0"
+              className="cifra w-full bg-transparent text-[20px] font-bold text-texto outline-none"
+            />
+            <span className="text-[15px] font-semibold whitespace-nowrap text-texto-suave">mm</span>
+          </label>
+          <BotonChico type="submit" disabled={guardando || !mm}>
+            {guardando ? 'Guardando…' : 'Guardar la de hoy'}
+          </BotonChico>
+          <button type="button" aria-label="Cancelar" onClick={() => setAbierto(false)} className="grid size-9 place-items-center rounded-full text-texto-suave hover:bg-superficie-hundida">
+            <Icono nombre="Cerrar" tamano={16} />
+          </button>
+        </form>
+      ) : (
+        <div className="flex items-center gap-3">
+          <span className="text-[#2779c4]">
+            <Icono nombre="Lluvia" />
+          </span>
+          <p className="min-w-0 flex-1 text-[15px] text-texto-suave">
+            {total !== undefined ? (
+              <>
+                <b className={cn(T.numeroChico, 'text-texto')}>
+                  {conPluviometro ? '' : '≈ '}
+                  {Math.round(total)} mm
+                </b>{' '}
+                en 60 días
+                <span className="block text-[13.5px]">{conPluviometro ? 'Según tu pluviómetro' : 'Estimado por el pronóstico'}</span>
+              </>
+            ) : (
+              'Sin datos de lluvia'
+            )}
+          </p>
+          <BotonChico type="button" onClick={() => setAbierto(true)}>
+            Anotar lluvia
+          </BotonChico>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -676,12 +754,12 @@ function Clima() {
 function DiaCorto({ d }: { d: DiaPronostico }) {
   const f = new Date(`${d.fecha}T12:00:00`)
   return (
-    <li className="flex flex-col items-center gap-1.5">
-      <span className="text-[15px] font-semibold text-texto-suave">{DIA_CORTO[f.getDay()]}</span>
+    <li className="flex flex-col items-center gap-2">
+      <span className={cn(T.texto, 'font-semibold text-texto-suave')}>{DIA_CORTO[f.getDay()]}</span>
       <IconoDia d={d} />
-      <span className="cifra text-[18px] leading-none font-bold text-texto">{d.max}°</span>
-      <span className="cifra text-[15px] leading-none text-texto-suave">{d.min}°</span>
-      <span className="cifra h-4 text-[13px] font-bold text-[#2779c4]">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
+      <span className={cn(T.numeroChico, 'text-texto')}>{d.max}°</span>
+      <span className="cifra text-[18px] leading-none text-texto-suave">{d.min}°</span>
+      <span className="cifra h-5 text-[15px] font-bold text-[#2779c4]">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
     </li>
   )
 }
@@ -701,7 +779,7 @@ function IconoDia({ d }: { d: DiaPronostico }) {
             : 'text-texto-suave'
   return (
     <span className={cn('grid size-8 shrink-0 place-items-center', tono)} title={d.descripcion}>
-      <WmoIcon code={c} className="size-[24px]" />
+      <WmoIcon code={c} className="size-[28px]" />
     </span>
   )
 }

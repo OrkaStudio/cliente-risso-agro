@@ -50,3 +50,23 @@ export function useCuantasHoy(): number {
   if (!panorama.data || !atender.data) return 0
   return cosasParaHoy(atender.data.potreros, panorama.data.vencimientos, atender.data.sinRecorrer).length
 }
+
+/**
+ * Lo que llovió en los últimos 60 días en el campo según Open-Meteo (los días
+ * pasados del pronóstico). Sirve de referencia cuando no hay pluviómetro anotado.
+ */
+export const useLluviaEstimada = (u: { lat: number; lon: number } | null) =>
+  useQuery({
+    queryKey: ['inicio', 'lluvia-estimada', u?.lat, u?.lon],
+    enabled: !!u,
+    staleTime: 1000 * 60 * 60,
+    queryFn: async (): Promise<number> => {
+      const r = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${u!.lat}&longitude=${u!.lon}&daily=precipitation_sum&past_days=60&forecast_days=1&timezone=America/Argentina/Buenos_Aires`,
+      )
+      if (!r.ok) throw new Error(`open-meteo ${r.status}`)
+      const j = (await r.json()) as { daily: { time: string[]; precipitation_sum: (number | null)[] } }
+      const hoy = ymd(new Date())
+      return j.daily.time.reduce((s, t, i) => (t < hoy ? s + (j.daily.precipitation_sum[i] ?? 0) : s), 0)
+    },
+  })
