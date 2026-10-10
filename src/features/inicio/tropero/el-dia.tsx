@@ -65,7 +65,11 @@ export function ElDia() {
         <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} empresaId={membresia?.empresa_id ?? ''} />
       </motion.div>
 
-      <motion.div {...entra(1)} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
+      <motion.div
+        {...entra(1)}
+        className="grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-4 [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l"
+      >
         <PulsoHacienda total={p.totalCabezas} campos={campos?.length ?? 0} cats={p.porCategoria} nacimientos={(a?.nacimientos ?? []).reduce((s, n) => s + n.total, 0)} />
         <PulsoPlata vencimientos={p.vencimientos} ganado={ganado.data ?? null} />
         <PulsoLluvia lugar={actual?.nombre ?? null} mm={lluvia.data?.total ?? null} temp={clima.data?.temp ?? null} manana={manana ?? null} />
@@ -179,20 +183,16 @@ function Pulso({
 }) {
   const ir = useIr()
   return (
-    <button
-      type="button"
-      onClick={() => ir(destino)}
-      className="group flex min-h-[148px] flex-col rounded-[18px] border border-borde bg-superficie p-5 text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(19,27,22,0.08)]"
-    >
-      <span className="flex items-center gap-2 text-[13.5px] font-semibold text-texto-suave">
+    <button type="button" onClick={() => ir(destino)} className="group flex min-h-[150px] flex-col p-6 text-left transition-colors hover:bg-superficie-hundida/50">
+      <span className="flex items-center gap-2 text-[14px] font-semibold text-texto-suave">
         <Icono nombre={icono} tamano={16} />
         {titulo}
-        <span className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="ml-auto text-principal opacity-0 transition-opacity group-hover:opacity-100">
           <Icono nombre="Siguiente" tamano={16} />
         </span>
       </span>
-      <span className="mt-2 flex-1">{children}</span>
-      <span className="mt-2 text-[13px] leading-snug text-texto-suave">{pie}</span>
+      <span className="mt-3 flex-1">{children}</span>
+      <span className="mt-2 text-[13.5px] leading-snug text-texto-suave">{pie}</span>
     </button>
   )
 }
@@ -306,16 +306,14 @@ const TONO = {
 } as const
 
 function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string }) {
+  const [primera, ...resto] = cosas
   return (
     <section id="para-atender" aria-labelledby="atender-hoy" className="scroll-mt-6">
-      <div className="mb-3 flex items-baseline gap-3">
-        <h2 id="atender-hoy" className="font-heading text-[20px] font-extrabold text-texto">
-          Para atender hoy
-        </h2>
-        {cosas.length > 0 && <span className="text-[13.5px] text-texto-suave">lo más urgente primero</span>}
-      </div>
-      {cosas.length === 0 ? (
-        <div className="flex items-center gap-4 rounded-[18px] border border-estado-bien/30 bg-estado-bien-suave px-6 py-5">
+      <h2 id="atender-hoy" className="mb-3 font-heading text-[20px] font-extrabold text-texto">
+        Para atender hoy
+      </h2>
+      {!primera ? (
+        <div className="flex items-center gap-4 rounded-[20px] border border-estado-bien/30 bg-estado-bien-suave px-6 py-5">
           <span className="grid size-12 place-items-center rounded-full bg-estado-bien text-superficie">
             <Icono nombre="Guardar" />
           </span>
@@ -325,52 +323,91 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {cosas.map((c, i) => (
-            <TarjetaCosa key={c.key} c={c} primera={i === 0} empresaId={empresaId} />
-          ))}
+        // Un solo panel con jerarquía: lo primero en grande, lo demás en filas.
+        <div className={cn('overflow-hidden rounded-[20px] border border-borde bg-superficie', resto.length > 0 && 'lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
+          <Destacada c={primera} empresaId={empresaId} />
+          {resto.length > 0 && (
+            <ul className="divide-y divide-borde border-borde max-lg:border-t lg:border-l">
+              {resto.map((c) => (
+                <FilaCosa key={c.key} c={c} empresaId={empresaId} />
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </section>
   )
 }
 
-function TarjetaCosa({ c, primera, empresaId }: { c: Cosa; primera: boolean; empresaId: string }) {
+/** Lo primero que hay que hacer: grande, con el color de su urgencia. */
+function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
   const navigate = useNavigate()
   const t = TONO[c.tono]
   return (
-    <article className={cn('flex min-h-[200px] flex-col rounded-[18px] border-[1.5px] p-5', t.borde, primera ? t.fondo : 'bg-superficie')}>
-      <div className="flex items-start justify-between gap-3">
-        <span className={cn('grid size-12 shrink-0 place-items-center rounded-[14px]', t.icono)}>
+    <article className={cn('flex flex-col p-7', t.fondo)}>
+      <div className="flex items-center gap-3">
+        <span className={cn('grid size-14 shrink-0 place-items-center rounded-[16px]', t.icono)}>
           <Icono nombre={c.icono} />
         </span>
-        {primera && c.tono === 'problema' && (
-          <span className="rounded-full bg-estado-problema px-2.5 py-1 text-[11.5px] font-bold text-superficie">Lo primero</span>
-        )}
+        <span className={cn('rounded-full px-3 py-1 text-[12.5px] font-bold', c.tono === 'problema' ? 'bg-estado-problema text-superficie' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
+          Lo primero
+        </span>
       </div>
-      <p className="mt-4 truncate font-heading text-[26px] leading-none font-extrabold text-texto">{c.lugar}</p>
-      <p className="mt-1.5 line-clamp-2 text-[15px] leading-snug font-semibold text-texto">{c.que}</p>
-      <p className={cn('mt-1 text-[13px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
-      <div className="mt-auto flex flex-col items-stretch gap-1.5 pt-4">
-        <BotonChico type="button" className="justify-center" onClick={() => navigate(c.accion.to)}>
+      <p className="mt-5 truncate font-heading text-[44px] leading-none font-extrabold tracking-[-0.02em] text-texto">{c.lugar}</p>
+      <p className="mt-2 text-[19px] leading-snug font-semibold text-texto">{c.que}</p>
+      <p className={cn('mt-1 text-[14.5px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate(c.accion.to)}
+          className="inline-flex h-11 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-5 text-[15px] font-bold text-principal-texto hover:bg-terracota-600"
+        >
           {c.accion.texto}
-        </BotonChico>
+          <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
+            <Icono nombre="Siguiente" tamano={16} />
+          </span>
+        </button>
         {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} />}
       </div>
     </article>
   )
 }
 
+/** El resto: una fila compacta con el color de la urgencia a la izquierda. */
+function FilaCosa({ c, empresaId }: { c: Cosa; empresaId: string }) {
+  const navigate = useNavigate()
+  const t = TONO[c.tono]
+  return (
+    <li className="flex items-center gap-4 px-6 py-4">
+      <span className={cn('grid size-11 shrink-0 place-items-center rounded-[12px]', t.icono)}>
+        <Icono nombre={c.icono} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[16px] text-texto">
+          <b className="font-heading font-extrabold">{c.lugar}</b>
+          <span className="text-texto-suave"> · </span>
+          <span className="font-semibold">{c.que}</span>
+        </p>
+        <p className={cn('text-[13.5px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
+      </div>
+      {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} compacto />}
+      <BotonChico type="button" onClick={() => navigate(c.accion.to)}>
+        {c.accion.texto.replace(' el potrero', '')}
+      </BotonChico>
+    </li>
+  )
+}
+
 /** «Se solucionó»: marca la señal de la recorrida. Queda confirmada con «Deshacer»; la lista se refresca después. */
-function SeSoluciono({ senal, empresaId }: { senal: NonNullable<Cosa['senal']>; empresaId: string }) {
+function SeSoluciono({ senal, empresaId, compacto = false }: { senal: NonNullable<Cosa['senal']>; empresaId: string; compacto?: boolean }) {
   const qc = useQueryClient()
   const marcar = useMarcarSenal()
   const deshacer = useDeshacerMarca()
   const [marca, setMarca] = useState<string | null>(null)
   if (marca)
     return (
-      <span className="flex items-center justify-center gap-1 text-[13.5px] font-bold text-estado-bien-texto">
-        <Icono nombre="Guardar" tamano={16} /> Solucionado
+      <span className="flex shrink-0 items-center justify-center gap-1 text-[13.5px] font-bold text-estado-bien-texto">
+        <Icono nombre="Guardar" tamano={16} /> {compacto ? '' : 'Solucionado'}
         <button
           type="button"
           className="rounded-full px-2 py-1 text-[13px] text-principal hover:bg-principal-suave"
@@ -396,9 +433,15 @@ function SeSoluciono({ senal, empresaId }: { senal: NonNullable<Cosa['senal']>; 
           },
         )
       }
-      className="inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-[7px] text-[14px] font-bold text-texto-suave hover:bg-superficie-hundida disabled:opacity-50"
+      aria-label="Se solucionó"
+      title="Se solucionó"
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full text-[14px] font-bold text-texto-suave hover:bg-superficie-hundida disabled:opacity-50',
+        compacto ? 'size-9 border border-borde' : 'px-3 py-[7px]',
+      )}
     >
-      <Icono nombre="Guardar" tamano={16} /> Se solucionó
+      <Icono nombre="Guardar" tamano={16} />
+      {!compacto && 'Se solucionó'}
     </button>
   )
 }
@@ -666,28 +709,28 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
         <p className="mt-4 text-[15.5px] text-texto-suave">Todavía no hay hacienda cargada.</p>
       ) : (
         <>
-          <div className="mt-5 grid grid-cols-[1fr_80px_1fr] items-baseline">
-            <p className="text-right text-[13px] font-semibold text-principal">Hembras {hembras}</p>
-            <p className="titulo-display text-center text-[28px] text-texto">{total}</p>
-            <p className="text-[13px] font-semibold text-texto-suave">Machos {machos}</p>
+          <div className="mt-5 grid grid-cols-[1fr_96px_1fr] items-baseline">
+            <p className="text-right text-[16px] font-bold text-principal">Hembras {hembras}</p>
+            <p className="titulo-display text-center text-[40px] text-texto">{total}</p>
+            <p className="text-[16px] font-bold text-[#5f6d4f]">Machos {machos}</p>
           </div>
           <div className="mt-4 flex flex-col gap-4">
             {filas.map((f) => (
-              <div key={f.etapa} className="grid grid-cols-[1fr_80px_1fr] items-center">
+              <div key={f.etapa} className="grid grid-cols-[1fr_96px_1fr] items-center">
                 <div className="flex items-center gap-3">
-                  <span className="w-[120px] shrink-0 text-[14px] text-texto">
+                  <span className="w-[140px] shrink-0 text-[16px] text-texto">
                     {f.h[0]} <b className="cifra">{f.h[1]}</b>
                   </span>
-                  <div className="flex h-6 flex-1 justify-end">
+                  <div className="flex h-8 flex-1 justify-end">
                     <div className={cn('h-full rounded-l-[6px]', HEMBRA)} style={{ width: `${(f.h[1] / max) * 100}%` }} />
                   </div>
                 </div>
-                <span className="text-center text-[11.5px] font-semibold text-texto-suave">{f.etapa}</span>
+                <span className="text-center text-[13px] font-semibold text-texto-suave">{f.etapa}</span>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-6 flex-1">
+                  <div className="flex h-8 flex-1">
                     <div className={cn('h-full rounded-r-[6px]', MACHO)} style={{ width: `${(f.m[1] / max) * 100}%` }} />
                   </div>
-                  <span className="w-[120px] shrink-0 text-right text-[14px] text-texto">
+                  <span className="w-[140px] shrink-0 text-right text-[16px] text-texto">
                     {f.m[0]} <b className="cifra">{f.m[1]}</b>
                   </span>
                 </div>
@@ -713,11 +756,11 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
 function Indicador({ nombre, valor, nota, tono }: { nombre: string; valor: string; nota: string; tono: 'neutro' | 'bien' | 'atencion' | 'acento' }) {
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <p className="text-[12.5px] font-semibold text-texto-suave">{nombre}</p>
-      <p className="cifra text-[24px] font-bold text-texto">{valor}</p>
+      <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
+      <p className="titulo-display text-[34px] leading-none text-texto">{valor}</p>
       <span
         className={cn(
-          'rounded-full px-3 py-0.5 text-[12.5px] font-semibold',
+          'rounded-full px-3 py-1 text-[13.5px] font-semibold',
           tono === 'bien' ? 'bg-estado-bien-suave text-estado-bien-texto' : tono === 'atencion' ? 'bg-estado-atencion-suave text-estado-atencion-texto' : tono === 'acento' ? 'bg-acento/35 text-acento-texto' : 'bg-superficie-hundida text-texto-suave',
         )}
       >
