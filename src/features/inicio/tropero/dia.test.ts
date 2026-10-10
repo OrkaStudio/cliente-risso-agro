@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
@@ -92,7 +92,7 @@ describe('por dónde va el mapa', () => {
 })
 
 describe('los chips de la cabecera', () => {
-  const cosa = (key: string): import('./dia').Cosa => ({ key, tono: 'problema', titulo: '', detalle: '', accion: { texto: '', to: '' } })
+  const cosa = (key: string): import('./dia').Cosa => ({ key, tono: 'problema', titulo: '', detalle: '', accion: { texto: '', to: '' }, icono: 'Plata', lugar: '', que: '', datos: [] })
   it('lo del campo, lo vencido y la lluvia, en ese orden', () => {
     const cs = chipsDelDia({ cosas: [cosa('p-1'), cosa('p-2'), cosa('v-1')], vencimientos: [venc('a', -2)], lluviaManana: 82 })
     expect(cs.map((c) => c.texto)).toEqual(['2 cosas en el campo', '1 pago vencido', '82 % de lluvia mañana'])
@@ -101,5 +101,18 @@ describe('los chips de la cabecera', () => {
   it('sin vencidos avisa lo de la semana; sin nada, que está todo en orden', () => {
     expect(chipsDelDia({ cosas: [], vencimientos: [venc('a', 4)], lluviaManana: 10 }).map((c) => c.texto)).toEqual(['1 vence esta semana'])
     expect(chipsDelDia({ cosas: [], vencimientos: [], lluviaManana: null })[0]!.texto).toBe('Todo en orden hoy')
+  })
+})
+
+describe('la línea de la plata', () => {
+  it('suma lo que entra y sale en 30 días y aparta lo vencido', () => {
+    const l = lineaDePlata([venc('a', -2), venc('b', 4, 'gasto', 5_400_000), venc('c', 9, 'ingreso', 18_900_000), venc('d', 45)])
+    expect(l).toMatchObject({ entra: 18_900_000, sale: 5_400_000, queda: 13_500_000, vencido: 350_000, maximo: 18_900_000 })
+    expect(l.vencidos.map((p) => p.id)).toEqual(['a'])
+    expect(l.futuros.map((p) => p.id)).toEqual(['b', 'c'])
+  })
+  it('la tarjeta de un potrero dice dónde, qué y cuánto, y cómo marcarla', () => {
+    const [c] = cosasParaHoy([potrero('11B', 'atender')], [], [])
+    expect(c).toMatchObject({ icono: 'Eléctrico', lugar: '11B', que: 'El eléctrico está cortado', datos: ['hace 3 días', '60 animales'], senal: { potreroId: '11B', tipo: 'electrico' } })
   })
 })

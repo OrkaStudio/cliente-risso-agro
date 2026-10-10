@@ -12,7 +12,6 @@ import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
-import type { CampoMapa } from '@/features/mapa/reglas'
 import { cn } from '@/lib/utils'
 import cielo from '@/assets/tropero/molino/cielo.svg'
 import campoMolino from '@/assets/tropero/molino/campo.svg'
@@ -20,9 +19,8 @@ import rueda from '@/assets/tropero/molino/rueda.svg'
 import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
-import { useParaAtender, type Aviso, type PotreroAtencion } from '../para-atender-api'
-import { CroquisRecorrida } from './croquis-recorrida'
-import { chipsDelDia, cosasParaHoy, franjasDelRodeo, plataCorta, proximos30, saludo, type Chip, type Cosa } from './dia'
+import { useParaAtender } from '../para-atender-api'
+import { chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { useGanadoCampania, useLluvia60 } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
@@ -74,18 +72,17 @@ export function ElDia() {
         <PulsoRecorrida ultima={a?.ultimaRecorridaHace ?? null} potreros={a?.potreros.length ?? 0} sinRecorrer={a?.sinRecorrer ?? []} />
       </motion.div>
 
-      <motion.div {...entra(2)} className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <ParaAtenderHoy cosas={cosas} />
-        <CobrosYPagos vencimientos={p.vencimientos} />
+      <motion.div {...entra(2)} className="mt-3">
+        <ParaAtenderHoy cosas={cosas} empresaId={membresia?.empresa_id ?? ''} />
       </motion.div>
 
-      <motion.div {...entra(3)} className="mt-3">
-        <LoQueDejoLaRecorrida campos={campos ?? []} atencion={a?.potreros ?? []} ultima={a?.ultimaRecorridaHace ?? null} empresaId={membresia?.empresa_id ?? ''} />
-      </motion.div>
-
-      <motion.div {...entra(4)} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <motion.div {...entra(3)} className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <EstructuraDelRodeo cats={p.porCategoria} total={p.totalCabezas} />
         <Clima />
+      </motion.div>
+
+      <motion.div {...entra(4)}>
+        <LaPlata vencimientos={p.vencimientos} />
       </motion.div>
     </div>
   )
@@ -276,7 +273,7 @@ function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | nu
     <Pulso
       titulo="Última recorrida"
       icono="Recorrida"
-      destino="#recorrida"
+      destino="#para-atender"
       pie={
         potreros > 0 ? (
           <b className="text-estado-problema-texto">Dejó {potreros} {potreros === 1 ? 'potrero' : 'potreros'} para mirar</b>
@@ -300,279 +297,248 @@ function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | nu
   )
 }
 
-// ===== Para atender hoy =====
+// ===== Para atender hoy: tarjetas que se entienden sin leer =====
 
-const BARRA: Record<Cosa['tono'], string> = { problema: 'bg-[#b3372a]', atencion: 'bg-[#d38f1d]', aviso: 'bg-acento' }
-
-function ParaAtenderHoy({ cosas }: { cosas: Cosa[] }) {
-  const navigate = useNavigate()
-  return (
-    <section id="para-atender" aria-labelledby="atender-hoy" className={cn(TARJETA, 'scroll-mt-6')}>
-      <h2 id="atender-hoy" className="font-heading text-[20px] font-extrabold text-texto">
-        Para atender hoy
-      </h2>
-      <p className="text-[13.5px] text-texto-suave">Lo urgente primero, con el botón para resolverlo.</p>
-      {cosas.length === 0 ? (
-        <div className="mt-4 flex items-center gap-3 rounded-[16px] bg-estado-bien-suave px-5 py-4 text-estado-bien-texto">
-          <span className="grid size-8 place-items-center rounded-full bg-estado-bien text-superficie">
-            <Icono nombre="Guardar" tamano={16} />
-          </span>
-          <p className="text-[15.5px] font-semibold">Nada urgente hoy. Lo que venga de la recorrida o de la agenda aparece acá.</p>
-        </div>
-      ) : (
-        <ul className="mt-2 flex flex-col">
-          {cosas.map((c) => (
-            <li key={c.key} className="flex items-center gap-4 border-b border-borde py-3.5 last:border-b-0 last:pb-0">
-              <span aria-hidden className={cn('w-1 self-stretch rounded-full', BARRA[c.tono])} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[16.5px] font-semibold text-texto">{c.titulo}</p>
-                <p className="text-[14px] text-texto-suave">{c.detalle}</p>
-              </div>
-              <BotonChico type="button" onClick={() => navigate(c.accion.to)}>
-                {c.accion.texto}
-              </BotonChico>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
-
-// ===== Lo que dejó la recorrida =====
-
-function LoQueDejoLaRecorrida({
-  campos,
-  atencion,
-  ultima,
-  empresaId,
-}: {
-  campos: CampoMapa[]
-  atencion: PotreroAtencion[]
-  ultima: number | null
-  empresaId: string
-}) {
-  const navigate = useNavigate()
-  // El campo del potrero más urgente; si no hay nada, el primero.
-  const campo = campos.find((c) => c.nombre === atencion[0]?.campo) ?? campos[0]
-  const [abierto, setAbierto] = useState<string | null>(atencion[0]?.nivel === 'atender' ? atencion[0].key : null)
-  return (
-    <section id="recorrida" className={cn(TARJETA, 'scroll-mt-6')} aria-labelledby="recorrida-titulo">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 id="recorrida-titulo" className="font-heading text-[20px] font-extrabold text-texto">
-            Lo que dejó la recorrida
-          </h2>
-          <p className="text-[13.5px] text-texto-suave">Cada potrero como lo vio el que recorrió. Si ya se arregló, marcalo.</p>
-        </div>
-        <BotonChico type="button" onClick={() => navigate('/campo/historial')}>
-          Historial
-        </BotonChico>
-      </div>
-      {ultima === null ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-[14px] bg-superficie-hundida/70 px-5 py-4">
-          <p className="text-[15.5px] text-texto">Todavía no hubo recorrida. Con la primera, acá ves cómo quedó cada potrero.</p>
-          <BotonChico type="button" icono="Recorrida" onClick={() => navigate('/campo/recorrida')}>
-            Hacer la primera
-          </BotonChico>
-        </div>
-      ) : (
-        <>
-          {campo?.contorno && (
-            <div className="mt-4">
-              <CroquisRecorrida campo={campo} atencion={atencion} />
-            </div>
-          )}
-          {atencion.length === 0 ? (
-            <p className="mt-4 text-[15.5px] text-texto-suave">
-              La última recorrida, {ultima === 0 ? 'de hoy' : ultima === 1 ? 'de ayer' : `de hace ${ultima} días`}, no dejó nada para atender.
-            </p>
-          ) : (
-            <div className="mt-4 flex flex-col gap-3">
-              {atencion.map((p) => (
-                <PotreroDeLaRecorrida
-                  key={p.key}
-                  p={p}
-                  abierto={abierto === p.key}
-                  onAbrir={() => setAbierto(abierto === p.key ? null : p.key)}
-                  empresaId={empresaId}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </section>
-  )
-}
-
-const NIVEL = {
-  atender: { chip: 'bg-estado-problema-suave text-estado-problema-texto', icono: 'bg-estado-problema-suave text-estado-problema-texto', texto: 'Atender' },
-  prevenir: { chip: 'bg-estado-atencion-suave text-estado-atencion-texto', icono: 'bg-estado-atencion-suave text-estado-atencion-texto', texto: 'Prevenir' },
-  nota: { chip: 'bg-superficie-hundida text-texto-suave', icono: 'bg-superficie-hundida text-texto-suave', texto: 'Para saber' },
+const TONO = {
+  problema: { borde: 'border-estado-problema/45', fondo: 'bg-estado-problema-suave/50', icono: 'bg-estado-problema text-superficie', dato: 'text-estado-problema-texto' },
+  atencion: { borde: 'border-estado-atencion/45', fondo: 'bg-superficie', icono: 'bg-estado-atencion text-superficie', dato: 'text-estado-atencion-texto' },
+  aviso: { borde: 'border-borde', fondo: 'bg-superficie', icono: 'bg-acento text-acento-texto', dato: 'text-texto-suave' },
 } as const
 
-const DIAS_SEMANA = ['el domingo', 'el lunes', 'el martes', 'el miércoles', 'el jueves', 'el viernes', 'el sábado']
-function vistoEl(hace: number): string {
-  if (hace <= 0) return 'Visto hoy'
-  if (hace === 1) return 'Visto ayer'
-  if (hace < 7) {
-    const d = new Date()
-    d.setDate(d.getDate() - hace)
-    return `Visto ${DIAS_SEMANA[d.getDay()]}`
-  }
-  return `Visto hace ${hace} días`
-}
-
-function PotreroDeLaRecorrida({
-  p,
-  abierto,
-  onAbrir,
-  empresaId,
-}: {
-  p: PotreroAtencion
-  abierto: boolean
-  onAbrir: () => void
-  empresaId: string
-}) {
-  const n = NIVEL[p.nivel]
-  const Primero = p.avisos[0]!.icon
-  const resumen = [p.campo, p.cabezas > 0 ? `${p.cabezas} animales` : null, ...p.avisos.map((a) => a.titulo)].filter(Boolean).join(' · ')
+function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string }) {
   return (
-    <div className={cn('rounded-[14px] border bg-superficie', abierto ? 'border-acento' : 'border-borde')}>
-      <button type="button" onClick={onAbrir} aria-expanded={abierto} className="flex w-full items-center gap-4 px-4 py-3.5 text-left">
-        <span className={cn('grid size-10 shrink-0 place-items-center rounded-[10px]', n.icono)}>
-          <Primero className="size-5" strokeWidth={1.75} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-heading text-[16px] font-extrabold text-texto">{p.potrero}</span>
-          <span className="block truncate text-[13.5px] text-texto-suave">{resumen}</span>
-        </span>
-        <span className={cn('shrink-0 rounded-full px-3 py-1 text-[13px] font-bold', n.chip)}>
-          {n.texto}
-          {p.hace > 0 ? ` · hace ${p.hace} ${p.hace === 1 ? 'día' : 'días'}` : ''}
-        </span>
-        <span className={cn('shrink-0 text-texto-suave transition-transform', abierto && 'rotate-180')}>
-          <Icono nombre="Desplegar" tamano={16} />
-        </span>
-      </button>
-      {abierto && (
-        <div className="flex flex-col gap-1 px-4 pb-3">
-          {p.avisos.map((a) => (
-            <SenalDeLaRecorrida key={a.key} p={p} a={a} empresaId={empresaId} />
+    <section id="para-atender" aria-labelledby="atender-hoy" className="scroll-mt-6">
+      <div className="mb-3 flex items-baseline gap-3">
+        <h2 id="atender-hoy" className="font-heading text-[20px] font-extrabold text-texto">
+          Para atender hoy
+        </h2>
+        {cosas.length > 0 && <span className="text-[13.5px] text-texto-suave">lo más urgente primero</span>}
+      </div>
+      {cosas.length === 0 ? (
+        <div className="flex items-center gap-4 rounded-[18px] border border-estado-bien/30 bg-estado-bien-suave px-6 py-5">
+          <span className="grid size-12 place-items-center rounded-full bg-estado-bien text-superficie">
+            <Icono nombre="Guardar" />
+          </span>
+          <div>
+            <p className="font-heading text-[19px] font-extrabold text-estado-bien-texto">Todo en orden</p>
+            <p className="text-[14px] text-estado-bien-texto">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {cosas.map((c, i) => (
+            <TarjetaCosa key={c.key} c={c} primera={i === 0} empresaId={empresaId} />
           ))}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
-/** Una señal con «Se solucionó». Queda confirmada con «Deshacer»; la lista se refresca al salir. */
-function SenalDeLaRecorrida({ p, a, empresaId }: { p: PotreroAtencion; a: Aviso; empresaId: string }) {
+function TarjetaCosa({ c, primera, empresaId }: { c: Cosa; primera: boolean; empresaId: string }) {
+  const navigate = useNavigate()
+  const t = TONO[c.tono]
+  return (
+    <article className={cn('flex min-h-[200px] flex-col rounded-[18px] border-[1.5px] p-5', t.borde, primera ? t.fondo : 'bg-superficie')}>
+      <div className="flex items-start justify-between gap-3">
+        <span className={cn('grid size-12 shrink-0 place-items-center rounded-[14px]', t.icono)}>
+          <Icono nombre={c.icono} />
+        </span>
+        {primera && c.tono === 'problema' && (
+          <span className="rounded-full bg-estado-problema px-2.5 py-1 text-[11.5px] font-bold text-superficie">Lo primero</span>
+        )}
+      </div>
+      <p className="mt-4 truncate font-heading text-[26px] leading-none font-extrabold text-texto">{c.lugar}</p>
+      <p className="mt-1.5 line-clamp-2 text-[15px] leading-snug font-semibold text-texto">{c.que}</p>
+      <p className={cn('mt-1 text-[13px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
+      <div className="mt-auto flex flex-col items-stretch gap-1.5 pt-4">
+        <BotonChico type="button" className="justify-center" onClick={() => navigate(c.accion.to)}>
+          {c.accion.texto}
+        </BotonChico>
+        {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} />}
+      </div>
+    </article>
+  )
+}
+
+/** «Se solucionó»: marca la señal de la recorrida. Queda confirmada con «Deshacer»; la lista se refresca después. */
+function SeSoluciono({ senal, empresaId }: { senal: NonNullable<Cosa['senal']>; empresaId: string }) {
   const qc = useQueryClient()
   const marcar = useMarcarSenal()
   const deshacer = useDeshacerMarca()
   const [marca, setMarca] = useState<string | null>(null)
-  const Icon = a.icon
-  return (
-    <div className={cn('flex items-center gap-4 rounded-[12px] px-1 py-2.5 transition-colors', marca && 'bg-estado-bien-suave/60')}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-estado-atencion-suave text-estado-atencion-texto">
-        <Icon className="size-5" strokeWidth={1.75} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-semibold text-texto">{a.titulo}</p>
-        <p className="text-[13.5px] text-texto-suave">{a.detalle ? `«${a.detalle}» · ` : ''}{vistoEl(p.hace)}</p>
-      </div>
-      {marca ? (
-        <span className="flex items-center gap-2 text-[14px] font-semibold text-estado-bien-texto">
-          <Icono nombre="Guardar" tamano={16} /> Solucionado
-          <button
-            type="button"
-            className="ml-1 rounded-full px-2 py-1 text-[13.5px] font-bold text-principal hover:bg-principal-suave"
-            onClick={() => deshacer.mutate(marca, { onSuccess: () => setMarca(null) })}
-          >
-            Deshacer
-          </button>
-        </span>
-      ) : (
+  if (marca)
+    return (
+      <span className="flex items-center justify-center gap-1 text-[13.5px] font-bold text-estado-bien-texto">
+        <Icono nombre="Guardar" tamano={16} /> Solucionado
         <button
           type="button"
-          disabled={marcar.isPending}
-          onClick={() =>
-            marcar.mutate(
-              { empresaId, potreroId: p.key, observacionId: p.observacionId, tipo: a.tipo, estado: 'resuelto' },
-              {
-                onSuccess: (id) => {
-                  setMarca(id)
-                  // La lista se actualiza un rato después: primero se ve la confirmación.
-                  window.setTimeout(() => invalidarAvisos(qc, p.key), 6000)
-                },
-              },
-            )
-          }
-          className="h-9 shrink-0 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14px] font-bold text-texto hover:border-texto-suave/60 disabled:opacity-50"
+          className="rounded-full px-2 py-1 text-[13px] text-principal hover:bg-principal-suave"
+          onClick={() => deshacer.mutate(marca, { onSuccess: () => setMarca(null) })}
         >
-          Se solucionó
+          Deshacer
         </button>
-      )}
-    </div>
+      </span>
+    )
+  return (
+    <button
+      type="button"
+      disabled={marcar.isPending}
+      onClick={() =>
+        marcar.mutate(
+          { empresaId, potreroId: senal.potreroId, observacionId: senal.observacionId, tipo: senal.tipo, estado: 'resuelto' },
+          {
+            onSuccess: (id) => {
+              setMarca(id)
+              // Primero se ve la confirmación; la lista se actualiza un rato después.
+              window.setTimeout(() => invalidarAvisos(qc, senal.potreroId), 6000)
+            },
+          },
+        )
+      }
+      className="inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-[7px] text-[14px] font-bold text-texto-suave hover:bg-superficie-hundida disabled:opacity-50"
+    >
+      <Icono nombre="Guardar" tamano={16} /> Se solucionó
+    </button>
   )
 }
 
-// ===== Cobros y pagos =====
+// ===== La plata de los próximos 30 días: una línea de tiempo =====
 
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const HORIZONTE = 30
 
-function CobrosYPagos({ vencimientos }: { vencimientos: Vencimiento[] }) {
+function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const navigate = useNavigate()
-  const vista = vencimientos.filter((v) => v.diasParaVencer !== null && v.diasParaVencer <= 30).slice(0, 4)
+  const l = lineaDePlata(vencimientos, HORIZONTE)
+  const hoy = new Date()
+  const fechaDe = (dia: number) => {
+    const d = new Date(hoy)
+    d.setDate(d.getDate() + dia)
+    return `${d.getDate()} ${MES[d.getMonth()]}`
+  }
+  // Tamaño por monto (área ∝ plata), entre 14 y 52 px.
+  const tam = (m: number) => 14 + 38 * Math.sqrt(m / l.maximo)
+  // Dos niveles de etiqueta para que no se pisen las que caen cerca.
+  const nivel = (lista: PuntoPlata[]) => {
+    const orden = [...lista].sort((a, b) => a.dia - b.dia)
+    return new Map(orden.map((p, i) => [p.id, i > 0 && p.dia - orden[i - 1]!.dia < 6 && i % 2 === 1 ? 1 : 0]))
+  }
+  const nivelArriba = nivel(l.futuros.filter((p) => p.cobro))
+  const nivelAbajo = nivel(l.futuros.filter((p) => !p.cobro))
+  const vacio = l.futuros.length === 0 && l.vencidos.length === 0
+
   return (
-    <section className={TARJETA} aria-labelledby="cobros-pagos">
-      <div className="flex items-start justify-between gap-4 border-b border-borde pb-4">
+    <section className={TARJETA} aria-labelledby="la-plata">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 id="cobros-pagos" className="font-heading text-[20px] font-extrabold text-texto">
-            Cobros y pagos
+          <h2 id="la-plata" className="font-heading text-[20px] font-extrabold text-texto">
+            La plata de los próximos 30 días
           </h2>
-          <p className="text-[13.5px] text-texto-suave">Lo que vence en 30 días</p>
+          <p className="text-[13.5px] text-texto-suave">Arriba lo que entra, abajo lo que sale. El tamaño es el monto.</p>
         </div>
         <BotonChico type="button" onClick={() => navigate('/agenda')}>
           Ver en Agenda
         </BotonChico>
       </div>
-      {vista.length === 0 ? (
-        <p className="pt-5 text-[15.5px] text-texto-suave">Nada por cobrar ni por pagar en los próximos 30 días.</p>
+
+      <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-3">
+        <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-estado-bien" />
+        <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-principal" />
+        <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} grande />
+        {l.vencidos.length > 0 && (
+          <span className="mb-1 rounded-full bg-estado-problema-suave px-3 py-1.5 text-[13.5px] font-bold text-estado-problema-texto">
+            {plataCorta(l.vencido)} vencido sin pagar
+          </span>
+        )}
+      </div>
+
+      {vacio ? (
+        <p className="mt-6 rounded-[14px] bg-superficie-hundida/60 px-5 py-4 text-[15px] text-texto-suave">Nada por cobrar ni por pagar en los próximos 30 días.</p>
       ) : (
-        <ul>
-          {vista.map((v) => {
-            const d = v.diasParaVencer ?? 0
-            const f = v.fechaVencimiento ? new Date(`${v.fechaVencimiento}T12:00:00`) : null
-            const cobro = v.tipo === 'ingreso'
-            return (
-              <li key={v.id} className="flex items-center gap-4 border-b border-borde py-3.5 last:border-b-0 last:pb-0">
-                <span className={cn('flex w-12 shrink-0 flex-col items-center rounded-[10px] py-1.5', d < 0 ? 'bg-estado-problema-suave' : 'bg-superficie-hundida')}>
-                  <span className="cifra text-[19px] leading-none font-bold text-texto">{f ? f.getDate() : '—'}</span>
-                  <span className="text-[11px] text-texto-suave">{f ? MES[f.getMonth()] : ''}</span>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[15px] leading-snug font-semibold text-texto">{v.descripcion}</p>
-                  <span
-                    className={cn(
-                      'mt-1 inline-block rounded-full px-2.5 py-0.5 text-[12.5px] font-bold',
-                      d < 0 ? 'bg-estado-problema-suave text-estado-problema-texto' : d <= 7 ? 'bg-estado-atencion-suave text-estado-atencion-texto' : 'bg-superficie-hundida text-texto-suave',
-                    )}
-                  >
-                    {d < 0 ? 'Venció' : d === 0 ? 'Hoy' : d === 1 ? 'Mañana' : `En ${d} días`}
-                  </span>
-                </div>
-                <span className={cn('cifra shrink-0 text-[17px] font-bold', cobro ? 'text-estado-bien' : 'text-texto')}>
-                  {v.monto ? `${cobro ? '+' : '−'}$${Math.round(v.monto).toLocaleString('es-AR')}` : '—'}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
+        <div className="relative mt-6 h-[230px]">
+          {/* Lo vencido, antes de hoy */}
+          <div className="absolute inset-y-0 left-0 w-[112px] rounded-[12px] bg-estado-problema-suave/45">
+            <p className="pt-2 text-center text-[11.5px] font-bold text-estado-problema-texto">Vencido</p>
+          </div>
+          {/* El eje: hoy → 30 días */}
+          <div className="absolute top-1/2 right-0 left-[112px] h-[2px] -translate-y-1/2 bg-borde" />
+          {[0, 7, 14, 21, 30].map((d) => (
+            <span
+              key={d}
+              className="absolute top-1/2 -translate-x-1/2 translate-y-2 text-[11.5px] font-semibold whitespace-nowrap text-texto-suave"
+              style={{ left: `calc(112px + (100% - 150px) * ${d / HORIZONTE} + 16px)` }}
+            >
+              {d === 0 ? 'Hoy' : fechaDe(d)}
+            </span>
+          ))}
+          {l.vencidos.map((p, i) => (
+            <Burbuja key={p.id} p={p} tam={tam(p.monto)} izquierda="56px" arriba={p.cobro} nivel={i % 2} vencido onClick={() => navigate('/agenda')} />
+          ))}
+          {l.futuros.map((p) => (
+            <Burbuja
+              key={p.id}
+              p={p}
+              tam={tam(p.monto)}
+              izquierda={`calc(112px + (100% - 150px) * ${p.dia / HORIZONTE} + 16px)`}
+              arriba={p.cobro}
+              nivel={(p.cobro ? nivelArriba : nivelAbajo).get(p.id) ?? 0}
+              onClick={() => navigate('/agenda')}
+            />
+          ))}
+        </div>
       )}
     </section>
+  )
+}
+
+function Cifra({ nombre, valor, clase, grande = false }: { nombre: string; valor: string; clase: string; grande?: boolean }) {
+  return (
+    <div>
+      <p className="text-[13px] font-semibold text-texto-suave">{nombre}</p>
+      <p className={cn('titulo-display leading-none tracking-[-0.02em]', grande ? 'text-[40px]' : 'text-[28px]', clase)}>{valor}</p>
+    </div>
+  )
+}
+
+/** Un cobro o un pago en la línea: la burbuja (tamaño = monto) y su etiqueta corta. */
+function Burbuja({
+  p,
+  tam,
+  izquierda,
+  arriba,
+  nivel,
+  vencido = false,
+  onClick,
+}: {
+  p: PuntoPlata
+  tam: number
+  izquierda: string
+  arriba: boolean
+  nivel: number
+  vencido?: boolean
+  onClick: () => void
+}) {
+  const color = vencido ? 'bg-estado-problema' : p.cobro ? 'bg-estado-bien' : 'bg-principal'
+  const tallo = 18 + nivel * 34
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${p.cobro ? 'Cobro' : 'Pago'} de ${plataCorta(p.monto)}: ${p.descripcion}`}
+      className="group absolute top-1/2 flex flex-col items-center"
+      style={{ left: izquierda, transform: `translate(-50%, ${arriba ? `calc(-100% - 1px)` : '1px'})`, flexDirection: arriba ? 'column' : 'column-reverse' }}
+    >
+      <span className="flex flex-col items-center" style={{ flexDirection: arriba ? 'column' : 'column-reverse' }}>
+        <span className={cn('cifra text-[13px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : p.cobro ? 'text-estado-bien' : 'text-principal')}>
+          {p.cobro ? '+' : '−'}
+          {plataCorta(p.monto)}
+        </span>
+        <span className={cn('truncate text-[11.5px] text-texto-suave', vencido ? 'max-w-[100px]' : 'max-w-[120px]')}>{p.descripcion}</span>
+      </span>
+      <span className={cn('my-1 rounded-full opacity-90 shadow-sm transition-transform group-hover:scale-110', color)} style={{ width: tam, height: tam }} />
+      <span className="w-[2px] bg-borde" style={{ height: tallo }} />
+    </button>
   )
 }
 

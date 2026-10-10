@@ -1,4 +1,5 @@
-import type { CampoSinRecorrer, PotreroAtencion } from '../para-atender-api'
+import type { NombreIcono } from '@/components/tropero/icono'
+import type { CampoSinRecorrer, PotreroAtencion, TipoSenal } from '../para-atender-api'
 import type { CategoriaConteo, Vencimiento } from '../api'
 import { estadoDe, type CampoMapa } from '@/features/mapa/reglas'
 
@@ -14,6 +15,24 @@ export type Cosa = {
   titulo: string
   detalle: string
   accion: { texto: string; to: string }
+  /** Para la tarjeta, que se entiende sin leer: el ícono del problema, dónde
+   *  (en grande), qué pasa en dos o tres palabras y los datos cortos. */
+  icono: NombreIcono
+  lugar: string
+  que: string
+  datos: string[]
+  /** Si es una señal de la recorrida, lo que hace falta para marcarla resuelta. */
+  senal?: { potreroId: string; observacionId: string; tipo: TipoSenal }
+}
+
+const ICONO_SENAL: Record<TipoSenal, NombreIcono> = {
+  agua: 'Agua',
+  pasto: 'Campos',
+  electrico: 'Eléctrico',
+  cultivo: 'Campos',
+  conteo: 'Vaca',
+  tratamiento: 'Vacuna',
+  novedad: 'Ayuda',
 }
 
 const plata = (n: number) => `$${Math.round(Math.abs(n)).toLocaleString('es-AR')}`
@@ -40,6 +59,11 @@ export function cosasParaHoy(
       titulo: `${a.titulo} en el ${p.potrero}`,
       detalle: `${cuando}.${adentro}`,
       accion: { texto: 'Ver el potrero', to: p.to },
+      icono: ICONO_SENAL[a.tipo],
+      lugar: p.potrero,
+      que: a.titulo,
+      datos: [p.hace <= 0 ? 'hoy' : p.hace === 1 ? 'ayer' : `hace ${p.hace} días`, ...(p.cabezas > 0 ? [`${p.cabezas} animales`] : []), ...(p.avisos.length > 1 ? [`+${p.avisos.length - 1} más`] : [])],
+      senal: { potreroId: p.key, observacionId: p.observacionId, tipo: a.tipo },
     }
   }
   const deVencimiento = (v: Vencimiento): Cosa => {
@@ -52,6 +76,10 @@ export function cosasParaHoy(
       titulo: v.descripcion,
       detalle: v.monto ? `${cuando}. ${plata(v.monto)}.` : `${cuando}.`,
       accion: { texto: cobro ? 'Registrar el cobro' : 'Registrar el pago', to: '/agenda' },
+      icono: 'Plata',
+      lugar: v.monto ? plataCorta(cobro ? v.monto : -v.monto, true) : v.descripcion,
+      que: v.descripcion,
+      datos: [d < 0 ? `venció hace ${dias(-d)}` : d === 0 ? 'vence hoy' : d === 1 ? 'vence mañana' : `vence en ${dias(d)}`],
     }
   }
   const atender = potreros.filter((p) => p.nivel === 'atender').map(dePotrero)
@@ -66,6 +94,10 @@ export function cosasParaHoy(
     titulo: c.hace === null ? `${c.campo} todavía no se recorrió` : `${c.campo} no se recorre hace ${dias(c.hace)}`,
     detalle: c.cabezas > 0 ? `Tiene ${c.cabezas} cabezas.` : 'Una vuelta alcanza para saber cómo está.',
     accion: { texto: 'Recorrerlo', to: c.to },
+    icono: 'Recorrida',
+    lugar: c.campo,
+    que: c.hace === null ? 'Nunca se recorrió' : 'Sin recorrer',
+    datos: [c.hace === null ? 'nunca' : `hace ${c.hace} días`, ...(c.cabezas > 0 ? [`${c.cabezas} cabezas`] : [])],
   }))
   return [...atender, ...vencidos, ...prevenir, ...proximos, ...recorrer].slice(0, max)
 }
@@ -188,4 +220,30 @@ export function chipsDelDia({
     chips.push({ key: 'lluvia', texto: `${lluviaManana} % de lluvia mañana`, tono: 'info', destino: '#clima' })
   if (chips.length === 0) chips.push({ key: 'ok', texto: 'Todo en orden hoy', tono: 'bien', destino: '#para-atender' })
   return chips.slice(0, 3)
+}
+
+export type PuntoPlata = { id: string; dia: number; monto: number; cobro: boolean; descripcion: string; fecha: string | null }
+
+/**
+ * La plata de los próximos días como línea de tiempo: lo que entra (arriba),
+ * lo que sale (abajo), lo vencido (antes de hoy) y los tres números que la
+ * resumen. Se entiende sin leer la lista.
+ */
+export function lineaDePlata(vencimientos: Vencimiento[], horizonte = 30) {
+  const puntos: PuntoPlata[] = vencimientos
+    .filter((v) => v.diasParaVencer !== null && v.diasParaVencer <= horizonte && (v.monto ?? 0) > 0)
+    .map((v) => ({ id: v.id, dia: v.diasParaVencer!, monto: v.monto!, cobro: v.tipo === 'ingreso', descripcion: v.descripcion, fecha: v.fechaVencimiento }))
+  const futuros = puntos.filter((p) => p.dia >= 0)
+  const entra = futuros.filter((p) => p.cobro).reduce((s, p) => s + p.monto, 0)
+  const sale = futuros.filter((p) => !p.cobro).reduce((s, p) => s + p.monto, 0)
+  const vencidos = puntos.filter((p) => p.dia < 0)
+  return {
+    entra,
+    sale,
+    queda: entra - sale,
+    vencido: vencidos.reduce((s, p) => s + (p.cobro ? -p.monto : p.monto), 0),
+    vencidos,
+    futuros,
+    maximo: Math.max(1, ...puntos.map((p) => p.monto)),
+  }
 }
