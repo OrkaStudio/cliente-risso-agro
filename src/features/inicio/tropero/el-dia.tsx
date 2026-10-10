@@ -80,9 +80,15 @@ export function ElDia() {
         <ParaAtenderHoy cosas={cosas} empresaId={membresia?.empresa_id ?? ''} />
       </motion.div>
 
-      <motion.div {...entra(3)} className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+      {/* El campo hoy: el rodeo y el clima en un solo panel, divididos por una línea. */}
+      <motion.div
+        {...entra(3)}
+        className="mt-3 grid overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,1fr)_400px]"
+      >
         <EstructuraDelRodeo cats={p.porCategoria} total={p.totalCabezas} />
-        <Clima />
+        <div className="border-borde max-lg:border-t lg:border-l">
+          <Clima />
+        </div>
       </motion.div>
 
       <motion.div {...entra(4)}>
@@ -598,7 +604,7 @@ function Clima() {
   const reducir = useReducedMotion()
   if (!actual) {
     return (
-      <section className={cn(TARJETA, 'flex flex-col items-start justify-center gap-3')}>
+      <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
         <h2 className="font-heading text-[20px] font-extrabold text-texto">El clima de tu campo</h2>
         <p className="text-[15px] text-texto-suave">Con el campo en el mapa, acá ves el pronóstico y la lluvia de los últimos dos meses.</p>
         <BotonChico type="button" icono="Campos" onClick={() => navigate('/campos')}>
@@ -610,9 +616,9 @@ function Clima() {
   const dias = (pronostico.data ?? []).slice(0, 5)
   const ultima = lluvia.data?.ultima
   return (
-    <section id="clima" aria-label={`El clima en ${actual.nombre}`} className="scroll-mt-6 overflow-hidden rounded-[18px] border border-borde bg-superficie">
+    <section id="clima" aria-label={`El clima en ${actual.nombre}`} className="flex h-full scroll-mt-6 flex-col">
       {/* Escena del Figma: el molino al atardecer, con la rueda girando despacio. */}
-      <div className="relative h-[120px] overflow-hidden bg-[#e8c0ae]">
+      <div className="relative h-[140px] shrink-0 overflow-hidden bg-[#e8c0ae]">
         <div className="absolute top-[-120px] left-[-150px] h-[320px] w-[569px]">
           <img src={cielo} alt="" className="absolute inset-0 size-full" />
           <img src={campoMolino} alt="" className="absolute inset-0 size-full" />
@@ -693,7 +699,7 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
   const destete = vacas > 0 ? Math.round(((n('ternero') + n('ternera')) / vacas) * 100) : null
 
   return (
-    <section className={TARJETA} aria-labelledby="estructura">
+    <section className="p-6" aria-labelledby="estructura">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 id="estructura" className="font-heading text-[20px] font-extrabold text-texto">
