@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import { hoyLocal } from '@/lib/fecha'
 
 export type PastoEstado = Database['public']['Enums']['pasto_estado']
 export type AguaEstado = Database['public']['Enums']['agua_estado']
@@ -80,8 +79,6 @@ export type Observacion = {
   /** Path en storage de la nota de voz (null = sin audio / borrar). */
   audio_url: string | null
 }
-
-const hoyISO = hoyLocal
 
 /** Días desde la última observación de un potrero. null = nunca se recorrió. */
 export function diasDesde(fecha: string | undefined | null): number | null {
@@ -335,38 +332,3 @@ export async function guardarObservacion(input: {
   }
 }
 
-/**
- * Lluvia del campo (mm) de un día, leída del pluviómetro — única por
- * campo+fecha (upsert manual). `fecha`: el día de la lectura (el de la
- * recorrida). Sin ella, hoy: una recorrida sin señal que sube al otro día no
- * puede guardar la lluvia en el día equivocado.
- */
-export async function guardarLluvia(input: {
-  campoId: string
-  empresaId: string
-  mm: number
-  fecha?: string
-}): Promise<void> {
-  const fecha = input.fecha ?? hoyISO()
-  const { data: ex } = await supabase
-    .from('lluvia')
-    .select('id')
-    .eq('campo_id', input.campoId)
-    .eq('fecha', fecha)
-    .maybeSingle()
-  if (ex) {
-    const { error } = await supabase
-      .from('lluvia')
-      .update({ mm: input.mm })
-      .eq('id', ex.id)
-    if (error) throw new Error(error.message)
-  } else {
-    const { error } = await supabase.from('lluvia').insert({
-      campo_id: input.campoId,
-      empresa_id: input.empresaId,
-      fecha,
-      mm: input.mm,
-    })
-    if (error) throw new Error(error.message)
-  }
-}

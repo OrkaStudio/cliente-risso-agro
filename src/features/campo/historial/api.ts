@@ -205,7 +205,6 @@ export type RecorridaHist = {
   potreros: number
   alertas: number
   /** Milímetros anotados ese día en ese campo (si se cargaron). */
-  lluviaMm: number | null
 }
 
 export async function fetchHistorialRecorridas(limit = 40): Promise<RecorridaHist[]> {
@@ -228,17 +227,6 @@ export async function fetchHistorialRecorridas(limit = 40): Promise<RecorridaHis
       recs.map((r) => r.id),
     )
   if (eObs) throw new Error(eObs.message)
-
-  // La lluvia del día se anota por campo, no por recorrida: se cruza por
-  // (campo, fecha), que es como la carga el productor al cerrar.
-  const { data: lluvias } = await supabase
-    .from('lluvia')
-    .select('campo_id, fecha, mm')
-    .in('campo_id', [...new Set(recs.map((r) => r.campo_id).filter(Boolean))])
-  const porCampoFecha = new Map<string, number>()
-  for (const l of lluvias ?? []) {
-    if (l.mm != null) porCampoFecha.set(`${l.campo_id}|${l.fecha}`, l.mm)
-  }
 
   const conteo = new Map<string, { potreros: number; alertas: number }>()
   for (const o of obs ?? []) {
@@ -263,7 +251,6 @@ export async function fetchHistorialRecorridas(limit = 40): Promise<RecorridaHis
     cargadoEn: r.created_at,
     potreros: conteo.get(r.id)?.potreros ?? 0,
     alertas: conteo.get(r.id)?.alertas ?? 0,
-    lluviaMm: porCampoFecha.get(`${r.campo_id}|${r.fecha}`) ?? null,
   }))
 }
 

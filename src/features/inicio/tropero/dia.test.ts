@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { lluviaDe60Dias, mmTexto, origenDeLaLluvia, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { lluviaDe60Dias, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
@@ -49,11 +49,11 @@ describe('lo que dice arriba', () => {
     expect(saludo(21, '')).toBe('Buenas noches.')
   })
   it('arma la frase con lo que hay', () => {
-    expect(fraseDelDia({ temp: 17, lugar: 'La Porteña', lluvia60: { mm: 142, aprox: false }, cosas: 4 })).toBe(
-      '17 grados en La Porteña. Llovieron 142 mm en dos meses y hay cuatro cosas para atender.',
+    expect(fraseDelDia({ temp: 17, lugar: 'La Porteña', lluvia60: 142, cosas: 4 })).toBe(
+      '17 grados en La Porteña. Llovieron unos 142 mm en dos meses y hay cuatro cosas para atender.',
     )
     expect(fraseDelDia({ temp: null, lugar: null, lluvia60: null, cosas: 0 })).toBe('No hay nada urgente.')
-    expect(fraseDelDia({ temp: 9, lugar: 'Los Pampas', lluvia60: { mm: 0, aprox: true }, cosas: 1 })).toBe('9 grados en Los Pampas. Hay una cosa para atender.')
+    expect(fraseDelDia({ temp: 9, lugar: 'Los Pampas', lluvia60: 0, cosas: 1 })).toBe('9 grados en Los Pampas. Hay una cosa para atender.')
   })
 })
 
@@ -130,43 +130,15 @@ describe('la escena del clima', () => {
 })
 
 describe('la lluvia de 60 días', () => {
-  const hoy = '2026-10-10'
-  // El pronóstico: 2 mm todos los días pasados (y 50 mm hoy, que no cuenta).
-  const est = Array.from({ length: 61 }, (_, i) => {
-    const f = new Date(2026, 9, 10 - 60 + i)
-    const ymd = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
-    return { fecha: ymd, mm: ymd === hoy ? 50 : 2 }
-  })
-  it('sin mediciones, es el pronóstico de los 59 días pasados (hoy no cuenta)', () => {
-    const l = lluviaDe60Dias(est, [], hoy)
-    expect(l).toMatchObject({ total: 118, diasMedidos: 0, diasEstimados: 59 })
-    expect(mmTexto(l)).toBe('≈ 118 mm')
-    expect(origenDeLaLluvia(l)).toBe('Estimado por el pronóstico')
-  })
-  it('una medición reemplaza el pronóstico de ese día, no el total', () => {
-    const l = lluviaDe60Dias(est, [{ fecha: '2026-10-05', mm: 30 }], hoy)
-    expect(l).toMatchObject({ total: 146, diasMedidos: 1, diasEstimados: 58 })
-    expect(origenDeLaLluvia(l)).toBe('Pronóstico y 1 día de tu pluviómetro')
-  })
-  it('un 0 medido es un dato; dos lecturas del mismo día no se suman; hoy cuenta si está medido', () => {
-    const l = lluviaDe60Dias(est, [{ fecha: '2026-10-05', mm: 0 }, { fecha: '2026-10-08', mm: 12 }, { fecha: '2026-10-08', mm: 10 }, { fecha: hoy, mm: 6 }], hoy)
-    expect(l).toMatchObject({ total: 2 * 57 + 0 + 12 + 6, diasMedidos: 3, diasEstimados: 57 })
-    expect(l.ultimaMedida).toEqual({ fecha: hoy, mm: 6 })
-  })
-  it('lo de fuera de la ventana no cuenta', () => {
-    expect(lluviaDe60Dias([], [{ fecha: '2026-08-01', mm: 80 }], hoy).total).toBe(0)
-  })
-  it('sin pronóstico, sólo lo medido y lo dice', () => {
-    const l = lluviaDe60Dias(null, [{ fecha: '2026-10-05', mm: 30 }], hoy)
-    expect(l).toMatchObject({ total: 30, sinPronostico: true })
-    expect(mmTexto(l)).toBe('30 mm')
-    expect(origenDeLaLluvia(l)).toBe('Sólo el día que mediste')
-  })
-  it('todo medido: el número es exacto', () => {
-    const med = est.map((x) => ({ fecha: x.fecha, mm: 1 }))
-    const l = lluviaDe60Dias(est, med, hoy)
-    expect(l).toMatchObject({ total: 60, diasEstimados: 0 })
-    expect(mmTexto(l)).toBe('60 mm')
-    expect(origenDeLaLluvia(l)).toBe('Según tu pluviómetro')
+  it('suma los 60 días que terminan ayer; hoy y lo anterior no cuentan', () => {
+    const hoy = '2026-10-10'
+    const est = Array.from({ length: 62 }, (_, i) => {
+      const f = new Date(2026, 9, 10 - 61 + i)
+      const ymd = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+      return { fecha: ymd, mm: ymd === hoy ? 50 : 2 }
+    })
+    // 62 días: el más viejo queda afuera, hoy no cuenta → 60 días × 2 mm.
+    expect(lluviaDe60Dias(est, hoy)).toBe(120)
+    expect(lluviaDe60Dias([], hoy)).toBe(0)
   })
 })

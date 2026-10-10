@@ -47,7 +47,7 @@ function Hoy() {
   const tiempo = useClima(clima.actual?.ubicacion ?? null)
   // La ubicación del campo de Hoy (el mismo que el del clima, o su centro).
   const ubicacion = campo && clima.actual?.id === campo.id ? clima.actual.ubicacion : campo?.lat != null && campo.lon != null ? { lat: campo.lat, lon: campo.lon } : null
-  const lluvia = useLluvia60(campo?.id ?? null, ubicacion)
+  const lluvia = useLluvia60(ubicacion)
   const reducir = useReducedMotion()
   const [eligiendo, setEligiendo] = useState(false)
 
@@ -63,7 +63,7 @@ function Hoy() {
   )
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
-  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluvia60: lluvia.data ? { mm: lluvia.data.total, aprox: lluvia.data.diasEstimados > 0 } : null, cosas: cosas.length })
+  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluvia60: lluvia.data ?? null, cosas: cosas.length })
   const tempTexto = tiempo.data ? `${tiempo.data.temp} grados. ` : ''
   const cabezas = campo ? campo.potreros.reduce((s, p) => s + p.cabezas, 0) : (panorama.data?.totalCabezas ?? 0)
   const color = campo ? colorDeCampo(campo.colorIdx ?? 0) : null
@@ -227,14 +227,14 @@ function Pendientes({ r }: { r: ReturnType<typeof useRecorrida> }) {
           <Icono nombre="Sin señal" tamano={16} /> Sin señal: trabajás igual y se sube solo cuando vuelva.
         </p>
       )}
-      {(r.sinSubir > 0 || r.lluviaPendiente) && (
+      {r.sinSubir > 0 && (
         <p className="flex items-center gap-2.5 rounded-[14px] bg-superficie px-4 py-3 text-[14px] text-texto-suave">
           <span className={cn('inline-flex', r.sincronizando && 'animate-spin')}>
             <Icono nombre="Reintentar" tamano={16} />
           </span>
           <span>
             <b className="text-texto">
-              {r.sinSubir > 0 ? (r.sinSubir === 1 ? '1 observación' : `${r.sinSubir} observaciones`) : 'La lluvia'}
+              {r.sinSubir === 1 ? '1 observación' : `${r.sinSubir} observaciones`}
             </b>{' '}
             sin subir: se sube sola.
           </span>

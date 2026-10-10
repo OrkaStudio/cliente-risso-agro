@@ -18,7 +18,7 @@ import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender } from '../para-atender-api'
-import { escenaDelClima, mmTexto, origenDeLaLluvia, type Lluvia60, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluvia60 } from './use-dia'
 
@@ -57,9 +57,8 @@ export function ElDia() {
   const atender = useParaAtender()
   const { data: campos } = useMapa(membresia?.empresa_id)
   const { actual } = useCampoClima()
-  const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(actual?.id ?? null, actual?.ubicacion ?? null)
+  const lluvia = useLluvia60(actual?.ubicacion ?? null)
   const ganado = useGanadoCampania()
   const reducir = useReducedMotion()
 
@@ -89,7 +88,7 @@ export function ElDia() {
       >
         <PulsoHacienda total={p.totalCabezas} campos={campos?.length ?? 0} cats={p.porCategoria} nacimientos={(a?.nacimientos ?? []).reduce((s, n) => s + n.total, 0)} />
         <PulsoPlata vencimientos={p.vencimientos} ganado={ganado.data ?? null} />
-        <PulsoLluvia lugar={actual?.nombre ?? null} lluvia={lluvia.data ?? null} temp={clima.data?.temp ?? null} manana={manana ?? null} />
+        <PulsoLluvia lugar={actual?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
         <PulsoRecorrida ultima={a?.ultimaRecorridaHace ?? null} potreros={a?.potreros.length ?? 0} sinRecorrer={a?.sinRecorrer ?? []} />
       </motion.div>
 
@@ -274,7 +273,7 @@ function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; gan
   )
 }
 
-function PulsoLluvia({ lugar, lluvia, temp, manana }: { lugar: string | null; lluvia: Lluvia60 | null; temp: number | null; manana: DiaPronostico | null }) {
+function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number | null; manana: DiaPronostico | null }) {
   return (
     <Pulso
       titulo={lugar ? `Lluvia en ${lugar}` : 'Lluvia'}
@@ -284,12 +283,12 @@ function PulsoLluvia({ lugar, lluvia, temp, manana }: { lugar: string | null; ll
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>
-          {lluvia === null ? '—' : `${lluvia.diasEstimados > 0 ? '≈' : ''}${Math.round(lluvia.total)}`}
+          {mm === null ? '—' : `≈${mm}`}
         </span>
         <span className="text-[15px] font-semibold text-texto-suave">mm</span>
       </span>
       <span className="mt-1 block truncate text-[13px] text-texto-suave">
-        en 60 días{temp !== null ? ` · ahora ${temp}°` : ''}
+        en 60 días, según el pronóstico
       </span>
     </Pulso>
   )
@@ -621,7 +620,7 @@ function Clima() {
   const navigate = useNavigate()
   const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(actual?.id ?? null, actual?.ubicacion ?? null)
+  const lluvia = useLluvia60(actual?.ubicacion ?? null)
   if (!actual) {
     return (
       <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
@@ -662,32 +661,28 @@ function Clima() {
         ))}
       </ul>
 
-      <LluviaDelCampo lluvia={lluvia.data} />
+      <LluviaDelCampo mm={lluvia.data} />
     </section>
   )
 }
 
-/**
- * Lo que llovió en 60 días y de dónde sale el número. No se carga acá: la
- * lluvia se mide en la recorrida o se manda por WhatsApp.
- */
-function LluviaDelCampo({ lluvia }: { lluvia: Lluvia60 | undefined }) {
+/** Lo que llovió en 60 días, según el pronóstico (no se carga a mano). */
+function LluviaDelCampo({ mm }: { mm: number | undefined }) {
   return (
     <div className="mt-auto flex items-center gap-3 border-t border-borde px-6 py-4">
       <span className="text-[#2779c4]">
         <Icono nombre="Lluvia" />
       </span>
-      {lluvia ? (
-        <p className="text-[15px] text-texto-suave">
-          <b className={cn(T.numeroChico, 'text-texto')}>{mmTexto(lluvia)}</b> en 60 días
-          <span className="block text-[13.5px]">
-            {origenDeLaLluvia(lluvia)}
-            {lluvia.diasMedidos === 0 && !lluvia.sinPronostico ? '. Medila en la recorrida y se ajusta.' : ''}
-          </span>
-        </p>
-      ) : (
-        <p className="text-[15px] text-texto-suave">Calculando la lluvia…</p>
-      )}
+      <p className="text-[15px] text-texto-suave">
+        {mm === undefined ? (
+          'Calculando la lluvia…'
+        ) : (
+          <>
+            <b className={cn(T.numeroChico, 'text-texto')}>≈ {mm} mm</b> en 60 días
+            <span className="block text-[13.5px]">Según el pronóstico para tu campo</span>
+          </>
+        )}
+      </p>
     </div>
   )
 }

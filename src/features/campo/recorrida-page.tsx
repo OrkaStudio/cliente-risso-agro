@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CloudOff,
-  CloudRain,
   Droplet,
   Flag,
   Hash,
@@ -305,11 +304,8 @@ function Recorrida({
     },
     [],
   )
-  const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [panelAbierto, setPanelAbierto] = useState(false)
   const potrero = r.potreros.find((p) => p.id === abierto) ?? null
-  // null = todavía no contestó · 0 = no llovió · >0 = mm del pluviómetro.
-  const lluvia = r.meta?.lluvia_mm ?? null
 
   // Pendientes de ESTA sesión, ordenados por atraso: nunca recorridos primero,
   // después de más a menos días. Es lo que alimenta el panel y su conteo.
@@ -394,7 +390,6 @@ function Recorrida({
               )}
               <CLabel className="!text-[11px]">
                 {r.hechos} de {r.total}
-                {lluvia != null && ` · ${lluvia === 0 ? 'sin lluvia' : `${lluvia} mm`}`}
               </CLabel>
               {pendientes.length > 0 && (
                 <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--c-sunk)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--c-ink-soft)]">
@@ -415,20 +410,6 @@ function Recorrida({
         </div>
       </header>
 
-      {/* La lluvia es un dato del DÍA, no del cierre. Antes vivía solo en la
-          pantalla de Cierre y se guardaba recién al terminar: si no terminaba
-          la recorrida —que es lo que pasa casi siempre— no se registraba nunca.
-          Ahora se pregunta arriba, se guarda al toque y desaparece. */}
-      {lluvia == null && (
-        <button
-          type="button"
-          onClick={() => setLluviaAbierta(true)}
-          className="flex h-12 shrink-0 items-center justify-center gap-2 border-b border-[var(--c-line)] bg-[var(--c-warn-soft,#fdf3e0)] px-3 text-[14px] font-semibold text-[var(--c-ink)]"
-        >
-          <CloudRain className="size-[18px]" />
-          ¿Llovió? Anotalo ahora
-        </button>
-      )}
 
       {/* El croquis y su panel viven en un contenedor RELATIVO: la confirmación
           flota adentro sin ocupar lugar. Antes abría altura y el contenedor se
@@ -530,15 +511,6 @@ function Recorrida({
         </div>
       </CSheet>
 
-      <LluviaSheet
-        open={lluviaAbierta}
-        valor={lluvia}
-        onCerrar={() => setLluviaAbierta(false)}
-        onGuardar={(mm) => {
-          void r.setLluvia(mm)
-          setLluviaAbierta(false)
-        }}
-      />
 
       {/* key por potrero → estado fresco (sexo/cantidad/tropa) en cada apertura. */}
       <MovimientoSheet
@@ -726,74 +698,6 @@ function ParteScreen({
         </button>
       </div>
     </div>
-  )
-}
-
-/**
- * ¿Llovió? Se responde durante la recorrida, no al cerrarla.
- *
- * "No llovió" es una respuesta de primera clase (0 mm), no la ausencia de
- * respuesta: misma filosofía que el parte del potrero, donde "sin novedad"
- * también es dato. Sin eso no se puede distinguir un día seco de un día que
- * nadie registró — y la serie de lluvias es lo que después sostiene la
- * comparación contra el promedio.
- */
-function LluviaSheet({
-  open,
-  valor,
-  onCerrar,
-  onGuardar,
-}: {
-  open: boolean
-  valor: number | null
-  onCerrar: () => void
-  onGuardar: (mm: number) => void
-}) {
-  const [mm, setMm] = useState(valor ?? 10)
-  return (
-    <CSheet open={open} title="Lluvia de hoy" onClose={onCerrar}>
-      {/* Cada lectura es la lluvia de UN día: así se combina con el pronóstico sin contar dos veces. */}
-      <p className="mb-3 text-[14px] text-[var(--c-ink-soft)]">Lo que marca el pluviómetro de las últimas 24 horas.</p>
-      <button
-        type="button"
-        onClick={() => onGuardar(0)}
-        className="c-hard-sm mb-3 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] text-[16px] font-semibold text-[var(--c-ink)]"
-      >
-        No llovió
-      </button>
-      <CLabel className="mb-2 !text-[12px]">Sí llovió — cuántos mm</CLabel>
-      <div className="flex items-stretch gap-1.5">
-        <button
-          type="button"
-          onClick={() => setMm((v) => Math.max(1, v - 5))}
-          aria-label="Restar 5 mm"
-          className="c-hard-sm flex size-14 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
-        >
-          <Minus className="size-6" strokeWidth={2.5} />
-        </button>
-        <div className="flex h-14 min-w-0 flex-1 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-sunk)]">
-          <span className="c-mono text-[24px] font-bold text-[var(--c-ink)]">
-            {mm} mm
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setMm((v) => v + 5)}
-          aria-label="Sumar 5 mm"
-          className="c-hard-sm flex size-14 shrink-0 items-center justify-center rounded-xl border border-[var(--c-line-strong)] bg-[var(--c-panel)]"
-        >
-          <Plus className="size-6" strokeWidth={2.5} />
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={() => onGuardar(mm)}
-        className="c-display c-hard mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--c-ok)] text-[17px] text-white"
-      >
-        <CloudRain className="size-5" />
-        Guardar {mm} mm
-      </button>
-    </CSheet>
   )
 }
 
@@ -1258,13 +1162,7 @@ function Cierre({
   r: ReturnType<typeof useRecorrida>
   onVolver: () => void
 }) {
-  const [lluviaAbierta, setLluviaAbierta] = useState(false)
   const [terminando, setTerminando] = useState(false)
-  // La lluvia YA se pregunta durante la recorrida (barra de arriba). Acá no se
-  // vuelve a cargar con otro widget: se MUESTRA lo contestado, con opción de
-  // cambiarlo abriendo la misma hoja. `meta` es reactivo (Dexie), así que la
-  // fila se actualiza sola tras guardar.
-  const lluvia = r.meta?.lluvia_mm ?? null
 
   // Potreros que necesitan atención (para el resumen).
   const atencion = useMemo(() => {
@@ -1287,8 +1185,6 @@ function Cierre({
 
   const terminar = async () => {
     setTerminando(true)
-    // La lluvia ya se guardó al contestarla (durante la recorrida o en la hoja
-    // de acá) — terminar NO la vuelve a escribir, así no pisa lo cargado.
     await r.terminar()
     // al terminar, meta se limpia → RecorridaPage vuelve al selector
   }
@@ -1341,46 +1237,8 @@ function Cierre({
           )}
         </div>
 
-        {/* Lluvia: se muestra lo ya contestado. Si falta, un toque abre la
-            MISMA hoja que en la recorrida (con "No llovió" de primera clase). */}
-        {lluvia != null ? (
-          <div className="c-panel flex items-center gap-2.5 px-4 py-3">
-            <CloudRain className="size-[18px] shrink-0 text-[var(--c-ok-deep)]" />
-            <span className="flex-1 text-[15px] font-semibold text-[var(--c-ink)]">
-              {lluvia === 0 ? 'No llovió hoy' : `Llovió ${lluvia} mm`}
-            </span>
-            <button
-              type="button"
-              onClick={() => setLluviaAbierta(true)}
-              className="c-label rounded-lg border border-[var(--c-line-strong)] px-3 py-2 !text-[11px] !text-[var(--c-ink-soft)]"
-            >
-              Cambiar
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setLluviaAbierta(true)}
-            className="c-panel flex items-center gap-2.5 px-4 py-3.5 text-left"
-          >
-            <CloudRain className="size-[18px] shrink-0 text-[var(--c-warn-deep)]" />
-            <span className="flex-1 text-[15px] font-semibold text-[var(--c-ink)]">
-              ¿Llovió hoy? Anotalo
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-[var(--c-faint)]" />
-          </button>
-        )}
       </div>
 
-      <LluviaSheet
-        open={lluviaAbierta}
-        valor={lluvia}
-        onCerrar={() => setLluviaAbierta(false)}
-        onGuardar={(mm) => {
-          void r.setLluvia(mm)
-          setLluviaAbierta(false)
-        }}
-      />
 
       {/* Acciones (footer fijo) */}
       <div className="flex shrink-0 flex-col gap-2 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-4 pt-3">

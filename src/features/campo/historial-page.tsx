@@ -10,7 +10,6 @@ import {
   Loader2,
   Paperclip,
   RefreshCw,
-  CloudRain,
   Search,
   Syringe,
   TriangleAlert,
@@ -707,12 +706,6 @@ function FilaRecorrida({ e, onAbrir }: { e: EntRec; onAbrir: () => void }) {
             <Footprints className="size-3" />
             {plural(e.potreros, 'potrero', 'potreros')}
           </span>
-          {e.lluviaMm != null && (
-            <span className="inline-flex items-center gap-0.5">
-              <CloudRain className="size-3" />
-              {e.lluviaMm} mm
-            </span>
-          )}
           {e.alertas > 0 && (
             <span className="inline-flex items-center gap-0.5 font-semibold text-[var(--c-warn-deep)]">
               <TriangleAlert className="size-3" />

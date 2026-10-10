@@ -119,15 +119,14 @@ export function fraseDelDia({
 }: {
   temp: number | null
   lugar: string | null
-  /** mm de 60 días y si incluye días estimados («unos»). */
-  lluvia60: { mm: number; aprox: boolean } | null
+  /** mm de 60 días según el pronóstico («unos»: es una estimación). */
+  lluvia60: number | null
   cosas: number
 }): string {
   const partes: string[] = []
   if (temp !== null && lugar) partes.push(`${temp} ${Math.abs(temp) === 1 ? 'grado' : 'grados'} en ${lugar}.`)
   const atender = cosas === 0 ? 'no hay nada urgente' : `hay ${enLetras(cosas)} ${cosas === 1 ? 'cosa' : 'cosas'} para atender`
-  if (lluvia60 !== null && Math.round(lluvia60.mm) > 0)
-    partes.push(`Llovieron ${lluvia60.aprox ? 'unos ' : ''}${Math.round(lluvia60.mm)} mm en dos meses y ${atender}.`)
+  if (lluvia60 !== null && lluvia60 > 0) partes.push(`Llovieron unos ${lluvia60} mm en dos meses y ${atender}.`)
   else partes.push(`${atender.charAt(0).toUpperCase()}${atender.slice(1)}.`)
   return partes.join(' ')
 }
@@ -271,71 +270,21 @@ export function escenaDelClima(code: number, viento: number, dia: boolean): { ci
 // ===== La lluvia de 60 días =====
 
 export type DiaLluvia = { fecha: string; mm: number }
-export type Lluvia60 = {
-  /** mm en la ventana (los 60 días que terminan hoy). */
-  total: number
-  /** Días con lectura del pluviómetro (recorrida o WhatsApp). */
-  diasMedidos: number
-  /** Días que salen del pronóstico porque nadie midió. */
-  diasEstimados: number
-  /** No se pudo traer el pronóstico: el total es sólo lo medido. */
-  sinPronostico: boolean
-  ultimaMedida: DiaLluvia | null
+
+/**
+ * Lo que llovió en el campo en los 60 días que terminan ayer, según Open-Meteo
+ * (sus días pasados). Hoy no cuenta: el pronóstico de hoy incluye horas que
+ * todavía no pasaron. Es una estimación del modelo para la ubicación del campo:
+ * así se dice en pantalla.
+ */
+export function lluviaDe60Dias(estimado: DiaLluvia[], hoy: string): number {
+  const desde = sumarDias(hoy, -60)
+  const total = estimado.filter((x) => x.fecha >= desde && x.fecha < hoy).reduce((s, x) => s + x.mm, 0)
+  return Math.round(total)
 }
 
 const sumarDias = (ymd: string, n: number) => {
   const [a, m, d] = ymd.split('-').map(Number)
   const f = new Date(a!, m! - 1, d! + n)
   return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
-}
-
-/**
- * La lluvia de los últimos 60 días, día por día: si hay lectura del
- * pluviómetro, vale la lectura; si no, lo que dice el pronóstico para ese día.
- *
- * - La ventana son los 60 días que terminan hoy.
- * - Cada lectura es la lluvia de ESE día («Lluvia de hoy» en la recorrida).
- *   Una lectura de 0 es un dato: ese día no llovió.
- * - Dos lecturas del mismo día (la recorrida y el WhatsApp) no se suman: se
- *   toma la mayor, porque son el mismo pluviómetro leído dos veces.
- * - Hoy sólo cuenta si está medido: el pronóstico de hoy incluye horas que
- *   todavía no pasaron.
- */
-export function lluviaDe60Dias(estimado: DiaLluvia[] | null, medido: DiaLluvia[], hoy: string): Lluvia60 {
-  const desde = sumarDias(hoy, -59)
-  const lecturas = new Map<string, number>()
-  for (const x of medido) {
-    if (x.fecha < desde || x.fecha > hoy) continue
-    lecturas.set(x.fecha, Math.max(lecturas.get(x.fecha) ?? 0, x.mm))
-  }
-  const pronostico = new Map((estimado ?? []).map((x) => [x.fecha, x.mm]))
-  let total = 0
-  let diasEstimados = 0
-  for (let f = desde; f <= hoy; f = sumarDias(f, 1)) {
-    const leido = lecturas.get(f)
-    if (leido !== undefined) total += leido
-    else if (f < hoy && pronostico.has(f)) {
-      total += pronostico.get(f)!
-      diasEstimados += 1
-    }
-  }
-  const ultima = [...lecturas.entries()].sort((a, b) => b[0].localeCompare(a[0]))[0]
-  return {
-    total: Math.round(total * 10) / 10,
-    diasMedidos: lecturas.size,
-    diasEstimados,
-    sinPronostico: estimado === null,
-    ultimaMedida: ultima ? { fecha: ultima[0], mm: ultima[1] } : null,
-  }
-}
-
-/** «≈ 112 mm» si hay días estimados; «112 mm» si todo salió del pluviómetro. */
-export const mmTexto = (l: Lluvia60) => `${l.diasEstimados > 0 ? '≈ ' : ''}${Math.round(l.total)} mm`
-
-/** De dónde sale el número, en una línea. */
-export function origenDeLaLluvia(l: Lluvia60): string {
-  if (l.sinPronostico) return l.diasMedidos === 1 ? 'Sólo el día que mediste' : `Sólo los ${l.diasMedidos} días que mediste`
-  if (l.diasEstimados === 0) return 'Según tu pluviómetro'
-  if (l.diasMedidos === 0) return 'Estimado por el pronóstico'
-  return `Pronóstico y ${l.diasMedidos} ${l.diasMedidos === 1 ? 'día' : 'días'} de tu pluviómetro`
 }

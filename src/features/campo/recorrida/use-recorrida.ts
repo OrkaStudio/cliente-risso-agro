@@ -6,7 +6,6 @@ import { opsdb, deltaPorPotrero } from '@/features/campo/ops/db'
 import { sembrarRecorrida } from '@/features/campo/seed-offline'
 import {
   asegurarRecorridaRemota,
-  guardarLluvia,
   guardarObservacion,
   pathAudio,
   subirAudio,
@@ -32,20 +31,18 @@ async function pendientesDe(recorridaId: string): Promise<RecObs[]> {
     .toArray()
 }
 
-/** ¿Esta recorrida tiene algo sin subir (observaciones o lluvia)? */
+/** ¿Esta recorrida tiene algo sin subir? */
 async function debeAlgo(s: RecSesion): Promise<boolean> {
-  if (s.lluvia_mm != null && !s.lluvia_ok) return true
   return (await pendientesDe(s.recorrida_id)).length > 0
 }
 
 /** ¿Recorrida ABIERTA sin registrar nada (fantasma)? Se abrió y se salió sin
- *  tocar un potrero ni cargar lluvia. No merece quedar en la lista de abiertas. */
+ *  tocar un potrero. No merece quedar en la lista de abiertas. */
 async function esFantasma(recorridaId: string): Promise<boolean> {
   const s = await recdb.recorridas.get(recorridaId)
   if (!s || s.terminada) return false
   const obs = await recdb.outbox.where('recorrida_id').equals(recorridaId).count()
-  const lluviaPend = s.lluvia_mm != null && !s.lluvia_ok
-  return obs === 0 && !lluviaPend
+  return obs === 0
 }
 
 /** Borra la recorrida si es fantasma. Devuelve true si la borró. */
@@ -205,21 +202,6 @@ export async function drenarRecorrida(onEstado?: (v: boolean) => void): Promise<
             }
           }
 
-          const sL = await recdb.recorridas.get(s.recorrida_id)
-          if (sL && sL.lluvia_mm != null && !sL.lluvia_ok) {
-            try {
-              await guardarLluvia({
-                campoId: sL.campo_id,
-                empresaId: sL.empresa_id,
-                mm: sL.lluvia_mm,
-                fecha: sL.lluvia_fecha ?? sL.fecha,
-              })
-              await recdb.recorridas.update(sL.recorrida_id, { lluvia_ok: 1 })
-            } catch {
-              /* reintenta */
-            }
-          }
-
           await cerrarSiCorresponde(s.recorrida_id)
         }
       } while (rerun)
@@ -271,7 +253,7 @@ export function useRecorrida() {
 
   /**
    * Mueve el puntero a otra recorrida (o a null = hub). Antes de irse, si la que
-   * dejamos era fantasma (0 obs, sin lluvia), la borra — así abrir un campo y no
+   * dejamos era fantasma (0 obs), la borra — así abrir un campo y no
    * hacer nada no deja recorridas vacías dando vueltas.
    */
   const irARecorrida = useCallback(async (rid: string | null) => {
@@ -444,16 +426,6 @@ export function useRecorrida() {
     [sincronizar, refs],
   )
 
-  const setLluvia = useCallback(
-    async (mm: number | null) => {
-      const rid = (await recdb.meta.get('actual'))?.recorrida_id
-      if (!rid) return
-      await recdb.recorridas.update(rid, { lluvia_mm: mm, lluvia_fecha: hoyISO(), lluvia_ok: 0 })
-      void sincronizar()
-    },
-    [sincronizar],
-  )
-
   /** Pausar: deja la recorrida ABIERTA y suelta la pantalla. Si no se registró
    *  nada (fantasma), la limpia y vuelve al hub. */
   const pausar = useCallback(async () => {
@@ -572,7 +544,6 @@ export function useRecorrida() {
 
   const sinSubir = todoElOutbox.filter((o) => o.estado === 'pendiente').length
   const errores = todoElOutbox.filter((o) => o.estado === 'error')
-  const lluviaPendiente = (sesiones ?? []).some((s) => s.lluvia_mm != null && !s.lluvia_ok)
   const cargando =
     punteroArr === undefined || sesiones === undefined || refsArr === undefined
 
@@ -597,12 +568,10 @@ export function useRecorrida() {
     colorCampo,
     sinSubir,
     errores,
-    lluviaPendiente,
     empezar,
     activar,
     guardar,
     setAudio,
-    setLluvia,
     pausar,
     terminar,
     descartarErrores,
