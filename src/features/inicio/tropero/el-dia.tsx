@@ -14,14 +14,12 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { useMapa } from '@/features/mapa/api'
 import { cn } from '@/lib/utils'
-import cielo from '@/assets/tropero/molino/cielo.svg'
-import campoMolino from '@/assets/tropero/molino/campo.svg'
-import rueda from '@/assets/tropero/molino/rueda.svg'
 import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender } from '../para-atender-api'
-import { chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluvia60 } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
@@ -618,7 +616,6 @@ function Clima() {
   const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
   const lluvia = useLluvia60(actual?.id ?? null)
-  const reducir = useReducedMotion()
   if (!actual) {
     return (
       <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
@@ -630,69 +627,62 @@ function Clima() {
       </section>
     )
   }
-  const dias = (pronostico.data ?? []).slice(0, 7)
-  const ultima = lluvia.data?.ultima
-  // La escala de la semana, para que cada barra de temperatura se compare con las otras.
-  const minSemana = Math.min(...dias.map((d) => d.min))
-  const maxSemana = Math.max(...dias.map((d) => d.max))
+  const dias = (pronostico.data ?? []).slice(1, 6)
+  const escena = clima.data ? escenaDelClima(clima.data.code, clima.data.viento, clima.data.dia) : { cielo: 'sol' as const, ventoso: false }
+  const ahora = new Date().getHours()
   return (
     <section id="clima" aria-label={`El clima en ${actual.nombre}`} className="flex h-full scroll-mt-6 flex-col">
-      {/* Escena del Figma: el molino al atardecer. Los datos van en el cielo, sobre una
-          banda que los deja leer; el campo y las vacas quedan libres abajo. */}
-      <div className="relative h-[150px] shrink-0 overflow-hidden bg-[#e8c0ae]">
-        <div className="absolute top-[-110px] left-[-60px] h-[320px] w-[569px]">
-          <img src={cielo} alt="" className="absolute inset-0 size-full" />
-          <img src={campoMolino} alt="" className="absolute inset-0 size-full" />
-          <motion.img
-            src={rueda}
-            alt=""
-            className="absolute top-[42.7px] left-[302.2px] size-[106.7px]"
-            animate={reducir ? undefined : { rotate: 360 }}
-            transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-          />
-        </div>
-        <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-[#b9734d]/85 via-[#c98d68]/55 to-transparent" />
-        <div className="relative flex h-full flex-col justify-center px-6 pb-6 text-superficie">
-          <p className="text-[14px] font-semibold opacity-90">{actual.nombre} · ahora</p>
-          <div className="flex items-baseline gap-3">
-            <p className="cifra text-[48px] leading-none font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
-            {clima.data && (
-              <p className="cifra text-[15px] font-semibold opacity-90">
-                {clima.data.max}° / {clima.data.min}°
-              </p>
-            )}
-          </div>
-          {clima.data && <p className="mt-1 text-[14px] font-medium opacity-90">{clima.data.descripcion}</p>}
-        </div>
-      </div>
+      {/* El día de hoy se ve en la escena: cambia con el cielo, la lluvia y el viento. */}
+      <EscenaClima cielo={escena.cielo} ventoso={escena.ventoso}>
+        <p className="text-[15px] font-semibold">{actual.nombre}</p>
+        <p className="cifra mt-1 text-[64px] leading-none font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
+        {clima.data && (
+          <p className="mt-2 text-[16px] font-semibold">
+            {clima.data.descripcion}
+            {escena.ventoso ? ` · viento ${clima.data.viento} km/h` : ''}
+          </p>
+        )}
+        {clima.data && (
+          <p className="cifra text-[15px] opacity-90">
+            {ahora < 18 ? 'Hoy' : 'Hoy hasta la noche'} {clima.data.max}° / {clima.data.min}°
+          </p>
+        )}
+      </EscenaClima>
 
-      {/* La semana: día · ícono · lluvia · la barra de mínima a máxima. */}
-      <ul className="flex-1 divide-y divide-borde/70 px-6 py-2">
-        {dias.map((d, i) => (
-          <FilaPronostico key={d.fecha} d={d} hoy={i === 0} min={minSemana} max={maxSemana} />
+      {/* Los próximos 5 días, en una franja */}
+      <ul className="grid grid-cols-5 px-4 py-5">
+        {dias.map((d) => (
+          <DiaCorto key={d.fecha} d={d} />
         ))}
       </ul>
 
-      <div className="mx-6 mb-6 flex items-center gap-3 rounded-[14px] bg-[#e6f1fa] px-4 py-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2779c4] text-superficie">
-          <Icono nombre="Lluvia" />
+      <p className="mt-auto flex items-center gap-2 border-t border-borde px-6 py-4 text-[15px] text-texto-suave">
+        <span className="text-[#2779c4]">
+          <Icono nombre="Lluvia" tamano={16} />
         </span>
         {lluvia.data && lluvia.data.total > 0 ? (
-          <div className="min-w-0">
-            <p className="text-[16px] text-[#1d4f7a]">
-              <b className="cifra text-[20px]">{Math.round(lluvia.data.total)} mm</b> en los últimos 60 días
-            </p>
-            {ultima && (
-              <p className="truncate text-[13.5px] text-[#215a7e]/80">
-                La última, {Math.round(ultima.mm)} mm el {new Date(`${ultima.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}
-              </p>
-            )}
-          </div>
+          <span>
+            <b className="cifra text-[17px] text-texto">{Math.round(lluvia.data.total)} mm</b> en los últimos 60 días
+          </span>
         ) : (
-          <p className="text-[15px] text-[#1d4f7a]">Sin lluvia anotada en los últimos 60 días.</p>
+          'Sin lluvia anotada en 60 días'
         )}
-      </div>
+      </p>
     </section>
+  )
+}
+
+/** Un día de la franja: el nombre, el ícono, la máxima y la mínima; la lluvia sólo si es probable. */
+function DiaCorto({ d }: { d: DiaPronostico }) {
+  const f = new Date(`${d.fecha}T12:00:00`)
+  return (
+    <li className="flex flex-col items-center gap-1.5">
+      <span className="text-[15px] font-semibold text-texto-suave">{DIA_CORTO[f.getDay()]}</span>
+      <IconoDia d={d} />
+      <span className="cifra text-[18px] leading-none font-bold text-texto">{d.max}°</span>
+      <span className="cifra text-[15px] leading-none text-texto-suave">{d.min}°</span>
+      <span className="cifra h-4 text-[13px] font-bold text-[#2779c4]">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
+    </li>
   )
 }
 
@@ -713,29 +703,6 @@ function IconoDia({ d }: { d: DiaPronostico }) {
     <span className={cn('grid size-8 shrink-0 place-items-center', tono)} title={d.descripcion}>
       <WmoIcon code={c} className="size-[24px]" />
     </span>
-  )
-}
-
-function FilaPronostico({ d, hoy, min, max }: { d: DiaPronostico; hoy: boolean; min: number; max: number }) {
-  const f = new Date(`${d.fecha}T12:00:00`)
-  const rango = Math.max(1, max - min)
-  return (
-    <li className="grid grid-cols-[44px_32px_52px_1fr] items-center gap-3 py-2.5">
-      <span className={cn(T.texto, hoy ? 'font-bold' : 'font-medium')}>{hoy ? 'Hoy' : DIA_CORTO[f.getDay()]}</span>
-      <IconoDia d={d} />
-      {/* La lluvia sólo si es probable: un número vacío no aporta. */}
-      <span className="cifra text-[15px] font-bold text-[#2779c4]">{d.lluviaProb >= 20 ? `${d.lluviaProb} %` : ''}</span>
-      <span className="flex items-center gap-2.5">
-        <span className="cifra w-7 text-right text-[16px] text-texto-suave">{d.min}°</span>
-        <span className="relative h-2 flex-1 rounded-full bg-superficie-hundida">
-          <span
-            className="absolute inset-y-0 rounded-full bg-gradient-to-r from-[#7fb3d9] to-[#e0a24a]"
-            style={{ left: `${((d.min - min) / rango) * 100}%`, right: `${((max - d.max) / rango) * 100}%` }}
-          />
-        </span>
-        <span className="cifra w-7 text-[16px] font-bold text-texto">{d.max}°</span>
-      </span>
-    </li>
   )
 }
 
@@ -780,39 +747,39 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
         // Se reparte en todo el alto del panel (el clima de al lado manda la altura).
         <div className="flex flex-1 flex-col justify-evenly gap-6 pt-4">
           {/* La leyenda: el total y de qué color es cada lado. */}
-          <p className="flex items-center justify-center gap-5 text-[15px] text-texto-suave">
+          <p className="flex items-center justify-center gap-6 text-[17px] text-texto-suave">
             <span className="flex items-center gap-2">
-              <span className={cn('size-3 rounded-[3px]', HEMBRA)} /> {hembras} hembras
+              <span className={cn('size-3.5 rounded-[4px]', HEMBRA)} /> {hembras} hembras
             </span>
-            <span className="titulo-display text-[22px] text-texto">{total} cabezas</span>
+            <span className="titulo-display text-[34px] text-texto">{total} cabezas</span>
             <span className="flex items-center gap-2">
-              <span className={cn('size-3 rounded-[3px]', MACHO)} /> {machos} machos
+              <span className={cn('size-3.5 rounded-[4px]', MACHO)} /> {machos} machos
             </span>
           </p>
           {/* Espejo: nombres afuera, números adentro junto a la barra, la etapa al medio. */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             {filas.map((f) => (
-              <div key={f.etapa} className="grid grid-cols-[minmax(0,1fr)_88px_minmax(0,1fr)] items-center">
+              <div key={f.etapa} className="grid grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center">
                 <div className="flex items-center gap-3">
-                  <span className="w-[104px] shrink-0 text-[16px] text-texto">{f.h[0]}</span>
-                  <div className="flex h-9 flex-1 items-center justify-end gap-2.5">
-                    <span className={cn('cifra text-[18px] font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
+                  <span className="w-[124px] shrink-0 text-[19px] text-texto">{f.h[0]}</span>
+                  <div className="flex h-12 flex-1 items-center justify-end gap-2.5">
+                    <span className={cn('cifra text-[26px] font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
                     <div
-                      className={cn('h-full rounded-l-[8px]', f.h[1] ? HEMBRA : 'bg-superficie-hundida')}
+                      className={cn('h-full rounded-l-[10px]', f.h[1] ? HEMBRA : 'bg-superficie-hundida')}
                       style={{ width: f.h[1] ? `${(f.h[1] / max) * 82}%` : 6 }}
                     />
                   </div>
                 </div>
-                <span className="text-center text-[13.5px] font-semibold text-texto-suave">{f.etapa}</span>
+                <span className="text-center text-[15px] font-semibold text-texto-suave">{f.etapa}</span>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 flex-1 items-center gap-2.5">
+                  <div className="flex h-12 flex-1 items-center gap-2.5">
                     <div
-                      className={cn('h-full rounded-r-[8px]', f.m[1] ? MACHO : 'bg-superficie-hundida')}
+                      className={cn('h-full rounded-r-[10px]', f.m[1] ? MACHO : 'bg-superficie-hundida')}
                       style={{ width: f.m[1] ? `${(f.m[1] / max) * 82}%` : 6 }}
                     />
-                    <span className={cn('cifra text-[18px] font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
+                    <span className={cn('cifra text-[26px] font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
                   </div>
-                  <span className="w-[104px] shrink-0 text-right text-[16px] text-texto">{f.m[0]}</span>
+                  <span className="w-[124px] shrink-0 text-right text-[19px] text-texto">{f.m[0]}</span>
                 </div>
               </div>
             ))}
@@ -837,9 +804,9 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
 function Indicador({ nombre, valor, nota, alerta = false }: { nombre: string; valor: string; nota: string; alerta?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
-      <p className="titulo-display text-[34px] leading-none text-texto">{valor}</p>
-      <p className={cn('text-[14px]', alerta ? 'font-semibold text-estado-atencion-texto' : 'text-texto-suave')}>{nota}</p>
+      <p className="text-[16px] font-semibold text-texto-suave">{nombre}</p>
+      <p className="titulo-display text-[46px] leading-none text-texto">{valor}</p>
+      <p className={cn('text-[15px]', alerta ? 'font-semibold text-estado-atencion-texto' : 'text-texto-suave')}>{nota}</p>
     </div>
   )
 }

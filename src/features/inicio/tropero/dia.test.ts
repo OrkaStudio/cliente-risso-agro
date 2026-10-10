@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
@@ -114,5 +114,17 @@ describe('la línea de la plata', () => {
   it('la tarjeta de un potrero dice dónde, qué y cuánto, y cómo marcarla', () => {
     const [c] = cosasParaHoy([potrero('11B', 'atender')], [], [])
     expect(c).toMatchObject({ icono: 'Eléctrico', lugar: '11B', que: 'El eléctrico está cortado', datos: ['hace 3 días', '60 animales'], senal: { potreroId: '11B', tipo: 'electrico' } })
+  })
+})
+
+describe('la escena del clima', () => {
+  it('elige el cielo por el código y suma el viento', () => {
+    expect(escenaDelClima(0, 10, true)).toEqual({ cielo: 'sol', ventoso: false })
+    expect(escenaDelClima(2, 35, true)).toEqual({ cielo: 'nubes', ventoso: true })
+    expect(escenaDelClima(3, 0, true).cielo).toBe('nublado')
+    expect(escenaDelClima(53, 0, true).cielo).toBe('lluvia')
+    expect(escenaDelClima(61, 0, false).cielo).toBe('lluvia')
+    expect(escenaDelClima(95, 0, true).cielo).toBe('tormenta')
+    expect(escenaDelClima(0, 0, false).cielo).toBe('noche')
   })
 })

@@ -89,6 +89,10 @@ export type Clima = {
   lluviaMm: number
   /** Helada prevista: mínima ≤ 3 °C. */
   helada: boolean
+  /** Viento ahora, km/h a 10 m. */
+  viento: number
+  /** Es de día (para la escena). */
+  dia: boolean
 }
 
 /**
@@ -98,13 +102,13 @@ export async function getClima(u: UbicacionClima): Promise<Clima> {
   const { lat, lon, nombre } = u
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&current=temperature_2m,weather_code` +
+    `&current=temperature_2m,weather_code,wind_speed_10m,is_day` +
     `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum` +
     `&timezone=America/Argentina/Buenos_Aires&forecast_days=1`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`open-meteo ${res.status}`)
   const j = (await res.json()) as {
-    current: { temperature_2m: number; weather_code: number }
+    current: { temperature_2m: number; weather_code: number; wind_speed_10m?: number; is_day?: number }
     daily: {
       temperature_2m_max: number[]
       temperature_2m_min: number[]
@@ -124,6 +128,8 @@ export async function getClima(u: UbicacionClima): Promise<Clima> {
     lluviaProb: Math.round(j.daily.precipitation_probability_max[0] ?? 0),
     lluviaMm: j.daily.precipitation_sum[0] ?? 0,
     helada: (j.daily.temperature_2m_min[0] ?? 99) <= 3,
+    viento: Math.round(j.current.wind_speed_10m ?? 0),
+    dia: j.current.is_day !== 0,
   }
 }
 

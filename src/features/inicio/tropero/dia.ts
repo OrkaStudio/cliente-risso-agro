@@ -247,3 +247,21 @@ export function lineaDePlata(vencimientos: Vencimiento[], horizonte = 30) {
     maximo: Math.max(1, ...puntos.map((p) => p.monto)),
   }
 }
+
+export type Cielo = 'sol' | 'nubes' | 'nublado' | 'lluvia' | 'tormenta' | 'noche'
+
+/**
+ * Cómo pintar la escena del molino con el clima de ahora (códigos WMO de
+ * Open-Meteo). El viento va aparte: se suma a cualquier cielo (la rueda gira
+ * rápido y las nubes corren). Ventoso desde 30 km/h.
+ */
+export function escenaDelClima(code: number, viento: number, dia: boolean): { cielo: Cielo; ventoso: boolean } {
+  const ventoso = viento >= 30
+  if (code >= 95) return { cielo: 'tormenta', ventoso }
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 71 && code <= 77) || code === 85 || code === 86)
+    return { cielo: 'lluvia', ventoso }
+  if (!dia) return { cielo: 'noche', ventoso }
+  if (code === 3 || code === 45 || code === 48) return { cielo: 'nublado', ventoso }
+  if (code === 2) return { cielo: 'nubes', ventoso }
+  return { cielo: 'sol', ventoso }
+}

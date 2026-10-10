@@ -780,3 +780,11 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
 }
 
+
+/* ===== Inicio: la escena del clima ===== */
+.escena-gota { animation: escena-gota 0.9s linear infinite; opacity: 0; }
+@keyframes escena-gota { 0% { transform: translateY(-20px); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(260px); opacity: 0.8; } }
+.escena-rayo { opacity: 0; animation: escena-rayo 6s infinite; }
+@keyframes escena-rayo { 0%, 88%, 92%, 100% { opacity: 0; } 89% { opacity: 0.55; } 90% { opacity: 0.1; } 91% { opacity: 0.4; } }
+.escena-viento { left: -100px; animation: escena-viento 2.2s linear infinite; }
+@keyframes escena-viento { from { transform: translateX(0); opacity: 0; } 20% { opacity: 1; } to { transform: translateX(560px); opacity: 0; } }
