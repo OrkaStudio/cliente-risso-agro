@@ -11,6 +11,7 @@ import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { useMapa } from '@/features/mapa/api'
 import { cn } from '@/lib/utils'
 import cielo from '@/assets/tropero/molino/cielo.svg'
@@ -24,7 +25,23 @@ import { chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, p
 import { useGanadoCampania, useLluvia60 } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
-const TARJETA = 'rounded-[18px] border border-borde bg-superficie p-6'
+const TARJETA = 'rounded-[20px] border border-borde bg-superficie p-6'
+/**
+ * La escala del Inicio: todos los paneles usan estos tamaños, así un ajuste se
+ * hace una vez y no panel por panel.
+ */
+const T = {
+  /** Título de cada panel. */
+  titulo: 'font-heading text-[22px] font-extrabold text-texto',
+  /** La línea de «para qué sirve» debajo del título. */
+  bajada: 'text-[15px] text-texto-suave',
+  /** Nombres, filas y etiquetas dentro de un gráfico. */
+  texto: 'text-[16px] text-texto',
+  /** Fechas, aclaraciones y ejes. */
+  chico: 'text-[14px] text-texto-suave',
+  /** Un número destacado dentro de un panel. */
+  numero: 'titulo-display leading-none tracking-[-0.02em]',
+} as const
 
 /**
  * Inicio · El día (página 35). Pensado desde el productor que abre la compu a
@@ -315,7 +332,7 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
   const [primera, ...resto] = cosas
   return (
     <section id="para-atender" aria-labelledby="atender-hoy" className="scroll-mt-6">
-      <h2 id="atender-hoy" className="mb-3 font-heading text-[20px] font-extrabold text-texto">
+      <h2 id="atender-hoy" className={cn('mb-3', T.titulo)}>
         Para atender hoy
       </h2>
       {!primera ? (
@@ -466,8 +483,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
     d.setDate(d.getDate() + dia)
     return `${d.getDate()} ${MES[d.getMonth()]}`
   }
-  // Tamaño por monto (área ∝ plata), entre 14 y 52 px.
-  const tam = (m: number) => 14 + 38 * Math.sqrt(m / l.maximo)
+  // Tamaño por monto (área ∝ plata), entre 20 y 72 px.
+  const tam = (m: number) => 20 + 52 * Math.sqrt(m / l.maximo)
   // Dos niveles de etiqueta para que no se pisen las que caen cerca.
   const nivel = (lista: PuntoPlata[]) => {
     const orden = [...lista].sort((a, b) => a.dia - b.dia)
@@ -481,10 +498,10 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
     <section className={TARJETA} aria-labelledby="la-plata">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 id="la-plata" className="font-heading text-[20px] font-extrabold text-texto">
+          <h2 id="la-plata" className={cn(T.titulo)}>
             La plata de los próximos 30 días
           </h2>
-          <p className="text-[13.5px] text-texto-suave">Arriba lo que entra, abajo lo que sale. El tamaño es el monto.</p>
+          <p className={T.bajada}>Arriba lo que entra, abajo lo que sale. El tamaño es el monto.</p>
         </div>
         <BotonChico type="button" onClick={() => navigate('/agenda')}>
           Ver en Agenda
@@ -496,7 +513,7 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
         <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-principal" />
         <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} grande />
         {l.vencidos.length > 0 && (
-          <span className="mb-1 rounded-full bg-estado-problema-suave px-3 py-1.5 text-[13.5px] font-bold text-estado-problema-texto">
+          <span className="mb-1 rounded-full bg-estado-problema-suave px-4 py-2 text-[15px] font-bold text-estado-problema-texto">
             {plataCorta(l.vencido)} vencido sin pagar
           </span>
         )}
@@ -505,17 +522,17 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       {vacio ? (
         <p className="mt-6 rounded-[14px] bg-superficie-hundida/60 px-5 py-4 text-[15px] text-texto-suave">Nada por cobrar ni por pagar en los próximos 30 días.</p>
       ) : (
-        <div className="relative mt-6 h-[230px]">
+        <div className="relative mt-6 h-[320px]">
           {/* Lo vencido, antes de hoy */}
           <div className="absolute inset-y-0 left-0 w-[112px] rounded-[12px] bg-estado-problema-suave/45">
-            <p className="pt-2 text-center text-[11.5px] font-bold text-estado-problema-texto">Vencido</p>
+            <p className="pt-3 text-center text-[14px] font-bold text-estado-problema-texto">Vencido</p>
           </div>
           {/* El eje: hoy → 30 días */}
           <div className="absolute top-1/2 right-0 left-[112px] h-[2px] -translate-y-1/2 bg-borde" />
           {[0, 7, 14, 21, 30].map((d) => (
             <span
               key={d}
-              className="absolute top-1/2 -translate-x-1/2 translate-y-2 text-[11.5px] font-semibold whitespace-nowrap text-texto-suave"
+              className="absolute top-1/2 -translate-x-1/2 translate-y-2.5 text-[14px] font-semibold whitespace-nowrap text-texto-suave"
               style={{ left: `calc(112px + (100% - 150px) * ${d / HORIZONTE} + 16px)` }}
             >
               {d === 0 ? 'Hoy' : fechaDe(d)}
@@ -544,8 +561,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
 function Cifra({ nombre, valor, clase, grande = false }: { nombre: string; valor: string; clase: string; grande?: boolean }) {
   return (
     <div>
-      <p className="text-[13px] font-semibold text-texto-suave">{nombre}</p>
-      <p className={cn('titulo-display leading-none tracking-[-0.02em]', grande ? 'text-[40px]' : 'text-[28px]', clase)}>{valor}</p>
+      <p className="text-[15px] font-semibold text-texto-suave">{nombre}</p>
+      <p className={cn('titulo-display leading-none tracking-[-0.02em]', grande ? 'text-[48px]' : 'text-[34px]', clase)}>{valor}</p>
     </div>
   )
 }
@@ -569,7 +586,7 @@ function Burbuja({
   onClick: () => void
 }) {
   const color = vencido ? 'bg-estado-problema' : p.cobro ? 'bg-estado-bien' : 'bg-principal'
-  const tallo = 18 + nivel * 34
+  const tallo = 20 + nivel * 44
   return (
     <button
       type="button"
@@ -579,11 +596,11 @@ function Burbuja({
       style={{ left: izquierda, transform: `translate(-50%, ${arriba ? `calc(-100% - 1px)` : '1px'})`, flexDirection: arriba ? 'column' : 'column-reverse' }}
     >
       <span className="flex flex-col items-center" style={{ flexDirection: arriba ? 'column' : 'column-reverse' }}>
-        <span className={cn('cifra text-[13px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : p.cobro ? 'text-estado-bien' : 'text-principal')}>
+        <span className={cn('cifra text-[16px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : p.cobro ? 'text-estado-bien' : 'text-principal')}>
           {p.cobro ? '+' : '−'}
           {plataCorta(p.monto)}
         </span>
-        <span className={cn('truncate text-[11.5px] text-texto-suave', vencido ? 'max-w-[100px]' : 'max-w-[120px]')}>{p.descripcion}</span>
+        <span className={cn('truncate text-[14px] text-texto-suave', vencido ? 'max-w-[104px]' : 'max-w-[150px]')}>{p.descripcion}</span>
       </span>
       <span className={cn('my-1 rounded-full opacity-90 shadow-sm transition-transform group-hover:scale-110', color)} style={{ width: tam, height: tam }} />
       <span className="w-[2px] bg-borde" style={{ height: tallo }} />
@@ -605,7 +622,7 @@ function Clima() {
   if (!actual) {
     return (
       <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
-        <h2 className="font-heading text-[20px] font-extrabold text-texto">El clima de tu campo</h2>
+        <h2 className={cn(T.titulo)}>El clima de tu campo</h2>
         <p className="text-[15px] text-texto-suave">Con el campo en el mapa, acá ves el pronóstico y la lluvia de los últimos dos meses.</p>
         <BotonChico type="button" icono="Campos" onClick={() => navigate('/campos')}>
           Ver mis campos
@@ -613,7 +630,7 @@ function Clima() {
       </section>
     )
   }
-  const dias = (pronostico.data ?? []).slice(0, 5)
+  const dias = (pronostico.data ?? []).slice(0, 7)
   const ultima = lluvia.data?.ultima
   return (
     <section id="clima" aria-label={`El clima en ${actual.nombre}`} className="flex h-full scroll-mt-6 flex-col">
@@ -631,9 +648,9 @@ function Clima() {
           />
         </div>
         <div className="relative px-5 pt-4 text-superficie [text-shadow:0_1px_3px_rgba(0,0,0,0.25)]">
-          <p className="text-[13px] font-semibold">{actual.nombre}</p>
-          <p className="cifra text-[35px] leading-tight font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
-          {clima.data && <p className="text-[12px] font-medium">Mín {clima.data.min}° · Máx {clima.data.max}°</p>}
+          <p className="text-[15px] font-semibold">{actual.nombre}</p>
+          <p className="cifra text-[44px] leading-tight font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
+          {clima.data && <p className="text-[14px] font-medium">Mín {clima.data.min}° · Máx {clima.data.max}°</p>}
         </div>
       </div>
       <ul className="px-5 pt-3">
@@ -644,9 +661,9 @@ function Clima() {
       <div className="px-5 pt-2 pb-5">
         {lluvia.data && lluvia.data.total > 0 ? (
           <>
-            <p className="text-[14.5px] font-semibold text-texto">Llovieron {Math.round(lluvia.data.total)} mm en los últimos 60 días</p>
+            <p className="text-[16px] font-semibold text-texto">Llovieron {Math.round(lluvia.data.total)} mm en los últimos 60 días</p>
             {ultima && (
-              <p className="text-[12.5px] text-texto-suave">
+              <p className={T.chico}>
                 La última: {Math.round(ultima.mm)} mm el {new Date(`${ultima.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}
                 {ultima.fuente === 'manual' ? ', anotada en la recorrida' : ''}
               </p>
@@ -660,18 +677,38 @@ function Clima() {
   )
 }
 
+/** El ícono del día con su color: sol trigo, nube gris, lluvia celeste, tormenta violeta, helada azul. */
+function IconoDia({ d }: { d: DiaPronostico }) {
+  const c = d.code
+  const tono =
+    c >= 95
+      ? 'bg-[#ece4f5] text-[#6a4c9c]'
+      : (c >= 51 && c <= 67) || (c >= 80 && c <= 82)
+        ? 'bg-[#dcebf6] text-[#2779c4]'
+        : (c >= 71 && c <= 77) || c === 85 || c === 86 || d.helada
+          ? 'bg-[#e6f1fa] text-[#4a90c8]'
+          : c <= 1
+            ? 'bg-acento/35 text-[#b07a10]'
+            : 'bg-superficie-hundida text-texto-suave'
+  return (
+    <span className={cn('grid size-10 shrink-0 place-items-center rounded-full', tono)} title={d.descripcion}>
+      <WmoIcon code={c} className="size-[22px]" />
+    </span>
+  )
+}
+
 function FilaPronostico({ d, hoy }: { d: DiaPronostico; hoy: boolean }) {
   const f = new Date(`${d.fecha}T12:00:00`)
   const llueve = d.lluviaProb >= 20
   return (
-    <li className="flex items-center gap-3 py-2 text-[14px]">
-      <span className="w-12 font-medium text-texto">{hoy ? 'Hoy' : DIA_CORTO[f.getDay()]}</span>
-      <span className="ml-auto flex items-center gap-1.5 text-[12.5px] text-texto-suave">
-        {llueve ? <Icono nombre="Lluvia" tamano={16} /> : <span className="size-3 rounded-full bg-acento" />}
-        {llueve ? `${d.lluviaProb} %` : 'Sol'}
+    <li className="flex items-center gap-3 py-1.5">
+      <span className={cn('w-12', T.texto, hoy ? 'font-bold' : 'font-medium')}>{hoy ? 'Hoy' : DIA_CORTO[f.getDay()]}</span>
+      <IconoDia d={d} />
+      <span className={cn('min-w-0 flex-1 truncate', T.chico, llueve && 'font-semibold text-[#2779c4]')}>
+        {llueve ? `${d.lluviaProb} %${d.lluviaMm >= 1 ? ` · ${Math.round(d.lluviaMm)} mm` : ''}` : d.helada ? 'Helada' : d.descripcion}
       </span>
-      <span className="cifra w-9 text-right font-bold text-texto">{d.max}°</span>
-      <span className="cifra w-7 text-right text-texto-suave">{d.min}°</span>
+      <span className="cifra w-10 text-right text-[17px] font-bold text-texto">{d.max}°</span>
+      <span className="cifra w-9 text-right text-[17px] text-texto-suave">{d.min}°</span>
     </li>
   )
 }
@@ -699,13 +736,13 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
   const destete = vacas > 0 ? Math.round(((n('ternero') + n('ternera')) / vacas) * 100) : null
 
   return (
-    <section className="p-6" aria-labelledby="estructura">
+    <section className="flex h-full flex-col p-6" aria-labelledby="estructura">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 id="estructura" className="font-heading text-[20px] font-extrabold text-texto">
+          <h2 id="estructura" className={cn(T.titulo)}>
             Estructura del rodeo
           </h2>
-          <p className="text-[13.5px] text-texto-suave">Hembras y machos por edad, y cómo viene la cría.</p>
+          <p className={T.bajada}>Hembras y machos por edad, y cómo viene la cría.</p>
         </div>
         <BotonChico type="button" onClick={() => navigate('/hacienda')}>
           Ver hacienda
@@ -714,13 +751,14 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
       {total === 0 ? (
         <p className="mt-4 text-[15.5px] text-texto-suave">Todavía no hay hacienda cargada.</p>
       ) : (
-        <>
+        // Se reparte en todo el alto del panel (el clima de al lado manda la altura).
+        <div className="flex flex-1 flex-col justify-evenly gap-2">
           <div className="mt-5 grid grid-cols-[1fr_96px_1fr] items-baseline">
             <p className="text-right text-[16px] font-bold text-principal">Hembras {hembras}</p>
             <p className="titulo-display text-center text-[40px] text-texto">{total}</p>
             <p className="text-[16px] font-bold text-[#5f6d4f]">Machos {machos}</p>
           </div>
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-2 flex flex-col gap-5">
             {filas.map((f) => (
               <div key={f.etapa} className="grid grid-cols-[1fr_96px_1fr] items-center">
                 <div className="flex items-center gap-3">
@@ -753,7 +791,7 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
             />
             <Indicador nombre="Destete" valor={destete === null ? '—' : `${destete} %`} nota="Terneros por vaca" tono="acento" />
           </div>
-        </>
+        </div>
       )}
     </section>
   )
