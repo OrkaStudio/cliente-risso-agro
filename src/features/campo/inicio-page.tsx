@@ -12,7 +12,7 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import { useParaAtender } from '@/features/inicio/para-atender-api'
 import { cosasParaHoy, fraseDelDia, franjasDelRodeo, saludo, type Cosa } from '@/features/inicio/tropero/dia'
-import { useLluvia60 } from '@/features/inicio/tropero/use-dia'
+import { useLluviaDelMes } from '@/features/inicio/tropero/use-dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { setForceOficina } from '@/lib/campo-mode'
@@ -47,7 +47,7 @@ function Hoy() {
   const tiempo = useClima(clima.actual?.ubicacion ?? null)
   // La ubicación del campo de Hoy (el mismo que el del clima, o su centro).
   const ubicacion = campo && clima.actual?.id === campo.id ? clima.actual.ubicacion : campo?.lat != null && campo.lon != null ? { lat: campo.lat, lon: campo.lon } : null
-  const lluvia = useLluvia60(ubicacion)
+  const lluvia = useLluviaDelMes(ubicacion)
   const reducir = useReducedMotion()
   const [eligiendo, setEligiendo] = useState(false)
 

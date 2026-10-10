@@ -95,44 +95,6 @@ export type Clima = {
   dia: boolean
 }
 
-/**
- * Clima actual + del día de UN campo vía Open-Meteo (gratis, sin key). Incluye máx/mín, lluvia y aviso de helada (clave para el productor).
- */
-export async function getClima(u: UbicacionClima): Promise<Clima> {
-  const { lat, lon, nombre } = u
-  const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&current=temperature_2m,weather_code,wind_speed_10m,is_day` +
-    `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum` +
-    `&timezone=America/Argentina/Buenos_Aires&forecast_days=1`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`open-meteo ${res.status}`)
-  const j = (await res.json()) as {
-    current: { temperature_2m: number; weather_code: number; wind_speed_10m?: number; is_day?: number }
-    daily: {
-      temperature_2m_max: number[]
-      temperature_2m_min: number[]
-      precipitation_probability_max: number[]
-      precipitation_sum: number[]
-    }
-  }
-  const code = j.current.weather_code
-  const min = Math.round(j.daily.temperature_2m_min[0] ?? 0)
-  return {
-    temp: Math.round(j.current.temperature_2m),
-    code,
-    descripcion: WMO[code] ?? '—',
-    lugar: nombre,
-    max: Math.round(j.daily.temperature_2m_max[0] ?? 0),
-    min,
-    lluviaProb: Math.round(j.daily.precipitation_probability_max[0] ?? 0),
-    lluviaMm: j.daily.precipitation_sum[0] ?? 0,
-    helada: (j.daily.temperature_2m_min[0] ?? 99) <= 3,
-    viento: Math.round(j.current.wind_speed_10m ?? 0),
-    dia: j.current.is_day !== 0,
-  }
-}
-
 export type DiaPronostico = {
   /** YYYY-MM-DD. */
   fecha: string
@@ -145,29 +107,39 @@ export type DiaPronostico = {
   helada: boolean
 }
 
-/**
- * Pronóstico de 7 días de UN campo (Open-Meteo, gratis, sin key).
- */
-export async function getPronostico(u: UbicacionClima): Promise<DiaPronostico[]> {
-  const { lat, lon } = u
-  const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum` +
-    `&timezone=America/Argentina/Buenos_Aires&forecast_days=7`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`open-meteo ${res.status}`)
-  const j = (await res.json()) as {
-    daily: {
-      time: string[]
-      weather_code: number[]
-      temperature_2m_max: number[]
-      temperature_2m_min: number[]
-      precipitation_probability_max: number[]
-      precipitation_sum: number[]
-    }
+/** El tiempo de UN campo en una sola foto: ahora, los 7 días desde hoy y la lluvia de los días pasados. */
+export type TiempoDelCampo = {
+  /** Sin `lugar`: lo pone el hook con el nombre del campo. */
+  ahora: Omit<Clima, 'lugar'>
+  /** Hoy y los 6 días que siguen. */
+  dias: DiaPronostico[]
+  /** Los días anteriores a hoy, con lo que llovió según el modelo (mm). */
+  pasado: { fecha: string; mm: number }[]
+}
+
+/** Los días que se piden hacia atrás: alcanzan para la lluvia del último mes (30 días que terminan ayer). */
+export const DIAS_PASADOS = 31
+
+type RespuestaOpenMeteo = {
+  current: { temperature_2m: number; weather_code: number; wind_speed_10m?: number; is_day?: number }
+  daily: {
+    time: string[]
+    weather_code: (number | null)[]
+    temperature_2m_max: (number | null)[]
+    temperature_2m_min: (number | null)[]
+    precipitation_probability_max: (number | null)[]
+    precipitation_sum: (number | null)[]
   }
+}
+
+/**
+ * Arma el tiempo del campo con la respuesta de Open-Meteo. Pura: se prueba sin red.
+ * `hoy` (YYYY-MM-DD, hora argentina) separa el pasado del pronóstico; un día sin
+ * dato del modelo no se inventa: se saca del pasado.
+ */
+export function leerTiempo(j: RespuestaOpenMeteo, hoy: string): TiempoDelCampo {
   const d = j.daily
-  return d.time.map((fecha, i) => {
+  const todos: DiaPronostico[] = d.time.map((fecha, i) => {
     const code = d.weather_code[i] ?? 0
     const min = d.temperature_2m_min[i] ?? 0
     return {
@@ -181,6 +153,49 @@ export async function getPronostico(u: UbicacionClima): Promise<DiaPronostico[]>
       helada: min <= 3,
     }
   })
+  const dias = todos.filter((x) => x.fecha >= hoy)
+  const pasado = d.time.flatMap((fecha, i) => (fecha < hoy && d.precipitation_sum[i] != null ? [{ fecha, mm: d.precipitation_sum[i]! }] : []))
+  const hoyDia = dias[0]
+  const code = j.current.weather_code
+  return {
+    ahora: {
+      temp: Math.round(j.current.temperature_2m),
+      code,
+      descripcion: WMO[code] ?? '—',
+      max: hoyDia?.max ?? 0,
+      min: hoyDia?.min ?? 0,
+      lluviaProb: hoyDia?.lluviaProb ?? 0,
+      lluviaMm: hoyDia?.lluviaMm ?? 0,
+      helada: hoyDia?.helada ?? false,
+      viento: Math.round(j.current.wind_speed_10m ?? 0),
+      dia: j.current.is_day !== 0,
+    },
+    dias,
+    pasado,
+  }
+}
+
+/** Hoy en la Argentina, YYYY-MM-DD (el mismo huso con el que Open-Meteo arma los días). */
+export const hoyEnArgentina = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+
+/**
+ * El tiempo de UN campo vía Open-Meteo (gratis, sin key), en UNA consulta: el
+ * clima de ahora, el pronóstico de la semana y la lluvia del último mes salen
+ * de la misma corrida del modelo, así nunca se contradicen. Para la Argentina,
+ * el modelo automático de Open-Meteo es el ECMWF IFS de 9 km (verificado el
+ * 10/10/2026: da los mismos valores que pedirlo explícito), el de mejor
+ * desempeño en la región pampeana; no se fija para conservar el respaldo si ese
+ * modelo falla.
+ */
+export async function getTiempoDelCampo(u: { lat: number; lon: number }): Promise<TiempoDelCampo> {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${u.lat}&longitude=${u.lon}` +
+    `&current=temperature_2m,weather_code,wind_speed_10m,is_day` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum` +
+    `&past_days=${DIAS_PASADOS}&forecast_days=7&timezone=America/Argentina/Buenos_Aires`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`open-meteo ${res.status}`)
+  return leerTiempo((await res.json()) as RespuestaOpenMeteo, hoyEnArgentina())
 }
 
 export type Gordo = {

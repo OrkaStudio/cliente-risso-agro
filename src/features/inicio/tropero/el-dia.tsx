@@ -20,7 +20,7 @@ import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-sen
 import { useParaAtender } from '../para-atender-api'
 import { escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { EscenaClima } from './escena-clima'
-import { useGanadoCampania, useLluvia60 } from './use-dia'
+import { useGanadoCampania, useLluviaDelMes } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const TARJETA = 'rounded-[20px] border border-borde bg-superficie p-6'
@@ -58,7 +58,7 @@ export function ElDia() {
   const { data: campos } = useMapa(membresia?.empresa_id)
   const { actual } = useCampoClima()
   const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(actual?.ubicacion ?? null)
+  const lluvia = useLluviaDelMes(actual?.ubicacion ?? null)
   const ganado = useGanadoCampania()
   const reducir = useReducedMotion()
 
@@ -620,7 +620,7 @@ function Clima() {
   const navigate = useNavigate()
   const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluvia60(actual?.ubicacion ?? null)
+  const lluvia = useLluviaDelMes(actual?.ubicacion ?? null)
   if (!actual) {
     return (
       <section className="flex h-full flex-col items-start justify-center gap-3 p-6">
