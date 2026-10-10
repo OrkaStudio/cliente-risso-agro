@@ -180,3 +180,10 @@ describe('nombres propios', () => {
     expect(diasDesde('2026-10-08', new Date(2026, 9, 8))).toBe(0)
   })
 })
+
+describe('la letra del campo', () => {
+  it('A…Z y después AA, AB…, igual que la base', async () => {
+    const { letraDeCampo } = await import('./modelo')
+    expect([0, 25, 26, 32, 701, 702].map(letraDeCampo)).toEqual(['A', 'Z', 'AA', 'AG', 'ZZ', 'AAA'])
+  })
+})

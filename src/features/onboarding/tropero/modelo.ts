@@ -1,7 +1,7 @@
 // Onboarding de Tropero: las reglas, sin React ni red (spec «Tropero para
 // código», sección 2). Se prueban solas en modelo.test.ts.
 import type { Database } from '@/lib/supabase/types'
-import type { Uso } from '@/features/campos/use-campo-mapa'
+import { letraDeIndice, type Uso } from '@/features/campos/use-campo-mapa'
 import { especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 
 export type Categoria = Database['public']['Enums']['categoria_animal']
@@ -220,7 +220,7 @@ export function totales(campos: CampoOnb[]): { hectareas: number; potreros: numb
 
 /** Letra del campo según su orden en la empresa: 0 → A, 1 → B… */
 export function letraDeCampo(colorIdx: number): string {
-  return String.fromCharCode(65 + colorIdx)
+  return letraDeIndice(colorIdx)
 }
 
 /**

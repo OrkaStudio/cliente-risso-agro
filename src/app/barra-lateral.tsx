@@ -38,7 +38,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
       </div>
 
       <nav aria-label="Oficina" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
-        <p className="px-3 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Oficina</p>
+        <p className="shrink-0 px-3 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Oficina</p>
         {SECCIONES.map((s) => {
           const bloqueada = pendiente && !abiertoSinMapa(s.to)
           return (
@@ -53,7 +53,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
               }}
               className={({ isActive }) =>
                 cn(
-                  'relative flex h-11 items-center gap-3 rounded-[12px] px-3 text-[15px] transition-colors',
+                  'relative flex h-11 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] transition-colors',
                   isActive && !bloqueada
                     ? 'font-bold text-texto'
                     : bloqueada
@@ -87,7 +87,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 
         {!!campos?.length && (
           <>
-            <p className="px-3 pt-7 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Tus campos</p>
+            <p className="shrink-0 px-3 pt-7 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Tus campos</p>
             {campos.map((c) => {
               const color = colorDeCampo(c.colorIdx ?? 0)
               const cab = c.potreros.reduce((s, p) => s + p.cabezas, 0)
@@ -95,7 +95,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
                 <NavLink
                   key={c.id}
                   to={pendiente ? `/mapa/${c.id}` : '/campos'}
-                  className="flex h-10 items-center gap-3 rounded-[12px] px-3 text-[15px] text-texto hover:bg-superficie-hundida/70"
+                  className="flex h-10 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] text-texto hover:bg-superficie-hundida/70"
                 >
                   <span className="grid size-[22px] shrink-0 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: color.hex }}>
                     {color.letra}
