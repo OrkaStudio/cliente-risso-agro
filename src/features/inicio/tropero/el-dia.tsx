@@ -778,44 +778,54 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
         <p className="mt-4 text-[15.5px] text-texto-suave">Todavía no hay hacienda cargada.</p>
       ) : (
         // Se reparte en todo el alto del panel (el clima de al lado manda la altura).
-        <div className="flex flex-1 flex-col justify-evenly gap-2">
-          <div className="mt-5 grid grid-cols-[1fr_96px_1fr] items-baseline">
-            <p className="text-right text-[16px] font-bold text-principal">Hembras {hembras}</p>
-            <p className="titulo-display text-center text-[40px] text-texto">{total}</p>
-            <p className="text-[16px] font-bold text-[#5f6d4f]">Machos {machos}</p>
-          </div>
-          <div className="mt-2 flex flex-col gap-5">
+        <div className="flex flex-1 flex-col justify-evenly gap-6 pt-4">
+          {/* La leyenda: el total y de qué color es cada lado. */}
+          <p className="flex items-center justify-center gap-5 text-[15px] text-texto-suave">
+            <span className="flex items-center gap-2">
+              <span className={cn('size-3 rounded-[3px]', HEMBRA)} /> {hembras} hembras
+            </span>
+            <span className="titulo-display text-[22px] text-texto">{total} cabezas</span>
+            <span className="flex items-center gap-2">
+              <span className={cn('size-3 rounded-[3px]', MACHO)} /> {machos} machos
+            </span>
+          </p>
+          {/* Espejo: nombres afuera, números adentro junto a la barra, la etapa al medio. */}
+          <div className="flex flex-col gap-4">
             {filas.map((f) => (
-              <div key={f.etapa} className="grid grid-cols-[1fr_96px_1fr] items-center">
+              <div key={f.etapa} className="grid grid-cols-[minmax(0,1fr)_88px_minmax(0,1fr)] items-center">
                 <div className="flex items-center gap-3">
-                  <span className="w-[140px] shrink-0 text-[16px] text-texto">
-                    {f.h[0]} <b className="cifra">{f.h[1]}</b>
-                  </span>
-                  <div className="flex h-8 flex-1 justify-end">
-                    <div className={cn('h-full rounded-l-[6px]', HEMBRA)} style={{ width: `${(f.h[1] / max) * 100}%` }} />
+                  <span className="w-[104px] shrink-0 text-[16px] text-texto">{f.h[0]}</span>
+                  <div className="flex h-9 flex-1 items-center justify-end gap-2.5">
+                    <span className={cn('cifra text-[18px] font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
+                    <div
+                      className={cn('h-full rounded-l-[8px]', f.h[1] ? HEMBRA : 'bg-superficie-hundida')}
+                      style={{ width: f.h[1] ? `${(f.h[1] / max) * 82}%` : 6 }}
+                    />
                   </div>
                 </div>
-                <span className="text-center text-[13px] font-semibold text-texto-suave">{f.etapa}</span>
+                <span className="text-center text-[13.5px] font-semibold text-texto-suave">{f.etapa}</span>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 flex-1">
-                    <div className={cn('h-full rounded-r-[6px]', MACHO)} style={{ width: `${(f.m[1] / max) * 100}%` }} />
+                  <div className="flex h-9 flex-1 items-center gap-2.5">
+                    <div
+                      className={cn('h-full rounded-r-[8px]', f.m[1] ? MACHO : 'bg-superficie-hundida')}
+                      style={{ width: f.m[1] ? `${(f.m[1] / max) * 82}%` : 6 }}
+                    />
+                    <span className={cn('cifra text-[18px] font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
                   </div>
-                  <span className="w-[140px] shrink-0 text-right text-[16px] text-texto">
-                    {f.m[0]} <b className="cifra">{f.m[1]}</b>
-                  </span>
+                  <span className="w-[104px] shrink-0 text-right text-[16px] text-texto">{f.m[0]}</span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-6 grid grid-cols-3 border-t border-borde pt-5 text-center">
-            <Indicador nombre="Vientres" valor={String(vientres)} nota={`${Math.round((vientres / total) * 100)} % del rodeo`} tono="neutro" />
+          <div className="grid grid-cols-3 border-t border-borde pt-5 text-center">
+            <Indicador nombre="Vientres" valor={String(vientres)} nota={`${Math.round((vientres / total) * 100)} % del rodeo`} />
             <Indicador
               nombre="Toro y vaca"
               valor={toroVaca === null ? '—' : `1 : ${toroVaca}`}
-              nota={toroVaca === null ? 'Sin toros' : enRango ? 'En rango (ideal 1:25)' : toroVaca > 30 ? 'Faltan toros (ideal 1:25)' : 'Sobran toros (ideal 1:25)'}
-              tono={toroVaca === null ? 'neutro' : enRango ? 'bien' : 'atencion'}
+              nota={toroVaca === null ? 'Sin toros' : enRango ? 'En rango' : toroVaca > 30 ? 'Faltan toros' : 'Sobran toros'}
+              alerta={toroVaca === null || !enRango}
             />
-            <Indicador nombre="Destete" valor={destete === null ? '—' : `${destete} %`} nota="Terneros por vaca" tono="acento" />
+            <Indicador nombre="Destete" valor={destete === null ? '—' : `${destete} %`} nota="terneros por vaca" />
           </div>
         </div>
       )}
@@ -823,19 +833,13 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
   )
 }
 
-function Indicador({ nombre, valor, nota, tono }: { nombre: string; valor: string; nota: string; tono: 'neutro' | 'bien' | 'atencion' | 'acento' }) {
+/** Un número del rodeo con su aclaración. El color sólo cuando algo está fuera de rango. */
+function Indicador({ nombre, valor, nota, alerta = false }: { nombre: string; valor: string; nota: string; alerta?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-1">
       <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
       <p className="titulo-display text-[34px] leading-none text-texto">{valor}</p>
-      <span
-        className={cn(
-          'rounded-full px-3 py-1 text-[13.5px] font-semibold',
-          tono === 'bien' ? 'bg-estado-bien-suave text-estado-bien-texto' : tono === 'atencion' ? 'bg-estado-atencion-suave text-estado-atencion-texto' : tono === 'acento' ? 'bg-acento/35 text-acento-texto' : 'bg-superficie-hundida text-texto-suave',
-        )}
-      >
-        {nota}
-      </span>
+      <p className={cn('text-[14px]', alerta ? 'font-semibold text-estado-atencion-texto' : 'text-texto-suave')}>{nota}</p>
     </div>
   )
 }
