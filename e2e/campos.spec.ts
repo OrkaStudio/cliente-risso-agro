@@ -31,5 +31,6 @@ test('campos y potreros: crear campo + crear potrero', async ({ page }) => {
   await potrero.getByLabel('Hectáreas (opcional)').fill('20')
   await potrero.getByRole('button', { name: 'Crear potrero' }).click()
   await expect(potrero).toBeHidden()
-  await expect(page.getByRole('link', { name: /^7[A-Z] / })).toBeVisible()
+  // Con más de 26 campos la letra es doble (AA, AB…): la cuenta de E2E acumula uno por corrida.
+  await expect(page.getByRole('link', { name: /^7[A-Z]+ / })).toBeVisible()
 })
