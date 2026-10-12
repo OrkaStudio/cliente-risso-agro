@@ -31,8 +31,9 @@ test('golden path Hacienda: login → alta → stock → ficha', async ({ page }
   // Ficha: la caravana y el alta en el historial
   await fila.getByRole('link').click()
   await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
-  await expect(page.getByRole('heading', { name: caravana, level: 1 })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Historial' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Vaca', level: 1 })).toBeVisible()
+  await expect(page.getByText(caravana, { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Su historia/ })).toBeVisible()
   await expect(page.getByText('Alta', { exact: true })).toBeVisible()
 })
 
@@ -47,10 +48,10 @@ test('acciones del animal: registrar evento → cambiar caravana → dar de baja
     .getByRole('row', { name: new RegExp(caravanaA) })
     .getByRole('link')
     .click()
-  await expect(page.getByRole('heading', { name: caravanaA, level: 1 })).toBeVisible()
+  await expect(page.getByText(caravanaA, { exact: true })).toBeVisible()
 
-  // Registrar evento (sanidad)
-  await page.getByRole('button', { name: 'Registrar evento' }).click()
+  // Anotarle algo (sanidad)
+  await page.getByRole('button', { name: 'Anotarle algo' }).click()
   const evento = page.getByRole('dialog', { name: 'Registrar evento' })
   await elegir(page, 'Tipo de evento', 'Sanidad')
   await evento.getByRole('button', { name: 'Registrar', exact: true }).click()
@@ -63,7 +64,7 @@ test('acciones del animal: registrar evento → cambiar caravana → dar de baja
   await cambio.getByLabel('Nueva caravana (RFID)').fill(caravanaB)
   await cambio.getByRole('button', { name: 'Confirmar cambio' }).click()
   await expect(cambio).toBeHidden()
-  await expect(page.getByRole('heading', { name: caravanaB, level: 1 })).toBeVisible()
+  await expect(page.getByText(caravanaB, { exact: true })).toBeVisible()
 
   // Dar de baja
   await page.getByRole('button', { name: 'Dar de baja' }).click()
@@ -71,5 +72,5 @@ test('acciones del animal: registrar evento → cambiar caravana → dar de baja
   await elegir(page, 'Motivo de baja', /vend/i)
   await baja.getByRole('button', { name: 'Confirmar baja' }).click()
   await expect(baja).toBeHidden()
-  await expect(page.getByText('Activo', { exact: true })).toBeHidden()
+  await expect(page.getByText('Vendido', { exact: true })).toBeVisible()
 })

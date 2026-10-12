@@ -64,9 +64,11 @@ function AccionDialog({
 export function RegistrarEventoDialog({
   animalId,
   empresaId,
+  trigger,
 }: {
   animalId: string
   empresaId: string
+  trigger?: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [tipo, setTipo] = useState<TipoEventoManual | ''>('')
@@ -139,7 +141,7 @@ export function RegistrarEventoDialog({
       open={open}
       setOpen={setOpen}
       titulo="Registrar evento"
-      trigger={<Button variant="outline" size="sm">Registrar evento</Button>}
+      trigger={trigger ?? <Button variant="outline" size="sm">Registrar evento</Button>}
     >
       <form onSubmit={onSubmit} className="grid gap-4">
         <div className="grid gap-2">
@@ -248,7 +250,7 @@ export function RegistrarEventoDialog({
 }
 
 // --- Cambiar caravana -------------------------------------------------
-export function CambiarCaravanaDialog({ animalId }: { animalId: string }) {
+export function CambiarCaravanaDialog({ animalId, trigger }: { animalId: string; trigger?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [nuevoRfid, setNuevoRfid] = useState('')
   const [nuevaVisual, setNuevaVisual] = useState('')
@@ -280,7 +282,7 @@ export function CambiarCaravanaDialog({ animalId }: { animalId: string }) {
       open={open}
       setOpen={setOpen}
       titulo="Cambiar caravana"
-      trigger={<Button variant="outline" size="sm">Cambiar caravana</Button>}
+      trigger={trigger ?? <Button variant="outline" size="sm">Cambiar caravana</Button>}
     >
       <form onSubmit={onSubmit} className="grid gap-4">
         <p className="text-sm text-muted-foreground">

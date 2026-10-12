@@ -36,8 +36,8 @@ const AnimalesPage = lazy(() =>
   })),
 )
 const FichaAnimalPage = lazy(() =>
-  import('@/features/hacienda/ficha-animal-page').then((m) => ({
-    default: m.FichaAnimalPage,
+  import('@/features/hacienda/tropero/ficha-page').then((m) => ({
+    default: m.FichaPage,
   })),
 )
 const LotesPage = lazy(() =>
