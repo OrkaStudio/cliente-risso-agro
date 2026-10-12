@@ -158,17 +158,23 @@ export function resumirRodeo(filas: FilaRodeo[], campos: { id: string; nombre: s
  * por campo es de la especie que se mira (cuadra con el número grande); las
  * otras especies, de todo el rodeo.
  */
-export function bajadaDelRodeo(deEspecie: ResumenRodeo, todo: ResumenRodeo, especie: Especie, unCampo: boolean): string {
+export function bajadaDelRodeo(deEspecie: ResumenRodeo, todo: ResumenRodeo, especie: Especie | 'todas', unCampo: boolean): string {
   const partes: string[] = []
   if (!unCampo && deEspecie.porCampo.length > 1) {
     const xs = deEspecie.porCampo.map((c) => `${c.cabezas} en ${c.nombre}`)
     partes.push(`${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}.`)
   }
-  const otras = (['bovino', 'ovino', 'equino'] as Especie[]).filter((e) => e !== especie && todo.porEspecie[e] > 0)
   const nombre: Record<Especie, [string, string]> = { bovino: ['vacuno', 'vacunos'], ovino: ['ovino', 'ovinos'], equino: ['equino', 'equinos'] }
-  if (otras.length) {
-    const xs = otras.map((e) => `${todo.porEspecie[e]} ${nombre[e][todo.porEspecie[e] === 1 ? 0 : 1]}`)
-    partes.push(`Más ${xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : xs[0]}.`)
+  const lista = (es: Especie[]) => {
+    const xs = es.map((e) => `${todo.porEspecie[e]} ${nombre[e][todo.porEspecie[e] === 1 ? 0 : 1]}`)
+    return xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : (xs[0] ?? '')
+  }
+  const hay = (['bovino', 'ovino', 'equino'] as Especie[]).filter((e) => todo.porEspecie[e] > 0)
+  if (especie === 'todas') {
+    if (hay.length > 1) partes.push(`Son ${lista(hay)}.`)
+  } else {
+    const otras = hay.filter((e) => e !== especie)
+    if (otras.length) partes.push(`Más ${lista(otras)}.`)
   }
   return partes.join(' ')
 }

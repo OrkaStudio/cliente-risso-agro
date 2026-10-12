@@ -45,10 +45,23 @@ const ICONO_QUE: Record<string, NombreIcono> = {
  * sin leer caravanas: qué pasó → de qué potrero y cuántos, sobre el croquis →
  * revisá (antes y después) → listo, con lo que queda por hacer.
  */
-export function EntradasSalidas({ modo, empresaId, abierto, onCerrar }: { modo: 'entraron' | 'salieron'; empresaId: string; abierto: boolean; onCerrar: () => void }) {
+export function EntradasSalidas({
+  modo,
+  empresaId,
+  abierto,
+  onCerrar,
+  onUnoConCaravana,
+}: {
+  modo: 'entraron' | 'salieron'
+  empresaId: string
+  abierto: boolean
+  onCerrar: () => void
+  /** Entraron · «Uno solo, con su caravana»: abre el alta de a uno. */
+  onUnoConCaravana?: () => void
+}) {
   const { data: mapa } = useMapa(empresaId)
   const animales = useAnimales()
-  const { elegido } = useCampoElegido()
+  const { elegido, campos: identidad } = useCampoElegido()
   const salida = useSalidaPorCantidad()
   const alta = useCrearAnimalesMasivo()
   const mover = useMoverAnimales()
@@ -107,11 +120,12 @@ export function EntradasSalidas({ modo, empresaId, abierto, onCerrar }: { modo: 
   function elegirQue(nuevo: Que) {
     setQ(nuevo)
     // De dónde salen: el campo que estás viendo; si viene de otro campo, otro que no sea ése.
-    const visto = elegido?.id ?? campos[0]?.id ?? null
-    const otro = campos.find((c) => c.id !== visto)?.id ?? null
+    // El campo que estás viendo; si mirás todos, se elige a la vista (no se adivina).
+    const visto = elegido?.id ?? null
     const traer = nuevo.modo === 'entraron' && nuevo.que === 'deOtroCampo'
-    setCampoId(traer ? otro : visto)
-    setDestCampoId(traer ? visto : nuevo.modo === 'salieron' && nuevo.que === 'otroCampo' ? otro : null)
+    const llevar = nuevo.modo === 'salieron' && nuevo.que === 'otroCampo'
+    setCampoId(traer ? null : (visto ?? campos[0]?.id ?? null))
+    setDestCampoId(traer ? visto : llevar ? null : null)
     setPaso('cuantos')
   }
 
@@ -166,7 +180,7 @@ export function EntradasSalidas({ modo, empresaId, abierto, onCerrar }: { modo: 
 
   const pie =
     paso === 'cuantos' ? (
-      <BotonPrincipal icono="Siguiente" disabled={!potreroId || total === 0} onClick={() => setPaso(mueve ? 'adonde' : 'revisa')}>
+      <BotonPrincipal icono="Siguiente" disabled={!potreroId || total === 0 || (!!mueve && !destCampoId)} onClick={() => setPaso(mueve ? 'adonde' : 'revisa')}>
         {total === 0 ? (potreroId ? 'Contá cuántos' : 'Tocá un potrero') : `Revisar: ${cuantosTexto(items)}`}
       </BotonPrincipal>
     ) : paso === 'adonde' ? (
@@ -184,7 +198,7 @@ export function EntradasSalidas({ modo, empresaId, abierto, onCerrar }: { modo: 
     ) : undefined
 
   return (
-    <PanelLateral abierto={abierto} onCerrar={cerrar} titulo={titulo} bajada={bajada} pie={pie}>
+    <PanelLateral abierto={abierto} onCerrar={cerrar} titulo={titulo} bajada={bajada} pie={pie} ancho={paso === 'cuantos' || paso === 'adonde'}>
       {paso !== 'que' && paso !== 'listo' && (
         <button
           type="button"
@@ -217,12 +231,40 @@ export function EntradasSalidas({ modo, empresaId, abierto, onCerrar }: { modo: 
                 </button>
               </li>
             ))}
+          {modo === 'entraron' && onUnoConCaravana && (
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  cerrar()
+                  onUnoConCaravana()
+                }}
+                className="flex w-full items-center gap-4 rounded-[18px] border-[1.5px] border-dashed border-borde px-5 py-4 text-left transition-colors hover:bg-superficie"
+              >
+                <span className="grid size-11 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto">
+                  <Icono nombre="Caravana" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-heading text-[18px] font-extrabold text-texto">Uno solo, con su caravana</span>
+                  <span className="block text-[14px] text-texto-suave">Un toro que compraste, por ejemplo: lo cargás con su número</span>
+                </span>
+                <Icono nombre="Siguiente" tamano={16} />
+              </button>
+            </li>
+          )}
         </ul>
       )}
 
       {paso === 'cuantos' && q && (
         <>
-          <ElegirCampo campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}))} excepto={q.modo === 'entraron' && q.que === 'deOtroCampo' ? destCampoId : null} />
+          {mueve ? (
+            <div className="mb-4 grid gap-3 rounded-[18px] bg-superficie p-4">
+              <ElegirCampo titulo="Vienen de" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}), id === destCampoId && setDestCampoId(null))} />
+              <ElegirCampo titulo="Llegan a" identidad={identidad} campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
+            </div>
+          ) : (
+            <ElegirCampo titulo="Campo" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}))} />
+          )}
           {campo && (
             <Potreros
               campo={campo}
@@ -246,7 +288,7 @@ export function EntradasSalidas({ modo, empresaId, abierto, onCerrar }: { modo: 
 
       {paso === 'adonde' && (
         <>
-          <ElegirCampo campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
+          <Recorrido identidad={identidad} de={campoId} a={destCampoId} />
           {destCampo && <Potreros campo={destCampo} elegido={destinoId} onElegir={setDestinoId} />}
         </>
       )}
@@ -347,18 +389,47 @@ function Potreros(props: React.ComponentProps<typeof CroquisElegir>) {
   )
 }
 
-function ElegirCampo({ campos, valor, onCambio, excepto }: { campos: CampoMapa[]; valor: string | null; onCambio: (id: string) => void; excepto?: string | null }) {
+type Identidad = { id: string; nombre: string; letra: string; color: string }
+
+function Letra({ c }: { c: Identidad | undefined }) {
+  if (!c) return null
+  return (
+    <span className="grid size-[22px] shrink-0 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: c.color }}>
+      {c.letra}
+    </span>
+  )
+}
+
+/** Qué campo: con su letra y su color, los mismos de la barra lateral. */
+function ElegirCampo({
+  titulo,
+  identidad,
+  campos,
+  valor,
+  onCambio,
+  excepto,
+}: {
+  titulo: string
+  identidad: Identidad[]
+  campos: CampoMapa[]
+  valor: string | null
+  onCambio: (id: string) => void
+  excepto?: string | null
+}) {
   const opciones = campos.filter((c) => c.id !== excepto)
-  if (opciones.length <= 1) return null
+  const de = (id: string) => identidad.find((i) => i.id === id)
   if (opciones.length > 4)
     return (
-      <label className="mb-3 flex flex-col gap-1.5">
-        <span className="text-[14px] font-semibold text-texto-suave">Campo</span>
+      <label className="mb-3 flex items-center gap-3">
+        <span className="w-[92px] shrink-0 text-[14px] font-semibold text-texto-suave">{titulo}</span>
+        <Letra c={valor ? de(valor) : undefined} />
         <select
+          aria-label="Campo"
           value={valor ?? ''}
           onChange={(e) => onCambio(e.target.value)}
-          className="h-11 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[15px] font-semibold text-texto"
+          className="h-11 min-w-0 flex-1 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[15px] font-semibold text-texto"
         >
+          {!valor && <option value="">Elegí el campo</option>}
           {opciones.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}
@@ -368,9 +439,41 @@ function ElegirCampo({ campos, valor, onCambio, excepto }: { campos: CampoMapa[]
       </label>
     )
   return (
-    <div className="mb-3">
-      <Segmentos etiqueta="Campo" opciones={opciones.map((c) => ({ valor: c.id, texto: c.nombre }))} valor={valor} onCambio={onCambio} />
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <span className="w-[92px] shrink-0 text-[14px] font-semibold text-texto-suave">{titulo}</span>
+      <div role="radiogroup" aria-label={titulo} className="flex flex-wrap gap-1.5">
+        {opciones.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="radio"
+            aria-checked={valor === c.id}
+            onClick={() => onCambio(c.id)}
+            className={cn(
+              'inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] px-3 text-[14.5px] font-bold transition-colors',
+              valor === c.id ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
+            )}
+          >
+            <Letra c={de(c.id)} />
+            {c.nombre}
+          </button>
+        ))}
+      </div>
     </div>
+  )
+}
+
+/** «De B La Loma → a C El Bajo»: el movimiento entre campos, siempre a la vista. */
+function Recorrido({ identidad, de, a }: { identidad: Identidad[]; de: string | null; a: string | null }) {
+  const c = (id: string | null) => identidad.find((i) => i.id === id)
+  return (
+    <p className="mb-4 flex flex-wrap items-center gap-2 rounded-[18px] bg-superficie px-4 py-3 text-[15px] font-semibold text-texto">
+      <span className="text-texto-suave">De</span>
+      <Letra c={c(de)} /> {c(de)?.nombre}
+      <Icono nombre="Siguiente" tamano={16} />
+      <span className="text-texto-suave">a</span>
+      <Letra c={c(a)} /> {c(a)?.nombre ?? 'elegí el campo'}
+    </p>
   )
 }
 

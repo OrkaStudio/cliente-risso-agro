@@ -68,7 +68,14 @@ export function leerPlanilla(
   yaPuestas: { visual: Set<string>; rfid: Set<string> },
 ): Lectura {
   const vacia: Lectura = { filas: 0, completas: [], sinElectronica: [], paraCorregir: [], faltan: [] }
-  const inicio = filas.findIndex((f) => f.some((c) => texto(c)))
+  // La fila de títulos: la primera que nombra la categoría y alguna caravana
+  // (la planilla puede traer un título o una explicación arriba).
+  const esTitulo = (f: Celda[]) => {
+    const hs = f.map((c) => sinTildes(texto(c)))
+    return hs.some((h) => /categ/.test(h)) && hs.some((h) => /visible|visual|caravana|electr|rfid|chip|nro|numero/.test(h))
+  }
+  let inicio = filas.findIndex(esTitulo)
+  if (inicio < 0) inicio = filas.findIndex((f) => f.some((c) => texto(c)))
   if (inicio < 0) return { ...vacia, faltan: ['Caravana visible', 'Categoría'] }
   const encabezado = filas[inicio]!.map((c) => sinTildes(texto(c)))
   const col: Partial<Record<string, number>> = {}

@@ -10,7 +10,8 @@ import { categoriaNombre } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import { CaravanasQueSalieron, ZonaArchivo, type Conocida } from './caravanas'
 import { leerArchivo } from './leer-archivo'
-import { leerPlanilla, PLANILLA_EJEMPLO, soloDigitos, type Lectura } from './planilla'
+import { leerPlanilla, soloDigitos, type Lectura } from './planilla'
+import { bajarPlanillaEjemplo } from './planilla-ejemplo'
 
 const ddmm = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '')
 
@@ -150,14 +151,7 @@ export function CaravanasPorExcel({ empresaId, abierto, onCerrar }: { empresaId:
     }
   }
 
-  const bajarEjemplo = () => {
-    const url = URL.createObjectURL(new Blob(['﻿' + PLANILLA_EJEMPLO], { type: 'text/csv;charset=utf-8' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'caravanas-ejemplo.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  const bajarEjemplo = () => void bajarPlanillaEjemplo(todos.filter((p) => !campoId || p.campo_id === campoId).map((p) => p.nombre))
 
   const titulo = hecho ? `Listo: ${hecho.asignadas} ${hecho.asignadas === 1 ? 'caravana puesta' : 'caravanas puestas'}` : lectura && !lectura.faltan.length ? `Leímos ${lectura.filas} ${lectura.filas === 1 ? 'fila' : 'filas'}` : 'Las caravanas, desde un Excel'
   const pie = hecho ? (
@@ -224,8 +218,8 @@ export function CaravanasPorExcel({ empresaId, abierto, onCerrar }: { empresaId:
               ))}
             </dl>
           </Grupo>
-          <button type="button" onClick={bajarEjemplo} className="mt-4 inline-flex h-9 items-center rounded-full border-[1.5px] border-principal px-3.5 text-[14px] font-bold text-principal hover:bg-principal-suave">
-            Bajar una planilla de ejemplo
+          <button type="button" onClick={bajarEjemplo} className="mt-4 inline-flex h-9 items-center gap-2 rounded-full border-[1.5px] border-principal px-3.5 text-[14px] font-bold text-principal hover:bg-principal-suave">
+            <Icono nombre="Descargar" tamano={16} /> Bajar la planilla de ejemplo (Excel)
           </button>
           {campos.length > 1 && (
             <Grupo titulo="Si falta el potrero, ¿a qué campo van?" className="mt-6">

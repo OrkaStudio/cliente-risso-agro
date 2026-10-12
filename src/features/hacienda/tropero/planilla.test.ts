@@ -38,6 +38,10 @@ describe('la planilla de caravanas', () => {
     ])
     expect(l.sinElectronica.map((f) => f.visual)).toEqual(['2218'])
   })
+  it('encuentra los títulos aunque arriba haya un título o una explicación', () => {
+    const l = leerPlanilla([['Planilla de caravanas'], ['Una fila por animal'], [], ['Caravana visible', 'Categoría', 'Potrero'], ['1161', 'Ternero', '11B']], potreros, nada)
+    expect(l.sinElectronica.map((f) => [f.visual, f.fila])).toEqual([['1161', 5]])
+  })
   it('avisa si faltan las columnas que hacen falta', () => {
     expect(leerPlanilla([['Nombre', 'Peso'], ['x', '200']], potreros, nada).faltan).toEqual(['Caravana visible', 'Categoría'])
   })

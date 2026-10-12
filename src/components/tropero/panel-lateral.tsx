@@ -16,7 +16,10 @@ export function PanelLateral({
   pie,
   children,
   className,
+  ancho = false,
 }: {
+  /** Más ancho, para cuando adentro hay un croquis. */
+  ancho?: boolean
   abierto: boolean
   onCerrar: () => void
   titulo: React.ReactNode
@@ -32,7 +35,9 @@ export function PanelLateral({
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-tinta/40 duration-200 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0" />
         <DialogPrimitive.Popup
           className={cn(
-            'fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full max-w-[520px] flex-col rounded-l-[28px] bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
+            'fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full flex-col transition-[max-width] duration-300',
+            ancho ? 'max-w-[680px]' : 'max-w-[520px]',
+            ' rounded-l-[28px] bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
             className,
           )}
         >

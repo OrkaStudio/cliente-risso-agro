@@ -49,12 +49,19 @@ export function CroquisElegir({
     const puntos = [...(campo.contorno ?? []), ...campo.potreros.flatMap((p) => p.poligono ?? [])]
     if (puntos.length) map.fitBounds(L.latLngBounds(puntos), { padding: [18, 18] })
     else if (campo.lat != null && campo.lon != null) map.setView([campo.lat, campo.lon], 14)
+    // Si el contenedor cambia de tamaño (el panel se ensancha), reencuadrar.
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize()
+      if (puntos.length) map.fitBounds(L.latLngBounds(puntos), { padding: [18, 18] })
+    })
+    ro.observe(host.current)
     // El panel entra animado: recalcular el tamaño cuando termina.
     const t = window.setTimeout(() => {
       map.invalidateSize()
       if (puntos.length) map.fitBounds(L.latLngBounds(puntos), { padding: [18, 18] })
     }, 350)
     return () => {
+      ro.disconnect()
       window.clearTimeout(t)
       quitar()
       map.remove()
@@ -90,5 +97,5 @@ export function CroquisElegir({
     }
   }, [campo, elegido, dato, apagado])
 
-  return <div ref={host} className={cn('h-[220px] overflow-hidden rounded-[20px] bg-tinta', className)} role="group" aria-label={`Croquis de ${campo.nombre}`} />
+  return <div ref={host} className={cn('h-[360px] overflow-hidden rounded-[20px] bg-tinta', className)} role="group" aria-label={`Croquis de ${campo.nombre}`} />
 }

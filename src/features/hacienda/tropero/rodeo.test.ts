@@ -51,6 +51,7 @@ describe('el rodeo', () => {
     const vacunos = resumirRodeo(filas.filter((f) => f.especie === 'bovino'), campos)
     expect(bajadaDelRodeo(vacunos, r, 'bovino', false)).toBe('5 en La Porteña y 1 en Los Pampas. Más 1 ovino.')
     expect(bajadaDelRodeo(vacunos, r, 'bovino', true)).toBe('Más 1 ovino.')
+    expect(bajadaDelRodeo(r, r, 'todas', false)).toBe('6 en La Porteña y 1 en Los Pampas. Son 6 vacunos y 1 ovino.')
   })
   it('la edad en meses hasta los dos años, después en años', () => {
     expect(edadTexto('2026-09-01', hoy)).toBe('1 mes')

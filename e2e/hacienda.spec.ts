@@ -6,7 +6,8 @@ const rfid = (sufijo = '') => `E2E${Date.now()}${sufijo}`
 
 async function darDeAlta(page: Page, caravana: string) {
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
-  await page.getByRole('button', { name: 'Uno, con su caravana' }).click()
+  await page.getByRole('button', { name: 'Entraron', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: /Uno solo, con su caravana/ }).click()
   const alta = page.getByRole('dialog', { name: 'Un animal nuevo' })
   await alta.getByLabel('Caravana electrónica').fill(caravana)
   await alta.getByRole('button', { name: 'Vaca', exact: true }).click()
@@ -105,7 +106,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await page.getByRole('button', { name: 'Salieron', exact: true }).click()
   const panel = page.getByRole('dialog')
   await panel.getByRole('button', { name: /Los vendí/ }).click()
-  await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
+  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
@@ -118,7 +119,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   // Entraron · Nacieron: dos terneros en el 1A, sin caravana.
   await page.getByRole('button', { name: 'Entraron', exact: true }).click()
   await panel.getByRole('button', { name: /Nacieron/ }).click()
-  await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
+  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Terneros' }).click()
   await panel.getByRole('button', { name: 'Uno más: Terneros' }).click()
@@ -126,7 +127,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: 'Sumar 2 terneros' }).click()
   await expect(panel.getByRole('heading', { name: 'Sumamos 2 terneros nacidos' })).toBeVisible()
   await panel.getByRole('button', { name: 'Listo' }).click()
-  await page.getByRole('button', { name: /sin caravana/ }).click()
+  await page.getByRole('tab', { name: /Sin caravana/ }).click()
   await expect(page.getByRole('row', { name: /Ternero/ }).first()).toBeVisible()
 })
 
@@ -138,7 +139,7 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   // Una venta por cantidad deja una vaca pendiente de identificar.
   await page.getByRole('button', { name: 'Salieron', exact: true }).click()
   await panel.getByRole('button', { name: /Los vendí/ }).click()
-  await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
+  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
@@ -149,7 +150,7 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await page.getByPlaceholder('Buscá una caravana').fill('E2E')
   const caravana = (await page.getByRole('row', { name: /Vaca/ }).first().getByRole('link').locator('span').first().textContent())!.trim()
   await page.getByPlaceholder('Buscá una caravana').fill('')
-  await page.getByRole('button', { name: /sin identificar/ }).click()
+  await page.getByRole('button', { name: 'Decir cuáles' }).click()
   await panel.getByLabel('Caravana que salió').fill(caravana)
   await panel.getByRole('button', { name: 'Sumar' }).click()
   await panel.getByRole('button', { name: /^Identificar 1/ }).click()
