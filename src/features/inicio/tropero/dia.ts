@@ -1,6 +1,6 @@
 import type { NombreIcono } from '@/components/tropero/icono'
-import type { CampoSinRecorrer, PotreroAtencion, TipoSenal } from '../para-atender-api'
-import type { CategoriaConteo, Vencimiento } from '../api'
+import type { CampoSinRecorrer, ParaAtenderData, PotreroAtencion, TipoSenal } from '../para-atender-api'
+import type { CategoriaConteo, PanoramaInicio, Vencimiento } from '../api'
 import { estadoDe, type CampoMapa } from '@/features/mapa/reglas'
 
 // El Inicio de Tropero (página 35, «Inicio · El día»): qué se dice arriba, qué
@@ -289,4 +289,41 @@ const sumarDias = (ymd: string, n: number) => {
   const [a, m, d] = ymd.split('-').map(Number)
   const f = new Date(a!, m! - 1, d! + n)
   return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+}
+
+/** Lo que el Inicio muestra de UN campo o de todos (`campoId` null). */
+export type VistaDelInicio = {
+  totalCabezas: number
+  porCategoria: CategoriaConteo[]
+  vencimientos: Vencimiento[]
+  potreros: PotreroAtencion[]
+  sinRecorrer: CampoSinRecorrer[]
+  nacimientos: number
+  ultimaRecorridaHace: number | null
+}
+
+/**
+ * Recorta el Inicio al campo elegido: la hacienda (por los potreros del campo),
+ * lo que hay que atender, la plata que se cargó a ese campo y su última
+ * recorrida. Con `null` es la empresa entera, tal cual llega.
+ */
+export function delCampo(campoId: string | null, p: Pick<PanoramaInicio, 'totalCabezas' | 'porCategoria' | 'potreros' | 'vencimientos'>, a: ParaAtenderData | undefined): VistaDelInicio {
+  const nac = (a?.nacimientos ?? []).filter((n) => campoId === null || n.campoId === campoId)
+  const base = {
+    potreros: (a?.potreros ?? []).filter((x) => campoId === null || x.campoId === campoId),
+    sinRecorrer: (a?.sinRecorrer ?? []).filter((x) => campoId === null || x.campoId === campoId),
+    nacimientos: nac.reduce((s, n) => s + n.total, 0),
+  }
+  if (campoId === null)
+    return { ...base, totalCabezas: p.totalCabezas, porCategoria: p.porCategoria, vencimientos: p.vencimientos, ultimaRecorridaHace: a?.ultimaRecorridaHace ?? null }
+  const cats = new Map<CategoriaConteo['categoria'], number>()
+  for (const pot of p.potreros) if (pot.campoId === campoId) for (const c of pot.porCategoria) cats.set(c.categoria, (cats.get(c.categoria) ?? 0) + c.cabezas)
+  const porCategoria = [...cats].map(([categoria, cabezas]) => ({ categoria, cabezas })).sort((x, y) => y.cabezas - x.cabezas)
+  return {
+    ...base,
+    totalCabezas: porCategoria.reduce((s, c) => s + c.cabezas, 0),
+    porCategoria,
+    vencimientos: p.vencimientos.filter((v) => v.campoId === campoId),
+    ultimaRecorridaHace: a?.ultimaPorCampo[campoId] ?? null,
+  }
 }

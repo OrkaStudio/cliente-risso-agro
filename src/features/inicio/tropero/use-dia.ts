@@ -15,12 +15,14 @@ import { cosasParaHoy, inicioDeCampania, lluviaDelMes } from './dia'
 export const useLluviaDelMes = (ubicacion: { lat: number; lon: number } | null) =>
   useTiempo(ubicacion, (t) => lluviaDelMes(t.pasado, hoyEnArgentina()))
 
-/** Lo que entró menos lo que salió desde el 1 de julio (la campaña). */
-export const useGanadoCampania = () =>
+/** Lo que entró menos lo que salió desde el 1 de julio (la campaña), de un campo o de todos. */
+export const useGanadoCampania = (campoId: string | null = null) =>
   useQuery({
-    queryKey: ['inicio', 'ganado-campania'],
+    queryKey: ['inicio', 'ganado-campania', campoId],
     queryFn: async (): Promise<number> => {
-      const { data, error } = await supabase.from('v_flujo_caja').select('neto').gte('mes', inicioDeCampania(new Date()))
+      let q = supabase.from('v_flujo_caja').select('neto').gte('mes', inicioDeCampania(new Date()))
+      if (campoId) q = q.eq('campo_id', campoId)
+      const { data, error } = await q
       if (error) throw new Error(error.message)
       return (data ?? []).reduce((s, f) => s + (f.neto ?? 0), 0)
     },

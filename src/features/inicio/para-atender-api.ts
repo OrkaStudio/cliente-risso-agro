@@ -94,6 +94,7 @@ export type PotreroAtencion = {
   /** "3B" */
   potrero: string
   campo: string
+  campoId: string
   /** Cabezas en el potrero (0 = vacío, no se muestra). */
   cabezas: number
   /** Ordenados por urgencia: el primero manda ícono, color y posición. */
@@ -108,6 +109,7 @@ export type PotreroAtencion = {
 export type CampoSinRecorrer = {
   key: string
   campo: string
+  campoId: string
   cabezas: number
   /** null = nunca se recorrió. */
   hace: number | null
@@ -119,6 +121,7 @@ export type Nacimientos = {
   key: string
   potrero: string
   campo: string
+  campoId: string
   total: number
   /** "2 terneros y 1 ternera" */
   detalle: string
@@ -138,6 +141,8 @@ export type ParaAtenderData = {
   nacimientos: Nacimientos[]
   /** Días desde la última recorrida de la empresa (null = nunca hubo). */
   ultimaRecorridaHace: number | null
+  /** Días desde la última recorrida de cada campo (por id); sin entrada = nunca. */
+  ultimaPorCampo: Record<string, number>
 }
 
 export const peso: Record<Nivel, number> = { atender: 0, prevenir: 1, nota: 2 }
@@ -299,6 +304,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
       observacionId: o.id,
       potrero: p.nombre,
       campo: p.campoNombre,
+      campoId: p.campoId,
       cabezas,
       avisos,
       nivel: avisos.reduce<Nivel>((peor, a) => (peso[a.nivel] < peso[peor] ? a.nivel : peor), 'nota'),
@@ -342,6 +348,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
       key: `${g.potreroId}-nac-${g.fecha}`,
       potrero: p.nombre,
       campo: p.campoNombre,
+      campoId: p.campoId,
       total: [...g.cats.values()].reduce((a, b) => a + b, 0),
       detalle: [...g.cats.entries()]
         .map(([cat, n]) => `${n} ${categoriaNombre(cat as never, n).toLocaleLowerCase('es')}`)
@@ -375,6 +382,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
     sinRecorrer.push({
       key: `${campoId}-rec`,
       campo: c.nombre,
+      campoId,
       cabezas: c.cabezas,
       hace,
       to: '/campos',
@@ -389,6 +397,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
     sinRecorrer,
     nacimientos,
     ultimaRecorridaHace: fechas.length ? diasDesde(fechas[0]) : null,
+    ultimaPorCampo: Object.fromEntries([...ultimaPorCampo].map(([id, f]) => [id, diasDesde(f)])),
   }
 }
 

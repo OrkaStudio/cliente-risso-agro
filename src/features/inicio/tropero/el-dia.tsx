@@ -4,43 +4,42 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
 import { BotonChico } from '@/components/tropero/boton'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
-import { CargarDialog } from '@/features/analitica/cargar-dialog'
 import lotes from '@/assets/tropero/lotes-del-campo.webp'
 import { useAuth } from '@/features/auth/auth-context'
-import { useCampoClima } from '@/features/cotizaciones/campo-clima'
+import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
-import { useMapa } from '@/features/mapa/api'
 import { cn } from '@/lib/utils'
 import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender } from '../para-atender-api'
-import { escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { delCampo, escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { useCampoDelInicio, type CampoElegible } from './campo-del-inicio'
 import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluviaDelMes } from './use-dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
-const TARJETA = 'rounded-[20px] border border-borde bg-superficie p-6'
+const TARJETA = 'rounded-[20px] border border-borde bg-superficie px-6 py-5'
 /**
  * La escala del Inicio: todos los paneles usan estos tamaños, así un ajuste se
  * hace una vez y no panel por panel.
  */
 const T = {
   /** Título de cada panel. */
-  titulo: 'font-heading text-[22px] font-extrabold text-texto',
+  titulo: 'font-heading text-[19px] font-extrabold text-texto',
   /** La línea de «para qué sirve» debajo del título. */
-  bajada: 'text-[15px] text-texto-suave',
+  bajada: 'text-[14px] text-texto-suave',
   /** Nombres, filas y etiquetas dentro de un gráfico. */
-  texto: 'text-[16px] text-texto',
+  texto: 'text-[15px] text-texto',
   /** Fechas, aclaraciones y ejes. */
-  chico: 'text-[14px] text-texto-suave',
+  chico: 'text-[13px] text-texto-suave',
   /** Un número destacado dentro de un panel. */
   numero: 'titulo-display leading-none tracking-[-0.02em]',
   /** Un número de fila (pronóstico, montos de una lista). */
-  numeroChico: 'cifra text-[24px] leading-none font-bold',
+  numeroChico: 'cifra text-[20px] leading-none font-bold',
 } as const
 
 /**
@@ -55,30 +54,32 @@ export function ElDia() {
   const { data: membresia } = useEmpresa()
   const panorama = usePanoramaInicio()
   const atender = useParaAtender()
-  const { data: campos } = useMapa(membresia?.empresa_id)
-  const { actual } = useCampoClima()
-  const pronostico = usePronostico(actual?.ubicacion ?? null)
-  const lluvia = useLluviaDelMes(actual?.ubicacion ?? null)
-  const ganado = useGanadoCampania()
+  const inicio = useCampoDelInicio()
+  const campoId = inicio.elegido?.id ?? null
+  // El clima del campo elegido; con todos, el que se eligió para el clima.
+  const { actual, opciones } = useCampoClima()
+  const lugar = (campoId ? opciones.find((o) => o.id === campoId) : null) ?? actual
+  const pronostico = usePronostico(lugar?.ubicacion ?? null)
+  const lluvia = useLluviaDelMes(lugar?.ubicacion ?? null)
+  const ganado = useGanadoCampania(campoId)
   const reducir = useReducedMotion()
 
   if (panorama.isLoading || atender.isLoading) return <div className="h-[132px] animate-pulse rounded-[22px] bg-superficie-hundida" aria-busy />
   if (panorama.error || !panorama.data) return <p className="text-texto-suave">No pudimos cargar el Inicio. Revisá la conexión y probá de nuevo.</p>
 
-  const p = panorama.data
-  const a = atender.data
-  const cosas = cosasParaHoy(a?.potreros ?? [], p.vencimientos, a?.sinRecorrer ?? [])
+  const v = delCampo(campoId, panorama.data, atender.data)
+  const cosas = cosasParaHoy(v.potreros, v.vencimientos, v.sinRecorrer)
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const manana = pronostico.data?.[1]
-  const chips = chipsDelDia({ cosas, vencimientos: p.vencimientos, lluviaManana: manana ? manana.lluviaProb : null })
+  const chips = chipsDelDia({ cosas, vencimientos: v.vencimientos, lluviaManana: manana ? manana.lluviaProb : null })
   const entra = (i: number) =>
     reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-5">
       <motion.div {...entra(0)}>
-        <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} empresaId={membresia?.empresa_id ?? ''} />
+        <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} campos={inicio.campos} elegido={inicio.elegido} elegir={inicio.elegir} />
       </motion.div>
 
       {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
@@ -86,29 +87,29 @@ export function ElDia() {
         {...entra(1)}
         className="grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-4 [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l"
       >
-        <PulsoHacienda total={p.totalCabezas} campos={campos?.length ?? 0} cats={p.porCategoria} nacimientos={(a?.nacimientos ?? []).reduce((s, n) => s + n.total, 0)} />
-        <PulsoPlata vencimientos={p.vencimientos} ganado={ganado.data ?? null} />
-        <PulsoLluvia lugar={actual?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
-        <PulsoRecorrida ultima={a?.ultimaRecorridaHace ?? null} potreros={a?.potreros.length ?? 0} sinRecorrer={a?.sinRecorrer ?? []} />
+        <PulsoHacienda total={v.totalCabezas} campos={campoId ? 1 : inicio.campos.length} cats={v.porCategoria} nacimientos={v.nacimientos} />
+        <PulsoPlata vencimientos={v.vencimientos} ganado={ganado.data ?? null} />
+        <PulsoLluvia lugar={lugar?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
+        <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} />
       </motion.div>
 
-      <motion.div {...entra(2)} className="mt-3">
+      <motion.div {...entra(2)}>
         <ParaAtenderHoy cosas={cosas} empresaId={membresia?.empresa_id ?? ''} />
       </motion.div>
 
       {/* El campo hoy: el rodeo y el clima en un solo panel, divididos por una línea. */}
       <motion.div
         {...entra(3)}
-        className="mt-3 grid overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,1fr)_400px]"
+        className="grid overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,1fr)_360px]"
       >
-        <EstructuraDelRodeo cats={p.porCategoria} total={p.totalCabezas} />
+        <EstructuraDelRodeo cats={v.porCategoria} total={v.totalCabezas} campo={inicio.elegido?.nombre ?? null} />
         <div className="border-borde max-lg:border-t lg:border-l">
-          <Clima />
+          <Clima lugar={lugar} />
         </div>
       </motion.div>
 
       <motion.div {...entra(4)}>
-        <LaPlata vencimientos={p.vencimientos} />
+        <LaPlata vencimientos={v.vencimientos} />
       </motion.div>
     </div>
   )
@@ -140,25 +141,34 @@ const PUNTO: Record<Chip['tono'], string> = {
   bien: 'bg-estado-bien',
 }
 
-function Cabecera({ titulo, chips, empresaId }: { titulo: string; chips: Chip[]; empresaId: string }) {
+function Cabecera({
+  titulo,
+  chips,
+  campos,
+  elegido,
+  elegir,
+}: {
+  titulo: string
+  chips: Chip[]
+  campos: CampoElegible[]
+  elegido: CampoElegible | null
+  elegir: (id: string | null) => void
+}) {
   const ir = useIr()
-  const navigate = useNavigate()
-  const acceso =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-superficie px-4 text-[14.5px] font-bold text-texto shadow-[0_2px_10px_rgba(19,27,22,0.12)] transition-transform hover:-translate-y-px'
   return (
-    <section className="relative isolate flex min-h-[132px] items-center gap-6 overflow-hidden rounded-[22px] border border-borde bg-superficie px-8 py-6">
+    <section className="relative isolate flex min-h-[112px] flex-wrap items-center gap-x-6 gap-y-4 overflow-hidden rounded-[20px] border border-borde bg-superficie px-7 py-5">
       {/* La ilustración de la 31 («Lotes y sombra de nube»), a la derecha, fundida con el fondo. */}
       <img src={lotes} alt="" className="absolute inset-y-0 right-0 -z-20 h-full w-[62%] object-cover object-[50%_35%]" />
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,var(--superficie)_38%,color-mix(in_srgb,var(--superficie)_70%,transparent)_58%,transparent_85%)]" />
       <div className="min-w-0 flex-1">
-        <h1 className="font-heading text-[34px] leading-tight font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <h1 className="font-heading text-[28px] leading-tight font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
+        <div className="mt-2.5 flex flex-wrap gap-2">
           {chips.map((c) => (
             <button
               key={c.key}
               type="button"
               onClick={() => ir(c.destino)}
-              className={cn('inline-flex h-8 items-center gap-2 rounded-full px-3 text-[13.5px] font-bold transition-transform hover:-translate-y-px', CHIP[c.tono])}
+              className={cn('inline-flex h-7 items-center gap-2 rounded-full px-3 text-[13px] font-bold transition-transform hover:-translate-y-px', CHIP[c.tono])}
             >
               <span className={cn('size-2 rounded-full', PUNTO[c.tono])} />
               {c.texto}
@@ -166,29 +176,72 @@ function Cabecera({ titulo, chips, empresaId }: { titulo: string; chips: Chip[];
           ))}
         </div>
       </div>
-      <div className="hidden shrink-0 flex-wrap justify-end gap-2.5 md:flex">
-        <CargarDialog
-          empresaId={empresaId}
-          renderTrigger={(abrir) => (
-            <button type="button" onClick={abrir} disabled={!empresaId} className={acceso}>
-              <Icono nombre="Plata" tamano={16} /> Anotar un gasto
-            </button>
-          )}
-        />
-        <button type="button" onClick={() => navigate('/agenda')} className={acceso}>
-          <Icono nombre="Agenda" tamano={16} /> Agenda
-        </button>
-        <button type="button" onClick={() => navigate('/campo')} className={cn(acceso, 'bg-principal text-principal-texto')}>
-          <Icono nombre="Celular" tamano={16} /> Modo Campo
-        </button>
-      </div>
+      <QueCampo campos={campos} elegido={elegido} elegir={elegir} />
     </section>
+  )
+}
+
+/**
+ * Qué campo estás mirando: todo el Inicio (hacienda, avisos, plata, recorrida y
+ * clima) es de ese campo, o de todos juntos. Con un solo campo, sólo lo nombra.
+ */
+function QueCampo({ campos, elegido, elegir }: { campos: CampoElegible[]; elegido: CampoElegible | null; elegir: (id: string | null) => void }) {
+  if (campos.length === 0) return null
+  const letra = (c: CampoElegible) => (
+    <span className="grid size-[20px] shrink-0 place-items-center rounded-[6px] text-[10.5px] font-extrabold text-white" style={{ background: c.color }}>
+      {c.letra}
+    </span>
+  )
+  const opcion = (activo: boolean) =>
+    cn(
+      'inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-bold whitespace-nowrap transition-colors',
+      activo ? 'bg-tinta text-superficie' : 'text-texto hover:bg-superficie-hundida',
+    )
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <span className="rounded-full bg-superficie/90 px-2 text-[12.5px] font-semibold text-texto-suave">Estás viendo</span>
+      {campos.length === 1 ? (
+        <span className="inline-flex h-11 items-center gap-2 rounded-full bg-superficie px-4 text-[15px] font-bold text-texto shadow-[0_2px_10px_rgba(19,27,22,0.12)]">
+          {letra(campos[0]!)} {campos[0]!.nombre}
+        </span>
+      ) : campos.length <= 4 ? (
+        <div role="radiogroup" aria-label="Qué campo estás viendo" className="flex gap-1 rounded-full bg-superficie p-1 shadow-[0_2px_10px_rgba(19,27,22,0.12)]">
+          <button type="button" role="radio" aria-checked={!elegido} onClick={() => elegir(null)} className={opcion(!elegido)}>
+            Todos
+          </button>
+          {campos.map((c) => (
+            <button key={c.id} type="button" role="radio" aria-checked={elegido?.id === c.id} onClick={() => elegir(c.id)} className={opcion(elegido?.id === c.id)}>
+              {letra(c)} {c.nombre}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <label className="relative inline-flex h-11 items-center rounded-full bg-superficie shadow-[0_2px_10px_rgba(19,27,22,0.12)]">
+          <span className="sr-only">Qué campo estás viendo</span>
+          <select
+            value={elegido?.id ?? ''}
+            onChange={(e) => elegir(e.target.value || null)}
+            className="h-full appearance-none rounded-full bg-transparent pr-10 pl-4 text-[15px] font-bold text-texto"
+          >
+            <option value="">Todos tus campos</option>
+            {campos.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.letra} · {c.nombre}
+              </option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-3 rotate-90 text-texto-suave">
+            <Icono nombre="Siguiente" tamano={16} />
+          </span>
+        </label>
+      )}
+    </div>
   )
 }
 
 // ===== El pulso del campo: cuatro números, cada uno lleva a su lugar =====
 
-const NUMERO = 'titulo-display text-[40px] leading-none tracking-[-0.02em] text-texto'
+const NUMERO = 'titulo-display text-[32px] leading-none tracking-[-0.02em] text-texto'
 
 function Pulso({
   titulo,
@@ -205,8 +258,8 @@ function Pulso({
 }) {
   const ir = useIr()
   return (
-    <button type="button" onClick={() => ir(destino)} className="group flex min-h-[150px] flex-col p-6 text-left transition-colors hover:bg-superficie-hundida/50">
-      <span className="flex items-center gap-2 text-[14px] font-semibold text-texto-suave">
+    <button type="button" onClick={() => ir(destino)} className="group flex min-h-[128px] flex-col px-5 py-4 text-left transition-colors hover:bg-superficie-hundida/50">
+      <span className="flex items-center gap-2 text-[13.5px] font-semibold text-texto-suave">
         <Icono nombre={icono} tamano={16} />
         {titulo}
         <span className="ml-auto text-principal opacity-0 transition-opacity group-hover:opacity-100">
@@ -214,7 +267,7 @@ function Pulso({
         </span>
       </span>
       <span className="mt-3 flex-1">{children}</span>
-      <span className="mt-2 text-[13.5px] leading-snug text-texto-suave">{pie}</span>
+      <span className="mt-2 text-[13px] leading-snug text-texto-suave">{pie}</span>
     </button>
   )
 }
@@ -226,11 +279,11 @@ function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; ca
       titulo="Hacienda"
       icono="Vaca"
       destino="/hacienda"
-      pie={nacimientos > 0 ? <b className="text-estado-bien-texto">+{nacimientos} nacimientos sin caravana</b> : campos > 1 ? `En ${campos} campos` : 'Ver por potrero'}
+      pie={nacimientos > 0 ? <b className="text-estado-bien-texto">+{nacimientos} nacimientos sin caravana</b> : campos > 1 ? `En tus ${campos} campos` : 'Ver por potrero'}
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>{total.toLocaleString('es-AR')}</span>
-        <span className="text-[15px] font-semibold text-texto-suave">cabezas</span>
+        <span className="text-[14px] font-semibold text-texto-suave">cabezas</span>
       </span>
       {franjas.length > 0 && (
         <span className="mt-3 flex h-1.5 gap-1">
@@ -268,7 +321,7 @@ function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; gan
       <span className={cn(NUMERO, p30 > 0 ? 'text-estado-bien' : p30 < 0 ? 'text-estado-problema-texto' : 'text-texto')}>
         {p30 === 0 ? '$0' : plataCorta(p30, true)}
       </span>
-      <span className="mt-1 block truncate text-[13px] text-texto-suave">cobros menos pagos</span>
+      <span className="mt-1 block truncate text-[12.5px] text-texto-suave">cobros menos pagos</span>
     </Pulso>
   )
 }
@@ -285,9 +338,9 @@ function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number |
         <span className={NUMERO}>
           {mm === null ? '—' : `≈${mm}`}
         </span>
-        <span className="text-[15px] font-semibold text-texto-suave">mm</span>
+        <span className="text-[14px] font-semibold text-texto-suave">mm</span>
       </span>
-      <span className="mt-1 block truncate text-[13px] text-texto-suave">
+      <span className="mt-1 block truncate text-[12.5px] text-texto-suave">
         en 30 días, según el pronóstico
       </span>
     </Pulso>
@@ -314,9 +367,9 @@ function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | nu
         <span className={NUMERO}>{ultima === null ? 'Nunca' : ultima === 0 ? 'Hoy' : 'Ayer'}</span>
       ) : (
         <span className="flex items-baseline gap-2">
-          <span className="text-[15px] font-semibold text-texto-suave">hace</span>
+          <span className="text-[14px] font-semibold text-texto-suave">hace</span>
           <span className={NUMERO}>{ultima}</span>
-          <span className="text-[15px] font-semibold text-texto-suave">días</span>
+          <span className="text-[14px] font-semibold text-texto-suave">días</span>
         </span>
       )}
     </Pulso>
@@ -334,23 +387,26 @@ const TONO = {
 function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string }) {
   const [primera, ...resto] = cosas
   return (
-    <section id="para-atender" aria-labelledby="atender-hoy" className="scroll-mt-6">
-      <h2 id="atender-hoy" className={cn('mb-3', T.titulo)}>
-        Para atender hoy
-      </h2>
+    <section id="para-atender" aria-labelledby="atender-hoy" className="scroll-mt-6 overflow-hidden rounded-[20px] border border-borde bg-superficie">
+      <div className="flex items-baseline gap-3 border-b border-borde px-6 py-4">
+        <h2 id="atender-hoy" className={T.titulo}>
+          Para atender hoy
+        </h2>
+        {primera && <span className={T.bajada}>De lo más urgente a lo que puede esperar</span>}
+      </div>
       {!primera ? (
-        <div className="flex items-center gap-4 rounded-[20px] border border-estado-bien/30 bg-estado-bien-suave px-6 py-5">
-          <span className="grid size-12 place-items-center rounded-full bg-estado-bien text-superficie">
+        <div className="flex items-center gap-4 bg-estado-bien-suave px-6 py-5">
+          <span className="grid size-11 place-items-center rounded-full bg-estado-bien text-superficie">
             <Icono nombre="Guardar" />
           </span>
           <div>
-            <p className="font-heading text-[19px] font-extrabold text-estado-bien-texto">Todo en orden</p>
+            <p className="font-heading text-[17px] font-extrabold text-estado-bien-texto">Todo en orden</p>
             <p className="text-[14px] text-estado-bien-texto">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
           </div>
         </div>
       ) : (
-        // Un solo panel con jerarquía: lo primero en grande, lo demás en filas.
-        <div className={cn('overflow-hidden rounded-[20px] border border-borde bg-superficie', resto.length > 0 && 'lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
+        // Lo primero en grande, lo demás en filas.
+        <div className={cn(resto.length > 0 && 'lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
           <Destacada c={primera} empresaId={empresaId} />
           {resto.length > 0 && (
             <ul className="divide-y divide-borde border-borde max-lg:border-t lg:border-l">
@@ -370,26 +426,26 @@ function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
   const navigate = useNavigate()
   const t = TONO[c.tono]
   return (
-    <article className={cn('flex flex-col p-7', t.fondo)}>
+    <article className={cn('flex flex-col p-6', t.fondo)}>
       <div className="flex items-center gap-3">
-        <span className={cn('grid size-14 shrink-0 place-items-center rounded-[16px]', t.icono)}>
+        <span className={cn('grid size-12 shrink-0 place-items-center rounded-[14px]', t.icono)}>
           <Icono nombre={c.icono} />
         </span>
         <span className={cn('rounded-full px-3 py-1 text-[12.5px] font-bold', c.tono === 'problema' ? 'bg-estado-problema text-superficie' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
           Lo primero
         </span>
       </div>
-      <p className="mt-5 truncate font-heading text-[44px] leading-none font-extrabold tracking-[-0.02em] text-texto">{c.lugar}</p>
-      <p className="mt-2 text-[19px] leading-snug font-semibold text-texto">{c.que}</p>
-      <p className={cn('mt-1 text-[14.5px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
-      <div className="mt-6 flex flex-wrap items-center gap-2">
+      <p className="mt-4 truncate font-heading text-[36px] leading-none font-extrabold tracking-[-0.02em] text-texto">{c.lugar}</p>
+      <p className="mt-2 text-[17px] leading-snug font-semibold text-texto">{c.que}</p>
+      <p className={cn('mt-1 text-[14px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
+      <div className="mt-5 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => navigate(c.accion.to)}
-          className="inline-flex h-11 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-5 text-[15px] font-bold text-principal-texto hover:bg-terracota-600"
+          className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
         >
           {c.accion.texto}
-          <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
+          <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
             <Icono nombre="Siguiente" tamano={16} />
           </span>
         </button>
@@ -404,17 +460,17 @@ function FilaCosa({ c, empresaId }: { c: Cosa; empresaId: string }) {
   const navigate = useNavigate()
   const t = TONO[c.tono]
   return (
-    <li className="flex items-center gap-4 px-6 py-4">
-      <span className={cn('grid size-11 shrink-0 place-items-center rounded-[12px]', t.icono)}>
+    <li className="flex items-center gap-4 px-5 py-3.5">
+      <span className={cn('grid size-10 shrink-0 place-items-center rounded-[12px]', t.icono)}>
         <Icono nombre={c.icono} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[16px] text-texto">
+        <p className="truncate text-[15px] text-texto">
           <b className="font-heading font-extrabold">{c.lugar}</b>
           <span className="text-texto-suave"> · </span>
           <span className="font-semibold">{c.que}</span>
         </p>
-        <p className={cn('text-[13.5px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
+        <p className={cn('text-[13px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
       </div>
       {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} compacto />}
       <BotonChico type="button" onClick={() => navigate(c.accion.to)}>
@@ -516,7 +572,7 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
         <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-principal" />
         <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} grande />
         {l.vencidos.length > 0 && (
-          <span className="mb-1 rounded-full bg-estado-problema-suave px-4 py-2 text-[15px] font-bold text-estado-problema-texto">
+          <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">
             {plataCorta(l.vencido)} vencido sin pagar
           </span>
         )}
@@ -525,7 +581,7 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       {vacio ? (
         <p className="mt-6 rounded-[14px] bg-superficie-hundida/60 px-5 py-4 text-[15px] text-texto-suave">Nada por cobrar ni por pagar en los próximos 30 días.</p>
       ) : (
-        <div className="relative mt-6 h-[320px]">
+        <div className="relative mt-6 h-[290px]">
           {/* Lo vencido, antes de hoy */}
           <div className="absolute inset-y-0 left-0 w-[112px] rounded-[12px] bg-estado-problema-suave/45">
             <p className="pt-3 text-center text-[14px] font-bold text-estado-problema-texto">Vencido</p>
@@ -564,8 +620,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
 function Cifra({ nombre, valor, clase, grande = false }: { nombre: string; valor: string; clase: string; grande?: boolean }) {
   return (
     <div>
-      <p className="text-[15px] font-semibold text-texto-suave">{nombre}</p>
-      <p className={cn('titulo-display leading-none tracking-[-0.02em]', grande ? 'text-[48px]' : 'text-[34px]', clase)}>{valor}</p>
+      <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
+      <p className={cn('titulo-display leading-none tracking-[-0.02em]', grande ? 'text-[38px]' : 'text-[28px]', clase)}>{valor}</p>
     </div>
   )
 }
@@ -599,11 +655,11 @@ function Burbuja({
       style={{ left: izquierda, transform: `translate(-50%, ${arriba ? `calc(-100% - 1px)` : '1px'})`, flexDirection: arriba ? 'column' : 'column-reverse' }}
     >
       <span className="flex flex-col items-center" style={{ flexDirection: arriba ? 'column' : 'column-reverse' }}>
-        <span className={cn('cifra text-[16px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : p.cobro ? 'text-estado-bien' : 'text-principal')}>
+        <span className={cn('cifra text-[15px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : p.cobro ? 'text-estado-bien' : 'text-principal')}>
           {p.cobro ? '+' : '−'}
           {plataCorta(p.monto)}
         </span>
-        <span className={cn('truncate text-[14px] text-texto-suave', vencido ? 'max-w-[104px]' : 'max-w-[150px]')}>{p.descripcion}</span>
+        <span className={cn('truncate text-[13px] text-texto-suave', vencido ? 'max-w-[104px]' : 'max-w-[150px]')}>{p.descripcion}</span>
       </span>
       <span className={cn('my-1 rounded-full opacity-90 shadow-sm transition-transform group-hover:scale-110', color)} style={{ width: tam, height: tam }} />
       <span className="w-[2px] bg-borde" style={{ height: tallo }} />
@@ -615,8 +671,7 @@ function Burbuja({
 
 const DIA_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
-function Clima() {
-  const { actual } = useCampoClima()
+function Clima({ lugar: actual }: { lugar: OpcionClima | null }) {
   const navigate = useNavigate()
   const clima = useClima(actual?.ubicacion ?? null)
   const pronostico = usePronostico(actual?.ubicacion ?? null)
@@ -640,15 +695,15 @@ function Clima() {
       {/* El día de hoy se ve en la escena: cambia con el cielo, la lluvia y el viento. */}
       <EscenaClima cielo={escena.cielo} ventoso={escena.ventoso}>
         <p className="text-[15px] font-semibold">{actual.nombre}</p>
-        <p className="cifra mt-1 text-[64px] leading-none font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
+        <p className="cifra mt-1 text-[52px] leading-none font-semibold">{clima.data ? `${clima.data.temp}°` : '—'}</p>
         {clima.data && (
-          <p className="mt-2 text-[16px] font-semibold">
+          <p className="mt-2 text-[15px] font-semibold">
             {clima.data.descripcion}
             {escena.ventoso ? ` · viento ${clima.data.viento} km/h` : ''}
           </p>
         )}
         {clima.data && (
-          <p className="cifra text-[15px] opacity-90">
+          <p className="cifra text-[14px] opacity-90">
             {ahora < 18 ? 'Hoy' : 'Hoy hasta la noche'} {clima.data.max}° / {clima.data.min}°
           </p>
         )}
@@ -673,13 +728,13 @@ function LluviaDelCampo({ mm }: { mm: number | undefined }) {
       <span className="text-[#2779c4]">
         <Icono nombre="Lluvia" />
       </span>
-      <p className="text-[15px] text-texto-suave">
+      <p className="text-[14px] text-texto-suave">
         {mm === undefined ? (
           'Calculando la lluvia…'
         ) : (
           <>
             <b className={cn(T.numeroChico, 'text-texto')}>≈ {mm} mm</b> en 30 días
-            <span className="block text-[13.5px]">Según el pronóstico para tu campo</span>
+            <span className="block text-[13px]">Según el pronóstico para tu campo</span>
           </>
         )}
       </p>
@@ -695,7 +750,7 @@ function DiaCorto({ d }: { d: DiaPronostico }) {
       <span className={cn(T.texto, 'font-semibold text-texto-suave')}>{DIA_CORTO[f.getDay()]}</span>
       <IconoDia d={d} />
       <span className={cn(T.numeroChico, 'text-texto')}>{d.max}°</span>
-      <span className="cifra text-[18px] leading-none text-texto-suave">{d.min}°</span>
+      <span className="cifra text-[16px] leading-none text-texto-suave">{d.min}°</span>
       <span className="cifra h-5 text-[15px] font-bold text-[#2779c4]">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
     </li>
   )
@@ -726,7 +781,7 @@ function IconoDia({ d }: { d: DiaPronostico }) {
 const HEMBRA = 'bg-principal'
 const MACHO = 'bg-[#7c8b69]'
 
-function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: number }) {
+function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; total: number; campo: string | null }) {
   const navigate = useNavigate()
   const n = (c: CategoriaConteo['categoria']) => cats.find((x) => x.categoria === c)?.cabezas ?? 0
   const filas = [
@@ -744,7 +799,7 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
   const destete = vacas > 0 ? Math.round(((n('ternero') + n('ternera')) / vacas) * 100) : null
 
   return (
-    <section className="flex h-full flex-col p-6" aria-labelledby="estructura">
+    <section className="flex h-full flex-col px-6 py-5" aria-labelledby="estructura">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 id="estructura" className={cn(T.titulo)}>
@@ -757,44 +812,50 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
         </BotonChico>
       </div>
       {total === 0 ? (
-        <p className="mt-4 text-[15.5px] text-texto-suave">Todavía no hay hacienda cargada.</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
+          <span className="grid size-14 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
+            <Icono nombre="Vaca" />
+          </span>
+          <p className="font-heading text-[17px] font-extrabold text-texto">{campo ? `${campo} no tiene hacienda` : 'Todavía no hay hacienda'}</p>
+          <p className="max-w-[340px] text-[14px] text-texto-suave">Cuando entren animales, acá ves cuántas vacas, toros y terneros hay, y cómo viene la cría.</p>
+        </div>
       ) : (
         // Se reparte en todo el alto del panel (el clima de al lado manda la altura).
         <div className="flex flex-1 flex-col justify-evenly gap-6 pt-4">
           {/* La leyenda: el total y de qué color es cada lado. */}
-          <p className="flex items-center justify-center gap-6 text-[17px] text-texto-suave">
+          <p className="flex items-center justify-center gap-6 text-[15px] text-texto-suave">
             <span className="flex items-center gap-2">
               <span className={cn('size-3.5 rounded-[4px]', HEMBRA)} /> {hembras} hembras
             </span>
-            <span className="titulo-display text-[34px] text-texto">{total} cabezas</span>
+            <span className="titulo-display text-[28px] text-texto">{total} cabezas</span>
             <span className="flex items-center gap-2">
               <span className={cn('size-3.5 rounded-[4px]', MACHO)} /> {machos} machos
             </span>
           </p>
           {/* Espejo: nombres afuera, números adentro junto a la barra, la etapa al medio. */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {filas.map((f) => (
               <div key={f.etapa} className="grid grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-center">
                 <div className="flex items-center gap-3">
-                  <span className="w-[124px] shrink-0 text-[19px] text-texto">{f.h[0]}</span>
-                  <div className="flex h-12 flex-1 items-center justify-end gap-2.5">
-                    <span className={cn('cifra text-[26px] font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
+                  <span className="w-[108px] shrink-0 text-[16px] text-texto">{f.h[0]}</span>
+                  <div className="flex h-10 flex-1 items-center justify-end gap-2.5">
+                    <span className={cn('cifra text-[22px] font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
                     <div
                       className={cn('h-full rounded-l-[10px]', f.h[1] ? HEMBRA : 'bg-superficie-hundida')}
                       style={{ width: f.h[1] ? `${(f.h[1] / max) * 82}%` : 6 }}
                     />
                   </div>
                 </div>
-                <span className="text-center text-[15px] font-semibold text-texto-suave">{f.etapa}</span>
+                <span className="text-center text-[13.5px] font-semibold text-texto-suave">{f.etapa}</span>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 flex-1 items-center gap-2.5">
+                  <div className="flex h-10 flex-1 items-center gap-2.5">
                     <div
                       className={cn('h-full rounded-r-[10px]', f.m[1] ? MACHO : 'bg-superficie-hundida')}
                       style={{ width: f.m[1] ? `${(f.m[1] / max) * 82}%` : 6 }}
                     />
-                    <span className={cn('cifra text-[26px] font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
+                    <span className={cn('cifra text-[22px] font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
                   </div>
-                  <span className="w-[124px] shrink-0 text-right text-[19px] text-texto">{f.m[0]}</span>
+                  <span className="w-[108px] shrink-0 text-right text-[16px] text-texto">{f.m[0]}</span>
                 </div>
               </div>
             ))}
@@ -819,9 +880,9 @@ function EstructuraDelRodeo({ cats, total }: { cats: CategoriaConteo[]; total: n
 function Indicador({ nombre, valor, nota, alerta = false }: { nombre: string; valor: string; nota: string; alerta?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <p className="text-[16px] font-semibold text-texto-suave">{nombre}</p>
-      <p className="titulo-display text-[46px] leading-none text-texto">{valor}</p>
-      <p className={cn('text-[15px]', alerta ? 'font-semibold text-estado-atencion-texto' : 'text-texto-suave')}>{nota}</p>
+      <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
+      <p className="titulo-display text-[36px] leading-none text-texto">{valor}</p>
+      <p className={cn('text-[14px]', alerta ? 'font-semibold text-estado-atencion-texto' : 'text-texto-suave')}>{nota}</p>
     </div>
   )
 }

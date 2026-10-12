@@ -32,6 +32,8 @@ export type Vencimiento = {
   monto: number | null
   fechaVencimiento: string | null
   diasParaVencer: number | null
+  /** El campo al que se cargó; null si es de toda la empresa. */
+  campoId: string | null
 }
 
 export type IvaPanorama = {
@@ -90,7 +92,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       .lt('mes', `${new Date().getFullYear() + 1}-01-01`),
     supabase
       .from('v_pendientes')
-      .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
+      .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer, campo_id')
       .order('dias_para_vencer', { ascending: true }),
     supabase
       .from('movimiento_financiero')
@@ -166,6 +168,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     monto: v.monto,
     fechaVencimiento: v.fecha_vencimiento,
     diasParaVencer: v.dias_para_vencer,
+    campoId: v.campo_id,
   }))
   const porPagarTotal = vencimientos
     .filter((v) => v.tipo === 'gasto')

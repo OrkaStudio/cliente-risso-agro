@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { lluviaDelMes, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { delCampo, lluviaDelMes, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
   observacionId: `o-${nombre}`,
   potrero: nombre,
   campo: 'La Porteña',
+  campoId: 'c1',
   cabezas: 60,
   avisos: [{ key: 'a', tipo: 'electrico', nivel, urgencia: 1, icon: (() => null) as never, titulo: 'El eléctrico está cortado' }],
   nivel,
@@ -23,6 +24,7 @@ const venc = (id: string, dias: number, tipo: 'gasto' | 'ingreso' = 'gasto', mon
   monto,
   fechaVencimiento: null,
   diasParaVencer: dias,
+  campoId: 'c1',
 })
 
 describe('para atender hoy', () => {
@@ -30,7 +32,7 @@ describe('para atender hoy', () => {
     const cs = cosasParaHoy(
       [potrero('4B', 'prevenir'), potrero('11B', 'atender')],
       [venc('a', 10), venc('b', -2), venc('c', 1, 'ingreso')],
-      [{ key: 'x', campo: 'Los Pampas', cabezas: 46, hace: 15, to: '/campo/recorrida' }],
+      [{ key: 'x', campo: 'Los Pampas', campoId: 'c2', cabezas: 46, hace: 15, to: '/campo/recorrida' }],
     )
     expect(cs.map((c) => c.key)).toEqual(['p-11B', 'v-b', 'p-4B', 'v-c'])
     expect(cs[0]).toMatchObject({ tono: 'problema', titulo: 'El eléctrico está cortado en el 11B', detalle: 'Desde hace 3 días. Hay 60 animales adentro.' })
@@ -140,5 +142,45 @@ describe('la lluvia del último mes', () => {
     // 32 días: el más viejo queda afuera, hoy no cuenta → 30 días × 2 mm.
     expect(lluviaDelMes(est, hoy)).toBe(60)
     expect(lluviaDelMes([], hoy)).toBe(0)
+  })
+})
+
+describe('el Inicio de un campo', () => {
+  const pot = (id: string, campoId: string, cats: [string, number][]) => ({
+    id, nombre: id, campoId, campoNombre: campoId, campoTipo: 'propio' as const, estadoCiclo: 'pastoreo' as never, hectareas: 10,
+    cabezas: cats.reduce((s, c) => s + c[1], 0), porCategoria: cats.map(([categoria, cabezas]) => ({ categoria: categoria as never, cabezas })),
+    cultivo: null, fechaSiembra: null, fechaCosechaEstimada: null, destino: null,
+  })
+  const panorama = {
+    totalCabezas: 30,
+    porCategoria: [{ categoria: 'vaca' as const, cabezas: 22 }, { categoria: 'ternero' as const, cabezas: 8 }],
+    potreros: [pot('1A', 'c1', [['vaca', 12], ['ternero', 5]]), pot('2A', 'c1', [['vaca', 4]]), pot('1B', 'c2', [['vaca', 6], ['ternero', 3]])],
+    vencimientos: [venc('a', 3), { ...venc('b', -1), campoId: 'c2' }],
+  }
+  const atender = {
+    potreros: [potrero('1A', 'atender'), potrero('1B', 'prevenir', { campoId: 'c2' })],
+    sinRecorrer: [{ key: 'x', campo: 'B', campoId: 'c2', cabezas: 9, hace: 20, to: '/campos' }],
+    nacimientos: [{ key: 'n', potrero: '1A', campo: 'A', campoId: 'c1', total: 2, detalle: '', fecha: '', orden: '' }],
+    ultimaRecorridaHace: 2,
+    ultimaPorCampo: { c1: 2, c2: 20 },
+  }
+  it('con un campo, cuenta sólo su hacienda, sus avisos, su plata y su recorrida', () => {
+    const v = delCampo('c1', panorama, atender)
+    expect(v.totalCabezas).toBe(21)
+    expect(v.porCategoria).toEqual([{ categoria: 'vaca', cabezas: 16 }, { categoria: 'ternero', cabezas: 5 }])
+    expect(v.potreros.map((p) => p.potrero)).toEqual(['1A'])
+    expect(v.sinRecorrer).toEqual([])
+    expect(v.vencimientos.map((x) => x.id)).toEqual(['a'])
+    expect(v.nacimientos).toBe(2)
+    expect(v.ultimaRecorridaHace).toBe(2)
+  })
+  it('un campo que nunca se recorrió no toma la recorrida de otro', () => {
+    expect(delCampo('c3', panorama, atender).ultimaRecorridaHace).toBeNull()
+  })
+  it('todos los campos es la empresa entera', () => {
+    const v = delCampo(null, panorama, atender)
+    expect(v.totalCabezas).toBe(30)
+    expect(v.potreros).toHaveLength(2)
+    expect(v.vencimientos).toHaveLength(2)
   })
 })
