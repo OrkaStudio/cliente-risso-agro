@@ -6,11 +6,12 @@ import { BotonChico } from '@/components/tropero/boton'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { QueCampo } from '@/features/campos/que-campo'
 import { useAnimales, useEventosSenales, usePotreros } from '@/features/hacienda/hooks'
-import { CrearAnimalDialog } from '@/features/hacienda/crear-animal-dialog'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 import { categoriaNombre, type Especie } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
+import { AnimalNuevo } from './paneles'
 import { bajadaDelRodeo, ESTADO_TEXTO, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo } from './rodeo'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
@@ -61,6 +62,8 @@ export function RodeoPage() {
   const [categoria, setCategoria] = useState('')
   const [buscar, setBuscar] = useState('')
   const [todas, setTodas] = useState(false)
+  const [nuevo, setNuevo] = useState(false)
+  const { data: membresia } = useEmpresa()
   const estado = (params.get('sinCaravana') === '1' ? 'sinCaravana' : params.get('estado')) as Estado | null
 
   const campoId = elegido.elegido?.id ?? null
@@ -148,20 +151,17 @@ export function RodeoPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <CrearAnimalDialog
-              renderTrigger={(abrir) => (
-                <button
-                  type="button"
-                  onClick={abrir}
-                  className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
-                >
-                  Un animal nuevo
-                  <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
-                    <Icono nombre="Agregar" tamano={16} />
-                  </span>
-                </button>
-              )}
-            />
+            <button
+              type="button"
+              onClick={() => setNuevo(true)}
+              className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
+            >
+              Un animal nuevo
+              <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
+                <Icono nombre="Agregar" tamano={16} />
+              </span>
+            </button>
+            {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={especie} abierto={nuevo} onCerrar={() => setNuevo(false)} />}
           </div>
         </div>
         <StockPorCategoria cats={r.porCategoria} total={r.total} especie={especie} />

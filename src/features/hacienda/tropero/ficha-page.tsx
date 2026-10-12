@@ -1,13 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimal, useEventos, useLote, usePotreros } from '@/features/hacienda/hooks'
-import { CambiarCaravanaDialog, DarBajaDialog, RegistrarEventoDialog } from '@/features/hacienda/acciones-animal'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { avisoDelAnimal, fraseDelAnimal, historiaDelAnimal, loQueHayQueSaber, tituloDelAnimal, type Tono } from './ficha'
+import { AnotarleAlgo, CambiarCaravana, DarDeBaja } from './paneles'
 import { estadoDe } from './rodeo'
 
 const AVISO: Record<Tono, string> = {
@@ -39,6 +39,7 @@ export function FichaPage() {
   const lote = useLote(animal.data?.lote_id)
   const { campos } = useCampoElegido()
   const hoyISO = hoyLocal()
+  const [panel, setPanel] = useState<'anotar' | 'caravana' | 'baja' | null>(null)
 
   const resumen = useMemo(
     () => (eventos.data ? resumirEventos(eventos.data.map((e) => ({ animal_id: e.animal_id, tipo: e.tipo, fecha: e.fecha, datos: e.datos }))).get(id) : undefined),
@@ -58,6 +59,7 @@ export function FichaPage() {
   const saber = loQueHayQueSaber(a, resumen, evs, lote.data?.nombre ?? null)
   const historia = historiaDelAnimal(evs)
   const titulo = tituloDelAnimal(a.categoria, a.sexo)
+  const panelAnimal = { id, empresaId: a.empresa_id ?? '', visual: a.caravana_visual, rfid: a.caravana_rfid, potreroId: a.potrero_id }
   const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : 'De baja'
 
   return (
@@ -98,35 +100,26 @@ export function FichaPage() {
           {aviso && <span className={cn('rounded-full px-3.5 py-1.5 text-[14px] font-bold', AVISO[aviso.tono])}>{aviso.texto}</span>}
           {activo && a.empresa_id && (
             <div className="mt-2 flex flex-wrap gap-2.5">
-              <RegistrarEventoDialog
-                animalId={id}
-                empresaId={a.empresa_id}
-                trigger={
-                  <button type="button" className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
-                    Anotarle algo
-                    <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
-                      <Icono nombre="Agregar" tamano={16} />
-                    </span>
-                  </button>
-                }
-              />
-              <CambiarCaravanaDialog
-                animalId={id}
-                trigger={
-                  <button type="button" className={SECUNDARIO}>
-                    <Icono nombre="Caravana" tamano={16} /> Cambiar caravana
-                  </button>
-                }
-              />
-              <DarBajaDialog
-                animalId={id}
-                trigger={
-                  <button type="button" className={SECUNDARIO}>
-                    <Icono nombre="Borrar" tamano={16} /> Dar de baja
-                  </button>
-                }
-              />
+              <button type="button" onClick={() => setPanel('anotar')} className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
+                Anotarle algo
+                <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
+                  <Icono nombre="Agregar" tamano={16} />
+                </span>
+              </button>
+              <button type="button" onClick={() => setPanel('caravana')} className={SECUNDARIO}>
+                <Icono nombre="Caravana" tamano={16} /> Cambiar caravana
+              </button>
+              <button type="button" onClick={() => setPanel('baja')} className={SECUNDARIO}>
+                <Icono nombre="Borrar" tamano={16} /> Dar de baja
+              </button>
             </div>
+          )}
+          {activo && a.empresa_id && (
+            <>
+              <AnotarleAlgo animal={panelAnimal} abierto={panel === 'anotar'} onCerrar={() => setPanel(null)} />
+              <CambiarCaravana animal={panelAnimal} abierto={panel === 'caravana'} onCerrar={() => setPanel(null)} />
+              <DarDeBaja animal={panelAnimal} abierto={panel === 'baja'} onCerrar={() => setPanel(null)} />
+            </>
           )}
         </div>
       </section>

@@ -96,8 +96,10 @@ export function useMoverAnimales() {
     mutationFn: api.moverAnimales,
     onSuccess: () => {
       invalidarStock(qc)
-      // El movimiento deja un evento en el historial de cada animal movido.
+      // El movimiento deja un evento en el historial de cada animal movido,
+      // y cambia su potrero: la ficha abierta tiene que mostrar el nuevo.
       qc.invalidateQueries({ queryKey: ['eventos'] })
+      qc.invalidateQueries({ queryKey: ['animal'] })
     },
   })
 }

@@ -273,12 +273,13 @@ export async function listTropasCampo(campoId: string) {
 
 export type MoverAnimalesInput = {
   empresaId: string
-  potreroOrigenId: string
+  /** Requerido salvo cuando se mueven animales puntuales. */
+  potreroOrigenId?: string
   potreroDestinoId: string
   /** Tropa de origen (null = animales sueltos). */
   loteId: string | null
   /** Qué se mueve: la tropa entera del potrero, o cantidades por categoría. */
-  seleccion: { todo: true } | { items: ItemCargaMasiva[] }
+  seleccion: { todo: true } | { items: ItemCargaMasiva[] } | { animalIds: string[] }
   /** A qué tropa llegan. Omitido = conservan la de origen (cruzar de campo
    *  conservando tropa solo vale si se muda entera; lo valida Postgres). */
   destino?: { loteId: string } | { nuevoNombre: string }
@@ -302,11 +303,13 @@ export async function moverAnimales(
   const { data, error } = await supabase.rpc('mover_animales', {
     p_empresa_id: input.empresaId,
     p_potrero_destino: input.potreroDestinoId,
-    p_potrero_origen: input.potreroOrigenId,
+    p_potrero_origen: input.potreroOrigenId || undefined,
     p_lote_id: input.loteId ?? undefined,
     ...('todo' in input.seleccion
       ? { p_todo: true }
-      : { p_items: input.seleccion.items.filter((it) => it.cantidad > 0) }),
+      : 'animalIds' in input.seleccion
+        ? { p_animal_ids: input.seleccion.animalIds }
+        : { p_items: input.seleccion.items.filter((it) => it.cantidad > 0) }),
     ...(input.destino && 'loteId' in input.destino
       ? { p_lote_destino: input.destino.loteId }
       : {}),
