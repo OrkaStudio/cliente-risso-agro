@@ -97,7 +97,7 @@ export function cosasParaHoy(
     icono: 'Recorrida',
     lugar: c.campo,
     que: c.hace === null ? 'Nunca se recorrió' : 'Sin recorrer',
-    datos: [c.hace === null ? 'nunca' : `hace ${c.hace} días`, ...(c.cabezas > 0 ? [`${c.cabezas} cabezas`] : [])],
+    datos: [...(c.hace === null ? [] : [`hace ${c.hace} días`]), ...(c.cabezas > 0 ? [`${c.cabezas} cabezas adentro`] : [])],
   }))
   return [...atender, ...vencidos, ...prevenir, ...proximos, ...recorrer].slice(0, max)
 }

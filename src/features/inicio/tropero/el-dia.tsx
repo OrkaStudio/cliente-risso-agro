@@ -11,6 +11,7 @@ import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
+import { categoriaNombre } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
@@ -392,7 +393,7 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
         <h2 id="atender-hoy" className={T.titulo}>
           Para atender hoy
         </h2>
-        {primera && <span className={T.bajada}>De lo más urgente a lo que puede esperar</span>}
+        {resto.length > 0 && <span className={T.bajada}>De lo más urgente a lo que puede esperar</span>}
       </div>
       {!primera ? (
         <div className="flex items-center gap-4 px-6 py-5">
@@ -407,7 +408,7 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
       ) : (
         // Lo primero en grande, lo demás en filas.
         <div className={cn(resto.length > 0 && 'lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
-          <Destacada c={primera} empresaId={empresaId} />
+          {resto.length > 0 ? <Destacada c={primera} empresaId={empresaId} /> : <Unica c={primera} empresaId={empresaId} />}
           {resto.length > 0 && (
             <ul className="divide-y divide-borde border-borde max-lg:border-t lg:border-l">
               {resto.map((c) => (
@@ -448,6 +449,40 @@ function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
           </span>
         </button>
         {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} />}
+      </div>
+    </article>
+  )
+}
+
+/** Una sola cosa para atender: en una franja, no un bloque grande y vacío. */
+function Unica({ c, empresaId }: { c: Cosa; empresaId: string }) {
+  const navigate = useNavigate()
+  const t = TONO[c.tono]
+  return (
+    <article className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
+      <span className={cn('grid size-12 shrink-0 place-items-center rounded-[14px]', t.icono)}>
+        <Icono nombre={c.icono} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[17px] text-texto">
+          <b className="font-heading text-[22px] font-extrabold tracking-[-0.01em]">{c.lugar}</b>
+          <span className="text-texto-suave"> · </span>
+          <span className="font-semibold">{c.que}</span>
+        </p>
+        <p className={cn('text-[14px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} />}
+        <button
+          type="button"
+          onClick={() => navigate(c.accion.to)}
+          className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
+        >
+          {c.accion.texto}
+          <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
+            <Icono nombre="Siguiente" tamano={16} />
+          </span>
+        </button>
       </div>
     </article>
   )
@@ -789,9 +824,13 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
   ] as const
   const hembras = filas.reduce((s, f) => s + f.h[1], 0)
   const machos = filas.reduce((s, f) => s + f.m[1], 0)
+  // El rodeo es la hacienda vacuna; los caballos y ovejas se nombran aparte.
+  const vacunas = new Set(['vaca', 'toro', 'vaquillona', 'novillo', 'capon', 'ternera', 'ternero'])
+  const otras = cats.filter((c) => !vacunas.has(c.categoria) && c.cabezas > 0)
   const max = Math.max(1, ...filas.flatMap((f) => [f.h[1], f.m[1]]))
   const vacas = n('vaca')
   const vientres = vacas + n('vaquillona')
+  const bovinos = Math.max(1, hembras + machos)
   const toroVaca = n('toro') > 0 ? Math.round(vacas / n('toro')) : null
   const enRango = toroVaca !== null && toroVaca >= 20 && toroVaca <= 30
   const destete = vacas > 0 ? Math.round(((n('ternero') + n('ternera')) / vacas) * 100) : null
@@ -825,11 +864,16 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
             <span className="flex items-center gap-2">
               <span className={cn('size-3.5 rounded-[4px]', HEMBRA)} /> {hembras} hembras
             </span>
-            <span className="titulo-display text-[28px] text-texto">{total} cabezas</span>
+            <span className="titulo-display text-[28px] text-texto">{hembras + machos} cabezas</span>
             <span className="flex items-center gap-2">
               <span className={cn('size-3.5 rounded-[4px]', MACHO)} /> {machos} machos
             </span>
           </p>
+          {otras.length > 0 && (
+            <p className="-mt-3 text-center text-[13.5px] text-texto-suave">
+              Además: {otras.map((c) => `${c.cabezas} ${categoriaNombre(c.categoria, c.cabezas).toLocaleLowerCase('es')}`).join(', ')}
+            </p>
+          )}
           {/* Espejo: nombres afuera, números adentro junto a la barra, la etapa al medio. */}
           <div className="flex flex-col gap-4">
             {filas.map((f) => (
@@ -859,7 +903,7 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
             ))}
           </div>
           <div className="grid grid-cols-3 border-t border-borde pt-5 text-center">
-            <Indicador nombre="Vientres" valor={String(vientres)} nota={`${Math.round((vientres / total) * 100)} % del rodeo`} />
+            <Indicador nombre="Vientres" valor={String(vientres)} nota={`${Math.round((vientres / bovinos) * 100)} % del rodeo`} />
             <Indicador
               nombre="Toro y vaca"
               valor={toroVaca === null ? '—' : `1 : ${toroVaca}`}
