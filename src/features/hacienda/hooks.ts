@@ -164,6 +164,24 @@ export function useSalidaPorCantidad() {
       qc.invalidateQueries({ queryKey: ['eventos'] })
       qc.invalidateQueries({ queryKey: ['eventos-senales'] })
       qc.invalidateQueries({ queryKey: ['animal'] })
+      qc.invalidateQueries({ queryKey: ['bajas-pendientes'] })
     },
   })
+}
+
+export const useBajasPendientes = () => useQuery({ queryKey: ['bajas-pendientes'], queryFn: api.listBajasPendientes })
+
+function invalidarCaravanas(qc: QueryClient) {
+  invalidarStock(qc)
+  for (const k of [['eventos'], ['eventos-senales'], ['animal'], ['bajas-pendientes']]) qc.invalidateQueries({ queryKey: k })
+}
+
+export function useIdentificarSalida() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: api.identificarSalida, onSuccess: () => invalidarCaravanas(qc) })
+}
+
+export function useAsignarCaravanasPlanilla() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: api.asignarCaravanasPlanilla, onSuccess: () => invalidarCaravanas(qc) })
 }

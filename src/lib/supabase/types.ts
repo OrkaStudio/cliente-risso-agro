@@ -152,7 +152,7 @@ export type Database = {
           fecha_baja: string | null
           id: string
           motivo_baja: string | null
-          numero_rfid: string
+          numero_rfid: string | null
           numero_visual: string | null
           vigente: boolean
         }
@@ -164,7 +164,7 @@ export type Database = {
           fecha_baja?: string | null
           id?: string
           motivo_baja?: string | null
-          numero_rfid: string
+          numero_rfid?: string | null
           numero_visual?: string | null
           vigente?: boolean
         }
@@ -176,7 +176,7 @@ export type Database = {
           fecha_baja?: string | null
           id?: string
           motivo_baja?: string | null
-          numero_rfid?: string
+          numero_rfid?: string | null
           numero_visual?: string | null
           vigente?: boolean
         }
@@ -1264,6 +1264,19 @@ export type Database = {
       }
     }
     Views: {
+      v_bajas_pendientes: {
+        Row: {
+          animal_id: string | null
+          categoria: Database["public"]["Enums"]["categoria_animal"] | null
+          empresa_id: string | null
+          estado: Database["public"]["Enums"]["estado_animal"] | null
+          evento_id: string | null
+          fecha: string | null
+          potrero_id: string | null
+          salida_id: string | null
+        }
+        Relationships: []
+      }
       v_animal_con_caravana: {
         Row: {
           caravana_rfid: string | null
@@ -1541,6 +1554,7 @@ export type Database = {
       }
       salida_por_cantidad: {
         Args: {
+          p_caravanas?: string[]
           p_empresa_id: string
           p_fecha?: string
           p_items: Json
@@ -1549,6 +1563,18 @@ export type Database = {
           p_potrero_id: string
         }
         Returns: Json
+      }
+      identificar_salida: {
+        Args: { p_caravanas: string[]; p_empresa_id: string }
+        Returns: Json
+      }
+      asignar_caravanas_planilla: {
+        Args: { p_campo_id: string; p_empresa_id: string; p_filas: Json }
+        Returns: Json
+      }
+      animal_por_caravana: {
+        Args: { p_caravana: string; p_empresa_id: string }
+        Returns: string
       }
       marcar_senal: {
         Args: {

@@ -460,6 +460,8 @@ export async function salidaPorCantidad(input: {
   motivo: MotivoSalida
   fecha?: string
   nota?: string
+  /** Las que se sabe que salieron (visible o electrónica). */
+  caravanas?: string[]
 }): Promise<{ salieron: number; pendientesIdentificar: number; salidaId: string }> {
   const { data, error } = await supabase.rpc('salida_por_cantidad', {
     p_empresa_id: input.empresaId,
@@ -468,8 +470,39 @@ export async function salidaPorCantidad(input: {
     p_motivo: input.motivo,
     p_fecha: input.fecha || undefined,
     p_nota: input.nota?.trim() || undefined,
+    p_caravanas: input.caravanas?.length ? input.caravanas : undefined,
   })
   if (error) throw new Error(error.message)
   const r = data as { salieron: number; pendientes_identificar: number; salida_id: string }
   return { salieron: r.salieron, pendientesIdentificar: r.pendientes_identificar, salidaId: r.salida_id }
+}
+
+/** Las bajas por cantidad que todavía no se identificaron (cuáles fueron). */
+export async function listBajasPendientes() {
+  const { data, error } = await supabase.from('v_bajas_pendientes').select('evento_id, animal_id, fecha, categoria, potrero_id, salida_id').order('fecha', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/** Decir cuáles fueron: si no era el elegido, vuelve al rodeo y sale éste. */
+export async function identificarSalida(input: { empresaId: string; caravanas: string[] }): Promise<{ identificadas: number; cambiados: number }> {
+  const { data, error } = await supabase.rpc('identificar_salida', { p_empresa_id: input.empresaId, p_caravanas: input.caravanas })
+  if (error) throw new Error(error.message)
+  return data as { identificadas: number; cambiados: number }
+}
+
+/** La planilla: caravana para los que se cargaron por categoría. No crea animales. */
+export async function asignarCaravanasPlanilla(input: {
+  empresaId: string
+  campoId: string
+  filas: { visual: string | null; rfid: string | null; categoria: CategoriaAnimal; potreroId: string | null; nacimiento: string | null; raza: string | null }[]
+}): Promise<{ asignadas: number; sinAnimal: string[] }> {
+  const { data, error } = await supabase.rpc('asignar_caravanas_planilla', {
+    p_empresa_id: input.empresaId,
+    p_campo_id: input.campoId,
+    p_filas: input.filas.map((f) => ({ visual: f.visual, rfid: f.rfid, categoria: f.categoria, potrero_id: f.potreroId, nacimiento: f.nacimiento, raza: f.raza })),
+  })
+  if (error) throw new Error(error.message)
+  const r = data as { asignadas: number; sin_animal: string[] }
+  return { asignadas: r.asignadas, sinAnimal: r.sin_animal }
 }

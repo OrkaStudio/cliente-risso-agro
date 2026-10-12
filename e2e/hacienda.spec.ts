@@ -102,7 +102,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
 
   // Salieron · Los vendí: una vaca del 1A. Todas tienen caravana → queda para identificar.
-  await page.getByRole('button', { name: 'Salieron' }).click()
+  await page.getByRole('button', { name: 'Salieron', exact: true }).click()
   const panel = page.getByRole('dialog')
   await panel.getByRole('button', { name: /Los vendí/ }).click()
   await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
@@ -116,7 +116,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: 'Listo' }).click()
 
   // Entraron · Nacieron: dos terneros en el 1A, sin caravana.
-  await page.getByRole('button', { name: 'Entraron' }).click()
+  await page.getByRole('button', { name: 'Entraron', exact: true }).click()
   await panel.getByRole('button', { name: /Nacieron/ }).click()
   await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
   await tocarPotrero(page, '1A')
@@ -128,4 +128,45 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: 'Listo' }).click()
   await page.getByRole('button', { name: /sin caravana/ }).click()
   await expect(page.getByRole('row', { name: /Ternero/ }).first()).toBeVisible()
+})
+
+test('decir cuál salió y poner caravanas con una planilla', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  const panel = page.getByRole('dialog')
+
+  // Una venta por cantidad deja una vaca pendiente de identificar.
+  await page.getByRole('button', { name: 'Salieron', exact: true }).click()
+  await panel.getByRole('button', { name: /Los vendí/ }).click()
+  await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
+  await tocarPotrero(page, '1A')
+  await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
+  await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
+  await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
+  await panel.getByRole('button', { name: 'Listo' }).click()
+
+  // Decir cuál fue: una vaca del 1A que sigue en el rodeo.
+  await page.getByPlaceholder('Buscá una caravana').fill('E2E')
+  const caravana = (await page.getByRole('row', { name: /Vaca/ }).first().getByRole('link').locator('span').first().textContent())!.trim()
+  await page.getByPlaceholder('Buscá una caravana').fill('')
+  await page.getByRole('button', { name: /sin identificar/ }).click()
+  await panel.getByLabel('Caravana que salió').fill(caravana)
+  await panel.getByRole('button', { name: 'Sumar' }).click()
+  await panel.getByRole('button', { name: /^Identificar 1/ }).click()
+  await expect(panel).toBeHidden()
+
+  // La planilla: una caravana para un ternero sin caravana del 1A.
+  const n = String(Date.now()).slice(-6)
+  await page.getByRole('button', { name: 'Caravanas por Excel' }).click()
+  await panel.locator('input[type=file]').setInputFiles({
+    name: 'caravanas.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`Caravana visible;Categoría;Potrero;Electrónica\n${n};Ternero;1A;032${n}${n}\n`),
+  })
+  await expect(panel.getByRole('heading', { name: 'Leímos 1 fila' })).toBeVisible()
+  await panel.getByRole('button', { name: 'Ponerle caravana a 1' }).click()
+  await expect(panel.getByRole('heading', { name: 'Listo: 1 caravana puesta' })).toBeVisible()
+  await panel.getByRole('button', { name: 'Listo' }).click()
+  await page.getByPlaceholder('Buscá una caravana').fill(n)
+  await expect(page.getByRole('row', { name: new RegExp(n) })).toContainText('Ternero')
 })

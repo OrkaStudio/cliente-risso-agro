@@ -132,14 +132,22 @@ export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: st
         case 'destete':
           return { ...base, titulo: 'Destete', detalle: nota, tono: 'principal' as Tono }
         case 'cambio_caravana':
-        case 'caravana_asignada':
           return { ...base, titulo: 'Caravana', detalle: texto(dato(d, 'nuevo')) ? `Nueva: ${dato(d, 'nuevo')}` : nota, tono: 'principal' as Tono }
+        case 'caravana_asignada': {
+          const v = texto(dato(d, 'visual'))
+          const detalle = dato(d, 'emparejada') ? 'Se emparejó el chip en la manga' : dato(d, 'origen') === 'planilla' ? `${v ? `La ${v}, ` : ''}por planilla${texto(dato(d, 'rfid')) ? '' : ' (falta el chip)'}` : v ? `La ${v}` : nota
+          return { ...base, titulo: 'Caravana', detalle, tono: 'principal' as Tono }
+        }
         case 'baja': {
           const est = dato(d, 'estado')
           return { ...base, titulo: est === 'vendido' ? 'Se vendió' : est === 'muerto' ? 'Murió' : 'Baja', detalle: nota, tono: 'problema' as Tono }
         }
+        case 'nota':
+          if (dato(d, 'vuelve_al_rodeo')) return { ...base, titulo: 'Volvió al rodeo', detalle: 'No era el que salió', tono: 'bien' as Tono }
+          if (dato(d, 'resuelve')) return { ...base, titulo: 'Identificada', detalle: 'Era éste el que salió', tono: 'neutro' as Tono }
+          return { ...base, titulo: 'Nota', detalle: nota, tono: 'neutro' as Tono }
         default:
-          return { ...base, titulo: e.tipo === 'nota' ? 'Nota' : e.tipo.charAt(0).toUpperCase() + e.tipo.slice(1), detalle: nota, tono: 'neutro' as Tono }
+          return { ...base, titulo: e.tipo.charAt(0).toUpperCase() + e.tipo.slice(1), detalle: nota, tono: 'neutro' as Tono }
       }
     })
 }

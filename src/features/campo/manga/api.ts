@@ -40,7 +40,9 @@ export async function fetchSinCaravana(): Promise<{
   if (potrerosRes.error) throw potrerosRes.error
   if (lotesRes.error) throw lotesRes.error
 
-  const taggeados = new Set((caravanasRes.data ?? []).map((c) => c.animal_id))
+  // Sólo cuenta como caravaneado el que tiene chip: el que tiene sólo la
+  // visible (cargada por planilla) sigue esperando el bastón para emparejarse.
+  const taggeados = new Set((caravanasRes.data ?? []).filter((c) => c.numero_rfid).map((c) => c.animal_id))
   const potreros = new Map((potrerosRes.data ?? []).map((p) => [p.id, p.nombre]))
   const lotes = new Map((lotesRes.data ?? []).map((l) => [l.id, l.nombre]))
 
@@ -59,8 +61,8 @@ export async function fetchSinCaravana(): Promise<{
   // puede venir con o sin separadores. Normalizar de los dos lados es lo que
   // hace que el duplicado se detecte igual. Sobre dígitos limpios (lo que hay
   // cargado hoy) normalizar es identidad → no invalida nada de lo existente.
-  const rfidsEnUso = (caravanasRes.data ?? []).map((c) =>
-    normalizarRfid(c.numero_rfid),
+  const rfidsEnUso = (caravanasRes.data ?? []).flatMap((c) =>
+    c.numero_rfid ? [normalizarRfid(c.numero_rfid)] : [],
   )
   return { animales, rfidsEnUso }
 }
@@ -201,6 +203,7 @@ export async function fetchRodeo(): Promise<AnimalRodeo[]> {
   for (const c of caravanasRes.data ?? []) {
     const a = porId.get(c.animal_id)
     if (!a) continue // caravana de un animal dado de baja: no entra a la manga
+    if (!c.numero_rfid) continue // sólo la visible: el bastón todavía no la conoce
     filas.push({
       // Normalizado de los dos lados: el mismo animal leído con otro bastón
       // tiene que caer en la misma clave o el lookup falla en silencio.

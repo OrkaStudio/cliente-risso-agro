@@ -5,12 +5,13 @@ import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { QueCampo } from '@/features/campos/que-campo'
-import { useAnimales, useEventosSenales, usePotreros } from '@/features/hacienda/hooks'
+import { useAnimales, useBajasPendientes, useEventosSenales, usePotreros } from '@/features/hacienda/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { categoriaNombre, type Especie } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
+import { CaravanasPorExcel, IdentificarSalidas } from './caravanas-paneles'
 import { EntradasSalidas } from './entradas-salidas-panel'
 import { AnimalNuevo } from './paneles'
 import { bajadaDelRodeo, ESTADO_TEXTO, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo } from './rodeo'
@@ -65,6 +66,8 @@ export function RodeoPage() {
   const [todas, setTodas] = useState(false)
   const [nuevo, setNuevo] = useState(false)
   const [entradaSalida, setEntradaSalida] = useState<'entraron' | 'salieron' | null>(null)
+  const [panelCaravanas, setPanelCaravanas] = useState<'excel' | 'identificar' | null>(null)
+  const pendientes = useBajasPendientes()
   const { data: membresia } = useEmpresa()
   const estado = (params.get('sinCaravana') === '1' ? 'sinCaravana' : params.get('estado')) as Estado | null
 
@@ -177,7 +180,14 @@ export function RodeoPage() {
             >
               <Icono nombre="Caravana" tamano={16} /> Uno, con su caravana
             </button>
+
             {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={especie} abierto={nuevo} onCerrar={() => setNuevo(false)} />}
+            {membresia?.empresa_id && (
+              <>
+                <CaravanasPorExcel key={`x${panelCaravanas}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
+                <IdentificarSalidas empresaId={membresia.empresa_id} abierto={panelCaravanas === 'identificar'} onCerrar={() => setPanelCaravanas(null)} />
+              </>
+            )}
             {membresia?.empresa_id && entradaSalida && (
               <EntradasSalidas key={entradaSalida} modo={entradaSalida} empresaId={membresia.empresa_id} abierto onCerrar={() => setEntradaSalida(null)} />
             )}
@@ -187,8 +197,18 @@ export function RodeoPage() {
       </motion.section>
 
       {/* Lo que hay que hacer: tocás y filtra */}
-      {CHIPS.some((c) => r.porEstado[c.estado]) && (
+      {(CHIPS.some((c) => r.porEstado[c.estado]) || (pendientes.data?.length ?? 0) > 0) && (
         <motion.div {...entra(2)} className="flex flex-wrap gap-2">
+          {(pendientes.data?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => setPanelCaravanas('identificar')}
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto hover:bg-superficie-hundida"
+            >
+              <span className="size-2 rounded-full bg-estado-atencion" />
+              {pendientes.data!.length} {pendientes.data!.length === 1 ? 'salió' : 'salieron'} sin identificar
+            </button>
+          )}
           {CHIPS.filter((c) => r.porEstado[c.estado]).map((c) => {
             const activo = estado === c.estado
             return (
@@ -245,6 +265,13 @@ export function RodeoPage() {
               <Icono nombre="Siguiente" tamano={16} />
             </span>
           </label>
+          <button
+            type="button"
+            onClick={() => setPanelCaravanas('excel')}
+            className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
+          >
+            <Icono nombre="Comprobante" tamano={16} /> Caravanas por Excel
+          </button>
         </div>
 
         {lista.length === 0 ? (
