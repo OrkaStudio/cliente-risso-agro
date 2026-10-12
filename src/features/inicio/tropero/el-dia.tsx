@@ -127,17 +127,17 @@ function useIr() {
 // ===== La cabecera: el saludo, lo importante en chips y los accesos =====
 
 const CHIP: Record<Chip['tono'], string> = {
-  problema: 'bg-estado-problema-suave text-estado-problema-texto',
-  atencion: 'bg-estado-atencion-suave text-estado-atencion-texto',
-  aviso: 'bg-acento/40 text-acento-texto',
-  info: 'bg-[#e1ebf2] text-[#215a7e]',
-  bien: 'bg-estado-bien-suave text-estado-bien-texto',
+  problema: 'border border-borde bg-superficie text-texto',
+  atencion: 'border border-borde bg-superficie text-texto',
+  aviso: 'border border-borde bg-superficie text-texto',
+  info: 'border border-borde bg-superficie text-texto',
+  bien: 'border border-borde bg-superficie text-texto',
 }
 const PUNTO: Record<Chip['tono'], string> = {
   problema: 'bg-estado-problema',
   atencion: 'bg-estado-atencion',
   aviso: 'bg-acento-texto',
-  info: 'bg-[#2779c4]',
+  info: 'bg-neutro-500',
   bien: 'bg-estado-bien',
 }
 
@@ -279,7 +279,7 @@ function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; ca
       titulo="Hacienda"
       icono="Vaca"
       destino="/hacienda"
-      pie={nacimientos > 0 ? <b className="text-estado-bien-texto">+{nacimientos} nacimientos sin caravana</b> : campos > 1 ? `En tus ${campos} campos` : 'Ver por potrero'}
+      pie={nacimientos > 0 ? <b className="text-texto">+{nacimientos} nacimientos sin caravana</b> : campos > 1 ? `En tus ${campos} campos` : 'Ver por potrero'}
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>{total.toLocaleString('es-AR')}</span>
@@ -318,7 +318,7 @@ function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; gan
         )
       }
     >
-      <span className={cn(NUMERO, p30 > 0 ? 'text-estado-bien' : p30 < 0 ? 'text-estado-problema-texto' : 'text-texto')}>
+      <span className={cn(NUMERO, p30 < 0 ? 'text-estado-problema-texto' : 'text-texto')}>
         {p30 === 0 ? '$0' : plataCorta(p30, true)}
       </span>
       <span className="mt-1 block truncate text-[12.5px] text-texto-suave">cobros menos pagos</span>
@@ -332,7 +332,7 @@ function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number |
       titulo={lugar ? `Lluvia en ${lugar}` : 'Lluvia'}
       icono="Lluvia"
       destino="#clima"
-      pie={manana ? (manana.lluviaProb >= 40 ? <b className="text-[#215a7e]">Mañana {manana.lluviaProb} % de lluvia</b> : `Mañana ${manana.max}°, sin lluvia`) : 'Pronóstico abajo'}
+      pie={manana ? (manana.lluviaProb >= 40 ? <b className="text-texto">Mañana {manana.lluviaProb} % de lluvia</b> : `Mañana ${manana.max}°, sin lluvia`) : 'Pronóstico abajo'}
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>
@@ -379,9 +379,9 @@ function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | nu
 // ===== Para atender hoy: tarjetas que se entienden sin leer =====
 
 const TONO = {
-  problema: { borde: 'border-estado-problema/45', fondo: 'bg-estado-problema-suave/50', icono: 'bg-estado-problema text-superficie', dato: 'text-estado-problema-texto' },
-  atencion: { borde: 'border-estado-atencion/45', fondo: 'bg-superficie', icono: 'bg-estado-atencion text-superficie', dato: 'text-estado-atencion-texto' },
-  aviso: { borde: 'border-borde', fondo: 'bg-superficie', icono: 'bg-acento text-acento-texto', dato: 'text-texto-suave' },
+  problema: { icono: 'bg-estado-problema-suave text-estado-problema-texto', dato: 'text-estado-problema-texto' },
+  atencion: { icono: 'bg-estado-atencion-suave text-estado-atencion-texto', dato: 'text-texto-suave' },
+  aviso: { icono: 'bg-superficie-hundida text-texto-suave', dato: 'text-texto-suave' },
 } as const
 
 function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string }) {
@@ -395,13 +395,13 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
         {primera && <span className={T.bajada}>De lo más urgente a lo que puede esperar</span>}
       </div>
       {!primera ? (
-        <div className="flex items-center gap-4 bg-estado-bien-suave px-6 py-5">
-          <span className="grid size-11 place-items-center rounded-full bg-estado-bien text-superficie">
+        <div className="flex items-center gap-4 px-6 py-5">
+          <span className="grid size-11 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
             <Icono nombre="Guardar" />
           </span>
           <div>
-            <p className="font-heading text-[17px] font-extrabold text-estado-bien-texto">Todo en orden</p>
-            <p className="text-[14px] text-estado-bien-texto">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
+            <p className="font-heading text-[17px] font-extrabold text-texto">Todo en orden</p>
+            <p className="text-[14px] text-texto-suave">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
           </div>
         </div>
       ) : (
@@ -426,14 +426,12 @@ function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
   const navigate = useNavigate()
   const t = TONO[c.tono]
   return (
-    <article className={cn('flex flex-col p-6', t.fondo)}>
+    <article className="flex flex-col p-6">
       <div className="flex items-center gap-3">
         <span className={cn('grid size-12 shrink-0 place-items-center rounded-[14px]', t.icono)}>
           <Icono nombre={c.icono} />
         </span>
-        <span className={cn('rounded-full px-3 py-1 text-[12.5px] font-bold', c.tono === 'problema' ? 'bg-estado-problema text-superficie' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
-          Lo primero
-        </span>
+        <span className="text-[13px] font-bold tracking-[0.02em] text-texto-suave uppercase">Lo primero</span>
       </div>
       <p className="mt-4 truncate font-heading text-[36px] leading-none font-extrabold tracking-[-0.02em] text-texto">{c.lugar}</p>
       <p className="mt-2 text-[17px] leading-snug font-semibold text-texto">{c.que}</p>
@@ -518,8 +516,8 @@ function SeSoluciono({ senal, empresaId, compacto = false }: { senal: NonNullabl
       aria-label="Se solucionó"
       title="Se solucionó"
       className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full text-[14px] font-bold text-texto-suave hover:bg-superficie-hundida disabled:opacity-50',
-        compacto ? 'size-9 border border-borde' : 'px-3 py-[7px]',
+        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-neutro-300 bg-superficie text-[14.5px] font-bold text-texto transition-colors hover:border-neutro-500 hover:bg-superficie-hundida disabled:opacity-50',
+        compacto ? 'size-9' : 'h-10 px-4',
       )}
     >
       <Icono nombre="Guardar" tamano={16} />
@@ -568,8 +566,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-3">
-        <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-estado-bien" />
-        <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-principal" />
+        <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-texto" />
+        <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-texto" />
         <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} grande />
         {l.vencidos.length > 0 && (
           <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">
@@ -644,7 +642,7 @@ function Burbuja({
   vencido?: boolean
   onClick: () => void
 }) {
-  const color = vencido ? 'bg-estado-problema' : p.cobro ? 'bg-estado-bien' : 'bg-principal'
+  const color = vencido ? 'bg-estado-problema' : p.cobro ? 'bg-salvia' : 'bg-principal'
   const tallo = 20 + nivel * 44
   return (
     <button
@@ -655,7 +653,7 @@ function Burbuja({
       style={{ left: izquierda, transform: `translate(-50%, ${arriba ? `calc(-100% - 1px)` : '1px'})`, flexDirection: arriba ? 'column' : 'column-reverse' }}
     >
       <span className="flex flex-col items-center" style={{ flexDirection: arriba ? 'column' : 'column-reverse' }}>
-        <span className={cn('cifra text-[15px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : p.cobro ? 'text-estado-bien' : 'text-principal')}>
+        <span className={cn('cifra text-[15px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : 'text-texto')}>
           {p.cobro ? '+' : '−'}
           {plataCorta(p.monto)}
         </span>
@@ -751,7 +749,7 @@ function DiaCorto({ d }: { d: DiaPronostico }) {
       <IconoDia d={d} />
       <span className={cn(T.numeroChico, 'text-texto')}>{d.max}°</span>
       <span className="cifra text-[16px] leading-none text-texto-suave">{d.min}°</span>
-      <span className="cifra h-5 text-[15px] font-bold text-[#2779c4]">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
+      <span className="cifra h-5 text-[15px] font-bold text-texto-suave">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
     </li>
   )
 }
