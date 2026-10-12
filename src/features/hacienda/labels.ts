@@ -193,6 +193,8 @@ export const estadoLabel: Record<Estado, string> = {
   activo: 'Activo',
   vendido: 'Vendido',
   muerto: 'Muerto',
+  // Cargado de más: no fue venta ni muerte (Corregir cabezas).
+  corregido: 'Corregido',
 }
 
 export const tipoEventoLabel: Record<TipoEvento, string> = {

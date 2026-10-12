@@ -445,3 +445,31 @@ export async function borrarAltaOnboardingSinPotrero(empresaId: string): Promise
     .eq('origen', 'onboarding')
   if (error) throw new Error(error.message)
 }
+
+export type MotivoSalida = 'venta' | 'muerte' | 'correccion'
+
+/**
+ * Salieron, por cantidad (RPC `salida_por_cantidad`): «vendí 12 terneros del
+ * 11B» sin leer caravanas. Da de baja primero los sin caravana; los
+ * caravaneados que entran en la cuenta quedan «pendientes de identificar».
+ */
+export async function salidaPorCantidad(input: {
+  empresaId: string
+  potreroId: string
+  items: ItemCargaMasiva[]
+  motivo: MotivoSalida
+  fecha?: string
+  nota?: string
+}): Promise<{ salieron: number; pendientesIdentificar: number; salidaId: string }> {
+  const { data, error } = await supabase.rpc('salida_por_cantidad', {
+    p_empresa_id: input.empresaId,
+    p_potrero_id: input.potreroId,
+    p_items: input.items.filter((it) => it.cantidad > 0),
+    p_motivo: input.motivo,
+    p_fecha: input.fecha || undefined,
+    p_nota: input.nota?.trim() || undefined,
+  })
+  if (error) throw new Error(error.message)
+  const r = data as { salieron: number; pendientes_identificar: number; salida_id: string }
+  return { salieron: r.salieron, pendientesIdentificar: r.pendientes_identificar, salidaId: r.salida_id }
+}

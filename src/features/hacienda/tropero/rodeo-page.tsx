@@ -11,6 +11,7 @@ import { categoriaNombre, type Especie } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
+import { EntradasSalidas } from './entradas-salidas-panel'
 import { AnimalNuevo } from './paneles'
 import { bajadaDelRodeo, ESTADO_TEXTO, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo } from './rodeo'
 
@@ -63,6 +64,7 @@ export function RodeoPage() {
   const [buscar, setBuscar] = useState('')
   const [todas, setTodas] = useState(false)
   const [nuevo, setNuevo] = useState(false)
+  const [entradaSalida, setEntradaSalida] = useState<'entraron' | 'salieron' | null>(null)
   const { data: membresia } = useEmpresa()
   const estado = (params.get('sinCaravana') === '1' ? 'sinCaravana' : params.get('estado')) as Estado | null
 
@@ -153,15 +155,32 @@ export function RodeoPage() {
           <div className="flex flex-wrap gap-2.5">
             <button
               type="button"
-              onClick={() => setNuevo(true)}
+              onClick={() => setEntradaSalida('entraron')}
               className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
             >
-              Un animal nuevo
+              Entraron
               <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
                 <Icono nombre="Agregar" tamano={16} />
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => setEntradaSalida('salieron')}
+              className="inline-flex h-10 items-center rounded-full bg-acento px-4 text-[14.5px] font-bold text-acento-texto hover:bg-trigo-500"
+            >
+              Salieron
+            </button>
+            <button
+              type="button"
+              onClick={() => setNuevo(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
+            >
+              <Icono nombre="Caravana" tamano={16} /> Uno, con su caravana
+            </button>
             {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={especie} abierto={nuevo} onCerrar={() => setNuevo(false)} />}
+            {membresia?.empresa_id && entradaSalida && (
+              <EntradasSalidas key={entradaSalida} modo={entradaSalida} empresaId={membresia.empresa_id} abierto onCerrar={() => setEntradaSalida(null)} />
+            )}
           </div>
         </div>
         <StockPorCategoria cats={r.porCategoria} total={r.total} especie={especie} />

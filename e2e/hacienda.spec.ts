@@ -6,7 +6,7 @@ const rfid = (sufijo = '') => `E2E${Date.now()}${sufijo}`
 
 async function darDeAlta(page: Page, caravana: string) {
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
-  await page.getByRole('button', { name: 'Un animal nuevo' }).click()
+  await page.getByRole('button', { name: 'Uno, con su caravana' }).click()
   const alta = page.getByRole('dialog', { name: 'Un animal nuevo' })
   await alta.getByLabel('Caravana electrónica').fill(caravana)
   await alta.getByRole('button', { name: 'Vaca', exact: true }).click()
@@ -84,4 +84,48 @@ test('acciones del animal: registrar evento → cambiar caravana → dar de baja
   await baja.getByRole('button', { name: 'Anotar la venta' }).click()
   await expect(baja).toBeHidden()
   await expect(page.getByText('Vendido', { exact: true })).toBeVisible()
+})
+
+/** Toca un potrero en el croquis del panel (o su botón, si el campo no está dibujado). */
+async function tocarPotrero(page: Page, nombre: string) {
+  const etiqueta = page.locator('.leaflet-tooltip', { hasText: new RegExp(`^${nombre}`) }).first()
+  if (await etiqueta.count()) {
+    const b = (await etiqueta.boundingBox())!
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2)
+  } else {
+    await page.getByRole('dialog').getByRole('button', { name: new RegExp(`^${nombre}`) }).first().click()
+  }
+}
+
+test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+
+  // Salieron · Los vendí: una vaca del 1A. Todas tienen caravana → queda para identificar.
+  await page.getByRole('button', { name: 'Salieron' }).click()
+  const panel = page.getByRole('dialog')
+  await panel.getByRole('button', { name: /Los vendí/ }).click()
+  await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
+  await tocarPotrero(page, '1A')
+  await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
+  await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
+  await expect(panel.getByText(/pendiente de identificar/)).toBeVisible()
+  await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
+  await expect(panel.getByRole('heading', { name: 'Se vendió 1 vaca' })).toBeVisible()
+  await expect(panel.getByText(/Decir cuáles fueron: 1 con caravana/)).toBeVisible()
+  await panel.getByRole('button', { name: 'Listo' }).click()
+
+  // Entraron · Nacieron: dos terneros en el 1A, sin caravana.
+  await page.getByRole('button', { name: 'Entraron' }).click()
+  await panel.getByRole('button', { name: /Nacieron/ }).click()
+  await panel.getByLabel('Campo').selectOption({ label: 'E2E Campo base' })
+  await tocarPotrero(page, '1A')
+  await panel.getByRole('button', { name: 'Uno más: Terneros' }).click()
+  await panel.getByRole('button', { name: 'Uno más: Terneros' }).click()
+  await panel.getByRole('button', { name: /Revisar: 2 terneros/ }).click()
+  await panel.getByRole('button', { name: 'Sumar 2 terneros' }).click()
+  await expect(panel.getByRole('heading', { name: 'Sumamos 2 terneros nacidos' })).toBeVisible()
+  await panel.getByRole('button', { name: 'Listo' }).click()
+  await page.getByRole('button', { name: /sin caravana/ }).click()
+  await expect(page.getByRole('row', { name: /Ternero/ }).first()).toBeVisible()
 })

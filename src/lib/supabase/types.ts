@@ -1539,6 +1539,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      salida_por_cantidad: {
+        Args: {
+          p_empresa_id: string
+          p_fecha?: string
+          p_items: Json
+          p_motivo: string
+          p_nota?: string
+          p_potrero_id: string
+        }
+        Returns: Json
+      }
       marcar_senal: {
         Args: {
           p_empresa_id: string
@@ -1613,7 +1624,7 @@ export type Database = {
       cultivo_obs_estado: "bien" | "regular" | "mal"
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
-      estado_animal: "activo" | "vendido" | "muerto"
+      estado_animal: "activo" | "vendido" | "muerto" | "corregido"
       estado_ciclo_potrero:
         | "ganadero"
         | "descanso"
@@ -1830,7 +1841,7 @@ export const Constants = {
       cultivo_obs_estado: ["bien", "regular", "mal"],
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
-      estado_animal: ["activo", "vendido", "muerto"],
+      estado_animal: ["activo", "vendido", "muerto", "corregido"],
       estado_ciclo_potrero: [
         "ganadero",
         "descanso",

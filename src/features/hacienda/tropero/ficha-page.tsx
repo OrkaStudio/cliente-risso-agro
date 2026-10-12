@@ -60,7 +60,7 @@ export function FichaPage() {
   const historia = historiaDelAnimal(evs)
   const titulo = tituloDelAnimal(a.categoria, a.sexo)
   const panelAnimal = { id, empresaId: a.empresa_id ?? '', visual: a.caravana_visual, rfid: a.caravana_rfid, potreroId: a.potrero_id }
-  const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : 'De baja'
+  const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : a.estado === 'corregido' ? 'Corregido: estaba cargado de más' : 'De baja'
 
   return (
     <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">

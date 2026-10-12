@@ -26,6 +26,9 @@ function invalidarStock(qc: QueryClient) {
     ['tropas-potrero'],
     ['tropas-campo'],
     ['panorama-inicio'],
+    // Las cabezas de cada campo en la barra lateral y lo que hay para atender.
+    ['mapa'],
+    ['para-atender-campo'],
   ]) {
     qc.invalidateQueries({ queryKey: key })
   }
@@ -148,6 +151,19 @@ export function useDarBaja(animalId: string) {
       qc.invalidateQueries({ queryKey: ['animal', animalId] })
       qc.invalidateQueries({ queryKey: ['eventos', animalId] })
       invalidarStock(qc)
+    },
+  })
+}
+
+export function useSalidaPorCantidad() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.salidaPorCantidad,
+    onSuccess: () => {
+      invalidarStock(qc)
+      qc.invalidateQueries({ queryKey: ['eventos'] })
+      qc.invalidateQueries({ queryKey: ['eventos-senales'] })
+      qc.invalidateQueries({ queryKey: ['animal'] })
     },
   })
 }
