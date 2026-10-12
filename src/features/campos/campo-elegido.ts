@@ -5,11 +5,11 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 
 /**
- * Qué campo mira el Inicio: uno, o todos juntos. Con un solo campo no hay nada
+ * Qué campo mira la Oficina (Inicio, Hacienda): uno, o todos juntos. Con un solo campo no hay nada
  * que elegir. Se recuerda en este dispositivo. Elegir un campo también lleva el
  * clima a ese campo (la barra de arriba y el panel dicen lo mismo).
  */
-const CLAVE = 'inicio-campo-id'
+const CLAVE = 'inicio-campo-id' // el nombre viejo se conserva: no se pierde lo elegido
 const TODOS = 'todos'
 const oyentes = new Set<() => void>()
 
@@ -35,7 +35,7 @@ function suscribir(f: () => void) {
 
 export type CampoElegible = { id: string; nombre: string; letra: string; color: string }
 
-export function useCampoDelInicio(): {
+export function useCampoElegido(): {
   campos: CampoElegible[]
   /** El campo elegido, o null para todos. */
   elegido: CampoElegible | null

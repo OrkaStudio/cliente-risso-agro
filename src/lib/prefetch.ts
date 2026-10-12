@@ -46,7 +46,7 @@ export const CHUNKS_CAMPO: Record<string, Thunk> = {
 
 /** Chunks de las secciones del Modo Oficina (escritorio). */
 export const CHUNKS_OFICINA: Record<string, Thunk> = {
-  '/hacienda': () => import('@/features/hacienda/animales-page'),
+  '/hacienda': () => import('@/features/hacienda/tropero/rodeo-page'),
   '/campos': () => import('@/features/lotes/lotes-page'),
   '/analitica': () => import('@/features/analitica/analitica-page'),
   '/agenda': () => import('@/features/agenda/agenda-page'),

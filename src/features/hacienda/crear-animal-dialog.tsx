@@ -43,7 +43,7 @@ const schema = z.object({
 })
 
 /** Alta de animal por caravana (RFID), en diálogo (misma lógica que el resto). */
-export function CrearAnimalDialog() {
+export function CrearAnimalDialog({ renderTrigger }: { renderTrigger?: (abrir: () => void) => React.ReactNode } = {}) {
   const empresa = useEmpresa()
   const potreros = usePotreros()
   const crear = useCrearAnimal()
@@ -107,7 +107,7 @@ export function CrearAnimalDialog() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>+ Nuevo animal</Button>
+      {renderTrigger ? renderTrigger(() => setOpen(true)) : <Button onClick={() => setOpen(true)}>+ Nuevo animal</Button>}
       <FormDialog
         open={open}
         onOpenChange={setOpen}

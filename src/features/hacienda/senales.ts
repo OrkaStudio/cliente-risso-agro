@@ -30,6 +30,8 @@ export type ResumenAnimal = {
   /** Último tacto positivo sin un parto posterior que lo cierre. */
   prenada: { fecha: string; meses: number | null } | null
   ultimoPeso: { kg: number; fecha: string } | null
+  /** El último tacto, dé lo que dé (para decir «Vacía» además de «Preñada»). */
+  ultimoTacto: { fecha: string; resultado: 'prenada' | 'vacia' } | null
   partos: number
   ultimoParto: string | null
 }
@@ -39,6 +41,7 @@ const RESUMEN_VACIO: ResumenAnimal = {
   tratamiento: null,
   prenada: null,
   ultimoPeso: null,
+  ultimoTacto: null,
   partos: 0,
   ultimoParto: null,
 }
@@ -69,6 +72,7 @@ export function resumirEventos(eventos: EventoSenal[]): Map<string, ResumenAnima
       }
       case 'tacto': {
         const res = campo(ev.datos, 'resultado')
+        if (res === 'prenada' || res === 'vacia') r.ultimoTacto = { fecha: ev.fecha, resultado: res }
         r.prenada =
           res === 'prenada'
             ? { fecha: ev.fecha, meses: num(campo(ev.datos, 'meses')) }

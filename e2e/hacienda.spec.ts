@@ -7,13 +7,15 @@ const rfid = (sufijo = '') => `E2E${Date.now()}${sufijo}`
 async function darDeAlta(page: Page, caravana: string) {
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Hacienda', level: 1 })).toBeVisible()
-  await page.getByRole('button', { name: '+ Nuevo animal' }).click()
+  await page.getByRole('button', { name: 'Un animal nuevo' }).click()
   const alta = page.getByRole('dialog', { name: 'Nuevo animal' })
   await alta.getByLabel('Caravana (RFID) *').fill(caravana)
   await elegir(page, 'Categoría', 'Vaca')
   await elegir(page, 'Potrero', /1A/)
   await alta.getByRole('button', { name: 'Dar de alta' }).click()
   await expect(alta).toBeHidden()
+  // El rodeo es largo: se busca por la caravana, como lo haría el productor.
+  await page.getByPlaceholder('Buscá una caravana').fill(caravana)
 }
 
 test('golden path Hacienda: login → alta → stock → ficha', async ({ page }) => {
@@ -24,10 +26,10 @@ test('golden path Hacienda: login → alta → stock → ficha', async ({ page }
   // Stock: la fila del animal, con su potrero
   const fila = page.getByRole('row', { name: new RegExp(caravana) })
   await expect(fila).toBeVisible()
-  await expect(fila.getByRole('link', { name: '1A' })).toBeVisible()
+  await expect(fila).toContainText('1A')
 
   // Ficha: la caravana y el alta en el historial
-  await fila.getByRole('link', { name: 'Ver ficha' }).click()
+  await fila.getByRole('link').click()
   await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
   await expect(page.getByRole('heading', { name: caravana, level: 1 })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Historial' })).toBeVisible()
@@ -43,7 +45,7 @@ test('acciones del animal: registrar evento → cambiar caravana → dar de baja
   await darDeAlta(page, caravanaA)
   await page
     .getByRole('row', { name: new RegExp(caravanaA) })
-    .getByRole('link', { name: 'Ver ficha' })
+    .getByRole('link')
     .click()
   await expect(page.getByRole('heading', { name: caravanaA, level: 1 })).toBeVisible()
 
