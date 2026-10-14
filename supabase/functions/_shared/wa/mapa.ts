@@ -72,7 +72,7 @@ export async function atenderMapa(campo: Campo, io: MapaIO): Promise<boolean> {
   }
   const incompleto = imagen.faltantes.length ? ` Sin dibujo: ${imagen.faltantes.join(', ')}.` : ''
   const vista = imagen.satelital ? 'Vista satelital de referencia' : 'Croquis de respaldo: el satélite no está disponible ahora'
-  const caption = `${vista} · ${datos.nombre} · ${imagen.dibujados} potreros dibujados.${incompleto}\nDescargá la imagen antes de salir al campo. Los números se corresponden con los nombres de la lista. Para completar una observación, escribí el nombre del potrero; no hace falta repetir el audio ni compartir ubicación en vivo.`
+  const caption = `${vista} · ${datos.nombre} · ${imagen.dibujados} potreros dibujados.${incompleto}\nMirá los nombres de los potreros; los números de referencia están en la lista. Si tenés una observación pendiente, respondé con el nombre del potrero; no hace falta repetir el audio ni compartir ubicación en vivo.`
   await io.enviarImagen(imagen.bytes, [...caption].slice(0, 1024).join(''), campo.id)
   return true
 }
