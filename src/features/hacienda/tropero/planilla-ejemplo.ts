@@ -48,7 +48,7 @@ export async function bajarPlanillaEjemplo(potreros: string[]) {
     fila('Caravana visible', 'El número grande de la caravana, el que se lee de lejos.', '1161', 'Sí'),
     fila('Categoría', 'Qué es el animal. Sirve en singular o en plural.', 'Ternero', 'Sí'),
     fila('Potrero', `El nombre del potrero, como está en Tropero (por ejemplo ${p1}). Si lo dejás vacío, va al campo que elijas al subirla.`, p1, 'No'),
-    fila('Electrónica', 'Los 15 números del chip (los que lee el bastón). Si falta, la caravana se pone igual y el chip se empareja en la próxima manga.', '032530055581161', 'No'),
+    fila('Electrónica', 'Los 15 números del chip. Si falta, la caravana se pone igual y la electrónica se suma después.', '032530055581161', 'No'),
     fila('Nacimiento', 'Día/mes/año. Si no se sabe, vacío.', '03/02/2026', 'No'),
     fila('Raza', 'Si la sabés.', 'Angus', 'No'),
     [],

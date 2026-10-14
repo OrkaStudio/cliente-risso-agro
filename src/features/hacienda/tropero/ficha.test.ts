@@ -40,3 +40,23 @@ describe('la ficha del animal', () => {
     expect(avisoDelAnimal('nada', undefined)).toBeNull()
   })
 })
+
+describe('la historia con una salida corregida', () => {
+  it('la baja que después se deshizo se muestra como anotación corregida', () => {
+    const h = historiaDelAnimal([
+      ev('baja', '2026-10-12', { estado: 'vendido', salida_id: 's1' }),
+      { id: 'n1', tipo: 'nota', fecha: '2026-10-14', datos: { resuelve: 'baja-2026-10-12', vuelve_al_rodeo: true }, nota: 'Vuelve al rodeo: la salida queda sin identificar' },
+    ])
+    expect(h.map((x) => [x.titulo, x.detalle])).toEqual([
+      ['Volvió al rodeo', 'Vuelve al rodeo: la salida queda sin identificar'],
+      ['Se anotó como vendida', 'Después se corrigió: no era ésta'],
+    ])
+  })
+  it('una anulada también', () => {
+    const h = historiaDelAnimal([
+      ev('baja', '2026-10-12', { estado: 'vendido', salida_id: 's9' }),
+      { id: 'n2', tipo: 'nota', fecha: '2026-10-13', datos: { anula_salida: 's9', vuelve_al_rodeo: true }, nota: 'Se anuló la salida: vuelve al rodeo' },
+    ])
+    expect(h[1]!.titulo).toBe('Se anotó como vendida')
+  })
+})

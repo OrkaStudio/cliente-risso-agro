@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
-import { useAnimal, useEventos, useLote, usePotreros } from '@/features/hacienda/hooks'
+import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
+import { categoriaNombre } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
@@ -40,6 +42,9 @@ export function FichaPage() {
   const { campos } = useCampoElegido()
   const hoyISO = hoyLocal()
   const [panel, setPanel] = useState<'anotar' | 'caravana' | 'baja' | null>(null)
+  const navigate = useNavigate()
+  const salidasQ = useSalidasSinIdentificar()
+  const fueEsta = useIdentificarAnimal()
 
   const resumen = useMemo(
     () => (eventos.data ? resumirEventos(eventos.data.map((e) => ({ animal_id: e.animal_id, tipo: e.tipo, fecha: e.fecha, datos: e.datos }))).get(id) : undefined),
@@ -82,11 +87,11 @@ export function FichaPage() {
               <dd className="cifra text-[24px] font-bold text-texto">{a.caravana_visual ?? '—'}</dd>
             </div>
             <div className="flex items-baseline justify-between gap-4 py-3">
-              <dt className="text-[14px] text-texto-suave">Electrónica, la que lee el bastón</dt>
+              <dt className="text-[14px] text-texto-suave">Electrónica, la del chip</dt>
               <dd className="cifra text-[22px] font-bold text-texto">{a.caravana_rfid ?? '—'}</dd>
             </div>
           </dl>
-          {!a.caravana_rfid && activo && <p className="mt-3 text-center text-[13.5px] text-texto-suave">Se le pone caravana la próxima vez que pase por la manga.</p>}
+          {!a.caravana_rfid && activo && <p className="mt-3 text-center text-[13.5px] text-texto-suave">Cuando le pongas caravana, cargala con «Cambiar caravana» o con la planilla.</p>}
         </div>
 
         {/* Quién es y qué hacer */}
@@ -123,6 +128,50 @@ export function FichaPage() {
           )}
         </div>
       </section>
+
+      {/* Puede ser la que salió: estaba en ese potrero el día de una salida sin identificar. */}
+      {activo &&
+        (salidasQ.data ?? [])
+          .filter((x) => x.posiblesIds.includes(id))
+          .map((x) => {
+            const pot = potreros.data?.find((p) => p.id === x.potreroId)?.nombre ?? ''
+            const que = `${x.pendientes} ${categoriaNombre(x.categoria, x.pendientes).toLowerCase()}`
+            const verbo = x.motivo === 'muerte' ? (x.pendientes === 1 ? 'murió' : 'murieron') : x.pendientes === 1 ? 'se vendió' : 'se vendieron'
+            const fecha = `${x.fecha.slice(8, 10)}/${x.fecha.slice(5, 7)}`
+            return (
+              <section key={x.salidaId} className="flex flex-wrap items-center gap-4 rounded-[20px] border border-estado-atencion/40 bg-estado-atencion-suave/40 px-6 py-4">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-estado-atencion-suave text-estado-atencion-texto">
+                  <Icono nombre="Caravana" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15.5px] font-bold text-texto">¿Fue ésta?</p>
+                  <p className="text-[14px] text-texto-suave">
+                    El {fecha} {verbo} {que} del {pot} sin decir {x.pendientes === 1 ? 'cuál' : 'cuáles'}. Ésta estaba ahí ese día: puede ser {x.pendientes === 1 ? 'la que salió' : 'una de las que salieron'} ({x.posibles} posibles).
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={fueEsta.isPending}
+                    onClick={async () => {
+                      try {
+                        await fueEsta.mutateAsync({ animalId: id, salidaId: x.salidaId })
+                        toast.success(`Listo: quedó como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} el ${fecha}`, { description: 'El número del rodeo no cambia: ya estaba restado.' })
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
+                      }
+                    }}
+                    className="inline-flex h-10 items-center rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-50"
+                  >
+                    Sí, fue ésta
+                  </button>
+                  <button type="button" onClick={() => navigate(`/hacienda?salida=${x.salidaId}`)} className={SECUNDARIO}>
+                    Ver las {x.posibles} posibles
+                  </button>
+                </div>
+              </section>
+            )
+          })}
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Panel titulo="Lo que hay que saber">

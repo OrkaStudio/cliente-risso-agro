@@ -5,7 +5,7 @@ import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { QueCampo } from '@/features/campos/que-campo'
-import { useAnimales, useBajasPendientes, useEventosSenales, usePotreros } from '@/features/hacienda/hooks'
+import { useAnimales, useEventosSenales, usePotreros, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { categoriaNombre, type Especie } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { CaravanasPorExcel, IdentificarSalidas } from './caravanas-paneles'
 import { EntradasSalidas } from './entradas-salidas-panel'
 import { AnimalNuevo } from './paneles'
-import { bajadaDelRodeo, ESTADO_TEXTO, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo } from './rodeo'
+import { bajadaDelRodeo, ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type FilaSalida } from './rodeo'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 /** Cuántas filas se ven antes de «Ver los N». */
@@ -68,10 +68,13 @@ export function RodeoPage() {
   const [todas, setTodas] = useState(false)
   const [nuevo, setNuevo] = useState(false)
   const [entradaSalida, setEntradaSalida] = useState<'entraron' | 'salieron' | null>(null)
-  const [panelCaravanas, setPanelCaravanas] = useState<'excel' | 'identificar' | null>(null)
-  const pendientes = useBajasPendientes()
+  const [panelCaravanas, setPanelCaravanas] = useState<'excel' | 'identificar' | null>(params.get('salida') ? 'identificar' : null)
+  const salidasQ = useSalidasSinIdentificar()
+  const [salidaFoco, setSalidaFoco] = useState<string | null>(params.get('salida'))
   const { data: membresia } = useEmpresa()
-  const estado = (params.get('sinCaravana') === '1' ? 'sinCaravana' : params.get('estado')) as Estado | null
+  const estadoParam = params.get('sinCaravana') === '1' ? 'sinCaravana' : params.get('estado')
+  const verSinIdentificar = estadoParam === 'sinIdentificar'
+  const estado = (verSinIdentificar ? null : estadoParam) as Estado | null
 
   const campoId = elegido.elegido?.id ?? null
   const base = useMemo(() => {
@@ -89,13 +92,20 @@ export function RodeoPage() {
   if (animales.isLoading || potreros.isLoading) return <div className="mx-auto h-[280px] w-full max-w-[1104px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
   if (animales.error) return <p className="text-texto-suave">No pudimos cargar la hacienda. Revisá la conexión y probá de nuevo.</p>
 
-  const resumen = resumirRodeo(base, elegido.campos)
+  // Las salidas que restaron el número sin decir cuál fue (del campo que se mira).
+  const salidasTodas = filasDeSalidas(salidasQ.data ?? [], (potreros.data ?? []).map((p) => ({ id: p.id, nombre: p.nombre, campo_id: p.campo_id })), elegido.campos).filter(
+    (x) => !campoId || x.campoId === campoId,
+  )
+  const resumen = resumirRodeo(base, elegido.campos, salidasTodas)
   const deEspecie = especie === 'todas' ? base : base.filter((f) => f.especie === especie)
-  const r = resumirRodeo(deEspecie, elegido.campos)
+  const salidas = salidasTodas.filter((x) => (especie === 'todas' || x.especie === especie) && (!categoria || x.categoria === categoria))
+  const r = resumirRodeo(deEspecie, elegido.campos, especie === 'todas' ? salidasTodas : salidasTodas.filter((x) => x.especie === especie))
+  const sinIdentificar = salidas.reduce((t, x) => t + x.pendientes, 0)
   const q = buscar.trim().replace(/\s+/g, '')
   const lista = deEspecie.filter(
     (f) =>
-      (!estado || f.estado === estado) &&
+      // Buscar una caravana busca en todo el rodeo, esté en la pestaña que esté.
+      (q || (!verSinIdentificar && (!estado || f.estado === estado))) &&
       (!categoria || f.categoria === categoria) &&
       (!q || (f.visual ?? '').replace(/\s+/g, '').includes(q) || (f.rfid ?? '').replace(/\s+/g, '').includes(q)),
   )
@@ -107,7 +117,7 @@ export function RodeoPage() {
   const cuantosDe = (e: Vista) => (e === 'todas' ? resumen.total : resumen.porEspecie[e])
   const nombreVista = vista === 'todas' ? (r.total === 1 ? 'cabeza' : 'cabezas') : ESPECIES.find((e) => e.especie === vista)!.nombre.toLowerCase()
   const nCampos = campoId ? 1 : r.porCampo.length
-  const elegirEstado = (e: Estado | null) => {
+  const elegirEstado = (e: Estado | 'sinIdentificar' | null) => {
     const p = new URLSearchParams(params)
     p.delete('sinCaravana')
     if (e) p.set('estado', e)
@@ -185,7 +195,20 @@ export function RodeoPage() {
             {membresia?.empresa_id && (
               <>
                 <CaravanasPorExcel key={`x${panelCaravanas}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
-                <IdentificarSalidas empresaId={membresia.empresa_id} abierto={panelCaravanas === 'identificar'} onCerrar={() => setPanelCaravanas(null)} />
+                <IdentificarSalidas
+                  empresaId={membresia.empresa_id}
+                  abierto={panelCaravanas === 'identificar'}
+                  salidaFoco={salidaFoco}
+                  onCerrar={() => {
+                    setPanelCaravanas(null)
+                    setSalidaFoco(null)
+                    if (params.has('salida')) {
+                      const p = new URLSearchParams(params)
+                      p.delete('salida')
+                      setParams(p, { replace: true })
+                    }
+                  }}
+                />
               </>
             )}
             {membresia?.empresa_id && entradaSalida && (
@@ -207,19 +230,19 @@ export function RodeoPage() {
       </motion.section>
 
       {/* Algo para resolver: un aviso con su botón (no es un filtro). */}
-      {(pendientes.data?.length ?? 0) > 0 && (
+      {sinIdentificar > 0 && (
         <motion.div {...entra(2)} className="flex items-center gap-4 rounded-[18px] border border-borde bg-superficie px-5 py-3.5">
           <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-estado-atencion-suave text-estado-atencion-texto">
             <Icono nombre="Caravana" />
           </span>
           <p className="min-w-0 flex-1 text-[15px] text-texto">
             <b>
-              {pendientes.data!.length} {pendientes.data!.length === 1 ? 'animal salió' : 'animales salieron'} sin decir cuál
+              {sinIdentificar} {sinIdentificar === 1 ? 'animal salió' : 'animales salieron'} sin decir cuál
             </b>
-            <span className="block text-[13.5px] text-texto-suave">Se vendieron o murieron por cantidad. Decí qué caravanas eran para que la ficha de cada uno quede bien.</span>
+            <span className="block text-[13.5px] text-texto-suave">Ya se restaron del número. Cuando sepas cuál fue, decilo acá o desde la ficha del animal; mientras, las fichas no cambian.</span>
           </p>
           <BotonChico type="button" onClick={() => setPanelCaravanas('identificar')}>
-            {pendientes.data!.length === 1 ? 'Decir cuál' : 'Decir cuáles'}
+            {sinIdentificar === 1 ? 'Decir cuál' : 'Decir cuáles'}
           </BotonChico>
         </motion.div>
       )}
@@ -227,10 +250,14 @@ export function RodeoPage() {
       {/* La lista */}
       <motion.section {...entra(3)} className="overflow-hidden rounded-[20px] border border-borde bg-superficie">
         {/* Filtrar por lo que hay que hacer: pestañas con su cuenta. */}
-        {FILTROS.some((f) => r.porEstado[f.estado]) && (
+        {(FILTROS.some((f) => r.porEstado[f.estado]) || sinIdentificar > 0) && (
           <div role="tablist" aria-label="Mostrar" className="flex flex-wrap items-center gap-1 border-b border-borde px-4 pt-3">
-            {[{ estado: null as Estado | null, texto: 'Todos', n: r.total }, ...FILTROS.filter((f) => r.porEstado[f.estado]).map((f) => ({ ...f, n: r.porEstado[f.estado]! }))].map((f) => {
-              const activo = estado === f.estado
+            {[
+              { estado: null as Estado | 'sinIdentificar' | null, texto: 'Todos', n: r.total },
+              ...(sinIdentificar > 0 ? [{ estado: 'sinIdentificar' as const, texto: 'Sin identificar', n: sinIdentificar }] : []),
+              ...FILTROS.filter((f) => r.porEstado[f.estado]).map((f) => ({ ...f, n: r.porEstado[f.estado]! })),
+            ].map((f) => {
+              const activo = f.estado === 'sinIdentificar' ? verSinIdentificar : !verSinIdentificar && estado === f.estado
               return (
                 <button
                   key={f.texto}
@@ -243,7 +270,7 @@ export function RodeoPage() {
                     activo ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto',
                   )}
                 >
-                  {f.estado && <span className={cn('size-2 rounded-full', PUNTO[f.estado])} />}
+                  {f.estado && <span className={cn('size-2 rounded-full', f.estado === 'sinIdentificar' ? 'bg-estado-atencion' : PUNTO[f.estado])} />}
                   {f.texto}
                   <span className={cn('cifra rounded-full px-1.5 text-[14px]', activo ? 'bg-principal-suave text-principal' : 'bg-superficie-hundida text-texto-suave')}>{f.n}</span>
                 </button>
@@ -292,7 +319,7 @@ export function RodeoPage() {
           </button>
         </div>
 
-        {lista.length === 0 ? (
+        {lista.length === 0 && (q || !(verSinIdentificar || (!estado && salidas.length > 0))) ? (
           <p className="px-6 py-10 text-center text-[15px] text-texto-suave">
             {deEspecie.length === 0 ? (campoId ? `${elegido.elegido!.nombre} no tiene ${vista === 'todas' ? 'hacienda' : ESPECIES.find((e) => e.especie === vista)!.nombre.toLowerCase()}.` : 'Todavía no hay hacienda cargada.') : 'Ningún animal coincide con lo que elegiste.'}
           </p>
@@ -308,6 +335,18 @@ export function RodeoPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-borde">
+              {!q &&
+                (verSinIdentificar || !estado) &&
+                salidas.map((x) => (
+                  <FilaDeSalida
+                    key={x.salidaId}
+                    x={x}
+                    onClick={() => {
+                      setSalidaFoco(x.salidaId)
+                      setPanelCaravanas('identificar')
+                    }}
+                  />
+                ))}
               {visibles.map((f) => (
                 <Fila key={f.id} f={f} onClick={() => navigate(`/hacienda/${f.id}`)} />
               ))}
@@ -401,6 +440,34 @@ function Fila({ f, onClick }: { f: FilaRodeo; onClick: () => void }) {
             {ESTADO_TEXTO[f.estado]}
           </span>
         )}
+      </td>
+    </tr>
+  )
+}
+
+const DIA = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+
+/** Una salida sin identificar, como fila de la lista: no es un animal, es una cuenta pendiente. */
+function FilaDeSalida({ x, onClick }: { x: FilaSalida; onClick: () => void }) {
+  const que = `${x.pendientes} ${categoriaNombre(x.categoria, x.pendientes).toLowerCase()}`
+  const verbo = x.motivo === 'muerte' ? (x.pendientes === 1 ? 'murió' : 'murieron') : x.pendientes === 1 ? 'vendida' : 'vendidas'
+  return (
+    <tr onClick={onClick} className="cursor-pointer bg-estado-atencion-suave/25 transition-colors hover:bg-estado-atencion-suave/50">
+      <td className="py-3 pl-5">
+        <span className="grid h-8 w-12 place-items-center rounded-[8px] border-[1.5px] border-dashed border-estado-atencion text-[16px] font-bold text-estado-atencion-texto">?</span>
+      </td>
+      <td className="py-3 pr-4 text-[15px] font-semibold text-texto">
+        {que} {verbo}
+      </td>
+      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{x.donde}</td>
+      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-lg:hidden">
+        El {DIA(x.fecha)}, sin decir {x.pendientes === 1 ? 'cuál' : 'cuáles'} · {x.posibles} posibles
+      </td>
+      <td className="py-3 pr-5">
+        <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
+          <span className="size-2 rounded-full bg-estado-atencion" />
+          Decir {x.pendientes === 1 ? 'cuál' : 'cuáles'}
+        </span>
       </td>
     </tr>
   )

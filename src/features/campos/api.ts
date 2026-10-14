@@ -78,10 +78,8 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
-    supabase
-      .from('v_animal_con_caravana')
-      .select('categoria, potrero_id, estado')
-      .eq('estado', 'activo'),
+    // Las cabezas por categoría ya sin las salidas sin identificar.
+    supabase.from('v_composicion_potrero').select('categoria, potrero_id, cabezas'),
   ])
   if (eC) throw new Error(eC.message)
   if (eP) throw new Error(eP.message)
@@ -93,7 +91,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
   for (const a of animales ?? []) {
     if (!a.categoria || !a.potrero_id) continue
     const m = catPorPotrero.get(a.potrero_id) ?? new Map<Categoria, number>()
-    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
     catPorPotrero.set(a.potrero_id, m)
   }
 

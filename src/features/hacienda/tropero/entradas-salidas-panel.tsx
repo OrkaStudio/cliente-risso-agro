@@ -5,7 +5,7 @@ import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
-import { useAnimales, useCrearAnimalesMasivo, useMoverAnimales, useSalidaPorCantidad } from '@/features/hacienda/hooks'
+import { useAnimales, useCrearAnimalesMasivo, useMoverAnimales, useSalidaPorCantidad, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { CroquisElegir } from '@/features/mapa/croquis-elegir'
 import { CaravanasQueSalieron } from './caravanas'
@@ -29,7 +29,7 @@ import {
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 type Paso = 'que' | 'cuantos' | 'adonde' | 'revisa' | 'listo'
-type Resultado = { titulo: string; quedan: string; pendientes: number }
+type Resultado = { titulo: string; quedan: string; sinIdentificar: number }
 
 const ICONO_QUE: Record<string, NombreIcono> = {
   venta: 'Plata',
@@ -81,7 +81,9 @@ export function EntradasSalidas({
   const [caravanas, setCaravanas] = useState<string[]>([])
 
   const campos = useMemo(() => (mapa ?? []).filter((c) => c.potreros.length > 0), [mapa])
-  const comp = useMemo(() => composicionPorPotrero(animales.data ?? []), [animales.data])
+  const salidasQ = useSalidasSinIdentificar()
+  // Lo que hay de verdad en cada potrero: sin las salidas sin identificar.
+  const comp = useMemo(() => composicionPorPotrero(animales.data ?? [], salidasQ.data ?? []), [animales.data, salidasQ.data])
   const campo = campos.find((c) => c.id === campoId) ?? null
   const potrero = campo?.potreros.find((p) => p.id === potreroId) ?? null
   const destCampo = campos.find((c) => c.id === destCampoId) ?? null
@@ -133,14 +135,14 @@ export function EntradasSalidas({
     try {
       if (q.modo === 'salieron' && q.que !== 'otroCampo') {
         const r = await salida.mutateAsync({ empresaId, potreroId, items, motivo: q.que === 'venta' ? 'venta' : q.que === 'muerte' ? 'muerte' : 'correccion', fecha: cuando === 'hoy' ? hoyLocal() : fecha, caravanas })
-        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} quedan ${antes - r.salieron}.`, pendientes: r.pendientesIdentificar })
+        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} quedan ${antes - r.salieron}.`, sinIdentificar: r.sinIdentificar })
       } else if (mueve) {
         if (!destinoId) return
         await mover.mutateAsync({ empresaId, potreroOrigenId: potreroId, potreroDestinoId: destinoId, loteId: null, seleccion: { items } })
-        setHecho({ titulo: tituloListo(q, items), quedan: `Ahora están en el ${destino!.nombre} de ${destCampo!.nombre}.`, pendientes: 0 })
+        setHecho({ titulo: tituloListo(q, items), quedan: `Ahora están en el ${destino!.nombre} de ${destCampo!.nombre}.`, sinIdentificar: 0 })
       } else {
         await alta.mutateAsync({ empresaId, campoId, origen: q.que === 'compra' ? 'compra' : q.que === 'nacimiento' ? 'nacimiento' : 'correccion', bloques: [{ potreroId, items }] })
-        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} ahora hay ${antes + total}.`, pendientes: 0 })
+        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} ahora hay ${antes + total}.`, sinIdentificar: 0 })
       }
       setPaso('listo')
     } catch (e) {
@@ -317,13 +319,13 @@ export function EntradasSalidas({
           </span>
           <p className="mt-4 text-[16px] text-texto-suave">{hecho.quedan}</p>
           <ul className="mt-5 divide-y divide-borde border-y border-borde">
-            {hecho.pendientes > 0 && (
-              <Siguiente icono="Caravana" titulo={`Decir cuáles fueron: ${hecho.pendientes} con caravana`} bajada="En la próxima manga, el bastón los reconoce. Mientras, quedan «pendientes de identificar»." />
+            {hecho.sinIdentificar > 0 && (
+              <Siguiente icono="Caravana" titulo={`${hecho.sinIdentificar} sin identificar`} bajada="Ya se restaron del número; las fichas no cambian. Cuando sepas cuál fue, lo decís desde la ficha del animal o desde Hacienda." />
             )}
             {q.modo === 'salieron' && q.que === 'venta' && <Siguiente icono="Comprobante" titulo="La liquidación" bajada="Cuando llegue, sacale una foto desde Plata." />}
             {q.modo === 'entraron' && q.que === 'compra' && <Siguiente icono="Comprobante" titulo="La liquidación" bajada="Cuando llegue, sacale una foto desde Plata." />}
             {q.modo === 'entraron' && (q.que === 'compra' || q.que === 'nacimiento' || q.que === 'correccion') && (
-              <Siguiente icono="Caravana" titulo="Caravanearlos" bajada="Entran sin caravana: se la ponés en la próxima manga." />
+              <Siguiente icono="Caravana" titulo="Caravanearlos" bajada="Entran sin caravana: cuando se las pongas, las cargás con la planilla." />
             )}
             {sacan && (
               <li className="flex items-center gap-4 py-3.5">
@@ -599,7 +601,7 @@ function Revisa({
       )}
       {pendientes > 0 && (
         <p className="mt-6 rounded-[14px] bg-superficie px-4 py-3 text-[14.5px] text-texto">
-          Salen primero los que no tienen caravana. <b>{pendientes}</b> {pendientes === 1 ? 'tiene' : 'tienen'} caravana: {pendientes === 1 ? 'queda' : 'quedan'} «pendiente de identificar» hasta que digas cuál fue, en la próxima manga.
+          Salen primero los que no tienen caravana. De los que tienen, <b>{pendientes}</b> {pendientes === 1 ? 'queda' : 'quedan'} «sin identificar»: se restan del número ahora y las fichas no cambian hasta que digas cuál fue.
         </p>
       )}
       {q.modo === 'salieron' && q.que === 'correccion' && (

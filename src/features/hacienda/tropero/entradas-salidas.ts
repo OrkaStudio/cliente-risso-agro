@@ -27,7 +27,9 @@ export const OPCIONES_ENTRADA: { que: Entrada; titulo: string; bajada: string }[
 export type Hay = { total: number; sinCaravana: number }
 /** Lo que hay en cada potrero, por categoría: cuántos y cuántos sin caravana. */
 export function composicionPorPotrero(
-  animales: { potrero_id: string | null; categoria: Categoria | null; estado: string | null; caravana_rfid: string | null }[],
+  animales: { potrero_id: string | null; categoria: Categoria | null; estado: string | null; caravana_rfid: string | null; caravana_visual?: string | null }[],
+  /** Las salidas sin identificar: ya no están, se restan (de los con caravana: son ellos los que pueden haber salido). */
+  salidas: { potreroId: string; categoria: Categoria; pendientes: number }[] = [],
 ): Map<string, Map<Categoria, Hay>> {
   const m = new Map<string, Map<Categoria, Hay>>()
   for (const a of animales) {
@@ -35,9 +37,13 @@ export function composicionPorPotrero(
     const p = m.get(a.potrero_id) ?? new Map<Categoria, Hay>()
     const h = p.get(a.categoria) ?? { total: 0, sinCaravana: 0 }
     h.total += 1
-    if (!a.caravana_rfid) h.sinCaravana += 1
+    if (!a.caravana_rfid && !a.caravana_visual) h.sinCaravana += 1
     p.set(a.categoria, h)
     m.set(a.potrero_id, p)
+  }
+  for (const x of salidas) {
+    const h = m.get(x.potreroId)?.get(x.categoria)
+    if (h) h.total = Math.max(0, h.total - x.pendientes)
   }
   return m
 }

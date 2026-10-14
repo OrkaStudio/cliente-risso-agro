@@ -49,7 +49,8 @@ type Modo = 'despues' | 'lista' | 'planilla'
 
 /**
  * Las caravanas que salieron (página 35, «Revisá · Las caravanas»). En la compu
- * no se tipea ni se usa el bastón: se resuelve solo en la próxima manga, se
+ * no se tipea ni se usa el bastón: se deja para después (la salida queda sin
+ * identificar y el número ya está bien), se
  * eligen de una lista donde cada una se reconoce por lo que es, o se sube la
  * planilla de la venta. Sólo acepta las `posibles` (las del potrero que sale).
  */
@@ -76,7 +77,7 @@ export function CaravanasQueSalieron({
     return posibles.find((p) => (p.visual && soloDigitos(p.visual) === d) || (p.rfid && soloDigitos(p.rfid) === d)) ?? null
   }
   const opciones = [
-    ...(conDespues ? [{ valor: 'despues' as Modo, texto: 'En la manga' }] : []),
+    ...(conDespues ? [{ valor: 'despues' as Modo, texto: 'Después' }] : []),
     { valor: 'lista' as Modo, texto: 'De la lista' },
     { valor: 'planilla' as Modo, texto: 'Con planilla' },
   ]
@@ -86,8 +87,7 @@ export function CaravanasQueSalieron({
       <Segmentos etiqueta="Las caravanas" opciones={opciones} valor={modo} onCambio={(m) => (setModo(m), setAviso(null), m === 'despues' && onCambio([]))} />
       {modo === 'despues' && (
         <p className="mt-3 rounded-[14px] bg-superficie px-4 py-3 text-[14px] text-texto">
-          No hace falta hacer nada ahora: la cuenta del rodeo ya queda bien. En la próxima manga, los que el bastón no lea en este potrero son los que salieron.
-        </p>
+          Restamos del número ahora y las fichas no cambian. Cuando sepas cuál fue, lo decís desde la ficha del animal o desde Hacienda.</p>
       )}
       {modo === 'lista' && (
         <>
@@ -99,7 +99,7 @@ export function CaravanasQueSalieron({
         <div className="mt-3">
           <ZonaArchivo
             titulo="Soltá acá la planilla de la venta"
-            bajada="La de la consignataria, el veterinario o el bastón. Excel o CSV: leemos los números de caravana."
+            bajada="La de la consignataria o la del veterinario. Excel o CSV: leemos los números de caravana."
             cargando={leyendo}
             onArchivo={async (f) => {
               setLeyendo(true)
@@ -120,7 +120,7 @@ export function CaravanasQueSalieron({
       )}
       {modo === 'planilla' && elegidas.length > 0 && (
         <p className="mt-3 text-[14px] font-semibold text-texto">
-          Encontramos {elegidas.length} de {cuantas}.{elegidas.length < cuantas ? ' Las que falten se resuelven en la próxima manga.' : ''}
+          Encontramos {elegidas.length} de {cuantas}.{elegidas.length < cuantas ? ' Las que falten quedan sin identificar hasta que digas cuáles fueron.' : ''}
         </p>
       )}
       {aviso && <p className="mt-2 text-[13.5px] font-semibold text-estado-atencion-texto">{aviso}</p>}

@@ -133,7 +133,48 @@ export type ResumenRodeo = {
   porEstado: Partial<Record<Estado, number>>
 }
 
-export function resumirRodeo(filas: FilaRodeo[], campos: { id: string; nombre: string }[]): ResumenRodeo {
+/** Una salida que restó del número sin decir qué animal fue (una fila propia en la lista). */
+export type FilaSalida = {
+  salidaId: string
+  especie: Especie
+  categoria: Categoria
+  motivo: 'venta' | 'muerte'
+  fecha: string
+  pendientes: number
+  posibles: number
+  donde: string
+  campoId: string | null
+}
+
+export function filasDeSalidas(
+  salidas: { salidaId: string; potreroId: string; categoria: Categoria; motivo: 'venta' | 'muerte'; fecha: string; pendientes: number; posibles: number }[],
+  potreros: PotreroRodeo[],
+  campos: { id: string; nombre: string }[],
+): FilaSalida[] {
+  const pot = new Map(potreros.map((p) => [p.id, p]))
+  const campo = new Map(campos.map((c) => [c.id, c.nombre]))
+  return salidas.map((x) => {
+    const p = pot.get(x.potreroId)
+    return {
+      salidaId: x.salidaId,
+      especie: especiePorCategoria[x.categoria],
+      categoria: x.categoria,
+      motivo: x.motivo,
+      fecha: x.fecha,
+      pendientes: x.pendientes,
+      posibles: x.posibles,
+      donde: p ? `${p.nombre}${campo.get(p.campo_id) ? `, ${campo.get(p.campo_id)}` : ''}` : '',
+      campoId: p?.campo_id ?? null,
+    }
+  })
+}
+
+/**
+ * El resumen del rodeo. Las salidas sin identificar ya no están: se restan de
+ * la categoría, la especie y el campo (los animales posibles siguen en la lista,
+ * porque no se sabe cuál salió).
+ */
+export function resumirRodeo(filas: FilaRodeo[], campos: { id: string; nombre: string }[], salidas: FilaSalida[] = []): ResumenRodeo {
   const porEspecie: Record<Especie, number> = { bovino: 0, ovino: 0, equino: 0 }
   const cats = new Map<Categoria, number>()
   const porCampo = new Map<string, number>()
@@ -144,11 +185,17 @@ export function resumirRodeo(filas: FilaRodeo[], campos: { id: string; nombre: s
     if (f.campoId) porCampo.set(f.campoId, (porCampo.get(f.campoId) ?? 0) + 1)
     porEstado[f.estado] = (porEstado[f.estado] ?? 0) + 1
   }
+  for (const x of salidas) {
+    porEspecie[x.especie] -= x.pendientes
+    cats.set(x.categoria, (cats.get(x.categoria) ?? 0) - x.pendientes)
+    if (x.campoId) porCampo.set(x.campoId, (porCampo.get(x.campoId) ?? 0) - x.pendientes)
+  }
+  const sinIdentificar = salidas.reduce((t, x) => t + x.pendientes, 0)
   return {
-    total: filas.length,
+    total: filas.length - sinIdentificar,
     porEspecie,
-    porCampo: campos.flatMap((c) => (porCampo.get(c.id) ? [{ id: c.id, nombre: c.nombre, cabezas: porCampo.get(c.id)! }] : [])),
-    porCategoria: [...cats].map(([categoria, cabezas]) => ({ categoria, cabezas })).sort((a, b) => b.cabezas - a.cabezas),
+    porCampo: campos.flatMap((c) => ((porCampo.get(c.id) ?? 0) > 0 ? [{ id: c.id, nombre: c.nombre, cabezas: porCampo.get(c.id)! }] : [])),
+    porCategoria: [...cats].filter(([, n]) => n > 0).map(([categoria, cabezas]) => ({ categoria, cabezas })).sort((a, b) => b.cabezas - a.cabezas),
     porEstado,
   }
 }

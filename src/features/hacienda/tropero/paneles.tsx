@@ -281,7 +281,7 @@ export function CambiarCaravana({ animal, abierto, onCerrar }: { animal: AnimalP
         <span className="cifra truncate text-[15px] text-texto-suave">{animal.rfid ?? 'sin electrónica'}</span>
       </div>
       <div className="mt-6 flex flex-col gap-4">
-        <CampoTexto etiqueta="La electrónica nueva" ayuda="Pasale el bastón o escribí el número de 15 cifras." inputMode="numeric" autoFocus value={rfid} onChange={(e) => setRfid(e.target.value)} />
+        <CampoTexto etiqueta="La electrónica nueva" ayuda="Los 15 números del chip." inputMode="numeric" autoFocus value={rfid} onChange={(e) => setRfid(e.target.value)} />
         <CampoTexto etiqueta="La visible nueva (opcional)" inputMode="numeric" value={visual} onChange={(e) => setVisual(e.target.value)} />
       </div>
       <Grupo titulo="¿Por qué la cambiaste?" className="mt-6">
@@ -358,7 +358,7 @@ export function AnimalNuevo({ empresaId, especie, abierto, onCerrar }: { empresa
 
   async function guardar() {
     setError(null)
-    if (!rfid.trim()) return setError('Escribí la caravana electrónica. Si todavía no tiene, sumalo con «Entraron»: queda para caravanear en la manga.')
+    if (!rfid.trim()) return setError('Escribí la caravana electrónica. Si todavía no tiene, sumalo con «Entraron»: entra sin caravana y se la cargás después.')
     if (!categoria) return setError('Tocá qué es.')
     if (!potrero) return setError('Tocá el potrero donde queda.')
     try {
@@ -388,7 +388,7 @@ export function AnimalNuevo({ empresaId, especie, abierto, onCerrar }: { empresa
       }
     >
       <div className="flex flex-col gap-4">
-        <CampoTexto etiqueta="Caravana electrónica" ayuda="Pasale el bastón o escribí el número." inputMode="numeric" autoFocus value={rfid} onChange={(e) => setRfid(e.target.value)} />
+        <CampoTexto etiqueta="Caravana electrónica" ayuda="Los 15 números del chip." inputMode="numeric" autoFocus value={rfid} onChange={(e) => setRfid(e.target.value)} />
         <CampoTexto etiqueta="Caravana visible (opcional)" inputMode="numeric" value={visual} onChange={(e) => setVisual(e.target.value)} />
       </div>
       <Grupo titulo="Qué es" className="mt-6">

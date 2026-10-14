@@ -99,6 +99,15 @@ export function loQueHayQueSaber(
 
 /** «Su historia»: cada evento con un título corto y su detalle. Lo más nuevo arriba. */
 export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: string; anio: string; titulo: string; detalle: string | null; tono: Tono }[] {
+  // Las bajas que después se deshicieron (volvió al rodeo): se muestran como lo
+  // que fueron, una anotación corregida, no como una venta o una muerte.
+  const deshechas = new Set(
+    eventos.filter((e) => e.tipo === 'nota' && dato(e.datos, 'vuelve_al_rodeo')).flatMap((e) => {
+      const r = texto(dato(e.datos, 'resuelve'))
+      const sal = texto(dato(e.datos, 'anula_salida'))
+      return eventos.filter((b) => b.tipo === 'baja' && (b.id === r || (sal && dato(b.datos, 'salida_id') === sal))).map((b) => b.id)
+    }),
+  )
   return [...eventos]
     .sort((x, y) => y.fecha.localeCompare(x.fecha))
     .map((e) => {
@@ -140,10 +149,13 @@ export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: st
         }
         case 'baja': {
           const est = dato(d, 'estado')
+          if (deshechas.has(e.id))
+            return { ...base, titulo: est === 'muerto' ? 'Se anotó como muerta' : 'Se anotó como vendida', detalle: 'Después se corrigió: no era ésta', tono: 'neutro' as Tono }
+          if (dato(d, 'sin_identificar')) return { ...base, titulo: est === 'muerto' ? 'Murió' : 'Se vendió', detalle: 'Sin identificar: no se supo cuál fue', tono: 'problema' as Tono }
           return { ...base, titulo: est === 'vendido' ? 'Se vendió' : est === 'muerto' ? 'Murió' : 'Baja', detalle: nota, tono: 'problema' as Tono }
         }
         case 'nota':
-          if (dato(d, 'vuelve_al_rodeo')) return { ...base, titulo: 'Volvió al rodeo', detalle: 'No era el que salió', tono: 'bien' as Tono }
+          if (dato(d, 'vuelve_al_rodeo')) return { ...base, titulo: 'Volvió al rodeo', detalle: nota ?? 'No era el que salió', tono: 'bien' as Tono }
           if (dato(d, 'resuelve')) return { ...base, titulo: 'Identificada', detalle: 'Era éste el que salió', tono: 'neutro' as Tono }
           return { ...base, titulo: 'Nota', detalle: nota, tono: 'neutro' as Tono }
         default:

@@ -72,10 +72,8 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     { data: pendientes, error: ePend },
     { data: movsIva, error: eIva },
   ] = await Promise.all([
-    supabase
-      .from('v_animal_con_caravana')
-      .select('categoria, estado, potrero_id')
-      .eq('estado', 'activo'),
+    // Las cabezas ya sin las salidas sin identificar (la misma cuenta en toda la app).
+    supabase.from('v_composicion_potrero').select('categoria, potrero_id, cabezas'),
     supabase
       .from('potrero')
       .select(
@@ -111,7 +109,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
   const catMap = new Map<Categoria, number>()
   for (const a of animales ?? []) {
     if (!a.categoria) continue
-    catMap.set(a.categoria, (catMap.get(a.categoria) ?? 0) + 1)
+    catMap.set(a.categoria, (catMap.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
   }
   const porCategoria: CategoriaConteo[] = [...catMap.entries()]
     .map(([categoria, cabezas]) => ({ categoria, cabezas }))
@@ -123,7 +121,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
   for (const a of animales ?? []) {
     if (!a.categoria || !a.potrero_id) continue
     const m = catPorPotrero.get(a.potrero_id) ?? new Map<Categoria, number>()
-    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
     catPorPotrero.set(a.potrero_id, m)
   }
 

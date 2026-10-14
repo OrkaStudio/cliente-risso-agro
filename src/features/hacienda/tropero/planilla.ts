@@ -2,7 +2,7 @@ import type { Database } from '@/lib/supabase/types'
 import { categoriaLabel, categoriaPlural } from '../labels'
 
 // La planilla de caravanas (página 35, «Las caravanas, desde un Excel»): la
-// del veterinario, la de SENASA o la del bastón. Puro: lee las columnas, las
+// del veterinario o la de SENASA. Puro: lee las columnas, las
 // entiende y separa lo que está listo de lo que hay que corregir.
 
 type Categoria = Database['public']['Enums']['categoria_animal']

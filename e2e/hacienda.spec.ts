@@ -98,6 +98,27 @@ async function tocarPotrero(page: Page, nombre: string) {
   }
 }
 
+/** Vende una vaca del 1A por cantidad, sin decir cuál. */
+async function venderUnaVaca(page: Page) {
+  const panel = page.getByRole('dialog')
+  await page.getByRole('button', { name: 'Salieron', exact: true }).click()
+  await panel.getByRole('button', { name: /Los vendí/ }).click()
+  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
+  await tocarPotrero(page, '1A')
+  await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
+  await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
+  await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
+  await panel.getByRole('button', { name: 'Listo' }).click()
+  await expect(panel).toBeHidden()
+}
+
+/** Abre, desde la pestaña «Sin identificar», la salida más nueva (la última fila). */
+async function abrirUltimaSalida(page: Page) {
+  await page.getByRole('tab', { name: /Sin identificar/ }).click()
+  await page.getByRole('row', { name: /vendida|murió/ }).last().click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+}
+
 test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) => {
   await entrar(page)
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
@@ -110,11 +131,17 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
-  await expect(panel.getByText(/pendiente de identificar/)).toBeVisible()
+  await expect(panel.getByText(/sin identificar/).first()).toBeVisible()
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
   await expect(panel.getByRole('heading', { name: 'Se vendió 1 vaca' })).toBeVisible()
-  await expect(panel.getByText(/Decir cuáles fueron: 1 con caravana/)).toBeVisible()
+  await expect(panel.getByText('1 sin identificar')).toBeVisible()
   await panel.getByRole('button', { name: 'Listo' }).click()
+
+  // La salida aparece como fila propia; «No sé cuál fue» la cierra con una cualquiera.
+  await abrirUltimaSalida(page)
+  await panel.getByRole('button', { name: 'No sé cuál fue' }).click()
+  await panel.getByRole('button', { name: 'Sí, que salga cualquiera' }).click()
+  await expect(panel).toBeHidden()
 
   // Entraron · Nacieron: dos terneros en el 1A, sin caravana.
   await page.getByRole('button', { name: 'Entraron', exact: true }).click()
@@ -136,20 +163,19 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
   const panel = page.getByRole('dialog')
 
-  // Una venta por cantidad deja una vaca pendiente de identificar.
-  await page.getByRole('button', { name: 'Salieron', exact: true }).click()
-  await panel.getByRole('button', { name: /Los vendí/ }).click()
-  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
-  await tocarPotrero(page, '1A')
-  await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
-  await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
-  await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
-  await panel.getByRole('button', { name: 'Listo' }).click()
-
-  // Decir cuál fue: una pregunta por salida; se toca la que salió (sin tipear números).
-  await page.getByRole('button', { name: /^Decir cuál/ }).click()
-  await panel.locator('section').first().getByRole('button').nth(1).click()
+  // Una venta por cantidad (todas con caravana): resta del número, no marca a nadie.
+  await venderUnaVaca(page)
+  await abrirUltimaSalida(page)
+  await expect(panel.getByRole('heading', { name: /Qué vaca se vendió del 1A/ })).toBeVisible()
+  await panel.locator('[role=radio]').first().click()
   await panel.getByRole('button', { name: 'Guardar' }).click()
+  await expect(panel).toBeHidden()
+
+  // Otra venta, cargada por error: se anula y el potrero queda como estaba.
+  await venderUnaVaca(page)
+  await abrirUltimaSalida(page)
+  await panel.getByRole('button', { name: 'Fue un error: anular la salida' }).click()
+  await panel.getByRole('button', { name: 'Sí, anular la salida' }).click()
   await expect(panel).toBeHidden()
 
   // La planilla: una caravana para un ternero sin caravana del 1A.
@@ -166,4 +192,18 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await panel.getByRole('button', { name: 'Listo' }).click()
   await page.getByPlaceholder('Buscá una caravana').fill(n)
   await expect(page.getByRole('row', { name: new RegExp(n) })).toContainText('Ternero')
+})
+
+test('desde la ficha: «¿Fue ésta?» → la vaca queda vendida, el número no cambia', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  await venderUnaVaca(page)
+
+  // Una vaca del 1A (todas son posibles de esa venta): su ficha pregunta.
+  await page.getByPlaceholder('Buscá una caravana').fill('E2E')
+  await page.getByRole('row', { name: /Vaca.*1A, E2E Campo base/ }).first().getByRole('link').click()
+  await expect(page.getByText('¿Fue ésta?').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Sí, fue ésta' }).first().click()
+  await expect(page.getByText('Vendido', { exact: true })).toBeVisible()
+  await expect(page.getByText('¿Fue ésta?')).toBeHidden()
 })

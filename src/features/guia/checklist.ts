@@ -46,6 +46,7 @@ export function useEstadoPuestaAPunto() {
         recorridas,
         alquilados,
         conAlquiler,
+        sinIdentificar,
       ] = await Promise.all([
         supabase
           .from('campo')
@@ -105,6 +106,12 @@ export function useEstadoPuestaAPunto() {
             if (r.error) throw new Error(r.error.message)
             return new Set((r.data ?? []).map((m) => m.campo_id))
           }),
+        // Las que salieron sin identificar ya no están: se restan de las cabezas.
+        supabase
+          .from('salida_pendiente')
+          .select('id', { count: 'exact', head: true })
+          .is('resuelta_en', null)
+          .then((r) => head(r.count, r.error)),
       ])
 
       const resumen: Resumen = {
@@ -112,7 +119,7 @@ export function useEstadoPuestaAPunto() {
         sinContorno,
         potreros,
         potrerosDibujados,
-        cabezas: activos,
+        cabezas: Math.max(activos - sinIdentificar, 0),
         sinPotrero: Math.max(activos - ubicados, 0),
         alquilados: alquilados.length,
         alquilerPendiente: alquilados.filter((c) => !conAlquiler.has(c.id)),

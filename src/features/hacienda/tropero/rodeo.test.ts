@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resumirEventos } from '../senales'
-import { bajadaDelRodeo, edadTexto, filasDelRodeo, resumirRodeo, type AnimalRodeo } from './rodeo'
+import { bajadaDelRodeo, edadTexto, filasDeSalidas, filasDelRodeo, resumirRodeo, type AnimalRodeo } from './rodeo'
 
 const hoy = new Date('2026-10-12T12:00:00')
 const HOY = '2026-10-12'
@@ -52,6 +52,15 @@ describe('el rodeo', () => {
     expect(bajadaDelRodeo(vacunos, r, 'bovino', false)).toBe('5 en La Porteña y 1 en Los Pampas. Más 1 ovino.')
     expect(bajadaDelRodeo(vacunos, r, 'bovino', true)).toBe('Más 1 ovino.')
     expect(bajadaDelRodeo(r, r, 'todas', false)).toBe('6 en La Porteña y 1 en Los Pampas. Son 6 vacunos y 1 ovino.')
+  })
+  it('una salida sin identificar resta del número pero no saca a nadie de la lista', () => {
+    const salidas = filasDeSalidas([{ salidaId: 's1', potreroId: 'p1', categoria: 'vaca', motivo: 'venta', fecha: '2026-10-14', pendientes: 1, posibles: 3 }], potreros, campos)
+    expect(salidas[0]).toMatchObject({ donde: '11B, La Porteña', especie: 'bovino', campoId: 'c1' })
+    const r = resumirRodeo(filas, campos, salidas)
+    expect(r.total).toBe(filas.length - 1)
+    expect(r.porEspecie.bovino).toBe(5)
+    expect(r.porCampo).toEqual([{ id: 'c1', nombre: 'La Porteña', cabezas: 5 }, { id: 'c2', nombre: 'Los Pampas', cabezas: 1 }])
+    expect(r.porCategoria.find((c) => c.categoria === 'vaca')!.cabezas).toBe(3)
   })
   it('la edad en meses hasta los dos años, después en años', () => {
     expect(edadTexto('2026-09-01', hoy)).toBe('1 mes')

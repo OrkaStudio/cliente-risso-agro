@@ -462,7 +462,7 @@ export async function salidaPorCantidad(input: {
   nota?: string
   /** Las que se sabe que salieron (visible o electrónica). */
   caravanas?: string[]
-}): Promise<{ salieron: number; pendientesIdentificar: number; salidaId: string }> {
+}): Promise<{ salieron: number; sinIdentificar: number; salidaId: string }> {
   const { data, error } = await supabase.rpc('salida_por_cantidad', {
     p_empresa_id: input.empresaId,
     p_potrero_id: input.potreroId,
@@ -473,22 +473,77 @@ export async function salidaPorCantidad(input: {
     p_caravanas: input.caravanas?.length ? input.caravanas : undefined,
   })
   if (error) throw new Error(error.message)
-  const r = data as { salieron: number; pendientes_identificar: number; salida_id: string }
-  return { salieron: r.salieron, pendientesIdentificar: r.pendientes_identificar, salidaId: r.salida_id }
+  const r = data as { salieron: number; sin_identificar: number; salida_id: string }
+  return { salieron: r.salieron, sinIdentificar: r.sin_identificar, salidaId: r.salida_id }
 }
 
-/** Las bajas por cantidad que todavía no se identificaron (cuáles fueron). */
-export async function listBajasPendientes() {
-  const { data, error } = await supabase.from('v_bajas_pendientes').select('evento_id, animal_id, fecha, categoria, potrero_id, salida_id, estado').order('fecha', { ascending: false })
+export type SalidaSinIdentificar = {
+  salidaId: string
+  potreroId: string
+  categoria: CategoriaAnimal
+  motivo: 'venta' | 'muerte'
+  fecha: string
+  pendientes: number
+  posibles: number
+  /** Los animales que pueden ser los que salieron (estaban ahí y siguen). */
+  posiblesIds: string[]
+}
+
+/**
+ * Las salidas que restaron el número sin decir qué animal fue: una por venta
+ * o muerte, con cuántas faltan identificar y sus posibles.
+ */
+export async function listSalidasSinIdentificar(): Promise<SalidaSinIdentificar[]> {
+  const [{ data: salidas, error: e1 }, { data: posibles, error: e2 }] = await Promise.all([
+    supabase.from('v_salidas_sin_identificar').select('salida_id, potrero_id, categoria, motivo, fecha, pendientes, posibles').order('created_at'),
+    supabase.from('v_posibles_salida').select('salida_id, animal_id'),
+  ])
+  if (e1) throw new Error(e1.message)
+  if (e2) throw new Error(e2.message)
+  return (salidas ?? []).map((s) => ({
+    salidaId: s.salida_id!,
+    potreroId: s.potrero_id!,
+    categoria: s.categoria!,
+    motivo: s.motivo === 'muerte' ? 'muerte' : 'venta',
+    fecha: s.fecha!,
+    pendientes: s.pendientes ?? 0,
+    posibles: s.posibles ?? 0,
+    posiblesIds: (posibles ?? []).filter((p) => p.salida_id === s.salida_id).map((p) => p.animal_id!),
+  }))
+}
+
+/** Por caravana (la planilla de la venta, o elegidas de la lista). */
+export async function identificarSalida(input: { empresaId: string; caravanas: string[]; salidaId?: string }): Promise<{ identificadas: number }> {
+  const { data, error } = await supabase.rpc('identificar_salida', { p_empresa_id: input.empresaId, p_caravanas: input.caravanas, p_salida_id: input.salidaId })
+  if (error) throw new Error(error.message)
+  return data as { identificadas: number }
+}
+
+/** «Fue ésta»: desde la ficha o la lista. */
+export async function identificarAnimal(input: { animalId: string; salidaId?: string }): Promise<void> {
+  const { error } = await supabase.rpc('identificar_animal', { p_animal_id: input.animalId, p_salida_id: input.salidaId })
+  if (error) throw new Error(error.message)
+}
+
+/** «No sé cuál fue»: sale una cualquiera de las posibles y su ficha lo dice. */
+export async function resolverSinSaber(salidaId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('resolver_sin_saber', { p_salida_id: salidaId })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** «Fue un error»: la salida entera se deshace. */
+export async function anularSalida(salidaId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('anular_salida', { p_salida_id: salidaId })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** Cabezas por potrero y categoría, ya sin las salidas sin identificar: la fuente de todos los números. */
+export async function listComposicion() {
+  const { data, error } = await supabase.from('v_composicion_potrero').select('potrero_id, categoria, cabezas')
   if (error) throw new Error(error.message)
   return data ?? []
-}
-
-/** Decir cuáles fueron: si no era el elegido, vuelve al rodeo y sale éste. */
-export async function identificarSalida(input: { empresaId: string; caravanas: string[] }): Promise<{ identificadas: number; cambiados: number }> {
-  const { data, error } = await supabase.rpc('identificar_salida', { p_empresa_id: input.empresaId, p_caravanas: input.caravanas })
-  if (error) throw new Error(error.message)
-  return data as { identificadas: number; cambiados: number }
 }
 
 /** La planilla: caravana para los que se cargaron por categoría. No crea animales. */

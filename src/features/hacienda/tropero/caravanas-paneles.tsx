@@ -5,7 +5,7 @@ import { Icono } from '@/components/tropero/icono'
 import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
-import { useAnimales, useAsignarCaravanasPlanilla, useBajasPendientes, useIdentificarSalida, usePotreros } from '@/features/hacienda/hooks'
+import { useAnimales, useAnularSalida, useAsignarCaravanasPlanilla, useIdentificarSalida, usePotreros, useResolverSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import { ElegirDeLista, ZonaArchivo } from './caravanas'
@@ -17,87 +17,136 @@ import { bajarPlanillaEjemplo } from './planilla-ejemplo'
 const ddmm = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '')
 
 /**
- * Las que salieron por cantidad y todavía no se sabe cuáles fueron: una
- * pregunta por cada salida («¿Qué vaca salió del 1A?»), con las caravanas de
- * ese potrero para reconocerla. Para que la cuenta diera bien, la app ya dio de
- * baja una (se marca «Figura como vendida»); si fue otra, se intercambian y
- * queda en la historia. También se resuelve sola en la próxima manga.
+ * Las salidas que restaron el número sin decir qué animal fue. Una pregunta
+ * por salida («¿Qué vaca se vendió del 3A?»), con las posibles: las vacas que
+ * estaban en ese potrero ese día y siguen en el rodeo. Se elige la que fue;
+ * si no se sabe, «No sé cuál fue» (sale una cualquiera y su ficha lo dice); si
+ * la salida fue un error, se anula.
  */
-export function IdentificarSalidas({ empresaId, abierto, onCerrar }: { empresaId: string; abierto: boolean; onCerrar: () => void }) {
-  const pendientes = useBajasPendientes()
+export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = null }: { empresaId: string; abierto: boolean; onCerrar: () => void; salidaFoco?: string | null }) {
+  const salidasQ = useSalidasSinIdentificar()
   const potreros = usePotreros()
   const identificar = useIdentificarSalida()
+  const sinSaber = useResolverSinSaber()
+  const anular = useAnularSalida()
   const [elegidas, setElegidas] = useState<Record<string, string[]>>({})
+  const [confirmar, setConfirmar] = useState<{ salidaId: string; que: 'sinSaber' | 'anular' } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const ps = pendientes.data ?? []
-  const nombrePotrero = (id: string | null) => potreros.data?.find((p) => p.id === id)?.nombre ?? 'sin potrero'
-  // Una salida = un potrero, una categoría, un día y un motivo.
-  const grupos = [
-    ...ps
-      .reduce((m, p) => {
-        const k = `${p.potrero_id}|${p.categoria}|${p.fecha}|${p.estado}`
-        const g = m.get(k) ?? { clave: k, potreroId: p.potrero_id, categoria: p.categoria, fecha: p.fecha, estado: p.estado, ids: [] as string[] }
-        g.ids.push(p.animal_id!)
-        m.set(k, g)
-        return m
-      }, new Map<string, { clave: string; potreroId: string | null; categoria: (typeof ps)[number]['categoria']; fecha: string | null; estado: (typeof ps)[number]['estado']; ids: string[] }>())
-      .values(),
-  ]
-  const todosPendientes = new Set(ps.map((p) => p.animal_id))
-  const posibles = usePosibles((a) => grupos.some((g) => a.potrero_id === g.potreroId && a.categoria === g.categoria) && (a.estado === 'activo' || todosPendientes.has(a.id)))
-  const total = Object.values(elegidas).reduce((s, xs) => s + xs.length, 0)
+  const todas = salidasQ.data ?? []
+  const salidas = salidaFoco ? todas.filter((x) => x.salidaId === salidaFoco) : todas
+  const posiblesIds = new Set(salidas.flatMap((x) => x.posiblesIds))
+  const posibles = usePosibles((a) => posiblesIds.has(a.id ?? ''))
+  const nombrePotrero = (id: string) => potreros.data?.find((p) => p.id === id)?.nombre ?? ''
+  const total = Object.values(elegidas).reduce((t, xs) => t + xs.length, 0)
+  const ocupado = identificar.isPending || sinSaber.isPending || anular.isPending
+
+  const cerrar = () => {
+    setElegidas({})
+    setConfirmar(null)
+    setError(null)
+    onCerrar()
+  }
 
   async function guardar() {
     setError(null)
-    const caravanas = Object.values(elegidas).flat()
-    if (caravanas.length === 0) return
     try {
-      const r = await identificar.mutateAsync({ empresaId, caravanas })
-      toast.success('Listo: cada ficha quedó en su lugar', {
-        description: r.cambiados > 0 ? `${r.cambiados === 1 ? 'La que figuraba como salida volvió' : 'Las que figuraban como salidas volvieron'} al rodeo.` : 'Era la que figuraba como salida.',
-      })
-      setElegidas({})
-      onCerrar()
+      let n = 0
+      for (const [salidaId, caravanas] of Object.entries(elegidas)) {
+        if (!caravanas.length) continue
+        n += (await identificar.mutateAsync({ empresaId, caravanas, salidaId })).identificadas
+      }
+      toast.success(`Listo: ${n === 1 ? 'la ficha quedó' : 'las fichas quedaron'} en su lugar`, { description: 'El número del rodeo no cambia: ya estaba restado.' })
+      cerrar()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
     }
   }
 
-  const unaSola = grupos.length === 1 && grupos[0]!.ids.length === 1
+  async function hacer(c: NonNullable<typeof confirmar>) {
+    setError(null)
+    try {
+      if (c.que === 'sinSaber') {
+        await sinSaber.mutateAsync(c.salidaId)
+        toast.success('Listo: salió una cualquiera de las posibles', { description: 'Su ficha dice «dada de baja sin identificar».' })
+      } else {
+        const n = await anular.mutateAsync(c.salidaId)
+        toast.success('Listo: anulamos esa salida', { description: n > 0 ? `${n === 1 ? 'Vuelve al rodeo el animal que había salido' : `Vuelven al rodeo los ${n} que habían salido`}.` : 'El número del potrero volvió a como estaba.' })
+      }
+      setConfirmar(null)
+      setElegidas((e) => {
+        const { [c.salidaId]: _, ...resto } = e
+        void _
+        return resto
+      })
+      if (salidas.length <= 1) cerrar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo. Probá de nuevo.')
+    }
+  }
+
+  const unaSola = salidas.length === 1 && salidas[0]!.pendientes === 1
   return (
     <PanelLateral
       abierto={abierto}
-      onCerrar={onCerrar}
+      onCerrar={cerrar}
       titulo={unaSola ? '¿Cuál salió?' : '¿Cuáles salieron?'}
-      bajada="La cuenta del rodeo ya está bien: esto pone cada ficha en su lugar. Si no te acordás, dejalo; se resuelve solo en la próxima manga."
+      bajada="El número del rodeo ya está bien: esto pone cada ficha en su lugar. No hace falta hacerlo ahora."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={identificar.isPending} disabled={identificar.isPending || total === 0} onClick={guardar}>
-          {total === 0 ? 'Tocá la que salió' : 'Guardar'}
+        <BotonPrincipal icono="Guardar" cargando={identificar.isPending} disabled={ocupado || total === 0} onClick={guardar}>
+          {total === 0 ? (unaSola ? 'Tocá la que fue' : 'Tocá las que fueron') : 'Guardar'}
         </BotonPrincipal>
       }
     >
-      <div className="flex flex-col gap-7">
-        {grupos.map((g) => {
-          const n = g.ids.length
-          const cat = g.categoria ? categoriaNombre(g.categoria, n).toLowerCase() : 'animales'
-          const verbo = g.estado === 'muerto' ? (n === 1 ? 'murió' : 'murieron') : n === 1 ? 'se vendió' : 'se vendieron'
-          const lugar = g.estado === 'muerto' ? `en el ${nombrePotrero(g.potreroId)}` : `del ${nombrePotrero(g.potreroId)}`
-          const figura = g.estado === 'muerto' ? 'Figura como muerta' : 'Figura como vendida'
-          const lista = posibles
-            .filter((p) => p.potreroId === g.potreroId && p.categoria === g.categoria && (p.activo || g.ids.includes(p.id)))
-            .map((p) => ({ ...p, marca: g.ids.includes(p.id) ? figura : undefined }))
-            // La que figura como salida, primero.
-            .sort((a, b) => Number(!!b.marca) - Number(!!a.marca))
+      {salidas.length === 0 && <p className="text-[15px] text-texto-suave">No queda ninguna salida sin identificar.</p>}
+      <div className="flex flex-col gap-8">
+        {salidas.map((x) => {
+          const n = x.pendientes
+          const cat = categoriaNombre(x.categoria, n).toLowerCase()
+          const catTodas = categoriaNombre(x.categoria, 2).toLowerCase()
+          const pot = nombrePotrero(x.potreroId)
+          const verbo = x.motivo === 'muerte' ? (n === 1 ? 'murió' : 'murieron') : n === 1 ? 'se vendió' : 'se vendieron'
+          const lista = posibles.filter((p) => x.posiblesIds.includes(p.id))
+          const justas = x.posibles === n
+          const c = confirmar?.salidaId === x.salidaId ? confirmar : null
           return (
-            <section key={g.clave}>
+            <section key={x.salidaId} aria-label={`Salida del ${pot}`}>
               <h3 className="font-heading text-[18px] font-extrabold text-texto">
-                ¿Qué {n === 1 ? cat : `${n} ${cat}`} {verbo} {lugar}?
+                ¿{n === 1 ? `Qué ${cat}` : `Qué ${n} ${cat}`} {verbo} {x.motivo === 'muerte' ? 'en el' : 'del'} {pot}?
               </h3>
-              <p className="mb-3 text-[14px] text-texto-suave">
-                Lo anotaste el {ddmm(g.fecha)} sin decir {n === 1 ? 'cuál' : 'cuáles'}. Tocá {n === 1 ? 'la que fue' : `las ${n} que fueron`}.
+              <p className="mt-1 mb-3 text-[14px] leading-snug text-texto-suave">
+                {justas
+                  ? `Sólo ${n === 1 ? 'queda una posible: tiene que ser ésa' : `quedan ${n} posibles: tienen que ser ésas`}. Las demás ${catTodas} que estaban se movieron o salieron después.`
+                  : `El ${ddmm(x.fecha)} anotaste que ${verbo} ${n} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. Éstas son las ${lista.length} ${catTodas} que estaban en el ${pot} ese día y siguen en el rodeo: ${n === 1 ? 'una' : `${n}`} de ellas es la que salió.`}
               </p>
-              <ElegirDeLista posibles={lista} elegidas={elegidas[g.clave] ?? []} cuantas={n} onCambio={(xs) => setElegidas((e) => ({ ...e, [g.clave]: xs }))} />
+              <ElegirDeLista posibles={lista} elegidas={elegidas[x.salidaId] ?? []} cuantas={n} onCambio={(xs) => setElegidas((e) => ({ ...e, [x.salidaId]: xs }))} />
+
+              {c ? (
+                <div className="mt-3 rounded-[14px] border border-borde bg-superficie px-4 py-3">
+                  <p className="text-[14px] text-texto">
+                    {c.que === 'sinSaber'
+                      ? `Damos de baja ${n === 1 ? 'una cualquiera' : `${n} cualesquiera`} de estas ${lista.length}. ${n === 1 ? 'Su ficha va' : 'Sus fichas van'} a decir «dada de baja sin identificar». Si después te enterás de cuál fue, lo corregís desde la ficha.`
+                      : `Borramos esta salida: el ${pot} vuelve a tener ${n === 1 ? `la ${cat}` : `las ${n} ${cat}`}${x.motivo === 'muerte' ? '' : ' (y lo de la venta que se haya anotado por cantidad)'}. Usalo si la cargaste por error.`}
+                  </p>
+                  <div className="mt-2.5 flex gap-2">
+                    <button type="button" disabled={ocupado} onClick={() => hacer(c)} className="h-9 rounded-full bg-principal px-4 text-[14px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-50">
+                      {c.que === 'sinSaber' ? 'Sí, que salga cualquiera' : 'Sí, anular la salida'}
+                    </button>
+                    <button type="button" onClick={() => setConfirmar(null)} className="h-9 rounded-full px-3 text-[14px] font-bold text-texto-suave hover:text-texto">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                  <button type="button" onClick={() => setConfirmar({ salidaId: x.salidaId, que: 'sinSaber' })} className="text-[14px] font-bold text-principal hover:underline">
+                    No sé cuál fue
+                  </button>
+                  <button type="button" onClick={() => setConfirmar({ salidaId: x.salidaId, que: 'anular' })} className="text-[14px] font-bold text-texto-suave hover:text-texto hover:underline">
+                    Fue un error: anular la salida
+                  </button>
+                </div>
+              )}
             </section>
           )
         })}
@@ -109,7 +158,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar }: { empresaId
 
 /**
  * Las caravanas, desde un Excel (página 35): la planilla del veterinario, la de
- * SENASA o la del bastón le pone número a los que se cargaron por categoría.
+ * SENASA le pone número a los que se cargaron por categoría.
  * No suma animales: cuenta contra los que ya están.
  */
 export function CaravanasPorExcel({ empresaId, abierto, onCerrar }: { empresaId: string; abierto: boolean; onCerrar: () => void }) {
@@ -187,7 +236,7 @@ export function CaravanasPorExcel({ empresaId, abierto, onCerrar }: { empresaId:
       abierto={abierto}
       onCerrar={cerrar}
       titulo={titulo}
-      bajada={!lectura && !hecho ? 'Le pone número a los animales que cargaste por categoría. Sirve la planilla del veterinario, la de SENASA o la del bastón.' : undefined}
+      bajada={!lectura && !hecho ? 'Le pone número a los animales que cargaste por categoría. Sirve la planilla del veterinario o la de SENASA.' : undefined}
       pie={pie}
     >
       {hecho ? (
@@ -199,7 +248,7 @@ export function CaravanasPorExcel({ empresaId, abierto, onCerrar }: { empresaId:
             {hecho.sinElectronica > 0 && (
               <li className="py-3">
                 <b className="text-texto">{hecho.sinElectronica} sin electrónica</b>
-                <span className="block text-[13.5px] text-texto-suave">Tienen la visible. El chip se empareja en la próxima manga: el bastón pregunta «¿es la 1172?».</span>
+                <span className="block text-[13.5px] text-texto-suave">Tienen la visible. La electrónica la sumás después, con otra planilla o desde la ficha de cada uno.</span>
               </li>
             )}
             {hecho.sinAnimal.length > 0 && (
@@ -254,7 +303,7 @@ export function CaravanasPorExcel({ empresaId, abierto, onCerrar }: { empresaId:
           <ul className="mt-5 flex flex-col gap-2.5">
             <Resumen tono="bien" titulo={`${lectura.completas.length} ${lectura.completas.length === 1 ? 'completa' : 'completas'}`} bajada="Se las ponemos a los que ya cargaste, en su potrero." />
             {lectura.sinElectronica.length > 0 && (
-              <Resumen tono="atencion" titulo={`${lectura.sinElectronica.length} sin electrónica`} bajada="Se ponen igual; el chip se empareja en la próxima manga." onVer={() => setVer(ver === 'sinElectronica' ? null : 'sinElectronica')} />
+              <Resumen tono="atencion" titulo={`${lectura.sinElectronica.length} sin electrónica`} bajada="Se ponen igual; la electrónica la sumás después." onVer={() => setVer(ver === 'sinElectronica' ? null : 'sinElectronica')} />
             )}
             {lectura.paraCorregir.length > 0 && (
               <Resumen tono="problema" titulo={`${lectura.paraCorregir.length} para corregir`} bajada="Quedan aparte. Corregilas en el Excel y volvé a subirlo." onVer={() => setVer(ver === 'corregir' ? null : 'corregir')} />

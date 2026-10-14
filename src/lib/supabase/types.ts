@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      salida_candidato: {
+        Row: { animal_id: string; descartado: boolean; empresa_id: string; salida_id: string }
+        Insert: { animal_id: string; descartado?: boolean; empresa_id: string; salida_id: string }
+        Update: { animal_id?: string; descartado?: boolean; empresa_id?: string; salida_id?: string }
+        Relationships: []
+      }
+      salida_pendiente: {
+        Row: {
+          categoria: Database["public"]["Enums"]["categoria_animal"]
+          created_at: string
+          empresa_id: string
+          fecha: string
+          id: string
+          motivo: string
+          nota: string | null
+          potrero_id: string
+          resuelta_animal_id: string | null
+          resuelta_como: string | null
+          resuelta_en: string | null
+          salida_id: string
+        }
+        Insert: {
+          categoria: Database["public"]["Enums"]["categoria_animal"]
+          empresa_id: string
+          fecha: string
+          motivo: string
+          potrero_id: string
+          salida_id: string
+        }
+        Update: { resuelta_como?: string | null; resuelta_en?: string | null }
+        Relationships: []
+      }
       animal: {
         Row: {
           categoria: Database["public"]["Enums"]["categoria_animal"]
@@ -1264,14 +1296,28 @@ export type Database = {
       }
     }
     Views: {
-      v_bajas_pendientes: {
+      v_composicion_potrero: {
         Row: {
-          animal_id: string | null
+          cabezas: number | null
           categoria: Database["public"]["Enums"]["categoria_animal"] | null
           empresa_id: string | null
-          estado: Database["public"]["Enums"]["estado_animal"] | null
-          evento_id: string | null
+          potrero_id: string | null
+        }
+        Relationships: []
+      }
+      v_posibles_salida: {
+        Row: { animal_id: string | null; empresa_id: string | null; salida_id: string | null }
+        Relationships: []
+      }
+      v_salidas_sin_identificar: {
+        Row: {
+          categoria: Database["public"]["Enums"]["categoria_animal"] | null
+          created_at: string | null
+          empresa_id: string | null
           fecha: string | null
+          motivo: string | null
+          pendientes: number | null
+          posibles: number | null
           potrero_id: string | null
           salida_id: string | null
         }
@@ -1565,9 +1611,15 @@ export type Database = {
         Returns: Json
       }
       identificar_salida: {
-        Args: { p_caravanas: string[]; p_empresa_id: string }
+        Args: { p_caravanas: string[]; p_empresa_id: string; p_salida_id?: string }
         Returns: Json
       }
+      identificar_animal: {
+        Args: { p_animal_id: string; p_salida_id?: string }
+        Returns: undefined
+      }
+      resolver_sin_saber: { Args: { p_salida_id: string }; Returns: number }
+      anular_salida: { Args: { p_salida_id: string }; Returns: number }
       asignar_caravanas_planilla: {
         Args: { p_campo_id: string; p_empresa_id: string; p_filas: Json }
         Returns: Json
