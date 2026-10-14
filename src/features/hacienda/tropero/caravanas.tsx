@@ -3,7 +3,7 @@ import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { cn } from '@/lib/utils'
 import { leerArchivo } from './leer-archivo'
-import { caravanasDeTexto, soloDigitos } from './planilla'
+import { soloDigitos } from './planilla'
 
 /** «Soltá acá el Excel»: se suelta o se toca para buscarlo. */
 export function ZonaArchivo({ titulo, bajada, onArchivo, cargando = false }: { titulo: string; bajada: string; onArchivo: (f: File) => void; cargando?: boolean }) {
@@ -44,13 +44,14 @@ export function ZonaArchivo({ titulo, bajada, onArchivo, cargando = false }: { t
   )
 }
 
-export type Conocida = { caravana: string; visual: string | null; rfid: string | null; etiqueta: string }
-type Modo = 'despues' | 'una' | 'rango' | 'planilla'
+export type Conocida = { caravana: string; visual: string | null; rfid: string | null; etiqueta: string; detalle?: string }
+type Modo = 'despues' | 'lista' | 'planilla'
 
 /**
- * Las caravanas que salieron (página 35, «Revisá · Las caravanas»): después
- * (quedan pendientes), de a una, por rango o con la planilla del bastón. Sólo
- * acepta las que están entre las `posibles` (las del potrero que sale).
+ * Las caravanas que salieron (página 35, «Revisá · Las caravanas»). En la compu
+ * no se tipea ni se usa el bastón: se resuelve solo en la próxima manga, se
+ * eligen de una lista donde cada una se reconoce por lo que es, o se sube la
+ * planilla de la venta. Sólo acepta las `posibles` (las del potrero que sale).
  */
 export function CaravanasQueSalieron({
   posibles,
@@ -62,14 +63,11 @@ export function CaravanasQueSalieron({
   posibles: Conocida[]
   elegidas: string[]
   onCambio: (cs: string[]) => void
-  /** Cuántas salen en total (para decir «7 de 12»). */
+  /** Cuántas salen en total (para decir «2 de 12»). */
   cuantas: number
   conDespues?: boolean
 }) {
-  const [modo, setModo] = useState<Modo>(conDespues ? 'despues' : 'una')
-  const [tipeo, setTipeo] = useState('')
-  const [desde, setDesde] = useState('')
-  const [hasta, setHasta] = useState('')
+  const [modo, setModo] = useState<Modo>(conDespues ? 'despues' : 'lista')
   const [aviso, setAviso] = useState<string | null>(null)
   const [leyendo, setLeyendo] = useState(false)
 
@@ -77,90 +75,70 @@ export function CaravanasQueSalieron({
     const d = soloDigitos(c)
     return posibles.find((p) => (p.visual && soloDigitos(p.visual) === d) || (p.rfid && soloDigitos(p.rfid) === d)) ?? null
   }
-  const sumar = (cs: string[]) => {
-    const nuevas: string[] = []
-    const no: string[] = []
-    for (const c of cs) {
-      const p = buscar(c)
-      if (!p) no.push(c)
-      else if (!elegidas.includes(p.caravana) && !nuevas.includes(p.caravana)) nuevas.push(p.caravana)
-    }
-    const lugar = Math.max(0, cuantas - elegidas.length)
-    onCambio([...elegidas, ...nuevas.slice(0, lugar)])
-    setAviso(
-      no.length
-        ? `${no.slice(0, 3).join(', ')}${no.length > 3 ? ` y ${no.length - 3} más` : ''}: no ${no.length === 1 ? 'está' : 'están'} en este potrero.`
-        : nuevas.length > lugar
-          ? `Salen ${cuantas}: sumamos las primeras.`
-          : null,
-    )
+  const tocar = (c: string) => {
+    setAviso(null)
+    if (elegidas.includes(c)) return onCambio(elegidas.filter((x) => x !== c))
+    if (elegidas.length >= cuantas) return setAviso(`Salieron ${cuantas}: sacá una antes de elegir otra.`)
+    onCambio([...elegidas, c])
   }
   const opciones = [
-    ...(conDespues ? [{ valor: 'despues' as Modo, texto: 'Después' }] : []),
-    { valor: 'una' as Modo, texto: 'De a una' },
-    { valor: 'rango' as Modo, texto: 'Rango' },
-    { valor: 'planilla' as Modo, texto: 'Planilla' },
+    ...(conDespues ? [{ valor: 'despues' as Modo, texto: 'En la manga' }] : []),
+    { valor: 'lista' as Modo, texto: 'De la lista' },
+    { valor: 'planilla' as Modo, texto: 'Con planilla' },
   ]
 
   return (
     <div>
       <Segmentos etiqueta="Las caravanas" opciones={opciones} valor={modo} onCambio={(m) => (setModo(m), setAviso(null), m === 'despues' && onCambio([]))} />
-      {modo === 'despues' && <p className="mt-3 text-[14px] text-texto-suave">Quedan «pendientes de identificar» y se resuelven en la próxima manga o desde Hacienda.</p>}
-      {modo === 'una' && (
-        <form
-          className="mt-3 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (tipeo.trim()) sumar(caravanasDeTexto(tipeo))
-            setTipeo('')
-          }}
-        >
-          <input
-            aria-label="Caravana que salió"
-            inputMode="numeric"
-            autoFocus
-            value={tipeo}
-            onChange={(e) => setTipeo(e.target.value)}
-            placeholder="Tipeá la caravana o leela con el bastón"
-            className="h-11 min-w-0 flex-1 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[15px] text-texto outline-none focus:border-principal"
-          />
-          <button type="submit" className="h-11 rounded-full border-[1.5px] border-principal px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave">
-            Sumar
-          </button>
-        </form>
+      {modo === 'despues' && (
+        <p className="mt-3 rounded-[14px] bg-superficie px-4 py-3 text-[14px] text-texto">
+          No hace falta hacer nada ahora: la cuenta del rodeo ya queda bien. En la próxima manga, los que el bastón no lea en este potrero son los que salieron.
+        </p>
       )}
-      {modo === 'rango' && (
-        <form
-          className="mt-3 flex items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (desde && hasta) sumar(caravanasDeTexto(`${soloDigitos(desde)}-${soloDigitos(hasta)}`).filter((c) => buscar(c)))
-          }}
-        >
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-[13.5px] font-semibold text-texto-suave">
-            Desde
-            <input inputMode="numeric" value={desde} onChange={(e) => setDesde(e.target.value)} className="h-11 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[15px] text-texto outline-none focus:border-principal" />
-          </label>
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-[13.5px] font-semibold text-texto-suave">
-            Hasta
-            <input inputMode="numeric" value={hasta} onChange={(e) => setHasta(e.target.value)} className="h-11 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[15px] text-texto outline-none focus:border-principal" />
-          </label>
-          <button type="submit" className="h-11 rounded-full border-[1.5px] border-principal px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave">
-            Sumar
-          </button>
-        </form>
+      {modo === 'lista' && (
+        <>
+          <p className="mt-3 text-[14px] text-texto-suave">Tocá las que salieron. Cada una dice qué es, para reconocerla sin acordarte del número.</p>
+          <div className="mt-3 grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+            {posibles.map((p) => {
+              const si = elegidas.includes(p.caravana)
+              return (
+                <button
+                  key={p.caravana}
+                  type="button"
+                  aria-pressed={si}
+                  onClick={() => tocar(p.caravana)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-[14px] border-[1.5px] px-3 py-2.5 text-left transition-colors',
+                    si ? 'border-principal bg-principal-suave' : 'border-borde bg-superficie hover:border-neutro-300',
+                  )}
+                >
+                  <span className={cn('cifra shrink-0 rounded-[8px] border-[1.5px] px-1.5 text-[18px] leading-tight font-bold', si ? 'border-principal bg-principal text-principal-texto' : 'border-principal text-principal')}>
+                    {p.visual ?? p.rfid?.slice(-4)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[14px] font-bold text-texto">{p.etiqueta}</span>
+                    {p.detalle && <span className="block truncate text-[12.5px] text-texto-suave">{p.detalle}</span>}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </>
       )}
       {modo === 'planilla' && (
         <div className="mt-3">
           <ZonaArchivo
-            titulo="Soltá acá la planilla del bastón"
-            bajada="Excel o CSV. Leemos los números de caravana."
+            titulo="Soltá acá la planilla de la venta"
+            bajada="La de la consignataria, el veterinario o el bastón. Excel o CSV: leemos los números de caravana."
             cargando={leyendo}
             onArchivo={async (f) => {
               setLeyendo(true)
               try {
                 const filas = await leerArchivo(f)
-                sumar(filas.flat().map((c) => soloDigitos(String(c ?? ''))).filter((d) => d.length >= 3 && buscar(d)))
+                const halladas = [...new Set(filas.flat().map((c) => soloDigitos(String(c ?? ''))).filter((d) => d.length >= 3).flatMap((d) => (buscar(d) ? [buscar(d)!.caravana] : [])))]
+                const nuevas = halladas.filter((c) => !elegidas.includes(c))
+                onCambio([...elegidas, ...nuevas].slice(0, cuantas))
+                setAviso(halladas.length ? (nuevas.length > cuantas - elegidas.length ? `Salieron ${cuantas}: sumamos las primeras.` : null) : 'En la planilla no encontramos caravanas de este potrero.')
               } catch {
                 setAviso('No pudimos leer ese archivo. Probá con un Excel (.xlsx) o un CSV.')
               } finally {
@@ -170,29 +148,10 @@ export function CaravanasQueSalieron({
           />
         </div>
       )}
-      {elegidas.length > 0 && (
-        <div className="mt-4">
-          <div className="flex flex-wrap gap-2">
-            {elegidas.map((c) => {
-              const p = posibles.find((x) => x.caravana === c)
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  title={`Sacar: ${p?.etiqueta ?? c}`}
-                  onClick={() => onCambio(elegidas.filter((x) => x !== c))}
-                  className="cifra inline-flex h-10 items-center gap-1.5 rounded-[10px] border-[1.5px] border-principal px-2.5 text-[18px] font-bold text-principal hover:bg-principal-suave"
-                >
-                  {p?.visual ?? c}
-                  <Icono nombre="Cerrar" tamano={16} />
-                </button>
-              )
-            })}
-          </div>
-          <p className="mt-2 text-[14px] font-semibold text-texto">
-            {elegidas.length} de {cuantas}.{elegidas.length < cuantas ? ' El resto queda pendiente de identificar.' : ''}
-          </p>
-        </div>
+      {elegidas.length > 0 && modo !== 'despues' && (
+        <p className="mt-3 text-[14px] font-semibold text-texto">
+          {elegidas.length} de {cuantas}.{elegidas.length < cuantas ? ' Las que falten se resuelven en la próxima manga.' : ''}
+        </p>
       )}
       {aviso && <p className="mt-2 text-[13.5px] font-semibold text-estado-atencion-texto">{aviso}</p>}
     </div>

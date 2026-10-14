@@ -8,7 +8,8 @@ import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useAsignarCaravanasPlanilla, useBajasPendientes, useIdentificarSalida, usePotreros } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
-import { CaravanasQueSalieron, ZonaArchivo, type Conocida } from './caravanas'
+import { CaravanasQueSalieron, ZonaArchivo } from './caravanas'
+import { usePosibles } from './posibles'
 import { leerArchivo } from './leer-archivo'
 import { leerPlanilla, soloDigitos, type Lectura } from './planilla'
 import { bajarPlanillaEjemplo } from './planilla-ejemplo'
@@ -17,12 +18,11 @@ const ddmm = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 
 
 /**
  * Las que salieron por cantidad y todavía no se sabe cuáles fueron. Se dice
- * acá (de a una, rango o planilla) o en la próxima manga. Si la que salió no
+ * acá (eligiéndolas de la lista o con la planilla) o en la próxima manga. Si la que salió no
  * era la que eligió la cuenta, la base las intercambia y lo deja anotado.
  */
 export function IdentificarSalidas({ empresaId, abierto, onCerrar }: { empresaId: string; abierto: boolean; onCerrar: () => void }) {
   const pendientes = useBajasPendientes()
-  const animales = useAnimales()
   const potreros = usePotreros()
   const identificar = useIdentificarSalida()
   const [caravanas, setCaravanas] = useState<string[]>([])
@@ -36,13 +36,10 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar }: { empresaId
     m.set(k, { ...p, n: (m.get(k)?.n ?? 0) + 1 })
     return m
   }, new Map<string, (typeof ps)[number] & { n: number }>()).values()]
-  const cats = new Set(ps.map((p) => p.categoria))
-  // Pueden ser cualquiera con caravana de esas categorías (los que siguen en el rodeo y los mismos que salieron).
-  const posibles: Conocida[] = (animales.data ?? []).flatMap((a) =>
-    a.categoria && cats.has(a.categoria) && (a.caravana_visual || a.caravana_rfid) && (a.estado === 'activo' || ps.some((p) => p.animal_id === a.id))
-      ? [{ caravana: (a.caravana_visual ?? a.caravana_rfid)!, visual: a.caravana_visual, rfid: a.caravana_rfid, etiqueta: categoriaNombre(a.categoria, 1) }]
-      : [],
-  )
+  // Las de los potreros y categorías que salieron: las que siguen en el rodeo y las que eligió la cuenta.
+  const claves = new Set(ps.map((p) => `${p.potrero_id}|${p.categoria}`))
+  const pendientesIds = new Set(ps.map((p) => p.animal_id))
+  const posibles = usePosibles((a) => claves.has(`${a.potrero_id}|${a.categoria}`) && (a.estado === 'activo' || pendientesIds.has(a.id)))
 
   async function guardar() {
     setError(null)
@@ -64,7 +61,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar }: { empresaId
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={`${ps.length} para identificar`}
-      bajada="Salieron sin leer las caravanas. Decí cuáles fueron: si no era el que eligió la cuenta, lo corregimos."
+      bajada="La cuenta del rodeo ya está bien. Falta saber qué ficha es cuál: se resuelve solo en la próxima manga, o elegilas acá si las reconocés."
       pie={
         <BotonPrincipal icono="Guardar" cargando={identificar.isPending} disabled={identificar.isPending || caravanas.length === 0} onClick={guardar}>
           {caravanas.length ? `Identificar ${caravanas.length}` : 'Sumá las caravanas'}

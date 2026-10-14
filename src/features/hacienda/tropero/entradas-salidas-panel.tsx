@@ -8,7 +8,8 @@ import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useCrearAnimalesMasivo, useMoverAnimales, useSalidaPorCantidad } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { CroquisElegir } from '@/features/mapa/croquis-elegir'
-import { CaravanasQueSalieron, type Conocida } from './caravanas'
+import { CaravanasQueSalieron } from './caravanas'
+import { usePosibles } from './posibles'
 import { useMapa } from '@/features/mapa/api'
 import type { CampoMapa } from '@/features/mapa/reglas'
 import type { Database } from '@/lib/supabase/types'
@@ -94,11 +95,7 @@ export function EntradasSalidas({
   const sacan = q?.modo === 'salieron' || (q?.modo === 'entraron' && q.que === 'deOtroCampo')
   const ocupado = salida.isPending || alta.isPending || mover.isPending
   // Las caravanas del potrero que pueden ser las que salieron (de las categorías que salen).
-  const posibles: (Conocida & { categoria: Categoria })[] = (animales.data ?? []).flatMap((a) =>
-    a.estado === 'activo' && a.potrero_id === potreroId && a.categoria && cuantos[a.categoria] && (a.caravana_visual || a.caravana_rfid)
-      ? [{ caravana: (a.caravana_visual ?? a.caravana_rfid)!, visual: a.caravana_visual, rfid: a.caravana_rfid, etiqueta: categoriaNombre(a.categoria, 1), categoria: a.categoria }]
-      : [],
-  )
+  const posibles = usePosibles((a) => a.estado === 'activo' && a.potrero_id === potreroId && !!a.categoria && !!cuantos[a.categoria])
   const identificadasPor = (c: Categoria) => caravanas.filter((x) => posibles.find((p) => p.caravana === x)?.categoria === c).length
 
   function reiniciar() {

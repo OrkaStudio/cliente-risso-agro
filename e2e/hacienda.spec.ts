@@ -146,13 +146,10 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
   await panel.getByRole('button', { name: 'Listo' }).click()
 
-  // Decir cuál fue: una vaca del 1A que sigue en el rodeo.
-  await page.getByPlaceholder('Buscá una caravana').fill('E2E')
-  const caravana = (await page.getByRole('row', { name: /Vaca/ }).first().getByRole('link').locator('span').first().textContent())!.trim()
-  await page.getByPlaceholder('Buscá una caravana').fill('')
+  // Decir cuál fue: se elige de la lista (cada una dice qué es), sin tipear números.
   await page.getByRole('button', { name: 'Decir cuáles' }).click()
-  await panel.getByLabel('Caravana que salió').fill(caravana)
-  await panel.getByRole('button', { name: 'Sumar' }).click()
+  await panel.locator('button[aria-pressed]').first().click()
+  await expect(panel.getByText(/^1 de \d+\./)).toBeVisible()
   await panel.getByRole('button', { name: /^Identificar 1/ }).click()
   await expect(panel).toBeHidden()
 
