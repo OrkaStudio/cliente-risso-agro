@@ -146,11 +146,10 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
   await panel.getByRole('button', { name: 'Listo' }).click()
 
-  // Decir cuál fue: se elige de la lista (cada una dice qué es), sin tipear números.
-  await page.getByRole('button', { name: 'Decir cuáles' }).click()
-  await panel.locator('button[aria-pressed]').first().click()
-  await expect(panel.getByText(/^1 de \d+\./)).toBeVisible()
-  await panel.getByRole('button', { name: /^Identificar 1/ }).click()
+  // Decir cuál fue: una pregunta por salida; se toca la que salió (sin tipear números).
+  await page.getByRole('button', { name: /^Decir cuál/ }).click()
+  await panel.locator('section').first().getByRole('button').nth(1).click()
+  await panel.getByRole('button', { name: 'Guardar' }).click()
   await expect(panel).toBeHidden()
 
   // La planilla: una caravana para un ternero sin caravana del 1A.

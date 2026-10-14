@@ -12,7 +12,9 @@ type Animal = Database['public']['Views']['v_animal_con_caravana']['Row']
  * que la hace reconocible — qué es, la edad, el último peso o tacto y dónde
  * está. «La vaca vieja de 6 años» se reconoce; el número, no se recuerda.
  */
-export function usePosibles(cuales: (a: Animal) => boolean): (Conocida & { categoria: NonNullable<Animal['categoria']> })[] {
+export type Posible = Conocida & { id: string; potreroId: string | null; activo: boolean; categoria: NonNullable<Animal['categoria']> }
+
+export function usePosibles(cuales: (a: Animal) => boolean): Posible[] {
   const animales = useAnimales()
   const eventos = useEventosSenales()
   const potreros = usePotreros()
@@ -30,6 +32,9 @@ export function usePosibles(cuales: (a: Animal) => boolean): (Conocida & { categ
         etiqueta: categoriaNombre(a.categoria!, 1),
         detalle: [edadTexto(a.fecha_nacimiento), dato, a.potrero_id ? pot.get(a.potrero_id) : null].filter(Boolean).join(' · '),
         categoria: a.categoria!,
+        id: a.id!,
+        potreroId: a.potrero_id,
+        activo: a.estado === 'activo',
       }
     })
     .sort((x, y) => (x.visual ?? x.rfid ?? '').localeCompare(y.visual ?? y.rfid ?? '', 'es', { numeric: true }))

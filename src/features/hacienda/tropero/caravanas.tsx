@@ -44,7 +44,7 @@ export function ZonaArchivo({ titulo, bajada, onArchivo, cargando = false }: { t
   )
 }
 
-export type Conocida = { caravana: string; visual: string | null; rfid: string | null; etiqueta: string; detalle?: string }
+export type Conocida = { caravana: string; visual: string | null; rfid: string | null; etiqueta: string; detalle?: string; /** «Figura como vendida»: la que la cuenta ya dio de baja. */ marca?: string }
 type Modo = 'despues' | 'lista' | 'planilla'
 
 /**
@@ -75,12 +75,6 @@ export function CaravanasQueSalieron({
     const d = soloDigitos(c)
     return posibles.find((p) => (p.visual && soloDigitos(p.visual) === d) || (p.rfid && soloDigitos(p.rfid) === d)) ?? null
   }
-  const tocar = (c: string) => {
-    setAviso(null)
-    if (elegidas.includes(c)) return onCambio(elegidas.filter((x) => x !== c))
-    if (elegidas.length >= cuantas) return setAviso(`Salieron ${cuantas}: sacá una antes de elegir otra.`)
-    onCambio([...elegidas, c])
-  }
   const opciones = [
     ...(conDespues ? [{ valor: 'despues' as Modo, texto: 'En la manga' }] : []),
     { valor: 'lista' as Modo, texto: 'De la lista' },
@@ -97,32 +91,8 @@ export function CaravanasQueSalieron({
       )}
       {modo === 'lista' && (
         <>
-          <p className="mt-3 text-[14px] text-texto-suave">Tocá las que salieron. Cada una dice qué es, para reconocerla sin acordarte del número.</p>
-          <div className="mt-3 grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto pr-1">
-            {posibles.map((p) => {
-              const si = elegidas.includes(p.caravana)
-              return (
-                <button
-                  key={p.caravana}
-                  type="button"
-                  aria-pressed={si}
-                  onClick={() => tocar(p.caravana)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-[14px] border-[1.5px] px-3 py-2.5 text-left transition-colors',
-                    si ? 'border-principal bg-principal-suave' : 'border-borde bg-superficie hover:border-neutro-300',
-                  )}
-                >
-                  <span className={cn('cifra shrink-0 rounded-[8px] border-[1.5px] px-1.5 text-[18px] leading-tight font-bold', si ? 'border-principal bg-principal text-principal-texto' : 'border-principal text-principal')}>
-                    {p.visual ?? p.rfid?.slice(-4)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-bold text-texto">{p.etiqueta}</span>
-                    {p.detalle && <span className="block truncate text-[12.5px] text-texto-suave">{p.detalle}</span>}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          <p className="mt-3 mb-3 text-[14px] text-texto-suave">Tocá {cuantas === 1 ? 'la que salió' : 'las que salieron'}. Cada una dice qué es, para reconocerla sin acordarte del número.</p>
+          <ElegirDeLista posibles={posibles} elegidas={elegidas} cuantas={cuantas} onCambio={onCambio} />
         </>
       )}
       {modo === 'planilla' && (
@@ -148,12 +118,60 @@ export function CaravanasQueSalieron({
           />
         </div>
       )}
-      {elegidas.length > 0 && modo !== 'despues' && (
+      {modo === 'planilla' && elegidas.length > 0 && (
         <p className="mt-3 text-[14px] font-semibold text-texto">
-          {elegidas.length} de {cuantas}.{elegidas.length < cuantas ? ' Las que falten se resuelven en la próxima manga.' : ''}
+          Encontramos {elegidas.length} de {cuantas}.{elegidas.length < cuantas ? ' Las que falten se resuelven en la próxima manga.' : ''}
         </p>
       )}
       {aviso && <p className="mt-2 text-[13.5px] font-semibold text-estado-atencion-texto">{aviso}</p>}
+    </div>
+  )
+}
+
+/**
+ * La lista para elegir: cada caravana con lo que la hace reconocible. Si sale
+ * una sola, tocar otra la reemplaza (como una opción); si salen varias, se
+ * marcan hasta completar la cuenta.
+ */
+export function ElegirDeLista({ posibles, elegidas, cuantas, onCambio }: { posibles: Conocida[]; elegidas: string[]; cuantas: number; onCambio: (cs: string[]) => void }) {
+  const tocar = (c: string) => {
+    if (elegidas.includes(c)) return onCambio(elegidas.filter((x) => x !== c))
+    if (cuantas === 1) return onCambio([c])
+    if (elegidas.length < cuantas) onCambio([...elegidas, c])
+  }
+  return (
+    <div>
+      <div role={cuantas === 1 ? 'radiogroup' : 'group'} className="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+        {posibles.map((p) => {
+          const si = elegidas.includes(p.caravana)
+          const lleno = !si && cuantas > 1 && elegidas.length >= cuantas
+          return (
+            <button
+              key={p.caravana}
+              type="button"
+              role={cuantas === 1 ? 'radio' : undefined}
+              aria-checked={cuantas === 1 ? si : undefined}
+              aria-pressed={cuantas === 1 ? undefined : si}
+              disabled={lleno}
+              onClick={() => tocar(p.caravana)}
+              className={cn(
+                'flex items-center gap-3 rounded-[14px] border-[1.5px] px-3 py-2.5 text-left transition-colors disabled:opacity-45',
+                si ? 'border-principal bg-principal-suave' : 'border-borde bg-superficie hover:border-neutro-300',
+              )}
+            >
+              <span className={cn('cifra shrink-0 rounded-[8px] border-[1.5px] px-1.5 text-[18px] leading-tight font-bold', si ? 'border-principal bg-principal text-principal-texto' : 'border-principal text-principal')}>
+                {p.visual ?? p.rfid?.slice(-4)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[14px] font-bold text-texto">{p.etiqueta}</span>
+                {p.detalle && <span className="block truncate text-[12.5px] text-texto-suave">{p.detalle}</span>}
+                {p.marca && <span className="mt-0.5 inline-block rounded-full bg-superficie-hundida px-2 text-[11.5px] font-semibold text-texto-suave">{p.marca}</span>}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {cuantas > 1 && <p className="mt-2 text-[13.5px] font-semibold text-texto">{elegidas.length} de {cuantas}</p>}
     </div>
   )
 }

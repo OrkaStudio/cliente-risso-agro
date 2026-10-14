@@ -8,7 +8,7 @@ import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useAsignarCaravanasPlanilla, useBajasPendientes, useIdentificarSalida, usePotreros } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
-import { CaravanasQueSalieron, ZonaArchivo } from './caravanas'
+import { ElegirDeLista, ZonaArchivo } from './caravanas'
 import { usePosibles } from './posibles'
 import { leerArchivo } from './leer-archivo'
 import { leerPlanilla, soloDigitos, type Lectura } from './planilla'
@@ -17,70 +17,91 @@ import { bajarPlanillaEjemplo } from './planilla-ejemplo'
 const ddmm = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '')
 
 /**
- * Las que salieron por cantidad y todavía no se sabe cuáles fueron. Se dice
- * acá (eligiéndolas de la lista o con la planilla) o en la próxima manga. Si la que salió no
- * era la que eligió la cuenta, la base las intercambia y lo deja anotado.
+ * Las que salieron por cantidad y todavía no se sabe cuáles fueron: una
+ * pregunta por cada salida («¿Qué vaca salió del 1A?»), con las caravanas de
+ * ese potrero para reconocerla. Para que la cuenta diera bien, la app ya dio de
+ * baja una (se marca «Figura como vendida»); si fue otra, se intercambian y
+ * queda en la historia. También se resuelve sola en la próxima manga.
  */
 export function IdentificarSalidas({ empresaId, abierto, onCerrar }: { empresaId: string; abierto: boolean; onCerrar: () => void }) {
   const pendientes = useBajasPendientes()
   const potreros = usePotreros()
   const identificar = useIdentificarSalida()
-  const [caravanas, setCaravanas] = useState<string[]>([])
+  const [elegidas, setElegidas] = useState<Record<string, string[]>>({})
   const [error, setError] = useState<string | null>(null)
 
   const ps = pendientes.data ?? []
   const nombrePotrero = (id: string | null) => potreros.data?.find((p) => p.id === id)?.nombre ?? 'sin potrero'
-  // Agrupado: «2 terneros del 11B · 12/10».
-  const grupos = [...ps.reduce((m, p) => {
-    const k = `${p.categoria}|${p.potrero_id}|${p.fecha}`
-    m.set(k, { ...p, n: (m.get(k)?.n ?? 0) + 1 })
-    return m
-  }, new Map<string, (typeof ps)[number] & { n: number }>()).values()]
-  // Las de los potreros y categorías que salieron: las que siguen en el rodeo y las que eligió la cuenta.
-  const claves = new Set(ps.map((p) => `${p.potrero_id}|${p.categoria}`))
-  const pendientesIds = new Set(ps.map((p) => p.animal_id))
-  const posibles = usePosibles((a) => claves.has(`${a.potrero_id}|${a.categoria}`) && (a.estado === 'activo' || pendientesIds.has(a.id)))
+  // Una salida = un potrero, una categoría, un día y un motivo.
+  const grupos = [
+    ...ps
+      .reduce((m, p) => {
+        const k = `${p.potrero_id}|${p.categoria}|${p.fecha}|${p.estado}`
+        const g = m.get(k) ?? { clave: k, potreroId: p.potrero_id, categoria: p.categoria, fecha: p.fecha, estado: p.estado, ids: [] as string[] }
+        g.ids.push(p.animal_id!)
+        m.set(k, g)
+        return m
+      }, new Map<string, { clave: string; potreroId: string | null; categoria: (typeof ps)[number]['categoria']; fecha: string | null; estado: (typeof ps)[number]['estado']; ids: string[] }>())
+      .values(),
+  ]
+  const todosPendientes = new Set(ps.map((p) => p.animal_id))
+  const posibles = usePosibles((a) => grupos.some((g) => a.potrero_id === g.potreroId && a.categoria === g.categoria) && (a.estado === 'activo' || todosPendientes.has(a.id)))
+  const total = Object.values(elegidas).reduce((s, xs) => s + xs.length, 0)
 
   async function guardar() {
     setError(null)
-    if (caravanas.length === 0) return setError('Sumá al menos una caravana.')
+    const caravanas = Object.values(elegidas).flat()
+    if (caravanas.length === 0) return
     try {
       const r = await identificar.mutateAsync({ empresaId, caravanas })
-      toast.success(`Listo: ${r.identificadas} ${r.identificadas === 1 ? 'identificada' : 'identificadas'}`, {
-        description: r.cambiados > 0 ? `${r.cambiados} no ${r.cambiados === 1 ? 'era el que salió: volvió' : 'eran los que salieron: volvieron'} al rodeo.` : 'Eran las que había elegido la cuenta.',
+      toast.success('Listo: cada ficha quedó en su lugar', {
+        description: r.cambiados > 0 ? `${r.cambiados === 1 ? 'La que figuraba como salida volvió' : 'Las que figuraban como salidas volvieron'} al rodeo.` : 'Era la que figuraba como salida.',
       })
-      setCaravanas([])
+      setElegidas({})
       onCerrar()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
     }
   }
 
+  const unaSola = grupos.length === 1 && grupos[0]!.ids.length === 1
   return (
     <PanelLateral
       abierto={abierto}
       onCerrar={onCerrar}
-      titulo={`${ps.length} para identificar`}
-      bajada="La cuenta del rodeo ya está bien. Falta saber qué ficha es cuál: se resuelve solo en la próxima manga, o elegilas acá si las reconocés."
+      titulo={unaSola ? '¿Cuál salió?' : '¿Cuáles salieron?'}
+      bajada="La cuenta del rodeo ya está bien: esto pone cada ficha en su lugar. Si no te acordás, dejalo; se resuelve solo en la próxima manga."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={identificar.isPending} disabled={identificar.isPending || caravanas.length === 0} onClick={guardar}>
-          {caravanas.length ? `Identificar ${caravanas.length}` : 'Sumá las caravanas'}
+        <BotonPrincipal icono="Guardar" cargando={identificar.isPending} disabled={identificar.isPending || total === 0} onClick={guardar}>
+          {total === 0 ? 'Tocá la que salió' : 'Guardar'}
         </BotonPrincipal>
       }
     >
-      <ul className="divide-y divide-borde border-y border-borde">
-        {grupos.map((g) => (
-          <li key={`${g.categoria}${g.potrero_id}${g.fecha}`} className="flex items-baseline justify-between gap-3 py-2.5 text-[15px]">
-            <span className="font-semibold text-texto">
-              {g.n} {g.categoria ? categoriaNombre(g.categoria, g.n).toLowerCase() : ''} del {nombrePotrero(g.potrero_id)}
-            </span>
-            <span className="text-[13.5px] text-texto-suave">salieron el {ddmm(g.fecha)}</span>
-          </li>
-        ))}
-      </ul>
-      <Grupo titulo="Cuáles fueron" className="mt-6">
-        <CaravanasQueSalieron posibles={posibles} elegidas={caravanas} onCambio={setCaravanas} cuantas={ps.length} conDespues={false} />
-      </Grupo>
+      <div className="flex flex-col gap-7">
+        {grupos.map((g) => {
+          const n = g.ids.length
+          const cat = g.categoria ? categoriaNombre(g.categoria, n).toLowerCase() : 'animales'
+          const verbo = g.estado === 'muerto' ? (n === 1 ? 'murió' : 'murieron') : n === 1 ? 'se vendió' : 'se vendieron'
+          const lugar = g.estado === 'muerto' ? `en el ${nombrePotrero(g.potreroId)}` : `del ${nombrePotrero(g.potreroId)}`
+          const figura = g.estado === 'muerto' ? 'Figura como muerta' : 'Figura como vendida'
+          const lista = posibles
+            .filter((p) => p.potreroId === g.potreroId && p.categoria === g.categoria && (p.activo || g.ids.includes(p.id)))
+            .map((p) => ({ ...p, marca: g.ids.includes(p.id) ? figura : undefined }))
+            // La que figura como salida, primero.
+            .sort((a, b) => Number(!!b.marca) - Number(!!a.marca))
+          return (
+            <section key={g.clave}>
+              <h3 className="font-heading text-[18px] font-extrabold text-texto">
+                ¿Qué {n === 1 ? cat : `${n} ${cat}`} {verbo} {lugar}?
+              </h3>
+              <p className="mb-3 text-[14px] text-texto-suave">
+                Lo anotaste el {ddmm(g.fecha)} sin decir {n === 1 ? 'cuál' : 'cuáles'}. Tocá {n === 1 ? 'la que fue' : `las ${n} que fueron`}.
+              </p>
+              <ElegirDeLista posibles={lista} elegidas={elegidas[g.clave] ?? []} cuantas={n} onCambio={(xs) => setElegidas((e) => ({ ...e, [g.clave]: xs }))} />
+            </section>
+          )
+        })}
+      </div>
       {error && <p className="mt-5 rounded-[14px] bg-estado-problema-suave px-4 py-3 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
     </PanelLateral>
   )

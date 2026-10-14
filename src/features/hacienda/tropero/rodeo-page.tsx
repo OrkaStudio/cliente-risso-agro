@@ -219,7 +219,7 @@ export function RodeoPage() {
             <span className="block text-[13.5px] text-texto-suave">Se vendieron o murieron por cantidad. Decí qué caravanas eran para que la ficha de cada uno quede bien.</span>
           </p>
           <BotonChico type="button" onClick={() => setPanelCaravanas('identificar')}>
-            Decir cuáles
+            {pendientes.data!.length === 1 ? 'Decir cuál' : 'Decir cuáles'}
           </BotonChico>
         </motion.div>
       )}

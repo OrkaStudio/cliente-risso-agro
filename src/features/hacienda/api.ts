@@ -479,7 +479,7 @@ export async function salidaPorCantidad(input: {
 
 /** Las bajas por cantidad que todavía no se identificaron (cuáles fueron). */
 export async function listBajasPendientes() {
-  const { data, error } = await supabase.from('v_bajas_pendientes').select('evento_id, animal_id, fecha, categoria, potrero_id, salida_id').order('fecha', { ascending: false })
+  const { data, error } = await supabase.from('v_bajas_pendientes').select('evento_id, animal_id, fecha, categoria, potrero_id, salida_id, estado').order('fecha', { ascending: false })
   if (error) throw new Error(error.message)
   return data ?? []
 }
