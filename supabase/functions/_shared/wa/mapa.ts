@@ -56,7 +56,7 @@ export type MapaCampo = { id: string; nombre: string; potreros: { id: string; no
 
 export type MapaIO = {
   datos: (campoId: string) => Promise<MapaCampo | null>
-  render: (datos: MapaCampo) => Promise<{ bytes: Uint8Array; dibujados: number; faltantes: string[] } | null>
+  render: (datos: MapaCampo) => Promise<{ bytes: Uint8Array; dibujados: number; faltantes: string[]; satelital?: boolean } | null>
   enviarImagen: (bytes: Uint8Array, caption: string, campoId: string) => Promise<void>
   responder: (mensaje: Mensaje) => Promise<void>
 }
@@ -71,7 +71,8 @@ export async function atenderMapa(campo: Campo, io: MapaIO): Promise<boolean> {
     await io.responder({ texto: `Todavía no hay potreros dibujados en ${datos.nombre}. Potreros registrados: ${datos.potreros.map(p => p.nombre).join(', ') || 'ninguno'}. Podés escribir el nombre del potrero; tu carga pendiente se conserva.` }); return false
   }
   const incompleto = imagen.faltantes.length ? ` Sin dibujo: ${imagen.faltantes.join(', ')}.` : ''
-  const caption = `Mapa de ${datos.nombre} · ${imagen.dibujados} potreros dibujados.${incompleto}\nLos números del croquis se corresponden con los nombres de la lista. Si tenés una observación pendiente, escribí el nombre del potrero; no hace falta repetir el audio.`
+  const vista = imagen.satelital ? 'Vista satelital de referencia' : 'Croquis de respaldo: el satélite no está disponible ahora'
+  const caption = `${vista} · ${datos.nombre} · ${imagen.dibujados} potreros dibujados.${incompleto}\nDescargá la imagen antes de salir al campo. Los números se corresponden con los nombres de la lista. Para completar una observación, escribí el nombre del potrero; no hace falta repetir el audio ni compartir ubicación en vivo.`
   await io.enviarImagen(imagen.bytes, [...caption].slice(0, 1024).join(''), campo.id)
   return true
 }

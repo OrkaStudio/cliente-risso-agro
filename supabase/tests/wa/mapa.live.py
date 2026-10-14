@@ -43,6 +43,8 @@ def business():
 before=business();initial_pending=pending()
 def image_case():
     row=send('mapa de La Porteña',True)
+    if '--expect-satellite' in sys.argv:
+        assert row['cuerpo']['image']['caption'].startswith('Vista satelital de referencia'),'El proveedor no respondió: llegó el croquis de respaldo.'
     assert row['cuerpo']['tropero_mapa']['campo_id']==LP
     assert pending()==initial_pending,'Mapa cambió el pendiente.'
     assert business()==before,'Consulta de mapa modificó datos de campo.'
@@ -79,4 +81,10 @@ if initial_pending is None:
     case('Responder 7B completa el borrador y cancelar evita escrituras',resolve_case)
 else:
     cases.append({'case':'Recorrida sintética nueva','result':'SKIP','reason':'Hay una carga genuina pendiente; no se reemplaza.'});persist()
+if '--expect-satellite' in sys.argv:
+    def no_location_case():
+        for event in events:
+            for row in event.get('respuestas',[]):
+                assert row['cuerpo'].get('interactive',{}).get('type')!='location_request_message','La recorrida sigue solicitando GPS.'
+    case('Recorrida y mapa se completan sin solicitud de ubicación',no_location_case)
 print(json.dumps({'version':expected,'casos_aprobados':sum(c['result']=='PASS' for c in cases),'casos_omitidos':sum(c['result']=='SKIP' for c in cases),'resultado':str(ROOT),'datos_campo_modificados':False},ensure_ascii=False),flush=True)

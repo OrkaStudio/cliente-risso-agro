@@ -141,17 +141,17 @@ describe('qué potrero es', () => {
 describe('«acá»: el potrero sale de la ubicación', () => {
   const aca = [obs({ aca: true, novedad: 'el molino no anda' })]
 
-  it('pide la ubicación con el botón de WhatsApp', () => {
+  it('permite ubicar la observación por mapa sin solicitar GPS', () => {
     const paso = siguientePaso('c', borrador(aca), ctx)
     if (paso.k !== 'preguntar') throw new Error('Debe preguntar')
     expect(paso.mensaje).toEqual({
-      texto: '¿En qué potrero pasó? Podés ver el mapa o escribir el nombre. Si todavía estás ahí, enviá la ubicación.',
-      pedirUbicacion: true,
+      texto: '¿En qué potrero pasó? Mirá el mapa y escribí el nombre; conservé lo que contaste.',
+      botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }],
     })
     expect(paso.pendiente.tipo).toBe('ubicacion')
   })
 
-  it('sin decir el potrero, también la pide', () => {
+  it('sin nombrar potrero conserva el audio y ofrece el mapa', () => {
     const paso = siguientePaso('c', borrador([obs({ novedad: 'alambrado cortado' })]), ctx)
     expect(paso.k === 'preguntar' && paso.pendiente.tipo).toBe('ubicacion')
   })

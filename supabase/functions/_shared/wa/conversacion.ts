@@ -519,7 +519,7 @@ function pasoRecorrida(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
   if (quedan.some((o) => o.aca && !o.potreroId)) {
     return {
       k: 'preguntar',
-      mensaje: { texto: `${aviso}¿En qué potrero pasó? Podés ver el mapa o escribir el nombre. Si todavía estás ahí, enviá la ubicación.`, pedirUbicacion: true },
+      mensaje: { texto: `${aviso}¿En qué potrero pasó? Mirá el mapa y escribí el nombre; conservé lo que contaste.`, botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] },
       pendiente: { tipo: 'ubicacion', capturaId, borrador: b, obsIndex: quedan.findIndex(o => o.aca && !o.potreroId) },
       notas,
     }
