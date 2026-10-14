@@ -21,11 +21,39 @@ export const INTENTS = [
   'consulta_lluvia',
   'consulta_vencimientos',
   'consulta_dias_potrero',
+  'consulta_recorrida',
+  'consulta_observacion',
+  'consulta_novedades',
+  'consulta_gastos',
+  'consulta_cargas',
   'no_soportado',
+  'ayuda_gasto',
+  'ayuda_lluvia',
   'saludo',
   'otro',
 ] as const
 export type Intent = (typeof INTENTS)[number]
+
+export const AGUA = ['llena', 'normal', 'baja', 'seca'] as const
+export const PASTO = ['abundante', 'normal', 'escaso', 'pelado'] as const
+export const ELECTRICO = ['ok', 'cortado'] as const
+export type Agua = (typeof AGUA)[number]
+export type Pasto = (typeof PASTO)[number]
+export type Electrico = (typeof ELECTRICO)[number]
+
+/** Lo que vio en un potrero, como lo devuelve el modelo. Los estados son los enums de la base. */
+export type ObsInterpretada = {
+  potrero: string | null
+  campo: string | null
+  /** Dijo "acá", "en este" o "en el que estoy": el potrero sale de la ubicación. */
+  aca: boolean
+  agua: Agua | null
+  pasto: Pasto | null
+  electrico: Electrico | null
+  /** Total de animales del potrero, sólo si contó todos. */
+  conteo: number | null
+  novedad: string | null
+}
 
 /** Lo que devuelve el modelo, ya limpio. Nunca se escribe tal cual: es una propuesta. */
 export type Interpretacion = {
@@ -34,20 +62,46 @@ export type Interpretacion = {
   potrero: string | null
   mm: number | null
   fecha: string | null
+  fechaInvalida?: boolean
   monto: number | null
   categoria: string | null
   contraparte: string | null
   descripcion: string | null
   periodo: 'semana' | 'mes' | 'anio' | null
+  /** Sólo en "novedad": una por potrero. */
+  observaciones: ObsInterpretada[]
 }
 
 export type TipoBorrador =
+  | 'recorrida'
   | 'lluvia'
   | 'gasto'
   | 'consulta_hacienda'
   | 'consulta_lluvia'
   | 'consulta_vencimientos'
   | 'consulta_dias_potrero'
+  | 'consulta_recorrida'
+  | 'consulta_observacion'
+  | 'consulta_novedades'
+  | 'consulta_gastos'
+  | 'consulta_cargas'
+
+/** Una observación de la recorrida mientras se resuelve su potrero. */
+export type ObsBorrador = {
+  potreroId?: string | null
+  campoId?: string | null
+  potreroMencion?: string | null
+  campoMencion?: string | null
+  aca?: boolean
+  agua: Agua | null
+  pasto: Pasto | null
+  electrico: Electrico | null
+  conteo: number | null
+  novedad: string | null
+}
+
+/** Dónde dijo la ubicación compartida que está el productor. */
+export type Ubicado = { potreroId: string; campoId: string }
 
 export type IvaLinea = { concepto: string | null; neto: number; alicuota: number; iva: number }
 
@@ -61,8 +115,10 @@ export type Borrador = {
   potreroMencion?: string | null
   mm?: number | null
   fecha?: string | null
+  fechaInvalida?: boolean
   monto?: number | null
   categoriaId?: string | null
+  categoriaMencion?: string | null
   contraparte?: string | null
   descripcion?: string | null
   cuit?: string | null
@@ -71,14 +127,28 @@ export type Borrador = {
   /** id del medio en Meta, para subir la foto al bucket al confirmar. */
   fotoMediaId?: string | null
   periodo?: 'semana' | 'mes' | 'anio' | null
+  observaciones?: ObsBorrador[]
 }
 
 /** Qué le preguntó el bot al productor y todavía espera. */
 export type Pendiente =
   | { tipo: 'propuesta'; capturaId: string; borrador: Borrador }
   | { tipo: 'dato'; capturaId: string; borrador: Borrador; dato: 'mm' | 'monto' }
-  | { tipo: 'campo'; capturaId: string; borrador: Borrador }
-  | { tipo: 'potrero'; capturaId: string; borrador: Borrador; opciones?: string[] }
+  | {
+      tipo: 'campo'; capturaId: string; borrador: Borrador
+      /** Sólo se guarda si la pregunta avisó explícitamente que elegir confirma. */
+      confirmaAlElegir?: boolean
+      camposOfrecidos?: string[]
+    }
+  | {
+      tipo: 'potrero'; capturaId: string; borrador: Borrador; opciones?: string[]
+      /** En una recorrida: a qué observación le falta el potrero. */
+      obsIndex?: number
+    }
+  /** La recorrida espera la ubicación (o el nombre) del potrero donde está. */
+  | { tipo: 'ubicacion'; capturaId: string; borrador: Borrador; obsIndex?: number }
+  /** Compartió la ubicación sin decir nada más: vale para el próximo mensaje. */
+  | { tipo: 'ubicado'; capturaId: null; ubicado: Ubicado }
   | { tipo: 'categoria'; capturaId: string; borrador: Borrador }
   | { tipo: 'corregir'; capturaId: string; borrador: Borrador }
 
@@ -87,6 +157,8 @@ export type Boton = { id: string; titulo: string; detalle?: string }
 /** Un mensaje del bot. Con ≤3 opciones van botones; con más, una lista (máx. 10). */
 export type Mensaje = {
   texto: string
+  /** Botón de WhatsApp para compartir la ubicación. */
+  pedirUbicacion?: boolean
   botones?: Boton[]
   lista?: { boton: string; filas: Boton[] }
 }

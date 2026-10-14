@@ -9,30 +9,40 @@
 //
 // Secrets: WA_TOKEN, WA_PHONE_NUMBER_ID, WA_APP_SECRET, WA_VERIFY_TOKEN,
 // ANTHROPIC_API_KEY (+ los SUPABASE_* que da la plataforma).
+import { comandoSemanal, periodoSemana } from '../_shared/wa/semanal.ts'
+import { enviarSolicitado } from '../wa-resumen-semanal/servicio.ts'
+import { configurar } from '../wa-resumen-semanal/store.ts'
 
 import {
   arrancar,
+  ayudaConPendiente,
   AUDIO_PRONTO,
+  conUbicacion,
   corregir,
   leer,
   QUE_PUEDO,
   siguientePaso,
   type Paso,
 } from '../_shared/wa/conversacion.ts'
+import { confirmarConVerificacion } from '../_shared/wa/confirmacion.ts'
 import { pistaTranscripcion } from '../_shared/wa/interpretar.ts'
 import * as R from '../_shared/wa/respuestas.ts'
-import { campoPorId, potreroPorId } from '../_shared/wa/resolver.ts'
-import { esFecha, hoyAR } from '../_shared/wa/texto.ts'
+import { campoPorId, potreroEnPunto, potreroPorId } from '../_shared/wa/resolver.ts'
+import { esFecha, finDeMes, hoyAR, inicioSemana, sumarDias } from '../_shared/wa/texto.ts'
 import type { Borrador, Contexto, Mensaje, Pendiente } from '../_shared/wa/tipos.ts'
 import * as db from './db.ts'
 import { interpretar, leerComprobante, transcribir } from './llm.ts'
 import * as meta from './meta.ts'
+import { atenderMapa, campoParaMapa, comandoMapa, elegirMapa, noRecuerdaPotrero, type PedidoMapa } from '../_shared/wa/mapa.ts'
+import { imagenMapa } from './mapa-imagen.ts'
 
 const NO_VINCULADO =
-  'Hola. Este número no está vinculado a ninguna cuenta. Si usás la app de campo de Orka, pedinos que lo vinculemos.'
-const ERROR = 'Tuve un problema y no lo pude anotar. Ya nos llegó el aviso; probá de nuevo en un rato.'
+  'Hola. Tu número no está vinculado a una cuenta de Tropero. Para vincularlo, contactá al equipo de Orka.'
+const ERROR = 'No pude procesar el mensaje ahora. Probá de nuevo en un rato.'
 /** Después de esto, lo que el bot preguntó se da por abandonado. */
 const PENDIENTE_VENCE_MS = 12 * 60 * 60 * 1000
+/** La ubicación compartida vale mientras está en ese potrero: después se mueve. */
+const UBICADO_VENCE_MS = 60 * 60 * 1000
 
 type MensajeMeta = {
   id: string
@@ -43,6 +53,7 @@ type MensajeMeta = {
   button?: { payload: string; text: string }
   image?: { id: string; mime_type: string; caption?: string }
   audio?: { id: string }
+  location?: { latitude: number; longitude: number; name?: string; address?: string }
 }
 
 Deno.serve(async (req) => {
@@ -95,15 +106,16 @@ async function recibir(m: MensajeMeta): Promise<void> {
   const mensajeId = await db.guardarEntrante({ wamid: m.id, telefono: m.from, tipo: m.type, cuerpo, vinculo })
   if (!mensajeId) return // Meta lo reenvió: ya se procesó.
   const tarea = procesar(m, mensajeId, vinculo).catch((e) => console.error('procesar', e))
-  // deno-lint-ignore no-explicit-any
-  const rt = (globalThis as any).EdgeRuntime
+  const rt = (globalThis as unknown as { EdgeRuntime?: { waitUntil: (task: Promise<unknown>) => void } }).EdgeRuntime
   if (rt?.waitUntil) rt.waitUntil(tarea)
   else await tarea
 }
 
 async function responder(v: db.Vinculo | null, to: string, m: Mensaje): Promise<void> {
-  const r = await meta.enviar(to, m)
-  await db.guardarSaliente({ wamid: r.wamid, telefono: to, vinculo: v, cuerpo: r.cuerpo })
+  for (const parte of meta.prepararMensajes(m)) {
+    const r = await meta.enviar(to, parte)
+    await db.guardarSaliente({ wamid: r.wamid, telefono: to, vinculo: v, cuerpo: r.cuerpo })
+  }
 }
 
 async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null): Promise<void> {
@@ -117,17 +129,24 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
 
   // Lo que el bot preguntó hace mucho ya no se espera.
   let pendiente: Pendiente | null = v.pendiente
-  if (pendiente && v.pendiente_at && Date.now() - new Date(v.pendiente_at).getTime() > PENDIENTE_VENCE_MS) {
-    await db.actualizarCaptura(pendiente.capturaId, { estado: 'incompleta', notas: ['Quedó sin respuesta más de 12 horas.'] })
+  const edad = v.pendiente_at ? Date.now() - new Date(v.pendiente_at).getTime() : 0
+  if (pendiente && edad > (pendiente.tipo === 'ubicado' ? UBICADO_VENCE_MS : PENDIENTE_VENCE_MS)) {
+    if (pendiente.capturaId) {
+      await db.actualizarCaptura(pendiente.capturaId, { estado: 'incompleta', notas: ['Quedó sin respuesta más de 12 horas.'] })
+    }
     await db.guardarPendiente(v.id, null)
     pendiente = null
   }
 
   let capturaId: string | null = null
   try {
+    if (m.type === 'location' && m.location) {
+      await ubicacion(v, ctx, pendiente, m.location)
+      return
+    }
     if (m.type === 'image' && m.image) {
       capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada: 'foto', texto: m.image.caption ?? null })
-      if (pendiente) await abandonar(pendiente.capturaId)
+      if (pendiente?.capturaId) await abandonar(pendiente.capturaId)
       await foto(v, ctx, capturaId, m.image)
       return
     }
@@ -146,22 +165,51 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       texto = await transcribir(a.bytes, a.mime, pistaTranscripcion(ctx))
       porAudio = true
       if (!texto) {
-        await responder(v, m.from, { texto: 'No te entendí el audio. ¿Me lo repetís o me lo escribís?' })
+        await responder(v, m.from, { texto: 'No pude entender el audio. ¿Me lo escribís? No se cargó nada.' })
         return
       }
     }
 
     if (!botonId && !texto) {
-      await responder(v, m.from, { texto: `Eso no lo puedo leer. ${QUE_PUEDO}` })
+      await responder(v, m.from, { texto: 'No puedo leer ese mensaje. Mandame texto, un audio o una foto del ticket o la factura.' })
       return
     }
 
+    // Comandos explícitos: funcionan también por audio y conservan cualquier carga pendiente.
+    const mapa = comandoMapa(texto, botonId)
+    if (mapa) { await mostrarMapa(v, ctx, pendiente, mapa); return }
+    if (!botonId && noRecuerdaPotrero(texto, pendiente)) {
+      await db.guardarPendiente(v.id, pendiente)
+      await responder(v, m.from, { texto: 'Conservé la observación pendiente de ubicar. Podés pedirme «mapa» y responder con el potrero cuando lo reconozcas; no hace falta repetir el audio.', botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] })
+      return
+    }
+    const weekly = !botonId ? comandoSemanal(texto ?? '') : null
+    if (weekly) {
+      if (Deno.env.get('WA_WEEKLY_ENABLED') !== 'true') {
+        // El paquete puede incluir código preparado, pero no consulta las tablas
+        // del resumen ni ofrece documentos hasta activar su piloto completo.
+        await responder(v, m.from, { texto: 'El resumen semanal todavía no está activado en este piloto. Tu carga pendiente se conserva. Por ahora podés consultar lluvia, gastos, novedades o qué falta recorrer.' })
+      } else if (weekly === 'ver') {
+        await enviarSolicitado(v, periodoSemana())
+      } else {
+        await configurar(v, weekly === 'activar')
+        await responder(v, m.from, { texto: weekly === 'activar'
+          ? 'Activé tu resumen semanal: los sábados a las *09:00, hora de Argentina*. Cubre los siete días completos anteriores, con lluvia, recorridas, novedades, gastos, hacienda y vencimientos. Para dejar de recibirlo: «desactivar resumen semanal».'
+          : 'Desactivé el resumen semanal. Podés seguir pidiéndome el documento cuando quieras.' })
+      }
+      return
+    }
     const l = leer({ texto, botonId }, pendiente, ctx)
     switch (l.k) {
+      case 'ayuda':
+        await responder(v, m.from, { texto: ayudaConPendiente(pendiente, ctx) })
+        return
       case 'viejo': {
-        const estado = await db.estadoCaptura(l.capturaId)
+        const guardada = await db.verificarCargaDeCaptura(v, l.capturaId).catch(() => null)
         await responder(v, m.from, {
-          texto: estado === 'confirmada' ? 'Eso ya estaba anotado. No lo cargo de nuevo.' : 'Eso ya quedó atrás. Mandame de nuevo lo que querías anotar.',
+          texto: guardada === true
+            ? 'Esa carga ya está guardada. No la cargué otra vez.'
+            : 'Ese botón corresponde a una propuesta anterior o que sigue en proceso. No volví a cargarla.',
         })
         return
       }
@@ -176,7 +224,11 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
         return
       case 'pedir_correccion':
         await db.guardarPendiente(v.id, { tipo: 'corregir', capturaId: l.capturaId, borrador: l.borrador })
-        await responder(v, m.from, { texto: 'Decime qué cambio. Por ejemplo: "eran 25" o "en otro campo".' })
+        await responder(v, m.from, {
+          texto: l.borrador.tipo === 'recorrida'
+            ? 'Mandámelo de nuevo como tiene que quedar, en texto o audio.'
+            : 'Decime qué cambio. Por ejemplo: "eran 25" o "en otro campo".',
+        })
         return
       case 'seguir':
         capturaId = l.capturaId
@@ -184,13 +236,27 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
         return
       case 'reinterpretar': {
         capturaId = l.capturaId
+        if (l.borrador.tipo === 'recorrida') {
+          // Una recorrida se corrige mandándola de nuevo: reemplaza la propuesta.
+          const { interpretacion, uso } = await interpretar(l.texto, ctx)
+          await db.actualizarCaptura(l.capturaId, {
+            notas: [`Corrección: "${l.texto}"`], tokensEntrada: uso.entrada, tokensSalida: uso.salida,
+          })
+          const a = arrancar(interpretacion, ctx, l.texto, { campoHoy: l.borrador.campoId ?? null })
+          if ('respuesta' in a || a.borrador.tipo !== 'recorrida') {
+            await responder(v, m.from, { texto: 'No lo entendí como una recorrida. Mandame de nuevo qué viste y en qué potrero.' })
+            return
+          }
+          await avanzar(v, ctx, l.capturaId, a.borrador, [])
+          return
+        }
         const { interpretacion, uso } = await interpretar(l.texto, ctx, l.borrador)
         await db.actualizarCaptura(l.capturaId, {
           notas: [`Corrección: "${l.texto}"`],
           tokensEntrada: uso.entrada,
           tokensSalida: uso.salida,
         })
-        await avanzar(v, ctx, l.capturaId, corregir(l.borrador, interpretacion, ctx), [])
+        await avanzar(v, ctx, l.capturaId, corregir(l.borrador, interpretacion, ctx, l.texto), [])
         return
       }
       case 'nuevo': {
@@ -203,7 +269,9 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
           tokensEntrada: uso.entrada,
           tokensSalida: uso.salida,
         })
-        const a = arrancar(interpretacion, ctx)
+        const ubicado = pendiente?.tipo === 'ubicado' ? pendiente.ubicado : null
+        const campoHoy = interpretacion.intent === 'novedad' ? await db.campoRecorridoHoy(v, ctx.hoy).catch(() => null) ?? await db.campoMapaReciente(v).catch(() => null) : null
+        const a = arrancar(interpretacion, ctx, texto, { ubicado, campoHoy })
         if ('respuesta' in a) {
           await db.guardarPendiente(v.id, null)
           await db.actualizarCaptura(capturaId, { estado: a.estado })
@@ -230,15 +298,47 @@ async function abandonar(capturaId: string): Promise<void> {
   })
 }
 
+async function mostrarMapa(v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | null, pedido: PedidoMapa, automatico = false): Promise<boolean> {
+  try {
+    const reciente = await db.campoMapaReciente(v).catch(() => null) ?? await db.campoRecorridoHoy(v, ctx.hoy).catch(() => null)
+    const campo = campoParaMapa(pedido, ctx, pendiente, reciente)
+    if (!campo) { if (!automatico) await responder(v, v.telefono, elegirMapa(ctx, Boolean(pedido.nombre || pedido.campoId))); return false }
+    const capturaId = pendiente?.capturaId ?? null
+    if (automatico && capturaId && await db.mapaEnviadoParaCaptura(v, capturaId, campo.id)) return true
+    return await atenderMapa(campo, {
+      datos: id => db.datosMapa(v, id), render: datos => imagenMapa(datos, ctx.hoy),
+      responder: m => responder(v, v.telefono, m),
+      enviarImagen: async (bytes, caption, campoId) => {
+        const mediaId = await meta.subirImagen(bytes, 'tropero-mapa.png')
+        const r = await meta.enviarImagen(v.telefono, mediaId, caption)
+        await db.guardarSaliente({ wamid: r.wamid, telefono: v.telefono, vinculo: v, cuerpo: { ...r.cuerpo, tropero_mapa: { campo_id: campoId, captura_id: capturaId } } })
+      },
+    })
+  } catch (e) {
+    console.warn('wa-webhook: no se pudo preparar o enviar el mapa', e instanceof Error ? e.message : String(e))
+    if (!automatico) await responder(v, v.telefono, { texto: 'No pude enviar el mapa ahora. Conservé tu carga pendiente; podés escribir el nombre del potrero o pedirme el mapa nuevamente.' }).catch(() => {})
+    return false
+  }
+}
+
 async function avanzar(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Borrador, notasPrevias: string[]): Promise<void> {
   const paso: Paso = siguientePaso(capturaId, b, ctx)
   const notas = [...notasPrevias, ...paso.notas]
   const to = v.telefono
   switch (paso.k) {
     case 'preguntar':
+      if (paso.pendiente.tipo === 'campo' && paso.pendiente.confirmaAlElegir) {
+        // La pregunta ya es una propuesta: la elección será su confirmación.
+        await db.actualizarCaptura(capturaId, { estado: 'propuesta', propuesta: paso.pendiente.borrador, notas })
+      }
       await db.guardarPendiente(v.id, paso.pendiente)
-      await db.actualizarCaptura(capturaId, { notas })
+      if (!(paso.pendiente.tipo === 'campo' && paso.pendiente.confirmaAlElegir))
+        await db.actualizarCaptura(capturaId, { notas })
       await responder(v, to, paso.mensaje)
+      if (paso.pendiente.tipo === 'potrero' || paso.pendiente.tipo === 'ubicacion') {
+        if (!(await mostrarMapa(v, ctx, paso.pendiente, {}, true)))
+          await responder(v, to, { texto: 'Para reconocer los potreros, podés pedirme «mapa». Tu audio se conserva.', botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] })
+      }
       return
     case 'proponer':
       await db.guardarPendiente(v.id, paso.pendiente)
@@ -263,7 +363,20 @@ async function avanzar(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Borra
 async function consultar(v: db.Vinculo, ctx: Contexto, b: Borrador): Promise<string> {
   const campo = campoPorId(ctx.campos, b.campoId)
   const potrero = potreroPorId(ctx.campos, b.potreroId)
+  const desde = b.periodo === 'anio' ? `${ctx.hoy.slice(0, 4)}-01-01` : b.periodo === 'semana' ? inicioSemana(ctx.hoy) : `${ctx.hoy.slice(0, 7)}-01`
   switch (b.tipo) {
+    case 'consulta_recorrida':
+      return R.resumenRecorrida(ctx.hoy, await db.resumenRecorrida(v, ctx.hoy, b.campoId ?? null))
+    case 'consulta_observacion':
+      return R.ultimaObservacion(await db.ultimaObservacion(v, b.potreroId!), potrero?.potrero.nombre ?? 'ese potrero', potrero?.campo.nombre ?? '')
+    case 'consulta_novedades': {
+      const inicio = b.periodo ? desde : sumarDias(ctx.hoy, -6)
+      return R.novedades(inicio, ctx.hoy, await db.novedades(v, inicio, ctx.hoy, b.campoId ?? null))
+    }
+    case 'consulta_gastos':
+      return R.resumenGastos(desde, ctx.hoy, await db.resumenGastos(v, desde, ctx.hoy, b.campoId ?? null, b.categoriaId ?? null))
+    case 'consulta_cargas':
+      return R.cargasRecientes(await db.cargasRecientes(v, b.campoId ?? null))
     case 'consulta_hacienda':
       return R.hacienda(await db.hacienda(v, b), { campo: potrero?.campo.nombre ?? campo?.nombre, potrero: potrero?.potrero.nombre })
     case 'consulta_lluvia': {
@@ -289,41 +402,74 @@ async function confirmar(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Bor
   await db.guardarPendiente(v.id, null)
   // Si dos "Sí" llegan juntos, sólo uno escribe.
   if (!(await db.tomarPropuesta(capturaId))) {
-    await responder(v, to, { texto: 'Eso ya estaba anotado. No lo cargo de nuevo.' })
+    const guardada = await db.verificarCargaDeCaptura(v, capturaId).catch(() => null)
+    await responder(v, to, {
+      texto: guardada === true
+        ? 'Esa carga ya está guardada. No la cargué otra vez.'
+        : 'Esa confirmación ya se está procesando o no está disponible. No volví a cargarla.',
+    })
     return
   }
-  try {
-    if (b.tipo === 'lluvia') {
-      const id = await db.escribirLluvia(v, b)
-      await db.actualizarCaptura(capturaId, { escritoTabla: 'lluvia', escritoId: id })
-      const [f] = await db.lluviaMes(v, b.campoId!, ctx.hoy)
-      await responder(v, to, {
-        texto: R.trasLluvia({ campo: f.campo, hoy: ctx.hoy, mesMm: f.mes_mm, anteriorMm: f.ant_mm }),
-      })
-      return
-    }
-    if (b.tipo === 'gasto') {
-      const id = crypto.randomUUID()
-      let url: string | null = null
-      if (b.fotoMediaId) {
-        try {
-          const f = await meta.descargarMedia(b.fotoMediaId)
-          url = await db.subirComprobante(v.empresa_id, id, f.bytes, f.mime)
-        } catch (e) {
-          await db.actualizarCaptura(capturaId, { notas: [`No se pudo guardar la foto: ${e instanceof Error ? e.message : e}`] })
-        }
-      }
-      await db.escribirGasto(v, b, url, id)
-      await db.actualizarCaptura(capturaId, { escritoTabla: 'movimiento_financiero', escritoId: id })
-      const g = await db.gastoMes(v, b.categoriaId!, ctx.hoy)
-      const cat = ctx.categoriasGasto.find((c) => c.id === b.categoriaId)?.nombre ?? 'esa categoría'
-      await responder(v, to, { texto: R.trasGasto({ hoy: ctx.hoy, categoria: cat, total: g.total, cantidad: g.cantidad }) })
-      return
-    }
-  } catch (e) {
-    await db.actualizarCaptura(capturaId, { estado: 'error', notas: [`Falló la escritura: ${e instanceof Error ? e.message : e}`] })
-    throw e
+
+  if (b.tipo === 'recorrida') {
+    await confirmarRecorrida(v, ctx, capturaId, b)
+    return
   }
+  if (b.tipo !== 'lluvia' && b.tipo !== 'gasto') return
+  // Registrar el campo elegido sólo después de ganar el bloqueo de confirmación.
+  await db.actualizarCaptura(capturaId, { propuesta: b })
+  // Se elige antes de escribir para comprobar incluso un commit cuya respuesta se perdió.
+  const id = crypto.randomUUID()
+  const tabla: db.TablaCarga = b.tipo === 'lluvia' ? 'lluvia' : 'movimiento_financiero'
+  let url: string | null = null
+  if (b.tipo === 'gasto' && b.fotoMediaId) {
+    try {
+      const f = await meta.descargarMedia(b.fotoMediaId)
+      url = await db.subirComprobante(v.empresa_id, id, f.bytes, f.mime)
+    } catch (e) {
+      const detalle = e instanceof Error ? e.message : String(e)
+      console.error('wa-webhook foto', detalle)
+      await db.actualizarCaptura(capturaId, { notas: [`No se pudo guardar la foto: ${detalle.slice(0, 500)}`] })
+    }
+  }
+
+  const fotoFalto = b.fotoMediaId && !url
+    ? '\n\nNo pude guardar la foto del ticket; guardá el comprobante.'
+    : ''
+  const fecha = b.fecha ?? ctx.hoy
+  const campo = campoPorId(ctx.campos, b.campoId!)?.nombre ?? 'el campo'
+  const lluvia = b.tipo === 'lluvia' ? { campo, mm: b.mm!, fecha, hoy: ctx.hoy } : null
+  const gasto = {
+    monto: b.monto ?? 0, campo, fecha, hoy: ctx.hoy,
+    categoria: ctx.categoriasGasto.find((c) => c.id === b.categoriaId)?.nombre ?? 'esa categoría',
+  }
+  const resultado = await confirmarConVerificacion({
+    escribir: () => b.tipo === 'lluvia' ? db.escribirLluvia(v, b, id) : db.escribirGasto(v, b, url, id),
+    verificar: () => db.verificarCarga(v, tabla, id),
+    mensajeGuardada: lluvia ? R.lluviaAnotada(lluvia) : `${R.gastoAnotado(gasto)}${fotoFalto}`,
+    resumir: async () => {
+      if (lluvia) {
+        // Un mes ya terminado se cuenta entero; el actual, hasta hoy.
+        const hasta = fecha.slice(0, 7) < ctx.hoy.slice(0, 7) ? finDeMes(fecha) : ctx.hoy
+        const [f] = await db.lluviaMes(v, b.campoId!, hasta)
+        return R.trasLluvia({ ...lluvia, campo: f.campo, mesMm: f.mes_mm, anteriorMm: f.ant_mm })
+      }
+      const g = await db.gastoMes(v, b.categoriaId!, fecha)
+      return R.trasGasto({
+        ...gasto, total: g.total, cantidad: g.cantidad,
+        fotoGuardada: b.fotoMediaId ? url !== null : null,
+      })
+    },
+  })
+
+  await db.actualizarCaptura(capturaId, {
+    estado: resultado.estado === 'guardada' ? 'confirmada' : 'error',
+    escritoTabla: tabla,
+    escritoId: id,
+    notas: resultado.error ? [`Verificación de carga: ${resultado.estado}. Error: ${resultado.error.slice(0, 500)}`] : [],
+  }).catch((e) => console.error('wa-webhook registrar confirmación', e))
+  // Un fallo de registro técnico o de envío no cambia una escritura ya confirmada.
+  await responder(v, to, { texto: resultado.texto }).catch((e) => console.error('wa-webhook enviar confirmación', e))
 }
 
 async function foto(
@@ -363,4 +509,70 @@ async function foto(
   }
   const notas = c.confianza === 'baja' ? ['Lectura de confianza baja: revisar.'] : []
   await avanzar(v, ctx, capturaId, borrador, notas)
+}
+
+/** La recorrida: todas las observaciones del mensaje en una transacción, con ids elegidos antes. */
+async function confirmarRecorrida(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Borrador): Promise<void> {
+  await db.actualizarCaptura(capturaId, { propuesta: b })
+  const obs: db.ObsEscrita[] = (b.observaciones ?? []).filter((o) => o.potreroId && o.campoId).map((o) => ({
+    id: crypto.randomUUID(),
+    potreroId: o.potreroId!,
+    campoId: o.campoId!,
+    agua: o.agua,
+    pasto: o.pasto,
+    electrico: o.electrico,
+    conteo: o.conteo,
+    novedad: o.novedad,
+  }))
+  let ids: string[] = []
+  const fecha = b.fecha ?? ctx.hoy
+  const resultado = await confirmarConVerificacion({
+    escribir: async () => {
+      ids = await db.escribirRecorrida(v, fecha, obs)
+    },
+    verificar: () => db.verificarRecorrida(v, fecha, obs),
+    mensajeGuardada: R.recorridaAnotada(new Set(obs.map((o) => o.potreroId)).size, fecha, ctx.hoy),
+    resumir: async () => {
+      const campos = [...new Set(obs.map((o) => o.campoId))]
+      return R.trasRecorrida(new Set(obs.map((o) => o.potreroId)).size, await db.avanceRecorrida(v, fecha, campos), fecha, ctx.hoy)
+    },
+  })
+  await db.actualizarCaptura(capturaId, {
+    estado: resultado.estado === 'guardada' ? 'confirmada' : 'error',
+    escritoTabla: 'observacion_potrero',
+    escritoId: ids[0] ?? obs[0]?.id,
+    notas: [
+      ...(ids.length > 1 ? [`Observaciones: ${ids.join(', ')}`] : []),
+      ...(resultado.error ? [`Verificación de carga: ${resultado.estado}. Error: ${resultado.error.slice(0, 500)}`] : []),
+    ],
+  }).catch((e) => console.error('wa-webhook registrar recorrida', e))
+  await responder(v, v.telefono, { texto: resultado.texto }).catch((e) => console.error('wa-webhook enviar recorrida', e))
+}
+
+/**
+ * Compartió la ubicación. Si el bot la pidió para una recorrida, completa el
+ * potrero de lo que dijo "acá"; si no, la guarda para el próximo mensaje.
+ */
+async function ubicacion(
+  v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | null, loc: { latitude: number; longitude: number },
+): Promise<void> {
+  const to = v.telefono
+  const p = potreroEnPunto(loc.latitude, loc.longitude, await db.potrerosDibujados(v))
+  if (pendiente?.tipo === 'ubicacion') {
+    if (!p) {
+      await responder(v, to, { texto: 'Esa ubicación no cae dentro de ningún potrero dibujado. Escribime el número del potrero.' })
+      return
+    }
+    const u = { potreroId: p.id, campoId: p.campoId }
+    await avanzar(v, ctx, pendiente.capturaId, conUbicacion(pendiente.borrador, u, pendiente.obsIndex), [`Ubicación: ${p.nombre} de ${p.campo}.`])
+    return
+  }
+  if (pendiente?.capturaId) await abandonar(pendiente.capturaId)
+  if (!p) {
+    await db.guardarPendiente(v.id, null)
+    await responder(v, to, { texto: 'No estás dentro de ningún potrero dibujado. Contame qué viste y en qué potrero.' })
+    return
+  }
+  await db.guardarPendiente(v.id, { tipo: 'ubicado', capturaId: null, ubicado: { potreroId: p.id, campoId: p.campoId } })
+  await responder(v, to, { texto: `Estás en el *${p.nombre}* de ${p.campo}. Contame qué ves.` })
 }

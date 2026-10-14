@@ -2,7 +2,10 @@
 // El modelo sólo extrae; no resuelve nombres ni escribe nada.
 
 import { esFecha, sumarDias } from './texto.ts'
-import { INTENTS, type Borrador, type Contexto, type Interpretacion } from './tipos.ts'
+import {
+  AGUA, ELECTRICO, INTENTS, PASTO,
+  type Borrador, type Contexto, type Interpretacion, type ObsInterpretada,
+} from './tipos.ts'
 
 export const HERRAMIENTA = {
   name: 'interpretar_mensaje',
@@ -20,6 +23,33 @@ export const HERRAMIENTA = {
       contraparte: { type: ['string', 'null'], description: 'A quién le pagó, si lo dijo.' },
       descripcion: { type: ['string', 'null'], description: 'Qué fue, en pocas palabras.' },
       periodo: { type: ['string', 'null'], enum: ['semana', 'mes', 'anio', null] },
+      observaciones: {
+        type: 'array',
+        description: 'Sólo para intent "novedad": una por potrero, en el orden en que los nombró.',
+        items: {
+          type: 'object',
+          properties: {
+            potrero: { type: ['string', 'null'], description: 'Como lo nombró ("2", "5B"). null si dijo "acá" o no lo dijo.' },
+            campo: { type: ['string', 'null'], description: 'El campo si lo nombró en el mensaje, en cada observación.' },
+            aca: { type: 'boolean', description: 'true si es el potrero donde está: "acá", "en este", "en el que estoy".' },
+            agua: {
+              type: ['string', 'null'], enum: [...AGUA, null],
+              description: 'Sólo la aguada, bebedero o tanque: llena (también rebalsando), normal, baja, seca. "Mucha agua" sin decir que es la aguada: null y va en novedad.',
+            },
+            pasto: { type: ['string', 'null'], enum: [...PASTO, null] },
+            electrico: { type: ['string', 'null'], enum: [...ELECTRICO, null], description: 'El eléctrico o boyero: cortado si no anda.' },
+            conteo: {
+              type: ['number', 'null'],
+              description: 'Total de animales del potrero, sólo si contó todos ("hay 80 cabezas"). Si contó una categoría ("15 terneros") o faltan animales, va en novedad.',
+            },
+            novedad: {
+              type: ['string', 'null'],
+              description: 'Lo demás, corto y con sus palabras: "faltan 2 terneros", "vaca muerta, caravana 4521", "molino roto", "15 terneros", "mucha agua".',
+            },
+          },
+          required: ['aca'],
+        },
+      },
     },
     required: ['intent'],
   },
@@ -45,17 +75,27 @@ Categorías de gasto: ${cats}
 
 intent:
 - "lluvia": informa lluvia medida (mm).
-- "novedad": un problema u observación de un potrero (molino, aguada, bebedero, alambrado, tranquera, pasto, un animal enfermo).
+- "novedad": cuenta lo que vio recorriendo uno o más potreros: agua, pasto, eléctrico, animales contados, faltantes, muertos o enfermos, roturas (molino, aguada, bebedero, alambrado, tranquera). Una vaca muerta encontrada es novedad.
 - "gasto": informa un gasto con monto.
 - "consulta_hacienda": pregunta cuántos animales hay.
 - "consulta_lluvia": pregunta cuánto llovió.
 - "consulta_vencimientos": pregunta qué vence o qué tiene que pagar o cobrar.
 - "consulta_dias_potrero": pregunta hace cuánto o desde cuándo están los animales en un potrero.
-- "no_soportado": quiere CARGAR algo que el bot todavía no carga: muertes, nacimientos, ventas o compras de hacienda, movimientos entre potreros, caravanas, tacto, pesadas.
-- "saludo": saluda o pide ayuda.
+- "consulta_recorrida": pide el resumen de la recorrida de hoy o qué potreros faltan recorrer.
+- "consulta_observacion": pregunta qué se anotó por última vez en un potrero; no informa una novedad nueva.
+- "consulta_novedades": pide las novedades registradas recientemente, de la última semana o de un campo.
+- "consulta_gastos": pregunta cuánto se gastó o pide el resumen de gastos; campo/categoría sólo si los nombró. Por defecto este mes.
+- "consulta_cargas": pregunta qué cargó él por WhatsApp últimamente o si quedó registrada una carga.
+- "no_soportado": quiere REGISTRAR una operación de hacienda: dar de baja o de alta animales, ventas o compras, movimientos entre potreros, caravanas, tacto, pesadas. Lo que VIO en un potrero (una vaca muerta, animales que faltan) es novedad.
+- "ayuda_gasto": pregunta CÓMO se anota un gasto, un ticket o una factura ("¿cómo cargo un gasto?").
+- "ayuda_lluvia": pregunta CÓMO se anota la lluvia.
+- "saludo": saluda o pide ayuda en general ("¿qué podés hacer?").
 - "otro": cualquier otra cosa.
 
 Reglas: null para todo lo que el mensaje no dice. No completes el campo ni el potrero si no los nombró. No conviertas un número de potrero en mm ni en monto.
+Si nombra uno de los campos de la lista, va en campo aunque venga con "para", "de" o "del campo" ("gasoil para Don Gilberto", "para el campo Toimil"); no lo pongas como contraparte.
+En novedad, una observación por potrero; si dice el campo una vez, ponelo en cada una.
+Una observación con un potrero que no figura en la lista sigue siendo "novedad": devolvé el nombre que dijo. El código comprueba si existe; no la conviertas en "otro" por ese motivo.
 ${correccion}
 Mensaje del productor:
 """
@@ -96,10 +136,36 @@ export function limpiarInterpretacion(raw: unknown): Interpretacion {
     potrero,
     mm: numero(o.mm),
     fecha: esFecha(o.fecha) ? (o.fecha as string) : null,
+    ...(o.fecha != null && !esFecha(o.fecha) ? { fechaInvalida: true } : {}),
     monto: numero(o.monto),
     categoria: texto(o.categoria),
     contraparte: texto(o.contraparte),
     descripcion: texto(o.descripcion),
     periodo,
+    observaciones: intent === 'novedad' ? limpiarObservaciones(o.observaciones) : [],
   }
+}
+
+const deLista = <T extends string>(lista: readonly T[], v: unknown): T | null =>
+  lista.includes(v as T) ? (v as T) : null
+
+/** Hasta 12 potreros por mensaje; una observación sin nada que anotar se descarta. */
+function limpiarObservaciones(raw: unknown): ObsInterpretada[] {
+  if (!Array.isArray(raw)) return []
+  return raw.slice(0, 12).flatMap((x) => {
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>
+    const conteo = numero(o.conteo)
+    const obs: ObsInterpretada = {
+      potrero: o.potrero === null || o.potrero === undefined ? null : texto(String(o.potrero)),
+      campo: texto(o.campo),
+      aca: o.aca === true,
+      agua: deLista(AGUA, o.agua),
+      pasto: deLista(PASTO, o.pasto),
+      electrico: deLista(ELECTRICO, o.electrico),
+      conteo: conteo === null ? null : Math.round(conteo),
+      novedad: texto(o.novedad),
+    }
+    const algo = obs.agua || obs.pasto || obs.electrico || obs.conteo !== null || obs.novedad
+    return algo ? [obs] : []
+  })
 }

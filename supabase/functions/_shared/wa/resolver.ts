@@ -10,6 +10,29 @@ export type Resultado<T> = { ok: T } | { varios: T[] } | { ninguno: true }
 const sinArticulo = (s: string) =>
   norm(s).replace(/^(campo|establecimiento|estancia)\s+/, '').replace(/^(la|el|los|las)\s+/, '')
 
+/** Sólo el nombre exacto: para saber si "Don Gilberto" es un campo y no a quién se le pagó. */
+export function campoExacto(mencion: string | null | undefined, campos: Campo[]): Campo | null {
+  const m = sinArticulo(mencion ?? '')
+  if (!m) return null
+  const exactos = campos.filter((c) => sinArticulo(c.nombre) === m)
+  return exactos.length === 1 ? exactos[0] : null
+}
+
+/**
+ * El único campo nombrado en el texto, completo y como palabras enteras. Red de
+ * seguridad para cuando el modelo no completa el campo ("para el campo Toimil").
+ * Si aparecen dos, no se adivina.
+ */
+export function campoEnTexto(texto: string, campos: Campo[]): Campo | null {
+  const palabras = (x: string) => x.replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const t = ` ${palabras(norm(texto))} `
+  const hallados = campos.filter((c) => {
+    const n = palabras(sinArticulo(c.nombre))
+    return n.length >= 3 && t.includes(` ${n} `)
+  })
+  return hallados.length === 1 ? hallados[0] : null
+}
+
 export function resolverCampo(mencion: string | null | undefined, campos: Campo[]): Resultado<Campo> {
   const m = sinArticulo(mencion ?? '')
   if (!m) return { ninguno: true }
@@ -80,4 +103,30 @@ export function potreroPorId(campos: Campo[], id: string | null | undefined): Po
     if (p) return { campo: c, potrero: p }
   }
   return null
+}
+
+export type PotreroDibujado = { id: string; nombre: string; campoId: string; campo: string; poligono: [number, number][] }
+
+/** Punto dentro de un polígono [lat, lng] (rayo horizontal). El borde cuenta como cualquiera de los dos lados. */
+function adentro(lat: number, lng: number, poligono: [number, number][]): boolean {
+  let dentro = false
+  for (let i = 0, j = poligono.length - 1; i < poligono.length; j = i++) {
+    const [lati, lngi] = poligono[i]
+    const [latj, lngj] = poligono[j]
+    // Incluye el borde: si dos dibujos lo comparten, la resolución será ambigua.
+    const cruz = (lat - lati) * (lngj - lngi) - (lng - lngi) * (latj - lati)
+    if (Math.abs(cruz) < 1e-12 && lat >= Math.min(lati, latj) && lat <= Math.max(lati, latj) && lng >= Math.min(lngi, lngj) && lng <= Math.max(lngi, lngj)) return true
+    if ((lati > lat) !== (latj > lat) && lng < ((lngj - lngi) * (lat - lati)) / (latj - lati) + lngi) dentro = !dentro
+  }
+  return dentro
+}
+
+/**
+ * En qué potrero dibujado cae la ubicación que compartió. Si cae en dos (dibujos
+ * superpuestos) o en ninguno, no se adivina.
+ */
+export function potreroEnPunto(lat: number, lng: number, potreros: PotreroDibujado[]): PotreroDibujado | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+  const en = potreros.filter((p) => p.poligono.length >= 3 && p.poligono.every(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180) && adentro(lat, lng, p.poligono))
+  return en.length === 1 ? en[0] : null
 }

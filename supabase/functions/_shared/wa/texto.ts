@@ -45,6 +45,18 @@ export function sumarDias(s: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** '2026-09-05' → '2026-09-30' */
+export function finDeMes(s: string): string {
+  const [y, m] = s.split('-').map(Number)
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+}
+
+/** Semana de calendario argentina: del lunes al día consultado. */
+export function inicioSemana(s: string): string {
+  const dia = new Date(`${s}T12:00:00Z`).getUTCDay()
+  return sumarDias(s, -((dia + 6) % 7))
+}
+
 export function diasEntre(desde: string, hasta: string): number {
   return Math.round((aUTC(hasta).getTime() - aUTC(desde).getTime()) / 86_400_000)
 }
@@ -71,9 +83,9 @@ export function cuandoTexto(fecha: string, hoy: string): string {
 
 /** $450.000 */
 export function pesos(n: number): string {
-  const entero = Math.round(n)
-  const signo = entero < 0 ? '-' : ''
-  return `${signo}$${Math.abs(entero).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
+  const [entero, centavos] = Math.abs(n).toFixed(2).split('.')
+  const signo = n < 0 ? '-' : ''
+  return `${signo}$${entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}${centavos === '00' ? '' : `,${centavos}`}`
 }
 
 /** mm con un decimal si hace falta: 22 → "22", 12.5 → "12,5" */
@@ -86,11 +98,11 @@ export function mmTexto(n: number): string {
  * "80 mil" → 80000, "80k" → 80000, "$184.500" → 184500, "12,5" → 12.5.
  */
 export function numeroEn(t: string): number | null {
-  const m = norm(t).match(/(\d+(?:[.,]\d+)*)\s*(mil\b|k\b|lucas\b)?/)
+  const m = norm(t).match(/(-?\d+(?:[.,]\d+)*)\s*(mil\b|k\b|lucas\b)?/)
   if (!m) return null
   let s = m[1]
-  if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '')
-  else if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '')
+  if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '')
+  else if (/^-?\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '')
   s = s.replace(',', '.')
   let v = Number(s)
   if (!Number.isFinite(v)) return null

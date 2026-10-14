@@ -49,3 +49,11 @@ dist-ssr
 *.local.mjs
 auditoria-shots/
 *.local.py
+
+# Imágenes de QA y copia de los archivos anteriores a la función de mapa
+/output/wa-mapa/
+
+# Artefactos locales del navegador y estado temporal del CLI de Supabase
+/.playwright-cli/
+/output/playwright/
+/supabase/.temp/

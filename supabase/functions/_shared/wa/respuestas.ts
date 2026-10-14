@@ -4,13 +4,63 @@
 
 import { cuandoTexto, ddmm, diasEntre, mmTexto, nombreMes, pesos, plural } from './texto.ts'
 
-export function trasLluvia(d: { campo: string; hoy: string; mesMm: number; anteriorMm: number | null }): string {
-  const base = `Listo. Van *${mmTexto(d.mesMm)} mm* en ${nombreMes(d.hoy)} en ${d.campo}`
-  return d.anteriorMm === null ? `${base}.` : `${base}; el año pasado a esta altura iban ${mmTexto(d.anteriorMm)}.`
+/** Lo que se anotó. Con la confirmación al elegir el campo es la única devolución de la carga. */
+export function lluviaAnotada(d: { campo: string; mm: number; fecha: string; hoy: string }): string {
+  return `Listo, anoté *${mmTexto(d.mm)} mm* ${cuandoTexto(d.fecha, d.hoy)} en ${d.campo}.`
 }
 
-export function trasGasto(d: { hoy: string; categoria: string; total: number; cantidad: number }): string {
-  return `Listo, quedó en Analítica. En ${nombreMes(d.hoy)} llevás *${pesos(d.total)}* en ${d.categoria} (${d.cantidad} ${d.cantidad === 1 ? 'carga' : 'cargas'}).`
+/**
+ * El total es del mes de la lluvia: la de ayer cargada el 1° no puede contestar
+ * "en octubre van 0". Un mes ya terminado se cuenta entero ("fueron").
+ */
+export function trasLluvia(d: {
+  campo: string
+  mm: number
+  fecha: string
+  hoy: string
+  mesMm: number
+  anteriorMm: number | null
+}): string {
+  const cerrado = d.fecha.slice(0, 7) < d.hoy.slice(0, 7)
+  const mes = nombreMes(d.fecha) + (d.fecha.slice(0, 4) === d.hoy.slice(0, 4) ? '' : ` de ${d.fecha.slice(0, 4)}`)
+  const total = d.mm > 0 && d.mesMm === d.mm
+    ? `Es la ${cerrado ? 'única' : 'primera'} de ${mes}`
+    : `En ${mes} ${cerrado ? 'fueron' : 'van'} ${mmTexto(d.mesMm)}`
+  const antes = d.anteriorMm === null
+    ? ''
+    : cerrado ? `; el año pasado, ${mmTexto(d.anteriorMm)}` : `; el año pasado a esta altura iban ${mmTexto(d.anteriorMm)}`
+  return `${lluviaAnotada(d)} ${total}${antes}.`
+}
+
+/** Lo que se anotó, con las mismas palabras que la propuesta: monto, categoría, campo y cuándo se pagó. */
+export function gastoAnotado(d: { monto: number; categoria: string; campo: string; fecha: string; hoy: string }): string {
+  return `Listo, anoté *${pesos(d.monto)}* de ${d.categoria} en ${d.campo}, pagado ${cuandoTexto(d.fecha, d.hoy)}.`
+}
+
+/**
+ * El total es del mes del gasto: un ticket del 29/09 cargado en octubre
+ * no puede contestar "en octubre llevás $0".
+ * fotoGuardada: null = no había foto; false = había y no se pudo guardar.
+ */
+export function trasGasto(d: {
+  monto: number
+  campo: string
+  fecha: string
+  hoy: string
+  categoria: string
+  total: number
+  cantidad: number
+  fotoGuardada: boolean | null
+}): string {
+  const mes = nombreMes(d.fecha) + (d.fecha.slice(0, 4) === d.hoy.slice(0, 4) ? '' : ` de ${d.fecha.slice(0, 4)}`)
+  const total = d.cantidad === 1
+    ? `Es el primer gasto de ${d.categoria} en ${mes}.`
+    : `En ${mes} llevás ${pesos(d.total)} en ${d.categoria} (${d.cantidad} cargas).`
+  const base = `${gastoAnotado(d)} ${total}`
+  if (d.fotoGuardada === false) {
+    return `${base}\n\nOjo: *no pude guardar la foto* del ticket. El gasto está anotado igual; guardá el papel por las dudas.`
+  }
+  return base
 }
 
 export type FilaHacienda = { campo: string; potrero: string; categoria: string; cabezas: number }
@@ -92,4 +142,51 @@ export function diasEnPotrero(
   }
   const lineas = g.slice(0, 4).map((x) => `• ${x.cabezas} desde el ${ddmm(x.desde)} (hace ${diasEntre(x.desde, hoy)} días)`)
   return `En el ${d.potrero} de ${d.campo} hay animales que entraron en distintas fechas:\n${lineas.join('\n')}`
+}
+
+const potreros = (n: number) => `${n} ${n === 1 ? 'potrero' : 'potreros'}`
+
+/** Lo que se anotó y cuánto lleva recorrido hoy: así se ve si le falta algún potrero. */
+export function recorridaAnotada(anotados: number, fecha?: string, hoy?: string): string {
+  return `Listo, anoté ${potreros(anotados)} en la recorrida de ${fecha && hoy ? cuandoTexto(fecha, hoy) : 'hoy'}.`
+}
+
+export function trasRecorrida(anotados: number, avance: { campo: string; recorridos: number; total: number }[], fecha?: string, hoy?: string): string {
+  if (!avance.length) return recorridaAnotada(anotados, fecha, hoy)
+  const van = avance.map((a) => `${a.recorridos} de ${a.total} en ${a.campo}`).join(', ')
+  return `${recorridaAnotada(anotados, fecha, hoy)} ${fecha && hoy && fecha !== hoy ? 'Ese día quedaron' : 'Hoy van'} ${van}.`
+}
+
+export function resumenRecorrida(fecha: string, filas: { campo: string; recorridos: number; total: number; pendientes: string[] }[]): string {
+  if (!filas.length) return 'Todavía no tengo campos cargados.'
+  return `Recorrida del ${ddmm(fecha)}:\n` + filas.map((f) => {
+    if (!f.total) return `• *${f.campo}*: sin potreros cargados.`
+    const faltan = f.pendientes.length ? `Faltan: ${[...f.pendientes].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).join(', ')}.` : 'Todos tienen una observación registrada.'
+    return `• *${f.campo}*: ${f.recorridos} de ${f.total} con observación. ${faltan}`
+  }).join('\n') + '\nCuento las observaciones guardadas; no puedo saber qué recorriste sin anotarlo.'
+}
+
+export function ultimaObservacion(d: { fecha: string; campo: string; potrero: string; agua: string | null; pasto: string | null; electrico: string | null; conteo: number | null; novedad: string | null } | null, potrero: string, campo: string): string {
+  if (!d) return `No tengo observaciones guardadas para el ${potrero} de ${campo}.`
+  const detalles = [d.agua ? `aguada ${d.agua}` : '', d.pasto ? `pasto ${d.pasto}` : '', d.electrico ? `eléctrico ${d.electrico === 'ok' ? 'bien' : 'cortado'}` : '', d.conteo !== null ? `${d.conteo} cabezas contadas` : '', d.novedad ?? ''].filter(Boolean)
+  return `Última observación del *${d.potrero} de ${d.campo}*, ${ddmm(d.fecha)}: ${detalles.join(', ') || 'sin estados ni novedades detallados'}.\nEs lo registrado ese día; puede haber cambiado.`
+}
+
+export function novedades(desde: string, hasta: string, filas: { fecha: string; campo: string; potrero: string; novedad: string }[]): string {
+  if (!filas.length) return `No tengo novedades en texto registradas del ${ddmm(desde)} al ${ddmm(hasta)}.`
+  return `Novedades registradas del ${ddmm(desde)} al ${ddmm(hasta)}:\n` + filas.slice(0, 10).map((f) => `• ${ddmm(f.fecha)} · ${f.potrero} de ${f.campo}: ${f.novedad}`).join('\n') + (filas.length > 10 ? '\nMuestro las 10 más recientes.' : '') + '\nEste historial no indica si ya se resolvieron.'
+}
+
+export function resumenGastos(desde: string, hasta: string, filas: { campo: string; categoria: string; cantidad: number; total: number }[]): string {
+  if (!filas.length) return `No tengo gastos registrados del ${ddmm(desde)} al ${ddmm(hasta)} para esa consulta.`
+  const total = filas.reduce((s, f) => s + Number(f.total), 0)
+  return `Gastos registrados del ${ddmm(desde)} al ${ddmm(hasta)}:\n` + filas.map((f) => `• ${f.campo} · ${f.categoria}: *${pesos(Number(f.total))}* (${f.cantidad} ${f.cantidad === 1 ? 'gasto' : 'gastos'}).`).join('\n') + `\nTotal: *${pesos(total)}*. Según fecha de devengo; excluyo anulados.`
+}
+
+export function cargasRecientes(filas: { fecha: string; tipo: string; campo: string; cantidad: number | null }[]): string {
+  if (!filas.length) return 'No encontré cargas tuyas de WhatsApp con un registro guardado para esa consulta.'
+  return 'Tus últimas cargas guardadas por WhatsApp:\n' + filas.map((f) => {
+    const valor = f.tipo === 'lluvia' ? `${mmTexto(Number(f.cantidad))} mm` : f.tipo === 'gasto' ? pesos(Number(f.cantidad)) : 'recorrida'
+    return `• ${ddmm(f.fecha)} · ${f.campo}: ${valor}.`
+  }).join('\n')
 }
