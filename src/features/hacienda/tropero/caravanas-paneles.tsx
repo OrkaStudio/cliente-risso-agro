@@ -5,7 +5,7 @@ import { Icono } from '@/components/tropero/icono'
 import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
-import { useAnimales, useAnularSalida, useAsignarCaravanasPlanilla, useIdentificarAnimal, usePotreros, useResolverSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
+import { useAnimales, useAsignarCaravanasPlanilla, useCorregirSalida, useIdentificarAnimal, usePotreros, useResolverSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
 import { ElegirDeLista, ZonaArchivo } from './caravanas'
@@ -30,11 +30,15 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
   const animales = useAnimales()
   const identificar = useIdentificarAnimal()
   const sinSaber = useResolverSinSaber()
-  const anular = useAnularSalida()
+  const corregir = useCorregirSalida()
   const [elegida, setElegida] = useState<string | null>(null)
   const [modo, setModo] = useState<'sabe' | 'nosabe' | 'error'>('sabe')
   const [ids, setIds] = useState<string[]>([])
   const [enTodo, setEnTodo] = useState(false)
+  const [buscar, setBuscar] = useState('')
+  const [mal, setMal] = useState<'potrero' | 'cantidad' | 'nosalio'>('potrero')
+  const [potCorrecto, setPotCorrecto] = useState<string | null>(null)
+  const [cantCorrecta, setCantCorrecta] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const todas = salidasQ.data ?? []
@@ -43,12 +47,16 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
   const nombrePotrero = (id: string | null) => potreros.data?.find((p) => p.id === id)?.nombre ?? ''
   const posiblesIds = new Set(x?.posiblesIds ?? [])
   const posibles = usePosibles((a) => posiblesIds.has(a.id ?? ''))
-  const ocupado = identificar.isPending || sinSaber.isPending || anular.isPending
+  const ocupado = identificar.isPending || sinSaber.isPending || corregir.isPending
 
   const reiniciar = () => {
     setModo('sabe')
     setIds([])
     setEnTodo(false)
+    setBuscar('')
+    setMal('potrero')
+    setPotCorrecto(null)
+    setCantCorrecta(null)
     setError(null)
   }
   const cerrar = () => {
@@ -85,9 +93,16 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
           description: 'Si después la ves en el campo, desde su ficha tocás «Sigue en el campo».',
         })
       } else {
-        const n = await anular.mutateAsync(x.salidaId)
-        toast.success('Listo: anulamos esa salida', {
-          description: `El ${nombrePotrero(x.potreroId)} volvió a como estaba${n > 0 ? ` y ${n === 1 ? 'vuelve al rodeo el animal que había salido' : `vuelven al rodeo los ${n} que habían salido`}` : ''}. Si salió de otro potrero, cargala de nuevo con «Salieron».`,
+        const cant = mal === 'nosalio' ? 0 : mal === 'cantidad' ? (cantCorrecta ?? x.pendientes) : x.pendientes
+        const potDestino = mal === 'potrero' ? potCorrecto! : x.potreroId
+        await corregir.mutateAsync({ salidaId: x.salidaId, categoria: x.categoria, potreroId: potDestino, cantidad: cant })
+        toast.success('Listo: quedó corregida', {
+          description:
+            mal === 'nosalio'
+              ? `El ${nombrePotrero(x.potreroId)} vuelve a tener lo que se había restado.`
+              : mal === 'potrero'
+                ? `El ${nombrePotrero(x.potreroId)} recupera su número y se restó del ${nombrePotrero(potDestino)}.`
+                : `Ahora son ${cant} ${categoriaNombre(x.categoria, cant).toLowerCase()} del ${nombrePotrero(x.potreroId)}.`,
         })
       }
       reiniciar()
@@ -138,7 +153,23 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
         : `Guardar: ${ids.length === 1 ? 'fue la' : 'fueron'} ${nums(elegidosInfo.map((a) => ({ visual: a.caravana_visual, rfid: a.caravana_rfid })))}`
       : modo === 'nosabe'
         ? `Que ${quedan.length === 1 ? 'quede la' : 'queden'} ${nums(quedan)}`
-        : `Anular la ${x.motivo === 'muerte' ? 'muerte' : 'venta'}`
+        : mal === 'nosalio'
+          ? `Anular: no ${x.motivo === 'muerte' ? 'murió' : 'se vendió'}`
+          : mal === 'potrero'
+            ? potCorrecto
+              ? `Corregir: salió del ${nombrePotrero(potCorrecto)}`
+              : 'Tocá el potrero correcto'
+            : cantCorrecta == null || cantCorrecta === n
+              ? 'Poné la cantidad correcta'
+              : `Corregir: fueron ${cantCorrecta}`
+  const listoParaConfirmar =
+    modo === 'sabe' ? ids.length >= n : modo === 'nosabe' ? quedan.length >= n : mal === 'nosalio' || (mal === 'potrero' ? !!potCorrecto : cantCorrecta != null && cantCorrecta !== n && cantCorrecta > 0)
+  // Para buscar por número: dígitos, sin espacios.
+  const q = buscar.replace(/\D/g, '')
+  const coincide = (a: { caravana_visual: string | null; caravana_rfid: string | null }) =>
+    !q || (a.caravana_visual ?? '').replace(/\D/g, '').includes(q) || (a.caravana_rfid ?? '').replace(/\D/g, '').includes(q)
+  // Potreros de la empresa con animales de esa categoría (para «salió de otro potrero»).
+  const potrerosConCat = [...new Set(rodeo.filter((a) => a.categoria === x.categoria && a.potrero_id && a.potrero_id !== x.potreroId).map((a) => a.potrero_id!))]
 
   return (
     <PanelLateral
@@ -146,9 +177,9 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
       onCerrar={cerrar}
       ancho={modo === 'sabe' && enTodo}
       titulo={`¿Qué ${n === 1 ? cat : `${n} ${cat}`} ${verbo} del ${pot}?`}
-      bajada={`Lo anotaste el ${ddmm(x.fecha)} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. El número del rodeo ya está bien: esto pone cada ficha en su lugar.`}
+      bajada={`El ${ddmm(x.fecha)} anotaste que ${verbo} ${n} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. El número del rodeo ya está bien; esto es para que cada ficha diga lo que pasó.`}
       pie={
-        <BotonPrincipal icono={modo === 'error' ? 'Borrar' : 'Guardar'} cargando={ocupado} disabled={ocupado || (modo === 'sabe' && ids.length < n) || (modo === 'nosabe' && quedan.length < n)} onClick={confirmar}>
+        <BotonPrincipal icono={modo === 'error' && mal === 'nosalio' ? 'Borrar' : 'Guardar'} cargando={ocupado} disabled={ocupado || !listoParaConfirmar} onClick={confirmar}>
           {boton}
         </BotonPrincipal>
       }
@@ -162,9 +193,9 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
       <div role="radiogroup" aria-label="Cómo se resuelve" className="flex flex-col gap-2">
         {(
           [
-            { m: 'sabe', titulo: n === 1 ? 'Sé cuál fue' : 'Sé cuáles fueron', bajada: 'La elegís de la lista.' },
-            { m: 'nosabe', titulo: 'No sé cuál fue', bajada: `Queda como ${como} una de las posibles, y se puede corregir después.` },
-            { m: 'error', titulo: 'La cargué mal', bajada: 'Otro potrero, otra cantidad, o no salió: se anula.' },
+            { m: 'sabe', titulo: n === 1 ? 'Sé cuál fue' : 'Sé cuáles fueron', bajada: 'La tocás en la lista o la buscás por su número.' },
+            { m: 'nosabe', titulo: 'No sé cuál fue', bajada: `Tropero marca una como ${como}. Si después la ves en el campo, se corrige.` },
+            { m: 'error', titulo: 'Me equivoqué al cargarla', bajada: 'Corregí el potrero o la cantidad, o anulala si no salió.' },
           ] as const
         ).map((o) => (
           <button
@@ -187,31 +218,61 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
       </div>
 
       <div className="mt-6">
+        {modo === 'sabe' && (
+          <label className="relative mb-4 flex h-11 items-center">
+            <span className="pointer-events-none absolute left-4 text-texto-suave">
+              <Icono nombre="Buscar" tamano={16} />
+            </span>
+            <span className="sr-only">Buscá por número de caravana</span>
+            <input
+              value={buscar}
+              onChange={(e) => {
+                setBuscar(e.target.value)
+                if (e.target.value.replace(/\D/g, '')) setEnTodo(true)
+              }}
+              inputMode="numeric"
+              placeholder="Buscá por número de caravana"
+              className="h-full w-full rounded-full border-[1.5px] border-borde bg-superficie pr-4 pl-11 text-[15px] text-texto outline-none placeholder:text-texto-suave focus:border-principal"
+            />
+          </label>
+        )}
+
         {modo === 'sabe' && !enTodo && (
           <>
             <p className="mb-3 text-[14px] leading-snug text-texto-suave">
               {x.posibles === n
                 ? `Sólo ${n === 1 ? 'queda una posible en el ' + pot : `quedan ${n} posibles en el ${pot}`}: las demás que estaban se movieron o salieron después.`
-                : `Éstas son las ${posibles.length} ${catTodas} que estaban en el ${pot} ese día y siguen en el rodeo.`}
+                : `Las ${posibles.length} ${catTodas} que estaban en el ${pot} ese día y siguen en el rodeo.`}
             </p>
             <ElegirDeLista posibles={posibles.map((p) => ({ ...p, caravana: p.id }))} elegidas={ids} cuantas={n} onCambio={setIds} />
-            <button type="button" onClick={() => (setEnTodo(true), setIds([]))} className="mt-4 w-full rounded-[14px] border-[1.5px] border-dashed border-borde px-4 py-3 text-left hover:bg-superficie">
-              <span className="block text-[15px] font-bold text-principal">No está acá: buscala en todo el rodeo</span>
-              <span className="block text-[13.5px] text-texto-suave">Si al cargarla tocaste otro potrero, o salió otra. Se corrige solo: el {pot} recupera su número.</span>
-            </button>
+            <div className="mt-5 flex items-center gap-3 rounded-[14px] bg-superficie px-4 py-3">
+              <p className="min-w-0 flex-1 text-[14px] text-texto-suave">¿No está entre éstas? Puede que al cargarla hayas tocado otro potrero.</p>
+              <button
+                type="button"
+                onClick={() => (setEnTodo(true), setIds([]))}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
+              >
+                <Icono nombre="Buscar" tamano={16} /> Ver todo el rodeo
+              </button>
+            </div>
           </>
         )}
 
         {modo === 'sabe' && enTodo && (
           <>
-            <button type="button" onClick={() => (setEnTodo(false), setIds([]))} className="mb-3 inline-flex items-center gap-1.5 text-[14px] font-semibold text-texto-suave hover:text-texto">
+            <button
+              type="button"
+              onClick={() => (setEnTodo(false), setIds([]), setBuscar(''))}
+              className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde px-3.5 text-[14px] font-bold text-texto hover:bg-superficie-hundida"
+            >
               <Icono nombre="Atrás" tamano={16} /> Sólo las del {pot}
             </button>
-            <p className="mb-3 text-[14px] text-texto-suave">Todo el rodeo, por potrero. Tocá {n === 1 ? 'la que salió' : `las ${n} que salieron`}.</p>
-            <div className="flex max-h-[520px] flex-col gap-5 overflow-y-auto pr-1">
-              {porPotrero.map(([potId, as]) => {
+            <p className="mb-3 text-[14px] text-texto-suave">{q ? `Las que tienen «${q}» en su caravana.` : `Todo el rodeo, por potrero. Tocá ${n === 1 ? 'la que salió' : `las ${n} que salieron`}.`}</p>
+            <div className="flex flex-col gap-5">
+              {porPotrero.map(([potId, todos]) => {
+                const as = todos.filter((a) => coincide(a) || (!q && !(a.caravana_visual || a.caravana_rfid)))
                 const conCaravana = as.filter((a) => a.caravana_visual || a.caravana_rfid)
-                const sin = as.filter((a) => !a.caravana_visual && !a.caravana_rfid)
+                const sin = q ? [] : as.filter((a) => !a.caravana_visual && !a.caravana_rfid)
                 const tiles = [
                   ...conCaravana.map((a) => ({
                     caravana: a.id!,
@@ -229,6 +290,7 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
                     detalle: `una de las ${sin.filter((a) => a.categoria === c).length}`,
                   })),
                 ]
+                if (!tiles.length) return null
                 return (
                   <section key={potId}>
                     <p className="mb-2 text-[13.5px] font-bold text-texto">{potId ? nombrePotrero(potId) : 'Sin potrero'}</p>
@@ -236,6 +298,7 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
                   </section>
                 )
               })}
+              {q && !rodeo.some(coincide) && <p className="text-[14.5px] text-texto-suave">Ninguna caravana tiene «{q}».</p>}
             </div>
           </>
         )}
@@ -257,13 +320,75 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
         )}
 
         {modo === 'error' && (
-          <div className="rounded-[16px] bg-superficie px-4 py-4 text-[14.5px] leading-relaxed text-texto">
-            <p className="font-bold">Se borra esta {x.motivo === 'muerte' ? 'muerte' : 'venta'} del {pot}</p>
-            <ul className="mt-2 flex flex-col gap-1.5 text-texto-suave">
-              <li>· El {pot} vuelve a tener {n === 1 ? `la ${cat}` : `las ${n} ${cat}`} que se habían restado.</li>
-              <li>· Si en esa misma carga salió algún animal sin caravana, vuelve al rodeo.</li>
-              <li>· Si de verdad salió, pero de otro potrero o en otra cantidad, cargala de nuevo con «Salieron».</li>
-            </ul>
+          <div>
+            <p className="mb-2.5 text-[14px] font-semibold text-texto-suave">¿Qué estuvo mal?</p>
+            <Segmentos
+              etiqueta="Qué estuvo mal"
+              opciones={[
+                { valor: 'potrero', texto: 'El potrero' },
+                { valor: 'cantidad', texto: 'La cantidad' },
+                { valor: 'nosalio', texto: x.motivo === 'muerte' ? 'No murió' : 'No se vendió' },
+              ]}
+              valor={mal}
+              onCambio={(v) => (setMal(v), setError(null))}
+            />
+            <div className="mt-4 rounded-[16px] bg-superficie px-4 py-4 text-[14.5px] text-texto">
+              {mal === 'potrero' && (
+                <>
+                  <p className="mb-3">
+                    ¿De qué potrero {n === 1 ? `salió la ${cat}` : `salieron las ${n} ${cat}`}? El {pot} recupera {n === 1 ? 'la que se le restó' : `las ${n} que se le restaron`}.
+                  </p>
+                  {potrerosConCat.length === 0 ? (
+                    <p className="text-texto-suave">No hay {catTodas} en otro potrero.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {potrerosConCat.map((id) => {
+                        const hay = rodeo.filter((a) => a.potrero_id === id && a.categoria === x.categoria).length
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            aria-pressed={potCorrecto === id}
+                            onClick={() => setPotCorrecto(id)}
+                            className={cn(
+                              'flex min-w-[64px] flex-col items-center rounded-[14px] border-[1.5px] px-3 py-2',
+                              potCorrecto === id ? 'border-principal bg-principal text-principal-texto' : 'border-borde bg-fondo text-texto hover:border-neutro-300',
+                            )}
+                          >
+                            <span className="cifra text-[18px] leading-none font-bold">{nombrePotrero(id)}</span>
+                            <span className="mt-0.5 text-[11.5px] font-semibold opacity-80">
+                              {hay} {categoriaNombre(x.categoria, hay).toLowerCase()}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+              {mal === 'cantidad' && (
+                <>
+                  <p className="mb-3">
+                    ¿Cuántas {catTodas} {x.motivo === 'muerte' ? 'murieron' : 'se vendieron'} del {pot}? Anotaste {n}.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button type="button" aria-label="Una menos" onClick={() => setCantCorrecta(Math.max(1, (cantCorrecta ?? n) - 1))} className="grid size-10 place-items-center rounded-full bg-superficie-hundida text-[20px] font-bold">
+                      −
+                    </button>
+                    <span className="cifra w-12 text-center text-[28px] font-bold">{cantCorrecta ?? n}</span>
+                    <button type="button" aria-label="Una más" onClick={() => setCantCorrecta((cantCorrecta ?? n) + 1)} className="grid size-10 place-items-center rounded-full bg-principal text-[20px] font-bold text-principal-texto">
+                      +
+                    </button>
+                  </div>
+                  <p className="mt-3 text-[13.5px] text-texto-suave">Se rehace con la misma fecha. Si no alcanzan, Tropero te avisa.</p>
+                </>
+              )}
+              {mal === 'nosalio' && (
+                <p>
+                  Se borra {x.motivo === 'muerte' ? 'esta muerte' : 'esta venta'}: el {pot} vuelve a tener {n === 1 ? `la ${cat}` : `las ${n} ${cat}`} que se habían restado. Si alguna sin caravana había salido en esa misma carga, vuelve al rodeo.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>

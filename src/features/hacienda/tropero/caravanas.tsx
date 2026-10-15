@@ -141,7 +141,7 @@ export function ElegirDeLista({ posibles, elegidas, cuantas, onCambio }: { posib
   }
   return (
     <div>
-      <div role={cuantas === 1 ? 'radiogroup' : 'group'} className="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto pr-1">
+      <div role={cuantas === 1 ? 'radiogroup' : 'group'} className="grid grid-cols-2 gap-2">
         {posibles.map((p) => {
           const si = elegidas.includes(p.caravana)
           const lleno = !si && cuantas > 1 && elegidas.length >= cuantas

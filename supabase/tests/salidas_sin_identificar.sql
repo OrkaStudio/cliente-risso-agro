@@ -182,4 +182,27 @@ begin
   perform pg_temp.afirmar((select estado from animal where id = '00000000-0000-0000-0000-000000000021') = 'vendido', 'la 9021 vendida');
 end $$;
 
+-- 10. «Me equivoqué al cargarla»: era del B, y eran 2 → se corrige en el lugar.
+do $$
+declare r jsonb; s uuid; a_antes int; b_antes int;
+begin
+  insert into animal (id, empresa_id, categoria, potrero_id) values
+    ('00000000-0000-0000-0000-000000000031', 'eeeeeeee-0000-0000-0000-000000000001', 'vaca', 'bbbbbbbb-0000-0000-0000-00000000000b'),
+    ('00000000-0000-0000-0000-000000000032', 'eeeeeeee-0000-0000-0000-000000000001', 'vaca', 'bbbbbbbb-0000-0000-0000-00000000000b');
+  insert into caravana (empresa_id, animal_id, numero_rfid, numero_visual) values
+    ('eeeeeeee-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000031', '032000000000031', '9031'),
+    ('eeeeeeee-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000032', '032000000000032', '9032');
+  a_antes := pg_temp.vacas_a();
+  b_antes := coalesce((select cabezas from v_composicion_potrero where potrero_id = 'bbbbbbbb-0000-0000-0000-00000000000b' and categoria = 'vaca'), 0);
+  r := salida_por_cantidad('eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', '[{"categoria":"vaca","cantidad":1}]', 'venta', current_date - 2);
+  s := (r->>'salida_id')::uuid;
+  r := corregir_salida(s, 'vaca', 'bbbbbbbb-0000-0000-0000-00000000000b', 2);
+  perform pg_temp.afirmar(pg_temp.vacas_a() = a_antes, 'A vuelve a como estaba');
+  perform pg_temp.afirmar(coalesce((select cabezas from v_composicion_potrero where potrero_id = 'bbbbbbbb-0000-0000-0000-00000000000b' and categoria = 'vaca'), 0) = b_antes - 2, 'B pierde 2');
+  perform pg_temp.afirmar((select fecha from v_salidas_sin_identificar where salida_id = (r->>'salida_id')::uuid) = current_date - 2, 'conserva la fecha');
+  -- «No salió»: cantidad 0
+  perform corregir_salida((r->>'salida_id')::uuid, 'vaca', 'bbbbbbbb-0000-0000-0000-00000000000b', 0);
+  perform pg_temp.afirmar(coalesce((select cabezas from v_composicion_potrero where potrero_id = 'bbbbbbbb-0000-0000-0000-00000000000b' and categoria = 'vaca'), 0) = b_antes, 'B vuelve a como estaba');
+end $$;
+
 rollback;

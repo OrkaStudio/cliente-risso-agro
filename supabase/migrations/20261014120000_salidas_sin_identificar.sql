@@ -566,7 +566,62 @@ begin
   return v_n;
 end $$;
 
+/**
+ * «Me equivoqué al cargarla»: corrige UNA categoría de una salida. Deshace lo
+ * que esa salida hizo con esa categoría (las pendientes se cierran, los que
+ * salieron vuelven al rodeo) y la vuelve a cargar con el potrero y la
+ * cantidad correctos, con la misma fecha y motivo. Cantidad 0 = no salió.
+ * Devuelve la salida nueva (o null si no salió).
+ */
+create or replace function corregir_salida(
+  p_salida_id  uuid,
+  p_categoria  categoria_animal,
+  p_potrero_id uuid,
+  p_cantidad   int
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_p   salida_pendiente;
+  v_e   record;
+  v_r   jsonb;
+begin
+  select * into v_p from salida_pendiente
+   where salida_id = p_salida_id and categoria = p_categoria and resuelta_en is null
+   order by created_at limit 1;
+  if v_p.id is null then raise exception 'Esa salida ya no está abierta'; end if;
+  if p_cantidad < 0 then raise exception 'La cantidad no puede ser negativa'; end if;
+
+  update salida_pendiente set resuelta_como = 'anulada', resuelta_en = now()
+   where salida_id = p_salida_id and categoria = p_categoria and resuelta_en is null;
+
+  perform set_config('tropero.resolviendo', '1', true);
+  for v_e in
+    select distinct on (e.animal_id) e.animal_id
+      from evento e join animal a on a.id = e.animal_id
+     where e.tipo = 'baja' and e.datos->>'salida_id' = p_salida_id::text
+       and a.categoria = p_categoria and a.estado <> 'activo'
+  loop
+    update animal set estado = 'activo', updated_at = now() where id = v_e.animal_id;
+    insert into evento (empresa_id, animal_id, tipo, nota, datos)
+    values (v_p.empresa_id, v_e.animal_id, 'nota', 'Se corrigió la salida: vuelve al rodeo',
+            jsonb_build_object('anula_salida', p_salida_id, 'vuelve_al_rodeo', true));
+  end loop;
+  perform set_config('tropero.resolviendo', '', true);
+
+  if p_cantidad = 0 then
+    return null;
+  end if;
+  v_r := salida_por_cantidad(v_p.empresa_id, p_potrero_id,
+           jsonb_build_array(jsonb_build_object('categoria', p_categoria, 'cantidad', p_cantidad)),
+           v_p.motivo, v_p.fecha, v_p.nota);
+  return v_r;
+end $$;
+
 grant execute on function identificar_animal(uuid, uuid) to authenticated;
+grant execute on function corregir_salida(uuid, categoria_animal, uuid, int) to authenticated;
 grant execute on function identificar_salida(uuid, text[], uuid) to authenticated;
 grant execute on function resolver_sin_saber(uuid, uuid[]) to authenticated;
 grant execute on function reabrir_sin_saber(uuid) to authenticated;

@@ -175,7 +175,7 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   // Se tocó el potrero equivocado: la que salió está en otro potrero.
   await venderUnaVaca(page)
   await abrirUltimaSalida(page)
-  await panel.getByRole('button', { name: /No está acá: buscala en todo el rodeo/ }).click()
+  await panel.getByRole('button', { name: /Ver todo el rodeo/ }).click()
   await panel.getByRole('radio', { name: /Vaca/ }).last().click()
   await panel.getByRole('button', { name: /^Guardar: fue la/ }).click()
   await expect(panel).toBeHidden()
@@ -183,8 +183,9 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   // Otra venta, cargada por error: se anula y el potrero queda como estaba.
   await venderUnaVaca(page)
   await abrirUltimaSalida(page)
-  await panel.getByRole('radio', { name: /La cargué mal/ }).click()
-  await panel.getByRole('button', { name: /^Anular la venta/ }).click()
+  await panel.getByRole('radio', { name: /Me equivoqué al cargarla/ }).click()
+  await panel.getByRole('radio', { name: 'No se vendió' }).click()
+  await panel.getByRole('button', { name: /^Anular: no se vendió/ }).click()
   await expect(panel).toBeHidden()
 
   // La planilla: una caravana para un ternero sin caravana del 1A.

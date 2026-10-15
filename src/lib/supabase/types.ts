@@ -1621,6 +1621,10 @@ export type Database = {
       resolver_sin_saber: { Args: { p_salida_id: string; p_animal_ids?: string[] }; Returns: number }
       reabrir_sin_saber: { Args: { p_animal_id: string }; Returns: string }
       anular_salida: { Args: { p_salida_id: string }; Returns: number }
+      corregir_salida: {
+        Args: { p_cantidad: number; p_categoria: Database["public"]["Enums"]["categoria_animal"]; p_potrero_id: string; p_salida_id: string }
+        Returns: Json
+      }
       asignar_caravanas_planilla: {
         Args: { p_campo_id: string; p_empresa_id: string; p_filas: Json }
         Returns: Json

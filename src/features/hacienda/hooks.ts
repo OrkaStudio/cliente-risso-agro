@@ -196,6 +196,10 @@ export function useReabrirSinSaber() {
   const qc = useQueryClient()
   return useMutation({ mutationFn: api.reabrirSinSaber, onSuccess: () => invalidarCaravanas(qc) })
 }
+export function useCorregirSalida() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: api.corregirSalida, onSuccess: () => invalidarCaravanas(qc) })
+}
 export function useAnularSalida() {
   const qc = useQueryClient()
   return useMutation({ mutationFn: api.anularSalida, onSuccess: () => invalidarCaravanas(qc) })

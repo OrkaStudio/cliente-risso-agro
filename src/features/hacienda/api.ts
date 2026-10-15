@@ -538,6 +538,12 @@ export async function reabrirSinSaber(animalId: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** «Me equivoqué al cargarla»: rehace esa categoría con el potrero y la cantidad correctos (0 = no salió). */
+export async function corregirSalida(input: { salidaId: string; categoria: CategoriaAnimal; potreroId: string; cantidad: number }): Promise<void> {
+  const { error } = await supabase.rpc('corregir_salida', { p_salida_id: input.salidaId, p_categoria: input.categoria, p_potrero_id: input.potreroId, p_cantidad: input.cantidad })
+  if (error) throw new Error(error.message)
+}
+
 /** «Fue un error»: la salida entera se deshace. */
 export async function anularSalida(salidaId: string): Promise<number> {
   const { data, error } = await supabase.rpc('anular_salida', { p_salida_id: salidaId })
