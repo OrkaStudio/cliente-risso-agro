@@ -3,7 +3,7 @@
 import * as db from './db.ts'
 import { imagenMapa } from './mapa-imagen.ts'
 import { NO, SI } from '../_shared/wa/conversacion.ts'
-import { bordeCompartido, comandoInfra, contorno, elementoDeTexto, largo, medio, metros, NOMBRE_TIPO, nombreElemento, pegarAlBorde, potrerosDeElemento, potrerosEnPunto, TIPOS_PUNTO, type ComandoInfra, type LatLng, type TipoInfra } from '../_shared/wa/infraestructura.ts'
+import { bordeCompartido, comandoInfra, contorno, elementoDeTexto, largo, medio, metros, NOMBRE_TIPO, nombreElemento, pegarAlBorde, potreroCercano, potrerosDeElemento, potrerosEnPunto, TIPOS_PUNTO, type ComandoInfra, type LatLng, type TipoInfra } from '../_shared/wa/infraestructura.ts'
 import { resolverPotrero, type PotreroDibujado } from '../_shared/wa/resolver.ts'
 import { norm } from '../_shared/wa/texto.ts'
 import type { Contexto, InfraNueva, Mensaje, Pendiente, PendienteInfra } from '../_shared/wa/tipos.ts'
@@ -44,15 +44,27 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
     await io.responder({ texto: 'Ese botón es de una propuesta anterior. No cambié nada.' }); return true
   }
   if (e.botonId) return false
-  if (p?.tipo === 'infra' && p.paso !== 'tipo') {
+  if (p?.tipo === 'infra' && (p.paso === 'confirmar' || p.paso === 'borrar')) {
     if (SI.test(t)) { if (p.paso === 'confirmar') await guardar(e, io, p.capturaId, p.elemento); else await borrar(e, io, p.capturaId, p.id, p.nombre); return true }
     if (NO.test(t)) { await cancelar(e, io); return true }
   }
+  if (p?.tipo === 'infra' && p.paso === 'ubicacion' && NO.test(t)) { await cancelar(e, io); return true }
   const lugar = lugarPendiente(p)
   if (lugar) {
     const el = elementoDeTexto(e.texto)
     if (el) { await proponerPunto(e, io, el.tipo, el.apodo, lugar.punto, lugar.campoId); return true }
     if (p?.tipo === 'infra' && NO.test(t)) { await cancelar(e, io); return true }
+  }
+  // Sin ubicación todavía: sin señal, la palabra y la ubicación salen juntas y pueden llegar en
+  // cualquier orden. Se espera la ubicación (hasta que venza el pendiente) en vez de no entenderla.
+  if ((!p || (p.tipo === 'infra' && p.paso === 'ubicacion')) && e.entrada !== 'boton') {
+    const el = elementoDeTexto(e.texto)
+    if (el) {
+      await db.guardarPendiente(e.v.id, { tipo: 'infra', capturaId: null, paso: 'ubicacion', elemento: el, origen: { texto: e.texto, entrada: e.entrada } })
+      const que = `${articulo(el.tipo) === 'la' ? 'de la' : 'del'} ${NOMBRE_TIPO[el.tipo].toLowerCase()}${el.apodo ? ` ${el.apodo}` : ''}`
+      await io.responder({ texto: `Mandame la ubicación ${que}: clip → Ubicación. Si no estás ahí, mové el pin sobre el mapa. Si ya la mandaste sin señal, llega sola cuando vuelva.` })
+      return true
+    }
   }
   // Un comando no pisa una carga en curso de otro tipo (una lluvia o una recorrida sin terminar).
   if (!p || p.tipo === 'ubicado' || p.tipo === 'infra') {
@@ -60,6 +72,13 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
     if (c) { await comando(e, io, c); return true }
   }
   return false
+}
+
+/** Llegó la ubicación de algo ya nombrado: se propone directo, sin volver a preguntar qué es. */
+export async function cargarEnUbicacion(e: EntradaInfra, io: IOInfra, p: Extract<PendienteInfra, { paso: 'ubicacion' }>, punto: LatLng): Promise<void> {
+  const cerca = potreroCercano(punto, await db.potrerosDibujados(e.v))
+  if (!cerca) { await io.responder({ texto: 'Esa ubicación no está cerca de ningún potrero dibujado. Mandala de nuevo desde el lugar o mové el pin sobre el campo.' }); return }
+  await proponerPunto({ ...e, texto: p.origen.texto, entrada: p.origen.entrada }, io, p.elemento.tipo, p.elemento.apodo, punto, cerca.campoId)
 }
 
 function lugarPendiente(p: Pendiente | PendienteInfra | null): { punto: LatLng; campoId: string } | null {

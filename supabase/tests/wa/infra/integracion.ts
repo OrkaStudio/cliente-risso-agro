@@ -133,6 +133,17 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
     out = await boton(v1, baja)
     assert(textos(out).includes('Listo, borré') && (await admin`select 1 from infraestructura where tipo='tranquera'`).length === 0)
 
+    // Sin señal: la palabra puede llegar antes que la ubicación.
+    out = await texto(v1, 'bebedero grande')
+    assert(textos(out).includes('Mandame la ubicación del bebedero grande') && !out.some(o => o.type === 'image'), textos(out))
+    out = await ubic(v1, -36.006, -59.284)
+    assert(out.some(o => o.type === 'image') && textos(out).includes('bebedero grande del 9B'), 'La ubicación tardía no completó la carga: ' + textos(out))
+    out = await boton(v1, botones(out).find(b => b.startsWith('inf:si='))!)
+    const [beb] = await admin`select apodo from infraestructura where tipo='bebedero'`
+    assert(beb?.apodo === 'grande', 'No guardó el bebedero')
+    const [cap] = await admin`select entrada, texto from captura where escrito_tabla='infraestructura' order by created_at desc limit 1`
+    assert(cap.entrada === 'texto' && cap.texto === 'bebedero grande', 'La captura perdió lo que dijo')
+
     out = await texto(v2, 'borrá el tanque del 9B')
     assert(!botones(out).some(b => b.startsWith('inf:borrar=')) && (await admin`select 1 from infraestructura where tipo='tanque'`).length === 1, 'Otra empresa pudo pedir la baja')
     out = await texto(v1, 'tanque australiano')

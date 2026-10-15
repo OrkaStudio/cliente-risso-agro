@@ -165,6 +165,8 @@ export type PendienteInfra =
   | { tipo: 'infra'; capturaId: string | null; paso: 'tipo'; punto: [number, number]; campoId: string }
   | { tipo: 'infra'; capturaId: string; paso: 'confirmar'; elemento: InfraNueva }
   | { tipo: 'infra'; capturaId: string; paso: 'borrar'; id: string; nombre: string }
+  /** Dijo qué es antes de mandar la ubicación (sin señal salen juntas y llegan en cualquier orden). */
+  | { tipo: 'infra'; capturaId: null; paso: 'ubicacion'; elemento: { tipo: InfraNueva['tipo']; apodo: string | null }; origen: { texto: string; entrada: 'texto' | 'audio' } }
 
 export type InfraNueva = {
   campoId: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'

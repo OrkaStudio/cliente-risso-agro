@@ -39,7 +39,7 @@ import { atenderMapa, campoParaMapa, comandoMapa, elegirMapa, noRecuerdaPotrero,
 import { imagenMapa } from './mapa-imagen.ts'
 import { colaHabilitada, tomarTrabajo, terminarTrabajo, canalEnRevision,canalesConTrabajo } from './cola.ts'
 import { atenderPiloto } from './piloto.ts'
-import { atenderInfra, ofrecerCarga } from './infra.ts'
+import { atenderInfra, cargarEnUbicacion, ofrecerCarga, type IOInfra } from './infra.ts'
 import { potreroCercano } from '../_shared/wa/infraestructura.ts'
 import * as pilotoStore from './piloto-store.ts'
 import { fusionarRecorrida } from '../_shared/wa/piloto.ts'
@@ -182,8 +182,16 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
   const pendiente: Pendiente | null = crudo?.tipo === 'infra' ? null : crudo
 
   let capturaId: string | null = null
+  const ioInfra: IOInfra = {
+    responder: msg => responder(v, v.telefono, msg),
+    enviarImagen: (bytes, caption, campoId) => enviarImagenMapa(v, bytes, caption, campoId, null),
+  }
   try {
     if (m.type === 'location' && m.location) {
+      if (pendienteInfra?.paso === 'ubicacion') {
+        await cargarEnUbicacion({ v, ctx, mensajeId, texto: '', pendiente: pendienteInfra, entrada: 'texto' }, ioInfra, pendienteInfra, [m.location.latitude, m.location.longitude])
+        return
+      }
       if (pendienteInfra?.capturaId) await abandonar(pendienteInfra.capturaId)
       await ubicacion(v, ctx, pendiente, m.location)
       return
@@ -227,10 +235,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     }
     const mapa = comandoMapa(texto, botonId)
     if (mapa) { await mostrarMapa(v, ctx, pendiente, mapa); return }
-    if (await atenderInfra({ v, ctx, mensajeId, texto, botonId, pendiente: pendienteInfra ?? pendiente, entrada: porAudio ? 'audio' : botonId ? 'boton' : 'texto' }, {
-      responder: msg => responder(v, v.telefono, msg),
-      enviarImagen: (bytes, caption, campoId) => enviarImagenMapa(v, bytes, caption, campoId, null),
-    })) return
+    if (await atenderInfra({ v, ctx, mensajeId, texto, botonId, pendiente: pendienteInfra ?? pendiente, entrada: porAudio ? 'audio' : botonId ? 'boton' : 'texto' }, ioInfra)) return
     // Una propuesta de inventario sin responder no bloquea lo que venga después.
     if (pendienteInfra) {
       if (pendienteInfra.capturaId) await abandonar(pendienteInfra.capturaId)
