@@ -1,5 +1,5 @@
 import type { Database } from '@/lib/supabase/types'
-import { categoriaNombre, categoriasPorEspecie } from '../labels'
+import { categoriaNombre, categoriasPorEspecie, especiePorCategoria, type Especie } from '../labels'
 
 // Entraron y Salieron (página 35): la hacienda que entra o sale por cantidad,
 // sin leer caravanas. Puro: lo que hay en cada potrero, lo que se puede sacar
@@ -49,14 +49,17 @@ export function composicionPorPotrero(
 }
 
 /** Las categorías para contar: en una salida, las que hay en el potrero; en una entrada, las del rodeo. */
-export function categoriasParaContar(q: Que, enPotrero: Map<Categoria, Hay> | undefined): { categoria: Categoria; max: number | null; hay: number }[] {
+export function categoriasParaContar(q: Que, enPotrero: Map<Categoria, Hay> | undefined, especie: Especie = 'bovino'): { categoria: Categoria; max: number | null; hay: number }[] {
   if (q.modo === 'salieron' || q.que === 'deOtroCampo') {
     return [...(enPotrero ?? new Map<Categoria, Hay>())]
+      .filter(([c]) => especiePorCategoria[c] === especie)
       .map(([categoria, h]) => ({ categoria, hay: h.total, max: q.modo === 'salieron' && q.que === 'correccion' ? h.sinCaravana : h.total }))
       .filter((c) => c.hay > 0)
       .sort((a, b) => b.hay - a.hay)
   }
-  const cats: Categoria[] = q.que === 'nacimiento' ? ['ternero', 'ternera'] : categoriasPorEspecie.bovino
+  // Nacieron: sólo las crías de esa especie.
+  const crias: Record<Especie, Categoria[]> = { bovino: ['ternero', 'ternera'], ovino: ['cordero', 'cordera'], equino: ['potrillo', 'potranca'] }
+  const cats: Categoria[] = q.que === 'nacimiento' ? crias[especie] : categoriasPorEspecie[especie]
   return cats.map((categoria) => ({ categoria, hay: enPotrero?.get(categoria)?.total ?? 0, max: null }))
 }
 

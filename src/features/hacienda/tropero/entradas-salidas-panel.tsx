@@ -6,7 +6,7 @@ import { Segmentos } from '@/components/tropero/segmentos'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useCrearAnimalesMasivo, useMoverAnimales, useSalidaPorCantidad, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
-import { categoriaNombre } from '@/features/hacienda/labels'
+import { categoriaNombre, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 import { CroquisElegir } from '@/features/mapa/croquis-elegir'
 import { CaravanasQueSalieron } from './caravanas'
 import { usePosibles } from './posibles'
@@ -29,7 +29,7 @@ import {
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 type Paso = 'que' | 'cuantos' | 'adonde' | 'revisa' | 'listo'
-type Resultado = { titulo: string; quedan: string; sinIdentificar: number }
+type Resultado = { titulo: string; quedan: string; sinIdentificar: number; mov: Mov }
 
 const ICONO_QUE: Record<string, NombreIcono> = {
   venta: 'Plata',
@@ -79,6 +79,7 @@ export function EntradasSalidas({
   const [error, setError] = useState<string | null>(null)
   const [hecho, setHecho] = useState<Resultado | null>(null)
   const [caravanas, setCaravanas] = useState<string[]>([])
+  const [especieElegida, setEspecie] = useState<Especie | null>(null)
 
   const campos = useMemo(() => (mapa ?? []).filter((c) => c.potreros.length > 0), [mapa])
   const salidasQ = useSalidasSinIdentificar()
@@ -97,6 +98,27 @@ export function EntradasSalidas({
   const mueve = q && (q.modo === 'salieron' ? q.que === 'otroCampo' : q.que === 'deOtroCampo')
   const sacan = q?.modo === 'salieron' || (q?.modo === 'entraron' && q.que === 'deOtroCampo')
   const ocupado = salida.isPending || alta.isPending || mover.isPending
+  // Primero la especie, después la categoría. En una salida, sólo las que hay en el potrero.
+  const especies: Especie[] = sacan
+    ? (['bovino', 'ovino', 'equino'] as Especie[]).filter((e) => [...(enPotrero?.keys() ?? [])].some((c) => especiePorCategoria[c] === e && (enPotrero!.get(c)!.total ?? 0) > 0))
+    : ['bovino', 'ovino', 'equino']
+  const especie: Especie = especieElegida && especies.includes(especieElegida) ? especieElegida : (especies[0] ?? 'bovino')
+  const cabezasEn = (id: string | null) => (id ? [...(comp.get(id)?.values() ?? [])].reduce((t, h) => t + h.total, 0) : 0)
+  const lado = (c: CampoMapa | null, p: { id: string; nombre: string } | null, delta: number): Lado | undefined =>
+    c && p ? { letra: identidad.find((i) => i.id === c.id), campo: c.nombre, potrero: p.nombre, antes: cabezasEn(p.id), despues: cabezasEn(p.id) + delta } : undefined
+  // El movimiento, para mostrarlo: de dónde sale, a dónde llega y cómo cambian los números.
+  const mov: Mov | null = q
+    ? {
+        que: cuantosTexto(items),
+        origen: sacan ? lado(campo, potrero, -total) : undefined,
+        destino: mueve ? lado(destCampo, destino, total) : !sacan ? lado(campo, potrero, total) : undefined,
+        fin:
+          q.modo === 'salieron' && q.que !== 'otroCampo'
+            ? { texto: q.que === 'venta' ? 'Vendidos' : q.que === 'muerte' ? 'Murieron' : 'Cargados de más', icono: q.que === 'venta' ? 'Plata' : 'Borrar' }
+            : undefined,
+        inicio: q.modo === 'entraron' && q.que !== 'deOtroCampo' ? { texto: q.que === 'compra' ? 'Comprados' : q.que === 'nacimiento' ? 'Nacieron' : 'Faltaban cargar', icono: q.que === 'compra' ? 'Plata' : q.que === 'nacimiento' ? 'Ternero' : 'Editar' } : undefined,
+      }
+    : null
   // Las caravanas del potrero que pueden ser las que salieron (de las categorías que salen).
   const posibles = usePosibles((a) => a.estado === 'activo' && a.potrero_id === potreroId && !!a.categoria && !!cuantos[a.categoria])
   const identificadasPor = (c: Categoria) => caravanas.filter((x) => posibles.find((p) => p.caravana === x)?.categoria === c).length
@@ -128,8 +150,10 @@ export function EntradasSalidas({
     // Lo obvio, preelegido: salen del campo que mirás (o del único con hacienda); llegan a otro.
     const origen = traer ? (conHacienda.find((c) => c.id !== visto)?.id ?? null) : visto && cabezasDe(visto) > 0 ? visto : (conHacienda[0]?.id ?? campos[0]?.id ?? null)
     const otros = campos.filter((c) => c.id !== origen)
-    setCampoId(origen)
-    setDestCampoId(traer ? (visto && visto !== origen ? visto : otros.length === 1 ? otros[0]!.id : null) : llevar ? (otros.length === 1 ? otros[0]!.id : null) : null)
+    void otros
+    // Entre campos no se preelige nada: el productor elige de dónde y a dónde.
+    setCampoId(traer || llevar ? null : origen)
+    setDestCampoId(null)
     setPaso('cuantos')
   }
 
@@ -140,14 +164,14 @@ export function EntradasSalidas({
     try {
       if (q.modo === 'salieron' && q.que !== 'otroCampo') {
         const r = await salida.mutateAsync({ empresaId, potreroId, items, motivo: q.que === 'venta' ? 'venta' : q.que === 'muerte' ? 'muerte' : 'correccion', fecha: cuando === 'hoy' ? hoyLocal() : fecha, caravanas })
-        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} quedan ${antes - r.salieron}.`, sinIdentificar: r.sinIdentificar })
+        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} quedan ${antes - r.salieron}.`, sinIdentificar: r.sinIdentificar, mov: mov! })
       } else if (mueve) {
         if (!destinoId) return
         await mover.mutateAsync({ empresaId, potreroOrigenId: potreroId, potreroDestinoId: destinoId, loteId: null, seleccion: { items } })
-        setHecho({ titulo: tituloListo(q, items), quedan: `Ahora están en el ${destino!.nombre} de ${destCampo!.nombre}.`, sinIdentificar: 0 })
+        setHecho({ titulo: tituloListo(q, items), quedan: `Ahora están en el ${destino!.nombre} de ${destCampo!.nombre}.`, sinIdentificar: 0, mov: mov! })
       } else {
         await alta.mutateAsync({ empresaId, campoId, origen: q.que === 'compra' ? 'compra' : q.que === 'nacimiento' ? 'nacimiento' : 'correccion', bloques: [{ potreroId, items }] })
-        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} ahora hay ${antes + total}.`, sinIdentificar: 0 })
+        setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} ahora hay ${antes + total}.`, sinIdentificar: 0, mov: mov! })
       }
       setPaso('listo')
     } catch (e) {
@@ -288,9 +312,15 @@ export function EntradasSalidas({
               dato={sacan ? (p) => (comp.get(p.id) ? `${[...comp.get(p.id)!.values()].reduce((s, h) => s + h.total, 0)} cab` : null) : undefined}
             />
           )}
+          {potrero && especies.length > 1 && (
+            <div className="mt-5">
+              <p className="mb-2.5 text-[14.5px] font-bold text-texto">Qué {sacan ? 'salió' : 'entró'}</p>
+              <Segmentos etiqueta="Especie" opciones={especies.map((e) => ({ valor: e, texto: NOMBRE_ESPECIE[e] }))} valor={especie} onCambio={setEspecie} />
+            </div>
+          )}
           {potrero && (
             <Contar
-              filas={categoriasParaContar(q, enPotrero)}
+              filas={categoriasParaContar(q, enPotrero, especie)}
               cuantos={cuantos}
               setCuantos={setCuantos}
               potrero={potrero.nombre}
@@ -302,13 +332,21 @@ export function EntradasSalidas({
 
       {paso === 'adonde' && (
         <>
-          <ElegirCampo titulo="Llegan a" identidad={identidad} campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
+          {mov && (
+            <div className="mb-5">
+              <Movimiento m={mov} />
+            </div>
+          )}
+          <div className="mb-4 rounded-[18px] bg-superficie p-4">
+            <ElegirCampo titulo="Llegan a" identidad={identidad} campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
+          </div>
           {destCampo && <Potreros campo={destCampo} elegido={destinoId} onElegir={setDestinoId} />}
         </>
       )}
 
-      {paso === 'revisa' && q && potrero && (
+      {paso === 'revisa' && q && potrero && mov && (
         <Revisa
+          mov={mov}
           q={q}
           items={items}
           antes={[...(enPotrero?.values() ?? [])].reduce((s, h) => s + h.total, 0)}
@@ -332,7 +370,9 @@ export function EntradasSalidas({
           <span className="grid size-12 place-items-center rounded-full bg-estado-bien text-superficie">
             <Icono nombre="Guardar" />
           </span>
-          <p className="mt-4 text-[16px] text-texto-suave">{hecho.quedan}</p>
+          <div className="mt-5">
+            <Movimiento m={hecho.mov} hecho />
+          </div>
           <ul className="mt-5 divide-y divide-borde border-y border-borde">
             {hecho.sinIdentificar > 0 && (
               <Siguiente icono="Caravana" titulo={`${hecho.sinIdentificar} sin identificar`} bajada="Ya se restaron del número; las fichas no cambian. Cuando sepas cuál fue, lo decís desde la ficha del animal o desde Hacienda." />
@@ -457,9 +497,9 @@ function ElegirCampo({
       </label>
     )
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <span className="w-[92px] shrink-0 text-[14px] font-semibold text-texto-suave">{titulo}</span>
-      <div role="radiogroup" aria-label={titulo} className="flex flex-wrap gap-1.5">
+    <div>
+      <p className="mb-2.5 text-[14.5px] font-bold text-texto">{titulo}</p>
+      <div role="radiogroup" aria-label={titulo} className="flex flex-wrap gap-2">
         {opciones.map((c) => (
           <button
             key={c.id}
@@ -469,7 +509,7 @@ function ElegirCampo({
             disabled={apagado?.(c.id)}
             onClick={() => onCambio(c.id)}
             className={cn(
-              'inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] px-3 text-[14.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+              'inline-flex h-11 items-center gap-2 rounded-full border-[1.5px] px-3.5 text-[15px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45',
               valor === c.id ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
             )}
           >
@@ -550,7 +590,9 @@ function Revisa({
   fecha,
   setFecha,
   caravanas,
+  mov,
 }: {
+  mov: Mov
   caravanas: React.ReactNode
   q: Que
   items: { categoria: Categoria; cantidad: number }[]
@@ -563,35 +605,13 @@ function Revisa({
   fecha: string
   setFecha: (v: string) => void
 }) {
-  const total = items.reduce((s, it) => s + it.cantidad, 0)
-  const sale = q.modo === 'salieron' || q.que === 'deOtroCampo'
-  const despues = sale ? antes - total : antes + total
-  const frase =
-    q.modo === 'salieron'
-      ? q.que === 'venta'
-        ? `se van en venta`
-        : q.que === 'muerte'
-          ? `murieron`
-          : q.que === 'otroCampo'
-            ? `pasan al ${destino}`
-            : `estaban cargados de más`
-      : q.que === 'deOtroCampo'
-        ? `pasan al ${destino}`
-        : q.que === 'nacimiento'
-          ? 'nacieron'
-          : q.que === 'compra'
-            ? 'entran comprados'
-            : 'faltaban cargar'
+  void items
+  void antes
+  void potrero
+  void destino
   return (
     <div>
-      <p className="flex items-center gap-4">
-        <span className="titulo-display text-[56px] leading-none text-texto-suave">{antes}</span>
-        <Icono nombre="Siguiente" />
-        <span className="titulo-display text-[56px] leading-none text-texto">{despues}</span>
-      </p>
-      <p className="mt-3 text-[16px] font-semibold text-texto">
-        {cuantosTexto(items)} {sale ? `del ${potrero}` : `en el ${potrero}`} {frase}.
-      </p>
+      <Movimiento m={mov} />
       {q.modo === 'salieron' && q.que !== 'otroCampo' && (
         <Grupo titulo="Cuándo" className="mt-6">
           <Segmentos etiqueta="Cuándo" opciones={[{ valor: 'hoy', texto: 'Hoy' }, { valor: 'otro', texto: 'Otro día' }]} valor={cuando} onCambio={setCuando} />
@@ -630,5 +650,59 @@ function Siguiente({ icono, titulo, bajada }: { icono: NombreIcono; titulo: stri
         <span className="block text-[13.5px] text-texto-suave">{bajada}</span>
       </span>
     </li>
+  )
+}
+
+const NOMBRE_ESPECIE: Record<Especie, string> = { bovino: 'Vacunos', ovino: 'Ovinos', equino: 'Equinos' }
+
+type Lado = { letra?: Identidad; campo: string; potrero: string; antes: number; despues: number }
+type Mov = { que: string; origen?: Lado; destino?: Lado; inicio?: { texto: string; icono: NombreIcono }; fin?: { texto: string; icono: NombreIcono } }
+
+/**
+ * Lo que pasa, a la vista: de qué campo y potrero salen, a dónde llegan y cómo
+ * cambia cada número. El mismo dibujo arma el paso, lo revisa y confirma que
+ * quedó hecho.
+ */
+function CajaLado({ l, rol, hecho }: { l?: Lado; rol: string; hecho: boolean }) {
+  if (!l) return <div className="min-w-0 flex-1 rounded-[16px] border border-dashed border-borde px-4 py-3 text-[14px] text-texto-suave">{rol === 'Llegan a' ? 'Elegí a dónde' : 'Elegí de dónde'}</div>
+  return (
+    <div className="min-w-0 flex-1 rounded-[16px] border border-borde bg-superficie px-4 py-3">
+      <p className="text-[12.5px] font-semibold tracking-[0.02em] text-texto-suave uppercase">{rol}</p>
+      <p className="mt-1 flex items-center gap-1.5 truncate text-[13.5px] font-semibold text-texto-suave">
+        <Letra c={l.letra} />
+        {l.campo}
+      </p>
+      <p className="cifra mt-1 text-[26px] leading-none font-bold text-texto">{l.potrero}</p>
+      <p className="mt-2 flex items-center gap-1.5 text-[15px]">
+        <span className={cn('cifra font-bold text-texto-suave', hecho && 'line-through')}>{l.antes}</span>
+        <Icono nombre="Siguiente" tamano={16} />
+        <span className="cifra text-[18px] font-bold text-texto">{l.despues}</span>
+        <span className="text-[13px] text-texto-suave">cab</span>
+      </p>
+    </div>
+  )
+}
+
+function Punta({ p }: { p: { texto: string; icono: NombreIcono } }) {
+  return (
+    <div className="flex w-[104px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[16px] bg-superficie-hundida px-2 py-3 text-center">
+      <Icono nombre={p.icono} />
+      <span className="text-[13.5px] font-bold text-texto">{p.texto}</span>
+    </div>
+  )
+}
+
+function Movimiento({ m, hecho = false }: { m: Mov; hecho?: boolean }) {
+  return (
+    <div className="flex items-stretch gap-2">
+      {m.inicio ? <Punta p={m.inicio} /> : <CajaLado l={m.origen} rol="Salen de" hecho={hecho} />}
+      <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-1">
+        <span className="max-w-[92px] text-center text-[12.5px] leading-tight font-bold text-principal">{m.que}</span>
+        <span className="text-principal">
+          <Icono nombre="Siguiente" />
+        </span>
+      </div>
+      {m.fin ? <Punta p={m.fin} /> : <CajaLado l={m.destino} rol="Llegan a" hecho={hecho} />}
+    </div>
   )
 }

@@ -176,7 +176,7 @@ export function RodeoPage() {
     <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
       {especies.length > 1 && <h1 className="sr-only">Hacienda</h1>}
       {/* Qué especie y qué campo */}
-      <motion.div {...entra(0)} className="flex flex-wrap items-end justify-between gap-4">
+      <motion.div {...entra(0)} className="flex flex-row-reverse flex-wrap items-end justify-between gap-4">
         {especies.length > 1 ? (
           <div role="tablist" aria-label="Especie" className="flex gap-1 rounded-full border border-borde bg-superficie p-1">
             {especies.map((e) => (
@@ -206,8 +206,9 @@ export function RodeoPage() {
       </motion.div>
 
       {/* El número del rodeo, de dónde y de qué está hecho, y lo que se hace: una sola tarjeta. */}
-      <motion.section {...entra(1)} className="grid gap-x-8 gap-y-5 rounded-[20px] border border-borde bg-superficie px-6 py-5 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-[180px]">
+      <motion.section {...entra(1)} className="grid rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+        <div className="flex flex-col gap-5 px-6 py-5">
+        <div>
           <p className="flex items-baseline gap-3">
             <span className="titulo-display text-[64px] leading-[0.85] tracking-[-0.03em] text-texto">{r.total.toLocaleString('es-AR')}</span>
             <span className="font-heading text-[19px] font-extrabold text-texto">{nombreVista}</span>
@@ -235,13 +236,11 @@ export function RodeoPage() {
           )}
         </div>
 
-        <StockPorCategoria cats={r.porCategoria} total={r.total} />
-
-        <div className="flex gap-2.5 lg:flex-col">
+        <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
             onClick={() => setEntradaSalida('entraron')}
-            className="inline-flex h-10 items-center justify-between gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
+            className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
           >
             Entraron
             <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
@@ -255,6 +254,10 @@ export function RodeoPage() {
           >
             Salieron
           </button>
+        </div>
+        </div>
+        <div className="flex items-center border-borde px-6 py-5 max-lg:border-t lg:border-l">
+          <StockPorCategoria cats={r.porCategoria} total={r.total} />
         </div>
             {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), setEntradaSalida('entraron'))} />}
             {membresia?.empresa_id && (
@@ -342,7 +345,7 @@ export function RodeoPage() {
                   role="tab"
                   aria-selected={verSalieron}
                   onClick={() => elegirEstado(verSalieron ? null : 'salieron')}
-                  className={cn('ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-bold transition-colors', verSalieron ? 'bg-tinta text-superficie' : 'text-texto-suave hover:text-texto')}
+                  className={cn('ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-dashed px-3.5 text-[14px] font-bold transition-colors', verSalieron ? 'border-tinta bg-tinta text-superficie' : 'border-neutro-300 text-texto-suave hover:border-neutro-400 hover:text-texto')}
                 >
                   Salieron <span className="cifra">{nSalieron}</span>
                 </button>
@@ -451,7 +454,8 @@ export function RodeoPage() {
 function StockPorCategoria({ cats, total }: { cats: { categoria: string; cabezas: number }[]; total: number }) {
   if (total === 0) return <p className="text-[14.5px] text-texto-suave">Todavía no hay hacienda en esta vista.</p>
   return (
-    <section aria-label="Por categoría" className="min-w-0">
+    <section aria-label="Por categoría" className="w-full min-w-0">
+      <p className="mb-3 text-[14px] font-semibold text-texto-suave">Por categoría</p>
       <div className="flex h-3.5 gap-[3px]">
         {cats.map((c, i) => (
           <span key={c.categoria} className={cn('rounded-full', PALETA[i % PALETA.length])} style={{ flexGrow: c.cabezas }} title={`${categoriaNombre(c.categoria as never, c.cabezas)}: ${c.cabezas}`} />

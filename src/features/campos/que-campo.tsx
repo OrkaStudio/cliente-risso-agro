@@ -19,7 +19,7 @@ export function QueCampo({ campos, elegido, elegir }: { campos: CampoElegible[];
       activo ? 'bg-tinta text-superficie' : 'text-texto hover:bg-superficie-hundida',
     )
   return (
-    <div className="flex shrink-0 flex-col items-end gap-1.5">
+    <div className="flex shrink-0 flex-col items-start gap-1.5">
       <span className="rounded-full bg-superficie/90 px-2 text-[12.5px] font-semibold text-texto-suave">Estás viendo</span>
       {campos.length === 1 ? (
         <span className="inline-flex h-11 items-center gap-2 rounded-full bg-superficie px-4 text-[15px] font-bold text-texto shadow-[0_2px_10px_rgba(19,27,22,0.12)]">
