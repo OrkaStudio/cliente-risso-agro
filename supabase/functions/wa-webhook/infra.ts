@@ -109,7 +109,8 @@ async function borrar(e: EntradaInfra, io: IOInfra, capturaId: string, id: strin
   const ok = await db.borrarInfra(e.v, id)
   await db.actualizarCaptura(capturaId, ok ? { escritoTabla: 'infraestructura', escritoId: id, notas: ['Baja confirmada.'] } : { estado: 'error', notas: ['No estaba para borrar.'] })
   await db.guardarPendiente(e.v.id, null)
-  await io.responder({ texto: ok ? `Listo, borré *${nombre}*.` : `No encontré *${nombre}* para borrarlo; puede que ya no esté.` })
+  const art = /^tranquera/.test(nombre) ? 'la' : 'el'
+  await io.responder({ texto: ok ? `Listo, borré ${art} *${nombre}*.` : `No encontré ${art} *${nombre}* para borrarlo; puede que ya no esté.` })
 }
 
 async function cancelar(e: EntradaInfra, io: IOInfra) {
