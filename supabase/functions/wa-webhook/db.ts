@@ -8,7 +8,8 @@
 //   queda con su id. Nunca con la clave de servicio.
 
 import postgres from 'npm:postgres@3.4.5'
-import { sumarDias } from '../_shared/wa/texto.ts'
+import { sumarDias,hoyAR } from '../_shared/wa/texto.ts'
+import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
 import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, Pasto, Pendiente } from '../_shared/wa/tipos.ts'
 import type { PotreroDibujado } from '../_shared/wa/resolver.ts'
 import type { FilaHacienda, FilaVencimiento } from '../_shared/wa/respuestas.ts'
@@ -16,7 +17,7 @@ import type { PeriodoSemana, SemanaCampo } from '../_shared/wa/semanal.ts'
 import type { MapaCampo } from '../_shared/wa/mapa.ts'
 
 // Pooler en modo transacción: sin prepared statements.
-const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 4, idle_timeout: 20 })
+export const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 4, idle_timeout: 20 })
 type Tx = postgres.TransactionSql
 
 export type Vinculo = {
@@ -43,13 +44,17 @@ export async function guardarEntrante(m: {
   cuerpo: unknown
   vinculo: Vinculo | null
 }): Promise<string | null> {
-  const [r] = await sql<{ id: string }[]>`
+  return await sql.begin(async tx => {
+  const [r] = await tx<{ id: string }[]>`
     insert into wa_mensaje (wamid, direccion, telefono, vinculo_id, empresa_id, tipo, cuerpo)
     values (${m.wamid}, 'entrante', ${m.telefono}, ${m.vinculo?.id ?? null}, ${m.vinculo?.empresa_id ?? null},
             ${m.tipo}, ${sql.json(m.cuerpo as postgres.JSONValue)})
     on conflict (wamid) do nothing
     returning id`
+  if (r && m.vinculo && Deno.env.get('WA_QUEUE_ENABLED') === 'true' && empresaEnPiloto(Deno.env.get('WA_PILOT_TENANTS'),m.vinculo.empresa_id))
+    await tx`insert into interno.wa_cola(mensaje_id,vinculo_id) values(${r.id},${m.vinculo.id})`
   return r?.id ?? null
+  }) as string | null
 }
 
 export async function guardarSaliente(m: {
@@ -78,6 +83,13 @@ export async function guardarPendiente(vinculoId: string, p: Pendiente | null): 
     update wa_vinculo set pendiente = ${p ? sql.json(p as unknown as postgres.JSONValue) : null},
       pendiente_at = ${p ? sql`now()` : null}
     where id = ${vinculoId}`
+}
+
+/** La fecha relativa del mensaje no cambia si el procesamiento cruza medianoche. */
+export async function fechaDeEntrada(v:Vinculo,mensajeId:string):Promise<string>{
+  const [r]=await sql<{created_at:string}[]>`select created_at::text from wa_mensaje where id=${mensajeId} and vinculo_id=${v.id} and empresa_id=${v.empresa_id} and direccion='entrante'`
+  if(!r)throw Error('Mensaje no disponible para este vínculo')
+  return hoyAR(new Date(r.created_at))
 }
 
 // ── Capturas ───────────────────────────────────────────────────────────
@@ -142,7 +154,7 @@ export async function estadoCaptura(id: string): Promise<string | null> {
 
 // ── Como el usuario ────────────────────────────────────────────────────
 
-async function comoUsuario<T>(userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+export async function comoUsuario<T>(userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return (await sql.begin(async (tx) => {
     await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId, role: 'authenticated' })}, true)`
     await tx.unsafe('set local role authenticated')
@@ -243,6 +255,8 @@ export async function verificarCargaDeCaptura(v: Vinculo, id: string): Promise<b
 
 export function escribirLluvia(v: Vinculo, b: Borrador, id: string): Promise<string> {
   return comoUsuario(v.user_id, async (tx) => {
+    const campo = await tx`select 1 from campo where id=${b.campoId!} and empresa_id=${v.empresa_id}`
+    if(campo.length!==1)throw new Error('Campo ajeno a la empresa')
     const [r] = await tx<{ id: string }[]>`
       insert into lluvia (id, empresa_id, campo_id, fecha, mm, fuente)
       values (${id}, ${v.empresa_id}, ${b.campoId!}, ${b.fecha!}, ${b.mm!}, 'manual')
@@ -256,6 +270,9 @@ export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | 
   const neto = lineas.reduce((s, l) => s + (l.neto || 0), 0)
   const iva = lineas.reduce((s, l) => s + (l.iva || 0), 0)
   return comoUsuario(v.user_id, async (tx) => {
+    const campo = await tx`select 1 from campo where id=${b.campoId!} and empresa_id=${v.empresa_id}`
+    const categoria = await tx`select 1 from categoria_movimiento where id=${b.categoriaId!} and (empresa_id is null or empresa_id=${v.empresa_id})`
+    if(campo.length!==1 || categoria.length!==1)throw new Error('Campo o categoría ajenos a la empresa')
     // Pagado en el momento (un ticket): liquidado con su fecha de pago, como
     // "Ya está pagado" en el formulario de la app.
     await tx`
@@ -397,6 +414,10 @@ export type ObsEscrita = {
  */
 export function escribirRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): Promise<string[]> {
   return comoUsuario(v.user_id, async (tx) => {
+    const filas=await tx<{id:string;campo_id:string}[]>`select p.id,p.campo_id from potrero p join campo c on c.id=p.campo_id
+      where p.empresa_id=${v.empresa_id} and c.empresa_id=${v.empresa_id} and p.id=any(${sql.array(obs.map(o=>o.potreroId))}::uuid[])`
+    const campos=new Map(filas.map(p=>[p.id,p.campo_id]))
+    if(obs.some(o=>campos.get(o.potreroId)!==o.campoId))throw new Error('Potrero ajeno al campo o empresa')
     // Dos capturas diferentes pueden confirmar a la vez. Serializar los campos
     // en un orden fijo evita duplicados entre bots y bloqueos cruzados.
     for (const campoId of [...new Set(obs.map((o) => o.campoId))].sort())

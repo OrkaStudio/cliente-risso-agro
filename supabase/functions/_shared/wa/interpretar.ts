@@ -7,6 +7,10 @@ import {
   type Borrador, type Contexto, type Interpretacion, type ObsInterpretada,
 } from './tipos.ts'
 
+export const MAX_TEXTO = 12000
+export const MAX_OBSERVACIONES = 60
+export class EntradaIncompleta extends Error {}
+
 export const HERRAMIENTA = {
   name: 'interpretar_mensaje',
   description: 'Devuelve lo que el productor quiso decir, sin inventar datos que no dijo.',
@@ -14,6 +18,7 @@ export const HERRAMIENTA = {
     type: 'object',
     properties: {
       intent: { type: 'string', enum: [...INTENTS] },
+      otros_registros: { type: 'array', items: { type: 'string' }, description: 'Otros tipos de REGISTRO presentes además del intent elegido: lluvia, gasto, novedad, hacienda. Vacío si hay uno solo; no omitir operaciones mezcladas.' },
       campo: { type: ['string', 'null'], description: 'El campo tal como lo nombró, o null.' },
       potrero: { type: ['string', 'null'], description: 'El potrero tal como lo nombró ("5", "5B"), o null.' },
       mm: { type: ['number', 'null'] },
@@ -56,6 +61,7 @@ export const HERRAMIENTA = {
 } as const
 
 export function promptInterpretar(texto: string, ctx: Contexto, anterior?: Borrador): string {
+  if (texto.length > MAX_TEXTO) throw new EntradaIncompleta('El mensaje es demasiado largo para revisarlo completo. Mandalo en dos partes; no guardé una carga parcial. Tu pendiente anterior se conserva.')
   const campos = ctx.campos
     .map((c) => `- ${c.nombre}: potreros ${c.potreros.map((p) => p.nombre).join(', ') || '(sin potreros)'}`)
     .join('\n')
@@ -66,7 +72,7 @@ export function promptInterpretar(texto: string, ctx: Contexto, anterior?: Borra
     : ''
   return `Sos el intérprete de un bot de WhatsApp para productores ganaderos argentinos. Leés UN mensaje del productor y llamás a la herramienta con lo que quiso decir. No le respondés al productor.
 
-Hoy es ${ctx.hoy} (hora de Argentina). "Anoche" o "ayer" es ${sumarDias(ctx.hoy, -1)}.
+El mensaje fue recibido el ${ctx.fechaMensaje ?? ctx.hoy} (hora de Argentina). "Hoy" refiere a ese día; "anoche" o "ayer" es ${sumarDias(ctx.fechaMensaje ?? ctx.hoy, -1)}.
 
 Campos de esta empresa:
 ${campos || '(ninguno)'}
@@ -93,13 +99,14 @@ intent:
 - "otro": cualquier otra cosa.
 
 Reglas: null para todo lo que el mensaje no dice. No completes el campo ni el potrero si no los nombró. No conviertas un número de potrero en mm ni en monto.
+Si combina tipos de registro (por ejemplo lluvia y gasto), completá otros_registros con los tipos adicionales. No omitas la segunda operación ni confundas una pregunta con un registro.
 Si nombra uno de los campos de la lista, va en campo aunque venga con "para", "de" o "del campo" ("gasoil para Don Gilberto", "para el campo Toimil"); no lo pongas como contraparte.
 En novedad, una observación por potrero; si dice el campo una vez, ponelo en cada una.
 Una observación con un potrero que no figura en la lista sigue siendo "novedad": devolvé el nombre que dijo. El código comprueba si existe; no la conviertas en "otro" por ese motivo.
 ${correccion}
 Mensaje del productor:
 """
-${texto.slice(0, 1500)}
+${texto}
 """`
 }
 
@@ -115,7 +122,7 @@ export function pistaTranscripcion(ctx: Contexto): string {
   return (
     `Productor ganadero argentino hablando de su campo. Campos: ${campos}. ` +
     'Palabras frecuentes: milímetros, lluvia, pluviómetro, potrero, gasoil, vacas, terneros, novillos, vaquillonas, veterinario.'
-  ).slice(0, 700)
+  ).slice(0, 3500)
 }
 
 const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 200) : null)
@@ -143,16 +150,18 @@ export function limpiarInterpretacion(raw: unknown): Interpretacion {
     descripcion: texto(o.descripcion),
     periodo,
     observaciones: intent === 'novedad' ? limpiarObservaciones(o.observaciones) : [],
+    otrosRegistros: Array.isArray(o.otros_registros) ? [...new Set(o.otros_registros.filter((v): v is string => typeof v === 'string' && ['lluvia', 'gasto', 'novedad', 'hacienda'].includes(v) && v !== intent))] : [],
   }
 }
 
 const deLista = <T extends string>(lista: readonly T[], v: unknown): T | null =>
   lista.includes(v as T) ? (v as T) : null
 
-/** Hasta 12 potreros por mensaje; una observación sin nada que anotar se descarta. */
+/** Un límite debe ser explícito: nunca devolver sólo un prefijo de la recorrida. */
 function limpiarObservaciones(raw: unknown): ObsInterpretada[] {
   if (!Array.isArray(raw)) return []
-  return raw.slice(0, 12).flatMap((x) => {
+  if (raw.length > MAX_OBSERVACIONES) throw new EntradaIncompleta('La recorrida tiene demasiadas observaciones para revisarlas juntas. Mandala en partes; no guardé una parte sin avisarte.')
+  return raw.flatMap((x) => {
     const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>
     const conteo = numero(o.conteo)
     const obs: ObsInterpretada = {

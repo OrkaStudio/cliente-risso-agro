@@ -1,7 +1,8 @@
 // Interpretar un mensaje con Haiku (tool use forzado) y leer comprobantes
 // reusando la Edge Function extraer-comprobante.
 
-import { HERRAMIENTA, limpiarInterpretacion, promptInterpretar } from '../_shared/wa/interpretar.ts'
+import { EntradaIncompleta, HERRAMIENTA, limpiarInterpretacion, promptInterpretar } from '../_shared/wa/interpretar.ts'
+import { leerServicio } from '../_shared/wa/servicios.ts'
 import type { Borrador, Contexto, Interpretacion } from '../_shared/wa/tipos.ts'
 
 const MODELO = 'claude-haiku-4-5'
@@ -15,7 +16,12 @@ export async function interpretar(
 ): Promise<{ interpretacion: Interpretacion; uso: Uso }> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) throw new Error('Falta ANTHROPIC_API_KEY')
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const prompt = promptInterpretar(texto, ctx, anterior)
+  const json = await leerServicio<{
+    content?: { type: string; input?: unknown }[]
+    usage?: { input_tokens: number; output_tokens: number }
+    stop_reason?: string
+  }>({ pedir: () => fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -24,21 +30,17 @@ export async function interpretar(
     },
     body: JSON.stringify({
       model: MODELO,
-      max_tokens: 400,
+      max_tokens: 4096,
       temperature: 0,
       tools: [HERRAMIENTA],
       tool_choice: { type: 'tool', name: HERRAMIENTA.name },
-      messages: [{ role: 'user', content: promptInterpretar(texto, ctx, anterior) }],
+      messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(25_000),
-  })
-  const json = (await res.json()) as {
-    content?: { type: string; input?: unknown }[]
-    usage?: { input_tokens: number; output_tokens: number }
-    error?: unknown
-  }
-  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${JSON.stringify(json.error ?? json)}`)
+  }) })
+  if (json.stop_reason === 'max_tokens') throw new EntradaIncompleta('No pude revisar el mensaje completo. Mandalo en partes más cortas; no guardé una parte sin avisarte. Tu pendiente se conserva.')
   const tool = json.content?.find((b) => b.type === 'tool_use')
+  if (!tool?.input) throw new EntradaIncompleta('No pude interpretar el mensaje completo. Tu pendiente se conserva; probá con un audio más corto o escribime lo que falta.')
   return {
     interpretacion: limpiarInterpretacion(tool?.input),
     uso: { entrada: json.usage?.input_tokens ?? 0, salida: json.usage?.output_tokens ?? 0 },
@@ -58,14 +60,12 @@ export async function transcribir(bytes: Uint8Array, mime: string, pista: string
   form.append('model', 'gpt-4o-mini-transcribe')
   form.append('language', 'es')
   form.append('prompt', pista)
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const json = await leerServicio<{ text?: string }>({ pedir: () => fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
     signal: AbortSignal.timeout(45_000),
-  })
-  const json = (await res.json().catch(() => ({}))) as { text?: string; error?: unknown }
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${JSON.stringify(json.error ?? json)}`)
+  }) })
   return (json.text ?? '').trim()
 }
 

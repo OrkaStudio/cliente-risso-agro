@@ -32,15 +32,15 @@ def send(text,kind):
     raise AssertionError('No llegó la respuesta '+kind)
 rows=send('En La Porteña vi un eléctrico cortado, pero no me acuerdo en qué potrero.', 'image')
 image=next(row for row in rows if row['type']=='image')
-assert image['image']['caption'].startswith('Vista satelital de referencia')
+assert not image['image']['caption'].startswith('Croquis')
 assert not any(row.get('interactive',{}).get('type')=='location_request_message' for row in rows)
 pending=lambda:db(f"select pendiente from wa_vinculo where id='{link}'")[0]['pendiente']
 p=pending();assert p and p['tipo'] in ['ubicacion','potrero']
-send('7B','interactive');assert pending()['tipo']=='propuesta'
+# Elegir el potrero ahora puede confirmar una observación única: no hacerlo en QA sin escrituras.
 send('cancelar','text');assert pending() is None
 after=h['snapshot']()
 assert all(after[key]==baseline[key] for key in ['observations','rain','expenses'])
 report={'version':expected,'resultado':'PASS','mapa_automatico_sin_pedido_previo':True,
-    'sin_solicitud_gps':True,'completa_por_nombre':True,'datos_campo_modificados':False}
+    'sin_solicitud_gps':True,'seleccion_con_guardado_probada_solo_local':True,'datos_campo_modificados':False}
 (root/'resultado.json').write_text(json.dumps(report,indent=2));persist()
 print(json.dumps(report))

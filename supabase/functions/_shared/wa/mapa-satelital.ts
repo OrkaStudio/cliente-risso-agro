@@ -5,8 +5,8 @@ const servicio = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Ima
 const atribucion = 'Fuente: Esri, Vantor, Earthstar Geographics y la comunidad GIS.'
 const limite = 4 * 1024 * 1024
 
-export function pedidoSatelital(datos: MapaCampo): string | null {
-  const geo = geometriaMapa(datos)
+export function pedidoSatelital(datos: MapaCampo, focoId?: string): string | null {
+  const geo = geometriaMapa(datos, focoId)
   if (!geo) return null
   // Bbox y raster tienen exactamente la misma proporción en Web Mercator.
   const params = new URLSearchParams({ bbox: geo.extent.join(','), bboxSR: '3857', imageSR: '3857',
@@ -16,12 +16,18 @@ export function pedidoSatelital(datos: MapaCampo): string | null {
 
 /** Sólo envía al proveedor el encuadre; no nombres, reportes, usuarios ni GPS. */
 export async function fondoSatelital(datos: MapaCampo, fetcher: typeof fetch = fetch): Promise<FondoSatelital | null> {
+  // El detalle recorta la misma referencia geográfica. Exportar parcelas muy
+  // pequeñas devolvió 500 «bytes» del proveedor; no inventar resolución adicional.
   const url = pedidoSatelital(datos)
   if (!url) return null
   const control = new AbortController()
-  const timeout = setTimeout(() => control.abort(), 15000)
+  const timeout = setTimeout(() => control.abort(), 25000)
   try {
-    const response = await fetcher(url, { signal: control.signal, redirect: 'error' })
+    let response = await fetcher(url, { signal: control.signal, redirect: 'error' })
+    if(response.status===429 || response.status>=500){
+      await response.body?.cancel().catch(()=>{})
+      response=await fetcher(url,{signal:control.signal,redirect:'error'})
+    }
     if (!response.ok || !response.headers.get('content-type')?.toLowerCase().startsWith('image/jpeg')) return null
     if (Number(response.headers.get('content-length')) > limite) return null
     const reader = response.body?.getReader()
@@ -43,6 +49,6 @@ export async function fondoSatelital(datos: MapaCampo, fetcher: typeof fetch = f
     if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[length - 2] !== 0xff || bytes[length - 1] !== 0xd9) return null
     let binary = ''
     for (let i = 0; i < length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192))
-    return { dataUri: `data:image/jpeg;base64,${btoa(binary)}`, atribucion }
+    return { dataUri: `data:image/jpeg;base64,${btoa(binary)}`, atribucion, extent: geometriaMapa(datos)!.extent }
   } catch { return null } finally { clearTimeout(timeout) }
 }

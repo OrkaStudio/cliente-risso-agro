@@ -8,9 +8,12 @@ export type Categoria = { id: string; nombre: string }
 /** Lo que el bot sabe de la empresa del número vinculado. */
 export type Contexto = {
   hoy: string
+  fechaMensaje?: string
   nombre: string | null
   campos: Campo[]
   categoriasGasto: Categoria[]
+  semanalHabilitado?: boolean
+  pilotoHabilitado?: boolean
 }
 
 export const INTENTS = [
@@ -70,6 +73,7 @@ export type Interpretacion = {
   periodo: 'semana' | 'mes' | 'anio' | null
   /** Sólo en "novedad": una por potrero. */
   observaciones: ObsInterpretada[]
+  otrosRegistros?: string[]
 }
 
 export type TipoBorrador =
@@ -128,6 +132,8 @@ export type Borrador = {
   fotoMediaId?: string | null
   periodo?: 'semana' | 'mes' | 'anio' | null
   observaciones?: ObsBorrador[]
+  sesionId?: string
+  cerrarSesion?: boolean
 }
 
 /** Qué le preguntó el bot al productor y todavía espera. */
@@ -146,7 +152,7 @@ export type Pendiente =
       obsIndex?: number
     }
   /** La recorrida espera la ubicación (o el nombre) del potrero donde está. */
-  | { tipo: 'ubicacion'; capturaId: string; borrador: Borrador; obsIndex?: number }
+  | { tipo: 'ubicacion'; capturaId: string; borrador: Borrador; obsIndex?: number; confirmaAlElegir?: boolean }
   /** Compartió la ubicación sin decir nada más: vale para el próximo mensaje. */
   | { tipo: 'ubicado'; capturaId: null; ubicado: Ubicado }
   | { tipo: 'categoria'; capturaId: string; borrador: Borrador }

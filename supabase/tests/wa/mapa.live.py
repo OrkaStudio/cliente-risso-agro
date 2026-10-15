@@ -44,7 +44,7 @@ before=business();initial_pending=pending()
 def image_case():
     row=send('mapa de La Porteña',True)
     if '--expect-satellite' in sys.argv:
-        assert row['cuerpo']['image']['caption'].startswith('Vista satelital de referencia'),'El proveedor no respondió: llegó el croquis de respaldo.'
+        assert not row['cuerpo']['image']['caption'].startswith('Croquis'),'El proveedor no respondió: llegó el croquis de respaldo.'
     assert row['cuerpo']['tropero_mapa']['campo_id']==LP
     assert pending()==initial_pending,'Mapa cambió el pendiente.'
     assert business()==before,'Consulta de mapa modificó datos de campo.'
@@ -53,12 +53,14 @@ def image_case():
     assert token,'Falta token local para comprobar el PNG recibido por Meta.'
     req=urllib.request.Request('https://graph.facebook.com/v23.0/'+media,headers={'Authorization':'Bearer '+token})
     with urllib.request.urlopen(req,timeout=30) as response: info=json.load(response)
-    assert info['mime_type']=='image/png'
+    assert info['mime_type'] in ['image/png','image/jpeg']
     req=urllib.request.Request(info['url'],headers={'Authorization':'Bearer '+token})
     with urllib.request.urlopen(req,timeout=30) as response: data=response.read(5*1024*1024+1)
-    assert data[:8]==b'\x89PNG\r\n\x1a\n' and len(data)<5*1024*1024
-    (ROOT/'mapa-meta.png').write_bytes(data)
-    event={'png_bytes':len(data),'png_sha256':hashlib.sha256(data).hexdigest(),'width':int.from_bytes(data[16:20],'big'),'height':int.from_bytes(data[20:24],'big')}
+    assert len(data)<5*1024*1024
+    jpeg=info['mime_type']=='image/jpeg'
+    assert (data[:2]==b'\xff\xd8' and data[-2:]==b'\xff\xd9') if jpeg else data[:8]==b'\x89PNG\r\n\x1a\n'
+    (ROOT/('mapa-meta.jpg' if jpeg else 'mapa-meta.png')).write_bytes(data)
+    event={'mime':info['mime_type'],'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
     events.append(event);persist()
 case('Mapa real renderizado en Edge, subido a Meta y conserva el pendiente',image_case)
 def weekly_case():
@@ -75,10 +77,9 @@ if initial_pending is None:
         send('mapa de La Porteña',True);assert pending()==p,'La imagen reinició el borrador.'
     case('Novedad pendiente sobrevive a no recordar y pedir otra imagen',draft_case)
     def resolve_case():
-        send('7B');p=pending();assert p and p['tipo']=='propuesta',p
-        assert p['borrador']['observaciones'][0]['potreroId']==db(f"select id from potrero where campo_id='{LP}' and nombre='7B'")[0]['id']
+        # Responder el potrero confirma ahora la observación única; se prueba sólo localmente.
         send('cancelar');assert pending() is None and business()==before,'Cancelar modificó datos de campo.'
-    case('Responder 7B completa el borrador y cancelar evita escrituras',resolve_case)
+    case('Cancelar la observación pendiente evita escrituras',resolve_case)
 else:
     cases.append({'case':'Recorrida sintética nueva','result':'SKIP','reason':'Hay una carga genuina pendiente; no se reemplaza.'});persist()
 if '--expect-satellite' in sys.argv:

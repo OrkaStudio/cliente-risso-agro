@@ -43,14 +43,16 @@ describe('Satélite georreferenciado para WhatsApp', () => {
   it('un proveedor sin conexión conserva la posibilidad de responder', async () => {
     expect(await fondoSatelital(campo, async () => { throw Error('sin red') })).toBeNull()
   })
-  it('el satélite incrustado conserva la leyenda y no tapa la foto con rellenos', () => {
+  it('el satélite conserva nombres y atribución, sin leyenda duplicada ni rellenos', () => {
     const r = svgMapa(campo, '2026-10-14', { dataUri: 'data:image/jpeg;base64,/9j/2Q==', atribucion: 'Fuente: Esri & colaboradores' })!
     expect(r.svg).toContain('<image ')
     expect(r.svg).toContain('Fuente: Esri &amp; colaboradores')
     expect(r.svg).toContain('7B'); expect(r.svg).toContain('stroke="#fff3b3"')
     expect(r.svg).not.toMatch(/<polygon [^>]*fill="(?!none)/)
     expect(r.svg).not.toMatch(/href="https?:/)
-    expect(r.svg).toContain('No requiere ubicación en vivo')
+    expect(r.svg).toContain('Imagen de referencia')
+    expect(r.svg).not.toContain('Todos los potreros')
+    expect(r.height).toBe(1220)
     expect(() => svgMapa(campo, '2026-10-14', { dataUri: 'https://ajeno.example/foto', atribucion: '' })).toThrow()
   })
   it('el croquis de respaldo avisa que el satélite falló sin descartar una carga', async () => {
@@ -59,6 +61,7 @@ describe('Satélite georreferenciado para WhatsApp', () => {
       render: async () => ({ bytes: new Uint8Array(), dibujados: 1, faltantes: [], satelital: false }),
       enviarImagen: async (_, text) => { caption = text }, responder: async () => {} })
     expect(caption).toContain('satélite no está disponible')
-    expect(caption).toContain('no hace falta repetir el audio ni compartir ubicación en vivo')
+    expect(caption).toContain('acercá')
+    expect(caption).not.toContain('referencia están en la lista')
   })
 })

@@ -93,6 +93,16 @@ export function resolverCategoria(mencion: string | null | undefined, cats: Cate
   )
 }
 
+/** Referencia explícita en comandos: «7B de La Porteña», sin adivinar el campo. */
+export function resolverReferenciaPotrero(mencion: string, campos: Campo[], campoId?: string | null): Resultado<PotreroDe> {
+  const directo = resolverPotrero(mencion, campos, campoId)
+  if ('ok' in directo) return directo
+  const partes = norm(mencion).match(/^(.+?) (?:de|del) (?:campo )?(.+)$/)
+  if (!partes) return directo
+  const campo = campoExacto(partes[2], campos)
+  return campo ? resolverPotrero(partes[1], campos, campo.id) : { ninguno: true }
+}
+
 export function campoPorId(campos: Campo[], id: string | null | undefined): Campo | null {
   return campos.find((c) => c.id === id) ?? null
 }

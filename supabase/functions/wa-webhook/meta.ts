@@ -100,10 +100,13 @@ export function payloadImagen(to: string, mediaId: string, caption: string): Rec
 }
 
 export async function subirImagen(bytes: Uint8Array, filename: string): Promise<string> {
-  if (bytes.length > 5 * 1024 * 1024 || bytes.length < 8 || bytes[0] !== 137 || bytes[1] !== 80 || bytes[2] !== 78 || bytes[3] !== 71) throw new Error('Imagen PNG inválida o demasiado grande')
+  const esJpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[bytes.length - 2] === 255 && bytes[bytes.length - 1] === 217
+  const esPng = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71
+  if (bytes.length > 5 * 1024 * 1024 || bytes.length < 8 || (!esJpeg && !esPng)) throw new Error('Imagen inválida o demasiado grande')
+  const mime = esJpeg ? 'image/jpeg' : 'image/png'
   const form = new FormData()
-  form.set('messaging_product', 'whatsapp'); form.set('type', 'image/png')
-  form.set('file', new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'image/png' }), filename)
+  form.set('messaging_product', 'whatsapp'); form.set('type', mime)
+  form.set('file', new Blob([bytes as Uint8Array<ArrayBuffer>], { type: mime }), filename)
   const res = await fetch(`${GRAPH}/${phoneId()}/media`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form, signal: AbortSignal.timeout(30_000) })
   const json = await res.json() as { id?: string; error?: { code?: number } }
   if (!res.ok || !json.id) throw new Error(`Meta imagen ${res.status} / ${json.error?.code ?? 'sin id'}`)

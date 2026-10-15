@@ -45,10 +45,10 @@ describe('lo que devuelve el modelo', () => {
       obs({ potrero: '3', conteo: 80, electrico: 'cortado' }),
     ])
   })
-  it('sólo la novedad trae observaciones, y como mucho 12', () => {
+  it('sólo la novedad trae observaciones, sin perder la decimotercera', () => {
     expect(limpiarInterpretacion({ intent: 'lluvia', observaciones: [{ novedad: 'x' }] }).observaciones).toEqual([])
     const muchas = Array.from({ length: 20 }, (_, i) => ({ potrero: String(i + 1), novedad: 'ok' }))
-    expect(limpiarInterpretacion({ intent: 'novedad', observaciones: muchas }).observaciones).toHaveLength(12)
+    expect(limpiarInterpretacion({ intent: 'novedad', observaciones: muchas }).observaciones).toHaveLength(20)
   })
   it('una novedad sin nada que anotar pide que cuente qué vio', () => {
     expect(arrancar(novedad([]), ctx)).toEqual({ respuesta: NOVEDAD_SIN_DATOS, estado: 'respondida' })
@@ -145,10 +145,11 @@ describe('«acá»: el potrero sale de la ubicación', () => {
     const paso = siguientePaso('c', borrador(aca), ctx)
     if (paso.k !== 'preguntar') throw new Error('Debe preguntar')
     expect(paso.mensaje).toEqual({
-      texto: '¿En qué potrero pasó? Mirá el mapa y escribí el nombre; conservé lo que contaste.',
+      texto: '¿A qué potrero corresponde «el molino no anda»? Al responder con el nombre, guardo esta observación de hoy.',
       botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }],
     })
     expect(paso.pendiente.tipo).toBe('ubicacion')
+    expect(paso.pendiente).toMatchObject({confirmaAlElegir:true})
   })
 
   it('sin nombrar potrero conserva el audio y ofrece el mapa', () => {

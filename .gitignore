@@ -57,3 +57,4 @@ auditoria-shots/
 /.playwright-cli/
 /output/playwright/
 /supabase/.temp/
+/supabase/tests/wa/piloto/resultado.json

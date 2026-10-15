@@ -27,13 +27,13 @@ export function leerBoton(id: string): { capturaId: string; accion: string } | n
 export const QUE_PUEDO =
   'Puedo anotar *lluvias* y *gastos*, y consultar *hacienda*, *lluvia medida*, *vencimientos* y *días en un potrero*. Para cargar movimientos de hacienda, usá la app.'
 
-export function ayuda(nombre: string | null): string {
-  return `¡Hola${nombre ? `, ${nombre}` : ''}! Puedo anotar lluvia, gastos y recorridas por texto o audio, y leer tickets por foto. También consultar hacienda, vencimientos, gastos, novedades, tus últimas cargas y qué falta recorrer. Para reconocer los potreros, pedime «mapa». Para recibir el documento de la semana, pedime «resumen semanal». ¿Qué necesitás?`
+export function ayuda(nombre: string | null, opciones: { semanalHabilitado?: boolean; pilotoHabilitado?: boolean } = {}): string {
+  return `Hola${nombre ? `, ${nombre}` : ''}. Mandame un audio con la recorrida, lluvia o un gasto; también puedo leer la foto de un ticket. Para ver los potreros, escribí «mapa» o «acercá» y el nombre del potrero. Podés consultar lo registrado y tus últimas cargas.${opciones.semanalHabilitado ? ' Para el documento de la semana, pedime «resumen semanal».' : ''}${opciones.pilotoHabilitado ? ' También: «empezar recorrida», «tareas», «problemas», «comparar recorridas» y «corregir última carga».' : ''}`
 }
 
 /** Pedir orientación nunca descarta una propuesta ni reinicia la conversación. */
 export function ayudaConPendiente(p: Pendiente | null, ctx: Contexto): string {
-  const base = ayuda(ctx.nombre)
+  const base = ayuda(ctx.nombre, ctx) + ' Para hablar con el equipo, escribí «soporte».'
   if (!p || p.tipo === 'ubicado') return base
   const asunto = p.borrador.tipo === 'recorrida' ? 'la recorrida' : p.borrador.tipo === 'lluvia' ? 'la lluvia' : p.borrador.tipo === 'gasto' ? 'el gasto' : 'la consulta'
   return `${base}\n\nSigue pendiente ${asunto}. Podés responder la pregunta anterior o escribir «cancelar».`
@@ -100,12 +100,16 @@ function campoDelMensaje(it0: Interpretacion, ctx: Contexto, texto?: string): In
   return campo ? { ...it, campo: campo.nombre } : it
 }
 
+/** Sin fecha dicha, el registro es del día en que llegó el mensaje, no del día en que se procesó.
+ * El borrador no la fija al arrancar: una recorrida por partes abierta decide la suya. */
+const fechaBase = (ctx: Contexto): string => ctx.fechaMensaje ?? ctx.hoy
+
 /** Las fechas explícitas del productor prevalecen sobre las omisiones del modelo. */
 function fechaDelMensaje(it: Interpretacion, ctx: Contexto, texto?: string, tipo: string = it.intent): Interpretacion {
-  if (!texto || !['lluvia', 'gasto'].includes(tipo)) return it
+  if (!texto || !['lluvia', 'gasto', 'novedad', 'recorrida'].includes(tipo)) return it
   const t = norm(texto)
   const relativos: Record<string, number> = { 'pasado manana': 2, manana: 1, hoy: 0, ayer: -1, anteayer: -2 }
-  const fechas = [...t.matchAll(/\b(pasado manana|manana|anteayer|ayer|hoy)\b/g)].map((m) => sumarDias(ctx.hoy, relativos[m[1]]))
+  const fechas = [...t.matchAll(/\b(pasado manana|manana|anteayer|ayer|hoy)\b/g)].map((m) => sumarDias(fechaBase(ctx), relativos[m[1]]))
   fechas.push(...[...t.matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].map((m) => m[0]))
   const distintas = [...new Set(fechas)]
   if (!distintas.length) return it
@@ -136,6 +140,7 @@ function obsDesde(o: ObsInterpretada, it: Interpretacion, r: Recorriendo): ObsBo
 
 export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: Recorriendo = {}): Arranque {
   const it = fechaDelMensaje(campoDelMensaje(it0, ctx, texto), ctx, texto)
+  if (it.otrosRegistros?.length) return { respuesta: 'Escuché más de un tipo de carga. Mandame la lluvia, el gasto y la recorrida en mensajes separados para no dejar nada afuera. No guardé este mensaje; tu pendiente anterior se conserva.', estado: 'respondida' }
   if (['otro', 'no_soportado'].includes(it.intent) && texto) {
     const mencionado = norm(texto).match(/^en (?:el )?(?:potrero )?(\d+[a-z]?)\b/)
     if (mencionado && 'ninguno' in resolverPotrero(mencionado[1], ctx.campos, null))
@@ -173,6 +178,8 @@ export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: 
       return {
         borrador: {
           tipo: 'recorrida',
+          fecha: it.fecha,
+          fechaInvalida: it.fechaInvalida,
           campoId: r.ubicado?.campoId ?? r.campoHoy ?? null,
           observaciones: it.observaciones.map((o) => obsDesde(o, it, r)),
         },
@@ -184,7 +191,7 @@ export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: 
     case 'ayuda_lluvia':
       return { respuesta: ayudaLluvia(ctx), estado: 'respondida' }
     case 'saludo':
-      return { respuesta: ayuda(ctx.nombre), estado: 'respondida' }
+      return { respuesta: ayuda(ctx.nombre, ctx), estado: 'respondida' }
     default:
       return { respuesta: NO_SE, estado: 'descartada' }
   }
@@ -364,7 +371,7 @@ function opciones(capturaId: string, items: Boton[], texto: string, boton: strin
 function preguntarCampo(
   capturaId: string, b: Borrador, campos: Campo[], texto: string, notas: string[], ctx: Contexto, aviso = '',
 ): Paso {
-  const lluvia = { ...b, fecha: b.fecha ?? ctx.hoy }
+  const lluvia = { ...b, fecha: b.fecha ?? fechaBase(ctx) }
   const confirma = lluviaLista(lluvia, ctx)
   const pendiente: Pendiente = confirma
     ? { tipo: 'campo', capturaId, borrador: lluvia, confirmaAlElegir: true, camposOfrecidos: campos.map((c) => c.id) }
@@ -424,7 +431,7 @@ function preguntarPotrero(
 
 export function textoPropuesta(b: Borrador, ctx: Contexto): string {
   const campo = campoPorId(ctx.campos, b.campoId)?.nombre ?? ''
-  const cuando = cuandoTexto(b.fecha ?? ctx.hoy, ctx.hoy)
+  const cuando = cuandoTexto(b.fecha ?? fechaBase(ctx), ctx.hoy)
   if (b.tipo === 'lluvia') return `Anoto *${mmTexto(b.mm ?? 0)} mm en ${campo}*, ${cuando}.`
   const cat = ctx.categoriasGasto.find((c) => c.id === b.categoriaId)?.nombre ?? ''
   const partes = [
@@ -481,6 +488,13 @@ function textoRecorrida(obs: ObsBorrador[], ctx: Contexto, aviso: string, fecha:
   return `${aviso}Anoto en la recorrida de ${cuandoTexto(fecha, ctx.hoy)}:\n${cuerpo}${baja}`
 }
 
+export function preguntaRecorrida(p: Pendiente, ctx: Contexto): string {
+  if (p.tipo !== 'ubicacion') return '¿A qué potrero corresponde lo que contaste? Respondé con el nombre, por texto o audio.'
+  const obs=p.borrador.observaciones?.[p.obsIndex ?? 0]
+  const detalle=obs ? detalleObs(obs) : 'lo que contaste'
+  return `¿A qué potrero corresponde «${corto(detalle,220)}»?${p.confirmaAlElegir ? ` Al responder con el nombre, guardo esta observación de ${cuandoTexto(p.borrador.fecha ?? fechaBase(ctx),ctx.hoy)}.` : ' Respondé con el nombre, por texto o audio.'}`
+}
+
 /**
  * Cada observación necesita su potrero: por nombre (el campo de la recorrida
  * desempata), por la ubicación si dijo "acá", o preguntando si hay más de uno.
@@ -488,12 +502,21 @@ function textoRecorrida(obs: ObsBorrador[], ctx: Contexto, aviso: string, fecha:
  */
 function pasoRecorrida(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
   const notas: string[] = []
+  if (b0.fechaInvalida || (b0.fecha && (!esFecha(b0.fecha) || b0.fecha > ctx.hoy)))
+    return { k: 'preguntar', mensaje: { texto: '¿Qué día hiciste la recorrida? Decime hoy o una fecha anterior.' }, pendiente: { tipo: 'corregir', capturaId, borrador: b0 }, notas }
   const noEncontrados: string[] = []
   const quedan: ObsBorrador[] = []
   let ambigua: { i: number; candidatos: PotreroDe[]; mencion: string } | null = null
 
   for (const o0 of b0.observaciones ?? []) {
     const o = { ...o0 }
+    if(o.potreroId){
+      const conocido=potreroPorId(ctx.campos,o.potreroId)
+      if(!conocido || (o.campoId && o.campoId!==conocido.campo.id)){
+        noEncontrados.push(o.potreroMencion ?? 'un potrero no disponible');notas.push('Referencia de potrero/campo no autorizada.');continue
+      }
+      o.campoId=conocido.campo.id
+    }
     if (!o.potreroId && o.potreroMencion) {
       const campoNombrado = o.campoId ?? (o.campoMencion ? campoExacto(o.campoMencion, ctx.campos)?.id ?? null : null)
       let r = resolverPotrero(o.potreroMencion, ctx.campos, campoNombrado ?? b0.campoId)
@@ -508,7 +531,7 @@ function pasoRecorrida(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
     quedan.push(o)
   }
 
-  const b: Borrador = { ...b0, fecha: b0.fecha ?? ctx.hoy, observaciones: quedan }
+  const b: Borrador = { ...b0, fecha: b0.fecha ?? fechaBase(ctx), observaciones: quedan }
   const aviso = noEncontrados.length
     ? `No encontré ${noEncontrados.length === 1 ? 'el potrero' : 'los potreros'} «${noEncontrados.join('», «')}»: eso no lo anoto. `
     : ''
@@ -517,10 +540,11 @@ function pasoRecorrida(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
     return { k: 'decir', mensaje: { texto: `${aviso}Decime el potrero como figura en la app.`.trim() }, notas }
   }
   if (quedan.some((o) => o.aca && !o.potreroId)) {
+    const pendiente: Pendiente = { tipo: 'ubicacion', capturaId, borrador: b, obsIndex: quedan.findIndex(o => o.aca && !o.potreroId), confirmaAlElegir: quedan.length === 1 && !b.sesionId }
     return {
       k: 'preguntar',
-      mensaje: { texto: `${aviso}¿En qué potrero pasó? Mirá el mapa y escribí el nombre; conservé lo que contaste.`, botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] },
-      pendiente: { tipo: 'ubicacion', capturaId, borrador: b, obsIndex: quedan.findIndex(o => o.aca && !o.potreroId) },
+      mensaje: { texto: `${aviso}${preguntaRecorrida(pendiente,ctx)}`, botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] },
+      pendiente,
       notas,
     }
   }
@@ -650,7 +674,7 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
         notas,
       }
     }
-    b.fecha = b.fecha ?? ctx.hoy
+    b.fecha = b.fecha ?? fechaBase(ctx)
     return {
       k: 'proponer',
       borrador: b,
