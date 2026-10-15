@@ -58,8 +58,9 @@ export function noRecuerdaPotrero(texto: string, p: Pendiente | null): boolean {
   return Boolean(p && ['potrero', 'ubicacion'].includes(p.tipo) && /^(?:no (?:me acuerdo|recuerdo|se)|no estoy seguro|no estoy segura)(?: (?:el|del|que|en que)?\s*potrero)?[.!?\s]*$/.test(norm(texto)))
 }
 
-/** Infraestructura del campo. Se nombra como la dice el productor: tipo + potrero («Molino 9B»). */
-export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; punto?: [number, number]; linea?: [number, number][]; falla?: string | null }
+/** Infraestructura del campo. El bot la encuentra por tipo + potrero («el molino del 9B»);
+ * en la imagen basta el tipo, porque el potrero ya se ve. El apodo sólo distingue dos iguales. */
+export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; apodo?: string | null; punto?: [number, number]; linea?: [number, number][]; falla?: string | null }
 export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
 
 export type MapaIO = {

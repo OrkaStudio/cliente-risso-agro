@@ -43,6 +43,9 @@ const GLIFO: Record<ElementoMapa['tipo'], string> = {
   tranquera: '<path d="M-11-8v16M11-8v16M-11-5h22M-11 0h22M-11 5h22M-11 5L11-5" fill="none" stroke-width="2.4"/>',
   electrico: '<path d="M2.5-12.5L-7.5 2h6.5l-3 10.5 10.5-15h-6.5z"/>',
 }
+const TIPO: Record<ElementoMapa['tipo'], string> = { molino: 'Molino', tanque: 'Tanque', bebedero: 'Bebedero', energizador: 'Energizador', tranquera: 'Tranquera', electrico: 'Eléctrico' }
+/** El potrero ya se lee en la imagen: el cartel lleva el tipo y, si hace falta, el apodo. */
+const etiqueta = (e: ElementoMapa) => e.apodo ? `${TIPO[e.tipo]} ${e.apodo}` : TIPO[e.tipo]
 type Caja = { x: number; y: number; w: number; h: number }
 /** Puntos y líneas de infraestructura. Las fallas se marcan en rojo con su texto al lado: sin referencias numeradas. */
 function capaInfraestructura(lista: ElementoMapa[], point: (p: Pt) => Pt, acercado: boolean, limites: Caja) {
@@ -72,7 +75,7 @@ function capaInfraestructura(lista: ElementoMapa[], point: (p: Pt) => Pt, acerca
   const textos = (ocupados: Caja[]) => conIcono.flatMap(({ e, at }) => {
     const falla = Boolean(e.falla), r = radio(e)
     if (!falla && !acercado) return []
-    const texto = falla ? `${e.nombre}: ${e.falla}` : e.nombre
+    const texto = falla ? `${etiqueta(e)}: ${e.falla}` : etiqueta(e)
     const size = falla ? (acercado ? 30 : 28) : 22, filas = lines(texto, falla ? 34 : 24)
     const w = Math.min(560, Math.max(...filas.map(f => f.length)) * size * .56 + 22), h = filas.length * (size + 4) + 12
     const cerca = [[r + 14, -h / 2], [-r - 14 - w, -h / 2], [-w / 2, r + 12], [-w / 2, -r - 12 - h], [r + 10, r + 6], [-r - 10 - w, -r - 6 - h], [r + 10, -r - 6 - h], [-r - 10 - w, r + 6]]
