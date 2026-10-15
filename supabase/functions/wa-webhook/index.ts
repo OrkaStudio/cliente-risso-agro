@@ -236,11 +236,6 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     const mapa = comandoMapa(texto, botonId)
     if (mapa) { await mostrarMapa(v, ctx, pendiente, mapa); return }
     if (await atenderInfra({ v, ctx, mensajeId, texto, botonId, pendiente: pendienteInfra ?? pendiente, entrada: porAudio ? 'audio' : botonId ? 'boton' : 'texto' }, ioInfra)) return
-    // Una propuesta de inventario sin responder no bloquea lo que venga después.
-    if (pendienteInfra) {
-      if (pendienteInfra.capturaId) await abandonar(pendienteInfra.capturaId)
-      await db.guardarPendiente(v.id, null)
-    }
     if (!botonId && noRecuerdaPotrero(texto, pendiente)) {
       await db.guardarPendiente(v.id, pendiente)
       await responder(v, m.from, { texto: 'Conservé la observación pendiente de ubicar. Podés pedirme «mapa» y responder con el potrero cuando lo reconozcas; no hace falta repetir el audio.', botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] })
@@ -273,7 +268,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     const l = leer({ texto, botonId }, pendiente, ctx)
     switch (l.k) {
       case 'ayuda':
-        await responder(v, m.from, { texto: ayudaConPendiente(pendiente, ctx) })
+        await responder(v, m.from, { texto: ayudaConPendiente(pendiente, ctx) + (pendienteInfra ? '\n\nSigue pendiente la carga de infraestructura. Podés responder la pregunta anterior o escribir «cancelar».' : '') })
         return
       case 'viejo': {
         const guardada = await db.verificarCargaDeCaptura(v, l.capturaId).catch(() => null)
@@ -358,7 +353,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
             await db.actualizarCaptura(capturaId, { estado: 'respondida' })
             return
           }
-          if (pendiente?.capturaId) {
+          if (pendiente?.capturaId || pendienteInfra) {
             await responder(v, m.from, { texto: 'Para esa consulta, incluí el campo o potrero en el mismo mensaje. Conservé tu carga pendiente.' })
             return
           }
@@ -370,6 +365,12 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
             if (b.fecha && b.fecha!==s.fecha) throw new EntradaIncompleta(`La sesión es del ${s.fecha}. Pausala antes de registrar una recorrida de otro día.`)
             b=fusionarRecorrida({...s.borrador,sesionId:s.id,campoId:s.campo_id,fecha:s.fecha},{...b,campoId:s.campo_id})
           }
+        }
+        // Sólo una nueva carga entendida reemplaza el inventario pendiente.
+        // Ayuda, consultas, mensajes incompletos y fallos de IA lo conservan.
+        if (pendienteInfra) {
+          if (pendienteInfra.capturaId) await abandonar(pendienteInfra.capturaId)
+          await db.guardarPendiente(v.id, null)
         }
         if (l.abandona) await abandonar(l.abandona)
         await avanzar(v, ctx, capturaId, b, [], mensajeId)

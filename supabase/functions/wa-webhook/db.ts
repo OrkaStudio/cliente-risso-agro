@@ -658,3 +658,59 @@ export function borrarInfra(v: Vinculo, id: string): Promise<boolean> {
   return comoUsuario(v.user_id, async (tx) => (await tx`delete from infraestructura where id = ${id} and empresa_id = ${v.empresa_id} returning id`).length === 1)
 }
 
+type PropuestaInfra = (InfraNueva & { carga: 'infraestructura' }) | { carga: 'infraestructura_baja'; id: string; nombre: string }
+export type ResultadoInfra = 'guardada' | 'borrada' | 'ya_guardada' | 'ya_borrada' | 'no_existe' | 'incierta' | 'vieja'
+
+/** La propuesta y el dato se confirman juntos. El bloqueo serializa incluso dos
+ * instancias del webhook; una excepción revierte ambos y deja reintentar.
+ * El rol técnico sólo administra captura/pendiente: el inventario usa RLS. */
+export function confirmarInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'borrar'): Promise<ResultadoInfra> {
+  return operarInfra(v, capturaId, accion, true)
+}
+export function resultadoInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'borrar'): Promise<ResultadoInfra> {
+  return operarInfra(v, capturaId, accion, false)
+}
+async function operarInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'borrar', ejecutar: boolean): Promise<ResultadoInfra> {
+  if (!/^[0-9a-f-]{36}$/i.test(capturaId)) return 'vieja'
+  return await sql.begin(async tx => {
+    const [c] = await tx<{ estado: string; escrito_tabla: string | null; escrito_id: string | null; propuesta: PropuestaInfra }[]>`
+      select c.estado,c.escrito_tabla,c.escrito_id,c.propuesta from captura c join wa_mensaje m on m.id=c.mensaje_id
+      where c.id=${capturaId} and c.user_id=${v.user_id} and c.empresa_id=${v.empresa_id}
+        and m.vinculo_id=${v.id} and m.empresa_id=${v.empresa_id} for update of c`
+    if (!c || c.propuesta?.carga !== (accion === 'guardar' ? 'infraestructura' : 'infraestructura_baja')) return 'vieja'
+    if (c.estado !== 'propuesta' && c.estado !== 'confirmada') return 'vieja'
+    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: v.user_id, role: 'authenticated' })}, true)`
+    await tx.unsafe('set local role authenticated')
+    const acceso = await tx`select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
+    if (!acceso.length) throw new Error('El vínculo ya no tiene acceso a esta empresa')
+    if (c.estado === 'confirmada') {
+      // Las versiones anteriores podían marcar confirmada antes de escribir.
+      // No adivinar éxito ni repetir una operación cuyo resultado no consta.
+      if (c.escrito_tabla !== 'infraestructura' || !c.escrito_id) return 'incierta'
+      const existe = await tx`select id from infraestructura where id=${c.escrito_id} and empresa_id=${v.empresa_id}`
+      if (accion === 'guardar') return existe.length ? 'ya_guardada' : 'incierta'
+      return !existe.length && c.propuesta.carga === 'infraestructura_baja' && c.escrito_id === c.propuesta.id ? 'ya_borrada' : 'incierta'
+    }
+    if (!ejecutar) return 'vieja'
+    let escritoId: string, resultado: ResultadoInfra
+    if (c.propuesta.carga === 'infraestructura') {
+      const e = c.propuesta
+      const [r] = await tx<{ id: string }[]>`insert into infraestructura (empresa_id,campo_id,tipo,apodo,lat,lng,linea)
+        values (${v.empresa_id},${e.campoId},${e.tipo}::public.tipo_infraestructura,${e.apodo},${e.lat},${e.lng},
+          ${e.linea ? sql.json(e.linea as postgres.JSONValue) : null}) returning id`
+      escritoId = r.id; resultado = 'guardada'
+    } else {
+      escritoId = c.propuesta.id
+      const eliminada = await tx`delete from infraestructura where id=${escritoId} and empresa_id=${v.empresa_id} returning id`
+      resultado = eliminada.length ? 'borrada' : 'no_existe'
+    }
+    await tx.unsafe('reset role')
+    await tx`update captura set estado=${resultado === 'no_existe' ? 'error' : 'confirmada'}::estado_captura,
+      escrito_tabla='infraestructura',escrito_id=${escritoId},updated_at=now() where id=${capturaId}`
+    // No borrar una propuesta distinta que haya llegado mientras se confirmaba.
+    await tx`update wa_vinculo set pendiente=null,pendiente_at=null where id=${v.id} and empresa_id=${v.empresa_id}
+      and pendiente->>'capturaId'=${capturaId}`
+    return resultado
+  }) as ResultadoInfra
+}
+

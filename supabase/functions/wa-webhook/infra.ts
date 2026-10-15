@@ -42,17 +42,18 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
     }
     if (accion === 'no') { await cancelar(e, io); return true }
     if (p?.tipo !== 'infra' || p.paso === 'tipo' || p.capturaId !== valor) {
-      // Un segundo toque al mismo botón: decir que ya está hecho, no que es viejo.
-      const hecho = valor && await db.estadoCaptura(valor) === 'confirmada'
-      await io.responder({ texto: hecho ? (accion === 'borrar' ? 'Eso ya se borró. No hice nada más.' : 'Eso ya está guardado. No lo cargué otra vez.') : 'Ese botón es de una propuesta anterior. No cambié nada.' }); return true
+      // Un botón viejo sólo consulta el resultado; nunca ejecuta otra propuesta.
+      const resultado = valor && (accion === 'si' || accion === 'borrar')
+        ? await db.resultadoInfra(e.v, valor, accion === 'si' ? 'guardar' : 'borrar') : 'vieja'
+      await io.responder({ texto: respuestaInfra(resultado || 'vieja') }); return true
     }
     if (accion === 'si' && p.paso === 'confirmar') { await guardar(e, io, p.capturaId, p.elemento); return true }
-    if (accion === 'borrar' && p.paso === 'borrar') { await borrar(e, io, p.capturaId, p.id, p.nombre); return true }
+    if (accion === 'borrar' && p.paso === 'borrar') { await borrar(e, io, p.capturaId, p.nombre); return true }
     await io.responder({ texto: 'Ese botón es de una propuesta anterior. No cambié nada.' }); return true
   }
   if (e.botonId) return false
   if (p?.tipo === 'infra' && (p.paso === 'confirmar' || p.paso === 'borrar')) {
-    if (SI.test(t)) { if (p.paso === 'confirmar') await guardar(e, io, p.capturaId, p.elemento); else await borrar(e, io, p.capturaId, p.id, p.nombre); return true }
+    if (SI.test(t)) { if (p.paso === 'confirmar') await guardar(e, io, p.capturaId, p.elemento); else await borrar(e, io, p.capturaId, p.nombre); return true }
     if (NO.test(t)) { await cancelar(e, io); return true }
   }
   if (p?.tipo === 'infra' && p.paso === 'ubicacion' && NO.test(t)) { await cancelar(e, io); return true }
@@ -125,20 +126,24 @@ async function proponer(e: EntradaInfra, io: IOInfra, elemento: InfraNueva, preg
 }
 
 async function guardar(e: EntradaInfra, io: IOInfra, capturaId: string, elemento: InfraNueva) {
-  if (!(await db.tomarPropuesta(capturaId))) { await io.responder({ texto: 'Eso ya está guardado. No lo cargué otra vez.' }); return }
-  const id = await db.guardarInfra(e.v, elemento)
-  await db.actualizarCaptura(capturaId, { escritoTabla: 'infraestructura', escritoId: id })
-  await db.guardarPendiente(e.v.id, null)
-  await io.responder({ texto: `Listo, guardé ${articulo(elemento.tipo)} *${elemento.nombre}*. Ya aparece en el mapa. Para cargar otra cosa, mandá su ubicación.` })
+  const resultado = await db.confirmarInfra(e.v, capturaId, 'guardar')
+  await io.responder({ texto: resultado === 'guardada'
+    ? `Listo, guardé ${articulo(elemento.tipo)} *${elemento.nombre}*. Ya aparece en el mapa. Para cargar otra cosa, mandá su ubicación.`
+    : respuestaInfra(resultado) })
 }
 
-async function borrar(e: EntradaInfra, io: IOInfra, capturaId: string, id: string, nombre: string) {
-  if (!(await db.tomarPropuesta(capturaId))) { await io.responder({ texto: 'Eso ya se borró. No hice nada más.' }); return }
-  const ok = await db.borrarInfra(e.v, id)
-  await db.actualizarCaptura(capturaId, ok ? { escritoTabla: 'infraestructura', escritoId: id, notas: ['Baja confirmada.'] } : { estado: 'error', notas: ['No estaba para borrar.'] })
-  await db.guardarPendiente(e.v.id, null)
+async function borrar(e: EntradaInfra, io: IOInfra, capturaId: string, nombre: string) {
+  const resultado = await db.confirmarInfra(e.v, capturaId, 'borrar')
   const art = /^tranquera/.test(nombre) ? 'la' : 'el'
-  await io.responder({ texto: ok ? `Listo, borré ${art} *${nombre}*.` : `No encontré ${art} *${nombre}* para borrarlo; puede que ya no esté.` })
+  await io.responder({ texto: resultado === 'borrada' ? `Listo, borré ${art} *${nombre}*.` : resultado === 'no_existe'
+    ? `No encontré ${art} *${nombre}* para borrarlo; puede que ya no esté.` : respuestaInfra(resultado) })
+}
+
+function respuestaInfra(resultado: db.ResultadoInfra): string {
+  if (resultado === 'ya_guardada') return 'Eso ya está guardado. No lo cargué otra vez.'
+  if (resultado === 'ya_borrada') return 'Eso ya se borró. No hice nada más.'
+  if (resultado === 'incierta') return 'No pude comprobar el resultado de esa carga. No la repetí. Escribí «soporte» para que la revisemos.'
+  return 'Ese botón es de una propuesta anterior. No cambié nada.'
 }
 
 async function cancelar(e: EntradaInfra, io: IOInfra) {
