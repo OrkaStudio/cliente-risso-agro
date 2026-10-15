@@ -58,7 +58,9 @@ export function noRecuerdaPotrero(texto: string, p: Pendiente | null): boolean {
   return Boolean(p && ['potrero', 'ubicacion'].includes(p.tipo) && /^(?:no (?:me acuerdo|recuerdo|se)|no estoy seguro|no estoy segura)(?: (?:el|del|que|en que)?\s*potrero)?[.!?\s]*$/.test(norm(texto)))
 }
 
-export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[] }
+/** Infraestructura del campo. Se nombra como la dice el productor: tipo + potrero («Molino 9B»). */
+export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; punto?: [number, number]; linea?: [number, number][]; falla?: string | null }
+export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
 
 export type MapaIO = {
   datos: (campoId: string) => Promise<MapaCampo | null>
@@ -78,8 +80,10 @@ export async function atenderMapa(campo: Campo, io: MapaIO, pregunta?: string): 
   }
   const incompleto = imagen.faltantes.length ? ` Sin dibujo: ${imagen.faltantes.join(', ')}.` : ''
   const respaldo = imagen.satelital ? '' : 'Croquis: el satélite no está disponible ahora. '
+  const abiertas = datos.infraestructura?.filter(e => e.falla).length ?? 0
+  const fallas = abiertas ? `\nEn rojo: ${abiertas === 1 ? 'un problema abierto' : `${abiertas} problemas abiertos`}.` : ''
   const problemas = datos.alertas?.length ? '\nEl borde rojo indica potreros con problemas abiertos. Para verlos, escribí «problemas».' : ''
-  const caption = `${respaldo}${pregunta ?? `${datos.nombre}. Para ver un detalle, escribí «acercá» y el nombre del potrero.`}${incompleto}${problemas}`
+  const caption = `${respaldo}${pregunta ?? `${datos.nombre}. Para ver un detalle, escribí «acercá» y el nombre del potrero.`}${incompleto}${fallas}${problemas}`
   await io.enviarImagen(imagen.bytes, [...caption].slice(0, 1024).join(''), campo.id, imagen.bytes[0] === 255 ? 'image/jpeg' : 'image/png')
   return true
 }

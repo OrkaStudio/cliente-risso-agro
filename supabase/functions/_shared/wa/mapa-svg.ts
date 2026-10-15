@@ -1,4 +1,4 @@
-import type { MapaCampo } from './mapa.ts'
+import type { ElementoMapa, MapaCampo } from './mapa.ts'
 type Pt = [number, number]
 const xml = (s: string) => [...s].filter(c => { const n = c.codePointAt(0)!; return n >= 32 || n === 9 || n === 10 || n === 13 }).join('').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 export function poligonoMapa(value: unknown): Pt[] | null {
@@ -33,6 +33,61 @@ function interior(poly: Pt[]): Pt {
     if (nearest > distance) { distance = nearest; best = p }
   }
   return best
+}
+// Glifos en una caja de ±12, dibujados en el color del ícono.
+const GLIFO: Record<ElementoMapa['tipo'], string> = {
+  molino: '<path d="M0 0L-3.5-12h7ZM0 0L12-3.5v7ZM0 0L3.5 12h-7ZM0 0L-12 3.5v-7Z"/><circle r="2.5"/>',
+  tanque: '<circle r="9.5" fill="none" stroke-width="3.2"/><circle r="3.6"/>',
+  bebedero: '<rect x="-11.5" y="-5.5" width="23" height="11" rx="2.5" fill="none" stroke-width="3.2"/><path d="M-7 1h14" stroke-width="2.6"/>',
+  energizador: '<path d="M2.5-12.5L-7.5 2h6.5l-3 10.5 10.5-15h-6.5z"/>',
+  tranquera: '<path d="M-11-8v16M11-8v16M-11-5h22M-11 0h22M-11 5h22M-11 5L11-5" fill="none" stroke-width="2.4"/>',
+  electrico: '<path d="M2.5-12.5L-7.5 2h6.5l-3 10.5 10.5-15h-6.5z"/>',
+}
+type Caja = { x: number; y: number; w: number; h: number }
+/** Puntos y líneas de infraestructura. Las fallas se marcan en rojo con su texto al lado: sin referencias numeradas. */
+function capaInfraestructura(lista: ElementoMapa[], point: (p: Pt) => Pt, acercado: boolean, limites: Caja) {
+  const lineas: string[] = [], iconos: string[] = [], cajas: Caja[] = []
+  // En el teléfono el lienzo se ve a ~28%: el general prioriza fallas; los sanos van discretos.
+  const radio = (e: ElementoMapa) => e.falla ? (acercado ? 31 : 28) : (acercado ? 24 : 15)
+  const visible = ([x, y]: Pt) => x >= limites.x && x <= limites.x + limites.w && y >= limites.y && y <= limites.y + limites.h
+  const items = lista.slice(0, 150).map(e => {
+    const linea = e.linea?.filter(p => Array.isArray(p) && p.every(Number.isFinite)).map(point)
+    const at = linea && linea.length > 1 ? linea[Math.floor(linea.length / 2) - (linea.length % 2 ? 0 : 1)].map((v, i) => (v + linea[Math.floor(linea.length / 2)][i]) / 2) as Pt : e.punto ? point(e.punto) : null
+    return { e, linea, at }
+  }).filter((x): x is typeof x & { at: Pt } => x.at !== null && visible(x.at))
+  // En el general, un eléctrico sano se reconoce por su línea: sin ícono que tape nombres.
+  const conIcono = items.filter(({ e }) => acercado || e.falla || e.tipo !== 'electrico')
+  for (const { e, linea } of items) if (linea) {
+    const pts = linea.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')
+    lineas.push(`<polyline points="${pts}" fill="none" stroke="#131b16" stroke-opacity=".8" stroke-width="${acercado ? 11 : 9}" stroke-linecap="round"/><polyline points="${pts}" fill="none" stroke="${e.falla ? '#ff4b3a' : '#2fd4ff'}" stroke-width="${acercado ? 6 : 5}" stroke-dasharray="${e.falla ? '0' : '14 9'}" stroke-linecap="round"/>`)
+  }
+  for (const { e, at } of conIcono) { const r = radio(e); cajas.push({ x: at[0] - r - 4, y: at[1] - r - 4, w: 2 * r + 8, h: 2 * r + 8 }) }
+  // Sanos primero y fallas encima: una falla nunca queda tapada.
+  for (const { e, at } of [...conIcono].sort((a, b) => Number(Boolean(a.e.falla)) - Number(Boolean(b.e.falla)))) {
+    const falla = Boolean(e.falla), r = radio(e), s = r / 19
+    if (falla) iconos.push(`<circle cx="${at[0]}" cy="${at[1]}" r="${r + 10}" fill="#ff4b3a" fill-opacity=".35"/>`)
+    iconos.push(`<circle cx="${at[0]}" cy="${at[1]}" r="${r}" fill="${falla ? '#d93a2b' : '#fbfaf6'}" stroke="${falla ? '#fff' : '#131b16'}" stroke-width="${falla ? 3 : 2}"/><g transform="translate(${at[0].toFixed(1)} ${at[1].toFixed(1)}) scale(${(s * .95).toFixed(3)})" fill="${falla ? '#fff' : '#131b16'}" stroke="${falla ? '#fff' : '#131b16'}" stroke-width="0">${GLIFO[e.tipo]}</g>`)
+  }
+  /** Los carteles van al final: esquivan nombres de potreros, íconos y otros carteles. */
+  const textos = (ocupados: Caja[]) => conIcono.flatMap(({ e, at }) => {
+    const falla = Boolean(e.falla), r = radio(e)
+    if (!falla && !acercado) return []
+    const texto = falla ? `${e.nombre}: ${e.falla}` : e.nombre
+    const size = falla ? (acercado ? 30 : 28) : 22, filas = lines(texto, falla ? 34 : 24)
+    const w = Math.min(560, Math.max(...filas.map(f => f.length)) * size * .56 + 22), h = filas.length * (size + 4) + 12
+    const cerca = [[r + 14, -h / 2], [-r - 14 - w, -h / 2], [-w / 2, r + 12], [-w / 2, -r - 12 - h], [r + 10, r + 6], [-r - 10 - w, -r - 6 - h], [r + 10, -r - 6 - h], [-r - 10 - w, r + 6]]
+    // Si no hay lugar al lado, el cartel se aleja con una línea guía antes que tapar un nombre.
+    const opciones = [...cerca, ...cerca.map(([dx, dy]) => [dx * 1.8 + (dx > 0 ? 30 : -30), dy * 1.8]), ...cerca.map(([dx, dy]) => [dx * 2.8 + (dx > 0 ? 60 : -60), dy * 2.8])]
+      .map(([dx, dy]) => ({ x: Math.max(limites.x + 6, Math.min(limites.x + limites.w - w - 6, at[0] + dx)), y: Math.max(limites.y + 6, Math.min(limites.y + limites.h - h - 6, at[1] + dy)), w, h }))
+    const libre = (a: Caja) => !ocupados.some(b => a.x < b.x + b.w + 6 && a.x + a.w + 6 > b.x && a.y < b.y + b.h + 6 && a.y + a.h + 6 > b.y)
+    const caja = opciones.find(libre) ?? (falla ? opciones[0] : null)
+    if (!caja) return []
+    ocupados.push(caja)
+    const cx = Math.max(caja.x, Math.min(caja.x + w, at[0])), cy = Math.max(caja.y, Math.min(caja.y + h, at[1]))
+    const guia = Math.hypot(cx - at[0], cy - at[1]) > r + 16 ? `<path d="M${at[0].toFixed(1)} ${at[1].toFixed(1)}L${cx.toFixed(1)} ${cy.toFixed(1)}" stroke="#131b16" stroke-width="6"/><path d="M${at[0].toFixed(1)} ${at[1].toFixed(1)}L${cx.toFixed(1)} ${cy.toFixed(1)}" stroke="${falla ? '#ff4b3a' : '#fff'}" stroke-width="3"/>` : ''
+    return [`${guia}<rect x="${caja.x.toFixed(1)}" y="${caja.y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="7" fill="#fbfaf6" stroke="${falla ? '#d93a2b' : '#131b16'}" stroke-width="${falla ? 3.5 : 1}"/><text text-anchor="middle" font-size="${size}" font-weight="${falla ? 700 : 600}" fill="${falla ? '#9d2318' : '#131b16'}">${filas.map((f, j) => `<tspan x="${(caja.x + w / 2).toFixed(1)}" y="${(caja.y + size + 3 + j * (size + 4)).toFixed(1)}">${xml(f)}</tspan>`).join('')}</text>`]
+  })
+  return { lineas, iconos, cajas, textos }
 }
 function lines(s: string, limit: number): string[] {
   const words = s.replace(/\s+/g, ' ').trim().match(new RegExp(`.{1,${limit}}(?:\\s|$)|.{1,${limit}}`, 'g')) ?? []
@@ -81,6 +136,7 @@ export function svgMapa(datos: MapaCampo, _fecha: string, fondo?: FondoSatelital
   const elements: string[] = []
   const labels: string[] = []
   const ocupados: { x: number; y: number; w: number; h: number }[] = []
+  const infra = capaInfraestructura(datos.infraestructura ?? [], point, Boolean(foco), { x: mapX, y: mapY, w: mapW, h: mapH })
   for (const [i, p] of valid.entries()) {
     const points = p.points.map(point), at = interior(points)
     const coords = points.map(v => v.map(n => n.toFixed(2)).join(',')).join(' ')
@@ -92,14 +148,18 @@ export function svgMapa(datos: MapaCampo, _fecha: string, fondo?: FondoSatelital
     if (at[0] < 0 || at[0] > width || at[1] < mapY || at[1] > mapY + mapH) continue
     const rows = lines(label, 20), size = label.length > 12 ? 28 : 38
     const bw = Math.min(600, Math.max(82, Math.max(...rows.map(r => r.length)) * size * .57 + 22)), bh = rows.length * (size + 3) + 14
-    const candidates = [[0, 0], [-140, 0], [140, 0], [0, -95], [0, 95], [-190, -90], [190, 90], [-270, 0], [270, 0]]
+    const candidates = [[0, 0], [0, -60], [0, 60], [-80, 0], [80, 0], [-70, -55], [70, 55], [70, -55], [-70, 55], [-140, 0], [140, 0], [0, -95], [0, 95], [-190, -90], [190, 90], [-270, 0], [270, 0]]
       .map(([dx, dy]) => ({ x: Math.max(8, Math.min(width - bw - 8, at[0] + dx - bw / 2)), y: Math.max(mapY + 8, Math.min(mapY + mapH - bh - 8, at[1] + dy - bh / 2)), w: bw, h: bh }))
     const overlaps = (a: typeof candidates[number]) => ocupados.some(b => a.x < b.x + b.w + 8 && a.x + a.w + 8 > b.x && a.y < b.y + b.h + 8 && a.y + a.h + 8 > b.y)
     const fits = (a: typeof candidates[number]) => [[a.x, a.y], [a.x + a.w, a.y], [a.x, a.y + a.h], [a.x + a.w, a.y + a.h]].every(p => inside(p as Pt, points))
-    const box = candidates.find(c => !overlaps(c) && fits(c)) ?? candidates.slice(1).find(c => !overlaps(c)) ?? candidates[0]
+    // Un ícono corre el nombre sólo si el nombre sigue dentro de su potrero; si no, el ícono va encima.
+    const pisa = (a: typeof candidates[number]) => infra.cajas.some(b => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y)
+    const centro = (a: typeof candidates[number]) => inside([a.x + a.w / 2, a.y + a.h / 2], points)
+    const box = candidates.find(c => !overlaps(c) && !pisa(c) && fits(c)) ?? candidates.find(c => !overlaps(c) && !pisa(c) && centro(c))
+      ?? candidates.find(c => !overlaps(c) && fits(c)) ?? candidates.slice(1).find(c => !overlaps(c)) ?? candidates[0]
     ocupados.push(box)
     const cx = box.x + bw / 2
-    if (!fits(box)) labels.push(`<path d="M${at[0].toFixed(2)} ${at[1].toFixed(2)} L${cx.toFixed(2)} ${(box.y + bh / 2).toFixed(2)}" stroke="#131b16" stroke-width="7"/><path d="M${at[0].toFixed(2)} ${at[1].toFixed(2)} L${cx.toFixed(2)} ${(box.y + bh / 2).toFixed(2)}" stroke="#fff" stroke-width="3"/>`)
+    if (!fits(box) && !centro(box)) labels.push(`<path d="M${at[0].toFixed(2)} ${at[1].toFixed(2)} L${cx.toFixed(2)} ${(box.y + bh / 2).toFixed(2)}" stroke="#131b16" stroke-width="7"/><path d="M${at[0].toFixed(2)} ${at[1].toFixed(2)} L${cx.toFixed(2)} ${(box.y + bh / 2).toFixed(2)}" stroke="#fff" stroke-width="3"/>`)
     labels.push(`<rect x="${box.x}" y="${box.y}" width="${bw}" height="${bh}" rx="7" fill="#fbfaf6" stroke="${p.id === foco?.id ? '#b85c2e' : '#131b16'}" stroke-width="${p.id === foco?.id ? 3 : 1}"/><text text-anchor="middle" font-size="${size}" font-weight="600">${rows.map((r, j) => `<tspan x="${cx}" y="${box.y + size + 4 + j * (size + 3)}">${xml(r)}</tspan>`).join('')}</text>`)
   }
   const raster=fondo?.extent ?? geo.extent
@@ -115,6 +175,6 @@ export function svgMapa(datos: MapaCampo, _fecha: string, fondo?: FondoSatelital
   // Sin clip-path: resvg reserva una capa del tamaño de todo lo recortado y, al
   // acercar un potrero chico, el campo ampliado pedía ~300 MB (Edge corta sin
   // responder). Cabecera y pie se pintan encima y cubren lo que se sale.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${labels.join('')}<rect width="${width}" height="${mapY}" fill="#131b16"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#131b16"/><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${infra.lineas.join('')}${labels.join('')}${infra.iconos.join('')}${infra.textos([...ocupados, ...infra.cajas]).join('')}<rect width="${width}" height="${mapY}" fill="#131b16"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#131b16"/><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
   return { svg, dibujados: valid.length, faltantes, width, height }
 }
