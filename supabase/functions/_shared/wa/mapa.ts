@@ -12,6 +12,9 @@ export function comandoMapa(texto: string, botonId?: string): PedidoMapa | null 
   const t = norm(texto).replace(/[¿?¡!.,]+$/g, '').trim()
   const detalle = t.match(/^(?:acerca|acercar|amplia|ampliar|mostrame el detalle de|detalle de)(?:\s+(?:el|del))?\s+(?:potrero\s+)?(.+)$/)
   if (detalle) return { potrero: detalle[1] }
+  // «Mostrame el potrero 3B» pide verlo, no sus observaciones (Fran, 15/10). Exige «potrero».
+  const ver = t.match(/^(?:mostrame|mostrarme|mostra|mostrar|ver|quiero ver|mandame|pasame)\s+(?:el\s+)?potrero\s+(.+)$/)
+  if (ver) return { potrero: ver[1] }
   const m = t.match(/^(?:mapa|ver (?:el )?mapa|(?:mandame|enviame|mostrame|pasame|mostra|mostrar|quiero ver) (?:el |un )?mapa)(?:\s+(.*))?$/)
   if (!m) return null
   const nombre = (m[1] ?? '').replace(/^(?:del campo|de la estancia|del establecimiento|de|del)\s+/, '').trim()

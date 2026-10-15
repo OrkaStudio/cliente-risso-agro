@@ -3,6 +3,7 @@ import { atenderMapa, campoParaMapa, comandoMapa, elegirMapa, noRecuerdaPotrero,
 import { poligonoMapa, svgMapa } from './mapa-svg.ts'
 import { arrancar, conUbicacion, leer, siguientePaso } from './conversacion.ts'
 import { payloadImagen } from '../../wa-webhook/meta.ts'
+import { resolverParaMostrar } from './resolver.ts'
 import type { Contexto, Pendiente, Mensaje } from './tipos.ts'
 
 const ctx: Contexto = { hoy: '2026-10-13', nombre: 'Lauti', categoriasGasto: [], campos: [
@@ -20,6 +21,12 @@ describe('pedido de mapa sin consumir la carga', () => {
   it('resuelve un campo nombrado', () => expect(campoParaMapa(comandoMapa('mapa de La Porteña')!, ctx, pendiente)?.id).toBe('lp'))
   it('el botón apunta al campo ofrecido', () => expect(campoParaMapa(comandoMapa('', 'ver_mapa@dg')!, ctx, pendiente)?.id).toBe('dg'))
   it('no traga una carga que menciona el mapa', () => expect(comandoMapa('En el 7B según el mapa llovieron 20')).toBeNull())
+  it.each(['Mostrarme el potrero 3B', 'mostrame el potrero 3B', 'ver el potrero 3B', 'quiero ver el potrero 3B'])('«%s» pide el acercamiento', t => expect(comandoMapa(t)).toEqual({ potrero: '3b' }))
+  it('pedir observaciones no se confunde con ver el potrero', () => expect(comandoMapa('mostrame las observaciones del 7B')).toBeNull())
+  it('el campo reciente desempata pero no esconde un potrero de otro campo', () => {
+    expect(resolverParaMostrar('7B', ctx.campos, 'dg')).toMatchObject({ ok: { potrero: { id: '7b' } } })
+    expect(resolverParaMostrar('9Z', ctx.campos, 'dg')).toEqual({ ninguno: true })
+  })
   it('botones de confirmación siguen su camino', () => expect(comandoMapa('', 'audio-original|si')).toBeNull())
   it('el campo del audio manda sobre el mapa reciente', () => expect(campoParaMapa({}, ctx, pendiente, 'dg')?.id).toBe('lp'))
   it('la observación específica manda sobre el campo general', () => {

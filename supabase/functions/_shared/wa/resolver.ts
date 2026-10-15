@@ -103,6 +103,13 @@ export function resolverReferenciaPotrero(mencion: string, campos: Campo[], camp
   return campo ? resolverPotrero(partes[1], campos, campo.id) : { ninguno: true }
 }
 
+/** Para mostrar un potrero: el campo reciente desempata, pero no esconde uno que
+ * sólo existe en otro campo (pedir «acercá el 12B» después de mirar Los Pampas). */
+export function resolverParaMostrar(mencion: string, campos: Campo[], campoId?: string | null): Resultado<PotreroDe> {
+  const r = resolverReferenciaPotrero(mencion, campos, campoId)
+  return 'ninguno' in r && campoId ? resolverReferenciaPotrero(mencion, campos, null) : r
+}
+
 export function campoPorId(campos: Campo[], id: string | null | undefined): Campo | null {
   return campos.find((c) => c.id === id) ?? null
 }

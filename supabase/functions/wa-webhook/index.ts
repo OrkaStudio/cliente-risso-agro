@@ -29,7 +29,7 @@ import { confirmarConVerificacion } from '../_shared/wa/confirmacion.ts'
 import { EntradaIncompleta, limpiarInterpretacion, pistaTranscripcion } from '../_shared/wa/interpretar.ts'
 import { Turnos,secretoValido } from '../_shared/wa/servicios.ts'
 import * as R from '../_shared/wa/respuestas.ts'
-import { campoPorId, potreroEnPunto, potreroPorId, resolverReferenciaPotrero } from '../_shared/wa/resolver.ts'
+import { campoPorId, potreroEnPunto, potreroPorId, resolverParaMostrar } from '../_shared/wa/resolver.ts'
 import { esFecha, finDeMes, hoyAR, inicioSemana, sumarDias,norm } from '../_shared/wa/texto.ts'
 import type { Borrador, Contexto, Mensaje, Pendiente } from '../_shared/wa/tipos.ts'
 import * as db from './db.ts'
@@ -381,7 +381,7 @@ async function mostrarMapa(v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | 
       if (!elegido) { await responder(v, v.telefono, { texto: 'Ese potrero no está disponible para tu cuenta.' }); return false }
       campo = elegido.campo
     } else if (pedido.potrero) {
-      const elegido = resolverReferenciaPotrero(pedido.potrero, ctx.campos, campo?.id ?? null)
+      const elegido = resolverParaMostrar(pedido.potrero, ctx.campos, campo?.id ?? null)
       if ('varios' in elegido) {
         await responder(v, v.telefono, { texto: '¿De cuál campo querés el detalle?', lista: { boton: 'Elegir potrero', filas: elegido.varios.slice(0, 10).map(x => ({ id: `acercar@${x.potrero.id}`, titulo: x.potrero.nombre, detalle: x.campo.nombre })) } }); return false
       }
@@ -399,7 +399,7 @@ async function mostrarMapa(v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | 
         const r = await meta.enviarImagen(v.telefono, mediaId, caption)
         await db.guardarSaliente({ wamid: r.wamid, telefono: v.telefono, vinculo: v, cuerpo: { ...r.cuerpo, tropero_mapa: { campo_id: campoId, captura_id: capturaId } } })
       },
-    }, automatico && pendiente ? preguntaRecorrida(pendiente,ctx) : focoId ? `Detalle de ${potreroPorId(ctx.campos, focoId)?.potrero.nombre}.` : undefined)
+    }, automatico && pendiente?.tipo === 'ubicacion' ? preguntaRecorrida(pendiente,ctx) : focoId ? `Detalle de ${potreroPorId(ctx.campos, focoId)?.potrero.nombre}.` : undefined)
   } catch (e) {
     console.warn('wa-webhook: no se pudo preparar o enviar el mapa', e instanceof Error ? e.message : String(e))
     if (!automatico) await responder(v, v.telefono, { texto: 'No pude enviar el mapa ahora. Conservé tu carga pendiente; podés escribir el nombre del potrero o pedirme el mapa nuevamente.' }).catch(() => {})
