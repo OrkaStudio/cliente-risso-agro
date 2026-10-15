@@ -345,7 +345,7 @@ const ORIGEN = [
   { valor: 'vecino', texto: 'De un vecino' },
 ] as const
 
-export function AnimalNuevo({ empresaId, especie, abierto, onCerrar }: { empresaId: string; especie: Especie; abierto: boolean; onCerrar: () => void }) {
+export function AnimalNuevo({ empresaId, especie, abierto, onCerrar, onVolver }: { empresaId: string; especie: Especie; abierto: boolean; onCerrar: () => void; onVolver?: () => void }) {
   const { elegido } = useCampoElegido()
   const [rfid, setRfid] = useState('')
   const [visual, setVisual] = useState('')
@@ -379,6 +379,7 @@ export function AnimalNuevo({ empresaId, especie, abierto, onCerrar }: { empresa
     <PanelLateral
       abierto={abierto}
       onCerrar={onCerrar}
+      onVolver={onVolver}
       titulo="Un animal nuevo"
       bajada="Para los que entran de a uno, con su caravana. Si son muchos, usá «Entraron»."
       pie={

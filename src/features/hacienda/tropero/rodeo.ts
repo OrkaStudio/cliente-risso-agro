@@ -45,6 +45,13 @@ export type FilaRodeo = {
   /** Lo último que se sabe: «186 kg», «Preñada en marzo», «Vacía hoy». */
   ultimoDato: string | null
   estado: Estado
+  /** Para la tabla de cada filtro. */
+  edad: string | null
+  peso: string | null
+  /** «Vacía el 09/10» */
+  tacto: string | null
+  /** «Oxitetraciclina · hasta el 30/10» */
+  retiro: string | null
 }
 
 const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -118,6 +125,10 @@ export function filasDelRodeo(
       rfid: a.caravana_rfid,
       ultimoDato: ultimoDato(r, hoyISO),
       estado: estadoDe(a, r, hoyISO, hoy),
+      edad,
+      peso: r?.ultimoPeso ? `${r.ultimoPeso.kg.toLocaleString('es-AR')} kg` : null,
+      tacto: r?.ultimoTacto ? `${r.ultimoTacto.resultado === 'prenada' ? 'Preñada' : 'Vacía'} el ${r.ultimoTacto.fecha.slice(8, 10)}/${r.ultimoTacto.fecha.slice(5, 7)}` : null,
+      retiro: r?.retiroHasta && r.retiroHasta >= hoyISO ? `${r.tratamiento ?? 'Tratamiento'} · hasta el ${r.retiroHasta.slice(8, 10)}/${r.retiroHasta.slice(5, 7)}` : null,
     }
   })
   // Lo que hay que hacer primero; a igual estado, por caravana.

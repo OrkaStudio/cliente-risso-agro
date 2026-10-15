@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
+import { BotonVolver } from '@/components/tropero/panel-lateral'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useReabrirSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
@@ -73,11 +74,8 @@ export function FichaPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
-      <nav aria-label="Dónde estás" className="flex items-center gap-2 text-[14.5px] text-texto-suave">
-        <Link to="/hacienda" className="font-semibold hover:text-texto">
-          Hacienda
-        </Link>
-        <span>/</span>
+      <nav aria-label="Dónde estás" className="flex items-center gap-3 text-[14.5px] text-texto-suave">
+        <BotonVolver onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/hacienda'))}>Hacienda</BotonVolver>
         <span>{potrero ? `${potrero.nombre}${campo ? `, ${campo}` : ''}` : 'Sin potrero'}</span>
       </nav>
 

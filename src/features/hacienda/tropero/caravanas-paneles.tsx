@@ -178,6 +178,8 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
       abierto={abierto}
       onCerrar={cerrar}
       ancho={modo === 'error' && mal === 'potrero'}
+      onVolver={todas.length > 1 && !salidaFoco ? () => (reiniciar(), setElegida(null)) : undefined}
+      volverTexto="Las otras salidas"
       titulo={`¿Qué ${n === 1 ? cat : `${n} ${cat}`} ${verbo} del ${pot}?`}
       bajada={`Lo anotaste el ${ddmm(x.fecha)} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. El número del rodeo ya está bien.`}
       pie={
@@ -186,12 +188,6 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
         </BotonPrincipal>
       }
     >
-      {todas.length > 1 && !salidaFoco && (
-        <button type="button" onClick={() => (reiniciar(), setElegida(null))} className="-mt-2 mb-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-texto-suave hover:text-texto">
-          <Icono nombre="Atrás" tamano={16} /> Las otras salidas
-        </button>
-      )}
-
       <div role="radiogroup" aria-label="Cómo se resuelve" className="flex flex-col gap-2">
         {(
           [

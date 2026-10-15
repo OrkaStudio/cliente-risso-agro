@@ -17,7 +17,12 @@ export function PanelLateral({
   children,
   className,
   ancho = false,
+  onVolver,
+  volverTexto = 'Volver',
 }: {
+  /** Si está, el panel muestra «← Volver» arriba del título (un paso atrás, sin cerrar). */
+  onVolver?: () => void
+  volverTexto?: string
   /** Más ancho, para cuando adentro hay un croquis. */
   ancho?: boolean
   abierto: boolean
@@ -43,6 +48,7 @@ export function PanelLateral({
         >
           <header className="flex items-start gap-4 px-8 pt-8 pb-5">
             <div className="min-w-0 flex-1">
+              {onVolver && <BotonVolver onClick={onVolver} className="mb-4">{volverTexto}</BotonVolver>}
               <DialogPrimitive.Title className="font-heading text-[28px] leading-[1.05] font-extrabold tracking-[-0.02em] text-texto">{titulo}</DialogPrimitive.Title>
               {bajada && <DialogPrimitive.Description className="mt-1.5 text-[15px] text-texto-suave">{bajada}</DialogPrimitive.Description>}
             </div>
@@ -100,5 +106,22 @@ export function Opciones<T extends string>({
         )
       })}
     </div>
+  )
+}
+
+/** «← Volver»: un paso atrás. Píldora con borde, para que se vea y se toque fácil. */
+export function BotonVolver({ onClick, children = 'Volver', className }: { onClick: () => void; children?: React.ReactNode; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie pr-4 pl-3 text-[14.5px] font-bold text-texto transition-colors hover:border-neutro-300 hover:bg-superficie-hundida',
+        className,
+      )}
+    >
+      <Icono nombre="Atrás" tamano={16} />
+      {children}
+    </button>
   )
 }

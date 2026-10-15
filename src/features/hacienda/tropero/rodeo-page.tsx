@@ -37,6 +37,37 @@ const FILTROS: { estado: Estado; texto: string }[] = [
   { estado: 'sinElectronica', texto: 'Sin electrónica' },
   { estado: 'sinCaravana', texto: 'Sin caravana' },
 ]
+type Filtro = Estado | 'sinIdentificar' | 'salieron'
+const GRUPO_ATENDER = ['sinIdentificar', 'retiro', 'destetar', 'vacia', 'vender'] as const
+const GRUPO_DATOS = ['sinCaravana', 'sinElectronica'] as const
+const TEXTO_FILTRO: Record<string, string> = { sinIdentificar: 'Sin identificar', ...Object.fromEntries(FILTROS.map((f) => [f.estado, f.texto])) }
+/** Qué es cada filtro y qué conviene hacer: una línea, debajo de las píldoras. */
+const EXPLICA: Record<string, string> = {
+  sinIdentificar: 'Salieron sin decir cuál. Tocá la fila para decir cuál fue.',
+  retiro: 'Tienen un tratamiento con retiro: no se pueden vender hasta la fecha.',
+  destetar: 'Terneros de 6 a 8 meses. Cuando los destetes, anotalo en su ficha.',
+  vacia: 'Dieron vacías en el último tacto. Mirá si conviene venderlas o darles otro servicio.',
+  vender: 'Novillos que pasaron los 400 kg.',
+  sinCaravana: 'No tienen caravana: se la ponés con una planilla o desde su ficha.',
+  sinElectronica: 'Tienen la visible pero no el chip.',
+  salieron: 'Vendidos y muertos, del más reciente al más viejo.',
+  prenada: '',
+  nada: '',
+}
+const COLUMNA: Record<string, string> = {
+  todos: 'Último dato',
+  sinIdentificar: 'Último dato',
+  retiro: 'Qué le dieron y hasta cuándo',
+  destetar: 'Último peso',
+  vacia: 'Tacto',
+  vender: 'Último peso',
+  sinCaravana: 'Cómo ponérsela',
+  sinElectronica: 'Cómo completarla',
+  salieron: 'Cuándo y cómo',
+  prenada: 'Último dato',
+  nada: 'Último dato',
+}
+
 /** El punto de cada estado: el color sólo marca el significado. */
 const PUNTO: Record<Estado, string> = {
   retiro: 'bg-estado-problema',
@@ -132,6 +163,7 @@ export function RodeoPage() {
   const cuantosDe = (e: Vista) => (e === 'todas' ? resumen.total : resumen.porEspecie[e])
   const nombreVista = vista === 'todas' ? (r.total === 1 ? 'cabeza' : 'cabezas') : ESPECIES.find((e) => e.especie === vista)!.nombre.toLowerCase()
   const nCampos = campoId ? 1 : r.porCampo.length
+  const filtroActivo: Filtro | null = verSalieron ? 'salieron' : verSinIdentificar ? 'sinIdentificar' : estado
   const elegirEstado = (e: Estado | 'sinIdentificar' | 'salieron' | null) => {
     const p = new URLSearchParams(params)
     p.delete('sinCaravana')
@@ -206,7 +238,7 @@ export function RodeoPage() {
               Salieron
             </button>
 
-            {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} />}
+            {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), setEntradaSalida('entraron'))} />}
             {membresia?.empresa_id && (
               <>
                 <CaravanasPorExcel key={`x${panelCaravanas}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
@@ -264,34 +296,38 @@ export function RodeoPage() {
 
       {/* La lista */}
       <motion.section {...entra(3)} className="overflow-hidden rounded-[20px] border border-borde bg-superficie">
-        {/* Filtrar por lo que hay que hacer: pestañas con su cuenta. */}
+        {/* Filtrar: agrupado por intención (para atender, datos que faltan, los que ya no están). */}
         {(FILTROS.some((f) => r.porEstado[f.estado]) || sinIdentificar > 0 || nSalieron > 0) && (
-          <div role="tablist" aria-label="Mostrar" className="flex flex-wrap items-center gap-1 border-b border-borde px-4 pt-3">
-            {[
-              { estado: null as Estado | 'sinIdentificar' | 'salieron' | null, texto: 'Todos', n: r.total },
-              ...(sinIdentificar > 0 ? [{ estado: 'sinIdentificar' as const, texto: 'Sin identificar', n: sinIdentificar }] : []),
-              ...FILTROS.filter((f) => r.porEstado[f.estado]).map((f) => ({ ...f, n: r.porEstado[f.estado]! })),
-              ...(nSalieron > 0 ? [{ estado: 'salieron' as const, texto: 'Salieron', n: nSalieron }] : []),
-            ].map((f) => {
-              const activo = f.estado === 'sinIdentificar' ? verSinIdentificar : f.estado === 'salieron' ? verSalieron : !verSinIdentificar && !verSalieron && estado === f.estado
-              return (
-                <button
-                  key={f.texto}
-                  type="button"
-                  role="tab"
-                  aria-selected={activo}
-                  onClick={() => elegirEstado(f.estado)}
-                  className={cn(
-                    '-mb-px inline-flex h-10 items-center gap-2 border-b-[2.5px] px-3 text-[14.5px] font-bold transition-colors',
-                    activo ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto',
-                  )}
-                >
-                  {f.estado && <span className={cn('size-2 rounded-full', f.estado === 'sinIdentificar' ? 'bg-estado-atencion' : f.estado === 'salieron' ? 'bg-neutro-400' : PUNTO[f.estado])} />}
-                  {f.texto}
-                  <span className={cn('cifra rounded-full px-1.5 text-[14px]', activo ? 'bg-principal-suave text-principal' : 'bg-superficie-hundida text-texto-suave')}>{f.n}</span>
-                </button>
-              )
-            })}
+          <div className="border-b border-borde px-5 pt-4 pb-3.5">
+            <div role="tablist" aria-label="Mostrar" className="flex flex-wrap items-center gap-x-2 gap-y-2.5">
+              <Pildora activo={!verSinIdentificar && !verSalieron && !estado} onClick={() => elegirEstado(null)} texto="Todos" n={r.total} />
+              {(GRUPO_ATENDER.some((e) => (e === 'sinIdentificar' ? sinIdentificar : r.porEstado[e])) ) && (
+                <>
+                  <span className="ml-2 text-[12.5px] font-semibold tracking-[0.03em] text-texto-suave uppercase">Para atender</span>
+                  {GRUPO_ATENDER.map((e) => {
+                    const n = e === 'sinIdentificar' ? sinIdentificar : (r.porEstado[e] ?? 0)
+                    if (!n) return null
+                    const activo = e === 'sinIdentificar' ? verSinIdentificar : !verSinIdentificar && !verSalieron && estado === e
+                    return <Pildora key={e} activo={activo} onClick={() => elegirEstado(activo ? null : e)} texto={TEXTO_FILTRO[e]} n={n} punto={e === 'sinIdentificar' ? 'bg-estado-atencion' : PUNTO[e]} />
+                  })}
+                </>
+              )}
+              {GRUPO_DATOS.some((e) => r.porEstado[e]) && (
+                <>
+                  <span className="ml-2 text-[12.5px] font-semibold tracking-[0.03em] text-texto-suave uppercase">Les falta</span>
+                  {GRUPO_DATOS.filter((e) => r.porEstado[e]).map((e) => {
+                    const activo = !verSinIdentificar && !verSalieron && estado === e
+                    return <Pildora key={e} activo={activo} onClick={() => elegirEstado(activo ? null : e)} texto={TEXTO_FILTRO[e]} n={r.porEstado[e]!} punto={PUNTO[e]} />
+                  })}
+                </>
+              )}
+              {nSalieron > 0 && (
+                <span className="ml-auto">
+                  <Pildora activo={verSalieron} onClick={() => elegirEstado(verSalieron ? null : 'salieron')} texto="Salieron" n={nSalieron} />
+                </span>
+              )}
+            </div>
+            {filtroActivo && <p className="mt-3 text-[14px] text-texto-suave">{EXPLICA[filtroActivo]}</p>}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3 border-b border-borde px-5 py-3.5">
@@ -345,9 +381,9 @@ export function RodeoPage() {
               <tr className="border-b border-borde text-[13px] font-semibold text-texto-suave">
                 <th className="py-3 pl-5 font-semibold">Caravana</th>
                 <th className="py-3 font-semibold">Qué es</th>
-                <th className="py-3 font-semibold max-md:hidden">Dónde está</th>
-                <th className="py-3 font-semibold max-lg:hidden">Último dato</th>
-                <th className="py-3 pr-5 font-semibold">Estado</th>
+                <th className="py-3 font-semibold max-md:hidden">{verSalieron ? 'De dónde salió' : 'Dónde está'}</th>
+                <th className="py-3 font-semibold max-lg:hidden">{COLUMNA[filtroActivo ?? 'todos']}</th>
+                {!filtroActivo && <th className="py-3 pr-5 font-semibold">Estado</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-borde">
@@ -365,11 +401,11 @@ export function RodeoPage() {
                   />
                 ))}
               {visibles.map((f) => (
-                <Fila key={f.id} f={f} onClick={() => navigate(`/hacienda/${f.id}`)} />
+                <Fila key={f.id} f={f} filtro={filtroActivo} onClick={() => navigate(`/hacienda/${f.id}`)} />
               ))}
               {/* Los que salieron: en su pestaña, o si la búsqueda los encuentra. */}
               {(verSalieron || q) &&
-                salidos.map(({ a, b }) => <FilaSalido key={a.id} a={a} b={b} donde={a.potrero_id ? (potreros.data?.find((p) => p.id === a.potrero_id)?.nombre ?? '') : ''} onClick={() => navigate(`/hacienda/${a.id}`)} />)}
+                salidos.map(({ a, b }) => <FilaSalido key={a.id} conEstado={!verSalieron} a={a} b={b} donde={a.potrero_id ? (potreros.data?.find((p) => p.id === a.potrero_id)?.nombre ?? '') : ''} onClick={() => navigate(`/hacienda/${a.id}`)} />)}
             </tbody>
           </table>
         )}
@@ -428,7 +464,20 @@ function StockPorCategoria({ cats, total, especie }: { cats: { categoria: string
 }
 
 /** Una fila: la caravana como se ve en la oreja, qué es, dónde, lo último y qué hacer. */
-function Fila({ f, onClick }: { f: FilaRodeo; onClick: () => void }) {
+function Fila({ f, filtro, onClick }: { f: FilaRodeo; filtro: Filtro | null; onClick: () => void }) {
+  // La columna del dato cambia con el filtro: lo que importa para esa decisión.
+  const dato =
+    filtro === 'retiro'
+      ? f.retiro
+      : filtro === 'destetar'
+        ? f.peso
+        : filtro === 'vacia'
+          ? f.tacto
+          : filtro === 'vender'
+            ? f.peso
+            : filtro === 'sinCaravana' || filtro === 'sinElectronica'
+              ? null
+              : f.ultimoDato
   return (
     <tr onClick={onClick} className="cursor-pointer transition-colors hover:bg-superficie-hundida/50">
       <td className="py-3 pl-5">
@@ -452,15 +501,19 @@ function Fila({ f, onClick }: { f: FilaRodeo; onClick: () => void }) {
       </td>
       <td className="py-3 pr-4 text-[15px] font-semibold text-texto">{f.queEs}</td>
       <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{f.donde ?? 'Sin potrero'}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-lg:hidden">{f.ultimoDato ?? '—'}</td>
-      <td className="py-3 pr-5">
-        {f.estado !== 'nada' && (
-          <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-            <span className={cn('size-2 rounded-full', PUNTO[f.estado])} />
-            {ESTADO_TEXTO[f.estado]}
-          </span>
-        )}
+      <td className={cn('py-3 pr-4 text-[14.5px] max-lg:hidden', filtro && filtro !== 'sinCaravana' && filtro !== 'sinElectronica' ? 'font-semibold text-texto' : 'text-texto-suave')}>
+        {filtro === 'sinCaravana' || filtro === 'sinElectronica' ? 'Con «Caravanas por Excel» o desde su ficha' : (dato ?? '—')}
       </td>
+      {!filtro && (
+        <td className="py-3 pr-5">
+          {f.estado !== 'nada' && (
+            <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
+              <span className={cn('size-2 rounded-full', PUNTO[f.estado])} />
+              {ESTADO_TEXTO[f.estado]}
+            </span>
+          )}
+        </td>
+      )}
     </tr>
   )
 }
@@ -494,7 +547,7 @@ function FilaDeSalida({ x, onClick }: { x: FilaSalida; onClick: () => void }) {
 }
 
 /** Un animal que ya no está: cuándo y cómo salió. Gris, para no confundirlo con el rodeo. */
-function FilaSalido({ a, b, donde, onClick }: { a: { caravana_visual: string | null; caravana_rfid: string | null; categoria: string | null; estado: string | null }; b?: { fecha: string; sinIdentificar: boolean }; donde: string; onClick: () => void }) {
+function FilaSalido({ a, b, donde, onClick, conEstado = true }: { conEstado?: boolean; a: { caravana_visual: string | null; caravana_rfid: string | null; categoria: string | null; estado: string | null }; b?: { fecha: string; sinIdentificar: boolean }; donde: string; onClick: () => void }) {
   const fem = ['vaca', 'vaquillona', 'ternera', 'oveja', 'cordera', 'yegua', 'potranca'].includes(a.categoria ?? '')
   const como = a.estado === 'muerto' ? 'Murió' : fem ? 'Vendida' : 'Vendido'
   return (
@@ -503,14 +556,36 @@ function FilaSalido({ a, b, donde, onClick }: { a: { caravana_visual: string | n
         <span className="cifra rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 text-[19px] leading-tight font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
       </td>
       <td className="py-3 pr-4 text-[15px] font-semibold">{a.categoria ? categoriaNombre(a.categoria as never, 1) : ''}</td>
-      <td className="py-3 pr-4 text-[14.5px] max-md:hidden">{donde ? `Salió del ${donde}` : ''}</td>
+      <td className="py-3 pr-4 text-[14.5px] max-md:hidden">{donde ? (conEstado ? `Salió del ${donde}` : donde) : ''}</td>
       <td className="py-3 pr-4 text-[14.5px] max-lg:hidden">{b ? `${como} el ${DIA(b.fecha)}${b.sinIdentificar ? ' · sin identificar' : ''}` : como}</td>
-      <td className="py-3 pr-5">
-        <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold">
-          <span className="size-2 rounded-full bg-neutro-400" />
-          {como}
-        </span>
-      </td>
+      {conEstado && (
+        <td className="py-3 pr-5">
+          <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold">
+            <span className="size-2 rounded-full bg-neutro-400" />
+            {como}
+          </span>
+        </td>
+      )}
     </tr>
+  )
+}
+
+/** Una píldora de filtro: la elegida en tinta, el resto con borde. */
+function Pildora({ activo, onClick, texto, n, punto }: { activo: boolean; onClick: () => void; texto: string; n: number; punto?: string }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={activo}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-9 items-center gap-2 rounded-full border-[1.5px] px-3.5 text-[14px] font-bold transition-colors',
+        activo ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
+      )}
+    >
+      {punto && <span className={cn('size-2 rounded-full', punto)} />}
+      {texto}
+      <span className={cn('cifra text-[14px]', activo ? 'text-superficie/75' : 'text-texto-suave')}>{n}</span>
+    </button>
   )
 }

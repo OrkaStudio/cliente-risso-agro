@@ -84,6 +84,7 @@ export function EntradasSalidas({
   const salidasQ = useSalidasSinIdentificar()
   // Lo que hay de verdad en cada potrero: sin las salidas sin identificar.
   const comp = useMemo(() => composicionPorPotrero(animales.data ?? [], salidasQ.data ?? []), [animales.data, salidasQ.data])
+  const cabezasDe = (campoId: string) => (mapa ?? []).find((c) => c.id === campoId)?.potreros.reduce((t, p) => t + [...(comp.get(p.id)?.values() ?? [])].reduce((u, h) => u + h.total, 0), 0) ?? 0
   const campo = campos.find((c) => c.id === campoId) ?? null
   const potrero = campo?.potreros.find((p) => p.id === potreroId) ?? null
   const destCampo = campos.find((c) => c.id === destCampoId) ?? null
@@ -123,8 +124,12 @@ export function EntradasSalidas({
     const visto = elegido?.id ?? null
     const traer = nuevo.modo === 'entraron' && nuevo.que === 'deOtroCampo'
     const llevar = nuevo.modo === 'salieron' && nuevo.que === 'otroCampo'
-    setCampoId(traer ? null : (visto ?? campos[0]?.id ?? null))
-    setDestCampoId(traer ? visto : llevar ? null : null)
+    const conHacienda = campos.filter((c) => cabezasDe(c.id) > 0)
+    // Lo obvio, preelegido: salen del campo que mirás (o del único con hacienda); llegan a otro.
+    const origen = traer ? (conHacienda.find((c) => c.id !== visto)?.id ?? null) : visto && cabezasDe(visto) > 0 ? visto : (conHacienda[0]?.id ?? campos[0]?.id ?? null)
+    const otros = campos.filter((c) => c.id !== origen)
+    setCampoId(origen)
+    setDestCampoId(traer ? (visto && visto !== origen ? visto : otros.length === 1 ? otros[0]!.id : null) : llevar ? (otros.length === 1 ? otros[0]!.id : null) : null)
     setPaso('cuantos')
   }
 
@@ -197,17 +202,15 @@ export function EntradasSalidas({
     ) : undefined
 
   return (
-    <PanelLateral abierto={abierto} onCerrar={cerrar} titulo={titulo} bajada={bajada} pie={pie} ancho={paso === 'cuantos' || paso === 'adonde'}>
-      {paso !== 'que' && paso !== 'listo' && (
-        <button
-          type="button"
-          onClick={() => setPaso(paso === 'revisa' ? (mueve ? 'adonde' : 'cuantos') : paso === 'adonde' ? 'cuantos' : 'que')}
-          className="-mt-2 mb-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-texto-suave hover:text-texto"
-        >
-          <Icono nombre="Atrás" tamano={16} /> Volver
-        </button>
-      )}
-
+    <PanelLateral
+      abierto={abierto}
+      onCerrar={cerrar}
+      titulo={titulo}
+      bajada={bajada}
+      pie={pie}
+      ancho={paso === 'cuantos' || paso === 'adonde'}
+      onVolver={paso !== 'que' && paso !== 'listo' ? () => setPaso(paso === 'revisa' ? (mueve ? 'adonde' : 'cuantos') : paso === 'adonde' ? 'cuantos' : 'que') : undefined}
+    >
       {paso === 'que' && (
         <ul className="flex flex-col gap-3">
           {(modo === 'salieron' ? OPCIONES_SALIDA : OPCIONES_ENTRADA)
@@ -258,13 +261,26 @@ export function EntradasSalidas({
         <>
           {mueve ? (
             <div className="mb-4 grid gap-3 rounded-[18px] bg-superficie p-4">
-              <ElegirCampo titulo="Vienen de" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}), id === destCampoId && setDestCampoId(null))} />
+              <ElegirCampo
+                titulo="Vienen de"
+                identidad={identidad}
+                campos={campos}
+                valor={campoId}
+                onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}), id === destCampoId && setDestCampoId(null))}
+                apagado={(id) => cabezasDe(id) === 0}
+                nota={(id) => (cabezasDe(id) === 0 ? 'sin hacienda' : `${cabezasDe(id)} cab`)}
+              />
               <ElegirCampo titulo="Llegan a" identidad={identidad} campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
             </div>
-          ) : (
+          ) : null}
+          {mueve && (!campoId || !destCampoId) ? (
+            <p className="rounded-[14px] border-[1.5px] border-dashed border-borde px-4 py-5 text-center text-[14.5px] text-texto-suave">
+              {!campoId ? 'Elegí de qué campo vienen.' : 'Elegí a qué campo llegan.'}
+            </p>
+          ) : !mueve ? (
             <ElegirCampo titulo="Campo" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}))} />
-          )}
-          {campo && (
+          ) : null}
+          {campo && (!mueve || destCampoId) && (
             <Potreros
               campo={campo}
               elegido={potreroId}
@@ -407,7 +423,11 @@ function ElegirCampo({
   valor,
   onCambio,
   excepto,
+  apagado,
+  nota,
 }: {
+  apagado?: (id: string) => boolean
+  nota?: (id: string) => string
   titulo: string
   identidad: Identidad[]
   campos: CampoMapa[]
@@ -447,14 +467,16 @@ function ElegirCampo({
             type="button"
             role="radio"
             aria-checked={valor === c.id}
+            disabled={apagado?.(c.id)}
             onClick={() => onCambio(c.id)}
             className={cn(
-              'inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] px-3 text-[14.5px] font-bold transition-colors',
+              'inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] px-3 text-[14.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45',
               valor === c.id ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
             )}
           >
             <Letra c={de(c.id)} />
             {c.nombre}
+            {nota && <span className={cn('text-[12.5px] font-semibold', valor === c.id ? 'text-superficie/75' : 'text-texto-suave')}>{nota(c.id)}</span>}
           </button>
         ))}
       </div>
