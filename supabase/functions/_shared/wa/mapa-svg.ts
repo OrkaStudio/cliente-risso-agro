@@ -76,7 +76,7 @@ export function geometriaMapa(datos: MapaCampo, focoId?: string) {
 export function svgMapa(datos: MapaCampo, _fecha: string, fondo?: FondoSatelital, focoId?: string): { svg: string; dibujados: number; faltantes: string[]; width: number; height: number } | null {
   const geo = geometriaMapa(datos, focoId)
   if (!geo) return null
-  if (fondo && (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(fondo.dataUri) || fondo.dataUri.length > 6 * 1024 * 1024)) throw Error('Fondo satelital inválido')
+  if (fondo && (!/^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(fondo.dataUri) || fondo.dataUri.length > 6 * 1024 * 1024)) throw Error('Fondo satelital inválido')
   const { valid, faltantes, width, height, mapW, mapH, mapX, mapY, point, foco } = geo
   const elements: string[] = []
   const labels: string[] = []
@@ -112,6 +112,9 @@ export function svgMapa(datos: MapaCampo, _fecha: string, fondo?: FondoSatelital
     const [x,y]=point([equipo.lat,equipo.lng])
     labels.push(`<circle cx="${x}" cy="${y}" r="21" fill="#ce4936" stroke="#fff" stroke-width="3"/><text x="${x}" y="${y+11}" text-anchor="middle" font-size="32" font-weight="700" fill="#fff">!</text>`)
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><defs><clipPath id="mapa"><rect x="0" y="${mapY}" width="${mapW}" height="${mapH}"/></clipPath></defs><g font-family="Inter" fill="#131b16"><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><g clip-path="url(#mapa)">${background}${elements.join('')}${labels.join('')}</g><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
+  // Sin clip-path: resvg reserva una capa del tamaño de todo lo recortado y, al
+  // acercar un potrero chico, el campo ampliado pedía ~300 MB (Edge corta sin
+  // responder). Cabecera y pie se pintan encima y cubren lo que se sale.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${labels.join('')}<rect width="${width}" height="${mapY}" fill="#131b16"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#131b16"/><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
   return { svg, dibujados: valid.length, faltantes, width, height }
 }

@@ -19,23 +19,25 @@ async function preparar() {
 type Imagen = { bytes: Uint8Array; dibujados: number; faltantes: string[]; satelital: boolean }
 const cache = new Map<string, { imagen: Imagen; vence: number }>()
 /** Recortar antes de escalar evita que WASM expanda la foto entera a cientos
- * de megapíxeles para mostrar una parcela pequeña. Conserva el encuadre real. */
-function recortarFondo(datos:MapaCampo,fondo:FondoSatelital,focoId:string):FondoSatelital{
+ * de megapíxeles para mostrar una parcela pequeña. Conserva el encuadre real.
+ * El recorte lo hace resvg: decodificar la foto con jpeg-js sumaba ~80 MB y el
+ * acercamiento superaba la memoria de Edge sin responder (15/10). */
+async function recortarFondo(datos:MapaCampo,fondo:FondoSatelital,focoId:string):Promise<FondoSatelital>{
   if(!fondo.extent)return fondo
-  const target=geometriaMapa(datos,focoId)!.extent,source=fondo.extent
-  const bytes=Uint8Array.from(atob(fondo.dataUri.split(',')[1]),c=>c.charCodeAt(0))
-  const image=jpeg.decode(bytes,{useTArray:true,maxResolutionInMP:4,maxMemoryUsageInMB:48})
-  const dx=source[2]-source[0],dy=source[3]-source[1]
-  const x0=Math.max(0,Math.floor((target[0]-source[0])/dx*image.width)),y0=Math.max(0,Math.floor((source[3]-target[3])/dy*image.height))
-  const x1=Math.min(image.width,Math.ceil((target[2]-source[0])/dx*image.width)),y1=Math.min(image.height,Math.ceil((source[3]-target[1])/dy*image.height))
+  // La foto general se pide con el lienzo general (fondoSatelital): sus píxeles se conocen sin decodificarla.
+  const general=geometriaMapa(datos)!,target=geometriaMapa(datos,focoId)!.extent,source=fondo.extent
+  const W=general.mapW,H=general.mapH,dx=source[2]-source[0],dy=source[3]-source[1]
+  const x0=Math.max(0,Math.floor((target[0]-source[0])/dx*W)),y0=Math.max(0,Math.floor((source[3]-target[3])/dy*H))
+  const x1=Math.min(W,Math.ceil((target[2]-source[0])/dx*W)),y1=Math.min(H,Math.ceil((source[3]-target[1])/dy*H))
   const width=x1-x0,height=y1-y0
   if(width<1||height<1)throw Error('El detalle quedó fuera de la foto de referencia')
-  const pixels=new Uint8Array(width*height*4)
-  for(let y=0;y<height;y++)pixels.set(image.data.subarray(((y0+y)*image.width+x0)*4,((y0+y)*image.width+x1)*4),y*width*4)
-  const cropped=jpeg.encode({data:pixels,width,height},92).data
+  await preparar()
+  const render=new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><image x="${-x0}" y="${-y0}" width="${W}" height="${H}" preserveAspectRatio="none" href="${fondo.dataUri}"/></svg>`)
+  let png:Uint8Array
+  try{const image=render.render();try{png=image.asPng()}finally{image.free()}}finally{render.free()}
   let binary=''
-  for(let i=0;i<cropped.length;i+=8192)binary+=String.fromCharCode(...cropped.subarray(i,i+8192))
-  return {...fondo,dataUri:`data:image/jpeg;base64,${btoa(binary)}`,extent:[source[0]+x0/image.width*dx,source[3]-y1/image.height*dy,source[0]+x1/image.width*dx,source[3]-y0/image.height*dy]}
+  for(let i=0;i<png.length;i+=8192)binary+=String.fromCharCode(...png.subarray(i,i+8192))
+  return {...fondo,dataUri:`data:image/png;base64,${btoa(binary)}`,extent:[source[0]+x0/W*dx,source[3]-y1/H*dy,source[0]+x1/W*dx,source[3]-y0/H*dy]}
 }
 /** Foto de Esri + límites locales; PNG privado, autorizado antes del cache. */
 export async function imagenMapa(datos: MapaCampo, fecha: string, fetcher: typeof fetch = fetch, focoId?: string) {
@@ -45,7 +47,7 @@ export async function imagenMapa(datos: MapaCampo, fecha: string, fetcher: typeo
   const cached = cache.get(hash)
   if (cached && cached.vence > Date.now()) return cached.imagen
   const general = await fondoSatelital(datos, fetcher)
-  const fondo = general && focoId ? recortarFondo(datos,general,focoId) : general
+  const fondo = general && focoId ? await recortarFondo(datos,general,focoId) : general
   const model = fondo ? svgMapa(datos, fecha, fondo, focoId)! : base
   await preparar()
   const render = new Resvg(model.svg, { font: { fontBuffers: [font], defaultFontFamily: 'Inter' } })
