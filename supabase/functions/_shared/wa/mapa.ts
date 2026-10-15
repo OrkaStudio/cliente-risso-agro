@@ -61,7 +61,8 @@ export function noRecuerdaPotrero(texto: string, p: Pendiente | null): boolean {
 /** Infraestructura del campo. El bot la encuentra por tipo + potrero («el molino del 9B»);
  * en la imagen basta el tipo, porque el potrero ya se ve. El apodo sólo distingue dos iguales. */
 export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; apodo?: string | null; punto?: [number, number]; linea?: [number, number][]; falla?: string | null }
-export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
+/** cabezas y ultimaRecorrida son opcionales: si no vienen, el cartel queda como siempre. null = nunca recorrido. */
+export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown; cabezas?: number; ultimaRecorrida?: string | null }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
 
 export type MapaIO = {
   datos: (campoId: string) => Promise<MapaCampo | null>
@@ -82,9 +83,11 @@ export async function atenderMapa(campo: Campo, io: MapaIO, pregunta?: string): 
   const incompleto = imagen.faltantes.length ? ` Sin dibujo: ${imagen.faltantes.join(', ')}.` : ''
   const respaldo = imagen.satelital ? '' : 'Croquis: el satélite no está disponible ahora. '
   const abiertas = datos.infraestructura?.filter(e => e.falla).length ?? 0
+  const conDatos = datos.potreros.some(p => p.cabezas !== undefined || p.ultimaRecorrida !== undefined)
+  const leyenda = conDatos ? '\nAl lado del potrero: cabezas y, en naranja, días sin recorrer.' : ''
   const fallas = abiertas ? `\nEn rojo: ${abiertas === 1 ? 'un problema abierto' : `${abiertas} problemas abiertos`}.` : ''
   const problemas = datos.alertas?.length ? '\nEl borde rojo indica potreros con problemas abiertos. Para verlos, escribí «problemas».' : ''
-  const caption = `${respaldo}${pregunta ?? `${datos.nombre}. Para ver un detalle, escribí «acercá» y el nombre del potrero.`}${incompleto}${fallas}${problemas}`
+  const caption = `${respaldo}${pregunta ?? `${datos.nombre}. Para ver un detalle, escribí «acercá» y el nombre del potrero.`}${incompleto}${leyenda}${fallas}${problemas}`
   await io.enviarImagen(imagen.bytes, [...caption].slice(0, 1024).join(''), campo.id, imagen.bytes[0] === 255 ? 'image/jpeg' : 'image/png')
   return true
 }
