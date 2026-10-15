@@ -140,7 +140,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   // La salida aparece como fila propia; «No sé cuál fue» la cierra con una cualquiera.
   await abrirUltimaSalida(page)
   await panel.getByRole('radio', { name: /No sé cuál fue/ }).click()
-  await expect(panel.getByText(/Va a quedar como vendida la/)).toBeVisible()
+  await expect(panel.getByText(/Queda como vendida la/)).toBeVisible()
   await panel.getByRole('button', { name: /^Que quede/ }).click()
   await expect(panel).toBeHidden()
 
@@ -175,7 +175,7 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   // Se tocó el potrero equivocado: la que salió está en otro potrero.
   await venderUnaVaca(page)
   await abrirUltimaSalida(page)
-  await panel.getByRole('button', { name: /Ver todo el rodeo/ }).click()
+  await panel.getByPlaceholder('Buscá por número de caravana').fill('E2E')
   await panel.getByRole('radio', { name: /Vaca/ }).last().click()
   await panel.getByRole('button', { name: /^Guardar: fue la/ }).click()
   await expect(panel).toBeHidden()

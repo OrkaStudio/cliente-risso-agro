@@ -10,6 +10,8 @@ import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels
 import { cn } from '@/lib/utils'
 import { ElegirDeLista, ZonaArchivo } from './caravanas'
 import { usePosibles } from './posibles'
+import { Potreros } from './entradas-salidas-panel'
+import { useMapa } from '@/features/mapa/api'
 import { edadTexto } from './rodeo'
 import { leerArchivo } from './leer-archivo'
 import { leerPlanilla, soloDigitos, type Lectura } from './planilla'
@@ -24,7 +26,7 @@ const ddmm = (iso: string | null) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 
  * otra), «No sé cuál fue» (queda una, nombrada, y se explica qué implica) o
  * «La cargué mal» (se anula). El botón de abajo dice lo que va a hacer.
  */
-export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { empresaId?: string; abierto: boolean; onCerrar: () => void; salidaFoco?: string | null }) {
+export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = null }: { empresaId: string; abierto: boolean; onCerrar: () => void; salidaFoco?: string | null }) {
   const salidasQ = useSalidasSinIdentificar()
   const potreros = usePotreros()
   const animales = useAnimales()
@@ -34,7 +36,6 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
   const [elegida, setElegida] = useState<string | null>(null)
   const [modo, setModo] = useState<'sabe' | 'nosabe' | 'error'>('sabe')
   const [ids, setIds] = useState<string[]>([])
-  const [enTodo, setEnTodo] = useState(false)
   const [buscar, setBuscar] = useState('')
   const [mal, setMal] = useState<'potrero' | 'cantidad' | 'nosalio'>('potrero')
   const [potCorrecto, setPotCorrecto] = useState<string | null>(null)
@@ -48,11 +49,14 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
   const posiblesIds = new Set(x?.posiblesIds ?? [])
   const posibles = usePosibles((a) => posiblesIds.has(a.id ?? ''))
   const ocupado = identificar.isPending || sinSaber.isPending || corregir.isPending
+  const { data: mapa } = useMapa(empresaId)
+  const camposMapa = (mapa ?? []).filter((c) => c.potreros.length > 0)
+  const [campoMapaId, setCampoMapaId] = useState<string | null>(null)
+  const campoMapa = camposMapa.find((c) => c.id === campoMapaId) ?? camposMapa.find((c) => c.potreros.some((p) => p.id === x?.potreroId)) ?? camposMapa[0]
 
   const reiniciar = () => {
     setModo('sabe')
     setIds([])
-    setEnTodo(false)
     setBuscar('')
     setMal('potrero')
     setPotCorrecto(null)
@@ -72,9 +76,6 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
   // «Buscala en todo el rodeo»: los animales activos de la misma especie, por potrero.
   const especie = x ? especiePorCategoria[x.categoria] : 'bovino'
   const rodeo = (animales.data ?? []).filter((a) => a.estado === 'activo' && a.id && a.categoria && especiePorCategoria[a.categoria] === especie)
-  const porPotrero = [...rodeo.reduce((m, a) => m.set(a.potrero_id ?? '', [...(m.get(a.potrero_id ?? '') ?? []), a]), new Map<string, typeof rodeo>())].sort(([a], [b]) =>
-    nombrePotrero(a).localeCompare(nombrePotrero(b), 'es', { numeric: true }),
-  )
   const elegidosInfo = ids.map((id) => rodeo.find((a) => a.id === id)).filter(Boolean) as typeof rodeo
 
   async function confirmar() {
@@ -140,7 +141,6 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
 
   const n = x.pendientes
   const cat = categoriaNombre(x.categoria, n).toLowerCase()
-  const catTodas = categoriaNombre(x.categoria, 2).toLowerCase()
   const pot = nombrePotrero(x.potreroId)
   const verbo = x.motivo === 'muerte' ? (n === 1 ? 'murió' : 'murieron') : n === 1 ? 'se vendió' : 'se vendieron'
   const como = x.motivo === 'muerte' ? 'muerta' : 'vendida'
@@ -168,16 +168,14 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
   const q = buscar.replace(/\D/g, '')
   const coincide = (a: { caravana_visual: string | null; caravana_rfid: string | null }) =>
     !q || (a.caravana_visual ?? '').replace(/\D/g, '').includes(q) || (a.caravana_rfid ?? '').replace(/\D/g, '').includes(q)
-  // Potreros de la empresa con animales de esa categoría (para «salió de otro potrero»).
-  const potrerosConCat = [...new Set(rodeo.filter((a) => a.categoria === x.categoria && a.potrero_id && a.potrero_id !== x.potreroId).map((a) => a.potrero_id!))]
 
   return (
     <PanelLateral
       abierto={abierto}
       onCerrar={cerrar}
-      ancho={modo === 'sabe' && enTodo}
+      ancho={modo === 'error' && mal === 'potrero'}
       titulo={`¿Qué ${n === 1 ? cat : `${n} ${cat}`} ${verbo} del ${pot}?`}
-      bajada={`El ${ddmm(x.fecha)} anotaste que ${verbo} ${n} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. El número del rodeo ya está bien; esto es para que cada ficha diga lo que pasó.`}
+      bajada={`Lo anotaste el ${ddmm(x.fecha)} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. El número del rodeo ya está bien.`}
       pie={
         <BotonPrincipal icono={modo === 'error' && mal === 'nosalio' ? 'Borrar' : 'Guardar'} cargando={ocupado} disabled={ocupado || !listoParaConfirmar} onClick={confirmar}>
           {boton}
@@ -193,9 +191,9 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
       <div role="radiogroup" aria-label="Cómo se resuelve" className="flex flex-col gap-2">
         {(
           [
-            { m: 'sabe', titulo: n === 1 ? 'Sé cuál fue' : 'Sé cuáles fueron', bajada: 'La tocás en la lista o la buscás por su número.' },
-            { m: 'nosabe', titulo: 'No sé cuál fue', bajada: `Tropero marca una como ${como}. Si después la ves en el campo, se corrige.` },
-            { m: 'error', titulo: 'Me equivoqué al cargarla', bajada: 'Corregí el potrero o la cantidad, o anulala si no salió.' },
+            { m: 'sabe', titulo: n === 1 ? 'Sé cuál fue' : 'Sé cuáles fueron', bajada: 'La tocás o la buscás por su caravana.' },
+            { m: 'nosabe', titulo: 'No sé cuál fue', bajada: `Tropero marca una como ${como}; se puede corregir.` },
+            { m: 'error', titulo: 'Me equivoqué al cargarla', bajada: 'Corregís el potrero o la cantidad, o la anulás.' },
           ] as const
         ).map((o) => (
           <button
@@ -219,102 +217,66 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
 
       <div className="mt-6">
         {modo === 'sabe' && (
-          <label className="relative mb-4 flex h-11 items-center">
-            <span className="pointer-events-none absolute left-4 text-texto-suave">
-              <Icono nombre="Buscar" tamano={16} />
-            </span>
-            <span className="sr-only">Buscá por número de caravana</span>
-            <input
-              value={buscar}
-              onChange={(e) => {
-                setBuscar(e.target.value)
-                if (e.target.value.replace(/\D/g, '')) setEnTodo(true)
-              }}
-              inputMode="numeric"
-              placeholder="Buscá por número de caravana"
-              className="h-full w-full rounded-full border-[1.5px] border-borde bg-superficie pr-4 pl-11 text-[15px] text-texto outline-none placeholder:text-texto-suave focus:border-principal"
-            />
-          </label>
-        )}
-
-        {modo === 'sabe' && !enTodo && (
           <>
-            <p className="mb-3 text-[14px] leading-snug text-texto-suave">
-              {x.posibles === n
-                ? `Sólo ${n === 1 ? 'queda una posible en el ' + pot : `quedan ${n} posibles en el ${pot}`}: las demás que estaban se movieron o salieron después.`
-                : `Las ${posibles.length} ${catTodas} que estaban en el ${pot} ese día y siguen en el rodeo.`}
+            <label className="relative mb-4 flex h-11 items-center">
+              <span className="pointer-events-none absolute left-4 text-texto-suave">
+                <Icono nombre="Buscar" tamano={16} />
+              </span>
+              <span className="sr-only">Buscá por número de caravana</span>
+              <input
+                value={buscar}
+                onChange={(e) => (setBuscar(e.target.value), setIds([]))}
+                inputMode="numeric"
+                placeholder="Buscá por número de caravana"
+                className="h-full w-full rounded-full border-[1.5px] border-borde bg-superficie pr-10 pl-11 text-[15px] text-texto outline-none placeholder:text-texto-suave focus:border-principal"
+              />
+              {buscar && (
+                <button type="button" aria-label="Borrar la búsqueda" onClick={() => (setBuscar(''), setIds([]))} className="absolute right-3 grid size-7 place-items-center rounded-full text-texto-suave hover:bg-superficie-hundida">
+                  <Icono nombre="Cerrar" tamano={16} />
+                </button>
+              )}
+            </label>
+            <p className="mb-3 text-[14px] text-texto-suave">
+              {q
+                ? `Caravanas con «${q}» en todo el rodeo.`
+                : x.posibles === n
+                  ? `${n === 1 ? 'Sólo queda una posible' : `Quedan ${n} posibles`}: las demás se movieron o salieron.`
+                  : `Las ${posibles.length} que estaban en el ${pot} ese día. Si no es ninguna, buscala.`}
             </p>
-            <ElegirDeLista posibles={posibles.map((p) => ({ ...p, caravana: p.id }))} elegidas={ids} cuantas={n} onCambio={setIds} />
-            <div className="mt-5 flex items-center gap-3 rounded-[14px] bg-superficie px-4 py-3">
-              <p className="min-w-0 flex-1 text-[14px] text-texto-suave">¿No está entre éstas? Puede que al cargarla hayas tocado otro potrero.</p>
-              <button
-                type="button"
-                onClick={() => (setEnTodo(true), setIds([]))}
-                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
-              >
-                <Icono nombre="Buscar" tamano={16} /> Ver todo el rodeo
-              </button>
-            </div>
-          </>
-        )}
-
-        {modo === 'sabe' && enTodo && (
-          <>
-            <button
-              type="button"
-              onClick={() => (setEnTodo(false), setIds([]), setBuscar(''))}
-              className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde px-3.5 text-[14px] font-bold text-texto hover:bg-superficie-hundida"
-            >
-              <Icono nombre="Atrás" tamano={16} /> Sólo las del {pot}
-            </button>
-            <p className="mb-3 text-[14px] text-texto-suave">{q ? `Las que tienen «${q}» en su caravana.` : `Todo el rodeo, por potrero. Tocá ${n === 1 ? 'la que salió' : `las ${n} que salieron`}.`}</p>
-            <div className="flex flex-col gap-5">
-              {porPotrero.map(([potId, todos]) => {
-                const as = todos.filter((a) => coincide(a) || (!q && !(a.caravana_visual || a.caravana_rfid)))
-                const conCaravana = as.filter((a) => a.caravana_visual || a.caravana_rfid)
-                const sin = q ? [] : as.filter((a) => !a.caravana_visual && !a.caravana_rfid)
-                const tiles = [
-                  ...conCaravana.map((a) => ({
-                    caravana: a.id!,
-                    visual: a.caravana_visual,
-                    rfid: a.caravana_rfid,
-                    etiqueta: categoriaNombre(a.categoria!, 1),
-                    detalle: [edadTexto(a.fecha_nacimiento), posiblesIds.has(a.id!) ? 'posible' : null].filter(Boolean).join(' · '),
-                  })),
-                  // Las sin caravana no se distinguen: una cualquiera de ellas.
-                  ...[...new Set(sin.map((a) => a.categoria!))].map((c) => ({
-                    caravana: sin.find((a) => a.categoria === c && !ids.includes(a.id!))?.id ?? sin.find((a) => a.categoria === c)!.id!,
-                    visual: null,
-                    rfid: null,
-                    etiqueta: `${categoriaNombre(c, 1)} sin caravana`,
-                    detalle: `una de las ${sin.filter((a) => a.categoria === c).length}`,
-                  })),
-                ]
-                if (!tiles.length) return null
+            {q ? (
+              (() => {
+                const halladas = rodeo.filter((a) => (a.caravana_visual || a.caravana_rfid) && coincide(a))
+                if (!halladas.length) return <p className="text-[14.5px] text-texto-suave">Ninguna caravana tiene «{q}».</p>
                 return (
-                  <section key={potId}>
-                    <p className="mb-2 text-[13.5px] font-bold text-texto">{potId ? nombrePotrero(potId) : 'Sin potrero'}</p>
-                    <ElegirDeLista posibles={tiles} elegidas={ids} cuantas={n} onCambio={setIds} />
-                  </section>
+                  <ElegirDeLista
+                    posibles={halladas.map((a) => ({
+                      caravana: a.id!,
+                      visual: a.caravana_visual,
+                      rfid: a.caravana_rfid,
+                      etiqueta: categoriaNombre(a.categoria!, 1),
+                      detalle: [edadTexto(a.fecha_nacimiento), nombrePotrero(a.potrero_id)].filter(Boolean).join(' · '),
+                    }))}
+                    elegidas={ids}
+                    cuantas={n}
+                    onCambio={setIds}
+                  />
                 )
-              })}
-              {q && !rodeo.some(coincide) && <p className="text-[14.5px] text-texto-suave">Ninguna caravana tiene «{q}».</p>}
-            </div>
+              })()
+            ) : (
+              <ElegirDeLista posibles={posibles.map((p) => ({ ...p, caravana: p.id }))} elegidas={ids} cuantas={n} onCambio={setIds} />
+            )}
           </>
         )}
 
         {modo === 'nosabe' && (
           <div className="rounded-[16px] bg-superficie px-4 py-4 text-[14.5px] leading-relaxed text-texto">
             <p className="font-bold">
-              Va a quedar como {como} {quedan.length === 1 ? 'la' : 'las'} {nums(quedan)}
+              Queda como {como} la {nums(quedan)}
             </p>
-            <p className="mt-1 text-texto-suave">No la elegís vos: es {quedan.length === 1 ? 'la primera' : `las primeras ${quedan.length}`} de las {posibles.length} posibles del {pot}. Qué implica:</p>
-            <ul className="mt-2 flex flex-col gap-1.5">
-              <li>· {quedan.length === 1 ? 'Deja' : 'Dejan'} de aparecer en el rodeo y {quedan.length === 1 ? 'su ficha dice' : 'sus fichas dicen'} «{como} sin identificar».</li>
-              <li>· Las otras {posibles.length - quedan.length} quedan como están. El número no cambia: ya estaba restado.</li>
-              <li>
-                · Si después ves en el campo {quedan.length === 1 ? `la ${nums(quedan)}` : 'alguna de ellas'}, en su ficha tocás «Sigue en el campo»: vuelve al rodeo y la {x.motivo === 'muerte' ? 'muerte' : 'venta'} queda otra vez sin identificar.
-              </li>
+            <ul className="mt-2 flex flex-col gap-1 text-texto-suave">
+              <li>· La elige Tropero entre las {posibles.length} posibles del {pot}.</li>
+              <li>· Su ficha dice «{como} sin identificar». Las demás no cambian.</li>
+              <li>· Si la ves en el campo, en su ficha tocás «Sigue en el campo».</li>
             </ul>
           </div>
         )}
@@ -335,42 +297,30 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
             <div className="mt-4 rounded-[16px] bg-superficie px-4 py-4 text-[14.5px] text-texto">
               {mal === 'potrero' && (
                 <>
-                  <p className="mb-3">
-                    ¿De qué potrero {n === 1 ? `salió la ${cat}` : `salieron las ${n} ${cat}`}? El {pot} recupera {n === 1 ? 'la que se le restó' : `las ${n} que se le restaron`}.
-                  </p>
-                  {potrerosConCat.length === 0 ? (
-                    <p className="text-texto-suave">No hay {catTodas} en otro potrero.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {potrerosConCat.map((id) => {
-                        const hay = rodeo.filter((a) => a.potrero_id === id && a.categoria === x.categoria).length
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            aria-pressed={potCorrecto === id}
-                            onClick={() => setPotCorrecto(id)}
-                            className={cn(
-                              'flex min-w-[64px] flex-col items-center rounded-[14px] border-[1.5px] px-3 py-2',
-                              potCorrecto === id ? 'border-principal bg-principal text-principal-texto' : 'border-borde bg-fondo text-texto hover:border-neutro-300',
-                            )}
-                          >
-                            <span className="cifra text-[18px] leading-none font-bold">{nombrePotrero(id)}</span>
-                            <span className="mt-0.5 text-[11.5px] font-semibold opacity-80">
-                              {hay} {categoriaNombre(x.categoria, hay).toLowerCase()}
-                            </span>
-                          </button>
-                        )
-                      })}
+                  <p className="mb-3">¿De qué potrero {n === 1 ? 'salió' : 'salieron'}? Tocalo en el mapa.</p>
+                  {camposMapa.length > 1 && (
+                    <div className="mb-3">
+                      <Segmentos etiqueta="Campo" opciones={camposMapa.map((c) => ({ valor: c.id, texto: c.nombre }))} valor={campoMapa?.id ?? null} onCambio={(id) => (setCampoMapaId(id), setPotCorrecto(null))} />
                     </div>
+                  )}
+                  {campoMapa && (
+                    <Potreros
+                      campo={campoMapa}
+                      elegido={potCorrecto}
+                      onElegir={setPotCorrecto}
+                      apagado={(p) => p.id === x.potreroId || !rodeo.some((a) => a.potrero_id === p.id && a.categoria === x.categoria)}
+                      dato={(p) => {
+                        if (p.id === x.potreroId) return 'el que cargaste'
+                        const hay = rodeo.filter((a) => a.potrero_id === p.id && a.categoria === x.categoria).length
+                        return hay ? `${hay} ${categoriaNombre(x.categoria, hay).toLowerCase()}` : null
+                      }}
+                    />
                   )}
                 </>
               )}
               {mal === 'cantidad' && (
                 <>
-                  <p className="mb-3">
-                    ¿Cuántas {catTodas} {x.motivo === 'muerte' ? 'murieron' : 'se vendieron'} del {pot}? Anotaste {n}.
-                  </p>
+                  <p className="mb-3">¿Cuántas fueron? Anotaste {n}.</p>
                   <div className="flex items-center gap-3">
                     <button type="button" aria-label="Una menos" onClick={() => setCantCorrecta(Math.max(1, (cantCorrecta ?? n) - 1))} className="grid size-10 place-items-center rounded-full bg-superficie-hundida text-[20px] font-bold">
                       −
@@ -380,14 +330,10 @@ export function IdentificarSalidas({ abierto, onCerrar, salidaFoco = null }: { e
                       +
                     </button>
                   </div>
-                  <p className="mt-3 text-[13.5px] text-texto-suave">Se rehace con la misma fecha. Si no alcanzan, Tropero te avisa.</p>
+                  <p className="mt-3 text-[13.5px] text-texto-suave">Se corrige con la misma fecha.</p>
                 </>
               )}
-              {mal === 'nosalio' && (
-                <p>
-                  Se borra {x.motivo === 'muerte' ? 'esta muerte' : 'esta venta'}: el {pot} vuelve a tener {n === 1 ? `la ${cat}` : `las ${n} ${cat}`} que se habían restado. Si alguna sin caravana había salido en esa misma carga, vuelve al rodeo.
-                </p>
-              )}
+              {mal === 'nosalio' && <p>Se borra la {x.motivo === 'muerte' ? 'muerte' : 'venta'} y el {pot} recupera lo que se había restado.</p>}
             </div>
           </div>
         )}

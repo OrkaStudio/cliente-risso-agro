@@ -239,7 +239,7 @@ export function RodeoPage() {
             <b>
               {sinIdentificar} {sinIdentificar === 1 ? 'animal salió' : 'animales salieron'} sin decir cuál
             </b>
-            <span className="block text-[13.5px] text-texto-suave">Ya se restaron del número. Cuando sepas cuál fue, decilo acá o desde la ficha del animal; mientras, las fichas no cambian.</span>
+            <span className="block text-[13.5px] text-texto-suave">Ya se restaron del número. Cuando sepas cuál fue, decilo acá o en su ficha.</span>
           </p>
           <BotonChico type="button" onClick={() => setPanelCaravanas('identificar')}>
             {sinIdentificar === 1 ? 'Decir cuál' : 'Decir cuáles'}

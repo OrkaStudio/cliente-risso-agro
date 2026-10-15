@@ -359,7 +359,7 @@ export function EntradasSalidas({
 }
 
 /** El croquis satelital si el campo está dibujado; si no, sus potreros como botones. */
-function Potreros(props: React.ComponentProps<typeof CroquisElegir>) {
+export function Potreros(props: React.ComponentProps<typeof CroquisElegir>) {
   const { campo, elegido, onElegir, dato, apagado } = props
   if (campo.potreros.some((p) => p.poligono)) return <CroquisElegir {...props} />
   return (
