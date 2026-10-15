@@ -375,7 +375,13 @@ end $$;
 grant execute on function salida_por_cantidad(uuid, uuid, jsonb, text, date, text, text[]) to authenticated;
 
 -- ── Decir cuál fue ────────────────────────────────────────────────────
-/** «Fue ésta»: el animal es una de las posibles de esa salida (o de la más vieja que la tenga). */
+/**
+ * «Fue ésta». Sin salida: el animal tiene que ser una de las posibles de alguna
+ * (la más vieja). Con salida: cualquier animal del rodeo — la que salió puede
+ * no estar entre las posibles (se tocó otro potrero al cargar, o era otra):
+ * la salida se cierra con ése, el potrero de la salida recupera su número y
+ * el del animal lo pierde.
+ */
 create or replace function identificar_animal(p_animal_id uuid, p_salida_id uuid default null)
 returns void
 language plpgsql
@@ -385,15 +391,33 @@ as $$
 declare
   v_pend uuid;
 begin
-  select s.id into v_pend
-    from salida_pendiente s
-    join salida_candidato c on c.salida_id = s.salida_id and c.animal_id = p_animal_id and not c.descartado
-   where s.resuelta_en is null and (p_salida_id is null or s.salida_id = p_salida_id)
-   order by s.created_at
-   limit 1
-   for update of s;
-  if v_pend is null then
-    raise exception 'Ese animal no es una de las posibles de una salida sin identificar';
+  if p_salida_id is null then
+    select s.id into v_pend
+      from salida_pendiente s
+      join salida_candidato c on c.salida_id = s.salida_id and c.animal_id = p_animal_id and not c.descartado
+     where s.resuelta_en is null
+     order by s.created_at
+     limit 1
+     for update of s;
+    if v_pend is null then
+      raise exception 'Ese animal no es una de las posibles de una salida sin identificar';
+    end if;
+  else
+    select s.id into v_pend
+      from salida_pendiente s
+     where s.salida_id = p_salida_id and s.resuelta_en is null
+     order by s.created_at
+     limit 1
+     for update;
+    if v_pend is null then
+      raise exception 'Esa salida ya no tiene nada sin identificar';
+    end if;
+    if not exists (
+      select 1 from animal a join salida_pendiente s on s.id = v_pend
+       where a.id = p_animal_id and a.empresa_id = s.empresa_id and a.estado = 'activo'
+    ) then
+      raise exception 'Ese animal ya no está en el rodeo';
+    end if;
   end if;
   perform _resolver_pendiente(v_pend, p_animal_id, 'identificada');
 end $$;

@@ -139,9 +139,9 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
 
   // La salida aparece como fila propia; «No sé cuál fue» la cierra con una cualquiera.
   await abrirUltimaSalida(page)
-  await panel.getByRole('button', { name: 'No sé cuál fue' }).click()
+  await panel.getByRole('radio', { name: /No sé cuál fue/ }).click()
   await expect(panel.getByText(/Va a quedar como vendida la/)).toBeVisible()
-  await panel.getByRole('button', { name: /^Sí, que quede/ }).click()
+  await panel.getByRole('button', { name: /^Que quede/ }).click()
   await expect(panel).toBeHidden()
 
   // Entraron · Nacieron: dos terneros en el 1A, sin caravana.
@@ -168,15 +168,23 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await venderUnaVaca(page)
   await abrirUltimaSalida(page)
   await expect(panel.getByRole('heading', { name: /Qué vaca se vendió del 1A/ })).toBeVisible()
-  await panel.locator('[role=radio]').first().click()
-  await panel.getByRole('button', { name: 'Guardar' }).click()
+  await panel.getByRole('radio', { name: /^\S+ ?Vaca/ }).first().click()
+  await panel.getByRole('button', { name: /^Guardar: fue la/ }).click()
+  await expect(panel).toBeHidden()
+
+  // Se tocó el potrero equivocado: la que salió está en otro potrero.
+  await venderUnaVaca(page)
+  await abrirUltimaSalida(page)
+  await panel.getByRole('button', { name: /No está acá: buscala en todo el rodeo/ }).click()
+  await panel.getByRole('radio', { name: /Vaca/ }).last().click()
+  await panel.getByRole('button', { name: /^Guardar: fue la/ }).click()
   await expect(panel).toBeHidden()
 
   // Otra venta, cargada por error: se anula y el potrero queda como estaba.
   await venderUnaVaca(page)
   await abrirUltimaSalida(page)
-  await panel.getByRole('button', { name: 'Fue un error: anular la salida' }).click()
-  await panel.getByRole('button', { name: 'Sí, anular la salida' }).click()
+  await panel.getByRole('radio', { name: /La cargué mal/ }).click()
+  await panel.getByRole('button', { name: /^Anular la venta/ }).click()
   await expect(panel).toBeHidden()
 
   // La planilla: una caravana para un ternero sin caravana del 1A.

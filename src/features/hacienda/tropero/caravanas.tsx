@@ -160,7 +160,7 @@ export function ElegirDeLista({ posibles, elegidas, cuantas, onCambio }: { posib
               )}
             >
               <span className={cn('cifra shrink-0 rounded-[8px] border-[1.5px] px-1.5 text-[18px] leading-tight font-bold', si ? 'border-principal bg-principal text-principal-texto' : 'border-principal text-principal')}>
-                {p.visual ?? p.rfid?.slice(-4)}
+                {p.visual ?? p.rfid?.slice(-4) ?? 's/c'}
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-[14px] font-bold text-texto">{p.etiqueta}</span>

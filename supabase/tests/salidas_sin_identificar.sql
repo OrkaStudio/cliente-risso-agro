@@ -163,4 +163,23 @@ begin
   perform pg_temp.afirmar((select posibles from v_salidas_sin_identificar where salida_id = s) = 2, 'ya sin la 9012 entre las posibles');
 end $$;
 
+-- 9. Se tocó el potrero equivocado: se vendió «del A» pero la que salió estaba en el B.
+do $$
+declare r jsonb; s uuid; a_antes int; b_antes int;
+begin
+  insert into animal (id, empresa_id, categoria, potrero_id) values
+    ('00000000-0000-0000-0000-000000000021', 'eeeeeeee-0000-0000-0000-000000000001', 'vaca', 'bbbbbbbb-0000-0000-0000-00000000000b');
+  insert into caravana (empresa_id, animal_id, numero_rfid, numero_visual)
+  values ('eeeeeeee-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000021', '032000000000021', '9021');
+  a_antes := pg_temp.vacas_a();
+  b_antes := coalesce((select cabezas from v_composicion_potrero where potrero_id = 'bbbbbbbb-0000-0000-0000-00000000000b' and categoria = 'vaca'), 0);
+  r := salida_por_cantidad('eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', '[{"categoria":"vaca","cantidad":1}]', 'venta');
+  s := (r->>'salida_id')::uuid;
+  perform pg_temp.afirmar(pg_temp.vacas_a() = a_antes - 1, 'A bajó (mal) uno');
+  perform identificar_animal('00000000-0000-0000-0000-000000000021', s);
+  perform pg_temp.afirmar(pg_temp.vacas_a() = a_antes, 'A recupera su número');
+  perform pg_temp.afirmar(coalesce((select cabezas from v_composicion_potrero where potrero_id = 'bbbbbbbb-0000-0000-0000-00000000000b' and categoria = 'vaca'), 0) = b_antes - 1, 'B pierde la que salió');
+  perform pg_temp.afirmar((select estado from animal where id = '00000000-0000-0000-0000-000000000021') = 'vendido', 'la 9021 vendida');
+end $$;
+
 rollback;
