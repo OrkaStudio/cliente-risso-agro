@@ -102,7 +102,16 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
     const botones = (out: typeof salida) => out.flatMap(o => [...(o.interactive?.action?.buttons?.map(b => b.reply.id) ?? []), ...(o.interactive?.action?.sections?.flatMap(s => s.rows.map(r => r.id)) ?? [])])
     const textos = (out: typeof salida) => out.map(o => o.text?.body ?? o.interactive?.body?.text ?? o.image?.caption ?? '').join(' | ')
 
+    // Apagado (como en producción hasta que la app muestre los tipos nuevos): sólo molino y tranquera.
+    Deno.env.delete('WA_INFRA_TIPOS_NUEVOS')
     let out = await ubic(v1, -36.005, -59.285)
+    assert(!botones(out).includes('inf:tipo=tanque') && botones(out).includes('inf:tipo=molino'), 'Ofreció un tipo que la app no muestra')
+    out = await texto(v1, 'tanque australiano')
+    assert(textos(out).includes('Por ahora puedo cargar molinos y tranqueras') && (await admin`select 1 from infraestructura`).length === 0)
+    out = await texto(v1, 'eléctrico entre el 8B y el 9B')
+    assert(textos(out).includes('Por ahora'), 'Propuso un eléctrico con los tipos nuevos apagados')
+    Deno.env.set('WA_INFRA_TIPOS_NUEVOS', 'true')
+    out = await ubic(v1, -36.005, -59.285)
     assert(botones(out).includes('inf:tipo=tanque') && textos(out).includes('9B'), 'Ubicación sin ofrecer carga: ' + textos(out))
     assert(((await db.vinculoDe(v1.telefono))!.pendiente as { tipo: string }).tipo === 'ubicado', 'La recorrida pierde el «estás acá»')
     out = await texto(v1, 'tanque australiano')

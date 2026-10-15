@@ -16,9 +16,16 @@ export type IOInfra = {
 
 const articulo = (t: TipoInfra) => t === 'tranquera' ? 'la' : 'el'
 
+// El panel del potrero de la app rompe con un tipo que no conoce (FEATURE_MAP[fid].Icon, 15/10).
+// Hasta que la app muestre los nuevos, el bot sólo carga lo que ella ya dibuja.
+const APP_CONOCE: TipoInfra[] = ['molino', 'tranquera']
+const nuevosHabilitados = () => Deno.env.get('WA_INFRA_TIPOS_NUEVOS') === 'true'
+export const tiposCargables = (): TipoInfra[] => nuevosHabilitados() ? TIPOS_PUNTO : TIPOS_PUNTO.filter(t => APP_CONOCE.includes(t))
+const TODAVIA_NO = 'Por ahora puedo cargar molinos y tranqueras. Tanques, bebederos, energizadores y eléctricos llegan cuando la app los pueda mostrar.'
+
 /** Lo que el bot ofrece al recibir una ubicación: la recorrida sigue igual, cargar es opcional. */
 export function ofrecerCarga(texto: string): Mensaje {
-  return { texto, lista: { boton: 'Cargar acá', filas: TIPOS_PUNTO.map(t => ({ id: `inf:tipo=${t}`, titulo: NOMBRE_TIPO[t] })) } }
+  return { texto, lista: { boton: 'Cargar acá', filas: tiposCargables().map(t => ({ id: `inf:tipo=${t}`, titulo: NOMBRE_TIPO[t] })) } }
 }
 
 /** true si el mensaje era del inventario y ya se contestó. */
@@ -29,7 +36,7 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
     const [accion, valor] = e.botonId.slice(4).split('=')
     if (accion === 'tipo') {
       const lugar = lugarPendiente(p)
-      if (!lugar || !TIPOS_PUNTO.includes(valor as TipoInfra)) { await io.responder({ texto: 'Esa opción era de una ubicación anterior. Mandame la ubicación de nuevo.' }); return true }
+      if (!lugar || !tiposCargables().includes(valor as TipoInfra)) { await io.responder({ texto: 'Esa opción era de una ubicación anterior. Mandame la ubicación de nuevo.' }); return true }
       await proponerPunto(e, io, valor as TipoInfra, null, lugar.punto, lugar.campoId)
       return true
     }
@@ -59,6 +66,7 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
   // cualquier orden. Se espera la ubicación (hasta que venza el pendiente) en vez de no entenderla.
   if ((!p || (p.tipo === 'infra' && p.paso === 'ubicacion')) && e.entrada !== 'boton') {
     const el = elementoDeTexto(e.texto)
+    if (el && !tiposCargables().includes(el.tipo)) { await io.responder({ texto: TODAVIA_NO }); return true }
     if (el) {
       await db.guardarPendiente(e.v.id, { tipo: 'infra', capturaId: null, paso: 'ubicacion', elemento: el, origen: { texto: e.texto, entrada: e.entrada } })
       const que = `${articulo(el.tipo) === 'la' ? 'de la' : 'del'} ${NOMBRE_TIPO[el.tipo].toLowerCase()}${el.apodo ? ` ${el.apodo}` : ''}`
@@ -88,6 +96,7 @@ function lugarPendiente(p: Pendiente | PendienteInfra | null): { punto: LatLng; 
 }
 
 async function proponerPunto(e: EntradaInfra, io: IOInfra, tipo: TipoInfra, apodo: string | null, punto0: LatLng, campoId: string) {
+  if (!tiposCargables().includes(tipo)) { await io.responder({ texto: TODAVIA_NO }); return }
   const dibujados = (await db.potrerosDibujados(e.v)).filter(x => x.campoId === campoId)
   const punto = tipo === 'tranquera' ? pegarAlBorde(punto0, dibujados) : punto0
   const ps = potrerosEnPunto(punto, dibujados)
@@ -145,6 +154,7 @@ function buscar(mencion: string, ctx: Contexto, dibujados: PotreroDibujado[], ca
 }
 
 async function comando(e: EntradaInfra, io: IOInfra, c: ComandoInfra) {
+  if (c.k !== 'borrar' && !nuevosHabilitados()) { await io.responder({ texto: TODAVIA_NO }); return }
   const dibujados = await db.potrerosDibujados(e.v)
   if (c.k === 'electrico_entre') {
     let a = buscar(c.a, e.ctx, dibujados, null)
