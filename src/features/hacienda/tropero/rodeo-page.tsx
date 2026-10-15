@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { CaravanasPorExcel, IdentificarSalidas } from './caravanas-paneles'
 import { EntradasSalidas } from './entradas-salidas-panel'
 import { AnimalNuevo } from './paneles'
-import { bajadaDelRodeo, ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type FilaSalida } from './rodeo'
+import { ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type FilaSalida } from './rodeo'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 /** Cuántas filas se ven antes de «Ver los N». */
@@ -162,7 +162,6 @@ export function RodeoPage() {
   const vista: Vista = especie === 'todas' && hayEspecies.length <= 1 ? 'bovino' : especie
   const cuantosDe = (e: Vista) => (e === 'todas' ? resumen.total : resumen.porEspecie[e])
   const nombreVista = vista === 'todas' ? (r.total === 1 ? 'cabeza' : 'cabezas') : ESPECIES.find((e) => e.especie === vista)!.nombre.toLowerCase()
-  const nCampos = campoId ? 1 : r.porCampo.length
   const filtroActivo: Filtro | null = verSalieron ? 'salieron' : verSinIdentificar ? 'sinIdentificar' : estado
   const elegirEstado = (e: Estado | 'sinIdentificar' | 'salieron' | null) => {
     const p = new URLSearchParams(params)
@@ -206,38 +205,57 @@ export function RodeoPage() {
         <QueCampo campos={elegido.campos} elegido={elegido.elegido} elegir={elegido.elegir} />
       </motion.div>
 
-      {/* El número del rodeo y de qué está hecho */}
-      <motion.section {...entra(1)} className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <div className="flex flex-col justify-between gap-5 rounded-[20px] border border-borde bg-superficie px-6 py-5">
-          <div className="flex items-end gap-4">
-            <p className="titulo-display text-[68px] leading-[0.85] tracking-[-0.03em] text-texto">{r.total.toLocaleString('es-AR')}</p>
-            <div className="pb-1">
-              <p className="font-heading text-[20px] leading-tight font-extrabold text-texto">
-                {nombreVista}
-                {campoId ? ` en ${elegido.elegido!.nombre}` : nCampos > 1 ? ` en ${['', '', 'dos', 'tres', 'cuatro', 'cinco'][nCampos] ?? nCampos} campos` : ''}
-              </p>
-              <p className="text-[14.5px] text-texto-suave">{bajadaDelRodeo(r, resumen, vista, !!campoId) || 'Ordenados por lo que hay que hacer.'}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2.5">
-            <button
-              type="button"
-              onClick={() => setEntradaSalida('entraron')}
-              className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
-            >
-              Entraron
-              <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
-                <Icono nombre="Agregar" tamano={16} />
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setEntradaSalida('salieron')}
-              className="inline-flex h-10 items-center rounded-full bg-acento px-4 text-[14.5px] font-bold text-acento-texto hover:bg-trigo-500"
-            >
-              Salieron
-            </button>
+      {/* El número del rodeo, de dónde y de qué está hecho, y lo que se hace: una sola tarjeta. */}
+      <motion.section {...entra(1)} className="grid gap-x-8 gap-y-5 rounded-[20px] border border-borde bg-superficie px-6 py-5 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-[180px]">
+          <p className="flex items-baseline gap-3">
+            <span className="titulo-display text-[64px] leading-[0.85] tracking-[-0.03em] text-texto">{r.total.toLocaleString('es-AR')}</span>
+            <span className="font-heading text-[19px] font-extrabold text-texto">{nombreVista}</span>
+          </p>
+          {campoId ? (
+            <p className="mt-2 text-[14px] text-texto-suave">en {elegido.elegido!.nombre}</p>
+          ) : (
+            r.porCampo.length > 1 && (
+              <ul className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
+                {r.porCampo.map((c) => {
+                  const id = elegido.campos.find((x) => x.id === c.id)
+                  return (
+                    <li key={c.id} className="flex items-center gap-1.5 text-[14px] text-texto-suave">
+                      {id && (
+                        <span className="grid size-[18px] place-items-center rounded-[5px] text-[10px] font-extrabold text-white" style={{ background: id.color }}>
+                          {id.letra}
+                        </span>
+                      )}
+                      {c.nombre} <b className="cifra text-[16px] text-texto">{c.cabezas}</b>
+                    </li>
+                  )
+                })}
+              </ul>
+            )
+          )}
+        </div>
 
+        <StockPorCategoria cats={r.porCategoria} total={r.total} />
+
+        <div className="flex gap-2.5 lg:flex-col">
+          <button
+            type="button"
+            onClick={() => setEntradaSalida('entraron')}
+            className="inline-flex h-10 items-center justify-between gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
+          >
+            Entraron
+            <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
+              <Icono nombre="Agregar" tamano={16} />
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntradaSalida('salieron')}
+            className="inline-flex h-10 items-center justify-center rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
+          >
+            Salieron
+          </button>
+        </div>
             {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), setEntradaSalida('entraron'))} />}
             {membresia?.empresa_id && (
               <>
@@ -271,9 +289,6 @@ export function RodeoPage() {
                 }}
               />
             )}
-          </div>
-        </div>
-        <StockPorCategoria cats={r.porCategoria} total={r.total} especie={vista} />
       </motion.section>
 
       {/* Algo para resolver: un aviso con su botón (no es un filtro). */}
@@ -303,28 +318,34 @@ export function RodeoPage() {
               <Pildora activo={!verSinIdentificar && !verSalieron && !estado} onClick={() => elegirEstado(null)} texto="Todos" n={r.total} />
               {(GRUPO_ATENDER.some((e) => (e === 'sinIdentificar' ? sinIdentificar : r.porEstado[e])) ) && (
                 <>
-                  <span className="ml-2 text-[12.5px] font-semibold tracking-[0.03em] text-texto-suave uppercase">Para atender</span>
+                  <span aria-hidden className="mx-1 h-6 w-px bg-borde" />
                   {GRUPO_ATENDER.map((e) => {
                     const n = e === 'sinIdentificar' ? sinIdentificar : (r.porEstado[e] ?? 0)
                     if (!n) return null
                     const activo = e === 'sinIdentificar' ? verSinIdentificar : !verSinIdentificar && !verSalieron && estado === e
-                    return <Pildora key={e} activo={activo} onClick={() => elegirEstado(activo ? null : e)} texto={TEXTO_FILTRO[e]} n={n} punto={e === 'sinIdentificar' ? 'bg-estado-atencion' : PUNTO[e]} />
+                    return <Pildora key={e} activo={activo} onClick={() => elegirEstado(activo ? null : e)} texto={TEXTO_FILTRO[e]} n={n} />
                   })}
                 </>
               )}
               {GRUPO_DATOS.some((e) => r.porEstado[e]) && (
                 <>
-                  <span className="ml-2 text-[12.5px] font-semibold tracking-[0.03em] text-texto-suave uppercase">Les falta</span>
+                  <span aria-hidden className="mx-1 h-6 w-px bg-borde" />
                   {GRUPO_DATOS.filter((e) => r.porEstado[e]).map((e) => {
                     const activo = !verSinIdentificar && !verSalieron && estado === e
-                    return <Pildora key={e} activo={activo} onClick={() => elegirEstado(activo ? null : e)} texto={TEXTO_FILTRO[e]} n={r.porEstado[e]!} punto={PUNTO[e]} />
+                    return <Pildora key={e} activo={activo} onClick={() => elegirEstado(activo ? null : e)} texto={TEXTO_FILTRO[e]} n={r.porEstado[e]!} />
                   })}
                 </>
               )}
               {nSalieron > 0 && (
-                <span className="ml-auto">
-                  <Pildora activo={verSalieron} onClick={() => elegirEstado(verSalieron ? null : 'salieron')} texto="Salieron" n={nSalieron} />
-                </span>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={verSalieron}
+                  onClick={() => elegirEstado(verSalieron ? null : 'salieron')}
+                  className={cn('ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-bold transition-colors', verSalieron ? 'bg-tinta text-superficie' : 'text-texto-suave hover:text-texto')}
+                >
+                  Salieron <span className="cifra">{nSalieron}</span>
+                </button>
               )}
             </div>
             {filtroActivo && <p className="mt-3 text-[14px] text-texto-suave">{EXPLICA[filtroActivo]}</p>}
@@ -426,39 +447,25 @@ export function RodeoPage() {
   )
 }
 
-/** La barra del stock: el ancho es la cantidad; la leyenda nombra y cuenta. */
-function StockPorCategoria({ cats, total, especie }: { cats: { categoria: string; cabezas: number }[]; total: number; especie: Vista }) {
-  const nombre = { todas: 'cabezas', bovino: 'vacunos', ovino: 'ovinos', equino: 'equinos' }[especie]
+/** La composición del rodeo: una barra (el ancho es la cantidad) y debajo cada categoría con su número. */
+function StockPorCategoria({ cats, total }: { cats: { categoria: string; cabezas: number }[]; total: number }) {
+  if (total === 0) return <p className="text-[14.5px] text-texto-suave">Todavía no hay hacienda en esta vista.</p>
   return (
-    <section aria-labelledby="stock" className="rounded-[20px] border border-borde bg-superficie px-6 py-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="stock" className="font-heading text-[17px] font-extrabold text-texto">
-          Stock por categoría
-        </h2>
-        <span className="text-[13.5px] text-texto-suave">
-          {total} {nombre}
-        </span>
+    <section aria-label="Por categoría" className="min-w-0">
+      <div className="flex h-3.5 gap-[3px]">
+        {cats.map((c, i) => (
+          <span key={c.categoria} className={cn('rounded-full', PALETA[i % PALETA.length])} style={{ flexGrow: c.cabezas }} title={`${categoriaNombre(c.categoria as never, c.cabezas)}: ${c.cabezas}`} />
+        ))}
       </div>
-      {total === 0 ? (
-        <p className="mt-3 text-[14px] text-texto-suave">Sin {nombre} cargados.</p>
-      ) : (
-        <>
-          <div className="mt-3 flex h-3 gap-[3px]">
-            {cats.map((c, i) => (
-              <span key={c.categoria} className={cn('rounded-full', PALETA[i % PALETA.length])} style={{ flexGrow: c.cabezas }} />
-            ))}
-          </div>
-          <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
-            {cats.map((c, i) => (
-              <li key={c.categoria} className="flex items-center gap-2 text-[14.5px] text-texto">
-                <span className={cn('size-2.5 rounded-full', PALETA[i % PALETA.length])} />
-                {categoriaNombre(c.categoria as never, c.cabezas)}
-                <b className="cifra text-[17px]">{c.cabezas}</b>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+        {cats.map((c, i) => (
+          <li key={c.categoria} className="flex items-center gap-2 text-[14.5px] text-texto">
+            <span className={cn('size-2.5 shrink-0 rounded-full', PALETA[i % PALETA.length])} />
+            <span>{categoriaNombre(c.categoria as never, c.cabezas)}</span>
+            <b className="cifra text-[17px]">{c.cabezas}</b>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

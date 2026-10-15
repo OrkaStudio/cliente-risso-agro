@@ -179,12 +179,12 @@ export function EntradasSalidas({
           ? '¿De qué potrero y cuántos?'
           : '¿A qué potrero y cuántos?'
         : paso === 'adonde'
-          ? `${cuantosTexto(items)} del ${potrero?.nombre ?? ''}`
+          ? `${cuantosTexto(items)} del ${potrero?.nombre ?? ''}${campo ? ` de ${campo.nombre}` : ''}. Elegí el campo y tocá el potrero.`
           : undefined
 
   const pie =
     paso === 'cuantos' ? (
-      <BotonPrincipal icono="Siguiente" disabled={!potreroId || total === 0 || (!!mueve && !destCampoId)} onClick={() => setPaso(mueve ? 'adonde' : 'revisa')}>
+      <BotonPrincipal icono="Siguiente" disabled={!potreroId || total === 0} onClick={() => setPaso(mueve ? 'adonde' : 'revisa')}>
         {total === 0 ? (potreroId ? 'Contá cuántos' : 'Tocá un potrero') : `Revisar: ${cuantosTexto(items)}`}
       </BotonPrincipal>
     ) : paso === 'adonde' ? (
@@ -270,17 +270,16 @@ export function EntradasSalidas({
                 apagado={(id) => cabezasDe(id) === 0}
                 nota={(id) => (cabezasDe(id) === 0 ? 'sin hacienda' : `${cabezasDe(id)} cab`)}
               />
-              <ElegirCampo titulo="Llegan a" identidad={identidad} campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
             </div>
           ) : null}
-          {mueve && (!campoId || !destCampoId) ? (
+          {mueve && !campoId ? (
             <p className="rounded-[14px] border-[1.5px] border-dashed border-borde px-4 py-5 text-center text-[14.5px] text-texto-suave">
-              {!campoId ? 'Elegí de qué campo vienen.' : 'Elegí a qué campo llegan.'}
+              Elegí de qué campo vienen.
             </p>
           ) : !mueve ? (
             <ElegirCampo titulo="Campo" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}))} />
           ) : null}
-          {campo && (!mueve || destCampoId) && (
+          {campo && (
             <Potreros
               campo={campo}
               elegido={potreroId}
@@ -303,7 +302,7 @@ export function EntradasSalidas({
 
       {paso === 'adonde' && (
         <>
-          <Recorrido identidad={identidad} de={campoId} a={destCampoId} />
+          <ElegirCampo titulo="Llegan a" identidad={identidad} campos={campos} valor={destCampoId} onCambio={(id) => (setDestCampoId(id), setDestinoId(null))} excepto={campoId} />
           {destCampo && <Potreros campo={destCampo} elegido={destinoId} onElegir={setDestinoId} />}
         </>
       )}
@@ -484,19 +483,6 @@ function ElegirCampo({
   )
 }
 
-/** «De B La Loma → a C El Bajo»: el movimiento entre campos, siempre a la vista. */
-function Recorrido({ identidad, de, a }: { identidad: Identidad[]; de: string | null; a: string | null }) {
-  const c = (id: string | null) => identidad.find((i) => i.id === id)
-  return (
-    <p className="mb-4 flex flex-wrap items-center gap-2 rounded-[18px] bg-superficie px-4 py-3 text-[15px] font-semibold text-texto">
-      <span className="text-texto-suave">De</span>
-      <Letra c={c(de)} /> {c(de)?.nombre}
-      <Icono nombre="Siguiente" tamano={16} />
-      <span className="text-texto-suave">a</span>
-      <Letra c={c(a)} /> {c(a)?.nombre ?? 'elegí el campo'}
-    </p>
-  )
-}
 
 /** Cuántos de cada categoría: − número + (en una salida, hasta lo que hay). */
 function Contar({

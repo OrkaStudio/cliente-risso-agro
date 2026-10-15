@@ -7,6 +7,8 @@ import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-latera
 import { Segmentos } from '@/components/tropero/segmentos'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { useMapa } from '@/features/mapa/api'
+import { Potreros } from './entradas-salidas-panel'
 import { useCambiarCaravana, useCrearAnimal, useDarBaja, useMoverAnimales, usePotreros, useRegistrarEvento } from '@/features/hacienda/hooks'
 import { categoriaLabel, categoriasPorEspecie, type Especie } from '@/features/hacienda/labels'
 import type { Database } from '@/lib/supabase/types'
@@ -399,12 +401,55 @@ export function AnimalNuevo({ empresaId, especie, abierto, onCerrar, onVolver }:
         <Opciones etiqueta="De dónde viene" opciones={[...ORIGEN]} elegidas={[origen]} onTocar={(o) => setOrigen(o)} />
       </Grupo>
       <Grupo titulo="Dónde queda">
-        <ElegirPotrero valor={potrero} onElegir={setPotrero} campoId={elegido?.id ?? null} />
+        <ElegirEnCroquis empresaId={empresaId} valor={potrero} onElegir={setPotrero} campoInicial={elegido?.id ?? null} />
       </Grupo>
       <Grupo titulo="Cuándo nació (si se sabe)">
         <CampoFecha value={nacio} onChange={setNacio} ariaLabel="Cuándo nació" max={hoyLocal()} conBorrar />
       </Grupo>
       <ErrorDelPanel texto={error} />
     </PanelLateral>
+  )
+}
+
+/** Elegir un potrero sobre el croquis: el campo arriba (con su letra) y el mapa compacto debajo. */
+function ElegirEnCroquis({ empresaId, valor, onElegir, campoInicial }: { empresaId: string; valor: string | null; onElegir: (id: string) => void; campoInicial: string | null }) {
+  const { data: mapa } = useMapa(empresaId)
+  const { campos: identidad } = useCampoElegido()
+  const campos = (mapa ?? []).filter((c) => c.potreros.length > 0)
+  const [campoId, setCampoId] = useState<string | null>(campoInicial)
+  const campo = campos.find((c) => c.id === campoId) ?? campos.find((c) => c.potreros.some((p) => p.id === valor)) ?? campos[0]
+  if (!campo) return <div className="h-10 animate-pulse rounded-full bg-superficie-hundida" />
+  const potrero = campo.potreros.find((p) => p.id === valor)
+  return (
+    <div>
+      {campos.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {campos.map((c) => {
+            const id = identidad.find((i) => i.id === c.id)
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={campo.id === c.id}
+                onClick={() => setCampoId(c.id)}
+                className={cn(
+                  'inline-flex h-9 items-center gap-2 rounded-full border-[1.5px] px-3 text-[14px] font-bold transition-colors',
+                  campo.id === c.id ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
+                )}
+              >
+                {id && (
+                  <span className="grid size-[20px] place-items-center rounded-[6px] text-[10.5px] font-extrabold text-white" style={{ background: id.color }}>
+                    {id.letra}
+                  </span>
+                )}
+                {c.nombre}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <Potreros campo={campo} elegido={valor} onElegir={onElegir} className="h-[240px]" />
+      <p className="mt-2 text-[13.5px] text-texto-suave">{potrero ? `Queda en el ${potrero.nombre} de ${campo.nombre}.` : 'Tocá el potrero en el mapa.'}</p>
+    </div>
   )
 }
