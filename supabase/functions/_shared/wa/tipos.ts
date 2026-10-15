@@ -105,7 +105,8 @@ export type ObsBorrador = {
 }
 
 /** Dónde dijo la ubicación compartida que está el productor. */
-export type Ubicado = { potreroId: string; campoId: string }
+/** punto: la ubicación compartida, para cargar ahí un molino o un tanque. */
+export type Ubicado = { potreroId: string; campoId: string; punto?: [number, number] }
 
 export type IvaLinea = { concepto: string | null; neto: number; alicuota: number; iva: number }
 
@@ -157,6 +158,18 @@ export type Pendiente =
   | { tipo: 'ubicado'; capturaId: null; ubicado: Ubicado }
   | { tipo: 'categoria'; capturaId: string; borrador: Borrador }
   | { tipo: 'corregir'; capturaId: string; borrador: Borrador }
+
+/** Inventario: elegir qué es lo de la ubicación, confirmar el alta o la baja.
+ * Va aparte de Pendiente: el webhook lo separa al leerlo y el resto del flujo no lo ve. */
+export type PendienteInfra =
+  | { tipo: 'infra'; capturaId: string | null; paso: 'tipo'; punto: [number, number]; campoId: string }
+  | { tipo: 'infra'; capturaId: string; paso: 'confirmar'; elemento: InfraNueva }
+  | { tipo: 'infra'; capturaId: string; paso: 'borrar'; id: string; nombre: string }
+
+export type InfraNueva = {
+  campoId: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'
+  apodo: string | null; lat: number; lng: number; linea: [number, number][] | null; nombre: string; focoId: string | null
+}
 
 export type Boton = { id: string; titulo: string; detalle?: string }
 

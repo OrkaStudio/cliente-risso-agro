@@ -60,7 +60,7 @@ export function noRecuerdaPotrero(texto: string, p: Pendiente | null): boolean {
 
 /** Infraestructura del campo. El bot la encuentra por tipo + potrero («el molino del 9B»);
  * en la imagen basta el tipo, porque el potrero ya se ve. El apodo sólo distingue dos iguales. */
-export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; apodo?: string | null; punto?: [number, number]; linea?: [number, number][]; falla?: string | null }
+export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; apodo?: string | null; nuevo?: boolean; punto?: [number, number]; linea?: [number, number][] | null; falla?: string | null }
 /** cabezas y ultimaRecorrida son opcionales: si no vienen, el cartel queda como siempre. null = nunca recorrido. */
 export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown; cabezas?: number; ultimaRecorrida?: string | null }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
 

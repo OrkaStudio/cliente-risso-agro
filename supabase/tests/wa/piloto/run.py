@@ -15,7 +15,7 @@ try:
         if subprocess.run(['docker','exec',name,'pg_isready','-U','postgres'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0:break
         time.sleep(1)
     else:raise RuntimeError('Postgres local no arrancó')
-    for file in [here.parent/'esquema.sql',here/'esquema-extra.sql',root/'supabase/migrations/20261015120000_whatsapp_piloto_productores.sql']:
+    for file in [here.parent/'esquema.sql',here/'esquema-extra.sql',root/'supabase/migrations/20261015120000_whatsapp_piloto_productores.sql',root/'supabase/migrations/20261015200000_infraestructura_carga_whatsapp.sql']:
         subprocess.run(['docker','exec','-i',name,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],input=file.read_text(),text=True,check=True,stdout=subprocess.DEVNULL)
     report=root/'output/wa-mapa/mejoras-2026-10-15/piloto-db.json';report.parent.mkdir(parents=True,exist_ok=True)
     env=dict(os.environ,SUPABASE_DB_URL='postgres://postgres:qa_local_only@127.0.0.1:'+port+'/postgres',WA_QA_LOCAL_DB='1',WA_QUEUE_ENABLED='true',WA_PILOT_ENABLED='true',WA_QA_REPORT=str(report))

@@ -1,6 +1,7 @@
 -- Esquema mínimo copiado de producción (12/10/2026): sólo lo que toca el guardado de la recorrida.
 create role authenticated nologin;
 create schema auth;
+create table auth.users(id uuid primary key,raw_user_meta_data jsonb not null default '{}');
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
 grant usage on schema auth to authenticated;
@@ -34,10 +35,18 @@ create table observacion_potrero (
   audio_url text
 );
 
+create type estado_animal as enum ('activo','vendido','muerto','baja');
+create table animal (id uuid primary key default gen_random_uuid(), empresa_id uuid not null references empresa(id), potrero_id uuid references potrero(id), estado estado_animal not null default 'activo');
+create view v_stock_potrero with (security_invoker = true) as
+  select empresa_id, potrero_id, count(*)::integer as cabezas from animal a where estado = 'activo' and potrero_id is not null group by empresa_id, potrero_id;
+
 create function auth_empresa_ids() returns setof uuid language sql stable set search_path to 'public' as $$
   select empresa_id from miembro_empresa where user_id = auth.uid() $$;
 grant select on miembro_empresa, empresa to authenticated;
 grant all on campo, potrero, recorrida, observacion_potrero to authenticated;
+grant select on animal, v_stock_potrero to authenticated;
+alter table animal enable row level security;
+create policy animal_mod on animal for all using (empresa_id in (select auth_empresa_ids())) with check (empresa_id in (select auth_empresa_ids()));
 alter table campo enable row level security;
 alter table potrero enable row level security;
 alter table recorrida enable row level security;
@@ -68,3 +77,12 @@ create table wa_mensaje (
   vinculo_id text, empresa_id uuid, direccion text, tipo text,
   cuerpo jsonb, created_at timestamptz not null default now()
 );
+
+-- Igual que producción (20260625173942_geometria_infraestructura_lote.sql).
+create type tipo_infraestructura as enum ('molino','laguna','tranquera','manga');
+create table infraestructura(id uuid primary key default gen_random_uuid(),empresa_id uuid not null references empresa(id) on delete cascade,
+ campo_id uuid not null references campo(id) on delete cascade,tipo tipo_infraestructura not null,lat float8 not null,lng float8 not null,
+ radio_m numeric,angulo_deg numeric,escala numeric,created_at timestamptz not null default now());
+alter table infraestructura enable row level security;
+create policy infraestructura_mod on infraestructura for all using(empresa_id in(select auth_empresa_ids())) with check(empresa_id in(select auth_empresa_ids()));
+grant all on infraestructura to authenticated;

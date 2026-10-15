@@ -31,7 +31,7 @@ import { Turnos,secretoValido } from '../_shared/wa/servicios.ts'
 import * as R from '../_shared/wa/respuestas.ts'
 import { campoPorId, potreroEnPunto, potreroPorId, resolverParaMostrar } from '../_shared/wa/resolver.ts'
 import { esFecha, finDeMes, hoyAR, inicioSemana, sumarDias,norm } from '../_shared/wa/texto.ts'
-import type { Borrador, Contexto, Mensaje, Pendiente } from '../_shared/wa/tipos.ts'
+import type { Borrador, Contexto, Mensaje, Pendiente, PendienteInfra } from '../_shared/wa/tipos.ts'
 import * as db from './db.ts'
 import { interpretar, leerComprobante, transcribir } from './llm.ts'
 import * as meta from './meta.ts'
@@ -39,6 +39,8 @@ import { atenderMapa, campoParaMapa, comandoMapa, elegirMapa, noRecuerdaPotrero,
 import { imagenMapa } from './mapa-imagen.ts'
 import { colaHabilitada, tomarTrabajo, terminarTrabajo, canalEnRevision,canalesConTrabajo } from './cola.ts'
 import { atenderPiloto } from './piloto.ts'
+import { atenderInfra, ofrecerCarga } from './infra.ts'
+import { potreroCercano } from '../_shared/wa/infraestructura.ts'
 import * as pilotoStore from './piloto-store.ts'
 import { fusionarRecorrida } from '../_shared/wa/piloto.ts'
 
@@ -166,25 +168,30 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
   const ctx = { ...await db.contexto(v, hoy),fechaMensaje:await db.fechaDeEntrada(v,mensajeId), semanalHabilitado: Deno.env.get('WA_WEEKLY_ENABLED') === 'true', pilotoHabilitado: Deno.env.get('WA_PILOT_ENABLED') === 'true' && colaHabilitada(v.empresa_id) }
 
   // Lo que el bot preguntó hace mucho ya no se espera.
-  let pendiente: Pendiente | null = v.pendiente
+  let crudo: Pendiente | PendienteInfra | null = v.pendiente
   const edad = v.pendiente_at ? Date.now() - new Date(v.pendiente_at).getTime() : 0
-  if (pendiente && edad > (pendiente.tipo === 'ubicado' ? UBICADO_VENCE_MS : PENDIENTE_VENCE_MS)) {
-    if (pendiente.capturaId) {
-      await db.actualizarCaptura(pendiente.capturaId, { estado: 'incompleta', notas: ['Quedó sin respuesta más de 12 horas.'] })
+  if (crudo && edad > (crudo.tipo === 'ubicado' ? UBICADO_VENCE_MS : PENDIENTE_VENCE_MS)) {
+    if (crudo.capturaId) {
+      await db.actualizarCaptura(crudo.capturaId, { estado: 'incompleta', notas: ['Quedó sin respuesta más de 12 horas.'] })
     }
     await db.guardarPendiente(v.id, null)
-    pendiente = null
+    crudo = null
   }
+  // El inventario lleva su propio pendiente; el resto del flujo no lo ve.
+  const pendienteInfra: PendienteInfra | null = crudo?.tipo === 'infra' ? crudo : null
+  const pendiente: Pendiente | null = crudo?.tipo === 'infra' ? null : crudo
 
   let capturaId: string | null = null
   try {
     if (m.type === 'location' && m.location) {
+      if (pendienteInfra?.capturaId) await abandonar(pendienteInfra.capturaId)
       await ubicacion(v, ctx, pendiente, m.location)
       return
     }
     if (m.type === 'image' && m.image) {
       capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada: 'foto', texto: m.image.caption ?? null })
       if (pendiente?.capturaId) await abandonar(pendiente.capturaId)
+      if (pendienteInfra?.capturaId) await abandonar(pendienteInfra.capturaId)
       await foto(v, ctx, capturaId, m.image)
       return
     }
@@ -220,6 +227,15 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     }
     const mapa = comandoMapa(texto, botonId)
     if (mapa) { await mostrarMapa(v, ctx, pendiente, mapa); return }
+    if (await atenderInfra({ v, ctx, mensajeId, texto, botonId, pendiente: pendienteInfra ?? pendiente, entrada: porAudio ? 'audio' : botonId ? 'boton' : 'texto' }, {
+      responder: msg => responder(v, v.telefono, msg),
+      enviarImagen: (bytes, caption, campoId) => enviarImagenMapa(v, bytes, caption, campoId, null),
+    })) return
+    // Una propuesta de inventario sin responder no bloquea lo que venga después.
+    if (pendienteInfra) {
+      if (pendienteInfra.capturaId) await abandonar(pendienteInfra.capturaId)
+      await db.guardarPendiente(v.id, null)
+    }
     if (!botonId && noRecuerdaPotrero(texto, pendiente)) {
       await db.guardarPendiente(v.id, pendiente)
       await responder(v, m.from, { texto: 'Conservé la observación pendiente de ubicar. Podés pedirme «mapa» y responder con el potrero cuando lo reconozcas; no hace falta repetir el audio.', botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] })
@@ -394,11 +410,7 @@ async function mostrarMapa(v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | 
     return await atenderMapa(campo, {
       datos: async id => { const datos=await db.datosMapa(v,id); return datos && ctx.pilotoHabilitado ? {...datos,alertas:await pilotoStore.potrerosConProblemas(v,id),equipos:await pilotoStore.equiposConProblemas(v,id)} : datos }, render: datos => imagenMapa(datos, ctx.hoy, fetch, focoId),
       responder: m => responder(v, v.telefono, m),
-      enviarImagen: async (bytes, caption, campoId, mime) => {
-        const mediaId = await meta.subirImagen(bytes, mime === 'image/jpeg' ? 'troppero-mapa.jpg' : 'troppero-mapa.png')
-        const r = await meta.enviarImagen(v.telefono, mediaId, caption)
-        await db.guardarSaliente({ wamid: r.wamid, telefono: v.telefono, vinculo: v, cuerpo: { ...r.cuerpo, tropero_mapa: { campo_id: campoId, captura_id: capturaId } } })
-      },
+      enviarImagen: (bytes, caption, campoId) => enviarImagenMapa(v, bytes, caption, campoId, capturaId),
     }, automatico && pendiente?.tipo === 'ubicacion' ? preguntaRecorrida(pendiente,ctx) : focoId ? `Detalle de ${potreroPorId(ctx.campos, focoId)?.potrero.nombre}.` : undefined)
   } catch (e) {
     console.warn('wa-webhook: no se pudo preparar o enviar el mapa', e instanceof Error ? e.message : String(e))
@@ -660,11 +672,18 @@ async function confirmarRecorrida(v: db.Vinculo, ctx: Contexto, capturaId: strin
  * Compartió la ubicación. Si el bot la pidió para una recorrida, completa el
  * potrero de lo que dijo "acá"; si no, la guarda para el próximo mensaje.
  */
+async function enviarImagenMapa(v: db.Vinculo, bytes: Uint8Array, caption: string, campoId: string, capturaId: string | null): Promise<void> {
+  const mediaId = await meta.subirImagen(bytes, bytes[0] === 255 ? 'troppero-mapa.jpg' : 'troppero-mapa.png')
+  const r = await meta.enviarImagen(v.telefono, mediaId, caption)
+  await db.guardarSaliente({ wamid: r.wamid, telefono: v.telefono, vinculo: v, cuerpo: { ...r.cuerpo, tropero_mapa: { campo_id: campoId, captura_id: capturaId } } })
+}
+
 async function ubicacion(
   v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | null, loc: { latitude: number; longitude: number },
 ): Promise<void> {
   const to = v.telefono
-  const p = potreroEnPunto(loc.latitude, loc.longitude, await db.potrerosDibujados(v))
+  const dibujados = await db.potrerosDibujados(v)
+  const p = potreroEnPunto(loc.latitude, loc.longitude, dibujados)
   if (pendiente?.tipo === 'ubicacion') {
     if (!p) {
       await responder(v, to, { texto: 'Esa ubicación no cae dentro de ningún potrero dibujado. Escribime el número del potrero.' })
@@ -675,11 +694,19 @@ async function ubicacion(
     return
   }
   if (pendiente?.capturaId) await abandonar(pendiente.capturaId)
+  const punto: [number, number] = [loc.latitude, loc.longitude]
   if (!p) {
+    // Fuera de los potreros (el casco, la calle): igual se puede cargar algo ahí.
+    const cerca = potreroCercano(punto, dibujados)
+    if (cerca) {
+      await db.guardarPendiente(v.id, { tipo: 'infra', capturaId: null, paso: 'tipo', punto, campoId: cerca.campoId })
+      await responder(v, to, ofrecerCarga(`Esa ubicación no cae dentro de un potrero; está cerca del *${cerca.nombre}* de ${cerca.campo}. Si querés cargar algo que está ahí, elegí qué es o escribilo («tanque australiano»).`))
+      return
+    }
     await db.guardarPendiente(v.id, null)
     await responder(v, to, { texto: 'No estás dentro de ningún potrero dibujado. Contame qué viste y en qué potrero.' })
     return
   }
-  await db.guardarPendiente(v.id, { tipo: 'ubicado', capturaId: null, ubicado: { potreroId: p.id, campoId: p.campoId } })
-  await responder(v, to, { texto: `Estás en el *${p.nombre}* de ${p.campo}. Contame qué ves.` })
+  await db.guardarPendiente(v.id, { tipo: 'ubicado', capturaId: null, ubicado: { potreroId: p.id, campoId: p.campoId, punto } })
+  await responder(v, to, ofrecerCarga(`Estás en el *${p.nombre}* de ${p.campo}. Contame qué ves. Si querés cargar algo que está acá, elegí qué es o escribilo («tanque australiano»).`))
 }

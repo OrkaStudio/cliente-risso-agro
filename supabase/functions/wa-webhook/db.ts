@@ -10,11 +10,11 @@
 import postgres from 'npm:postgres@3.4.5'
 import { sumarDias,hoyAR } from '../_shared/wa/texto.ts'
 import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
-import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, Pasto, Pendiente } from '../_shared/wa/tipos.ts'
+import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, InfraNueva, Pasto, Pendiente, PendienteInfra } from '../_shared/wa/tipos.ts'
 import type { PotreroDibujado } from '../_shared/wa/resolver.ts'
 import type { FilaHacienda, FilaVencimiento } from '../_shared/wa/respuestas.ts'
 import type { PeriodoSemana, SemanaCampo } from '../_shared/wa/semanal.ts'
-import type { MapaCampo } from '../_shared/wa/mapa.ts'
+import type { ElementoMapa, MapaCampo } from '../_shared/wa/mapa.ts'
 
 // Pooler en modo transacción: sin prepared statements.
 export const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 4, idle_timeout: 20 })
@@ -25,7 +25,8 @@ export type Vinculo = {
   telefono: string
   user_id: string
   empresa_id: string
-  pendiente: Pendiente | null
+  /** Puede traer un PendienteInfra: el webhook lo separa antes de usarlo. */
+  pendiente: Pendiente | PendienteInfra | null
   pendiente_at: string | null
 }
 
@@ -78,7 +79,7 @@ export async function actualizarEstado(wamid: string, estado: string, error: unk
     where wamid = ${wamid}`
 }
 
-export async function guardarPendiente(vinculoId: string, p: Pendiente | null): Promise<void> {
+export async function guardarPendiente(vinculoId: string, p: Pendiente | PendienteInfra | null): Promise<void> {
   await sql`
     update wa_vinculo set pendiente = ${p ? sql.json(p as unknown as postgres.JSONValue) : null},
       pendiente_at = ${p ? sql`now()` : null}
@@ -597,9 +598,20 @@ export function datosMapa(v: Vinculo, campoId: string): Promise<MapaCampo | null
     const [campo] = await tx<{ id: string; nombre: string }[]>`select c.id,c.nombre from campo c where c.id=${campoId} and c.empresa_id=${v.empresa_id}
       and exists(select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id})`
     if (!campo) return null
-    const potreros = await tx<MapaCampo['potreros']>`select p.id,p.nombre,p.poligono from potrero p join campo c on c.id=p.campo_id
+    // Cabezas activas (vista con security_invoker: respeta RLS) y la última recorrida de cada potrero.
+    const potreros = await tx<MapaCampo['potreros']>`select p.id,p.nombre,p.poligono,
+        coalesce((select s.cabezas from v_stock_potrero s where s.potrero_id=p.id and s.empresa_id=${v.empresa_id}),0)::int as cabezas,
+        (select max(r.fecha)::text from observacion_potrero o join recorrida r on r.id=o.recorrida_id
+          where o.potrero_id=p.id and r.empresa_id=${v.empresa_id}) as "ultimaRecorrida"
+      from potrero p join campo c on c.id=p.campo_id
       where c.id=${campo.id} and c.empresa_id=${v.empresa_id} and p.empresa_id=${v.empresa_id} order by p.nombre`
-    return { ...campo, potreros }
+    // Un campo que todavía no usa recorridas no se llena de «nunca».
+    if (!potreros.some(p => p.ultimaRecorrida)) for (const p of potreros) delete p.ultimaRecorrida
+    const infra = await tx<{ id: string; tipo: ElementoMapa['tipo']; apodo: string | null; lat: number; lng: number; linea: [number, number][] | null }[]>`
+      select id, tipo::text as tipo, apodo, lat, lng, linea from infraestructura
+      where campo_id=${campo.id} and empresa_id=${v.empresa_id}
+        and tipo::text in ('molino','tanque','bebedero','energizador','tranquera','electrico') order by created_at limit 150`
+    return { ...campo, potreros, infraestructura: infra.map(i => ({ id: i.id, tipo: i.tipo, nombre: i.tipo, apodo: i.apodo, punto: [i.lat, i.lng] as [number, number], linea: i.linea })) }
   })
 }
 
@@ -617,3 +629,32 @@ export async function mapaEnviadoParaCaptura(v: Vinculo, capturaId: string, camp
     and cuerpo->'tropero_mapa'->>'captura_id'=${capturaId} and cuerpo->'tropero_mapa'->>'campo_id'=${campoId} limit 1`
   return filas.length > 0
 }
+
+// ── Infraestructura cargada desde WhatsApp ──────────────────────────────
+
+export type InfraGuardada = { id: string; campo_id: string; tipo: InfraNueva['tipo']; apodo: string | null; lat: number; lng: number; linea: [number, number][] | null }
+
+/** Lo cargado de la empresa, para resolver «el tanque del 9B» y avisar duplicados. */
+export function infraDeEmpresa(v: Vinculo): Promise<InfraGuardada[]> {
+  return comoUsuario(v.user_id, (tx) => tx<InfraGuardada[]>`
+    select id, campo_id, tipo::text as tipo, apodo, lat, lng, linea from infraestructura
+    where empresa_id = ${v.empresa_id} and tipo::text in ('molino','tanque','bebedero','energizador','tranquera','electrico')
+    order by created_at limit 500`)
+}
+
+/** Como el usuario: RLS y el disparador de la migración rechazan otra empresa o un campo ajeno. */
+export function guardarInfra(v: Vinculo, e: InfraNueva): Promise<string> {
+  return comoUsuario(v.user_id, async (tx) => {
+    const [r] = await tx<{ id: string }[]>`
+      insert into infraestructura (empresa_id, campo_id, tipo, apodo, lat, lng, linea)
+      values (${v.empresa_id}, ${e.campoId}, ${e.tipo}::public.tipo_infraestructura, ${e.apodo}, ${e.lat}, ${e.lng},
+        ${e.linea ? sql.json(e.linea as postgres.JSONValue) : null})
+      returning id`
+    return r.id
+  })
+}
+
+export function borrarInfra(v: Vinculo, id: string): Promise<boolean> {
+  return comoUsuario(v.user_id, async (tx) => (await tx`delete from infraestructura where id = ${id} and empresa_id = ${v.empresa_id} returning id`).length === 1)
+}
+

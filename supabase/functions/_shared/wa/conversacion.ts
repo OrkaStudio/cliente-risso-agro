@@ -227,8 +227,8 @@ export type Lectura =
   /** Mensaje nuevo. Si había algo pendiente, queda incompleto. */
   | { k: 'nuevo'; abandona: string | null }
 
-const SI = /^(si|sii+|dale|ok|okey|oka|confirmo|de una|correcto|joya|perfecto|listo|asi es|eso)\b/
-const NO = /^(no|nop|cancela|cancelar|deja|dejalo|olvidate)\b/
+export const SI = /^(si|sii+|dale|ok|okey|oka|confirmo|de una|correcto|joya|perfecto|listo|asi es|eso)\b/
+export const NO = /^(no|nop|cancela|cancelar|deja|dejalo|olvidate)\b/
 
 function lluviaLista(b: Borrador, ctx: Contexto): boolean {
   return b.tipo === 'lluvia' && typeof b.mm === 'number' && Number.isFinite(b.mm) && b.mm >= 0 &&

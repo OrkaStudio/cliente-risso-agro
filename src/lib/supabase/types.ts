@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -139,6 +139,84 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      captura: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          entrada: string
+          escrito_id: string | null
+          escrito_tabla: string | null
+          estado: Database["public"]["Enums"]["estado_captura"]
+          id: string
+          interpretacion: Json | null
+          interpretado_por: string | null
+          mensaje_id: string | null
+          notas: string[]
+          propuesta: Json | null
+          puerta: string
+          texto: string | null
+          tokens_entrada: number | null
+          tokens_salida: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          entrada: string
+          escrito_id?: string | null
+          escrito_tabla?: string | null
+          estado?: Database["public"]["Enums"]["estado_captura"]
+          id?: string
+          interpretacion?: Json | null
+          interpretado_por?: string | null
+          mensaje_id?: string | null
+          notas?: string[]
+          propuesta?: Json | null
+          puerta?: string
+          texto?: string | null
+          tokens_entrada?: number | null
+          tokens_salida?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          entrada?: string
+          escrito_id?: string | null
+          escrito_tabla?: string | null
+          estado?: Database["public"]["Enums"]["estado_captura"]
+          id?: string
+          interpretacion?: Json | null
+          interpretado_por?: string | null
+          mensaje_id?: string | null
+          notas?: string[]
+          propuesta?: Json | null
+          puerta?: string
+          texto?: string | null
+          tokens_entrada?: number | null
+          tokens_salida?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "captura_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captura_mensaje_id_fkey"
+            columns: ["mensaje_id"]
+            isOneToOne: false
+            referencedRelation: "wa_mensaje"
             referencedColumns: ["id"]
           },
         ]
@@ -398,6 +476,50 @@ export type Database = {
           },
         ]
       }
+      evento_producto: {
+        Row: {
+          created_at: string
+          dispositivo: string | null
+          empresa_id: string | null
+          id: number
+          nombre: string
+          props: Json
+          sesion_id: string
+          ts_cliente: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dispositivo?: string | null
+          empresa_id?: string | null
+          id?: never
+          nombre: string
+          props?: Json
+          sesion_id: string
+          ts_cliente: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          dispositivo?: string | null
+          empresa_id?: string | null
+          id?: never
+          nombre?: string
+          props?: Json
+          sesion_id?: string
+          ts_cliente?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evento_producto_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guia_vista: {
         Row: {
           clave: string
@@ -422,36 +544,45 @@ export type Database = {
       infraestructura: {
         Row: {
           angulo_deg: number | null
+          apodo: string | null
           campo_id: string
           created_at: string
+          created_by: string | null
           empresa_id: string
           escala: number | null
           id: string
           lat: number
+          linea: Json | null
           lng: number
           radio_m: number | null
           tipo: Database["public"]["Enums"]["tipo_infraestructura"]
         }
         Insert: {
           angulo_deg?: number | null
+          apodo?: string | null
           campo_id: string
           created_at?: string
+          created_by?: string | null
           empresa_id: string
           escala?: number | null
           id?: string
           lat: number
+          linea?: Json | null
           lng: number
           radio_m?: number | null
           tipo: Database["public"]["Enums"]["tipo_infraestructura"]
         }
         Update: {
           angulo_deg?: number | null
+          apodo?: string | null
           campo_id?: string
           created_at?: string
+          created_by?: string | null
           empresa_id?: string
           escala?: number | null
           id?: string
           lat?: number
+          linea?: Json | null
           lng?: number
           radio_m?: number | null
           tipo?: Database["public"]["Enums"]["tipo_infraestructura"]
@@ -1209,6 +1340,110 @@ export type Database = {
           },
         ]
       }
+      wa_mensaje: {
+        Row: {
+          created_at: string
+          cuerpo: Json
+          direccion: string
+          empresa_id: string | null
+          error: Json | null
+          estado: string | null
+          estado_at: string | null
+          id: string
+          telefono: string
+          tipo: string
+          vinculo_id: string | null
+          wamid: string
+        }
+        Insert: {
+          created_at?: string
+          cuerpo: Json
+          direccion: string
+          empresa_id?: string | null
+          error?: Json | null
+          estado?: string | null
+          estado_at?: string | null
+          id?: string
+          telefono: string
+          tipo: string
+          vinculo_id?: string | null
+          wamid: string
+        }
+        Update: {
+          created_at?: string
+          cuerpo?: Json
+          direccion?: string
+          empresa_id?: string | null
+          error?: Json | null
+          estado?: string | null
+          estado_at?: string | null
+          id?: string
+          telefono?: string
+          tipo?: string
+          vinculo_id?: string | null
+          wamid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_mensaje_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_mensaje_vinculo_id_fkey"
+            columns: ["vinculo_id"]
+            isOneToOne: false
+            referencedRelation: "wa_vinculo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_vinculo: {
+        Row: {
+          activo: boolean
+          created_at: string
+          empresa_id: string
+          id: string
+          pendiente: Json | null
+          pendiente_at: string | null
+          telefono: string
+          user_id: string
+          vinculado_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          empresa_id: string
+          id?: string
+          pendiente?: Json | null
+          pendiente_at?: string | null
+          telefono: string
+          user_id: string
+          vinculado_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          pendiente?: Json | null
+          pendiente_at?: string | null
+          telefono?: string
+          user_id?: string
+          vinculado_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_vinculo_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       v_animal_con_caravana: {
@@ -1466,6 +1701,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      infraestructura_linea_valida: { Args: { l: Json }; Returns: boolean }
       marcar_senal: {
         Args: {
           p_empresa_id: string
@@ -1541,6 +1777,14 @@ export type Database = {
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
       estado_animal: "activo" | "vendido" | "muerto"
+      estado_captura:
+        | "recibida"
+        | "propuesta"
+        | "confirmada"
+        | "incompleta"
+        | "descartada"
+        | "error"
+        | "respondida"
       estado_ciclo_potrero:
         | "ganadero"
         | "descanso"
@@ -1582,7 +1826,15 @@ export type Database = {
         | "baja"
         | "nota"
         | "caravana_asignada"
-      tipo_infraestructura: "molino" | "laguna" | "tranquera" | "manga"
+      tipo_infraestructura:
+        | "molino"
+        | "laguna"
+        | "tranquera"
+        | "manga"
+        | "tanque"
+        | "bebedero"
+        | "energizador"
+        | "electrico"
       tipo_labor:
         | "laboreo"
         | "siembra"
@@ -1758,6 +2010,15 @@ export const Constants = {
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
       estado_animal: ["activo", "vendido", "muerto"],
+      estado_captura: [
+        "recibida",
+        "propuesta",
+        "confirmada",
+        "incompleta",
+        "descartada",
+        "error",
+        "respondida",
+      ],
       estado_ciclo_potrero: [
         "ganadero",
         "descanso",
@@ -1803,7 +2064,16 @@ export const Constants = {
         "nota",
         "caravana_asignada",
       ],
-      tipo_infraestructura: ["molino", "laguna", "tranquera", "manga"],
+      tipo_infraestructura: [
+        "molino",
+        "laguna",
+        "tranquera",
+        "manga",
+        "tanque",
+        "bebedero",
+        "energizador",
+        "electrico",
+      ],
       tipo_labor: [
         "laboreo",
         "siembra",

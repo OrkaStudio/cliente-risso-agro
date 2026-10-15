@@ -39,7 +39,7 @@ const GLIFO: Record<ElementoMapa['tipo'], string> = {
   molino: '<path d="M0 0L-3.5-12h7ZM0 0L12-3.5v7ZM0 0L3.5 12h-7ZM0 0L-12 3.5v-7Z"/><circle r="2.5"/>',
   tanque: '<circle r="9.5" fill="none" stroke-width="3.2"/><circle r="3.6"/>',
   bebedero: '<rect x="-11.5" y="-5.5" width="23" height="11" rx="2.5" fill="none" stroke-width="3.2"/><path d="M-7 1h14" stroke-width="2.6"/>',
-  energizador: '<path d="M2.5-12.5L-7.5 2h6.5l-3 10.5 10.5-15h-6.5z"/>',
+  energizador: '<rect x="-11.5" y="-11.5" width="23" height="23" rx="4" fill="none" stroke-width="2.8"/><path d="M1.8-8.5L-5.2 1.6h4.6l-2.1 7.4 7.3-10.4h-4.6z"/>',
   tranquera: '<path d="M-11-8v16M11-8v16M-11-5h22M-11 0h22M-11 5h22M-11 5L11-5" fill="none" stroke-width="2.4"/>',
   electrico: '<path d="M2.5-12.5L-7.5 2h6.5l-3 10.5 10.5-15h-6.5z"/>',
 }
@@ -49,9 +49,11 @@ const etiqueta = (e: ElementoMapa) => e.apodo ? `${TIPO[e.tipo]} ${e.apodo}` : T
 type Caja = { x: number; y: number; w: number; h: number }
 /** Puntos y líneas de infraestructura. Las fallas se marcan en rojo con su texto al lado: sin referencias numeradas. */
 function capaInfraestructura(lista: ElementoMapa[], point: (p: Pt) => Pt, acercado: boolean, limites: Caja) {
-  const lineas: string[] = [], sanos: string[] = [], fallas: string[] = [], cajas: Caja[] = []
-  // En el teléfono el lienzo se ve a ~28%: el general prioriza fallas; los sanos van discretos.
-  const radio = (e: ElementoMapa) => e.falla ? (acercado ? 31 : 28) : (acercado ? 24 : 15)
+  const lineas: string[] = [], sanos: string[] = [], destacados: string[] = [], cajas: Caja[] = []
+  // Destacado: una falla (rojo) o lo que se está por cargar (terracota). Mismo tamaño, cartel y prioridad.
+  const tono = (e: ElementoMapa) => e.falla ? DESTACADO.falla : e.nuevo ? DESTACADO.nuevo : null
+  // En el teléfono el lienzo se ve a ~28%: el general prioriza lo destacado; los sanos van discretos.
+  const radio = (e: ElementoMapa) => tono(e) ? (acercado ? 31 : 28) : (acercado ? 24 : 15)
   const visible = ([x, y]: Pt) => x >= limites.x && x <= limites.x + limites.w && y >= limites.y && y <= limites.y + limites.h
   const items = lista.slice(0, 150).map(e => {
     const linea = e.linea?.filter(p => Array.isArray(p) && p.every(Number.isFinite)).map(point)
@@ -59,39 +61,42 @@ function capaInfraestructura(lista: ElementoMapa[], point: (p: Pt) => Pt, acerca
     return { e, linea, at }
   }).filter((x): x is typeof x & { at: Pt } => x.at !== null && visible(x.at))
   // En el general, un eléctrico sano se reconoce por su línea: sin ícono que tape nombres.
-  const conIcono = items.filter(({ e }) => acercado || e.falla || e.tipo !== 'electrico')
+  const conIcono = items.filter(({ e }) => acercado || tono(e) || e.tipo !== 'electrico')
   for (const { e, linea } of items) if (linea) {
-    const pts = linea.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')
-    lineas.push(`<polyline points="${pts}" fill="none" stroke="#131b16" stroke-opacity=".8" stroke-width="${acercado ? 11 : 9}" stroke-linecap="round"/><polyline points="${pts}" fill="none" stroke="${e.falla ? '#ff4b3a' : '#2fd4ff'}" stroke-width="${acercado ? 6 : 5}" stroke-dasharray="${e.falla ? '0' : '14 9'}" stroke-linecap="round"/>`)
+    const pts = linea.map(p => p.map(n => n.toFixed(1)).join(',')).join(' '), t = tono(e)
+    lineas.push(`<polyline points="${pts}" fill="none" stroke="#131b16" stroke-opacity=".8" stroke-width="${acercado ? 11 : 9}" stroke-linecap="round"/><polyline points="${pts}" fill="none" stroke="${t ? t.linea : '#2fd4ff'}" stroke-width="${acercado ? 6 : 5}" stroke-dasharray="${t ? '0' : '14 9'}" stroke-linecap="round"/>`)
   }
   for (const { e, at } of conIcono) { const r = radio(e); cajas.push({ x: at[0] - r - 4, y: at[1] - r - 4, w: 2 * r + 8, h: 2 * r + 8 }) }
-  // Sanos primero y fallas encima: una falla nunca queda tapada.
-  for (const { e, at } of [...conIcono].sort((a, b) => Number(Boolean(a.e.falla)) - Number(Boolean(b.e.falla)))) {
-    const falla = Boolean(e.falla), r = radio(e), s = r / 19
-    const iconos = falla ? fallas : sanos
-    if (falla) iconos.push(`<circle cx="${at[0]}" cy="${at[1]}" r="${r + 10}" fill="#ff4b3a" fill-opacity=".35"/>`)
-    iconos.push(`<circle cx="${at[0]}" cy="${at[1]}" r="${r}" fill="${falla ? '#d93a2b' : '#fbfaf6'}" stroke="${falla ? '#fff' : '#131b16'}" stroke-width="${falla ? 3 : 2}"/><g transform="translate(${at[0].toFixed(1)} ${at[1].toFixed(1)}) scale(${(s * .95).toFixed(3)})" fill="${falla ? '#fff' : '#131b16'}" stroke="${falla ? '#fff' : '#131b16'}" stroke-width="0">${GLIFO[e.tipo]}</g>`)
+  for (const { e, at } of conIcono) {
+    const t = tono(e), r = radio(e), s = r / 19
+    const capa = t ? destacados : sanos
+    if (t) capa.push(`<circle cx="${at[0]}" cy="${at[1]}" r="${r + 10}" fill="${t.halo}" fill-opacity=".35"/>`)
+    capa.push(`<circle cx="${at[0]}" cy="${at[1]}" r="${r}" fill="${t ? t.fondo : '#fbfaf6'}" stroke="${t ? '#fff' : '#131b16'}" stroke-width="${t ? 3 : 2}"/><g transform="translate(${at[0].toFixed(1)} ${at[1].toFixed(1)}) scale(${(s * .95).toFixed(3)})" fill="${t ? '#fff' : '#131b16'}" stroke="${t ? '#fff' : '#131b16'}" stroke-width="0">${GLIFO[e.tipo]}</g>`)
   }
   /** Los carteles van al final: esquivan nombres de potreros, íconos y otros carteles. */
   const textos = (ocupados: Caja[]) => conIcono.flatMap(({ e, at }) => {
-    const falla = Boolean(e.falla), r = radio(e)
-    if (!falla && !acercado) return []
-    const texto = falla ? `${etiqueta(e)}: ${e.falla}` : etiqueta(e)
-    const size = falla ? (acercado ? 30 : 28) : 22, filas = lines(texto, falla ? 34 : 24)
+    const t = tono(e), r = radio(e)
+    if (!t && !acercado) return []
+    const texto = e.falla ? `${etiqueta(e)}: ${e.falla}` : e.nuevo ? `Nuevo: ${etiqueta(e)}` : etiqueta(e)
+    const size = t ? (acercado ? 30 : 28) : 22, filas = lines(texto, t ? 34 : 24)
     const w = Math.min(560, Math.max(...filas.map(f => f.length)) * size * .56 + 22), h = filas.length * (size + 4) + 12
     const cerca = [[r + 14, -h / 2], [-r - 14 - w, -h / 2], [-w / 2, r + 12], [-w / 2, -r - 12 - h], [r + 10, r + 6], [-r - 10 - w, -r - 6 - h], [r + 10, -r - 6 - h], [-r - 10 - w, r + 6]]
     // Si no hay lugar al lado, el cartel se aleja con una línea guía antes que tapar un nombre.
     const opciones = [...cerca, ...cerca.map(([dx, dy]) => [dx * 1.8 + (dx > 0 ? 30 : -30), dy * 1.8]), ...cerca.map(([dx, dy]) => [dx * 2.8 + (dx > 0 ? 60 : -60), dy * 2.8])]
       .map(([dx, dy]) => ({ x: Math.max(limites.x + 6, Math.min(limites.x + limites.w - w - 6, at[0] + dx)), y: Math.max(limites.y + 6, Math.min(limites.y + limites.h - h - 6, at[1] + dy)), w, h }))
     const libre = (a: Caja) => !ocupados.some(b => a.x < b.x + b.w + 6 && a.x + a.w + 6 > b.x && a.y < b.y + b.h + 6 && a.y + a.h + 6 > b.y)
-    const caja = opciones.find(libre) ?? (falla ? opciones[0] : null)
+    const caja = opciones.find(libre) ?? (t ? opciones[0] : null)
     if (!caja) return []
     ocupados.push(caja)
     const cx = Math.max(caja.x, Math.min(caja.x + w, at[0])), cy = Math.max(caja.y, Math.min(caja.y + h, at[1]))
-    const guia = Math.hypot(cx - at[0], cy - at[1]) > r + 16 ? `<path d="M${at[0].toFixed(1)} ${at[1].toFixed(1)}L${cx.toFixed(1)} ${cy.toFixed(1)}" stroke="#131b16" stroke-width="6"/><path d="M${at[0].toFixed(1)} ${at[1].toFixed(1)}L${cx.toFixed(1)} ${cy.toFixed(1)}" stroke="${falla ? '#ff4b3a' : '#fff'}" stroke-width="3"/>` : ''
-    return [`${guia}<rect x="${caja.x.toFixed(1)}" y="${caja.y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="7" fill="#fbfaf6" stroke="${falla ? '#d93a2b' : '#131b16'}" stroke-width="${falla ? 3.5 : 1}"/><text text-anchor="middle" font-size="${size}" font-weight="${falla ? 700 : 600}" fill="${falla ? '#9d2318' : '#131b16'}">${filas.map((f, j) => `<tspan x="${(caja.x + w / 2).toFixed(1)}" y="${(caja.y + size + 3 + j * (size + 4)).toFixed(1)}">${xml(f)}</tspan>`).join('')}</text>`]
+    const guia = Math.hypot(cx - at[0], cy - at[1]) > r + 16 ? `<path d="M${at[0].toFixed(1)} ${at[1].toFixed(1)}L${cx.toFixed(1)} ${cy.toFixed(1)}" stroke="#131b16" stroke-width="6"/><path d="M${at[0].toFixed(1)} ${at[1].toFixed(1)}L${cx.toFixed(1)} ${cy.toFixed(1)}" stroke="${t ? t.linea : '#fff'}" stroke-width="3"/>` : ''
+    return [`${guia}<rect x="${caja.x.toFixed(1)}" y="${caja.y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="7" fill="#fbfaf6" stroke="${t ? t.fondo : '#131b16'}" stroke-width="${t ? 3.5 : 1}"/><text text-anchor="middle" font-size="${size}" font-weight="${t ? 700 : 600}" fill="${t ? t.texto : '#131b16'}">${filas.map((f, j) => `<tspan x="${(caja.x + w / 2).toFixed(1)}" y="${(caja.y + size + 3 + j * (size + 4)).toFixed(1)}">${xml(f)}</tspan>`).join('')}</text>`]
   })
-  return { lineas, sanos, fallas, cajas, textos }
+  return { lineas, sanos, destacados, cajas, textos }
+}
+const DESTACADO = {
+  falla: { halo: '#ff4b3a', fondo: '#d93a2b', linea: '#ff4b3a', texto: '#9d2318' },
+  nuevo: { halo: '#b85c2e', fondo: '#b85c2e', linea: '#e07a3f', texto: '#7d3a17' },
 }
 function lines(s: string, limit: number): string[] {
   const words = s.replace(/\s+/g, ' ').trim().match(new RegExp(`.{1,${limit}}(?:\\s|$)|.{1,${limit}}`, 'g')) ?? []
@@ -187,6 +192,6 @@ export function svgMapa(datos: MapaCampo, fecha: string, fondo?: FondoSatelital,
   // Sin clip-path: resvg reserva una capa del tamaño de todo lo recortado y, al
   // acercar un potrero chico, el campo ampliado pedía ~300 MB (Edge corta sin
   // responder). Cabecera y pie se pintan encima y cubren lo que se sale.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${infra.lineas.join('')}${infra.sanos.join('')}${labels.join('')}${infra.fallas.join('')}${infra.textos([...ocupados, ...infra.cajas]).join('')}<rect width="${width}" height="${mapY}" fill="#131b16"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#131b16"/><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${infra.lineas.join('')}${infra.sanos.join('')}${labels.join('')}${infra.destacados.join('')}${infra.textos([...ocupados, ...infra.cajas]).join('')}<rect width="${width}" height="${mapY}" fill="#131b16"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#131b16"/><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
   return { svg, dibujados: valid.length, faltantes, width, height }
 }
