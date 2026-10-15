@@ -67,8 +67,12 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
     setError(null)
     try {
       if (c.que === 'sinSaber') {
-        await sinSaber.mutateAsync(c.salidaId)
-        toast.success('Listo: salió una cualquiera de las posibles', { description: 'Su ficha dice «dada de baja sin identificar».' })
+        const x = salidas.find((y) => y.salidaId === c.salidaId)!
+        const elegidasAhora = posibles.filter((p) => x.posiblesIds.includes(p.id)).slice(0, x.pendientes)
+        await sinSaber.mutateAsync({ salidaId: c.salidaId, animalIds: elegidasAhora.map((p) => p.id) })
+        toast.success(`Listo: ${elegidasAhora.map((p) => p.visual ?? p.rfid?.slice(-4)).join(', ')} ${elegidasAhora.length === 1 ? 'quedó' : 'quedaron'} como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} sin identificar`, {
+          description: 'Si después la ves en el campo, desde su ficha tocás «Sigue en el campo».',
+        })
       } else {
         const n = await anular.mutateAsync(c.salidaId)
         toast.success('Listo: anulamos esa salida', { description: n > 0 ? `${n === 1 ? 'Vuelve al rodeo el animal que había salido' : `Vuelven al rodeo los ${n} que habían salido`}.` : 'El número del potrero volvió a como estaba.' })
@@ -124,13 +128,32 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
               {c ? (
                 <div className="mt-3 rounded-[14px] border border-borde bg-superficie px-4 py-3">
                   <p className="text-[14px] text-texto">
-                    {c.que === 'sinSaber'
-                      ? `Damos de baja ${n === 1 ? 'una cualquiera' : `${n} cualesquiera`} de estas ${lista.length}. ${n === 1 ? 'Su ficha va' : 'Sus fichas van'} a decir «dada de baja sin identificar». Si después te enterás de cuál fue, lo corregís desde la ficha.`
-                      : `Borramos esta salida: el ${pot} vuelve a tener ${n === 1 ? `la ${cat}` : `las ${n} ${cat}`}${x.motivo === 'muerte' ? '' : ' (y lo de la venta que se haya anotado por cantidad)'}. Usalo si la cargaste por error.`}
+                    {c.que === 'sinSaber' ? (
+                      <>
+                        {(() => {
+                          const van = lista.slice(0, n)
+                          const nums = van.map((p) => p.visual ?? p.rfid?.slice(-4)).join(', ')
+                          const como = x.motivo === 'muerte' ? 'muerta' : 'vendida'
+                          return (
+                            <>
+                              <b>
+                                Va a quedar como {como} {n === 1 ? 'la' : 'las'} {nums}
+                              </b>{' '}
+                              ({n === 1 ? 'la primera' : `las primeras ${n}`} de la lista). Como no sabés cuál fue, Tropero elige; qué implica:
+                              <span className="mt-1.5 block">· {n === 1 ? 'Deja' : 'Dejan'} de aparecer en el rodeo y {n === 1 ? 'su ficha dice' : 'sus fichas dicen'} «{como} sin identificar».</span>
+                              <span className="block">· Las otras {lista.length - n} quedan como están. El número no cambia: ya estaba restado.</span>
+                              <span className="block">· Si después ves en el campo {n === 1 ? `la ${nums}` : 'alguna de ellas'}, en su ficha tocás «Sigue en el campo»: vuelve al rodeo y la {x.motivo === 'muerte' ? 'muerte' : 'venta'} queda otra vez sin identificar.</span>
+                            </>
+                          )
+                        })()}
+                      </>
+                    ) : (
+                      `Borramos esta salida: el ${pot} vuelve a tener ${n === 1 ? `la ${cat}` : `las ${n} ${cat}`}${x.motivo === 'muerte' ? '' : ' (y lo de la venta que se haya anotado por cantidad)'}. Usalo si la cargaste por error.`
+                    )}
                   </p>
                   <div className="mt-2.5 flex gap-2">
                     <button type="button" disabled={ocupado} onClick={() => hacer(c)} className="h-9 rounded-full bg-principal px-4 text-[14px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-50">
-                      {c.que === 'sinSaber' ? 'Sí, que salga cualquiera' : 'Sí, anular la salida'}
+                      {c.que === 'sinSaber' ? `Sí, que ${n === 1 ? 'quede' : 'queden'} ${n === 1 ? 'ésa' : 'ésas'}` : 'Sí, anular la salida'}
                     </button>
                     <button type="button" onClick={() => setConfirmar(null)} className="h-9 rounded-full px-3 text-[14px] font-bold text-texto-suave hover:text-texto">
                       Cancelar

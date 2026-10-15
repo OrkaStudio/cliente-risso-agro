@@ -526,10 +526,16 @@ export async function identificarAnimal(input: { animalId: string; salidaId?: st
 }
 
 /** «No sé cuál fue»: sale una cualquiera de las posibles y su ficha lo dice. */
-export async function resolverSinSaber(salidaId: string): Promise<number> {
-  const { data, error } = await supabase.rpc('resolver_sin_saber', { p_salida_id: salidaId })
+export async function resolverSinSaber(input: { salidaId: string; animalIds: string[] }): Promise<number> {
+  const { data, error } = await supabase.rpc('resolver_sin_saber', { p_salida_id: input.salidaId, p_animal_ids: input.animalIds })
   if (error) throw new Error(error.message)
   return data as number
+}
+
+/** «Sigue en el campo»: la que salió sin identificar vuelve y la salida se reabre sin ella. */
+export async function reabrirSinSaber(animalId: string): Promise<void> {
+  const { error } = await supabase.rpc('reabrir_sin_saber', { p_animal_id: animalId })
+  if (error) throw new Error(error.message)
 }
 
 /** «Fue un error»: la salida entera se deshace. */

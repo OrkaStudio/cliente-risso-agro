@@ -9,6 +9,9 @@ describe('la ficha del animal', () => {
   it('lo describe en una frase', () => {
     expect(fraseDelAnimal({ fecha_nacimiento: '2026-03-01', raza: 'Angus', pelaje: 'Negro' }, { potrero: '11B', campo: 'La Porteña' }, hoy)).toBe('7 meses. Angus negro. Hoy en el 11B de La Porteña.')
     expect(fraseDelAnimal({ fecha_nacimiento: null, raza: null, pelaje: null }, null, hoy)).toBe('Todavía no está en un potrero.')
+    expect(fraseDelAnimal({ fecha_nacimiento: '2021-04-05', raza: null, pelaje: null }, { potrero: '1A', campo: 'La Porteña' }, hoy, { fecha: '2026-10-12', murio: false })).toBe('5 años. Salió del 1A de La Porteña el 12/10.')
+    expect(fraseDelAnimal({ fecha_nacimiento: null, raza: null, pelaje: null }, { potrero: '1A', campo: null }, hoy, { fecha: '2026-10-12', murio: true })).toBe('Murió en el 1A el 12/10.')
+    expect(fraseDelAnimal({ fecha_nacimiento: null, raza: null, pelaje: null }, { potrero: '1A', campo: null }, hoy, { fecha: '2026-10-12', murio: false, corregido: true })).toBe('Se sacó del 1A el 12/10: estaba cargado de más.')
   })
   const eventos = [
     ev('alta', '2026-03-05', { caravana: '1161' }),

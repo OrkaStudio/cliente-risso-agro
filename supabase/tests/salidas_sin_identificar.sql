@@ -138,4 +138,29 @@ begin
   perform pg_temp.afirmar(pg_temp.vacas_a() = 0, 'el número sigue en 0');
 end $$;
 
+-- 8. «No sé cuál fue» eligiendo cuál, y «Sigue en el campo»: vuelve y la salida se reabre sin ella.
+do $$
+declare r jsonb; s uuid;
+begin
+  -- Volver a tener vacas en A: entran 3 nuevas con caravana.
+  insert into animal (id, empresa_id, categoria, potrero_id) values
+    ('00000000-0000-0000-0000-000000000011', 'eeeeeeee-0000-0000-0000-000000000001', 'vaca', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+    ('00000000-0000-0000-0000-000000000012', 'eeeeeeee-0000-0000-0000-000000000001', 'vaca', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+    ('00000000-0000-0000-0000-000000000013', 'eeeeeeee-0000-0000-0000-000000000001', 'vaca', 'aaaaaaaa-0000-0000-0000-00000000000a');
+  insert into caravana (empresa_id, animal_id, numero_rfid, numero_visual)
+  select 'eeeeeeee-0000-0000-0000-000000000001', ('00000000-0000-0000-0000-0000000000' || i)::uuid, '03200000000' || i, '90' || i
+    from generate_series(11, 13) i;
+  r := salida_por_cantidad('eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', '[{"categoria":"vaca","cantidad":1}]', 'venta');
+  s := (r->>'salida_id')::uuid;
+  perform resolver_sin_saber(s, array['00000000-0000-0000-0000-000000000012']::uuid[]);
+  perform pg_temp.afirmar((select estado from animal where id = '00000000-0000-0000-0000-000000000012') = 'vendido', 'sale la que mostró la pantalla (la 9012)');
+  perform pg_temp.afirmar(pg_temp.vacas_a() = 2, 'quedan 2');
+
+  perform reabrir_sin_saber('00000000-0000-0000-0000-000000000012');
+  perform pg_temp.afirmar((select estado from animal where id = '00000000-0000-0000-0000-000000000012') = 'activo', 'la 9012 vuelve al rodeo');
+  perform pg_temp.afirmar(pg_temp.vacas_a() = 2, 'el número no cambia: la salida vuelve a estar sin identificar');
+  perform pg_temp.afirmar((select pendientes from v_salidas_sin_identificar where salida_id = s) = 1, 'la salida está abierta otra vez');
+  perform pg_temp.afirmar((select posibles from v_salidas_sin_identificar where salida_id = s) = 2, 'ya sin la 9012 entre las posibles');
+end $$;
+
 rollback;

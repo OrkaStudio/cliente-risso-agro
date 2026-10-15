@@ -140,7 +140,8 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   // La salida aparece como fila propia; «No sé cuál fue» la cierra con una cualquiera.
   await abrirUltimaSalida(page)
   await panel.getByRole('button', { name: 'No sé cuál fue' }).click()
-  await panel.getByRole('button', { name: 'Sí, que salga cualquiera' }).click()
+  await expect(panel.getByText(/Va a quedar como vendida la/)).toBeVisible()
+  await panel.getByRole('button', { name: /^Sí, que quede/ }).click()
   await expect(panel).toBeHidden()
 
   // Entraron · Nacieron: dos terneros en el 1A, sin caravana.

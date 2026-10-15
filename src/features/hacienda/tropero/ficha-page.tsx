@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
-import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
+import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useReabrirSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
@@ -45,6 +45,7 @@ export function FichaPage() {
   const navigate = useNavigate()
   const salidasQ = useSalidasSinIdentificar()
   const fueEsta = useIdentificarAnimal()
+  const reabrir = useReabrirSinSaber()
 
   const resumen = useMemo(
     () => (eventos.data ? resumirEventos(eventos.data.map((e) => ({ animal_id: e.animal_id, tipo: e.tipo, fecha: e.fecha, datos: e.datos }))).get(id) : undefined),
@@ -64,6 +65,9 @@ export function FichaPage() {
   const saber = loQueHayQueSaber(a, resumen, evs, lote.data?.nombre ?? null)
   const historia = historiaDelAnimal(evs)
   const titulo = tituloDelAnimal(a.categoria, a.sexo)
+  // Si ya no está: la fecha de su última baja (la del hecho, no la de la carga).
+  const ultimaBaja = !activo ? (eventos.data ?? []).filter((e) => e.tipo === 'baja').sort((x, y) => y.created_at.localeCompare(x.created_at))[0] : undefined
+  const salio = ultimaBaja ? { fecha: ultimaBaja.fecha, murio: a.estado === 'muerto', corregido: a.estado === 'corregido' } : null
   const panelAnimal = { id, empresaId: a.empresa_id ?? '', visual: a.caravana_visual, rfid: a.caravana_rfid, potreroId: a.potrero_id }
   const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : a.estado === 'corregido' ? 'Corregido: estaba cargado de más' : 'De baja'
 
@@ -101,7 +105,7 @@ export function FichaPage() {
             {estadoTexto}
           </span>
           <h1 className="font-heading text-[48px] leading-[0.95] font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
-          <p className="max-w-[460px] text-[16.5px] leading-relaxed text-texto-suave">{fraseDelAnimal(a, potrero ? { potrero: potrero.nombre, campo } : null)}</p>
+          <p className="max-w-[460px] text-[16.5px] leading-relaxed text-texto-suave">{fraseDelAnimal(a, potrero ? { potrero: potrero.nombre, campo } : null, new Date(), salio)}</p>
           {aviso && <span className={cn('rounded-full px-3.5 py-1.5 text-[14px] font-bold', AVISO[aviso.tono])}>{aviso.texto}</span>}
           {activo && a.empresa_id && (
             <div className="mt-2 flex flex-wrap gap-2.5">
@@ -128,6 +132,45 @@ export function FichaPage() {
           )}
         </div>
       </section>
+
+      {/* Salió «sin identificar»: la eligió Tropero porque no se supo cuál fue. */}
+      {(() => {
+        const baja = !activo ? (eventos.data ?? []).filter((e) => e.tipo === 'baja').sort((x, y) => y.created_at.localeCompare(x.created_at))[0] : undefined
+        const d = baja?.datos as Record<string, unknown> | undefined
+        if (!baja || !d?.sin_identificar) return null
+        const como = a.estado === 'muerto' ? 'muerta' : 'vendida'
+        const fecha = `${baja.fecha.slice(8, 10)}/${baja.fecha.slice(5, 7)}`
+        return (
+          <section className="flex flex-wrap items-center gap-4 rounded-[20px] border border-borde bg-superficie px-6 py-4">
+            <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-superficie-hundida text-texto-suave">
+              <Icono nombre="Caravana" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15.5px] font-bold text-texto">
+                Figura como {como} sin identificar
+              </p>
+              <p className="text-[14px] text-texto-suave">
+                El {fecha} salió una del {potrero?.nombre ?? 'potrero'} y no se supo cuál; la eligió Tropero. Si la ves en el campo, no fue ésta: vuelve al rodeo y la salida queda otra vez sin identificar.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={reabrir.isPending}
+              onClick={async () => {
+                try {
+                  await reabrir.mutateAsync(id)
+                  toast.success('Listo: volvió al rodeo', { description: 'La salida quedó otra vez sin identificar, ya sin ésta entre las posibles.' })
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'No se pudo.')
+                }
+              }}
+              className={SECUNDARIO}
+            >
+              Sigue en el campo
+            </button>
+          </section>
+        )
+      })()}
 
       {/* Puede ser la que salió: estaba en ese potrero el día de una salida sin identificar. */}
       {activo &&

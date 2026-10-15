@@ -27,13 +27,18 @@ export function fraseDelAnimal(
   a: { fecha_nacimiento: string | null; raza: string | null; pelaje: string | null },
   donde: { potrero: string; campo: string | null } | null,
   hoy = new Date(),
+  /** Si ya no está en el rodeo: cuándo salió (o murió). */
+  salio?: { fecha: string; murio: boolean; corregido?: boolean } | null,
 ): string {
   const partes: string[] = []
   const edad = edadTexto(a.fecha_nacimiento, hoy)
   if (edad) partes.push(edad.charAt(0).toUpperCase() + edad.slice(1))
   const raza = [texto(a.raza), texto(a.pelaje)?.toLowerCase()].filter(Boolean).join(' ')
   if (raza) partes.push(raza.charAt(0).toUpperCase() + raza.slice(1))
-  partes.push(donde ? `Hoy en el ${donde.potrero}${donde.campo ? ` de ${donde.campo}` : ''}` : 'Todavía no está en un potrero')
+  const lugar = donde ? `el ${donde.potrero}${donde.campo ? ` de ${donde.campo}` : ''}` : null
+  if (salio?.corregido) partes.push(`Se sacó ${lugar ? `d${lugar}` : 'del rodeo'} el ${ddmm(salio.fecha)}: estaba cargado de más`.replace('del el ', 'del '))
+  else if (salio) partes.push(`${salio.murio ? 'Murió en' : 'Salió de'} ${lugar ?? 'el campo'} el ${ddmm(salio.fecha)}`.replace('Salió de el ', 'Salió del '))
+  else partes.push(lugar ? `Hoy en ${lugar}` : 'Todavía no está en un potrero')
   return partes.join('. ') + '.'
 }
 

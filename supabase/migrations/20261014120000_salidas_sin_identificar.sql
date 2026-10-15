@@ -424,8 +424,13 @@ begin
   return jsonb_build_object('identificadas', v_ok);
 end $$;
 
-/** «No sé cuál fue»: sale una cualquiera de las posibles, y la ficha lo dice. */
-create or replace function resolver_sin_saber(p_salida_id uuid)
+/**
+ * «No sé cuál fue»: sale una de las posibles y la ficha lo dice. La pantalla
+ * muestra cuál va a salir y la manda en `p_animal_ids` (las primeras de la
+ * lista que ve el productor); sin ellas, la más vieja.
+ */
+drop function if exists resolver_sin_saber(uuid);
+create or replace function resolver_sin_saber(p_salida_id uuid, p_animal_ids uuid[] default null)
 returns int
 language plpgsql
 security invoker
@@ -435,18 +440,76 @@ declare
   v_p   record;
   v_a   uuid;
   v_n   int := 0;
+  v_i   int := 1;
 begin
   for v_p in select id from salida_pendiente where salida_id = p_salida_id and resuelta_en is null order by created_at loop
-    select c.animal_id into v_a
-      from salida_candidato c join animal a on a.id = c.animal_id
-     where c.salida_id = p_salida_id and not c.descartado and a.estado = 'activo'
-     order by a.created_at
-     limit 1;
+    v_a := null;
+    if p_animal_ids is not null and v_i <= array_length(p_animal_ids, 1) then
+      select c.animal_id into v_a
+        from salida_candidato c join animal a on a.id = c.animal_id
+       where c.salida_id = p_salida_id and c.animal_id = p_animal_ids[v_i] and not c.descartado and a.estado = 'activo';
+      if v_a is null then raise exception 'Ese animal ya no es una de las posibles'; end if;
+      v_i := v_i + 1;
+    else
+      select c.animal_id into v_a
+        from salida_candidato c join animal a on a.id = c.animal_id
+       where c.salida_id = p_salida_id and not c.descartado and a.estado = 'activo'
+       order by a.created_at
+       limit 1;
+    end if;
     if v_a is null then raise exception 'No quedan posibles para esa salida'; end if;
     perform _resolver_pendiente(v_p.id, v_a, 'sin_saber');
     v_n := v_n + 1;
   end loop;
   return v_n;
+end $$;
+
+/**
+ * «Sigue en el campo»: la que salió «sin identificar» en realidad está. Vuelve
+ * al rodeo y la salida queda otra vez sin identificar, ya sin ella entre las
+ * posibles. Si no queda ninguna otra posible, la salida no cierra: se pide
+ * anularla.
+ */
+create or replace function reabrir_sin_saber(p_animal_id uuid)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_p   salida_pendiente;
+  v_ev  uuid;
+begin
+  select * into v_p from salida_pendiente
+   where resuelta_animal_id = p_animal_id and resuelta_como = 'sin_saber'
+   order by resuelta_en desc limit 1 for update;
+  if v_p.id is null then raise exception 'Ese animal no salió «sin identificar»'; end if;
+
+  update salida_candidato set descartado = true where salida_id = v_p.salida_id and animal_id = p_animal_id;
+  if not exists (
+    select 1 from salida_candidato c join animal a on a.id = c.animal_id
+     where c.salida_id = v_p.salida_id and not c.descartado and a.estado = 'activo'
+  ) then
+    raise exception 'No queda otra posible: si ésta sigue en el campo, esa salida estuvo mal cargada. Anulala desde Hacienda.';
+  end if;
+
+  select id into v_ev from evento
+   where animal_id = p_animal_id and tipo = 'baja' and datos->>'salida_id' = v_p.salida_id::text
+   order by created_at desc limit 1;
+
+  perform set_config('tropero.resolviendo', '1', true);
+  update animal set estado = 'activo', updated_at = now() where id = p_animal_id;
+  perform set_config('tropero.resolviendo', '', true);
+
+  insert into evento (empresa_id, animal_id, tipo, nota, datos)
+  values (v_p.empresa_id, p_animal_id, 'nota', 'Sigue en el campo: la salida vuelve a quedar sin identificar',
+          jsonb_build_object('resuelve', v_ev, 'salida_id', v_p.salida_id, 'vuelve_al_rodeo', true));
+
+  update salida_pendiente set resuelta_como = 'anulada', resuelta_en = coalesce(resuelta_en, now())
+   where id = v_p.id;
+  insert into salida_pendiente (empresa_id, salida_id, potrero_id, categoria, motivo, fecha, nota)
+  values (v_p.empresa_id, v_p.salida_id, v_p.potrero_id, v_p.categoria, v_p.motivo, v_p.fecha, v_p.nota);
+  return v_p.salida_id;
 end $$;
 
 /** «Fue un error»: la salida entera se deshace; los que habían salido vuelven al rodeo. */
@@ -481,7 +544,8 @@ end $$;
 
 grant execute on function identificar_animal(uuid, uuid) to authenticated;
 grant execute on function identificar_salida(uuid, text[], uuid) to authenticated;
-grant execute on function resolver_sin_saber(uuid) to authenticated;
+grant execute on function resolver_sin_saber(uuid, uuid[]) to authenticated;
+grant execute on function reabrir_sin_saber(uuid) to authenticated;
 grant execute on function anular_salida(uuid) to authenticated;
 
 -- ── Convertir las bajas del modelo anterior ───────────────────────────
