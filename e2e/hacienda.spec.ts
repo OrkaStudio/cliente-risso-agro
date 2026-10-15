@@ -216,4 +216,12 @@ test('desde la ficha: «¿Fue ésta?» → la vaca queda vendida, el número no 
   await page.getByRole('button', { name: 'Sí, fue ésta' }).first().click()
   await expect(page.getByText('Vendido', { exact: true })).toBeVisible()
   await expect(page.getByText('¿Fue ésta?')).toBeHidden()
+  // La caravana como la muestra la lista: la visible o, si no tiene, los últimos 4 de la electrónica.
+  const visible = (await page.locator('dd').first().textContent())!.trim()
+  const caravana = visible !== '—' ? visible : (await page.locator('dd').nth(1).textContent())!.trim().slice(-4)
+
+  // Se ve en Hacienda, pestaña «Salieron».
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).first().click()
+  await page.getByRole('tab', { name: /Salieron/ }).click()
+  await expect(page.getByRole('row', { name: new RegExp(`${caravana}.*Vendida`) })).toBeVisible()
 })

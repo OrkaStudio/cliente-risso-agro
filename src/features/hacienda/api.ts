@@ -573,3 +573,20 @@ export async function asignarCaravanasPlanilla(input: {
   const r = data as { asignadas: number; sin_animal: string[] }
   return { asignadas: r.asignadas, sinAnimal: r.sin_animal }
 }
+
+export type Baja = { animalId: string; fecha: string; estado: string; motivo: string | null; sinIdentificar: boolean }
+
+/** La última baja de cada animal que salió (para la pestaña «Salieron» de Hacienda). */
+export async function listBajas(): Promise<Baja[]> {
+  const { data, error } = await supabase.from('evento').select('animal_id, fecha, datos, created_at').eq('tipo', 'baja').order('created_at', { ascending: false }).limit(5000)
+  if (error) throw new Error(error.message)
+  const vistos = new Set<string>()
+  const out: Baja[] = []
+  for (const e of data ?? []) {
+    if (vistos.has(e.animal_id)) continue
+    vistos.add(e.animal_id)
+    const d = (e.datos ?? {}) as Record<string, unknown>
+    out.push({ animalId: e.animal_id, fecha: e.fecha, estado: String(d.estado ?? ''), motivo: typeof d.motivo === 'string' ? d.motivo : null, sinIdentificar: !!d.sin_identificar })
+  }
+  return out
+}

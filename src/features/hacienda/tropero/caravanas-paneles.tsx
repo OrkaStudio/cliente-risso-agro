@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
@@ -33,6 +34,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
   const identificar = useIdentificarAnimal()
   const sinSaber = useResolverSinSaber()
   const corregir = useCorregirSalida()
+  const navigate = useNavigate()
   const [elegida, setElegida] = useState<string | null>(null)
   const [modo, setModo] = useState<'sabe' | 'nosabe' | 'error'>('sabe')
   const [ids, setIds] = useState<string[]>([])
@@ -86,12 +88,14 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
         for (const id of ids) await identificar.mutateAsync({ animalId: id, salidaId: x.salidaId })
         const fuera = elegidosInfo.filter((a) => a.potrero_id !== x.potreroId)
         toast.success(`Listo: ${ids.length === 1 ? 'fue' : 'fueron'} ${nums(elegidosInfo.map((a) => ({ visual: a.caravana_visual, rfid: a.caravana_rfid })))}`, {
-          description: fuera.length ? `El ${nombrePotrero(x.potreroId)} recuperó su número y ${fuera.map((a) => `el ${nombrePotrero(a.potrero_id)}`).join(' y ')} perdió la que salió.` : 'El número del rodeo no cambia: ya estaba restado.',
+          description: fuera.length ? `El ${nombrePotrero(x.potreroId)} recuperó su número y ${fuera.map((a) => `el ${nombrePotrero(a.potrero_id)}`).join(' y ')} perdió la que salió.` : 'La ves en Hacienda, pestaña «Salieron».',
+          action: ids.length === 1 ? { label: 'Ver su ficha', onClick: () => navigate(`/hacienda/${ids[0]}`) } : undefined,
         })
       } else if (modo === 'nosabe') {
         await sinSaber.mutateAsync({ salidaId: x.salidaId, animalIds: quedan.map((p) => p.id) })
         toast.success(`Listo: ${nums(quedan)} ${quedan.length === 1 ? 'quedó' : 'quedaron'} como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} sin identificar`, {
-          description: 'Si después la ves en el campo, desde su ficha tocás «Sigue en el campo».',
+          description: 'La ves en Hacienda, pestaña «Salieron».',
+          action: quedan.length === 1 ? { label: 'Ver su ficha', onClick: () => navigate(`/hacienda/${quedan[0]!.id}`) } : undefined,
         })
       } else {
         const cant = mal === 'nosalio' ? 0 : mal === 'cantidad' ? (cantCorrecta ?? x.pendientes) : x.pendientes

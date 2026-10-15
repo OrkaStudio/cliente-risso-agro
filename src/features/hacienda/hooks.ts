@@ -32,6 +32,7 @@ function invalidarStock(qc: QueryClient) {
     // Las salidas sin identificar restan del número: cualquier cambio las toca.
     ['salidas-sin-identificar'],
     ['composicion'],
+    ['bajas'],
     ['campos-recorrida'],
   ]) {
     qc.invalidateQueries({ queryKey: key })
@@ -209,3 +210,5 @@ export function useAsignarCaravanasPlanilla() {
   const qc = useQueryClient()
   return useMutation({ mutationFn: api.asignarCaravanasPlanilla, onSuccess: () => invalidarCaravanas(qc) })
 }
+
+export const useBajas = () => useQuery({ queryKey: ['bajas'], queryFn: api.listBajas })
