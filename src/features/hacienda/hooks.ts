@@ -136,18 +136,6 @@ export function useRegistrarEvento(animalId: string) {
   })
 }
 
-export function useCambiarCaravana(animalId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: api.cambiarCaravana,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['animal', animalId] })
-      qc.invalidateQueries({ queryKey: ['eventos', animalId] })
-      qc.invalidateQueries({ queryKey: ['animales'] })
-    },
-  })
-}
-
 export function useDarBaja(animalId: string) {
   const qc = useQueryClient()
   return useMutation({
@@ -206,9 +194,25 @@ export function useAnularSalida() {
   return useMutation({ mutationFn: api.anularSalida, onSuccess: () => invalidarCaravanas(qc) })
 }
 
-export function useAsignarCaravanasPlanilla() {
+export function useAsignarCaravanas() {
   const qc = useQueryClient()
-  return useMutation({ mutationFn: api.asignarCaravanasPlanilla, onSuccess: () => invalidarCaravanas(qc) })
+  return useMutation({ mutationFn: api.asignarCaravanas, onSuccess: () => invalidarCaravanas(qc) })
+}
+export function useDeshacerCaravanas() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: api.deshacerCaravanas, onSuccess: () => invalidarCaravanas(qc) })
+}
+export function useCorregirAnimal(animalId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.corregirAnimal,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['animal', animalId] })
+      qc.invalidateQueries({ queryKey: ['eventos'] })
+      invalidarCaravanas(qc)
+      invalidarStock(qc)
+    },
+  })
 }
 
 export const useBajas = () => useQuery({ queryKey: ['bajas'], queryFn: api.listBajas })

@@ -35,11 +35,17 @@ export function CampoFormDialog({
   campo,
   triggerLabel,
   triggerVariant = 'default',
+  triggerClassName,
+  onCreado,
 }: {
   empresaId: string
   campo?: Campo
   triggerLabel: string
   triggerVariant?: 'default' | 'outline'
+  /** Para usar otro botón (el del rediseño) en lugar del de siempre. */
+  triggerClassName?: string
+  /** Con el campo nuevo ya creado (para mostrarlo). */
+  onCreado?: (id: string) => void
 }) {
   const editing = !!campo
   const [open, setOpen] = useState(false)
@@ -89,7 +95,7 @@ export function CampoFormDialog({
         })
         toast.success('Campo actualizado')
       } else {
-        await crear.mutateAsync({
+        const nuevo = await crear.mutateAsync({
           empresaId,
           nombre,
           tipo,
@@ -100,6 +106,7 @@ export function CampoFormDialog({
             : undefined,
         })
         toast.success('Campo creado')
+        onCreado?.(nuevo.id)
       }
       setOpen(false)
     } catch (err) {
@@ -109,9 +116,15 @@ export function CampoFormDialog({
 
   return (
     <>
-      <Button variant={triggerVariant} size="sm" onClick={() => setOpen(true)}>
-        {triggerLabel}
-      </Button>
+      {triggerClassName ? (
+        <button type="button" className={triggerClassName} onClick={() => setOpen(true)}>
+          {triggerLabel}
+        </button>
+      ) : (
+        <Button variant={triggerVariant} size="sm" onClick={() => setOpen(true)}>
+          {triggerLabel}
+        </Button>
+      )}
       <FormDialog
         open={open}
         onOpenChange={setOpen}

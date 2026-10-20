@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Icono, type NombreIcono } from '@/components/tropero/icono'
+import { Icono } from '@/components/tropero/icono'
 import { BotonVolver } from '@/components/tropero/panel-lateral'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useReabrirSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
@@ -9,8 +9,12 @@ import { categoriaNombre } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { avisoDelAnimal, fraseDelAnimal, historiaDelAnimal, loQueHayQueSaber, tituloDelAnimal, type Tono } from './ficha'
-import { AnotarleAlgo, CambiarCaravana, DarDeBaja } from './paneles'
+import textura from '@/assets/tropero/textura-campo.webp'
+import { CroquisDibujo } from '@/features/mapa/croquis-dibujo'
+import { useMapa } from '@/features/mapa/api'
+import { avisoDelAnimal, desdeCuando, fraseDelAnimal, historiaDelAnimal, loQueHayQueSaber, rasgosDelAnimal, tituloDelAnimal, type Tono } from './ficha'
+import { CaravanaDibujo, SinCaravanaDibujo } from './caravana-dibujo'
+import { AnotarleAlgo, CorregirDatos, DarDeBaja } from './paneles'
 import { estadoDe } from './rodeo'
 
 const AVISO: Record<Tono, string> = {
@@ -42,11 +46,12 @@ export function FichaPage() {
   const lote = useLote(animal.data?.lote_id)
   const { campos } = useCampoElegido()
   const hoyISO = hoyLocal()
-  const [panel, setPanel] = useState<'anotar' | 'caravana' | 'baja' | null>(null)
+  const [panel, setPanel] = useState<'anotar' | 'corregir' | 'baja' | null>(null)
   const navigate = useNavigate()
   const salidasQ = useSalidasSinIdentificar()
   const fueEsta = useIdentificarAnimal()
   const reabrir = useReabrirSinSaber()
+  const { data: mapa } = useMapa(animal.data?.empresa_id ?? undefined)
 
   const resumen = useMemo(
     () => (eventos.data ? resumirEventos(eventos.data.map((e) => ({ animal_id: e.animal_id, tipo: e.tipo, fecha: e.fecha, datos: e.datos }))).get(id) : undefined),
@@ -63,72 +68,152 @@ export function FichaPage() {
   const estado = activo ? estadoDe({ id, categoria: a.categoria, fecha_nacimiento: a.fecha_nacimiento, potrero_id: a.potrero_id, caravana_visual: a.caravana_visual, caravana_rfid: a.caravana_rfid }, resumen, hoyISO) : 'nada'
   const aviso = avisoDelAnimal(estado, resumen)
   const evs = (eventos.data ?? []).map((e) => ({ id: e.id, tipo: e.tipo, fecha: e.fecha, datos: e.datos, nota: e.nota }))
-  const saber = loQueHayQueSaber(a, resumen, evs, lote.data?.nombre ?? null)
+  // El peso ya está arriba.
+  const saber = loQueHayQueSaber(a, resumen, evs, lote.data?.nombre ?? null, new Date(), estado === 'prenada' || estado === 'vacia').filter((f) => f.nombre !== 'Último peso')
+  const rasgos = rasgosDelAnimal(a)
+  const alta = (eventos.data ?? []).filter((e) => e.tipo === 'alta').sort((x, y) => x.fecha.localeCompare(y.fecha))[0]?.fecha ?? a.created_at?.slice(0, 10)
+  const diasDesde = (f: string, hoy: string) => {
+    const d = Math.round((Date.parse(hoy) - Date.parse(f)) / 86_400_000)
+    return d <= 0 ? 'Desde hoy' : d === 1 ? '1 día' : d < 60 ? `${d} días` : d < 730 ? `${Math.floor(d / 30.4)} meses` : `${Math.floor(d / 365.25)} años`
+  }
+  const ddmmaa = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(2, 4)}`
+  const datos: { nombre: string; valor: string | null; sub?: string; vacio?: string; cargar?: boolean }[] = [
+    { nombre: 'Edad', valor: rasgos.find((r) => r.nombre === 'Edad')?.valor ?? null, cargar: true },
+    { nombre: 'Raza', valor: rasgos.find((r) => r.nombre !== 'Edad')?.valor ?? null, cargar: true },
+    { nombre: 'Último peso', valor: resumen?.ultimoPeso ? `${resumen.ultimoPeso.kg.toLocaleString('es-AR')} kg` : null, sub: resumen?.ultimoPeso ? `el ${ddmmaa(resumen.ultimoPeso.fecha)}` : undefined, vacio: 'Sin pesar' },
+    { nombre: 'En el rodeo', valor: alta ? diasDesde(alta, hoyISO) : null, sub: alta ? `desde el ${ddmmaa(alta)}` : undefined, vacio: '—' },
+  ]
+  const campoMapa = mapa?.find((c) => c.potreros.some((p) => p.id === a.potrero_id))
+  const identidad = campos.find((c) => c.id === potrero?.campo_id)
   const historia = historiaDelAnimal(evs)
   const titulo = tituloDelAnimal(a.categoria, a.sexo)
   // Si ya no está: la fecha de su última baja (la del hecho, no la de la carga).
   const ultimaBaja = !activo ? (eventos.data ?? []).filter((e) => e.tipo === 'baja').sort((x, y) => y.created_at.localeCompare(x.created_at))[0] : undefined
   const salio = ultimaBaja ? { fecha: ultimaBaja.fecha, murio: a.estado === 'muerto', corregido: a.estado === 'corregido' } : null
   const panelAnimal = { id, empresaId: a.empresa_id ?? '', visual: a.caravana_visual, rfid: a.caravana_rfid, potreroId: a.potrero_id }
+  const editable = activo && !!a.empresa_id
   const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : a.estado === 'corregido' ? 'Corregido: estaba cargado de más' : 'De baja'
 
   return (
     <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
-      <nav aria-label="Dónde estás" className="flex items-center gap-3 text-[14.5px] text-texto-suave">
+      <nav aria-label="Dónde estás">
         <BotonVolver onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/hacienda'))}>Hacienda</BotonVolver>
-        <span>{potrero ? `${potrero.nombre}${campo ? `, ${campo}` : ''}` : 'Sin potrero'}</span>
       </nav>
 
-      <section className="grid items-center gap-8 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
-        {/* La caravana, como está en la oreja */}
-        <div className="rounded-[24px] border border-borde bg-superficie px-8 pt-8 pb-6">
-          <Caravana visual={a.caravana_visual} rfid={a.caravana_rfid} campo={campo} />
-          <dl className="mt-6 divide-y divide-borde border-y border-borde">
-            <div className="flex items-baseline justify-between gap-4 py-3">
-              <dt className="text-[14px] text-texto-suave">Visible, la que se lee de lejos</dt>
-              <dd className="cifra text-[24px] font-bold text-texto">{a.caravana_visual ?? '—'}</dd>
-            </div>
-            <div className="flex items-baseline justify-between gap-4 py-3">
-              <dt className="text-[14px] text-texto-suave">Electrónica, la del chip</dt>
-              <dd className="cifra text-[22px] font-bold text-texto">{a.caravana_rfid ?? '—'}</dd>
-            </div>
-          </dl>
-          {!a.caravana_rfid && activo && <p className="mt-3 text-center text-[13.5px] text-texto-suave">Cuando le pongas caravana, cargala con «Cambiar caravana» o con la planilla.</p>}
+      <section className="grid overflow-hidden rounded-[26px] border border-borde bg-superficie md:grid-cols-[210px_minmax(0,1fr)] lg:grid-cols-[210px_minmax(0,1fr)_minmax(300px,0.75fr)]">
+        {/* La caravana, una sola vez: como está en la oreja, sobre el campo */}
+        <div className="relative grid place-items-center overflow-hidden bg-tinta px-4 pt-7 pb-5">
+          <img src={textura} alt="" className="absolute inset-0 size-full object-cover opacity-35" />
+          <div className="relative drop-shadow-[0_18px_24px_rgba(0,0,0,0.35)]">
+            {a.caravana_visual || a.caravana_rfid ? (
+              <CaravanaDibujo visual={a.caravana_visual} rfid={a.caravana_rfid} campo={campo} ancho={150} />
+            ) : (
+              <SinCaravanaDibujo ancho={150} onPoner={editable ? () => setPanel('corregir') : undefined} />
+            )}
+          </div>
         </div>
 
         {/* Quién es y qué hacer */}
-        <div className="flex flex-col items-start gap-4">
-          <span className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1 text-[13.5px] font-bold', activo ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-superficie-hundida text-texto-suave')}>
-            <span className={cn('size-2 rounded-full', activo ? 'bg-estado-bien' : 'bg-neutro-400')} />
-            {estadoTexto}
-          </span>
-          <h1 className="font-heading text-[48px] leading-[0.95] font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
-          <p className="max-w-[460px] text-[16.5px] leading-relaxed text-texto-suave">{fraseDelAnimal(a, potrero ? { potrero: potrero.nombre, campo } : null, new Date(), salio)}</p>
-          {aviso && <span className={cn('rounded-full px-3.5 py-1.5 text-[14px] font-bold', AVISO[aviso.tono])}>{aviso.texto}</span>}
-          {activo && a.empresa_id && (
-            <div className="mt-2 flex flex-wrap gap-2.5">
-              <button type="button" onClick={() => setPanel('anotar')} className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
+        <div className="flex min-w-0 flex-col justify-center gap-3.5 p-5 md:px-6">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1 text-[13.5px] font-bold', activo ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-superficie-hundida text-texto-suave')}>
+              <span className={cn('size-2 rounded-full', activo ? 'bg-estado-bien' : 'bg-neutro-400')} />
+              {estadoTexto}
+            </span>
+            {aviso && <span className={cn('rounded-full px-3 py-1 text-[13.5px] font-bold', AVISO[aviso.tono])}>{aviso.texto}</span>}
+          </div>
+          <h1 className="font-heading text-[40px] leading-[0.95] font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
+          {!activo && <p className="max-w-[460px] text-[15.5px] text-texto-suave">{fraseDelAnimal({ fecha_nacimiento: null, raza: null, pelaje: null }, potrero ? { potrero: potrero.nombre, campo } : null, new Date(), salio)}</p>}
+
+          {/* Lo primero que se mira: cada dato una vez; lo que falta, para cargarlo */}
+          <dl className="grid grid-cols-2 gap-2">
+            {datos.map((d) => (
+              <div key={d.nombre} className={cn('flex flex-col gap-0.5 rounded-[12px] px-3 py-2', d.valor ? 'bg-fondo' : 'border-[1.5px] border-dashed border-borde')}>
+                <dt className="text-[11px] font-semibold tracking-[0.05em] text-texto-suave uppercase">{d.nombre}</dt>
+                {d.valor ? (
+                  <dd>
+                    <span className="text-[16px] font-bold text-texto">{d.valor}</span>
+                    {d.sub && <span className="ml-1.5 text-[12.5px] text-texto-suave">{d.sub}</span>}
+                  </dd>
+                ) : (
+                  <dd>
+                    {d.cargar && editable ? (
+                      <button type="button" onClick={() => setPanel('corregir')} className="text-[14px] font-bold text-principal hover:underline">
+                        + Cargar
+                      </button>
+                    ) : (
+                      <span className="text-[14px] text-texto-suave">{d.vacio}</span>
+                    )}
+                  </dd>
+                )}
+              </div>
+            ))}
+          </dl>
+
+          {editable && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setPanel('anotar')} className="inline-flex h-10 items-center gap-2 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
                 Anotarle algo
                 <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
                   <Icono nombre="Agregar" tamano={16} />
                 </span>
               </button>
-              <button type="button" onClick={() => setPanel('caravana')} className={SECUNDARIO}>
-                <Icono nombre="Caravana" tamano={16} /> Cambiar caravana
+              <button type="button" onClick={() => setPanel('corregir')} className={SECUNDARIO}>
+                <Icono nombre="Editar" tamano={16} /> Corregir datos
               </button>
-              <button type="button" onClick={() => setPanel('baja')} className={SECUNDARIO}>
-                <Icono nombre="Borrar" tamano={16} /> Dar de baja
+              <button type="button" onClick={() => setPanel('baja')} className="inline-flex h-10 items-center rounded-full border-[1.5px] border-borde px-4 text-[14px] font-semibold text-texto-suave hover:border-neutro-300 hover:text-texto">
+                Dar de baja
               </button>
             </div>
           )}
-          {activo && a.empresa_id && (
+          {editable && (
             <>
               <AnotarleAlgo animal={panelAnimal} abierto={panel === 'anotar'} onCerrar={() => setPanel(null)} />
-              <CambiarCaravana animal={panelAnimal} abierto={panel === 'caravana'} onCerrar={() => setPanel(null)} />
+              <CorregirDatos
+                animal={{ ...panelAnimal, categoria: a.categoria, fechaNacimiento: a.fecha_nacimiento, raza: a.raza, pelaje: a.pelaje }}
+                abierto={panel === 'corregir'}
+                onCerrar={() => setPanel(null)}
+              />
               <DarDeBaja animal={panelAnimal} abierto={panel === 'baja'} onCerrar={() => setPanel(null)} />
             </>
           )}
         </div>
+          {/* Dónde está, en el croquis del campo */}
+          <section className="flex min-w-0 flex-col gap-2.5 border-t border-borde p-5 md:col-span-2 md:[&>*]:max-w-[440px] lg:col-span-1 lg:border-t-0 lg:border-l lg:[&>*]:max-w-none">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="flex items-baseline gap-2 font-heading text-[16px] font-extrabold text-texto">
+                {activo ? 'Dónde está' : 'Dónde estaba'}
+                <span className="cifra text-[24px] leading-none">{potrero?.nombre ?? '—'}</span>
+              </h2>
+              {identidad && (
+                <span className="inline-flex items-center gap-1.5 text-[14.5px] font-semibold text-texto">
+                  <span className="grid size-5 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: identidad.color }}>
+                    {identidad.letra}
+                  </span>
+                  {identidad.nombre}
+                </span>
+              )}
+            </div>
+            {campoMapa?.potreros.some((p) => p.poligono) && <CroquisDibujo campo={campoMapa} elegido={a.potrero_id} llenar className="min-h-[220px] flex-1" />}
+            {campoMapa && campoMapa.potreros.some((p) => !p.poligono) ? (
+              // Los potreros que todavía no están dibujados, con éste marcado.
+              <ul className="flex flex-wrap gap-1.5" aria-label={`Potreros de ${campoMapa.nombre} sin dibujar`}>
+                {campoMapa.potreros.filter((p) => !p.poligono).map((p) => (
+                  <li key={p.id} aria-current={p.id === a.potrero_id || undefined} className={cn('cifra grid h-8 min-w-[42px] place-items-center rounded-[9px] px-2 text-[15px] font-bold', p.id === a.potrero_id ? 'bg-principal text-principal-texto' : 'bg-superficie-hundida text-texto-suave')}>
+                    {p.nombre}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              !potrero && <p className="text-[14px] text-texto-suave">Todavía no está en un potrero.</p>
+            )}
+            {potrero && activo && <p className="text-[13px] text-texto-suave">{desdeCuando(evs, potrero.nombre)}</p>}
+            {!potrero && editable && (
+              <button type="button" onClick={() => setPanel('corregir')} className={cn(SECUNDARIO, 'self-start')}>
+                Elegir el potrero
+              </button>
+            )}
+          </section>
       </section>
 
       {/* Salió «sin identificar»: la eligió Tropero porque no se supo cuál fue. */}
@@ -214,22 +299,7 @@ export function FichaPage() {
             )
           })}
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <Panel titulo="Lo que hay que saber">
-          {saber.length === 0 ? (
-            <p className="py-3 text-[14.5px] text-texto-suave">Todavía no hay datos. Se completan solos cuando le anotás una pesada, un tacto o una vacuna.</p>
-          ) : (
-            <dl className="divide-y divide-borde">
-              {saber.map((f) => (
-                <div key={f.nombre} className="flex items-baseline justify-between gap-6 py-3">
-                  <dt className="shrink-0 text-[14.5px] text-texto-suave">{f.nombre}</dt>
-                  <dd className="text-right text-[15px] font-semibold text-texto">{f.valor}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </Panel>
-
+      <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <Panel titulo="Su historia" bajada="No se borra nunca">
           {historia.length === 0 ? (
             <p className="py-3 text-[14.5px] text-texto-suave">Sin nada anotado todavía.</p>
@@ -254,6 +324,20 @@ export function FichaPage() {
             </ol>
           )}
         </Panel>
+        <Panel titulo="Lo que hay que saber">
+            {saber.length === 0 ? (
+              <p className="py-3 text-[14.5px] text-texto-suave">Se completa solo cuando le anotás una pesada, un tacto o una vacuna.</p>
+            ) : (
+              <dl className="divide-y divide-borde">
+                {saber.map((f) => (
+                  <div key={f.nombre} className="flex items-baseline justify-between gap-6 py-3">
+                    <dt className="shrink-0 text-[14.5px] text-texto-suave">{f.nombre}</dt>
+                    <dd className="text-right text-[15px] font-semibold text-texto">{f.valor}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </Panel>
       </section>
     </div>
   )
@@ -268,40 +352,5 @@ function Panel({ titulo, bajada, children }: { titulo: string; bajada?: string; 
       </h2>
       {children}
     </section>
-  )
-}
-
-/** La caravana dibujada: el campo arriba, el número visible grande y la electrónica abajo. */
-function Caravana({ visual, rfid, campo }: { visual: string | null; rfid: string | null; campo: string | null }) {
-  const sin = !visual && !rfid
-  const icono: NombreIcono = 'Caravana'
-  if (sin)
-    return (
-      <div className="mx-auto grid h-[220px] w-[200px] place-items-center rounded-[36px] border-2 border-dashed border-neutro-300 text-center text-texto-suave">
-        <span className="flex flex-col items-center gap-2">
-          <Icono nombre={icono} />
-          <span className="text-[14px] font-semibold">Sin caravana</span>
-        </span>
-      </div>
-    )
-  return (
-    <svg viewBox="0 0 220 260" className="mx-auto h-[240px] w-auto -rotate-6 text-principal" role="img" aria-label={`Caravana ${visual ?? rfid}`}>
-      <circle cx="110" cy="34" r="22" fill="none" stroke="currentColor" strokeWidth="5" />
-      <circle cx="110" cy="34" r="10" fill="none" stroke="currentColor" strokeWidth="4" />
-      <path d="M78 52 Q110 70 142 52 L176 92 Q186 104 186 120 L186 222 Q186 246 162 246 L58 246 Q34 246 34 222 L34 120 Q34 104 44 92 Z" fill="var(--superficie)" stroke="currentColor" strokeWidth="5" />
-      <rect x="52" y="104" width="116" height="124" rx="12" fill="none" stroke="currentColor" strokeWidth="2.5" />
-      {campo && (
-        <text x="110" y="128" textAnchor="middle" fill="currentColor" fontSize="12" fontWeight="700" letterSpacing="2.5">
-          {campo.toUpperCase().slice(0, 16)}
-        </text>
-      )}
-      <text x="110" y="182" textAnchor="middle" fill="currentColor" fontFamily="var(--font-cifra)" fontSize={visual && visual.length > 5 ? 34 : 56} fontWeight="800">
-        {visual ?? rfid!.slice(-4)}
-      </text>
-      <line x1="66" y1="196" x2="154" y2="196" stroke="currentColor" strokeWidth="2.5" />
-      <text x="110" y="214" textAnchor="middle" fill="currentColor" fontFamily="var(--font-cifra)" fontSize="11" fontWeight="600">
-        {rfid ? `ARG · ${rfid}`.slice(0, 26) : 'sin electrónica'}
-      </text>
-    </svg>
   )
 }

@@ -11,7 +11,8 @@ import { categoriaNombre, especiePorCategoria, type Especie } from '@/features/h
 import { resumirEventos } from '@/features/hacienda/senales'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { CaravanasPorExcel, IdentificarSalidas } from './caravanas-paneles'
+import { IdentificarSalidas } from './caravanas-paneles'
+import { CargarCaravanas } from './caravanas-carga'
 import { EntradasSalidas } from './entradas-salidas-panel'
 import { AnimalNuevo } from './paneles'
 import { ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type FilaSalida } from './rodeo'
@@ -110,6 +111,8 @@ export function RodeoPage() {
   const bajas = useBajas()
 
   const campoId = elegido.elegido?.id ?? null
+  const potreroId = params.get('potrero')
+  const potreroFiltro = potreroId ? potreros.data?.find((p) => p.id === potreroId) : undefined
   const base = useMemo(() => {
     const activos = (animales.data ?? []).filter((a) => a.estado === 'activo' && a.id)
     const filas = filasDelRodeo(
@@ -119,8 +122,10 @@ export function RodeoPage() {
       resumirEventos(eventos.data ?? []),
       hoyLocal(),
     )
+    // Desde Campos («Ver su hacienda»): sólo la de ese potrero.
+    if (potreroId) return filas.filter((f) => f.potreroId === potreroId)
     return campoId ? filas.filter((f) => f.campoId === campoId) : filas
-  }, [animales.data, potreros.data, eventos.data, elegido.campos, campoId])
+  }, [animales.data, potreros.data, eventos.data, elegido.campos, campoId, potreroId])
 
   if (animales.isLoading || potreros.isLoading) return <div className="mx-auto h-[280px] w-full max-w-[1104px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
   if (animales.error) return <p className="text-texto-suave">No pudimos cargar la hacienda. Revisá la conexión y probá de nuevo.</p>
@@ -202,7 +207,19 @@ export function RodeoPage() {
         ) : (
           <h1 className="font-heading text-[22px] font-extrabold text-texto">Hacienda</h1>
         )}
-        <QueCampo campos={elegido.campos} elegido={elegido.elegido} elegir={elegido.elegir} />
+        {potreroFiltro ? (
+          <button
+            type="button"
+            onClick={() => setParams((p) => (p.delete('potrero'), p))}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-texto px-4 text-[14.5px] font-bold text-superficie"
+            aria-label={`Ver toda la hacienda, no sólo la del ${potreroFiltro.nombre}`}
+          >
+            Sólo el {potreroFiltro.nombre}
+            <Icono nombre="Cerrar" tamano={16} />
+          </button>
+        ) : (
+          <QueCampo campos={elegido.campos} elegido={elegido.elegido} elegir={elegido.elegir} />
+        )}
       </motion.div>
 
       {/* El número del rodeo, de dónde y de qué está hecho, y lo que se hace: una sola tarjeta. */}
@@ -262,7 +279,7 @@ export function RodeoPage() {
             {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), setEntradaSalida('entraron'))} />}
             {membresia?.empresa_id && (
               <>
-                <CaravanasPorExcel key={`x${panelCaravanas}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
+                <CargarCaravanas key={`x${panelCaravanas}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
                 <IdentificarSalidas
                   empresaId={membresia.empresa_id}
                   abierto={panelCaravanas === 'identificar'}
@@ -391,7 +408,7 @@ export function RodeoPage() {
             onClick={() => setPanelCaravanas('excel')}
             className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
           >
-            <Icono nombre="Comprobante" tamano={16} /> Caravanas por Excel
+            <Icono nombre="Comprobante" tamano={16} /> Caravanas desde una planilla
           </button>
         </div>
 
@@ -513,7 +530,7 @@ function Fila({ f, filtro, onClick }: { f: FilaRodeo; filtro: Filtro | null; onC
       <td className="py-3 pr-4 text-[15px] font-semibold text-texto">{f.queEs}</td>
       <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{f.donde ?? 'Sin potrero'}</td>
       <td className={cn('py-3 pr-4 text-[14.5px] max-lg:hidden', filtro && filtro !== 'sinCaravana' && filtro !== 'sinElectronica' ? 'font-semibold text-texto' : 'text-texto-suave')}>
-        {filtro === 'sinCaravana' || filtro === 'sinElectronica' ? 'Con «Caravanas por Excel» o desde su ficha' : (dato ?? '—')}
+        {filtro === 'sinCaravana' || filtro === 'sinElectronica' ? 'Desde su ficha o con una planilla' : (dato ?? '—')}
       </td>
       {!filtro && (
         <td className="py-3 pr-5">

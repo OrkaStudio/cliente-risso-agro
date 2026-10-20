@@ -7,7 +7,7 @@ import { CampoFecha } from '@/components/ui/campo-fecha'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useCrearAnimalesMasivo, useMoverAnimales, useSalidaPorCantidad, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
-import { CroquisElegir } from '@/features/mapa/croquis-elegir'
+import { CroquisDibujo } from '@/features/mapa/croquis-dibujo'
 import { CaravanasQueSalieron } from './caravanas'
 import { usePosibles } from './posibles'
 import { useMapa } from '@/features/mapa/api'
@@ -414,12 +414,23 @@ export function EntradasSalidas({
 }
 
 /** El croquis satelital si el campo está dibujado; si no, sus potreros como botones. */
-export function Potreros(props: React.ComponentProps<typeof CroquisElegir>) {
-  const { campo, elegido, onElegir, dato, apagado } = props
-  if (campo.potreros.some((p) => p.poligono)) return <CroquisElegir {...props} />
+export function Potreros(props: React.ComponentProps<typeof CroquisDibujo> & { onElegir: (id: string) => void }) {
+  const { campo } = props
+  // Dibujado, el croquis simple; los potreros sin dibujo, como botones debajo.
+  const sueltos = campo.potreros.filter((p) => !p.poligono || p.poligono.length < 3)
+  if (sueltos.length === campo.potreros.length) return <BotonesPotrero {...props} potreros={sueltos} />
+  return (
+    <div className="flex flex-col gap-2.5">
+      <CroquisDibujo {...props} />
+      {sueltos.length > 0 && <BotonesPotrero {...props} potreros={sueltos} />}
+    </div>
+  )
+}
+
+function BotonesPotrero({ potreros, elegido, onElegir, dato, apagado }: React.ComponentProps<typeof Potreros> & { potreros: CampoMapa['potreros'] }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {campo.potreros.map((p) => {
+      {potreros.map((p) => {
         const off = apagado?.(p) ?? false
         const d = dato?.(p)
         return (
@@ -455,7 +466,7 @@ function Letra({ c }: { c: Identidad | undefined }) {
 }
 
 /** Qué campo: con su letra y su color, los mismos de la barra lateral. */
-function ElegirCampo({
+export function ElegirCampo({
   titulo,
   identidad,
   campos,

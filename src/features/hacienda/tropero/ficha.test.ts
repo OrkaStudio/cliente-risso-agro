@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resumirEventos } from '../senales'
-import { avisoDelAnimal, fraseDelAnimal, historiaDelAnimal, loQueHayQueSaber, type EventoFicha } from './ficha'
+import { avisoDelAnimal, desdeCuando, fraseDelAnimal, historiaDelAnimal, loQueHayQueSaber, rasgosDelAnimal, type EventoFicha } from './ficha'
 
 const hoy = new Date('2026-10-12T12:00:00')
 const ev = (tipo: EventoFicha['tipo'], fecha: string, datos: object = {}, nota: string | null = null): EventoFicha => ({ id: `${tipo}-${fecha}`, tipo, fecha, datos, nota })
@@ -22,10 +22,8 @@ describe('la ficha del animal', () => {
   const r = resumirEventos(eventos.map((e) => ({ animal_id: 'a', tipo: e.tipo, fecha: e.fecha, datos: e.datos }))).get('a')
   it('lo que hay que saber, sólo con dato', () => {
     expect(loQueHayQueSaber({ categoria: 'ternero', fecha_nacimiento: '2026-03-01', origen: 'nacimiento' }, r, eventos, null, hoy)).toEqual([
-      { nombre: 'Nació', valor: '1 de marzo de 2026 · 7 meses' },
       { nombre: 'Último peso', valor: '186 kg, 01/10' },
       { nombre: 'Última sanidad', valor: 'Aftosa y carbunclo, 21/08' },
-      { nombre: 'Último movimiento', valor: 'Del 4B al 11B, 12/03' },
       { nombre: 'Destete', valor: 'Previsto para noviembre, a los 8 meses' },
     ])
   })
@@ -33,8 +31,27 @@ describe('la ficha del animal', () => {
     expect(historiaDelAnimal(eventos).map((h) => [h.dia, h.titulo, h.detalle])).toEqual([
       ['1 oct', 'Pesada', '186 kg'],
       ['21 ago', 'Sanidad', 'Aftosa y carbunclo'],
-      ['12 mar', 'Movimiento', 'Del 4B al 11B'],
+      ['12 mar', 'Pasó al 11B', 'Venía del 4B'],
       ['5 mar', 'Alta', 'Con la caravana 1161'],
+    ])
+  })
+  it('arriba, sólo los rasgos que se saben, y desde cuándo está en su potrero', () => {
+    expect(rasgosDelAnimal({ fecha_nacimiento: '2026-03-01', raza: 'Angus', pelaje: 'Negro' }, hoy)).toEqual([
+      { nombre: 'Edad', valor: '7 meses' },
+      { nombre: 'Raza', valor: 'Angus negro' },
+    ])
+    expect(rasgosDelAnimal({ fecha_nacimiento: null, raza: null, pelaje: null }, hoy)).toEqual([])
+    expect(desdeCuando(eventos, '11B')).toBe('Desde el 12 de marzo. Venía del 4B.')
+    expect(desdeCuando([ev('alta', '2026-03-05')], '1A')).toBe('Desde el 5 de marzo.')
+  })
+  it('lo corregido queda en la historia con el antes', () => {
+    const h = historiaDelAnimal([
+      { id: 'c', tipo: 'nota', fecha: '2026-10-19', nota: 'Se corrigieron datos', datos: { correccion: { categoria: { antes: 'vaquillona', despues: 'vaca' }, raza: { antes: null, despues: 'Angus' } } } },
+      ev('cambio_caravana', '2026-10-18', { nuevo: '1040', visual: '1040', antes: { visual: '1032' } }),
+    ])
+    expect(h.map((x) => [x.titulo, x.detalle])).toEqual([
+      ['Se corrigieron datos', 'Qué es: Vaquillona → Vaca · Raza: sin dato → Angus'],
+      ['Caravana nueva: la 1040', 'Antes tenía la 1032'],
     ])
   })
   it('el aviso dice lo que importa del estado', () => {

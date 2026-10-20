@@ -1625,9 +1625,17 @@ export type Database = {
         Args: { p_cantidad: number; p_categoria: Database["public"]["Enums"]["categoria_animal"]; p_potrero_id: string; p_salida_id: string }
         Returns: Json
       }
-      asignar_caravanas_planilla: {
-        Args: { p_campo_id: string; p_empresa_id: string; p_filas: Json }
+      asignar_caravanas: {
+        Args: { p_altas?: Json; p_chips?: Json; p_empresa_id: string; p_filas: Json; p_lote: string }
         Returns: Json
+      }
+      deshacer_caravanas: {
+        Args: { p_lote: string }
+        Returns: number
+      }
+      corregir_animal: {
+        Args: { p_animal_id: string; p_cambios: Json }
+        Returns: undefined
       }
       animal_por_caravana: {
         Args: { p_caravana: string; p_empresa_id: string }

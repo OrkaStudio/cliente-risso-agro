@@ -71,12 +71,14 @@ export function loQueHayQueSaber(
   eventos: EventoFicha[],
   tropa: string | null,
   hoy = new Date(),
+  /** El aviso de arriba ya dice preñada o vacía: el tacto no se repite. */
+  tactoArriba = false,
 ): { nombre: string; valor: string }[] {
   const filas: { nombre: string; valor: string }[] = []
   const ultimo = (t: TipoEvento) => eventos.filter((e) => e.tipo === t).sort((x, y) => y.fecha.localeCompare(x.fecha))[0]
-  if (a.fecha_nacimiento) filas.push({ nombre: 'Nació', valor: `${Number(a.fecha_nacimiento.slice(8, 10))} de ${MES[Number(a.fecha_nacimiento.slice(5, 7)) - 1]} de ${a.fecha_nacimiento.slice(0, 4)} · ${edadTexto(a.fecha_nacimiento, hoy)}` })
+  // La edad va arriba, en sus rasgos; el potrero, en «Dónde está».
   if (r?.ultimoPeso) filas.push({ nombre: 'Último peso', valor: `${r.ultimoPeso.kg.toLocaleString('es-AR')} kg, ${ddmm(r.ultimoPeso.fecha)}` })
-  if (r?.ultimoTacto) {
+  if (r?.ultimoTacto && !tactoArriba) {
     const p = r.prenada ? partoEstimado(r.prenada) : null
     filas.push({
       nombre: 'Último tacto',
@@ -86,12 +88,6 @@ export function loQueHayQueSaber(
   if (r && r.partos > 0) filas.push({ nombre: 'Partos', valor: `${r.partos}${r.ultimoParto ? ` · el último en ${MES[Number(r.ultimoParto.slice(5, 7)) - 1]} de ${r.ultimoParto.slice(0, 4)}` : ''}` })
   const san = ultimo('sanidad')
   if (san) filas.push({ nombre: 'Última sanidad', valor: `${texto(dato(san.datos, 'tratamiento')) ?? 'Sanidad'}, ${ddmm(san.fecha)}` })
-  const mov = ultimo('movimiento')
-  if (mov) {
-    const de = texto(dato(mov.datos, 'potrero_origen'))
-    const a2 = texto(dato(mov.datos, 'potrero_destino'))
-    filas.push({ nombre: 'Último movimiento', valor: `${de && a2 ? `Del ${de} al ${a2}` : a2 ? `Al ${a2}` : 'Se movió'}, ${ddmm(mov.fecha)}` })
-  }
   if (a.categoria && CRIA.includes(a.categoria) && a.fecha_nacimiento && !ultimo('destete')) {
     const [y, m] = a.fecha_nacimiento.split('-').map(Number)
     const t = m! - 1 + 8
@@ -113,6 +109,8 @@ export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: st
       return eventos.filter((b) => b.tipo === 'baja' && (b.id === r || (sal && dato(b.datos, 'salida_id') === sal))).map((b) => b.id)
     }),
   )
+  // Las cargas de caravanas que después se deshicieron.
+  const lotesDeshechos = new Set(eventos.filter((e) => e.tipo === 'nota' && texto(dato(e.datos, 'deshace'))).map((e) => texto(dato(e.datos, 'deshace'))))
   return [...eventos]
     .sort((x, y) => y.fecha.localeCompare(x.fecha))
     .map((e) => {
@@ -125,7 +123,7 @@ export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: st
         case 'movimiento': {
           const de = texto(dato(d, 'potrero_origen'))
           const a = texto(dato(d, 'potrero_destino'))
-          return { ...base, titulo: 'Movimiento', detalle: de && a ? `Del ${de} al ${a}` : a ? `Al ${a}` : nota, tono: 'atencion' as Tono }
+          return { ...base, titulo: a ? `Pasó al ${a}` : 'Se movió', detalle: de ? `Venía del ${de}` : nota, tono: 'atencion' as Tono }
         }
         case 'sanidad': {
           const t = texto(dato(d, 'tratamiento'))
@@ -145,11 +143,23 @@ export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: st
           return { ...base, titulo: 'Parió', detalle: nota, tono: 'bien' as Tono }
         case 'destete':
           return { ...base, titulo: 'Destete', detalle: nota, tono: 'principal' as Tono }
-        case 'cambio_caravana':
-          return { ...base, titulo: 'Caravana', detalle: texto(dato(d, 'nuevo')) ? `Nueva: ${dato(d, 'nuevo')}` : nota, tono: 'principal' as Tono }
+        case 'cambio_caravana': {
+          const nueva = texto(dato(d, 'visual')) ?? texto(dato(d, 'nuevo'))
+          const antes = texto(dato(dato(d, 'antes'), 'visual')) ?? texto(dato(dato(d, 'antes'), 'rfid'))
+          return { ...base, titulo: nueva ? `Caravana nueva: la ${nueva}` : 'Caravana nueva', detalle: antes ? `Antes tenía la ${antes}` : nota, tono: 'principal' as Tono }
+        }
         case 'caravana_asignada': {
           const v = texto(dato(d, 'visual'))
-          const detalle = dato(d, 'emparejada') ? 'Se emparejó el chip en la manga' : dato(d, 'origen') === 'planilla' ? `${v ? `La ${v}, ` : ''}por planilla${texto(dato(d, 'rfid')) ? '' : ' (falta el chip)'}` : v ? `La ${v}` : nota
+          const lote = texto(dato(d, 'lote'))
+          const detalle = dato(d, 'emparejada')
+            ? 'Se emparejó el chip en la manga'
+            : dato(d, 'origen') === 'planilla'
+              ? `${v ? `La ${v}, ` : ''}por planilla${lote && lotesDeshechos.has(lote) ? ' (después se deshizo)' : texto(dato(d, 'rfid')) ? '' : ' (falta el chip)'}`
+              : v
+                ? `La ${v}`
+                : texto(dato(d, 'rfid'))
+                  ? `El chip ${dato(d, 'rfid')}`
+                  : nota
           return { ...base, titulo: 'Caravana', detalle, tono: 'principal' as Tono }
         }
         case 'baja': {
@@ -162,11 +172,51 @@ export function historiaDelAnimal(eventos: EventoFicha[]): { id: string; dia: st
         case 'nota':
           if (dato(d, 'vuelve_al_rodeo')) return { ...base, titulo: 'Volvió al rodeo', detalle: nota ?? 'No era el que salió', tono: 'bien' as Tono }
           if (dato(d, 'resuelve')) return { ...base, titulo: 'Identificada', detalle: 'Era éste el que salió', tono: 'neutro' as Tono }
+          if (dato(d, 'correccion')) return { ...base, titulo: 'Se corrigieron datos', detalle: correcciones(dato(d, 'correccion')), tono: 'neutro' as Tono }
+          if (dato(d, 'deshace')) return { ...base, titulo: 'Se sacó la caravana', detalle: nota ?? 'Se deshizo la carga de la planilla', tono: 'neutro' as Tono }
           return { ...base, titulo: 'Nota', detalle: nota, tono: 'neutro' as Tono }
         default:
           return { ...base, titulo: e.tipo.charAt(0).toUpperCase() + e.tipo.slice(1), detalle: nota, tono: 'neutro' as Tono }
       }
     })
+}
+
+const NOMBRE_DATO: Record<string, string> = { categoria: 'Qué es', fecha_nacimiento: 'Nació', raza: 'Raza', pelaje: 'Pelaje' }
+const valorDato = (k: string, v: unknown) => {
+  const t = texto(v)
+  if (!t) return 'sin dato'
+  if (k === 'categoria') return categoriaLabel[t as Categoria] ?? t
+  if (k === 'fecha_nacimiento') return `${t.slice(8, 10)}/${t.slice(5, 7)}/${t.slice(0, 4)}`
+  return t
+}
+/** «Qué es: Vaquillona → Vaca · Raza: sin dato → Angus» */
+function correcciones(c: unknown): string | null {
+  if (!c || typeof c !== 'object') return null
+  return Object.entries(c as Record<string, { antes?: unknown; despues?: unknown }>)
+    .map(([k, v]) => `${NOMBRE_DATO[k] ?? k}: ${valorDato(k, v?.antes)} → ${valorDato(k, v?.despues)}`)
+    .join(' · ')
+}
+
+/** Los rasgos de arriba de la ficha, sólo los que se saben: «3 años», «Angus negro». */
+export function rasgosDelAnimal(a: { fecha_nacimiento: string | null; raza: string | null; pelaje: string | null }, hoy = new Date()): { nombre: string; valor: string }[] {
+  const r: { nombre: string; valor: string }[] = []
+  const edad = edadTexto(a.fecha_nacimiento, hoy)
+  if (edad) r.push({ nombre: 'Edad', valor: edad.charAt(0).toUpperCase() + edad.slice(1) })
+  const raza = [texto(a.raza), texto(a.pelaje)?.toLowerCase()].filter(Boolean).join(' ')
+  if (raza) r.push({ nombre: texto(a.raza) ? 'Raza' : 'Pelaje', valor: raza.charAt(0).toUpperCase() + raza.slice(1) })
+  return r
+}
+
+/** «Desde el 12 de septiembre. Venía del 3A.»: desde cuándo está en su potrero. */
+export function desdeCuando(eventos: EventoFicha[], potrero: string | null): string | null {
+  const llego = eventos
+    .filter((e) => e.tipo === 'movimiento' && texto(dato(e.datos, 'potrero_destino')) === potrero)
+    .sort((x, y) => y.fecha.localeCompare(x.fecha))[0]
+  const alta = eventos.filter((e) => e.tipo === 'alta').sort((x, y) => x.fecha.localeCompare(y.fecha))[0]
+  const f = llego?.fecha ?? alta?.fecha
+  if (!f) return null
+  const de = llego ? texto(dato(llego.datos, 'potrero_origen')) : null
+  return `Desde el ${Number(f.slice(8, 10))} de ${MES[Number(f.slice(5, 7)) - 1]}${f.slice(0, 4) !== String(new Date().getFullYear()) ? ` de ${f.slice(0, 4)}` : ''}.${de ? ` Venía del ${de}.` : ''}`
 }
 
 /** «Ternero macho», «Vaca»: el título grande de la ficha. */

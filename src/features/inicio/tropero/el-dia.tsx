@@ -508,6 +508,8 @@ function SeSoluciono({ senal, empresaId, compacto = false }: { senal: NonNullabl
 
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const HORIZONTE = 30
+/** Ancho de la columna de lo vencido, a la izquierda de la línea. */
+const VENCIDO = 190
 
 function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const navigate = useNavigate()
@@ -519,7 +521,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
     return `${d.getDate()} ${MES[d.getMonth()]}`
   }
   // Tamaño por monto (área ∝ plata), entre 20 y 72 px.
-  const tam = (m: number) => 20 + 52 * Math.sqrt(m / l.maximo)
+  const maxFuturo = Math.max(1, ...l.futuros.map((p) => p.monto))
+  const tam = (m: number) => 20 + 52 * Math.sqrt(m / maxFuturo)
   // Dos niveles de etiqueta para que no se pisen las que caen cerca.
   const nivel = (lista: PuntoPlata[]) => {
     const orden = [...lista].sort((a, b) => a.dia - b.dia)
@@ -528,6 +531,9 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const nivelArriba = nivel(l.futuros.filter((p) => p.cobro))
   const nivelAbajo = nivel(l.futuros.filter((p) => !p.cobro))
   const vacio = l.futuros.length === 0 && l.vencidos.length === 0
+  // Lo vencido no es todo pérdida: lo que no se pagó y lo que no se cobró van separados.
+  const sinPagar = l.vencidos.filter((p) => !p.cobro).reduce((t, p) => t + p.monto, 0)
+  const sinCobrar = l.vencidos.filter((p) => p.cobro).reduce((t, p) => t + p.monto, 0)
 
   return (
     <section className={TARJETA} aria-labelledby="la-plata">
@@ -547,11 +553,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
         <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-texto" />
         <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-texto" />
         <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} grande />
-        {l.vencidos.length > 0 && (
-          <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">
-            {plataCorta(l.vencido)} vencido sin pagar
-          </span>
-        )}
+        {sinPagar > 0 && <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">{plataCorta(sinPagar)} vencido sin pagar</span>}
+        {sinCobrar > 0 && <span className="mb-1 rounded-full bg-estado-bien-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-bien-texto">{plataCorta(sinCobrar)} vencido sin cobrar</span>}
       </div>
 
       {vacio ? (
@@ -559,29 +562,52 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       ) : (
         <div className="relative mt-6 h-[290px]">
           {/* Lo vencido, antes de hoy */}
-          <div className="absolute inset-y-0 left-0 w-[112px] rounded-[12px] bg-estado-problema-suave/45">
-            <p className="pt-3 text-center text-[14px] font-bold text-estado-problema-texto">Vencido</p>
+          {/* Lo vencido no tiene lugar en la línea: va en lista, de lo más grande a lo más chico */}
+          <div className="absolute inset-y-0 left-0 flex flex-col gap-1.5 rounded-[12px] bg-superficie-hundida/70 px-3 py-3" style={{ width: VENCIDO - 12 }}>
+            <p className="text-[14px] font-bold text-texto">Vencido</p>
+            {l.vencidos.length === 0 ? (
+              <p className="text-[13px] text-texto-suave">Nada</p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {[...l.vencidos]
+                  .sort((x, y) => y.monto - x.monto)
+                  .slice(0, 4)
+                  .map((p) => (
+                    <li key={p.id}>
+                      <button type="button" onClick={() => navigate('/agenda')} className="flex w-full flex-col items-start rounded-[8px] px-1.5 py-1 text-left hover:bg-superficie/70" aria-label={`${p.cobro ? 'Cobro' : 'Pago'} vencido de ${plataCorta(p.monto)}: ${p.descripcion}`}>
+                        <span className={cn('flex items-center gap-1.5 text-[15px] leading-tight font-bold', p.cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+                          <span className={cn('size-2 shrink-0 rounded-full', p.cobro ? 'bg-salvia' : 'bg-estado-problema')} aria-hidden />
+                          <span className="cifra">
+                            {p.cobro ? '+' : '−'}
+                            {plataCorta(p.monto)}
+                          </span>
+                          <span className="text-[11.5px] font-semibold">{p.cobro ? 'sin cobrar' : 'sin pagar'}</span>
+                        </span>
+                        <span className="w-full truncate text-[12.5px] text-texto-suave">{p.descripcion}</span>
+                      </button>
+                    </li>
+                  ))}
+                {l.vencidos.length > 4 && <li className="px-1.5 text-[12.5px] font-semibold text-texto-suave">y {l.vencidos.length - 4} más</li>}
+              </ul>
+            )}
           </div>
           {/* El eje: hoy → 30 días */}
-          <div className="absolute top-1/2 right-0 left-[112px] h-[2px] -translate-y-1/2 bg-borde" />
+          <div className="absolute top-1/2 right-0 h-[2px] -translate-y-1/2 bg-borde" style={{ left: VENCIDO }} />
           {[0, 7, 14, 21, 30].map((d) => (
             <span
               key={d}
               className="absolute top-1/2 -translate-x-1/2 translate-y-2.5 text-[14px] font-semibold whitespace-nowrap text-texto-suave"
-              style={{ left: `calc(112px + (100% - 150px) * ${d / HORIZONTE} + 16px)` }}
+              style={{ left: `calc(${VENCIDO}px + (100% - ${VENCIDO + 38}px) * ${d / HORIZONTE} + 16px)` }}
             >
               {d === 0 ? 'Hoy' : fechaDe(d)}
             </span>
-          ))}
-          {l.vencidos.map((p, i) => (
-            <Burbuja key={p.id} p={p} tam={tam(p.monto)} izquierda="56px" arriba={p.cobro} nivel={i % 2} vencido onClick={() => navigate('/agenda')} />
           ))}
           {l.futuros.map((p) => (
             <Burbuja
               key={p.id}
               p={p}
               tam={tam(p.monto)}
-              izquierda={`calc(112px + (100% - 150px) * ${p.dia / HORIZONTE} + 16px)`}
+              izquierda={`calc(${VENCIDO}px + (100% - ${VENCIDO + 38}px) * ${p.dia / HORIZONTE} + 16px)`}
               arriba={p.cobro}
               nivel={(p.cobro ? nivelArriba : nivelAbajo).get(p.id) ?? 0}
               onClick={() => navigate('/agenda')}
@@ -609,7 +635,6 @@ function Burbuja({
   izquierda,
   arriba,
   nivel,
-  vencido = false,
   onClick,
 }: {
   p: PuntoPlata
@@ -617,10 +642,9 @@ function Burbuja({
   izquierda: string
   arriba: boolean
   nivel: number
-  vencido?: boolean
   onClick: () => void
 }) {
-  const color = vencido ? 'bg-estado-problema' : p.cobro ? 'bg-salvia' : 'bg-principal'
+  const color = p.cobro ? 'bg-salvia' : 'bg-principal'
   const tallo = 20 + nivel * 44
   return (
     <button
@@ -631,11 +655,11 @@ function Burbuja({
       style={{ left: izquierda, transform: `translate(-50%, ${arriba ? `calc(-100% - 1px)` : '1px'})`, flexDirection: arriba ? 'column' : 'column-reverse' }}
     >
       <span className="flex flex-col items-center" style={{ flexDirection: arriba ? 'column' : 'column-reverse' }}>
-        <span className={cn('cifra text-[15px] font-bold whitespace-nowrap', vencido ? 'text-estado-problema-texto' : 'text-texto')}>
+        <span className={'cifra text-[15px] font-bold whitespace-nowrap text-texto'}>
           {p.cobro ? '+' : '−'}
           {plataCorta(p.monto)}
         </span>
-        <span className={cn('truncate text-[13px] text-texto-suave', vencido ? 'max-w-[104px]' : 'max-w-[150px]')}>{p.descripcion}</span>
+        <span className={'max-w-[150px] truncate text-[13px] text-texto-suave'}>{p.descripcion}</span>
       </span>
       <span className={cn('my-1 rounded-full opacity-90 shadow-sm transition-transform group-hover:scale-110', color)} style={{ width: tam, height: tam }} />
       <span className="w-[2px] bg-borde" style={{ height: tallo }} />

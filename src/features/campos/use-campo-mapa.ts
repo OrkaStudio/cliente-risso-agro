@@ -91,3 +91,15 @@ export const useCampoMapa = (campoId: string) =>
     queryFn: () => api.getCampoMapa(campoId),
     enabled: !!campoId,
   })
+
+/** Construye el CampoVM (identidad real + color) para los componentes del mapa. */
+export function vmDe(c: api.CampoConPotreros): CampoVM {
+  return {
+    id: c.id,
+    nombre: c.nombre,
+    tipo: c.tipo,
+    hectareas: c.hectareas,
+    color: colorDeCampo(c.color_idx),
+    centro: c.ubicacion.lat != null && c.ubicacion.lon != null ? { lat: c.ubicacion.lat, lon: c.ubicacion.lon } : null,
+  }
+}

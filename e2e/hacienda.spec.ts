@@ -37,11 +37,10 @@ test('golden path Hacienda: login → alta → stock → ficha', async ({ page }
   await expect(page.getByText('Alta', { exact: true })).toBeVisible()
 })
 
-test('acciones del animal: registrar evento → cambiar caravana → dar de baja', async ({
+test('acciones del animal: registrar evento → corregir datos → dar de baja', async ({
   page,
 }) => {
   const caravanaA = rfid('A')
-  const caravanaB = caravanaA.replace(/A$/, 'B')
   await entrar(page)
   await darDeAlta(page, caravanaA)
   await page
@@ -67,16 +66,22 @@ test('acciones del animal: registrar evento → cambiar caravana → dar de baja
   await destino.click()
   await mov.getByRole('button', { name: `Moverlo al ${nombreDestino}` }).click()
   await expect(mov).toBeHidden()
-  await expect(page.getByRole('navigation', { name: 'Dónde estás' })).toContainText(nombreDestino)
-  await expect(page.getByText('Movimiento', { exact: true })).toBeVisible()
+  await expect(page.getByText(`Pasó al ${nombreDestino}`)).toBeVisible()
 
-  // Cambiar caravana
-  await page.getByRole('button', { name: 'Cambiar caravana' }).click()
-  const cambio = page.getByRole('dialog', { name: 'Otra caravana para este animal' })
-  await cambio.getByLabel('La electrónica nueva').fill(caravanaB)
-  await cambio.getByRole('button', { name: 'Guardar la caravana nueva' }).click()
-  await expect(cambio).toBeHidden()
-  await expect(page.getByText(caravanaB, { exact: true })).toBeVisible()
+  // Corregir datos: la caravana y qué es, juntas; lo de antes queda en la historia
+  const visible = String(Date.now()).slice(-6)
+  await page.getByRole('button', { name: 'Corregir datos' }).click()
+  const corregir = page.getByRole('dialog', { name: 'Corregir datos' })
+  await corregir.getByLabel('Visible').fill(visible)
+  await corregir.getByRole('button', { name: 'Vaquillona', exact: true }).click()
+  await expect(corregir.getByText('Antes: Vaca')).toBeVisible()
+  await corregir.getByRole('button', { name: 'Guardar 2 cambios' }).click()
+  await expect(corregir).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Vaquillona', level: 1 })).toBeVisible()
+  await expect(page.getByRole('img', { name: new RegExp(`^Caravana ${visible}`) })).toBeVisible()
+  await expect(page.getByText(`Caravana nueva: la ${visible}`)).toBeVisible()
+  await expect(page.getByText(`Antes tenía la ${caravanaA}`)).toBeVisible()
+  await expect(page.getByText('Qué es: Vaca → Vaquillona')).toBeVisible()
 
   // Dar de baja
   await page.getByRole('button', { name: 'Dar de baja' }).click()
@@ -159,9 +164,12 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await expect(page.getByRole('row', { name: /Ternero/ }).first()).toBeVisible()
 })
 
-test('decir cuál salió y poner caravanas con una planilla', async ({ page }) => {
+test('decir cuál salió: del potrero, de otro potrero o anularla', async ({ page }) => {
+  test.slow() // tres altas y tres ventas
   await entrar(page)
-  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  // Vacas propias para vender: el test no depende de lo que dejaron otros.
+  for (const sufijo of ['S1', 'S2', 'S3']) await darDeAlta(page, rfid(sufijo))
+  await page.getByPlaceholder('Buscá una caravana').fill('')
   const panel = page.getByRole('dialog')
 
   // Una venta por cantidad (todas con caravana): resta del número, no marca a nadie.
@@ -187,25 +195,118 @@ test('decir cuál salió y poner caravanas con una planilla', async ({ page }) =
   await panel.getByRole('radio', { name: 'No se vendió' }).click()
   await panel.getByRole('button', { name: /^Anular: no se vendió/ }).click()
   await expect(panel).toBeHidden()
+})
 
-  // La planilla: una caravana para un ternero sin caravana del 1A.
+/** Sube una planilla CSV al panel «Caravanas desde una planilla». */
+async function subirPlanilla(page: Page, csv: string) {
+  await page.getByRole('button', { name: 'Caravanas desde una planilla' }).click()
+  await page.getByRole('dialog').locator('input[type=file]').setInputFiles({ name: 'caravanas.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+}
+
+/** Elige el campo base y toca el 1A en el croquis (o en sus botones). */
+async function elDelUnoA(page: Page) {
+  const panel = page.getByRole('dialog')
+  const select = panel.getByRole('combobox', { name: 'Campo' })
+  if (await select.count()) await select.selectOption({ label: 'E2E Campo base' })
+  else await panel.getByRole('radio', { name: /E2E Campo base/ }).click()
+  await tocarPotrero(page, '1A')
+}
+
+test('planilla completa: ¿Es ésta?, Revisá con el antes y después, y Deshacer', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  const panel = page.getByRole('dialog')
   const n = String(Date.now()).slice(-6)
-  await page.getByRole('button', { name: 'Caravanas por Excel' }).click()
-  await panel.locator('input[type=file]').setInputFiles({
-    name: 'caravanas.csv',
-    mimeType: 'text/csv',
-    buffer: Buffer.from(`Caravana visible;Categoría;Potrero;Electrónica\n${n};Ternero;1A;032${n}${n}\n`),
-  })
-  await expect(panel.getByRole('heading', { name: 'Leímos 1 fila' })).toBeVisible()
+  await subirPlanilla(page, `Caravana visible;Categoría;Potrero;Electrónica\n${n};Ternero;1A;032${n}${n}\n`)
+  await expect(panel.getByRole('heading', { name: '¿Es ésta?' })).toBeVisible()
+  await expect(panel.getByText('para ponerles caravana')).toBeVisible()
+  await panel.getByRole('button', { name: 'Sí, es ésta' }).click()
+  // Todo se entendió solo: va directo al Revisá.
+  await expect(panel.getByRole('heading', { name: 'Revisá' })).toBeVisible()
+  await expect(panel.getByText('1 ternero del 1A va a tener caravana')).toBeVisible()
   await panel.getByRole('button', { name: 'Ponerle caravana a 1' }).click()
   await expect(panel.getByRole('heading', { name: 'Listo: 1 caravana puesta' })).toBeVisible()
+
+  // Deshacer: el ternero vuelve a estar sin caravana y el número queda libre.
+  await panel.getByRole('button', { name: 'Deshacer esta carga' }).click()
+  await expect(panel.getByRole('heading', { name: 'Se deshizo la carga' })).toBeVisible()
   await panel.getByRole('button', { name: 'Listo' }).click()
   await page.getByPlaceholder('Buscá una caravana').fill(n)
-  await expect(page.getByRole('row', { name: new RegExp(n) })).toContainText('Ternero')
+  await expect(page.getByRole('row', { name: new RegExp(n) })).toHaveCount(0)
+})
+
+test('planilla con sólo números: se dice qué son y dónde estaban, sin suponer', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  const panel = page.getByRole('dialog')
+  const n = Number(String(Date.now()).slice(-6))
+  await subirPlanilla(page, `Nro\n${n}\n${n + 1}\n`)
+  await panel.getByRole('button', { name: 'Sí, es ésta' }).click()
+  await expect(panel.getByRole('heading', { name: '¿Qué son estos 2?' })).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Seguir' })).toBeDisabled()
+  await panel.getByRole('button', { name: 'Todos lo mismo' }).click()
+  await panel.getByRole('combobox', { name: 'Qué son todos' }).selectOption('ternero')
+  await panel.getByRole('button', { name: 'Seguir' }).click()
+  await expect(panel.getByRole('heading', { name: '¿Estaban todos en el mismo potrero?' })).toBeVisible()
+  await elDelUnoA(page)
+  await panel.getByRole('button', { name: 'Seguir' }).click()
+  await expect(panel.getByText(String(n + 1), { exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: 'Ponerle caravana a 2' }).click()
+  await expect(panel.getByRole('heading', { name: 'Listo: 2 caravanas puestas' })).toBeVisible()
+  await panel.getByRole('button', { name: 'Listo' }).click()
+  await page.getByPlaceholder('Buscá una caravana').fill(String(n + 1))
+  await expect(page.getByRole('row', { name: new RegExp(String(n + 1)) })).toContainText('Ternero')
+})
+
+test('planilla que no cierra: se decide por grupo, y los errores se corrigen en el Revisá', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  const panel = page.getByRole('dialog')
+  const n = String(Date.now()).slice(-6)
+  await subirPlanilla(page, `Caravana;Categoría;Potrero\n${n};Toro;1A\nA-${n};Ternero;1A\n`)
+  await expect(panel.getByText('con un error')).toBeVisible()
+  await panel.getByRole('button', { name: 'Sí, es ésta' }).click()
+  await expect(panel.getByRole('heading', { name: 'Un grupo no cierra' })).toBeVisible()
+  await panel.getByRole('radio', { name: 'No ponerles caravana por ahora' }).click()
+  await panel.getByRole('button', { name: 'Seguir' }).click()
+  await expect(panel.getByText('Toros del 1A: 1 quedan para después')).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'No hay nada para poner' })).toBeDisabled()
+  // El error se corrige ahí mismo: sin la letra, entra.
+  await panel.getByRole('button', { name: 'Ver y corregir' }).click()
+  await panel.getByRole('textbox', { name: 'Caravana de la fila 3' }).fill(`9${n}`)
+  await expect(panel.getByRole('button', { name: 'Ponerle caravana a 1' })).toBeEnabled()
+})
+
+test('desde la ficha: a uno solo se le pone su primera caravana, y la planilla le suma el chip', async ({ page }) => {
+  await entrar(page)
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  await page.getByRole('tab', { name: /Sin caravana/ }).click()
+  await page.getByRole('row', { name: /Ternero/ }).first().getByRole('link').click()
+  const n = String(Date.now()).slice(-5)
+  await page.getByRole('button', { name: 'Ponerle caravana' }).click()
+  const ficha = page.getByRole('dialog', { name: 'Corregir datos' })
+  await expect(ficha.getByText('Escribí la que le pusiste.')).toBeVisible()
+  await ficha.getByLabel('Visible').fill(n)
+  await ficha.getByRole('button', { name: 'Guardar 1 cambio' }).click()
+  await expect(ficha).toBeHidden()
+  await expect(page.getByRole('img', { name: `Caravana ${n}` })).toBeVisible()
+  await expect(page.getByText(`La ${n}`)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ponerle caravana' })).toHaveCount(0)
+
+  // La planilla del veterinario trae su chip: se saltea la caravana y se suma el chip.
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).first().click()
+  const panel = page.getByRole('dialog')
+  await subirPlanilla(page, `Caravana;Chip\n${n};0325300${n.padStart(8, '0')}\n`)
+  await expect(panel.getByText('1 ya tiene caravana')).toBeVisible()
+  await panel.getByRole('button', { name: 'Sí, es ésta' }).click()
+  await expect(panel.getByRole('checkbox', { name: /Sumarles el chip a 1/ })).toBeChecked()
+  await panel.getByRole('button', { name: 'Sumar 1 chip' }).click()
+  await expect(panel.getByRole('heading', { name: 'Listo: 1 chip sumado' })).toBeVisible()
 })
 
 test('desde la ficha: «¿Fue ésta?» → la vaca queda vendida, el número no cambia', async ({ page }) => {
   await entrar(page)
+  for (const sufijo of ['F1', 'F2']) await darDeAlta(page, rfid(sufijo))
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
   await venderUnaVaca(page)
 
@@ -217,8 +318,9 @@ test('desde la ficha: «¿Fue ésta?» → la vaca queda vendida, el número no 
   await expect(page.getByText('Vendido', { exact: true })).toBeVisible()
   await expect(page.getByText('¿Fue ésta?')).toBeHidden()
   // La caravana como la muestra la lista: la visible o, si no tiene, los últimos 4 de la electrónica.
-  const visible = (await page.locator('dd').first().textContent())!.trim()
-  const caravana = visible !== '—' ? visible : (await page.locator('dd').nth(1).textContent())!.trim().slice(-4)
+  const etiqueta = (await page.getByRole('img', { name: /^Caravana / }).getAttribute('aria-label'))!
+  const numero = etiqueta.replace(/^Caravana /, '').split(',')[0]!
+  const caravana = /^\d{1,8}$/.test(numero) ? numero : numero.slice(-4)
 
   // Se ve en Hacienda, pestaña «Salieron».
   await page.getByRole('link', { name: 'Hacienda', exact: true }).first().click()

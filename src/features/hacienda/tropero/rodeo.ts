@@ -40,6 +40,7 @@ export type FilaRodeo = {
   /** «11B, La Porteña»; null si no está en un potrero. */
   donde: string | null
   campoId: string | null
+  potreroId: string | null
   visual: string | null
   rfid: string | null
   /** Lo último que se sabe: «186 kg», «Preñada en marzo», «Vacía hoy». */
@@ -121,6 +122,7 @@ export function filasDelRodeo(
       queEs: [a.categoria ? categoriaLabel[a.categoria] : 'Sin categoría', edad].filter(Boolean).join(', '),
       donde: p ? `${p.nombre}, ${campo.get(p.campo_id) ?? ''}`.replace(/, $/, '') : null,
       campoId: p?.campo_id ?? null,
+      potreroId: p?.id ?? null,
       visual: a.caravana_visual,
       rfid: a.caravana_rfid,
       ultimoDato: ultimoDato(r, hoyISO),

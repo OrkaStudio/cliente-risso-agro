@@ -330,22 +330,6 @@ export async function moverAnimales(
   }
 }
 
-/** Cambiar la caravana conservando la identidad del animal (RPC transaccional). */
-export async function cambiarCaravana(input: {
-  animalId: string
-  nuevoRfid: string
-  nuevaVisual?: string
-  motivo?: string
-}): Promise<void> {
-  const { error } = await supabase.rpc('cambiar_caravana', {
-    p_animal_id: input.animalId,
-    p_nuevo_rfid: input.nuevoRfid.trim(),
-    p_nueva_visual: input.nuevaVisual?.trim() || undefined,
-    p_motivo: input.motivo?.trim() || undefined,
-  })
-  if (error) throw new Error(error.message)
-}
-
 /** Dar de baja (vendido/muerto) + dejar el evento en el historial (RPC). */
 export async function darBaja(input: {
   animalId: string
@@ -559,19 +543,43 @@ export async function listComposicion() {
 }
 
 /** La planilla: caravana para los que se cargaron por categoría. No crea animales. */
-export async function asignarCaravanasPlanilla(input: {
+/**
+ * Pone las caravanas de una planilla, todo o nada: cada número en el animal
+ * exacto que eligió el productor, el chip a los que ya tenían la visible y el
+ * alta de los que entraron sin cargarse.
+ */
+export async function asignarCaravanas(input: {
   empresaId: string
-  campoId: string
-  filas: { visual: string | null; rfid: string | null; categoria: CategoriaAnimal; potreroId: string | null; nacimiento: string | null; raza: string | null }[]
-}): Promise<{ asignadas: number; sinAnimal: string[] }> {
-  const { data, error } = await supabase.rpc('asignar_caravanas_planilla', {
+  lote: string
+  filas: { animalId: string; visual: string | null; rfid: string | null; nacimiento: string | null; raza: string | null }[]
+  chips: { animalId: string; rfid: string }[]
+  altas: { categoria: CategoriaAnimal; potreroId: string; visual: string | null; rfid: string | null; nacimiento: string | null; raza: string | null }[]
+}): Promise<{ asignadas: number; chips: number; altas: number }> {
+  const { data, error } = await supabase.rpc('asignar_caravanas', {
     p_empresa_id: input.empresaId,
-    p_campo_id: input.campoId,
-    p_filas: input.filas.map((f) => ({ visual: f.visual, rfid: f.rfid, categoria: f.categoria, potrero_id: f.potreroId, nacimiento: f.nacimiento, raza: f.raza })),
+    p_lote: input.lote,
+    p_filas: input.filas.map((f) => ({ animal_id: f.animalId, visual: f.visual, rfid: f.rfid, nacimiento: f.nacimiento, raza: f.raza })),
+    p_chips: input.chips.map((c) => ({ animal_id: c.animalId, rfid: c.rfid })),
+    p_altas: input.altas.map((a) => ({ categoria: a.categoria, potrero_id: a.potreroId, visual: a.visual, rfid: a.rfid, nacimiento: a.nacimiento, raza: a.raza })),
   })
   if (error) throw new Error(error.message)
-  const r = data as { asignadas: number; sin_animal: string[] }
-  return { asignadas: r.asignadas, sinAnimal: r.sin_animal }
+  return data as { asignadas: number; chips: number; altas: number }
+}
+
+/** Saca las caravanas de una carga (las que siguen puestas). */
+export async function deshacerCaravanas(lote: string): Promise<number> {
+  const { data, error } = await supabase.rpc('deshacer_caravanas', { p_lote: lote })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** Lo que se cambia desde «Corregir datos»: sólo van las claves que cambiaron. */
+export type Correccion = Partial<{ categoria: CategoriaAnimal; fecha_nacimiento: string | null; raza: string | null; pelaje: string | null; visual: string | null; rfid: string | null; potrero_id: string }>
+
+/** Corregir lo que estaba mal cargado, todo o nada; lo de antes queda en su historia (RPC). */
+export async function corregirAnimal(input: { animalId: string; cambios: Correccion }): Promise<void> {
+  const { error } = await supabase.rpc('corregir_animal', { p_animal_id: input.animalId, p_cambios: input.cambios })
+  if (error) throw new Error(error.message)
 }
 
 export type Baja = { animalId: string; fecha: string; estado: string; motivo: string | null; sinIdentificar: boolean }

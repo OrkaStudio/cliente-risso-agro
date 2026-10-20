@@ -8,9 +8,10 @@ import { Segmentos } from '@/components/tropero/segmentos'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useMapa } from '@/features/mapa/api'
-import { Potreros } from './entradas-salidas-panel'
-import { useCambiarCaravana, useCrearAnimal, useDarBaja, useMoverAnimales, usePotreros, useRegistrarEvento } from '@/features/hacienda/hooks'
-import { categoriaLabel, categoriasPorEspecie, type Especie } from '@/features/hacienda/labels'
+import { ElegirCampo, Potreros } from './entradas-salidas-panel'
+import type { Correccion } from '@/features/hacienda/api'
+import { useCorregirAnimal, useCrearAnimal, useDarBaja, useMoverAnimales, usePotreros, useRegistrarEvento } from '@/features/hacienda/hooks'
+import { categoriaLabel, categoriasPorEspecie, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 import type { Database } from '@/lib/supabase/types'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
@@ -235,30 +236,73 @@ export function AnotarleAlgo({ animal, abierto, onCerrar }: { animal: AnimalPane
   )
 }
 
-// ===== Cambiar caravana =====
+// ===== Corregir datos =====
 
-const MOTIVOS_CARAVANA = [
-  { valor: 'Se perdió', texto: 'Se perdió' },
-  { valor: 'Se rompió', texto: 'Se rompió' },
-  { valor: 'Estaba mal cargada', texto: 'Estaba mal cargada' },
-]
+export type AnimalCorregir = AnimalPanel & { categoria: Categoria | null; fechaNacimiento: string | null; raza: string | null; pelaje: string | null }
+type Datos = { visual: string; rfid: string; categoria: Categoria | null; nacio: string; raza: string; pelaje: string; potreroId: string | null }
 
-export function CambiarCaravana({ animal, abierto, onCerrar }: { animal: AnimalPanel; abierto: boolean; onCerrar: () => void }) {
-  const [rfid, setRfid] = useState('')
-  const [visual, setVisual] = useState('')
-  const [motivo, setMotivo] = useState<string[]>([])
+/**
+ * Un solo panel para corregir lo que estaba mal cargado: la caravana, qué es,
+ * cuándo nació, raza, pelaje y el potrero. Lo que cambia se marca con el valor
+ * de antes, se guarda todo junto y lo de antes queda en su historia.
+ */
+export function CorregirDatos({ animal, abierto, onCerrar }: { animal: AnimalCorregir; abierto: boolean; onCerrar: () => void }) {
+  const antes: Datos = { visual: animal.visual ?? '', rfid: (animal.rfid ?? '').replace(/\s/g, ''), categoria: animal.categoria, nacio: animal.fechaNacimiento ?? '', raza: animal.raza ?? '', pelaje: animal.pelaje ?? '', potreroId: animal.potreroId }
+  const [d, setD] = useState<Datos>(antes)
+  const [abiertoAntes, setAbiertoAntes] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const mut = useCambiarCaravana(animal.id)
+  const mut = useCorregirAnimal(animal.id)
+  const { data: mapa } = useMapa(animal.empresaId)
+  const { campos: identidad } = useCampoElegido()
+  const potreros = usePotreros()
+  const camposMapa = (mapa ?? []).filter((c) => c.potreros.length > 0)
+  const campoDe = (id: string | null) => camposMapa.find((c) => c.potreros.some((p) => p.id === id))?.id ?? null
+  const [campoId, setCampoId] = useState<string | null>(null)
+  // Al abrir, el panel arranca con los datos de hoy.
+  if (abierto !== abiertoAntes) {
+    setAbiertoAntes(abierto)
+    if (abierto) {
+      setD(antes)
+      setError(null)
+      setCampoId(null)
+    }
+  }
+  const campo = camposMapa.find((c) => c.id === (campoId ?? campoDe(d.potreroId) ?? (camposMapa.length === 1 ? camposMapa[0]!.id : null)))
+  const nombrePot = (id: string | null) => potreros.data?.find((p) => p.id === id)?.nombre ?? 'sin potrero'
+  const fecha = (f: string) => (f ? `${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(0, 4)}` : 'sin fecha')
+  const especie = animal.categoria ? especiePorCategoria[animal.categoria] : 'bovino'
+
+  const chip = d.rfid.replace(/\s/g, '')
+  const cambia = {
+    caravana: d.visual.trim() !== antes.visual || chip !== antes.rfid,
+    que: d.categoria !== antes.categoria,
+    nacio: d.nacio !== antes.nacio || d.raza.trim() !== antes.raza || d.pelaje.trim() !== antes.pelaje,
+    potrero: d.potreroId !== antes.potreroId,
+  }
+  const lista = [cambia.caravana && 'caravana', cambia.que && 'qué es', cambia.nacio && 'nacimiento, raza o pelaje', cambia.potrero && 'potrero'].filter(Boolean) as string[]
+  const problema =
+    cambia.caravana && !d.visual.trim() && !chip
+      ? 'Escribí la caravana visible, el chip o los dos.'
+      : d.visual.trim() !== antes.visual && /\D/.test(d.visual.trim())
+        ? 'La visible va sólo con números.'
+        : chip !== antes.rfid && chip && !/^\d{15}$/.test(chip)
+          ? `El chip tiene ${chip.replace(/\D/g, '').length} números: son 15.`
+          : null
 
   async function guardar() {
     setError(null)
-    if (!rfid.trim()) return setError('Escribí el número de la electrónica nueva.')
+    const c: Correccion = {}
+    // Sólo lo que cambió: el chip guardado puede tener espacios y no hay que «cambiarlo» por eso.
+    if (d.visual.trim() !== antes.visual) c.visual = d.visual.trim() || null
+    if (chip !== antes.rfid) c.rfid = chip || null
+    if (cambia.que && d.categoria) c.categoria = d.categoria
+    if (d.nacio !== antes.nacio) c.fecha_nacimiento = d.nacio || null
+    if (d.raza.trim() !== antes.raza) c.raza = d.raza.trim() || null
+    if (d.pelaje.trim() !== antes.pelaje) c.pelaje = d.pelaje.trim() || null
+    if (cambia.potrero && d.potreroId) c.potrero_id = d.potreroId
     try {
-      await mut.mutateAsync({ animalId: animal.id, nuevoRfid: rfid, nuevaVisual: visual, motivo: motivo[0] })
-      toast.success(`Listo: el animal tiene caravana nueva${visual.trim() ? `, la ${visual.trim()}` : ''}`, { description: 'La anterior queda en su historia.' })
-      setRfid('')
-      setVisual('')
-      setMotivo([])
+      await mut.mutateAsync({ animalId: animal.id, cambios: c })
+      toast.success(lista.length === 1 ? 'Listo: 1 cambio guardado' : `Listo: ${lista.length} cambios guardados`, { description: 'Lo de antes queda en su historia.' })
       onCerrar()
     } catch (e) {
       setError(errorTexto(e))
@@ -269,28 +313,72 @@ export function CambiarCaravana({ animal, abierto, onCerrar }: { animal: AnimalP
     <PanelLateral
       abierto={abierto}
       onCerrar={onCerrar}
-      titulo="Otra caravana para este animal"
-      bajada="Lo que tiene hoy queda en su historia, con la fecha del cambio."
+      titulo="Corregir datos"
+      bajada="Lo que está mal cargado. Lo de antes queda en su historia."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={mut.isPending} onClick={guardar}>
-          Guardar la caravana nueva
-        </BotonPrincipal>
+        <div className="flex flex-col gap-2">
+          <p className="text-center text-[13.5px] text-texto-suave">{problema ?? (lista.length ? `Cambia: ${lista.join(', ')}.` : 'Cambiá lo que esté mal.')}</p>
+          <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={mut.isPending || lista.length === 0 || !!problema} onClick={guardar}>
+            {lista.length === 0 ? 'Guardar' : lista.length === 1 ? 'Guardar 1 cambio' : `Guardar ${lista.length} cambios`}
+          </BotonPrincipal>
+        </div>
       }
     >
-      <div className="flex items-center gap-4 rounded-[18px] bg-superficie px-5 py-4">
-        <span className="text-[14px] text-texto-suave">Tiene hoy</span>
-        <span className="cifra rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 text-[20px] font-bold text-principal">{animal.visual ?? '—'}</span>
-        <span className="cifra truncate text-[15px] text-texto-suave">{animal.rfid ?? 'sin electrónica'}</span>
+      <div className="flex flex-col gap-3">
+        <Bloque titulo="Caravana" antes={cambia.caravana ? (antes.visual || antes.rfid ? `Antes: ${antes.visual || '—'}${antes.rfid ? ` · chip ${antes.rfid.slice(-4)}` : ''}` : 'Antes: sin caravana') : null}>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            <CampoTexto etiqueta="Visible" inputMode="numeric" autoComplete="off" value={d.visual} onChange={(e) => setD({ ...d, visual: e.target.value })} />
+            <CampoTexto etiqueta="Chip (15 números)" inputMode="numeric" autoComplete="off" value={d.rfid} onChange={(e) => setD({ ...d, rfid: e.target.value })} />
+          </div>
+          <p className="text-[13px] text-texto-suave">{antes.visual || antes.rfid ? 'Si se le cayó y le pusiste otra, escribí la nueva.' : 'Escribí la que le pusiste.'}</p>
+        </Bloque>
+
+        <Bloque titulo="Qué es" antes={cambia.que && antes.categoria ? `Antes: ${categoriaLabel[antes.categoria]}` : null}>
+          <div className="flex flex-wrap gap-2">
+            {categoriasPorEspecie[especie].map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={d.categoria === c}
+                onClick={() => setD({ ...d, categoria: c })}
+                className={cn('h-10 rounded-full border-[1.5px] px-4 text-[14.5px] font-semibold transition-colors', d.categoria === c ? 'border-texto bg-texto text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300')}
+              >
+                {categoriaLabel[c]}
+              </button>
+            ))}
+          </div>
+        </Bloque>
+
+        <Bloque titulo="Nació" antes={cambia.nacio ? `Antes: ${[fecha(antes.nacio), antes.raza || 'sin raza', antes.pelaje].filter(Boolean).join(' · ')}` : null}>
+          <CampoFecha value={d.nacio} onChange={(v) => setD({ ...d, nacio: v })} ariaLabel="Cuándo nació" max={hoyLocal()} conBorrar />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CampoTexto etiqueta="Raza" autoComplete="off" value={d.raza} onChange={(e) => setD({ ...d, raza: e.target.value })} />
+            <CampoTexto etiqueta="Pelaje" autoComplete="off" value={d.pelaje} onChange={(e) => setD({ ...d, pelaje: e.target.value })} />
+          </div>
+        </Bloque>
+
+        <Bloque titulo="Potrero" antes={cambia.potrero ? `Antes: ${nombrePot(antes.potreroId)}` : null}>
+          {camposMapa.length > 1 && <ElegirCampo titulo="Campo" identidad={identidad} campos={camposMapa} valor={campo?.id ?? null} onCambio={setCampoId} />}
+          {campo ? <Potreros campo={campo} elegido={d.potreroId} onElegir={(id) => setD({ ...d, potreroId: id })} dato={SIN_DATO} /> : <p className="text-[14px] text-texto-suave">Elegí el campo.</p>}
+          <p className="text-[13px] text-texto-suave">Tocá el potrero donde está. En su historia queda como que pasó ahí hoy.</p>
+        </Bloque>
       </div>
-      <div className="mt-6 flex flex-col gap-4">
-        <CampoTexto etiqueta="La electrónica nueva" ayuda="Los 15 números del chip." inputMode="numeric" autoFocus value={rfid} onChange={(e) => setRfid(e.target.value)} />
-        <CampoTexto etiqueta="La visible nueva (opcional)" inputMode="numeric" value={visual} onChange={(e) => setVisual(e.target.value)} />
-      </div>
-      <Grupo titulo="¿Por qué la cambiaste?" className="mt-6">
-        <Opciones etiqueta="Por qué" opciones={MOTIVOS_CARAVANA} elegidas={motivo} onTocar={(v) => setMotivo((xs) => (xs[0] === v ? [] : [v]))} />
-      </Grupo>
       <ErrorDelPanel texto={error} />
     </PanelLateral>
+  )
+}
+
+const SIN_DATO = () => null
+
+function Bloque({ titulo, antes, children }: { titulo: string; antes: string | null; children: React.ReactNode }) {
+  return (
+    <section className={cn('flex flex-col gap-3 rounded-[18px] border bg-superficie px-4 py-3.5', antes ? 'border-principal ring-1 ring-principal' : 'border-borde')}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[15.5px] font-bold text-texto">{titulo}</h3>
+        {antes && <span className="rounded-full bg-principal-suave px-2.5 py-0.5 text-[12.5px] font-semibold text-principal">{antes}</span>}
+      </div>
+      {children}
+    </section>
   )
 }
 

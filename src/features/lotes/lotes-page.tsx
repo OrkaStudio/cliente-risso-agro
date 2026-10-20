@@ -22,11 +22,7 @@ import {
   useSetCampoContorno,
   useSetPotreroPoligono,
 } from '@/features/campos/hooks'
-import {
-  colorDeCampo,
-  useCampoMapa,
-  type CampoVM,
-} from '@/features/campos/use-campo-mapa'
+import { colorDeCampo, useCampoMapa, vmDe } from '@/features/campos/use-campo-mapa'
 import type { CampoConPotreros, LatLng, PotreroMapa } from '@/features/campos/api'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { CampoFormDialog } from '@/features/campos/campos-dialogs'
@@ -88,17 +84,6 @@ function Kpi({
   )
 }
 
-/** Construye el CampoVM (identidad real + color) para los componentes del mapa. */
-function vmDe(c: CampoConPotreros): CampoVM {
-  return {
-    id: c.id,
-    nombre: c.nombre,
-    tipo: c.tipo,
-    hectareas: c.hectareas,
-    color: colorDeCampo(c.color_idx),
-    centro: c.ubicacion.lat != null && c.ubicacion.lon != null ? { lat: c.ubicacion.lat, lon: c.ubicacion.lon } : null,
-  }
-}
 
 /**
  * Aviso de potreros sin dibujar. Oficina es donde se traza el polígono, así
