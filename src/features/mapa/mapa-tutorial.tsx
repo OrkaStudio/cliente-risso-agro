@@ -23,7 +23,7 @@ const COLOR: Record<NonNullable<PotreroMapa['tipo']>, { fill: string; op: number
   vacio: { fill: HUESO, op: 0.45 },
 }
 
-export type ModoMapa = 'mirar' | 'tocar' | 'borde' | 'ajustar' | 'potrero'
+export type ModoMapa = 'mirar' | 'tocar' | 'borde' | 'ajustar' | 'potrero' | 'linea'
 
 /** La guía animada sobre el mapa: dónde y qué gesto hacer. Sin `en`, va al centro. */
 export type Guia = { tipo: 'tocar' | 'arrastrar'; en?: LatLng; texto?: string }
@@ -69,6 +69,18 @@ export const MapaTutorial = forwardRef<
     /** Una parcela propuesta (catastro), en trigo, esperando confirmación. */
     candidato?: LatLng[] | null
     guia?: Guia | null
+    /** Modo «ajustar»: el dibujo que se corrige (sin esto, el borde del campo). */
+    editable?: LatLng[] | null
+    /** Potreros que no se pintan (el que se corrige o se divide va aparte). */
+    ocultos?: string[]
+    /** Las partes de una división, cada una con su nombre. */
+    piezas?: { poligono: LatLng[]; nombre: string; que?: string }[]
+    /** El potrero elegido: borde grueso. */
+    elegido?: string | null
+    /** Lo que tapa una tarjeta encima del mapa (px): el encuadre lo deja libre. */
+    relleno?: { derecha?: number; abajo?: number }
+    /** Modo «linea»: los puntos marcados hasta ahora. */
+    onLinea?: (p: LatLng[]) => void
     className?: string
   }
 >(function MapaTutorial(
@@ -89,6 +101,12 @@ export const MapaTutorial = forwardRef<
     onToque,
     candidato,
     guia,
+    editable,
+    ocultos,
+    piezas,
+    elegido,
+    onLinea,
+    relleno,
     className,
   },
   api,
@@ -96,13 +114,21 @@ export const MapaTutorial = forwardRef<
   const host = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
   const capas = useRef<L.LayerGroup | null>(null)
-  const cb = useRef({ onDibujo, onPuntos, onAjuste, onToque })
-  cb.current = { onDibujo, onPuntos, onAjuste, onToque }
+  const cb = useRef({ onDibujo, onPuntos, onAjuste, onToque, onLinea })
+  cb.current = { onDibujo, onPuntos, onAjuste, onToque, onLinea }
   const modoRef = useRef(modo)
   modoRef.current = modo
   const contar = useRef<(n: number, primero?: L.LatLng) => void>(() => {})
   const cursor = useRef<HTMLDivElement>(null)
   const cerrar = useRef<HTMLDivElement>(null)
+  const margen = (): L.FitBoundsOptions => {
+    // En una pantalla angosta, menos aire: el campo se ve más grande.
+    const aire = (host.current?.clientWidth ?? 1000) < 600 ? 20 : 48
+    return {
+      paddingTopLeft: [aire, relleno ? 64 : aire],
+      paddingBottomRight: [aire + (relleno?.derecha ?? 0), aire + (relleno?.abajo ?? 0)],
+    }
+  }
 
   // Montar una sola vez.
   useEffect(() => {
@@ -116,9 +142,10 @@ export const MapaTutorial = forwardRef<
     })
     mapa.current = map
     // Algunos pasos montan el mapa de nuevo: si ya hay borde, arranca encuadrado en él.
-    if (contorno) map.fitBounds(L.latLngBounds(contorno), { padding: [48, 48] })
+    if (contorno) map.fitBounds(L.latLngBounds(contorno), margen())
     const quitarSatelite = ponerSatelite(map)
-    L.control.zoom({ position: 'bottomright' }).addTo(map)
+    // Con una tarjeta a la derecha, el zoom va a la izquierda: abajo a la derecha quedaba tapado.
+    L.control.zoom({ position: relleno?.derecha ? 'bottomleft' : 'bottomright' }).addTo(map)
     capas.current = L.layerGroup().addTo(map)
     map.pm.setLang('es')
     map.pm.setGlobalOptions({
@@ -146,7 +173,8 @@ export const MapaTutorial = forwardRef<
     }
     map.on('move zoom', ubicarCierre)
     contar.current = (n, primero) => {
-      primerPunto = n >= 3 && primero ? primero : null
+      // La línea de una división no se cierra: no lleva «Cerrá acá».
+      primerPunto = n >= 3 && primero && modoRef.current !== 'linea' ? primero : null
       ubicarCierre()
       cb.current.onPuntos?.(n)
     }
@@ -155,6 +183,7 @@ export const MapaTutorial = forwardRef<
       e.workingLayer.on('pm:vertexadded', () => {
         const ll = (e.workingLayer as L.Polyline).getLatLngs() as L.LatLng[]
         contar.current(ll.length, ll[0])
+        if (modoRef.current === 'linea') cb.current.onLinea?.(ll.map((p) => [p.lat, p.lng] as LatLng))
       })
     })
     map.on('pm:drawend', () => contar.current(0))
@@ -168,7 +197,16 @@ export const MapaTutorial = forwardRef<
     map.on('click', (e: L.LeafletMouseEvent) => {
       if (modoRef.current === 'tocar') cb.current.onToque?.(e.latlng.lat, e.latlng.lng)
     })
-    map.on('pm:create', (e: { layer: L.Layer }) => {
+    map.on('pm:create', (e: { layer: L.Layer; shape?: string }) => {
+      // Una línea que Geoman cierra sola (tocar su último punto) no es un dibujo.
+      if (e.shape === 'Line') {
+        map.removeLayer(e.layer)
+        if (modoRef.current === 'linea') {
+          map.pm.enableDraw('Line', { finishOn: null, tooltips: false })
+          cb.current.onLinea?.([])
+        }
+        return
+      }
       const p = ring(e.layer as L.Polygon)
       map.removeLayer(e.layer)
       cb.current.onDibujo?.(p)
@@ -200,7 +238,7 @@ export const MapaTutorial = forwardRef<
       ]
       L.polygon([mundo, contorno], { stroke: false, fillColor: TINTA, fillOpacity: 0.62, interactive: false, snapIgnore: true, pmIgnore: true } as L.PolylineOptions).addTo(g)
     }
-    if (contorno && modo !== 'ajustar') {
+    if (contorno && (modo !== 'ajustar' || editable)) {
       L.polygon(contorno, {
         color: TERRACOTA,
         weight: 3,
@@ -211,9 +249,10 @@ export const MapaTutorial = forwardRef<
     }
     for (const p of potreros) {
       // El que se está mostrando como borrador va una sola vez, con su etiqueta.
-      if (!p.poligono || p.poligono === borrador) continue
+      if (!p.poligono || p.poligono === borrador || ocultos?.includes(p.id)) continue
       const c = COLOR[p.tipo ?? 'vacio']
-      L.polygon(p.poligono, { color: HUESO, weight: 2, fillColor: c.fill, fillOpacity: c.op, interactive: false })
+      const si = p.id === elegido
+      L.polygon(p.poligono, { color: si ? TRIGO : HUESO, weight: si ? 4.5 : 2, fillColor: c.fill, fillOpacity: elegido && !si ? c.op * 0.55 : c.op, interactive: false })
         .bindTooltip(`<b>${p.nombre}</b><span>${p.que}</span>`, {
           permanent: true,
           direction: 'center',
@@ -245,6 +284,15 @@ export const MapaTutorial = forwardRef<
         pmIgnore: true,
       } as L.MarkerOptions).addTo(g)
     }
+    for (const pz of piezas ?? []) {
+      L.polygon(pz.poligono, { color: HUESO, weight: 2.5, fillColor: TERRACOTA, fillOpacity: 0.55, interactive: false })
+        .bindTooltip(`<b>${pz.nombre}</b>${pz.que ? `<span>${pz.que}</span>` : ''}`, {
+          permanent: true,
+          direction: 'center',
+          className: 'tropero-etiqueta tropero-etiqueta--activa',
+        })
+        .addTo(g)
+    }
     if (borrador) {
       const l = L.polygon(borrador, { color: HUESO, weight: 2.5, fillColor: TERRACOTA, fillOpacity: 0.88, interactive: false }).addTo(g)
       if (borradorNombre)
@@ -254,7 +302,7 @@ export const MapaTutorial = forwardRef<
           className: 'tropero-etiqueta tropero-etiqueta--activa',
         })
     }
-  }, [contorno, potreros, borrador, borradorNombre, borradorQue, foco, pueblo, modo, candidato, guia])
+  }, [contorno, potreros, borrador, borradorNombre, borradorQue, foco, pueblo, modo, candidato, guia, editable, ocultos, piezas, elegido])
 
   // El modo: dibujar el borde o un potrero, o ajustar el borde arrastrando puntos.
   useEffect(() => {
@@ -269,9 +317,18 @@ export const MapaTutorial = forwardRef<
       map.pm.enableDraw('Polygon', { finishOn: null, continueDrawing: true, tooltips: false })
       return () => map.pm.disableDraw()
     }
-    if (modo === 'ajustar' && contorno) {
-      const l = L.polygon(contorno, { color: TERRACOTA, weight: 3, fillColor: TERRACOTA, fillOpacity: 0.12 }).addTo(map)
-      l.pm.enable({ allowSelfIntersection: false, snappable: false })
+    if (modo === 'linea') {
+      // Nunca se termina sola: quien la usa mira cada punto y decide cuándo cruzó.
+      map.pm.enableDraw('Line', { finishOn: null, tooltips: false })
+      return () => map.pm.disableDraw()
+    }
+    const objetivo = editable ?? contorno
+    if (modo === 'ajustar' && objetivo) {
+      // Un potrero se corrige en trigo: el terracota es el borde del campo, que queda atrás.
+      const tono = editable ? TRIGO : TERRACOTA
+      const l = L.polygon(objetivo, { color: tono, weight: 3, fillColor: tono, fillOpacity: editable ? 0.22 : 0.12 }).addTo(map)
+      // Un potrero se engancha a los vecinos: el alambrado es el mismo.
+      l.pm.enable({ allowSelfIntersection: false, snappable: !!editable })
       const avisar = () => cb.current.onAjuste?.(ring(l))
       l.on('pm:edit', avisar)
       l.on('pm:markerdragend', avisar)
@@ -280,27 +337,34 @@ export const MapaTutorial = forwardRef<
         map.removeLayer(l)
       }
     }
-  }, [modo, contorno])
+  }, [modo, contorno, editable])
 
   useImperativeHandle(api, () => ({
     deshacer() {
-      const d = mapa.current?.pm.Draw as unknown as { Polygon?: { _removeLastVertex?: () => void; _layer?: L.Polyline } }
-      d?.Polygon?._removeLastVertex?.()
-      const ll = (d?.Polygon?._layer?.getLatLngs() as L.LatLng[] | undefined) ?? []
+      type Dibujo = { _removeLastVertex?: () => void; _layer?: L.Polyline }
+      const d = mapa.current?.pm.Draw as unknown as { Polygon?: Dibujo; Line?: Dibujo }
+      const linea = modoRef.current === 'linea'
+      const h = linea ? d?.Line : d?.Polygon
+      h?._removeLastVertex?.()
+      const ll = (h?._layer?.getLatLngs() as L.LatLng[] | undefined) ?? []
       contar.current(ll.length, ll[0])
+      if (linea) cb.current.onLinea?.(ll.map((p) => [p.lat, p.lng] as LatLng))
     },
     reiniciar() {
       const map = mapa.current
       if (!map) return
       map.pm.disableDraw()
-      map.pm.enableDraw('Polygon', { finishOn: null, continueDrawing: true, tooltips: false })
+      if (modoRef.current === 'linea') {
+        map.pm.enableDraw('Line', { finishOn: null, tooltips: false })
+        cb.current.onLinea?.([])
+      } else map.pm.enableDraw('Polygon', { finishOn: null, continueDrawing: true, tooltips: false })
       contar.current(0)
     },
     irA(lat, lon, zoom = 15) {
       mapa.current?.flyTo([lat, lon], zoom, { duration: 0.8 })
     },
     encuadrar(p) {
-      mapa.current?.flyToBounds(L.latLngBounds(p), { padding: [48, 48], duration: 0.8 })
+      mapa.current?.flyToBounds(L.latLngBounds(p), { ...margen(), duration: 0.8 })
     },
   }))
 
@@ -319,7 +383,7 @@ export const MapaTutorial = forwardRef<
         <span className="tropero-cerrar-onda" />
         <span className="tropero-cerrar-texto">Cerrá acá</span>
       </div>
-      {pistaCursor && (modo === 'borde' || modo === 'potrero') && (
+      {pistaCursor && (modo === 'borde' || modo === 'potrero' || modo === 'linea') && (
         <div
           ref={cursor}
           aria-hidden

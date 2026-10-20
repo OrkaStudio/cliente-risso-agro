@@ -8,12 +8,12 @@ import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { MapErrorBoundary } from '@/components/map-error-boundary'
-import type { CampoConPotreros, LatLng } from '@/features/campos/api'
+import type { CampoConPotreros } from '@/features/campos/api'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { CampoFormDialog } from '@/features/campos/campos-dialogs'
-import { useActualizarCampo, useActualizarPotreroMapa, useCamposConPotreros, useCrearPotrero, useInfraestructura, useSetPotreroPoligono } from '@/features/campos/hooks'
+import { useActualizarCampo, useActualizarPotreroMapa, useCamposConPotreros, useInfraestructura } from '@/features/campos/hooks'
 import { tipoCampoLabel } from '@/features/campos/labels'
-import { useCampoMapa, usoDeEstado, usoToEstadoCiclo, vmDe, type Uso } from '@/features/campos/use-campo-mapa'
+import { usoDeEstado, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useAnimales } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
@@ -28,7 +28,7 @@ import { descansoPrevio, historiaDelPotrero, LABOR, type Hecho, type Labor, type
 import { MapaCampo, type Marca } from './mapa-campo'
 import { AGUA, avisosDelCampo, lluviaDesde, PASTO, textoDias, ultimaPorPotrero, type Aviso, type Lluvia, type Observacion } from './panorama'
 
-const CampoMapaReal = lazy(() => import('@/features/lotes/campo-mapa-real').then((m) => ({ default: m.CampoMapaReal })))
+const EditorCampo = lazy(() => import('./editor-campo'))
 
 // Campos (rediseño, Figma «Mapa y potreros», nodo 1050:2). Arriba, el campo:
 // cuál es, sus números y lo que pide atención. En el medio, el mapa (satélite
@@ -195,7 +195,7 @@ export function CamposPage() {
       </div>
 
       {/* El mapa, con una sola tarjeta: el campo, o el potrero tocado */}
-      <section className="relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta">
+      <section className={cn('relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta', editando && 'max-lg:h-[calc(100dvh-190px)]')}>
         <div className="absolute inset-0">
           {estado.tipo === 'sin-borde' ? (
             <div className="grid size-full place-items-center bg-pasto-oscuro px-6 lg:pr-[420px]">
@@ -208,26 +208,16 @@ export function CamposPage() {
               </div>
             </div>
           ) : editando ? (
-            <div className="size-full overflow-y-auto bg-fondo p-3 pt-16">
-              <Satelite campo={campo} empresaId={empresaId} onVerPotrero={(id) => (setDibujar(false), setPotreroId(id))} />
-            </div>
+            <MapErrorBoundary>
+              <Suspense fallback={<div className="size-full animate-pulse bg-tinta" aria-busy />}>
+                <EditorCampo key={campo.id} campo={campo} mapa={mapa} empresaId={empresaId} onEmpezo={() => setDibujar(true)} onSalir={listo ? () => setDibujar(false) : null} />
+              </Suspense>
+            </MapErrorBoundary>
           ) : (
             <MapaCampo campo={mapa} elegido={potreroId} onElegir={tocar} onFondo={() => setPotreroId(null)} color={(p) => COLOR[usoDe(p.id)]} dato={() => null} marcas={marcas} margenDerecho={420} />
           )}
         </div>
 
-        {editando && (
-          <div className="absolute top-3 left-3 z-[500] flex max-w-[calc(100%-24px)] flex-wrap items-center gap-2">
-            {listo && (
-              <button type="button" onClick={() => setDibujar(false)} className="inline-flex h-10 items-center gap-2 rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto shadow-sm hover:bg-terracota-600">
-                <Icono nombre="Guardar" tamano={16} /> Listo, volver al campo
-              </button>
-            )}
-            {estado.tipo === 'faltan' && (
-              <p className="rounded-full bg-superficie px-4 py-2 text-[14px] font-semibold text-texto shadow-sm">Faltan dibujar {estado.faltan.map((p) => p.nombre).join(', ')}. Elegí cuál y marcá sus esquinas.</p>
-            )}
-          </div>
-        )}
         {!editando && listo && (
           <div className="absolute bottom-3 left-3 z-[500] flex flex-wrap gap-3 rounded-full bg-superficie/95 px-3.5 py-1.5 text-[13px] font-semibold text-texto shadow-sm">
             {(['ganadero', 'agricola', 'vacio'] as Uso[]).map((u) => (
@@ -591,39 +581,6 @@ function QueHay({ cats }: { cats: Potrero['porCategoria'] }) {
 }
 
 const BOTON_CHICO = 'inline-flex h-9 items-center rounded-full border-[1.5px] border-principal px-3.5 text-[14px] font-bold text-principal hover:bg-principal-suave'
-
-function Satelite({ campo, empresaId, onVerPotrero }: { campo: CampoConPotreros; empresaId: string; onVerPotrero: (id: string) => void }) {
-  const mapa = useCampoMapa(campo.id)
-  const crearPotrero = useCrearPotrero(campo.id)
-  const setPoligono = useSetPotreroPoligono(campo.id)
-  const guardarPotrero = useActualizarPotreroMapa(campo.id)
-  const qc = useQueryClient()
-  if (mapa.isLoading) return <div className="h-[480px] animate-pulse rounded-[18px] bg-superficie/30" aria-busy />
-  const potreros = mapa.data?.potreros ?? []
-  return (
-    <MapErrorBoundary>
-      <Suspense fallback={<div className="h-[480px] rounded-[18px] bg-superficie/30" />}>
-        <CampoMapaReal
-          key={campo.id}
-          campo={vmDe(campo)}
-          contorno={mapa.data?.contorno ?? null}
-          potreros={potreros}
-          onDibujarPotrero={async (nombre: string, poligono: LatLng[], haMedidas: number) => {
-            const existe = potreros.find((p) => p.nombre === nombre)
-            const id = existe ? existe.id : (await crearPotrero.mutateAsync({ empresaId, campoId: campo.id, nombre, estadoCiclo: 'descanso', hectareas: haMedidas > 0 ? haMedidas : null })).id
-            await setPoligono.mutateAsync({ potreroId: id, poligono })
-            // Un potrero cargado en el alta: el dibujo manda en las hectáreas.
-            if (existe && haMedidas > 0) await guardarPotrero.mutateAsync({ id, estadoCiclo: existe.estadoCiclo, hectareas: haMedidas, cultivo: existe.cultivo })
-            qc.invalidateQueries({ queryKey: ['mapa'] })
-            return id
-          }}
-          onSetPoligono={(potreroId, poligono) => setPoligono.mutate({ potreroId, poligono }, { onSuccess: () => qc.invalidateQueries({ queryKey: ['mapa'] }) })}
-          onVerPotrero={onVerPotrero}
-        />
-      </Suspense>
-    </MapErrorBoundary>
-  )
-}
 
 function CorregirCampo({ campo, abierto, onCerrar, empresaId, onDibujar }: { campo: CampoConPotreros; abierto: boolean; onCerrar: () => void; empresaId: string; onDibujar: () => void }) {
   const [nombre, setNombre] = useState(campo.nombre)
