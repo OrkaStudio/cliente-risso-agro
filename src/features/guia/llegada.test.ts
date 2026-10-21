@@ -104,38 +104,23 @@ describe('misiones — enseñar haciendo', () => {
     expect(inv.porQue).toContain('ARBA')
   })
 
-  it('campo en Buenos Aires: dos pasos, y cada uno se da por hecho cuando pasó de verdad', () => {
+  it('traer el campo al mapa: lleva a Campos con ese campo y le deja la palabra al editor', () => {
     const pasos = MISIONES['campo-en-mapa'].pasos(RECIEN_ONBOARDEADO)
-    expect(pasos.map((p) => p.ancla)).toEqual(['campos-satelital', 'catastro-boton', 'catastro-form'])
+    expect(pasos).toHaveLength(1)
     expect(pasos[0]!.ruta).toBe('/campos?campo=c1')
-    expect(pasos[1]!.texto.split(' ').length).toBeLessThanOrEqual(12)
-    // Paso 0: pasar a la satelital; se salta solo si el catastro ya está en pantalla.
+    expect(pasos[0]!.delega).toBe(true)
+    // Termina cuando el borde quedó guardado (el campo ya no está sin contorno).
     expect(pasos[0]!.hecho(ctx(RECIEN_ONBOARDEADO))).toBe(false)
-    expect(pasos[0]!.hecho(ctx(RECIEN_ONBOARDEADO, { anclas: new Set(['catastro-boton']) }))).toBe(true)
-    // Paso 1: se abrió el diálogo.
-    expect(pasos[1]!.hecho(ctx(RECIEN_ONBOARDEADO))).toBe(false)
-    expect(pasos[1]!.hecho(ctx(RECIEN_ONBOARDEADO, { dialogoAbierto: true }))).toBe(true)
-    // Paso 2: el contorno quedó guardado (el campo ya no está sin contorno).
-    expect(pasos[2]!.hecho(ctx(RECIEN_ONBOARDEADO, { dialogoAbierto: true }))).toBe(false)
-    expect(pasos[2]!.hecho(ctx({ ...RECIEN_ONBOARDEADO, sinContorno: [] }))).toBe(true)
-    // Y los anteriores también se saltan si ya se guardó (el productor fue más rápido).
-    expect(pasos[1]!.hecho(ctx({ ...RECIEN_ONBOARDEADO, sinContorno: [] }))).toBe(true)
-  })
-
-  it('fuera de Buenos Aires se marca a mano: el paso 2 espera el modo "marcando"', () => {
-    const r = { ...RECIEN_ONBOARDEADO, sinContorno: [{ id: 'c2', nombre: 'El Bajo', provincia: 'La Pampa' }] }
-    const pasos = MISIONES['campo-en-mapa'].pasos(r)
-    expect(pasos[1]!.texto).toBe('Tocá «Marcar el contorno».')
-    expect(pasos[1]!.hecho(ctx(r, { anclas: new Set(['campos-marcando']) }))).toBe(true)
-    expect(pasos[2]!.ancla).toBe('campos-mapa')
+    expect(pasos[0]!.hecho(ctx({ ...RECIEN_ONBOARDEADO, sinContorno: [] }))).toBe(true)
   })
 
   it('con el contorno puesto sigue el primer potrero; dibujado uno, no insiste', () => {
     const conContorno = { ...RECIEN_ONBOARDEADO, sinContorno: [] }
     expect(proximaMision(conContorno)?.id).toBe('primer-potrero')
     const pasos = MISIONES['primer-potrero'].pasos(conContorno)
-    expect(pasos[0]!.hecho(ctx(conContorno, { anclas: new Set(['campos-dibujando']) }))).toBe(true)
-    expect(pasos[1]!.hecho(ctx({ ...conContorno, potrerosDibujados: 1 }))).toBe(true)
+    expect(pasos[0]!.delega).toBe(true)
+    expect(pasos[0]!.hecho(ctx(conContorno))).toBe(false)
+    expect(pasos[0]!.hecho(ctx({ ...conContorno, potrerosDibujados: 1 }))).toBe(true)
     expect(proximaMision({ ...conContorno, potrerosDibujados: 1 })?.id).toBe('ubicar-hacienda')
   })
 

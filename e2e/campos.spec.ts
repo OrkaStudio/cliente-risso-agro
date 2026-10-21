@@ -18,9 +18,9 @@ test('campos: sumar un campo, y si todavía no está en el mapa, ubicarlo', asyn
   await alta.getByRole('button', { name: 'Crear campo' }).click()
   await expect(alta).toBeHidden()
 
-  // Queda elegido; como no tiene borde ni potreros, se lo ubica en el satélite
-  await expect(page.getByRole('heading', { name: campo, level: 1 })).toBeVisible()
-  await expect(page.getByText(`${campo} todavía no está en el mapa`)).toBeVisible()
-  await page.getByRole('button', { name: 'Ubicarlo en el mapa' }).click()
-  await expect(page).toHaveURL(/\/mapa\/[0-9a-f-]{36}$/)
+  // Queda elegido y, como no tiene borde, Campos se vuelve el mapa para armarlo: sin salir de la web.
+  await expect(page.getByRole('heading', { name: `Armemos ${campo} en el mapa` })).toBeVisible()
+  await page.getByRole('button', { name: 'Empezar' }).click()
+  await expect(page.getByRole('heading', { name: 'Encontrá tu campo' })).toBeVisible()
+  await expect(page).toHaveURL(/\/campos/)
 })

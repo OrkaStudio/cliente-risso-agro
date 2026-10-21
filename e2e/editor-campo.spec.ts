@@ -63,8 +63,9 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   if (process.env.MOVIL) await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/campos?campo=${campoId}`)
 
-  // Falta el 2: el editor se abre solo, con la lista del alta.
-  await expect(page.getByRole('heading', { name: 'Elegí el potrero' })).toBeVisible()
+  // Falta el 2: el editor se abre solo, con la lista del alta (y el asistente acompaña).
+  await expect(page.getByRole('heading', { name: 'Dibujá el siguiente' })).toBeVisible()
+  await expect(page.getByTestId('acompanante')).toContainText('Dibujá el siguiente.')
   await captura(page, '1-elegir')
   await page.getByRole('region', { name: 'Faltan dibujar' }).getByRole('button', { name: new RegExp(`^${dos!.nombre}`) }).click()
   await expect(page.getByRole('heading', { name: `Dibujá el ${dos!.nombre}` })).toBeVisible()
@@ -79,7 +80,7 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   await captura(page, '2-dibujar')
   await tocar(page, 0.53, 0.04)
 
-  await expect(page.getByRole('heading', { name: `${dos!.nombre} dibujado` })).toBeVisible()
+  await expect(page.getByRole('heading', { name: `El ${dos!.nombre} ya está` })).toBeVisible()
   await captura(page, '3-dibujado')
   await page.getByRole('button', { name: 'Volver al campo' }).click()
 
@@ -116,7 +117,7 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   expect(has[1]).toBeLessThan(30)
 
   // Corregir el borde del 2: se arrastra su esquina noreste hacia adentro.
-  await page.getByRole('button', { name: 'Dibujar otro' }).click()
+  await page.getByRole('button', { name: 'Ver los potreros' }).click()
   await page.getByRole('region', { name: 'Ya dibujados' }).getByRole('button', { name: new RegExp(`^${dos!.nombre}`) }).click()
   await page.getByRole('button', { name: /Corregir el borde/ }).click()
   await expect(page.getByRole('heading', { name: `Corregí el borde del ${dos!.nombre}` })).toBeVisible()
@@ -133,7 +134,7 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   await expect(page.getByRole('button', { name: 'Guardar el borde' })).toBeEnabled()
   await captura(page, '7-borde')
   await page.getByRole('button', { name: 'Guardar el borde' }).click()
-  await expect(page.getByRole('heading', { name: `${dos!.nombre} dibujado` })).toBeVisible()
+  await expect(page.getByRole('heading', { name: `El ${dos!.nombre} ya está` })).toBeVisible()
   const [corregido] = await rest(token, `potrero?id=eq.${dos!.id}&select=hectareas`, 'GET')
   expect(Number(corregido!.hectareas)).toBeLessThan(47)
 })

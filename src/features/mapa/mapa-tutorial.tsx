@@ -35,6 +35,8 @@ export type MapaTutorialApi = {
   reiniciar: () => void
   irA: (lat: number, lon: number, zoom?: number) => void
   encuadrar: (p: LatLng[]) => void
+  /** Dónde cae un punto del mapa en pantalla, relativo al mapa (null si no está montado). */
+  aPantalla: (p: LatLng) => { x: number; y: number } | null
 }
 
 const ring = (l: L.Polygon): LatLng[] => (l.getLatLngs()[0] as L.LatLng[]).map((p) => [p.lat, p.lng] as LatLng)
@@ -81,6 +83,10 @@ export const MapaTutorial = forwardRef<
     relleno?: { derecha?: number; abajo?: number }
     /** Modo «linea»: los puntos marcados hasta ahora. */
     onLinea?: (p: LatLng[]) => void
+    /** La persona arrastró el mapa (no cuenta cuando lo mueve la app). */
+    onArrastre?: () => void
+    /** Cualquier movimiento o zoom: lo que se ubica sobre el mapa se vuelve a medir. */
+    onMovio?: () => void
     className?: string
   }
 >(function MapaTutorial(
@@ -106,6 +112,8 @@ export const MapaTutorial = forwardRef<
     piezas,
     elegido,
     onLinea,
+    onArrastre,
+    onMovio,
     relleno,
     className,
   },
@@ -114,8 +122,8 @@ export const MapaTutorial = forwardRef<
   const host = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
   const capas = useRef<L.LayerGroup | null>(null)
-  const cb = useRef({ onDibujo, onPuntos, onAjuste, onToque, onLinea })
-  cb.current = { onDibujo, onPuntos, onAjuste, onToque, onLinea }
+  const cb = useRef({ onDibujo, onPuntos, onAjuste, onToque, onLinea, onArrastre, onMovio })
+  cb.current = { onDibujo, onPuntos, onAjuste, onToque, onLinea, onArrastre, onMovio }
   const modoRef = useRef(modo)
   modoRef.current = modo
   const contar = useRef<(n: number, primero?: L.LatLng) => void>(() => {})
@@ -172,6 +180,8 @@ export const MapaTutorial = forwardRef<
       el.style.transform = `translate(${pt.x}px, ${pt.y}px)`
     }
     map.on('move zoom', ubicarCierre)
+    map.on('move zoom', () => cb.current.onMovio?.())
+    map.on('dragend', () => cb.current.onArrastre?.())
     contar.current = (n, primero) => {
       // La línea de una división no se cierra: no lleva «Cerrá acá».
       primerPunto = n >= 3 && primero && modoRef.current !== 'linea' ? primero : null
@@ -362,6 +372,12 @@ export const MapaTutorial = forwardRef<
     },
     irA(lat, lon, zoom = 15) {
       mapa.current?.flyTo([lat, lon], zoom, { duration: 0.8 })
+    },
+    aPantalla(p) {
+      const map = mapa.current
+      if (!map) return null
+      const pt = map.latLngToContainerPoint(p)
+      return { x: pt.x, y: pt.y }
     },
     encuadrar(p) {
       mapa.current?.flyToBounds(L.latLngBounds(p), { ...margen(), duration: 0.8 })

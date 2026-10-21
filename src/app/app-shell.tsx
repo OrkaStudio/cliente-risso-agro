@@ -197,7 +197,7 @@ function OficinaMobileMenu({ empresaNombre, onSignOut }: {
             return (
             <NavLink
               key={to}
-              to={bloqueada ? '/mapa' : to}
+              to={bloqueada ? '/campos' : to}
               state={bloqueada ? { bloqueada: seccionBloqueada(to) } : undefined}
               end={end}
               onClick={() => setOpen(false)}

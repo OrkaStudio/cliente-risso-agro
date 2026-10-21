@@ -39,6 +39,12 @@ export type PasoMision = {
   sobreDialogo?: boolean
   /** Ya pasó lo que este paso esperaba → el motor avanza solo. */
   hecho: (c: Contexto) => boolean
+  /**
+   * En esa pantalla acompaña otro: el editor del mapa de Campos tiene su propio
+   * asistente, que sabe en qué paso está. El motor sólo lleva hasta ahí y espera
+   * (sin burbuja encima), para no hablar dos veces.
+   */
+  delega?: boolean
 }
 
 export type Mision = {
@@ -87,51 +93,16 @@ const campoEnMapa: Mision = {
   pasos: (r) => {
     const c = campoObjetivo(r)
     if (!c) return []
-    const auto = catastroAutomatico(c.provincia)
-    const ruta = `/campos?campo=${c.id}`
-    const guardado = (x: Contexto) => !x.resumen.sinContorno.some((s) => s.id === c.id)
-    // Con potreros ya dibujados la página abre en "Vista por potrero" y el
-    // catastro vive en la satelital: primero hay que pasar ahí. Si ya está,
-    // el paso pasa solo (el botón del catastro está en pantalla).
-    const aSatelital: PasoMision = {
-      ruta,
-      ancla: 'campos-satelital',
-      texto: 'Tocá «Vista satelital».',
-      hecho: (x) =>
-        x.anclas.has('catastro-boton') || x.anclas.has('campos-marcar') || x.dialogoAbierto || guardado(x),
-    }
-    return auto
-      ? [
-          aSatelital,
-          {
-            ruta,
-            ancla: 'catastro-boton',
-            texto: 'Tocá «Traer del catastro».',
-            hecho: (x) => x.dialogoAbierto || guardado(x),
-          },
-          {
-            ruta,
-            ancla: 'catastro-form',
-            sobreDialogo: true,
-            texto: 'Partido y parcela: están en la boleta de ARBA. Después, «Buscar parcela».',
-            hecho: guardado,
-          },
-        ]
-      : [
-          aSatelital,
-          {
-            ruta,
-            ancla: 'campos-marcar',
-            texto: 'Tocá «Marcar el contorno».',
-            hecho: (x) => x.anclas.has('campos-marcando') || guardado(x),
-          },
-          {
-            ruta,
-            ancla: 'campos-mapa',
-            texto: 'Clic en cada esquina del campo. Cerrá en la primera.',
-            hecho: guardado,
-          },
-        ]
+    // Se arma en Campos, con el asistente del editor (encontrarlo, el borde, los potreros).
+    return [
+      {
+        ruta: `/campos?campo=${c.id}`,
+        ancla: 'campos-editor',
+        texto: '',
+        delega: true,
+        hecho: (x) => !x.resumen.sinContorno.some((s) => s.id === c.id),
+      },
+    ]
   },
   festejo: (r) => {
     // Al festejar el campo ya no está en sinContorno: se nombra por lo que
@@ -163,14 +134,9 @@ const primerPotrero: Mision = {
     return [
       {
         ruta: '/campos',
-        ancla: 'campos-faltan',
-        texto: 'Elegí el potrero que vas a dibujar.',
-        hecho: (x) => x.anclas.has('campos-dibujando') || x.resumen.potrerosDibujados > antes,
-      },
-      {
-        ruta: '/campos',
-        ancla: 'campos-mapa',
-        texto: 'Clic en cada esquina. Cerrá en la primera y queda guardado.',
+        ancla: 'campos-editor',
+        texto: '',
+        delega: true,
         hecho: (x) => x.resumen.potrerosDibujados > antes,
       },
     ]

@@ -86,6 +86,11 @@ export function fueraDelBorde(dibujo: LatLng[], contorno: LatLng[]): number {
   return Math.max(0, 1 - compartidas(dibujo, contorno) / ha)
 }
 
+/** La esquina de más arriba a la izquierda del borde: ahí señala la mano. */
+export function esquinaDe(p: LatLng[]): LatLng {
+  return p.reduce((a, b) => (b[0] - b[1] > a[0] - a[1] ? b : a))
+}
+
 // ===== Qué potrero es (Tutorial · Qué potrero es / Cuál es) =====
 
 export type Candidato = PotreroMapa & { parecido: boolean }

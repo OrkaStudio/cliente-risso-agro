@@ -163,6 +163,9 @@ function MisionEnCurso({ mision, inicial }: { mision: MisionDef; inicial: Resume
   const z = paso?.sobreDialogo ? 'z-[60]' : 'z-[45]'
   const texto = fase === 'festejo' ? festejo.texto : lejos ? `Seguimos en ${nombreRuta(destino)}.` : paso!.texto
 
+  // Ya en Campos, el editor acompaña con lo suyo: nada encima.
+  if (paso?.delega && !lejos) return null
+
   return createPortal(
     <MotionConfig reducedMotion="user">
       {/* Halo que respira sobre el botón real. Sin velo alrededor. */}

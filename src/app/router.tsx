@@ -115,6 +115,9 @@ function OnboardingRuta() {
 const TutorialMapaPage = lazy(() =>
   import('@/features/mapa/tutorial-page').then((m) => ({ default: m.TutorialMapaPage })),
 )
+const ChispaMuestra = lazy(() =>
+  import('@/features/campos/tropero/chispa-muestra').then((m) => ({ default: m.ChispaMuestra })),
+)
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -122,7 +125,10 @@ const MuestraPage = lazy(() =>
 export const router = createBrowserRouter([
   // Sólo en desarrollo: los componentes de Tropero juntos (/estilo).
   ...(import.meta.env.DEV
-    ? [{ path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> }]
+    ? [
+        { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
+        { path: '/estilo/chispa', element: <Suspense fallback={null}><ChispaMuestra /></Suspense> },
+      ]
     : []),
   // Acceso (A1–A3): se entra con un código por WhatsApp, sin contraseñas.
   {

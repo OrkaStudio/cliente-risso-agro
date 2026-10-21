@@ -44,7 +44,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
           return (
             <NavLink
               key={s.to}
-              to={bloqueada ? '/mapa' : s.to}
+              to={bloqueada ? '/campos' : s.to}
               state={bloqueada ? { bloqueada: seccionBloqueada(s.to) } : undefined}
               end={s.end}
               onMouseEnter={() => {
@@ -94,7 +94,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
               return (
                 <NavLink
                   key={c.id}
-                  to={pendiente ? `/mapa/${c.id}` : '/campos'}
+                  to={pendiente ? `/campos?campo=${c.id}` : '/campos'}
                   className="flex h-10 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] text-texto hover:bg-superficie-hundida/70"
                 >
                   <span className="grid size-[22px] shrink-0 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: color.hex }}>
@@ -111,7 +111,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 
       <div className="flex flex-col gap-2 px-3 pt-4">
         <NavLink
-          to={pendiente ? '/mapa' : '/campo'}
+          to={pendiente ? '/campos' : '/campo'}
           state={pendiente ? { bloqueada: 'El Modo Campo' } : undefined}
           className={cn(
             'flex h-12 items-center justify-center gap-2.5 rounded-[14px] border-[1.5px] text-[15px] font-semibold transition-colors',

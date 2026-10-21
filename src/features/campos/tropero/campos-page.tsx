@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
@@ -19,6 +19,7 @@ import { useAnimales } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
 import { useMapa } from '@/features/mapa/api'
 import { CargarLaborDialog } from '@/features/potrero/cargar-labor-dialog'
+import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { estadoDe } from '@/features/mapa/reglas'
 import { hoyLocal } from '@/lib/fecha'
 import { supabase } from '@/lib/supabase/client'
@@ -88,7 +89,6 @@ function useDatosDelCampo(empresaId: string, campoId: string, potreroIds: string
 }
 
 export function CamposPage() {
-  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { data: membresia } = useEmpresa()
   const empresaId = membresia?.empresa_id ?? ''
@@ -106,6 +106,9 @@ export function CamposPage() {
   const infraQ = useInfraestructura(campoId)
   const [potreroId, setPotreroId] = useState<string | null>(null)
   const [dibujar, setDibujar] = useState(false)
+  const pendiente = useMapaPendiente()
+  // Llegó desde una sección que todavía no se abrió: se dice por qué, hasta el primer paso.
+  const bloqueada = (useLocation().state as { bloqueada?: string } | null)?.bloqueada
   const [panel, setPanel] = useState<'campo' | 'potrero' | null>(null)
 
   useEffect(() => {
@@ -136,7 +139,8 @@ export function CamposPage() {
 
   const estado = estadoDe(mapa)
   const listo = estado.tipo === 'listo'
-  const editando = dibujar || (!listo && estado.tipo !== 'sin-borde')
+  // Mientras el campo no esté armado, Campos es el mapa para armarlo (antes era otra pantalla, /mapa).
+  const editando = dibujar || !listo
   const potrero = campo.potreros.find((p) => p.id === potreroId) ?? null
   const usoDe = (id: string): Uso => {
     const p = campo.potreros.find((x) => x.id === id)
@@ -195,22 +199,23 @@ export function CamposPage() {
       </div>
 
       {/* El mapa, con una sola tarjeta: el campo, o el potrero tocado */}
-      <section className={cn('relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta', editando && 'max-lg:h-[calc(100dvh-190px)]')}>
+      <section data-guia="campos-mapa" className={cn('relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta', editando && 'max-lg:h-[calc(100dvh-190px)]')}>
         <div className="absolute inset-0">
-          {estado.tipo === 'sin-borde' ? (
-            <div className="grid size-full place-items-center bg-pasto-oscuro px-6 lg:pr-[420px]">
-              <div className="flex max-w-[400px] flex-col items-center gap-3 rounded-[20px] bg-superficie px-6 py-7 text-center shadow-sm">
-                <b className="text-[18px] text-texto">{campo.nombre} todavía no está en el mapa</b>
-                <p className="text-[14.5px] text-texto-suave">Se busca el campo en el satélite, se marca el borde y se dibuja cada uno de los {campo.potreros.length} potreros que cargaste.</p>
-                <BotonPrincipal icono="Siguiente" onClick={() => navigate(`/mapa/${campo.id}`)}>
-                  Ubicarlo en el mapa
-                </BotonPrincipal>
-              </div>
-            </div>
-          ) : editando ? (
+          {editando ? (
             <MapErrorBoundary>
               <Suspense fallback={<div className="size-full animate-pulse bg-tinta" aria-busy />}>
-                <EditorCampo key={campo.id} campo={campo} mapa={mapa} empresaId={empresaId} onEmpezo={() => setDibujar(true)} onSalir={listo ? () => setDibujar(false) : null} />
+                <EditorCampo
+                  key={campo.id}
+                  campo={campo}
+                  mapa={mapa}
+                  campos={mapaQ.data ?? []}
+                  empresaId={empresaId}
+                  pendiente={pendiente}
+                  nota={bloqueada ? `${bloqueada} se abre cuando tu campo esté en el mapa.` : undefined}
+                  onEmpezo={() => setDibujar(true)}
+                  onSalir={listo ? () => setDibujar(false) : null}
+                  onSeguirCon={elegirCampo}
+                />
               </Suspense>
             </MapErrorBoundary>
           ) : (
@@ -260,7 +265,7 @@ export function CamposPage() {
         )}
       </section>
 
-      <CorregirCampo campo={campo} abierto={panel === 'campo'} onCerrar={() => setPanel(null)} empresaId={empresaId} onDibujar={estado.tipo === 'sin-borde' ? () => navigate(`/mapa/${campo.id}`) : () => (setPanel(null), setPotreroId(null), setDibujar(true))} />
+      <CorregirCampo campo={campo} abierto={panel === 'campo'} onCerrar={() => setPanel(null)} empresaId={empresaId} onDibujar={() => (setPanel(null), setPotreroId(null), setDibujar(true))} />
       {potrero && <CorregirPotrero campoId={campo.id} p={potrero} abierto={panel === 'potrero'} onCerrar={() => setPanel(null)} />}
     </div>
   )

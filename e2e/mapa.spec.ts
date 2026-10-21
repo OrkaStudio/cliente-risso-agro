@@ -39,6 +39,9 @@ async function empresaConOnboarding(page: Page) {
   await expect(page.getByRole('heading', { name: 'Tus campos están cargados.' })).toBeVisible()
 }
 
+/** Con CAPTURAS=<carpeta>, cada paso queda en una imagen para mirarlo. */
+const captura = (page: Page, nombre: string) => process.env.CAPTURAS && page.waitForTimeout(700).then(() => page.screenshot({ path: `${process.env.CAPTURAS}/${nombre}.png` }))
+
 /** Toca las esquinas y cierra tocando la primera (como el productor). */
 async function dibujar(page: Page, puntos: [number, number][]) {
   for (const [x, y] of puntos) {
@@ -52,9 +55,11 @@ test('primero el campo: sin el mapa sólo andan el Inicio y Campos', async ({ pa
   await empresaConOnboarding(page)
   await page.getByRole('button', { name: 'Después: queda esperando en el Inicio' }).click()
   await expect(page).not.toHaveURL(/onboarding/)
+  // La Hacienda espera: lleva a Campos, donde se arma el mapa sin salir de la web.
   await page.goto('/hacienda')
-  await expect(page).toHaveURL(/\/mapa$/)
+  await expect(page).toHaveURL(/\/campos$/)
   await expect(page.getByRole('heading', { name: 'Armemos La Porteña en el mapa' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Oficina' })).toBeVisible()
   // Dice por qué está acá; al dar el primer paso ya no hace falta.
   await expect(page.getByText('La Hacienda se abre cuando tu campo esté en el mapa.')).toBeVisible()
   await page.getByRole('button', { name: 'Empezar' }).click()
@@ -66,43 +71,55 @@ test('primero el campo: sin el mapa sólo andan el Inicio y Campos', async ({ pa
 test('de punta a punta: borde a mano, los dos potreros y se abre la app', async ({ page }) => {
   await empresaConOnboarding(page)
   await page.getByRole('button', { name: 'Ubicar La Porteña en el mapa' }).click()
-  await page.waitForURL('**/mapa/**')
+  await page.waitForURL('**/campos?campo=**')
+  await expect(page.getByTestId('acompanante')).toContainText('Te acompaño')
+  await captura(page, 't1-bienvenida')
   await page.getByRole('button', { name: 'Empezar' }).click()
   await expect(page.getByRole('heading', { name: 'Encontrá tu campo' })).toBeVisible()
+  await expect(page.getByTestId('acompanante')).toContainText('Arrastrá el mapa')
+  await captura(page, 't2-encontrar')
   await page.getByRole('button', { name: 'Ya lo veo' }).click()
   await page.getByRole('button', { name: 'Lo marco a mano' }).click()
   await expect(page.getByRole('heading', { name: 'Clic en cada esquina' })).toBeVisible()
+  await captura(page, 't3-marcar')
 
-  await dibujar(page, [[260, 260], [680, 240], [700, 640], [280, 660]])
+  await dibujar(page, [[360, 260], [780, 240], [800, 640], [380, 660]])
   await expect(page.getByRole('heading', { name: /La Porteña mide unas [\d.,]+ ha/ })).toBeVisible()
   // Dibujado a mano no cuadra con las 100 ha del alta: no deja seguir sin decidir.
-  await expect(page.getByText('No cuadra con el alta')).toBeVisible()
+  await expect(page.getByText('No cuadra con el alta', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Seguir con los potreros' })).toHaveCount(0)
+  await captura(page, 't4-no-cuadra')
   await page.getByRole('button', { name: /Sí, mide [\d.,]+ ha: lo corrijo/ }).click()
   await page.getByRole('button', { name: 'Seguir con los potreros' }).click()
 
   await expect(page.getByRole('heading', { name: 'Dibujá un potrero' })).toBeVisible()
-  await dibujar(page, [[300, 300], [500, 290], [510, 620], [310, 630]])
+  await captura(page, 't5-potreros')
+  await page.getByRole('button', { name: 'Dibujar un potrero', exact: true }).click()
+  await page.waitForTimeout(1000) // el mapa se encuadra en el campo
+  await dibujar(page, [[400, 300], [600, 290], [610, 620], [410, 630]])
   await expect(page.getByRole('heading', { name: '¿Cuál de estos es?' })).toBeVisible()
   // Ninguno de tamaño parecido: hay que elegir.
   await expect(page.getByText('Elegí uno para seguir')).toBeVisible()
+  await captura(page, 't6-cual')
   await page.getByRole('radio', { name: /1A/ }).click()
   // Lo dibujado no cuadra con las 60 ha del alta: se avisa y hay que confirmar la corrección.
-  await expect(page.getByText('No cuadra con el alta')).toBeVisible()
+  await expect(page.getByText('No cuadra con el alta', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /Sí, el 1A mide [\d.,]+ ha: lo corrijo/ }).click()
   await expect(page.getByRole('heading', { name: 'El 1A ya está' })).toBeVisible()
+  await captura(page, 't7-listo')
 
   await page.getByRole('button', { name: 'Dibujar otro' }).click()
   // Uno encima del otro no se acepta.
-  await dibujar(page, [[320, 320], [480, 320], [480, 600], [320, 600]])
+  await dibujar(page, [[420, 320], [580, 320], [580, 600], [420, 600]])
   await expect(page.getByText('Se pisa con el 1A. Dibujalo al lado.')).toBeVisible()
-  await dibujar(page, [[560, 300], [660, 290], [675, 600], [570, 605]])
+  await dibujar(page, [[660, 300], [760, 290], [775, 600], [670, 605]])
   // Queda uno solo: va elegido.
   await page.getByRole('button', { name: /Es el 2A|Sí, el 2A mide/ }).click()
   await page.getByRole('button', { name: 'Listo, La Porteña' }).click()
   await expect(page.getByRole('heading', { name: 'Tu campo, en el mapa' })).toBeVisible()
+  await captura(page, 't8-cierre')
   await page.getByRole('button', { name: 'Ir al Inicio' }).click()
-  await expect(page).not.toHaveURL(/mapa/)
+  await expect(page).toHaveURL(/\/$/)
 
   // La app quedó abierta.
   await page.goto('/hacienda')
@@ -135,9 +152,11 @@ test('tocando el campo trae el borde del catastro y lo compara con el alta', asy
   await page.getByRole('button', { name: 'Empezar' }).click()
   await page.getByRole('button', { name: 'Ya lo veo' }).click()
   await expect(page.getByRole('heading', { name: 'Hacé clic en tu campo' })).toBeVisible()
-  await page.mouse.click(480, 450)
+  await captura(page, 'c1-tocar')
+  await page.mouse.click(580, 450)
   await expect(page.getByRole('heading', { name: '¿Es este tu campo?' })).toBeVisible()
   await expect(page.getByText('Coincide con el alta')).toBeVisible()
+  await captura(page, 'c2-parcela')
   await page.getByRole('button', { name: 'Sí, es este' }).click()
   await expect(page.getByRole('heading', { name: /La Porteña mide unas 100 ha/ })).toBeVisible()
   await page.getByRole('button', { name: 'Seguir con los potreros' }).click()
