@@ -1,40 +1,25 @@
-// Página interna de desarrollo (/estilo/chispa): las variantes de Chispa una al
-// lado de la otra, animadas, sobre el satélite y sobre la tarjeta, para que Lau
-// elija. No existe en producción.
+// Página interna de desarrollo (/estilo/chispa): todos los gestos de Chispa a la
+// vez, animados, para que Lau los compare. Vuela de verdad (de un lado al otro),
+// festeja y guiña se repiten solos. No existe en producción.
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion, useMotionValue, useSpring, useVelocity } from 'framer-motion'
 import { Logo } from '@/components/tropero/logo'
 import { cn } from '@/lib/utils'
-import { Chispa, type Animo, type Variante } from './mascota'
+import { Chispa, type Animo } from './mascota'
 
-type Estado = Animo | 'habla' | 'vuela'
+type Gesto = 'normal' | 'habla' | 'vuela' | 'piensa' | 'festeja' | 'guina' | 'duerme'
 
-const VARIANTES: { v: Variante; nombre: string; idea: string }[] = [
-  { v: 'terracota', nombre: 'Terracota', idea: 'Esfera lisa, brillo de vidrio y resplandor quieto. Nada titila: la vida la dan los ojos y los movimientos lentos.' },
-  { v: 'terracota-oscura', nombre: 'Terracota oscura', idea: 'La misma, un tono más profundo.' },
-  { v: 'sage', nombre: 'Referencia (Sage)', idea: 'La del video, en azul, con los mismos gestos.' },
+const GESTOS: { g: Gesto; nombre: string; que: string }[] = [
+  { g: 'normal', nombre: 'Quieta', que: 'Flota, respira, se mece apenas y mira alrededor.' },
+  { g: 'habla', nombre: 'Habla', que: 'Asiente mientras la boca acompaña lo que escribe.' },
+  { g: 'vuela', nombre: 'Vuela', que: 'Mira a dónde va, toma impulso, se inclina y deja una cola de luz.' },
+  { g: 'piensa', nombre: 'Piensa', que: 'Mira arriba buscando, con su nube de «…».' },
+  { g: 'festeja', nombre: 'Festeja', que: 'Se agacha, salta estirada, cae y se mece contenta.' },
+  { g: 'guina', nombre: 'Guiña', que: 'Ladea la cabeza, cierra un ojo y sonríe de costado.' },
+  { g: 'duerme', nombre: 'Duerme', que: 'Se inclina, cierra los ojos y suben las «z».' },
 ]
-
-const ESTADOS: { e: Estado | 'auto'; texto: string }[] = [
-  { e: 'auto', texto: 'Automático' },
-  { e: 'normal', texto: 'Quieta' },
-  { e: 'habla', texto: 'Habla' },
-  { e: 'vuela', texto: 'Vuela' },
-  { e: 'piensa', texto: 'Piensa' },
-  { e: 'festeja', texto: 'Festeja' },
-  { e: 'guina', texto: 'Guiña' },
-  { e: 'duerme', texto: 'Duerme' },
-]
-const RONDA: { e: Estado; ms: number; dice: string }[] = [
-  { e: 'normal', ms: 2200, dice: '¡Hola! Te acompaño a armar tu campo.' },
-  { e: 'habla', ms: 2600, dice: 'Arrastrá el mapa hasta ver tu campo.' },
-  { e: 'vuela', ms: 1200, dice: 'Vamos al siguiente paso.' },
-  { e: 'piensa', ms: 2600, dice: 'Buscando la parcela en el catastro…' },
-  { e: 'festeja', ms: 2000, dice: '¡Uno menos! Vamos con el que sigue.' },
-  { e: 'guina', ms: 1500, dice: '¡Acá estoy!' },
-  { e: 'duerme', ms: 2800, dice: '' },
-]
-const DICE: Partial<Record<Estado, string>> = Object.fromEntries(RONDA.map((r) => [r.e, r.dice]))
+const FRASES = ['Arrastrá el mapa hasta ver tu campo.', 'Tocá el potrero que querés dibujar.', '¡Listo! Vamos con el que sigue.']
 
 // Un pedazo del satélite de Chascomús (Esri, zoom 14), como fondo de verdad.
 const TESELAS = [
@@ -45,65 +30,46 @@ const TESELAS = [
 ]
 
 export function ChispaMuestra() {
-  const [elegido, setElegido] = useState<Estado | 'auto'>('auto')
-  const [paso, setPaso] = useState(0)
   const [grande, setGrande] = useState(true)
+  const [satelite, setSatelite] = useState(false)
   const [parpadea, setParpadea] = useState(false)
-
-  useEffect(() => {
-    if (elegido !== 'auto') return
-    const t = setTimeout(() => setPaso((p) => (p + 1) % RONDA.length), RONDA[paso]!.ms)
-    return () => clearTimeout(t)
-  }, [elegido, paso])
   useEffect(() => {
     const iv = setInterval(() => {
       setParpadea(true)
       setTimeout(() => setParpadea(false), 140)
-    }, 3200)
+    }, 3600)
     return () => clearInterval(iv)
   }, [])
-
-  const estado: Estado = elegido === 'auto' ? RONDA[paso]!.e : elegido
-  const dice = elegido === 'auto' ? RONDA[paso]!.dice : (DICE[estado] ?? '')
+  const tam = grande ? 140 : 76
 
   return (
     <div className="h-full overflow-y-auto bg-fondo p-8 text-texto">
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
         <header className="flex flex-wrap items-center gap-4">
           <Logo alto={28} />
-          <h1 className="titulo-display text-[28px]">Chispa · ¿cuál es Tropero?</h1>
+          <h1 className="titulo-display text-[28px]">Chispa · sus gestos</h1>
         </header>
         <div className="flex flex-wrap items-center gap-2">
-          {ESTADOS.map(({ e, texto }) => (
-            <button
-              key={e}
-              type="button"
-              aria-pressed={elegido === e}
-              onClick={() => setElegido(e)}
-              className={cn('h-9 rounded-full border-[1.5px] px-3.5 text-[14px] font-bold transition-colors', elegido === e ? 'border-texto bg-texto text-superficie' : 'border-borde bg-superficie hover:border-texto-suave')}
-            >
-              {texto}
-            </button>
-          ))}
-          <span className="mx-2 h-6 w-px bg-borde" />
           <button type="button" onClick={() => setGrande((g) => !g)} className="h-9 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold">
-            {grande ? 'Ver en tamaño real (76 px)' : 'Ver de cerca (150 px)'}
+            {grande ? 'Ver en tamaño real (76 px)' : 'Ver de cerca (140 px)'}
           </button>
+          <button type="button" onClick={() => setSatelite((s) => !s)} className="h-9 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold">
+            {satelite ? 'Fondo claro' : 'Fondo satélite'}
+          </button>
+          <Link to="/campos" className="inline-flex h-9 items-center rounded-full bg-principal px-4 text-[14px] font-bold text-principal-texto hover:bg-terracota-600">
+            Verla en el tutorial
+          </Link>
           <span className="text-[13.5px] text-texto-suave">Mové el mouse sobre cada una: te sigue con los ojos.</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-          {VARIANTES.map(({ v, nombre, idea }) => (
-            <article key={v} className="flex flex-col gap-3 rounded-[22px] border border-borde bg-superficie p-4">
-              <div className="flex flex-col gap-1">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {GESTOS.map(({ g, nombre, que }) => (
+            <article key={g} className="flex flex-col gap-3 rounded-[22px] border border-borde bg-superficie p-4">
+              <div className="flex flex-col gap-0.5">
                 <h2 className="text-[18px] font-extrabold">{nombre}</h2>
-                <p className="min-h-[60px] text-[13.5px] text-texto-suave">{idea}</p>
+                <p className="text-[13.5px] text-texto-suave">{que}</p>
               </div>
-              <Escena fondo="satelite" variante={v} estado={estado} dice={dice} parpadea={parpadea} tam={grande ? 150 : 76} />
-              <Escena fondo="tarjeta" variante={v} estado={estado} dice={dice} parpadea={parpadea} tam={grande ? 150 : 76} />
-              <Link to={`/campos?chispa=${v}`} className="inline-flex h-10 items-center justify-center rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
-                Probarla en el tutorial
-              </Link>
+              <Escena gesto={g} satelite={satelite} parpadea={parpadea} tam={tam} />
             </article>
           ))}
         </div>
@@ -112,31 +78,103 @@ export function ChispaMuestra() {
   )
 }
 
-function Escena({ fondo, variante, estado, dice, parpadea, tam }: { fondo: 'satelite' | 'tarjeta'; variante: Variante; estado: Estado; dice: string; parpadea: boolean; tam: number }) {
+function Escena({ gesto, satelite, parpadea, tam }: { gesto: Gesto; satelite: boolean; parpadea: boolean; tam: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const [mira, setMira] = useState({ x: 0, y: 0 })
-  const animo: Animo = estado === 'habla' || estado === 'vuela' ? 'normal' : estado
+  const [mouse, setMouse] = useState(false)
+
+  // Festeja y guiña se repiten solos (vuelven a quieta un rato y arrancan de nuevo).
+  const [enGesto, setEnGesto] = useState(true)
+  useEffect(() => {
+    if (gesto !== 'festeja' && gesto !== 'guina') return
+    const t = setTimeout(() => setEnGesto((e) => !e), enGesto ? 3400 : 1400)
+    return () => clearTimeout(t)
+  }, [gesto, enGesto])
+
+  // Habla: escribe una frase, se calla un momento y sigue con otra.
+  const [frase, setFrase] = useState(0)
+  const [habla, setHabla] = useState(true)
+  useEffect(() => {
+    if (gesto !== 'habla') return
+    const t = setTimeout(
+      () => {
+        if (habla) setHabla(false)
+        else {
+          setFrase((f) => (f + 1) % FRASES.length)
+          setHabla(true)
+        }
+      },
+      habla ? FRASES[frase]!.length * 60 + 900 : 1300,
+    )
+    return () => clearTimeout(t)
+  }, [gesto, habla, frase])
+
+  const animo: Animo = gesto === 'habla' || gesto === 'vuela' ? 'normal' : (gesto === 'festeja' || gesto === 'guina') && !enGesto ? 'normal' : gesto
   return (
     <div
       ref={ref}
       onMouseMove={(e) => {
         const r = ref.current!.getBoundingClientRect()
+        setMouse(true)
         setMira({ x: (e.clientX - (r.left + r.width / 2)) / 120, y: (e.clientY - (r.top + r.height / 2)) / 120 })
       }}
-      onMouseLeave={() => setMira({ x: 0, y: 0 })}
-      className={cn('relative grid h-[230px] place-items-center overflow-hidden rounded-[16px]', fondo === 'tarjeta' ? 'border border-borde bg-fondo' : 'bg-tinta')}
+      onMouseLeave={() => {
+        setMouse(false)
+        setMira({ x: 0, y: 0 })
+      }}
+      className={cn('relative grid h-[260px] place-items-center overflow-hidden rounded-[16px]', satelite ? 'bg-tinta' : 'border border-borde bg-fondo')}
     >
-      {fondo === 'satelite' && (
+      {satelite && (
         <div aria-hidden className="absolute inset-0 grid grid-cols-2 grid-rows-2 opacity-95">
           {TESELAS.map(([y, x]) => (
             <img key={`${y}-${x}`} alt="" src={`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/14/${y}/${x}`} className="size-full object-cover" />
           ))}
         </div>
       )}
-      <div className="relative flex flex-col items-center gap-2">
-        <Chispa tam={tam} variante={variante} animo={animo} habla={estado === 'habla'} vuela={estado === 'vuela'} parpadea={parpadea} mira={mira} />
-        {dice && <span className="max-w-[230px] rounded-[14px] bg-superficie/95 px-3 py-1.5 text-center text-[13px] font-semibold text-texto shadow-md">{dice}</span>}
-      </div>
+      {gesto === 'vuela' ? (
+        <Viajera tam={tam} parpadea={parpadea} />
+      ) : (
+        <div className="relative flex flex-col items-center gap-3">
+          <Chispa tam={tam} animo={animo} habla={gesto === 'habla' && habla} parpadea={parpadea} mira={mouse ? mira : { x: 0, y: 0 }} />
+          {gesto === 'habla' && <span className="h-[34px] max-w-[260px] rounded-[14px] bg-superficie/95 px-3 py-1.5 text-center text-[13px] font-semibold text-texto shadow-md">{habla ? FRASES[frase] : '…'}</span>}
+        </div>
+      )}
     </div>
+  )
+}
+
+/** Vuela de un costado al otro con el mismo resorte del tutorial: mira, toma impulso y sale. */
+function Viajera({ tam, parpadea }: { tam: number; parpadea: boolean }) {
+  const recorrido = tam * 0.85
+  const meta = useMotionValue(-recorrido)
+  const x = useSpring(meta, { stiffness: 34, damping: 12.5, mass: 1.15, restDelta: 0.2 })
+  const vx = useVelocity(x)
+  const vy = useMotionValue(0)
+  const prepara = useMotionValue(0)
+  const [hacia, setHacia] = useState(1)
+  useEffect(() => {
+    let lado = 1
+    let t1: ReturnType<typeof setTimeout>
+    let t2: ReturnType<typeof setTimeout>
+    const ciclo = () => {
+      setHacia(lado)
+      prepara.set(1)
+      t1 = setTimeout(() => {
+        prepara.set(0)
+        meta.set(lado * recorrido)
+        lado = -lado
+        t2 = setTimeout(ciclo, 2300)
+      }, 300)
+    }
+    t2 = setTimeout(ciclo, 900)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [meta, prepara, recorrido])
+  return (
+    <motion.div style={{ x }}>
+      <Chispa tam={tam} parpadea={parpadea} mira={{ x: hacia, y: 0 }} viaje={{ vx, vy, prepara }} />
+    </motion.div>
   )
 }

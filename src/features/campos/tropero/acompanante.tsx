@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useVelocity } from 'framer-motion'
 import { Chispa, type Animo, type Variante } from './mascota'
 
-/** Para probar las variantes en el tutorial real: /campos?chispa=horizonte (ver /estilo/chispa). */
+/** Para probar las variantes en el tutorial real: /campos?chispa=terracota (ver /estilo/chispa). */
 function variantePedida(): Variante | null {
   const v = new URLSearchParams(window.location.search).get('chispa')
   return v === 'terracota' || v === 'terracota-oscura' || v === 'sage' ? v : null
@@ -18,6 +18,9 @@ function variantePedida(): Variante | null {
 export type Objetivo = { tipo: 'boton'; id: string } | { tipo: 'punto'; x: number; y: number } | { tipo: 'arriba' }
 
 const TAM = 76
+/** El viaje: lento al arrancar, sin rebote al llegar. */
+const VUELO = { stiffness: 34, damping: 12.5, mass: 1.15, restDelta: 0.2 }
+const GLOBO = { stiffness: 55, damping: 14, mass: 1 }
 const ANCHO_GLOBO = 260
 /** Lo que dice si lo tocan (de a uno, en orden). */
 const MIMOS = ['¡Hola! Acá estoy.', 'Seguimos juntos, de a un paso.', 'Si te trabás, escribinos por WhatsApp.', '¡Vamos que sale!']
@@ -98,17 +101,50 @@ export function Acompanante({
   const centro = { x: x + TAM / 2, y: y + TAM / 2 }
   const aLaDerecha = destino ? destino.x >= centro.x : true
 
-  // ===== Vuela cuando cambia de lugar =====
-  const [corre, setCorre] = useState(false)
-  const antes = useRef({ x, y })
+  // ===== Viaja con un resorte suave =====
+  // Antes de un viaje largo mira a dónde va y recién después arranca, como quien
+  // piensa antes de moverse. En viaje se inclina hacia donde va y se estira según
+  // la velocidad real (no por un rato fijo), así arranca y frena sin cortes.
+  const visible = !!objetivo && !(objetivo.tipo === 'boton' && !caja) && base.w > 0
+  const metaX = useMotionValue(x)
+  const metaY = useMotionValue(y)
+  const posX = useSpring(metaX, VUELO)
+  const posY = useSpring(metaY, VUELO)
+  const prepara = useMotionValue(0)
+  const aparecio = useRef(false)
   useEffect(() => {
-    const d = Math.hypot(x - antes.current.x, y - antes.current.y)
-    antes.current = { x, y }
-    if (d < 24 || quieto) return
-    setCorre(true)
-    const t = setTimeout(() => setCorre(false), Math.min(1100, 380 + d * 0.9))
-    return () => clearTimeout(t)
-  }, [x, y, quieto])
+    if (!visible) return
+    if (!aparecio.current || quieto) {
+      aparecio.current = true
+      posX.jump(x)
+      posY.jump(quieto ? y : y + 14)
+      metaX.jump(x)
+      metaY.set(y)
+      return
+    }
+    // Los ajustes chicos (scroll, el mapa que se mueve) lo siguen sin demora.
+    if (Math.hypot(x - metaX.get(), y - metaY.get()) < 60) {
+      metaX.set(x)
+      metaY.set(y)
+      return
+    }
+    // Mientras mira a dónde va, se agacha para tomar impulso.
+    prepara.set(1)
+    const t = setTimeout(() => {
+      prepara.set(0)
+      metaX.set(x)
+      metaY.set(y)
+    }, 280)
+    return () => {
+      clearTimeout(t)
+      prepara.set(0)
+    }
+  }, [x, y, visible, quieto, metaX, metaY, posX, posY, prepara])
+  const velX = useVelocity(posX)
+  const velY = useVelocity(posY)
+  // El globo lo sigue con un poco de demora, como colgado de él.
+  const globoSigueX = useSpring(posX, GLOBO)
+  const globoSigueY = useSpring(posY, GLOBO)
 
   // ===== Vida: parpadeo, mira el mouse, se duerme =====
   const [parpadea, setParpadea] = useState(false)
@@ -158,22 +194,22 @@ export function Acompanante({
     setDuerme(false)
   }
 
-  // Mira el mouse si anda cerca; si no, lo que hay que hacer.
-  const foco = mouse && Math.hypot(mouse.x - centro.x, mouse.y - centro.y) < 360 ? mouse : destino
-  const mira = foco ? { x: (foco.x - centro.x) / 120, y: (foco.y - centro.y) / 120 } : { x: 0, y: 0 }
+  // Mira lo que hay que hacer y, a medida que el mouse se acerca, pasa a mirarlo
+  // a él: mezcla las dos miradas en vez de saltar de una a otra.
+  const hacia = (p: { x: number; y: number } | null) => (p ? { x: (p.x - centro.x) / 120, y: (p.y - centro.y) / 120 } : { x: 0, y: 0 })
+  const alObjetivo = hacia(destino)
+  const alMouse = mouse ? hacia(mouse) : alObjetivo
+  const cerca = mouse ? Math.hypot(mouse.x - centro.x, mouse.y - centro.y) : Infinity
+  const peso = Math.max(0, Math.min(1, (440 - cerca) / 200))
+  const mira = { x: alObjetivo.x + (alMouse.x - alObjetivo.x) * peso, y: alObjetivo.y + (alMouse.y - alObjetivo.y) * peso }
 
-  // ===== Si lo tocan =====
+  // ===== Si lo tocan: guiña y contesta =====
   const [mimo, setMimo] = useState<string | null>(null)
   const nMimo = useRef(0)
-  const [salto, setSalto] = useState(0)
   const tocar = () => {
-    setSalto((s) => s + 1)
     setMimo(MIMOS[nMimo.current++ % MIMOS.length]!)
     setTimeout(() => setMimo(null), 2600)
   }
-
-  // Festeja al llegar a un paso de festejo: un salto con chispas, una vez por paso.
-  const festejo = animo === 'festeja' ? `f-${texto}` : ''
 
   const dice = duerme ? null : (mimo ?? texto)
   // Mueve la boca mientras el globo se escribe, no todo el tiempo.
@@ -201,7 +237,6 @@ export function Acompanante({
       : x + TAM + 6
     : Math.max(4, Math.min(x + TAM / 2 - ANCHO_GLOBO / 2, base.w - margenDerecho - ANCHO_GLOBO - 8))
   const globoY = alCostado ? y + TAM / 2 : y - 6
-  const brinca = salto > 0 || !!festejo
 
   return (
     <>
@@ -223,12 +258,13 @@ export function Acompanante({
               boxShadow: '0 0 0 2.5px rgba(236,196,106,0.85), 0 0 14px 4px rgba(169,85,44,0.18)',
             }}
             exit={{ opacity: 0, transition: { duration: 0.3 } }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
+            transition={{ type: 'spring', stiffness: 60, damping: 17, opacity: { duration: 0.5 } }}
           />
         )}
       </AnimatePresence>
 
-      {/* El globo: lo que dice, escrito de a poco. */}
+      {/* El globo: lo que dice, escrito de a poco. Cuelga de Chispa y la sigue. */}
+      <motion.div className="pointer-events-none absolute top-0 left-0 z-[670]" style={{ x: globoSigueX, y: globoSigueY }}>
       <AnimatePresence>
         {dice && (
           <motion.div
@@ -236,43 +272,38 @@ export function Acompanante({
             role="status"
             aria-live="polite"
             data-testid="acompanante"
-            className="pointer-events-none absolute z-[670] rounded-[14px] bg-superficie/95 px-3.5 py-2 text-[14px] leading-snug font-semibold text-texto shadow-[0_8px_28px_rgba(76,29,11,0.22)] ring-1 ring-[#a9552c]/20 backdrop-blur"
+            className="absolute rounded-[14px] bg-superficie/95 px-3.5 py-2 text-[14px] leading-snug font-semibold text-texto shadow-[0_8px_28px_rgba(76,29,11,0.22)] ring-1 ring-[#a9552c]/20 backdrop-blur"
             style={{ width: 'max-content', maxWidth: ANCHO_GLOBO }}
-            initial={{ opacity: 0, scale: 0.9, left: globoX, top: globoY }}
+            initial={{ opacity: 0, scale: 0.94, left: globoX - x, top: globoY - y }}
             animate={{
               opacity: 1,
               scale: 1,
-              left: globoX,
-              top: globoY,
+              left: globoX - x,
+              top: globoY - y,
               translateX: alCostado && aLaDerecha ? '-100%' : '0%',
               translateY: globoArriba ? '-100%' : '-50%',
             }}
-            exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
-            transition={{ type: 'spring', stiffness: 90, damping: 17, mass: 0.9 }}
+            exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.3, ease: 'easeOut' } }}
+            transition={{ type: 'spring', stiffness: 70, damping: 18, opacity: { duration: 0.4 } }}
           >
             <Escribe texto={dice} />
           </motion.div>
         )}
       </AnimatePresence>
+      </motion.div>
 
-      {/* Chispa: vuela con resorte hasta su lugar. */}
+      {/* Chispa: viaja con resorte hasta su lugar, inclinada hacia donde va. */}
       <motion.button
         type="button"
         aria-label="El ayudante del mapa"
         onClick={tocar}
-        className="absolute z-[668] cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-principal/40"
-        style={{ width: TAM, height: TAM }}
-        initial={{ opacity: 0, left: x, top: y + 20 }}
-        animate={{ opacity: 1, left: x, top: y }}
-        transition={{ type: 'spring', stiffness: 55, damping: 15, mass: 1 }}
+        className="absolute top-0 left-0 z-[668] cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-principal/40"
+        style={{ width: TAM, height: TAM, x: posX, y: posY }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
       >
-        <motion.div
-          key={`${salto}-${festejo}`}
-          animate={quieto ? {} : brinca ? { y: [0, -22, 0, -10, 0] } : { y: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-        >
-          <Chispa tam={TAM} variante={variantePedida() ?? 'terracota'} mira={mira} habla={hablando && !duerme} vuela={corre} parpadea={parpadea} animo={animoChispa} />
-        </motion.div>
+        <Chispa tam={TAM} variante={variantePedida() ?? 'terracota-oscura'} mira={mira} habla={hablando && !duerme} parpadea={parpadea} animo={animoChispa} viaje={{ vx: velX, vy: velY, prepara }} />
       </motion.button>
     </>
   )
