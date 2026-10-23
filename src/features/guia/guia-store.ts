@@ -123,8 +123,9 @@ export function useMisionActiva(): MisionId | null {
  *  - `recibimiento`: la invitación de llegada ya se respondió (Dale o Después).
  *  - `mision.<id>`: la misión ya se festejó (los datos dicen si está hecha;
  *    esto evita festejarla dos veces).
- *  - `spot.<ancla>`: el puntito de ese panel ya se tocó. */
-export type ClaveGuia = 'recibimiento' | `mision.${MisionId}` | `spot.${string}`
+ *  - `spot.<ancla>`: el puntito de ese panel ya se tocó.
+ *  - `presentacion`: el asistente ya se presentó (bienvenida del mapa en Campos). */
+export type ClaveGuia = 'recibimiento' | 'presentacion' | `mision.${MisionId}` | `spot.${string}`
 
 function queryKey(userId: string) {
   return ['guia-vista', userId] as const

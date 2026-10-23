@@ -115,8 +115,8 @@ function OnboardingRuta() {
 const TutorialMapaPage = lazy(() =>
   import('@/features/mapa/tutorial-page').then((m) => ({ default: m.TutorialMapaPage })),
 )
-const ChispaMuestra = lazy(() =>
-  import('@/features/campos/tropero/chispa-muestra').then((m) => ({ default: m.ChispaMuestra })),
+const AsistenteMuestra = lazy(() =>
+  import('@/features/campos/tropero/asistente-muestra').then((m) => ({ default: m.AsistenteMuestra })),
 )
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
@@ -127,7 +127,7 @@ export const router = createBrowserRouter([
   ...(import.meta.env.DEV
     ? [
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
-        { path: '/estilo/chispa', element: <Suspense fallback={null}><ChispaMuestra /></Suspense> },
+        { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
       ]
     : []),
   // Acceso (A1–A3): se entra con un código por WhatsApp, sin contraseñas.

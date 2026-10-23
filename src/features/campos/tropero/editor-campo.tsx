@@ -31,6 +31,8 @@ import {
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
 import { Acompanante, type Objetivo } from './acompanante'
+import { dudasDe } from './dudas'
+import { useMarcarVista, usePendiente } from '@/features/guia/guia-store'
 import { adentro, dividir, numeroSiguiente } from './dividir'
 
 // El mapa del campo, adentro de Campos: ubicarlo (encontrarlo en el satélite y
@@ -132,6 +134,9 @@ export default function EditorCampo({
   const siguienteCampo = campos.find((c) => c.id !== mapa.id && estadoDe(c).tipo !== 'listo')
   // El asistente acompaña mientras el campo se arma (o falta terminar el mapa); después, sólo la pista.
   const guiado = pendiente || estadoDe(mapa).tipo !== 'listo'
+  // La primera vez que lo ve, el asistente se presenta en la bienvenida (una vez por persona, no por campo).
+  const presentarse = usePendiente('presentacion')
+  const marcarVista = useMarcarVista()
 
   useEffect(() => {
     const el = hostMapa.current
@@ -353,7 +358,9 @@ export default function EditorCampo({
     setPtEsquina(primerDibujo && esquina ? (api.current?.aPantalla(esquina) ?? null) : null)
   }, [primerDibujo, esquina, vuelta, tamMapa])
 
-  // Lo que dice el asistente y a dónde va.
+  // Lo que dice el asistente y a dónde va. Si lo que hay que tocar está en la
+  // tarjeta, se queda acoplado arriba de ella y habla la tarjeta (el texto que
+  // queda acá no se muestra); si está en el mapa, va hasta ahí con su línea.
   const punto = (): Objetivo => {
     if (primerDibujo && ptEsquina) return { tipo: 'punto', ...ptEsquina }
     // Sin lugar fijo, la mano va un poco abajo y a la izquierda del centro (ver mapa-tutorial).
@@ -362,7 +369,7 @@ export default function EditorCampo({
   const verbo = movil ? 'Tocá' : 'Hacé clic'
   const [objetivo, dice] = ((): [Objetivo | null, string | null] => {
     if (!guiado) return [null, null]
-    const boton = (id: string, t: string): [Objetivo, string] => [{ tipo: 'boton', id }, t]
+    const boton = (id: string, t: string): [Objetivo, string] => [{ tipo: 'tarjeta', resalta: id }, t]
     const arriba = (t: string): [Objetivo, string] => [{ tipo: 'arriba' }, t]
     switch (paso.e) {
       case 'bienvenida':
@@ -371,14 +378,14 @@ export default function EditorCampo({
         if (paso.buscando) return boton('buscador', 'Escribí un camino o un paraje que conozcas.')
         return movido ? boton('ya-lo-veo', '¿Ves tus alambrados? Seguí.') : [punto(), 'Arrastrá el mapa hasta ver tu campo.']
       case 'tocar':
-        return paso.buscando ? arriba('Buscando la parcela en el catastro…') : [punto(), `${verbo} adentro de tu campo.`]
+        return paso.buscando ? [{ tipo: 'tarjeta' }, null] : [punto(), `${verbo} adentro de tu campo.`]
       case 'parcela':
         return boton('es-este', 'Si es tu campo, confirmalo.')
       case 'boleta':
         return boton('boleta', 'Los números están arriba a la izquierda de la boleta.')
       case 'marcar':
         if (puntos === 0) return [punto(), 'Empezá por una esquina del alambrado.']
-        return movil ? arriba('Seguí el alambrado y cerrá en el primer punto.') : [null, null]
+        return movil ? arriba('Seguí el alambrado y cerrá en el primer punto.') : [{ tipo: 'tarjeta' }, null]
       case 'borde-listo':
         if (paso.ajustando) return arriba('Arrastrá los puntos hasta el alambrado.')
         if (!paso.altaCorregida && compararBorde(haRedondo(hectareasDe(paso.borde)), mapa.hectareas) === 'muy-distinto')
@@ -387,12 +394,12 @@ export default function EditorCampo({
       case 'sin-potreros':
         return boton('dividido', '¿Tiene potreros adentro?')
       case 'inicio':
-        if (!faltan.length) return [null, null]
+        if (!faltan.length) return [{ tipo: 'tarjeta' }, null]
         return boton('dibujar', dibujados.length ? 'Dibujá el siguiente.' : 'Dibujá cualquiera: después te pregunto cuál es.')
       case 'dibujar':
         if (primerDibujo) return [punto(), 'Empezá por una esquina.']
         if (puntos === 0) return arriba(`Marcá las esquinas${sel ? ` del ${sel.nombre}` : ' de un potrero'}.`)
-        return movil ? arriba('Cerrá en el primer punto.') : [null, null]
+        return movil ? arriba('Cerrá en el primer punto.') : [{ tipo: 'tarjeta' }, null]
       case 'cual':
         return boton('cual', '¿Cuál de los que cargaste es?')
       case 'nuevo':
@@ -404,7 +411,7 @@ export default function EditorCampo({
       case 'cierre':
         return boton('cierre', siguienteCampo ? `¡Bien! Seguimos con ${siguienteCampo.nombre}.` : '¡Listo! Se abre toda la app.')
       default:
-        return [null, null]
+        return [{ tipo: 'tarjeta' }, null]
     }
   })()
 
@@ -497,11 +504,36 @@ export default function EditorCampo({
             {nota}
           </p>
         )}
+        {/* El lugar del asistente: arriba de la tarjeta, que es su voz. */}
+        {guiado && (
+          <div className="flex items-center gap-3">
+            <span data-acompana="dock" aria-hidden className="size-16 shrink-0 rounded-full bg-[radial-gradient(circle,rgba(169,85,44,0.18)_0%,rgba(169,85,44,0)_68%)]" />
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[14px] font-bold text-texto">Asistente de Tropero</span>
+              <span className="text-[13.5px] text-texto-suave">Tocame si tenés una duda</span>
+            </div>
+          </div>
+        )}
         {etapaBorde && paso.e !== 'bienvenida' && !(paso.e === 'borde-listo' && paso.corrigiendo) && <Progreso n={paso.e === 'encontrar' ? 1 : 2} texto={paso.e === 'encontrar' ? 'encontrar el campo' : 'el borde'} />}
 
         {paso.e === 'bienvenida' && (
-          <Tarjeta titulo={`Armemos ${mapa.nombre} en el mapa`} texto="Lo encontrás en el satélite, marcás el borde y dibujás los potreros. Son 3 pasos y unos 10 minutos; si cortás, seguís donde quedaste.">
-            <BotonPrincipal icono="Siguiente" data-acompana="empezar" onClick={() => ir({ e: 'encontrar', buscando: false })}>
+          <Tarjeta titulo={`Armemos ${mapa.nombre} en el mapa`} texto="Unos 10 minutos. Si cortás, seguís donde quedaste.">
+            <ol className="flex flex-col gap-2.5">
+              {['Lo encontramos en el satélite', 'Marcamos el borde', 'Dibujamos los potreros'].map((t, i) => (
+                <li key={t} className="flex items-center gap-3 text-[15px] font-semibold text-texto">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-principal-suave text-[13.5px] font-extrabold text-principal">{i + 1}</span>
+                  {t}
+                </li>
+              ))}
+            </ol>
+            <BotonPrincipal
+              icono="Siguiente"
+              data-acompana="empezar"
+              onClick={() => {
+                if (presentarse) marcarVista('presentacion')
+                ir({ e: 'encontrar', buscando: false })
+              }}
+            >
               Empezar
             </BotonPrincipal>
           </Tarjeta>
@@ -846,6 +878,8 @@ export default function EditorCampo({
         medir={vuelta}
         margenDerecho={movil ? 0 : 400}
         animo={paso.e === 'tocar' && paso.buscando ? 'piensa' : paso.e === 'listo' || paso.e === 'cierre' ? 'festeja' : 'normal'}
+        dudas={dudasDe(paso.e, movil)}
+        presentarse={presentarse && paso.e === 'bienvenida'}
       />
     </div>
   )

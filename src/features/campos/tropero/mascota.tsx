@@ -1,8 +1,8 @@
 import { useId } from 'react'
 import { AnimatePresence, motion, useAnimationFrame, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from 'framer-motion'
 
-// Chispa: el asistente de Tropero hecho personaje (referencia que pasó Lau el
-// 20/10: el orbe «Sage» de un dashboard con IA). Una esfera lisa terracota
+// El asistente de Tropero hecho personaje, sin nombre propio (Lau, 22/10).
+// Referencia que pasó Lau el 20/10: el orbe «Sage» de un dashboard con IA. Una esfera lisa terracota
 // oscura, con brillo de vidrio y un resplandor quieto. Nada titila (Lau, 20/10:
 // «esa visual que titila es muy molesta»).
 //
@@ -12,9 +12,10 @@ import { AnimatePresence, motion, useAnimationFrame, useMotionValue, useReducedM
 // (flotar, respirar, el vaivén, la mirada que deambula) se calcula cuadro a
 // cuadro y pasa por resortes, así un estado se funde en el otro sin cortes.
 // A dónde va y qué dice lo decide acompanante.tsx; los gestos se ven todos
-// juntos en /estilo/chispa (sólo en dev).
+// juntos en /estilo/asistente (sólo en dev).
 
-export type Animo = 'normal' | 'festeja' | 'piensa' | 'duerme' | 'guina'
+/** `despierta`: el momento de salir del sueño (se estira y abre los ojos). */
+export type Animo = 'normal' | 'festeja' | 'piensa' | 'duerme' | 'despierta' | 'guina'
 export type Variante = 'terracota' | 'terracota-oscura' | 'sage'
 /** La velocidad del viaje (px/s) y `prepara` (0 a 1) mientras junta impulso para salir. */
 export type Viaje = { vx: MotionValue<number>; vy: MotionValue<number>; prepara?: MotionValue<number> }
@@ -29,7 +30,7 @@ const LENTO = { type: 'spring', stiffness: 70, damping: 18, mass: 1 } as const
 const SUAVE = { type: 'spring', stiffness: 90, damping: 17 } as const
 const BLANDO = { stiffness: 110, damping: 20 }
 
-export function Chispa({
+export function Mascota({
   tam = 64,
   mira = { x: 0, y: 0 },
   habla = false,
@@ -54,6 +55,7 @@ export function Chispa({
   const festeja = animo === 'festeja'
   const piensa = animo === 'piensa'
   const guina = animo === 'guina'
+  const despierta = animo === 'despierta'
   const mx = Math.max(-1, Math.min(1, mira.x))
   const my = Math.max(-1, Math.min(1, mira.y))
   // Pensando: mira arriba, a un costado.
@@ -112,14 +114,18 @@ export function Chispa({
     ? { y: [0, 2, -10, 0, 0], scaleY: [1, 0.86, 1.09, 0.93, 1], scaleX: [1, 1.1, 0.93, 1.06, 1] }
     : guina
       ? { y: [0, -4, 0], scaleY: [1, 1.05, 1], scaleX: [1, 0.97, 1] }
-      : duerme
+      : despierta
+        ? { y: [0, 0, -3, 0], scaleY: [0.95, 0.93, 1.1, 1], scaleX: [1.04, 1.06, 0.93, 1] }
+        : duerme
         ? { y: 0, scaleX: 1.04, scaleY: 0.95 }
         : { y: 0, scaleX: 1, scaleY: 1 }
   const tiempoPose = festeja
     ? { duration: 1.1, times: [0, 0.2, 0.48, 0.78, 1], ease: 'easeInOut' as const }
     : guina
       ? { duration: 0.7, ease: 'easeInOut' as const }
-      : LENTO
+      : despierta
+        ? { duration: 0.9, times: [0, 0.25, 0.6, 1], ease: 'easeInOut' as const }
+        : LENTO
 
   const formaIzq = duerme ? 'dormido' : festeja ? 'feliz' : 'abierto'
   const formaDer = duerme ? 'dormido' : festeja || guina ? 'feliz' : 'abierto'

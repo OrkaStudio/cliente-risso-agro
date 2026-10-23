@@ -65,7 +65,9 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
 
   // Falta el 2: el editor se abre solo, con la lista del alta (y el asistente acompaña).
   await expect(page.getByRole('heading', { name: 'Dibujá el siguiente' })).toBeVisible()
-  await expect(page.getByTestId('acompanante')).toContainText('Dibujá el siguiente.')
+  // El asistente queda acoplado a la tarjeta: ahí habla la tarjeta, no un globo aparte.
+  await expect(page.getByRole('button', { name: /El asistente de Tropero/ })).toBeVisible()
+  await expect(page.getByTestId('acompanante')).toHaveCount(0)
   await captura(page, '1-elegir')
   await page.getByRole('region', { name: 'Faltan dibujar' }).getByRole('button', { name: new RegExp(`^${dos!.nombre}`) }).click()
   await expect(page.getByRole('heading', { name: `Dibujá el ${dos!.nombre}` })).toBeVisible()

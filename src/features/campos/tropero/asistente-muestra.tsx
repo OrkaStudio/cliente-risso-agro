@@ -1,4 +1,4 @@
-// Página interna de desarrollo (/estilo/chispa): todos los gestos de Chispa a la
+// Página interna de desarrollo (/estilo/asistente): todos los gestos del asistente a la
 // vez, animados, para que Lau los compare. Vuela de verdad (de un lado al otro),
 // festeja y guiña se repiten solos. No existe en producción.
 import { useEffect, useRef, useState } from 'react'
@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { motion, useMotionValue, useSpring, useVelocity } from 'framer-motion'
 import { Logo } from '@/components/tropero/logo'
 import { cn } from '@/lib/utils'
-import { Chispa, type Animo } from './mascota'
+import { Mascota, type Animo } from './mascota'
 
 type Gesto = 'normal' | 'habla' | 'vuela' | 'piensa' | 'festeja' | 'guina' | 'duerme'
 
@@ -29,7 +29,7 @@ const TESELAS = [
   [9928, 5553],
 ]
 
-export function ChispaMuestra() {
+export function AsistenteMuestra() {
   const [grande, setGrande] = useState(true)
   const [satelite, setSatelite] = useState(false)
   const [parpadea, setParpadea] = useState(false)
@@ -47,7 +47,7 @@ export function ChispaMuestra() {
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
         <header className="flex flex-wrap items-center gap-4">
           <Logo alto={28} />
-          <h1 className="titulo-display text-[28px]">Chispa · sus gestos</h1>
+          <h1 className="titulo-display text-[28px]">El asistente de Tropero · sus gestos</h1>
         </header>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setGrande((g) => !g)} className="h-9 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold">
@@ -135,7 +135,7 @@ function Escena({ gesto, satelite, parpadea, tam }: { gesto: Gesto; satelite: bo
         <Viajera tam={tam} parpadea={parpadea} />
       ) : (
         <div className="relative flex flex-col items-center gap-3">
-          <Chispa tam={tam} animo={animo} habla={gesto === 'habla' && habla} parpadea={parpadea} mira={mouse ? mira : { x: 0, y: 0 }} />
+          <Mascota tam={tam} animo={animo} habla={gesto === 'habla' && habla} parpadea={parpadea} mira={mouse ? mira : { x: 0, y: 0 }} />
           {gesto === 'habla' && <span className="h-[34px] max-w-[260px] rounded-[14px] bg-superficie/95 px-3 py-1.5 text-center text-[13px] font-semibold text-texto shadow-md">{habla ? FRASES[frase] : '…'}</span>}
         </div>
       )}
@@ -174,7 +174,7 @@ function Viajera({ tam, parpadea }: { tam: number; parpadea: boolean }) {
   }, [meta, prepara, recorrido])
   return (
     <motion.div style={{ x }}>
-      <Chispa tam={tam} parpadea={parpadea} mira={{ x: hacia, y: 0 }} viaje={{ vx, vy, prepara }} />
+      <Mascota tam={tam} parpadea={parpadea} mira={{ x: hacia, y: 0 }} viaje={{ vx, vy, prepara }} />
     </motion.div>
   )
 }

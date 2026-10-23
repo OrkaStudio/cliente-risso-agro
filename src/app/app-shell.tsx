@@ -18,7 +18,6 @@ import { useAuth } from '@/features/auth/auth-context'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { useMedirPuestaAPunto } from '@/features/guia/medir'
 import { Mision } from '@/features/guia/mision'
-import { Spots } from '@/features/guia/spots'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
@@ -165,7 +164,6 @@ export function AppShell() {
           lista «Tu campo, en marcha» se reemplazaron por el Inicio «Antes del
           mapa» de Tropero, que muestra los mismos pasos en un solo lugar. */}
       <Mision />
-      <Spots />
 
       {/* Panel del Asistente (preguntas + WhatsApp): se abre desde la barra lateral. */}
       <AsistentePanel />
