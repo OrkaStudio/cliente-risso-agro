@@ -2,127 +2,120 @@ import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
+import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
-import { campoPendiente, totalesDelMapa } from '@/features/mapa/reglas'
+import { primerPendiente } from '@/features/mapa/bloqueo'
+import { EjemploCampo } from '@/features/mapa/ejemplo'
+import { dibujadoEn, estadoDe, haTexto, type CampoMapa } from '@/features/mapa/reglas'
 import { cn } from '@/lib/utils'
-import ilustracion from '@/assets/tropero/antes-del-mapa.webp'
-import { porDondeVaElMapa } from './dia'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
-/** «La Porteña, La Loma y El Bajo». */
-const lista = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}`)
 
 /**
- * Inicio · Antes del mapa (página 35): el campo está cargado pero no ubicado.
- * Una sola cosa para hacer (el mapa), y lo que viene después, a la vista pero
- * apagado: se abre con el mapa.
+ * Inicio mientras falta el mapa (Lau, 02/11: «que se entienda sin leer»).
+ * A la izquierda, cómo va a quedar: un campo de ejemplo que se arma solo sobre
+ * el satélite (el borde y después los potreros con lo que tienen). A la
+ * derecha, lo concreto de SU campo: el borde y cada potrero, con nombre,
+ * hectáreas y lo que tiene, para ir tildando, y un solo botón. Abajo, lo que se
+ * abre al terminar.
  */
 export function AntesDelMapa() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const { data: campos } = useMapa(membresia?.empresa_id)
+  const { user } = useAuth()
   const reducir = useReducedMotion()
-  const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
-  const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const cs = campos ?? []
-  const t = totalesDelMapa(cs)
-  const siguiente = campoPendiente(cs)
-  const nombres = cs.map((c) => c.nombre)
-  const tus = cs.length === 1 ? 'tu campo' : `tus ${['', '', 'dos', 'tres', 'cuatro', 'cinco'][cs.length] ?? cs.length} campos`
-
-  const pasos = [
-    {
-      titulo: 'Cargar el campo',
-      detalle: `${lista(nombres)}, ${t.potreros} ${t.potreros === 1 ? 'potrero' : 'potreros'} y ${t.cabezas} cabezas`,
-      estado: 'listo' as const,
-    },
-    {
-      titulo: cs.length === 1 ? 'Ubicar tu campo en el mapa' : 'Ubicar tus campos en el mapa',
-      detalle: porDondeVaElMapa(cs),
-      estado: 'ahora' as const,
-    },
-    { titulo: 'Mandá tu primera lluvia por WhatsApp', detalle: 'Ya está conectado: es el celular con el que entrás', estado: 'despues' as const },
-    { titulo: 'Probar el bastón', detalle: 'Leé una caravana en la manga. Se abre con el mapa', estado: 'despues' as const },
-    { titulo: 'Anotar el primer gasto', detalle: 'Con la foto del ticket, en diez segundos', estado: 'despues' as const },
-  ]
-  const entra = (i: number) =>
-    reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.07, ease: CURVA } }
+  const campo = primerPendiente(cs)
+  if (!campo) return null
+  const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.08, ease: CURVA } })
+  const nombre = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
+  const primeraVez = !cs.some((c) => primerPendiente([c]) === null)
+  const otros = cs.filter((c) => c.id !== campo.id && primerPendiente([c]) !== null)
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-10">
-      <motion.section {...entra(0)} className="relative isolate flex h-[300px] flex-col justify-center overflow-hidden rounded-[28px] bg-tinta px-12">
-        <img src={ilustracion} alt="" className="absolute inset-0 -z-20 size-full object-cover" fetchPriority="high" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[rgba(19,27,22,0.85)] via-[rgba(19,27,22,0.15)] via-60% to-transparent" />
-        {nombre && <p className="text-[20px] font-semibold text-[#f7e3b6]">Bienvenido, {nombre}</p>}
-        <h1 className="titulo-display mt-1 max-w-[760px] text-[60px] leading-none tracking-[-0.03em] text-superficie">
-          Falta el mapa de {cs.length === 1 ? 'tu campo' : 'tus campos'}.
-        </h1>
-        <p className="mt-4 max-w-[760px] text-[17px] text-[#f7e3b6]">
-          Lo primero es tener {tus} en el mapa. Con los potreros dibujados se abre toda la app.
-        </p>
+    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-4">
+      <motion.p {...entra(0)} className="text-[15px] font-semibold text-texto-suave">
+        {primeraVez ? `Hola${nombre ? `, ${nombre}` : ''}. Lo primero es tu campo en el mapa.` : `Sumaste ${campo.nombre}: falta ubicarlo en el mapa.`}
+      </motion.p>
+
+      <motion.section {...entra(1)} className="grid overflow-hidden rounded-[24px] border border-borde bg-superficie lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        {/* Cómo va a quedar: el ejemplo se arma solo. */}
+        <div className="relative min-h-[300px] bg-tinta lg:min-h-[440px]">
+          <EjemploCampo />
+          <p className="absolute top-4 left-4 rounded-full bg-tinta/80 px-3.5 py-1.5 text-[13.5px] font-bold text-superficie backdrop-blur">Así va a quedar tu campo</p>
+        </div>
+        {/* Lo que tiene que hacer, con su campo. */}
+        <Lista campo={campo} />
       </motion.section>
 
-      <div className="grid gap-10 lg:grid-cols-[320px_1fr]">
-        <motion.div {...entra(1)}>
-          <p className="titulo-display text-[96px] leading-[0.95] tracking-[-0.03em] whitespace-nowrap text-texto">1 de 5</p>
-          <p className="mt-3 text-[18px] font-semibold text-texto-suave">pasos para arrancar</p>
-          <div className="mt-4 flex gap-1.5" aria-hidden>
-            {pasos.map((p, i) => (
-              <span key={i} className={cn('h-2 flex-1 rounded-full', p.estado === 'listo' ? 'bg-estado-bien' : 'bg-borde')} />
-            ))}
-          </div>
-        </motion.div>
+      <motion.div {...entra(2)} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[18px] bg-superficie-hundida/60 px-5 py-3.5">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie text-texto-suave">
+          <Icono nombre="Candado" tamano={16} />
+        </span>
+        <p className="min-w-0 flex-1 text-[15px] text-texto">
+          Al terminar se abren <b>Hacienda</b>, <b>Plata</b> y <b>Agenda</b>.
+          {otros.length > 0 && <span className="text-texto-suave"> Después siguen {otros.map((c) => c.nombre).join(' y ')}.</span>}
+        </p>
+      </motion.div>
+    </div>
+  )
+}
 
-        <ol className="flex flex-col gap-1">
-          {pasos.map((p, i) => (
-            <motion.li
-              key={p.titulo}
-              {...entra(2 + i)}
-              className={cn(
-                'flex items-center gap-5 rounded-[18px] px-5 py-4',
-                p.estado === 'ahora' && 'bg-superficie shadow-[0_2px_14px_rgba(19,27,22,0.06)]',
-              )}
-            >
-              <span
-                className={cn(
-                  'grid size-[30px] shrink-0 place-items-center rounded-full text-[14px] font-bold',
-                  p.estado === 'listo'
-                    ? 'bg-estado-bien text-superficie'
-                    : p.estado === 'ahora'
-                      ? 'border-2 border-principal text-principal'
-                      : 'border-[1.5px] border-borde text-texto-suave/70',
-                )}
-              >
-                {p.estado === 'listo' ? <Icono nombre="Guardar" tamano={16} /> : i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className={cn('text-[18px]', p.estado === 'ahora' ? 'font-bold text-texto' : p.estado === 'listo' ? 'font-medium text-texto' : 'font-semibold text-texto-suave/70')}>
-                  {p.titulo}
-                </p>
-                <p className={cn('text-[14.5px]', p.estado === 'despues' ? 'text-texto-suave/60' : 'text-texto-suave')}>{p.detalle}</p>
-              </div>
-              {p.estado === 'listo' && <span className="text-[15px] font-semibold text-estado-bien-texto">Listo</span>}
-              {p.estado === 'ahora' && (
-                <button
-                  type="button"
-                  onClick={() => navigate(siguiente ? `/mapa/${siguiente.id}` : '/mapa')}
-                  className="inline-flex h-12 shrink-0 items-center gap-3 rounded-full bg-principal py-1.5 pr-1.5 pl-6 text-[16px] font-bold text-principal-texto hover:bg-terracota-600"
-                >
-                  Seguir
-                  <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
-                    <Icono nombre="Siguiente" tamano={16} />
-                  </span>
-                </button>
-              )}
-              {p.estado === 'despues' && <span className="shrink-0 text-[15px] font-semibold text-principal/60">Después del mapa</span>}
-            </motion.li>
-          ))}
-        </ol>
+function Lista({ campo }: { campo: CampoMapa }) {
+  const navigate = useNavigate()
+  const col = colorDeCampo(campo.colorIdx ?? 0)
+  const borde = !!campo.contorno
+  const potreros = [...campo.potreros].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
+  const hechos = borde ? potreros.filter((p) => dibujadoEn(p, campo.contorno)).length : 0
+  const sigue = !borde ? 'borde' : (potreros.find((p) => !dibujadoEn(p, campo.contorno))?.id ?? null)
+  const fila = (hecho: boolean, ahora: boolean, titulo: React.ReactNode, detalle: string) => (
+    <li className={cn('flex items-center gap-3 rounded-[14px] px-3 py-2.5', ahora && 'bg-principal-suave/50 ring-1 ring-principal/30')}>
+      <span
+        className={cn(
+          'grid size-6 shrink-0 place-items-center rounded-full',
+          hecho ? 'bg-estado-bien text-superficie' : ahora ? 'border-2 border-principal' : 'border-[1.5px] border-borde',
+        )}
+      >
+        {hecho && <Icono nombre="Guardar" tamano={16} />}
+      </span>
+      <span className={cn('min-w-0 flex-1 text-[15px]', hecho ? 'text-texto-suave line-through decoration-texto-suave/40' : 'text-texto')}>{titulo}</span>
+      <span className="shrink-0 text-[13px] text-texto-suave">{detalle}</span>
+    </li>
+  )
+  return (
+    <div className="flex flex-col gap-4 p-6">
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-[10px] text-[18px] font-extrabold text-white" style={{ background: col.hex }}>
+          {col.letra}
+        </span>
+        <div className="min-w-0">
+          <h1 className="font-heading text-[24px] leading-tight font-extrabold text-texto">{campo.nombre}</h1>
+          <p className="text-[14px] text-texto-suave">
+            {campo.hectareas ? `${haTexto(campo.hectareas)} ha · ` : ''}
+            {potreros.length} {potreros.length === 1 ? 'potrero' : 'potreros'}
+          </p>
+        </div>
       </div>
-
-      <p className="text-[15px] text-texto-suave">Si cortás, cada paso queda donde lo dejaste. Nada se pierde.</p>
+      <p className="text-[15px] text-texto">Marcá en el satélite su borde y cada potrero.</p>
+      <ol className="flex flex-col gap-0.5">
+        {fila(borde, sigue === 'borde', <b>Borde del campo</b>, borde ? 'listo' : '')}
+        {potreros.map((p) => {
+          const hecho = borde && dibujadoEn(p, campo.contorno)
+          return fila(hecho, sigue === p.id, <b className="cifra">{p.nombre}</b>, [p.hectareas ? `${haTexto(p.hectareas)} ha` : null, p.que].filter(Boolean).join(' · '))
+        })}
+      </ol>
+      <button
+        type="button"
+        // Campos abre solo el que falta: el link no cambia lo elegido en la barra.
+        onClick={() => navigate('/campos')}
+        className="mt-auto inline-flex h-12 w-full items-center justify-between rounded-full bg-principal py-1 pr-1 pl-6 text-[16px] font-bold text-principal-texto hover:bg-terracota-600"
+      >
+        {estadoDe(campo).tipo === 'sin-borde' ? `Dibujar ${campo.nombre}` : `Seguir: ${hechos} de ${potreros.length} potreros`}
+        <span className="grid size-10 place-items-center rounded-full bg-acento text-acento-texto">
+          <Icono nombre="Siguiente" tamano={16} />
+        </span>
+      </button>
     </div>
   )
 }

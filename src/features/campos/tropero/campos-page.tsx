@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
@@ -9,7 +9,8 @@ import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { MapErrorBoundary } from '@/components/map-error-boundary'
 import type { CampoConPotreros } from '@/features/campos/api'
-import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { useCampoDesdeUrl, useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
+import { CampoVisto } from '@/features/campos/campo-visto'
 import { CampoFormDialog } from '@/features/campos/campos-dialogs'
 import { useActualizarCampo, useActualizarPotreroMapa, useCamposConPotreros, useInfraestructura } from '@/features/campos/hooks'
 import { tipoCampoLabel } from '@/features/campos/labels'
@@ -19,14 +20,16 @@ import { useAnimales } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
 import { useMapa } from '@/features/mapa/api'
 import { CargarLaborDialog } from '@/features/potrero/cargar-labor-dialog'
-import { useMapaPendiente } from '@/features/mapa/bloqueo'
-import { estadoDe } from '@/features/mapa/reglas'
+import { primerPendiente, useMapaPendiente } from '@/features/mapa/bloqueo'
+import { estadoDe, type CampoMapa } from '@/features/mapa/reglas'
 import { hoyLocal } from '@/lib/fecha'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { diasPorPotrero, type Dias } from './dias'
 import { descansoPrevio, historiaDelPotrero, LABOR, type Hecho, type Labor, type MovimientoPotrero } from './historia'
 import { MapaCampo, type Marca } from './mapa-campo'
+import { MapaCampos } from './mapa-campos'
+import { ProgresoMapa } from './progreso-mapa'
 import { AGUA, avisosDelCampo, lluviaDesde, PASTO, textoDias, ultimaPorPotrero, type Aviso, type Lluvia, type Observacion } from './panorama'
 
 const EditorCampo = lazy(() => import('./editor-campo'))
@@ -89,7 +92,6 @@ function useDatosDelCampo(empresaId: string, campoId: string, potreroIds: string
 }
 
 export function CamposPage() {
-  const [params, setParams] = useSearchParams()
   const { data: membresia } = useEmpresa()
   const empresaId = membresia?.empresa_id ?? ''
   const camposQ = useCamposConPotreros()
@@ -98,15 +100,25 @@ export function CamposPage() {
   const qc = useQueryClient()
   const animalesQ = useAnimales()
   const campos = camposQ.data ?? []
-  const pedido = params.get('campo')
-  const campoId = (pedido && campos.some((c) => c.id === pedido) ? pedido : identidad.elegido?.id) ?? campos[0]?.id ?? ''
+  // El campo lo elige la barra izquierda; un link con ?campo= (tutorial, asistente) lo elige ahí.
+  const pedido = useCampoDesdeUrl()
+  const pendienteMapa = useMapaPendiente()
+  // Primero el mapa (Lau, 30/10): mientras falte terminar un campo, Campos abre ése, uno por uno.
+  const aTerminar = pendienteMapa && mapaQ.data ? primerPendiente(mapaQ.data) : null
+  // El que se está armando se recuerda en esta visita: al dibujar el último potrero se ve su cierre.
+  const [armando, setArmando] = useState<string | null>(null)
+  if (aTerminar && armando !== aTerminar.id) setArmando(aTerminar.id)
+  // «Todos tus campos» es la vista general; sin el mapa, se arma el primero (el tutorial).
+  const todos = !pedido && !identidad.elegido && campos.length > 1 && !pendienteMapa && !armando
+  const campoId = todos ? '' : (aTerminar?.id ?? armando ?? (pedido && campos.some((c) => c.id === pedido) ? pedido : identidad.elegido?.id) ?? campos[0]?.id ?? '')
+  // La barra no se toca: lo elegido es un filtro del productor, no del tutorial (Lau, 02/11).
   const campo = campos.find((c) => c.id === campoId)
   const mapa = mapaQ.data?.find((c) => c.id === campoId)
   const datosQ = useDatosDelCampo(empresaId, campoId, campo?.potreros.map((p) => p.id) ?? [])
   const infraQ = useInfraestructura(campoId)
   const [potreroId, setPotreroId] = useState<string | null>(null)
   const [dibujar, setDibujar] = useState(false)
-  const pendiente = useMapaPendiente()
+  const pendiente = pendienteMapa
   // Llegó desde una sección que todavía no se abrió: se dice por qué, hasta el primer paso.
   const bloqueada = (useLocation().state as { bloqueada?: string } | null)?.bloqueada
   const [panel, setPanel] = useState<'campo' | 'potrero' | null>(null)
@@ -129,11 +141,21 @@ export function CamposPage() {
 
   if (camposQ.isLoading || mapaQ.isLoading) return <div className="mx-auto h-[560px] w-full max-w-[1280px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (camposQ.error) return <p className="text-texto-suave">No pudimos cargar los campos. Revisá la conexión y probá de nuevo.</p>
+  if (todos)
+    return (
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
+        <div className="flex items-end justify-between gap-3">
+          <CampoVisto campos={identidad.campos} elegido={null} />
+          <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
+        </div>
+        <VistaGeneral campos={mapaQ.data ?? []} identidad={identidad.campos} onElegir={identidad.elegir} />
+      </div>
+    )
   if (!campo || !mapa)
     return (
       <div className="mx-auto flex max-w-[520px] flex-col items-center gap-4 py-16 text-center">
         <h1 className="titulo-display text-[34px] text-texto">Todavía no hay campos</h1>
-        <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName={BOTON} onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), setParams((p) => (p.set('campo', id), p)))} />
+        <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName={BOTON} onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
       </div>
     )
 
@@ -153,7 +175,6 @@ export function CamposPage() {
   )
   const lluvia30 = lluviaDesde(datosQ.data?.lluvias ?? [], antes(hoy, 30))
   const elegirCampo = (id: string) => {
-    setParams((p) => (p.set('campo', id), p))
     identidad.elegir(id)
     setPotreroId(null)
     setDibujar(false)
@@ -163,38 +184,11 @@ export function CamposPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
-      {/* Arriba, aparte del mapa: qué campo */}
-      <div className="flex flex-wrap items-center gap-2">
-        {campos.length > 5 ? (
-          <label className="relative inline-flex">
-            <span className="sr-only">Campo</span>
-            <select value={campo.id} onChange={(e) => elegirCampo(e.target.value)} className="h-10 max-w-[300px] appearance-none truncate rounded-full border border-borde bg-superficie pr-9 pl-4 text-[15px] font-bold text-texto">
-              {campos.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
-            <Icono nombre="Desplegar" tamano={16} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2" />
-          </label>
-        ) : (
-          <div className="flex flex-wrap gap-1 rounded-full bg-superficie-hundida p-1" role="group" aria-label="Campo">
-            {campos.map((c) => {
-              const id = identidad.campos.find((x) => x.id === c.id)
-              const si = c.id === campo.id
-              return (
-                <button key={c.id} type="button" aria-pressed={si} onClick={() => elegirCampo(c.id)} className={cn('inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[14.5px] font-bold transition-colors', si ? 'bg-texto text-superficie' : 'text-texto hover:bg-superficie')}>
-                  {id && (
-                    <span className="grid size-5 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: id.color }}>
-                      {id.letra}
-                    </span>
-                  )}
-                  {c.nombre}
-                </button>
-              )
-            })}
-          </div>
-        )}
+      {/* Arriba: qué campo se está viendo (se elige en la barra izquierda) y sumar otro. */}
+      <div className="flex items-end justify-between gap-3">
+        <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
+        {/* En la misma fila: lo que falta para abrir la app, sin quitarle alto al mapa. */}
+        {aTerminar && mapaQ.data && <ProgresoMapa campos={mapaQ.data} actual={aTerminar} />}
         <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
       </div>
 
@@ -706,5 +700,70 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
         {uso === 'agricola' && <CampoTexto etiqueta="Cultivo" placeholder="Trigo, soja, pastura…" value={cultivo} onChange={(e) => setCultivo(e.target.value)} />}
       </div>
     </PanelLateral>
+  )
+}
+
+/**
+ * «Todos tus campos» (Lau, 29/10): todos juntos sobre el satélite y, al lado,
+ * lo que suman y cada campo con lo suyo. Tocar uno lo elige, como en la barra.
+ */
+function VistaGeneral({ campos, identidad, onElegir }: { campos: CampoMapa[]; identidad: CampoElegible[]; onElegir: (id: string) => void }) {
+  const marca = (id: string) => identidad.find((c) => c.id === id)
+  const cabezas = (c: CampoMapa) => c.potreros.reduce((n, p) => n + p.cabezas, 0)
+  const hectareas = (c: CampoMapa) => c.hectareas ?? c.potreros.reduce((n, p) => n + (p.hectareas ?? 0), 0)
+  const totalHa = campos.reduce((n, c) => n + hectareas(c), 0)
+  const totalCab = campos.reduce((n, c) => n + cabezas(c), 0)
+  return (
+    <section className="relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta">
+      <div className="absolute inset-0">
+        <MapErrorBoundary>
+          <MapaCampos
+            campos={campos.map((c) => ({ campo: c, letra: marca(c.id)?.letra ?? '', color: marca(c.id)?.color ?? '#a9552c' }))}
+            onElegir={onElegir}
+            margenDerecho={420}
+          />
+        </MapErrorBoundary>
+      </div>
+      <aside className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto">
+        <div>
+          <p className="text-[13.5px] font-semibold text-texto-suave">{campos.length} campos</p>
+          <h1 className="titulo-display text-[34px] leading-[1.05] text-texto">Todos tus campos</h1>
+        </div>
+        <div className="flex gap-7">
+          <p className="flex flex-col">
+            <span className="titulo-display cifra text-[32px] leading-none">{ha(totalHa)}</span>
+            <span className="mt-1 text-[13.5px] text-texto-suave">hectáreas</span>
+          </p>
+          <p className="flex flex-col">
+            <span className="titulo-display cifra text-[32px] leading-none">{totalCab.toLocaleString('es-AR')}</span>
+            <span className="mt-1 text-[13.5px] text-texto-suave">cabezas</span>
+          </p>
+        </div>
+        <ul className="flex flex-col overflow-hidden rounded-[16px] border border-borde">
+          {campos.map((c) => {
+            const m = marca(c.id)
+            const listo = estadoDe(c).tipo === 'listo'
+            return (
+              <li key={c.id} className="border-b border-borde/70 last:border-b-0">
+                <button type="button" onClick={() => onElegir(c.id)} className="group flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-fondo">
+                  <span className="grid size-[24px] shrink-0 place-items-center rounded-[7px] text-[11.5px] font-extrabold text-white" style={{ background: m?.color }}>
+                    {m?.letra}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-bold text-texto">{c.nombre}</span>
+                    <span className="cifra block text-[13px] text-texto-suave">
+                      {ha(hectareas(c))} ha · {cabezas(c)} cab
+                    </span>
+                  </span>
+                  {!listo && <span className="shrink-0 rounded-full bg-principal-suave px-2.5 py-1 text-[12px] font-bold text-principal">Falta el mapa</span>}
+                  <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave transition-transform group-hover:translate-x-0.5" />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <p className="text-[13.5px] text-texto-suave">Tocá un campo, acá o en el mapa, para ver sus potreros.</p>
+      </aside>
+    </section>
   )
 }

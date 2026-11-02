@@ -145,7 +145,7 @@ export function AppShell() {
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
-            className="w-full px-4 pb-12 pt-7 sm:px-10 sm:pt-8"
+            className="w-full px-4 pb-28 pt-7 sm:px-10 sm:pt-8"
             style={bienvenida && !contenidoListo ? { opacity: 0 } : undefined}
           >
             <Suspense
@@ -165,7 +165,7 @@ export function AppShell() {
           mapa» de Tropero, que muestra los mismos pasos en un solo lugar. */}
       <Mision />
 
-      {/* Panel del Asistente (preguntas + WhatsApp): se abre desde la barra lateral. */}
+      {/* El asistente, siempre a la vista abajo a la derecha: lo que notó, el progreso y las dudas. */}
       <AsistentePanel />
     </div>
   )

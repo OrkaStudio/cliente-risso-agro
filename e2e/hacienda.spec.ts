@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
-import { entrar } from './helpers'
+import { entrar, sesionDePrueba } from './helpers'
+import { borrarCampo } from './mapa-e2e'
+
+// Los campos que crea un test se borran al terminar: uno a medias trabaría la app (primero el mapa).
+const creados: string[] = []
+test.afterEach(() => {
+  for (const n of creados.splice(0)) borrarCampo(n)
+})
+
 
 // RFID con prefijo E2E para poder limpiarlo después sin tocar datos reales.
 const rfid = (sufijo = '') => `E2E${Date.now()}${sufijo}`
@@ -326,4 +334,41 @@ test('desde la ficha: «¿Fue ésta?» → la vaca queda vendida, el número no 
   await page.getByRole('link', { name: 'Hacienda', exact: true }).first().click()
   await page.getByRole('tab', { name: /Salieron/ }).click()
   await expect(page.getByRole('row', { name: new RegExp(`${caravana}.*Vendida`) })).toBeVisible()
+})
+
+test('un campo sin animales: si es agrícola lo dice con lo sembrado; si no, ofrece cargar la hacienda', async ({ page }) => {
+  const token = (await sesionDePrueba()).access_token as string
+  const CUADRADO = [[-35.8, -59.0], [-35.8, -58.989], [-35.809, -58.989], [-35.809, -59.0]]
+  const alta = async (nombre: string, actividad: 'agricola' | 'ganadera', cultivo: string | null) => {
+    const r = await fetch('http://127.0.0.1:54321/rest/v1/campo', {
+      method: 'POST',
+      headers: { apikey: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      // Completo (borde y potrero dibujado): un campo a medias trabaría la Hacienda (primero el mapa).
+      body: JSON.stringify({ empresa_id: 'e2e00000-0000-4000-8000-0000000000e1', nombre, tipo: 'propio', actividad, hectareas: 100, contorno: CUADRADO }),
+    })
+    const [c] = (await r.json()) as { id: string }[]
+    await fetch('http://127.0.0.1:54321/rest/v1/potrero', {
+      method: 'POST',
+      headers: { apikey: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ empresa_id: 'e2e00000-0000-4000-8000-0000000000e1', campo_id: c!.id, nombre: '1', estado_ciclo: cultivo ? 'cultivo' : 'descanso', cultivo, hectareas: 100, poligono: CUADRADO }),
+    })
+    creados.push(nombre)
+    return nombre
+  }
+  const sufijo = Date.now()
+  const agricola = await alta(`E2E Trigal ${sufijo}`, 'agricola', 'trigo')
+  const vacio = await alta(`E2E Vacío ${sufijo}`, 'ganadera', null)
+
+  await entrar(page)
+  await page.goto('/hacienda')
+  const barra = page.getByRole('radiogroup', { name: 'Qué campo estás viendo' })
+  await barra.getByRole('radio', { name: new RegExp(agricola) }).click()
+  await expect(page.getByRole('heading', { name: `${agricola} es agrícola` })).toBeVisible()
+  await expect(page.getByText('Trigo')).toBeVisible()
+  await expect(page.getByPlaceholder('Buscá una caravana')).toHaveCount(0)
+
+  await barra.getByRole('radio', { name: new RegExp(vacio) }).click()
+  await expect(page.getByRole('heading', { name: `Todavía no cargaste la hacienda de ${vacio}` })).toBeVisible()
+  await page.getByRole('button', { name: /^Entraron/ }).first().click()
+  await expect(page.getByText('¿De dónde vienen?')).toBeVisible()
 })

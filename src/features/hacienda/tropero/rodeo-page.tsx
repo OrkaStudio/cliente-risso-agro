@@ -4,7 +4,10 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
-import { QueCampo } from '@/features/campos/que-campo'
+import { CampoVisto } from '@/features/campos/campo-visto'
+import { useCamposConPotreros } from '@/features/campos/hooks'
+import { caraSinHacienda } from './sin-hacienda'
+import { SinHacienda } from './sin-hacienda-vista'
 import { useAnimales, useBajas, useEventosSenales, usePotreros, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { categoriaNombre, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
@@ -92,6 +95,7 @@ export function RodeoPage() {
   const [params, setParams] = useSearchParams()
   const animales = useAnimales()
   const potreros = usePotreros()
+  const camposQ = useCamposConPotreros()
   const eventos = useEventosSenales()
   const elegido = useCampoElegido()
   const [especie, setEspecie] = useState<Vista>('todas')
@@ -165,6 +169,9 @@ export function RodeoPage() {
   const hayEspecies = (['bovino', 'ovino', 'equino'] as Especie[]).filter((e) => resumen.porEspecie[e] > 0)
   const especies = ESPECIES.filter((e) => (e.especie === 'todas' ? hayEspecies.length > 1 : e.especie === 'bovino' || resumen.porEspecie[e.especie] > 0))
   const vista: Vista = especie === 'todas' && hayEspecies.length <= 1 ? 'bovino' : especie
+  // Sin animales en lo que se mira (y sin historia que mostrar): una de dos caras, no un 0 y una tabla vacía.
+  const vacio = base.length === 0 && !potreroId && nSalieron === 0 && sinIdentificar === 0
+  const cara = caraSinHacienda(campoId ? (camposQ.data?.find((c) => c.id === campoId) ?? null) : null)
   const cuantosDe = (e: Vista) => (e === 'todas' ? resumen.total : resumen.porEspecie[e])
   const nombreVista = vista === 'todas' ? (r.total === 1 ? 'cabeza' : 'cabezas') : ESPECIES.find((e) => e.especie === vista)!.nombre.toLowerCase()
   const filtroActivo: Filtro | null = verSalieron ? 'salieron' : verSinIdentificar ? 'sinIdentificar' : estado
@@ -180,33 +187,9 @@ export function RodeoPage() {
   return (
     <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
       {especies.length > 1 && <h1 className="sr-only">Hacienda</h1>}
-      {/* Qué especie y qué campo */}
-      <motion.div {...entra(0)} className="flex flex-row-reverse flex-wrap items-end justify-between gap-4">
-        {especies.length > 1 ? (
-          <div role="tablist" aria-label="Especie" className="flex gap-1 rounded-full border border-borde bg-superficie p-1">
-            {especies.map((e) => (
-              <button
-                key={e.especie}
-                type="button"
-                role="tab"
-                aria-selected={vista === e.especie}
-                onClick={() => {
-                  setEspecie(e.especie)
-                  setCategoria('')
-                }}
-                className={cn(
-                  'inline-flex h-9 items-center gap-2 rounded-full px-4 text-[14px] font-bold transition-colors',
-                  vista === e.especie ? 'bg-tinta text-superficie' : 'text-texto hover:bg-superficie-hundida',
-                )}
-              >
-                <Icono nombre={e.icono} tamano={16} />
-                {e.nombre} {cuantosDe(e.especie)}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <h1 className="font-heading text-[22px] font-extrabold text-texto">Hacienda</h1>
-        )}
+      {/* Qué campo a la izquierda y qué especie a la derecha, siempre en una línea (Lau).
+          Si el ancho no alcanza, las especies muestran sólo su ícono y su número. */}
+      <motion.div {...entra(0)} className="@container flex items-end justify-between gap-3">
         {potreroFiltro ? (
           <button
             type="button"
@@ -218,12 +201,50 @@ export function RodeoPage() {
             <Icono nombre="Cerrar" tamano={16} />
           </button>
         ) : (
-          <QueCampo campos={elegido.campos} elegido={elegido.elegido} elegir={elegido.elegir} />
+          <CampoVisto campos={elegido.campos} elegido={elegido.elegido} />
+        )}
+        {especies.length > 1 ? (
+          <div role="tablist" aria-label="Especie" className="flex shrink-0 gap-0.5 rounded-full border border-borde bg-superficie p-1">
+            {especies.map((e) => (
+              <button
+                key={e.especie}
+                type="button"
+                role="tab"
+                aria-selected={vista === e.especie}
+                onClick={() => {
+                  setEspecie(e.especie)
+                  setCategoria('')
+                }}
+                aria-label={`${e.nombre} ${cuantosDe(e.especie)}`}
+                title={e.nombre}
+                className={cn(
+                  'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-bold whitespace-nowrap transition-colors',
+                  vista === e.especie ? 'bg-tinta text-superficie' : 'text-texto hover:bg-superficie-hundida',
+                )}
+              >
+                <Icono nombre={e.icono} tamano={16} />
+                <span className="hidden @[1040px]:inline">{e.nombre}</span>
+                <span className="cifra">{cuantosDe(e.especie)}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <h1 className="font-heading text-[22px] font-extrabold text-texto">Hacienda</h1>
         )}
       </motion.div>
 
       {/* El número del rodeo, de dónde y de qué está hecho, y lo que se hace: una sola tarjeta. */}
       <motion.section {...entra(1)} className="grid rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+        {vacio ? (
+          <SinHacienda
+            cara={cara}
+            campo={elegido.elegido?.nombre ?? null}
+            onEntraron={() => setEntradaSalida('entraron')}
+            onPlanilla={() => setPanelCaravanas('excel')}
+            onVerCampo={() => navigate('/campos')}
+          />
+        ) : (
+          <>
         <div className="flex flex-col gap-5 px-6 py-5">
         <div>
           <p className="flex items-baseline gap-3">
@@ -256,6 +277,7 @@ export function RodeoPage() {
         <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
+            data-guia="hacienda-entraron"
             onClick={() => setEntradaSalida('entraron')}
             className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
           >
@@ -276,6 +298,8 @@ export function RodeoPage() {
         <div className="flex items-center border-borde px-6 py-5 max-lg:border-t lg:border-l">
           <StockPorCategoria cats={r.porCategoria} total={r.total} />
         </div>
+          </>
+        )}
             {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), setEntradaSalida('entraron'))} />}
             {membresia?.empresa_id && (
               <>
@@ -330,6 +354,7 @@ export function RodeoPage() {
       )}
 
       {/* La lista */}
+      {!vacio && (
       <motion.section {...entra(3)} className="overflow-hidden rounded-[20px] border border-borde bg-superficie">
         {/* Filtrar: agrupado por intención (para atender, datos que faltan, los que ya no están). */}
         {(FILTROS.some((f) => r.porEstado[f.estado]) || sinIdentificar > 0 || nSalieron > 0) && (
@@ -463,6 +488,7 @@ export function RodeoPage() {
           </div>
         )}
       </motion.section>
+      )}
     </div>
   )
 }

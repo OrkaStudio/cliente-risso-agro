@@ -419,5 +419,7 @@ function htmlGuia(g: Guia): string {
   const mano =
     '<svg class="guia-mano" viewBox="-1 -1 26 26" width="46" height="46" overflow="visible"><path d="M10 13V3.5a1.5 1.5 0 0 1 3 0V10a1.5 1.5 0 0 1 3 0v.8a1.5 1.5 0 0 1 3 0V12a1.4 1.4 0 0 1 2.8 0v3.5a6.5 6.5 0 0 1-6.5 6.5h-1.8a6 6 0 0 1-4.6-2.2l-3.7-4.4a1.5 1.5 0 0 1 2.2-2L10 15.5Z" fill="#fbfaf6" stroke="#131b16" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 10v3M16 10.8v2.4M19 12v1.8" fill="none" stroke="#131b16" stroke-width="1.2" stroke-linecap="round"/></svg>'
   const texto = g.texto ? `<span class="guia-texto">${g.texto}</span>` : ''
-  return `<div class="guia guia--${g.tipo}"><span class="guia-onda"></span>${mano}${texto}</div>`
+  // Sin la mano (Lau, 02/11): sólo el punto que respira y, si hace falta, la etiqueta.
+  void mano
+  return `<div class="guia guia--${g.tipo}"><span class="guia-onda"></span>${texto}</div>`
 }

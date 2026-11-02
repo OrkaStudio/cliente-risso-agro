@@ -6,16 +6,20 @@ import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
-import { crearPotrero, type CampoConPotreros } from '@/features/campos/api'
+import { crearPotrero, eliminarCampo, eliminarPotrero, type CampoConPotreros } from '@/features/campos/api'
+import { elegirCampo } from '@/features/campos/campo-elegido'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
-import { buscarParcelaRural, parcelaEnPunto } from '@/features/lotes/catastro'
+import { parcelaEnPunto, parcelaPorPartida } from '@/features/lotes/catastro'
 import { asignarDibujo, campoDeUnSoloPotrero, corregirHectareasCampo, corregirHectareasPotrero, guardarBorde, terminarMapa } from '@/features/mapa/api'
 import { MapaTutorial, type Guia, type MapaTutorialApi, type ModoMapa } from '@/features/mapa/mapa-tutorial'
-import { Boleta, Buscador, Comparacion, ComoSeDibuja, Totales } from '@/features/mapa/piezas'
+import { Buscador, Comparacion, ComoSeDibuja, Partida, Totales } from '@/features/mapa/piezas'
 import { abrirSoporte } from '@/features/mapa/soporte'
 import {
   candidatos,
   compararBorde,
+  cuantoSeAleja,
+  dibujadoEn,
+  lejosDelAlta,
   esquinaDe,
   estadoDe,
   fueraDelBorde,
@@ -49,8 +53,11 @@ type Paso =
   // ===== El borde =====
   | { e: 'bienvenida' }
   | { e: 'encontrar'; buscando: boolean }
-  | { e: 'tocar'; buscando: boolean; aviso?: string }
-  | { e: 'parcela'; borde: LatLng[] }
+  /** `fallos`: cuántas veces no encontró su campo; a la segunda se ofrece marcarlo a mano. */
+  | { e: 'tocar'; buscando: boolean; aviso?: string; fallos?: number }
+  | { e: 'pregunta' }
+  /** Lo que trajo el catastro, para confirmar: de dónde vino, su partida y sus hectáreas. */
+  | { e: 'parcela'; borde: LatLng[]; partida: string; ha: number; origen: 'tocar' | 'partida'; fallos?: number }
   | { e: 'boleta' }
   | { e: 'marcar' }
   /** `corrigiendo`: el campo ya tenía borde y se lo está ajustando. */
@@ -87,7 +94,7 @@ export default function EditorCampo({
   mapa,
   campos,
   empresaId,
-  pendiente,
+  pendiente: pendienteAlEntrar,
   nota,
   onEmpezo,
   onSalir,
@@ -126,13 +133,19 @@ export default function EditorCampo({
   const [tamMapa, setTamMapa] = useState({ w: 0, h: 0 })
   const letra = colorDeCampo(mapa.colorIdx ?? 0).letra
 
-  const faltan = ordenar(mapa.potreros.filter((p) => !p.poligono))
-  const dibujados = ordenar(mapa.potreros.filter((p) => p.poligono))
+  // Un dibujo que quedó afuera del borde no cuenta: se pide de nuevo y no se muestra en otro lado.
+  const vistos = mapa.potreros.map((p) => (dibujadoEn(p, mapa.contorno) ? p : { ...p, poligono: null }))
+  const faltan = ordenar(vistos.filter((p) => !p.poligono))
+  const dibujados = ordenar(vistos.filter((p) => p.poligono))
   const de = (id: string) => mapa.potreros.find((p) => p.id === id)
   const fino = (id: string) => campo.potreros.find((p) => p.id === id)
   const esBA = mapa.provincia.includes('Buenos Aires')
   const siguienteCampo = campos.find((c) => c.id !== mapa.id && estadoDe(c).tipo !== 'listo')
   // El asistente acompaña mientras el campo se arma (o falta terminar el mapa); después, sólo la pista.
+  // Arrancó trabando la app: sigue siendo el tutorial hasta el cierre, aunque al dibujar
+  // el último potrero el bloqueo (que se calcula con los campos) ya se haya levantado.
+  const [enTutorial] = useState(pendienteAlEntrar)
+  const pendiente = pendienteAlEntrar || enTutorial
   const guiado = pendiente || estadoDe(mapa).tipo !== 'listo'
   // La primera vez que lo ve, el asistente se presenta en la bienvenida (una vez por persona, no por campo).
   const presentarse = usePendiente('presentacion')
@@ -146,12 +159,26 @@ export default function EditorCampo({
     return () => ro.disconnect()
   }, [])
 
+  // Los pasos del borde se recuerdan para poder volver (Lau, 02/11: «encontré la partida»).
+  const atras = useRef<Paso[]>([])
+  const BORDE = ['bienvenida', 'pregunta', 'encontrar', 'tocar', 'parcela', 'boleta', 'marcar']
   function ir(p: Paso) {
     setVerNota(false)
     setError(null)
     setPuntos(0)
+    if (BORDE.includes(paso.e) && p.e !== paso.e) atras.current.push(paso)
+    else if (!BORDE.includes(p.e) && p.e !== 'borde-listo') atras.current = []
     setPaso(p)
   }
+  function volver() {
+    const anterior = atras.current.pop()
+    if (!anterior) return
+    setVerNota(false)
+    setError(null)
+    setPuntos(0)
+    setPaso(anterior.e === 'tocar' ? { e: 'tocar', buscando: false, fallos: anterior.fallos } : anterior)
+  }
+  const puedeVolver = atras.current.length > 0 && (BORDE.includes(paso.e) || (paso.e === 'borde-listo' && !paso.corrigiendo))
   async function correr(fn: () => Promise<void>) {
     setOcupado(true)
     setError(null)
@@ -180,6 +207,30 @@ export default function EditorCampo({
     }
   }
   const enfocar = (p: LatLng[] | null | undefined) => p && api.current?.encuadrar(p)
+
+  // Salidas del «primero el mapa» (QA 30/10): sin ellas, un campo sumado por error o un
+  // potrero que ya no existe dejaban la app trabada. Sólo sin hacienda: con animales es real.
+  const sinHacienda = mapa.potreros.every((p) => p.cabezas === 0)
+  function sacarCampo() {
+    void intentar(
+      async () => {
+        await eliminarCampo(mapa.id)
+        elegirCampo(null)
+        await qc.invalidateQueries()
+      },
+      () => navigate('/campos', { replace: true }),
+    )
+  }
+  function sacarPotrero(id: string) {
+    void intentar(
+      async () => {
+        await eliminarPotrero(id)
+        await qc.invalidateQueries()
+      },
+      // Era el último que faltaba: el campo quedó listo, al cierre (abre la app si era lo único).
+      () => faltan.length === 1 && faltan[0]!.id === id && mapa.contorno && ir({ e: 'cierre' }),
+    )
+  }
 
   // ===== Lo que llega del mapa =====
 
@@ -213,15 +264,16 @@ export default function EditorCampo({
   }
 
   async function alTocar(lat: number, lng: number) {
-    if (paso.e === 'tocar' || paso.e === 'parcela') {
-      setPaso({ e: 'tocar', buscando: true })
+    if (paso.e === 'tocar' || (paso.e === 'parcela' && paso.origen === 'tocar')) {
+      const fallos = paso.fallos ?? 0
+      setPaso({ e: 'tocar', buscando: true, fallos })
       try {
         const p = await parcelaEnPunto(lat, lng)
-        if (!p) return setPaso({ e: 'tocar', buscando: false, aviso: 'Ahí no hay una parcela del catastro. Tocá más adentro del campo.' })
+        if (!p) return setPaso({ e: 'tocar', buscando: false, fallos: fallos + 1, aviso: 'Ahí no hay una parcela del catastro. Tocá más adentro del campo.' })
         enfocar(p.anillo as LatLng[])
-        setPaso({ e: 'parcela', borde: p.anillo as LatLng[] })
+        setPaso({ e: 'parcela', borde: p.anillo as LatLng[], partida: p.partida, ha: p.areaHa, origen: 'tocar', fallos })
       } catch (e) {
-        setPaso({ e: 'tocar', buscando: false, aviso: e instanceof Error ? e.message : 'No pudimos buscar la parcela.' })
+        setPaso({ e: 'tocar', buscando: false, fallos: fallos + 1, aviso: e instanceof Error ? e.message : 'No pudimos buscar la parcela.' })
       }
       return
     }
@@ -305,7 +357,7 @@ export default function EditorCampo({
   // ===== El mapa, según el paso =====
 
   const sel = 'id' in paso && paso.id ? de(paso.id) : undefined
-  const etapaBorde = ['bienvenida', 'encontrar', 'tocar', 'parcela', 'boleta', 'marcar', 'borde-listo'].includes(paso.e)
+  const etapaBorde = ['bienvenida', 'pregunta', 'encontrar', 'tocar', 'parcela', 'boleta', 'marcar', 'borde-listo'].includes(paso.e)
   const modo: ModoMapa =
     paso.e === 'tocar' || paso.e === 'parcela'
       ? 'tocar'
@@ -350,7 +402,8 @@ export default function EditorCampo({
         : (paso.e === 'tocar' && !paso.buscando) || (paso.e === 'marcar' && puntos === 0) || primerDibujo
           ? 'tocar'
           : null
-  const guia = useMemo<Guia | null>(() => (gesto ? { tipo: gesto, en: primerDibujo ? esquina! : undefined } : null), [gesto, primerDibujo, esquina])
+  // Sin la mano sobre el mapa (Lau, 02/11): la indicación la dicen la franja de arriba y la tarjeta.
+  const guia = useMemo<Guia | null>(() => (gesto && primerDibujo && esquina ? { tipo: gesto, en: esquina } : null), [gesto, primerDibujo, esquina])
 
   // Dónde cae en pantalla la esquina que señala la mano: se vuelve a medir cuando el mapa se mueve.
   const [ptEsquina, setPtEsquina] = useState<{ x: number; y: number } | null>(null)
@@ -375,14 +428,15 @@ export default function EditorCampo({
       case 'bienvenida':
         return boton('empezar', '¡Hola! Te acompaño a armar tu campo: son tres pasos.')
       case 'encontrar':
-        if (paso.buscando) return boton('buscador', 'Escribí un camino o un paraje que conozcas.')
-        return movido ? boton('ya-lo-veo', '¿Ves tus alambrados? Seguí.') : [punto(), 'Arrastrá el mapa hasta ver tu campo.']
+        return movido ? boton('ya-lo-veo', '¿Ves tus alambrados? Marcá el borde.') : boton('buscador', 'Escribí un paraje o pueblo cercano.')
       case 'tocar':
-        return paso.buscando ? [{ tipo: 'tarjeta' }, null] : [punto(), `${verbo} adentro de tu campo.`]
+        return paso.buscando ? [{ tipo: 'tarjeta' }, null] : movido ? [punto(), `${verbo} adentro de tu campo.`] : boton('buscador', 'Escribí un paraje o pueblo cercano, o buscalo en el mapa.')
       case 'parcela':
-        return boton('es-este', 'Si es tu campo, confirmalo.')
+        return boton('es-este', paso.origen === 'tocar' ? '¿Es el tuyo, o el del vecino?' : '¿Es tu campo?')
+      case 'pregunta':
+        return [{ tipo: 'tarjeta' }, null]
       case 'boleta':
-        return boton('boleta', 'Los números están arriba a la izquierda de la boleta.')
+        return boton('boleta', 'El número de partida está arriba en la boleta.')
       case 'marcar':
         if (puntos === 0) return [punto(), 'Empezá por una esquina del alambrado.']
         return movil ? arriba('Seguí el alambrado y cerrá en el primer punto.') : [{ tipo: 'tarjeta' }, null]
@@ -448,7 +502,7 @@ export default function EditorCampo({
       className="size-full"
       centro={{ lat: mapa.lat ?? -35.57, lon: mapa.lon ?? -58.0, zoom: 14 }}
       contorno={contorno}
-      potreros={mapa.potreros}
+      potreros={vistos}
       foco={!etapaBorde && !!mapa.contorno}
       pueblo={(paso.e === 'bienvenida' || paso.e === 'encontrar' || paso.e === 'tocar') && mapa.lat != null && mapa.lon != null && mapa.localidad ? { lat: mapa.lat, lon: mapa.lon, nombre: mapa.localidad } : null}
       relleno={movil ? {} : { derecha: 400 }}
@@ -494,7 +548,7 @@ export default function EditorCampo({
       </div>
       <aside
         className={cn(
-          'z-[600] flex flex-col gap-4 overflow-y-auto bg-superficie p-5',
+          'z-[600] flex flex-col gap-4 overflow-y-auto overscroll-contain bg-superficie p-5 pb-0',
           movil ? 'relative min-h-0 flex-1' : 'absolute top-3 right-3 max-h-[calc(100%-24px)] w-[380px] rounded-[22px] shadow-[0_12px_40px_rgba(19,27,22,0.22)]',
         )}
       >
@@ -506,13 +560,20 @@ export default function EditorCampo({
         )}
         {/* El lugar del asistente: arriba de la tarjeta, que es su voz. */}
         {guiado && (
-          <div className="flex items-center gap-3">
+          // Fijo arriba: el asistente (y su ayuda) no se van con el scroll de la tarjeta.
+          <div className="sticky -top-5 z-10 -mx-5 -mt-5 flex items-center gap-3 bg-superficie px-5 pt-5 pb-2 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-6 after:bg-gradient-to-b after:from-superficie after:to-transparent">
             <span data-acompana="dock" aria-hidden className="size-16 shrink-0 rounded-full bg-[radial-gradient(circle,rgba(169,85,44,0.18)_0%,rgba(169,85,44,0)_68%)]" />
             <div className="flex min-w-0 flex-col">
               <span className="text-[14px] font-bold text-texto">Asistente de Tropero</span>
               <span className="text-[13.5px] text-texto-suave">Tocame si tenés una duda</span>
             </div>
           </div>
+        )}
+        {puedeVolver && (
+          <button type="button" onClick={volver} className="-mb-1 inline-flex h-9 items-center gap-1.5 self-start rounded-full border-[1.5px] border-borde bg-superficie pr-4 pl-3 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
+            <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
+            Volver
+          </button>
         )}
         {etapaBorde && paso.e !== 'bienvenida' && !(paso.e === 'borde-listo' && paso.corrigiendo) && <Progreso n={paso.e === 'encontrar' ? 1 : 2} texto={paso.e === 'encontrar' ? 'encontrar el campo' : 'el borde'} />}
 
@@ -531,47 +592,28 @@ export default function EditorCampo({
               data-acompana="empezar"
               onClick={() => {
                 if (presentarse) marcarVista('presentacion')
-                ir({ e: 'encontrar', buscando: false })
+                // En Buenos Aires, primero el número de partida: es exacto. Si no, se busca en el mapa.
+                ir(esBA ? { e: 'pregunta' } : { e: 'encontrar', buscando: false })
               }}
             >
               Empezar
             </BotonPrincipal>
+            {guiado && sinHacienda && <SacarCampo nombre={mapa.nombre} ocupado={ocupado} onSacar={sacarCampo} />}
           </Tarjeta>
         )}
 
         {paso.e === 'encontrar' && (
-          <Tarjeta
-            titulo={paso.buscando ? '¿Te ayudamos a encontrarlo?' : 'Encontrá tu campo'}
-            texto={
-              paso.buscando
-                ? 'Escribí un camino o un paraje que conozcas, y el mapa va ahí.'
-                : mapa.lat != null
-                  ? `El mapa arranca en ${mapa.localidad ?? 'el pueblo de tu campo'}, el pueblo que pusiste en el alta. Arrastralo hacia tu campo y acercate hasta ver los alambrados.`
-                  : 'No sabemos el pueblo del campo. Buscá un camino o un paraje que conozcas.'
-            }
-          >
-            {paso.buscando && (
-              <div data-acompana="buscador">
-                <Buscador abierto className="" cerca={mapa.lat != null && mapa.lon != null ? { lat: mapa.lat, lon: mapa.lon } : undefined} onElegir={(l) => api.current?.irA(l.lat, l.lon, 15)} />
-              </div>
-            )}
-            <BotonPrincipal icono="Siguiente" data-acompana="ya-lo-veo" onClick={() => ir(esBA ? { e: 'tocar', buscando: false } : { e: 'marcar' })}>
-              Ya lo veo
+          <Tarjeta titulo="Buscá tu campo" texto="Escribí un paraje, un pueblo o una ruta cercana y acercate hasta ver los alambrados.">
+            <div data-acompana="buscador"><Buscador abierto={false} className="" cerca={mapa.lat != null && mapa.lon != null ? { lat: mapa.lat, lon: mapa.lon } : undefined} onElegir={(l) => api.current?.irA(l.lat, l.lon, 15)} /></div>
+            <BotonPrincipal icono="Editar" data-acompana="ya-lo-veo" onClick={() => ir({ e: 'marcar' })}>
+              Marcar el borde
             </BotonPrincipal>
-            {paso.buscando ? (
-              <BotonChico type="button" className="self-start" onClick={() => ir({ e: 'marcar' })}>
-                Seguir sin encontrarlo
-              </BotonChico>
-            ) : (
-              <BotonChico type="button" icono="Buscar" className="self-start" onClick={() => setPaso({ e: 'encontrar', buscando: true })}>
-                ¿No lo encontrás? Buscá un camino
-              </BotonChico>
-            )}
           </Tarjeta>
         )}
 
         {paso.e === 'tocar' && (
-          <Tarjeta titulo={movil ? 'Tocá tu campo' : 'Hacé clic en tu campo'} texto="Traemos el borde del catastro, como figura en la boleta.">
+          <Tarjeta titulo="Buscá tu campo y tocalo" texto={`Escribí un paraje, un pueblo o una ruta cercana. Cuando veas tu campo, ${movil ? 'tocá' : 'hacé clic'} adentro: traemos su parcela del catastro.`}>
+            <div data-acompana="buscador"><Buscador abierto={false} className="" cerca={mapa.lat != null && mapa.lon != null ? { lat: mapa.lat, lon: mapa.lon } : undefined} onElegir={(l) => api.current?.irA(l.lat, l.lon, 15)} /></div>
             {paso.buscando && (
               <div role="status" className="flex items-center gap-3 rounded-[16px] bg-superficie-hundida px-4 py-3">
                 <span className="size-5 animate-spin rounded-full border-2 border-principal/25 border-t-principal" />
@@ -579,49 +621,67 @@ export default function EditorCampo({
               </div>
             )}
             {paso.aviso && <Aviso tipo="atencion" icono="Ayuda" titulo={paso.aviso} />}
-            <div className="flex flex-wrap gap-2">
-              <BotonChico type="button" icono="Editar" onClick={() => ir({ e: 'marcar' })}>
-                Lo marco a mano
+            {/* Recién si no lo encuentra dos veces: marcarlo a mano. */}
+            {(paso.fallos ?? 0) >= 2 && (
+              <BotonChico type="button" icono="Editar" className="self-start" onClick={() => ir({ e: 'marcar' })}>
+                No aparece: lo marco a mano
               </BotonChico>
-              <BotonChico type="button" icono="Comprobante" onClick={() => ir({ e: 'boleta' })}>
-                Tengo la boleta
-              </BotonChico>
-            </div>
+            )}
           </Tarjeta>
         )}
 
         {paso.e === 'parcela' && (
-          <Tarjeta titulo="¿Es este tu campo?">
+          <Tarjeta
+            titulo="¿Es tu campo?"
+            texto={`Es la parcela del catastro${paso.partida ? ` de la partida ${paso.partida.replace('-', '\u2011')}` : ''}, de ${haTexto(paso.ha || ha(paso.borde))} ha. Fijate en el mapa que el borde siga tu alambrado.`}
+          >
             <Comparacion medido={ha(paso.borde)} alta={mapa.hectareas} comp={compararBorde(ha(paso.borde), mapa.hectareas)} />
             <BotonPrincipal icono="Guardar" data-acompana="es-este" onClick={() => ir({ e: 'borde-listo', borde: paso.borde, ajustando: false })}>
-              Sí, es este
+              Sí, es mi campo
             </BotonPrincipal>
-            <p className="text-[14px] text-texto-suave">¿No es? {movil ? 'Tocá' : 'Hacé clic en'} otra parte del mapa.</p>
-            <BotonChico type="button" icono="Editar" className="self-start" onClick={() => ir({ e: 'marcar' })}>
-              Lo marco a mano
+            <BotonChico
+              type="button"
+              icono="Reintentar"
+              data-acompana="no-es"
+              className="self-start"
+              onClick={() =>
+                paso.origen === 'tocar'
+                  ? ir({ e: 'tocar', buscando: false, fallos: (paso.fallos ?? 0) + 1, aviso: 'Tocá bien adentro de tu campo, lejos del alambrado.' })
+                  : ir({ e: 'boleta' })
+              }
+            >
+              {paso.origen === 'tocar' ? 'No, toco otra' : 'No, reviso el número'}
             </BotonChico>
           </Tarjeta>
         )}
 
+        {paso.e === 'pregunta' && (
+          <Tarjeta titulo="¿Tenés a mano la boleta de ARBA?" texto="La del Inmobiliario Rural. Con su número traemos tu campo exacto.">
+            <div className="flex flex-col gap-2.5">
+              <Opcion icono="Comprobante" titulo="Sí, la tengo" texto="Escribís el número de partida" data-acompana="con-boleta" onClick={() => ir({ e: 'boleta' })} />
+              <Opcion icono="Buscar" titulo="No" texto="Lo buscás en el mapa y lo tocás" onClick={() => ir({ e: 'tocar', buscando: false })} />
+            </div>
+          </Tarjeta>
+        )}
+
         {paso.e === 'boleta' && (
-          <Tarjeta titulo="Copiá los números de la boleta">
+          <Tarjeta titulo="Tu número de partida" texto="Está en la boleta del Inmobiliario Rural de ARBA. Con eso traemos tu campo exacto.">
             <div data-acompana="boleta" className="flex flex-col gap-4">
-              <Boleta
+              <Partida
                 ocupado={ocupado}
                 error={error}
-                onTraer={(datos) =>
+                onTraer={(d) =>
                   void intentar(
                     async () => {
-                      const res = await buscarParcelaRural(datos)
-                      if (!res.length) throw new Error('No encontramos esa parcela. Revisá los números o marcala en el mapa.')
-                      const borde = res[0]!.anillo as LatLng[]
-                      enfocar(borde)
-                      ir({ e: 'borde-listo', borde, ajustando: false })
+                      const p = await parcelaPorPartida(d.partido, d.partida)
+                      if (!p) throw new Error('No encontramos esa partida en el catastro. Revisá los números, o buscá tu campo en el mapa.')
+                      enfocar(p.anillo as LatLng[])
+                      setPaso({ e: 'parcela', borde: p.anillo as LatLng[], partida: p.partida, ha: p.areaHa, origen: 'partida' })
                     },
                     () => {},
                   )
                 }
-                onAMano={() => ir({ e: 'marcar' })}
+                onSinBoleta={error ? () => ir({ e: 'tocar', buscando: false }) : null}
               />
             </div>
           </Tarjeta>
@@ -633,9 +693,6 @@ export default function EditorCampo({
             <div className="flex flex-wrap gap-2">
               <BotonChico type="button" icono="Reintentar" disabled={puntos === 0} onClick={() => api.current?.deshacer()}>
                 Deshacer
-              </BotonChico>
-              <BotonChico type="button" disabled={puntos === 0} onClick={() => api.current?.reiniciar()}>
-                Empezar de nuevo
               </BotonChico>
             </div>
           </Tarjeta>
@@ -695,6 +752,8 @@ export default function EditorCampo({
             onElegir={(id) => (enfocar(de(id)?.poligono), ir({ e: 'potrero', id }))}
             onCorregirBorde={mapa.contorno ? () => ir({ e: 'borde-listo', borde: mapa.contorno!, ajustando: true, altaCorregida: true, corrigiendo: true }) : null}
             onSalir={onSalir}
+            onSacarPotrero={guiado ? sacarPotrero : null}
+            sacarCampo={guiado && sinHacienda ? <SacarCampo nombre={mapa.nombre} ocupado={ocupado} onSacar={sacarCampo} /> : null}
           />
         )}
 
@@ -747,12 +806,26 @@ export default function EditorCampo({
         {paso.e === 'confirmar' && sel && (
           <Tarjeta titulo={`¿Es el ${sel.nombre}?`} texto={`Dibujaste ${haTexto(ha(paso.dibujo))} ha y en el alta pusiste ${haTexto(sel.hectareas ?? 0)}. Revisá que hayas seguido el alambrado.`}>
             {problema}
-            <BotonPrincipal icono="Guardar" data-acompana="confirmar" cargando={ocupado} disabled={ocupado} onClick={() => void guardarDibujo(sel.id, paso.dibujo, true)}>
-              {ocupado ? 'Guardando…' : `Sí, mide ${haTexto(ha(paso.dibujo))} ha`}
-            </BotonPrincipal>
-            <BotonChico type="button" icono="Reintentar" className="self-start" disabled={ocupado} onClick={() => ir({ e: 'dibujar', id: sel.id })}>
-              Lo dibujo de nuevo
-            </BotonChico>
+            {lejosDelAlta(ha(paso.dibujo), sel.hectareas) ? (
+              <>
+                <p className="text-[14.5px] text-texto">Es {cuantoSeAleja(ha(paso.dibujo), sel.hectareas!)}: lo más probable es que el dibujo no siga el alambrado.</p>
+                <BotonPrincipal icono="Reintentar" data-acompana="confirmar" disabled={ocupado} onClick={() => ir({ e: 'dibujar', id: sel.id })}>
+                  Lo dibujo de nuevo
+                </BotonPrincipal>
+                <BotonChico type="button" className="self-start" disabled={ocupado} onClick={() => void guardarDibujo(sel.id, paso.dibujo, true)}>
+                  Mide {haTexto(ha(paso.dibujo))} ha: corregir el alta
+                </BotonChico>
+              </>
+            ) : (
+              <>
+                <BotonPrincipal icono="Guardar" data-acompana="confirmar" cargando={ocupado} disabled={ocupado} onClick={() => void guardarDibujo(sel.id, paso.dibujo, true)}>
+                  {ocupado ? 'Guardando…' : `Sí, mide ${haTexto(ha(paso.dibujo))} ha`}
+                </BotonPrincipal>
+                <BotonChico type="button" icono="Reintentar" className="self-start" disabled={ocupado} onClick={() => ir({ e: 'dibujar', id: sel.id })}>
+                  Lo dibujo de nuevo
+                </BotonChico>
+              </>
+            )}
           </Tarjeta>
         )}
 
@@ -870,6 +943,8 @@ export default function EditorCampo({
         {paso.e === 'cierre' && (
           <Cierre campo={mapa} campos={campos} siguiente={siguienteCampo ?? null} pendiente={pendiente} ocupado={ocupado} problema={problema} onSeguir={onSeguirCon} onAbrir={() => void abrirLaApp()} onSalir={onSalir} />
         )}
+        {/* Si hay más abajo, la tarjeta se desvanece en vez de cortarse (Lau, 02/11). */}
+        <div aria-hidden className="pointer-events-none sticky bottom-0 -mx-5 -mt-4 h-8 shrink-0 bg-gradient-to-t from-superficie via-superficie/80 to-transparent" />
       </aside>
       <Acompanante
         raiz={raiz}
@@ -886,6 +961,27 @@ export default function EditorCampo({
 }
 
 // ===== Piezas =====
+
+/** Una de las dos respuestas grandes de una pregunta. */
+function Opcion({ icono, titulo, texto, onClick, ...resto }: { icono: 'Comprobante' | 'Buscar'; titulo: string; texto: string; onClick: () => void; 'data-acompana'?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      {...resto}
+      className="group flex items-center gap-4 rounded-[18px] border-[1.5px] border-borde bg-superficie p-4 text-left transition-colors hover:border-principal hover:bg-principal-suave/40"
+    >
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-principal-suave text-principal">
+        <Icono nombre={icono} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[17px] font-bold text-texto">{titulo}</span>
+        <span className="block text-[14px] text-texto-suave">{texto}</span>
+      </span>
+      <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave transition-transform group-hover:translate-x-0.5 group-hover:text-principal" />
+    </button>
+  )
+}
 
 function Tarjeta({ titulo, texto, children }: { titulo: string; texto?: string; children: React.ReactNode }) {
   return (
@@ -926,6 +1022,61 @@ function FilaPotrero({ p, onClick }: { p: PotreroM; onClick: () => void }) {
   )
 }
 
+/** Un potrero que falta dibujar, con la salida «ya no existe» (confirmada) al lado. */
+function FilaFalta({ p, onDibujar, onSacar }: { p: PotreroM; onDibujar: () => void; onSacar: () => void }) {
+  const [seguro, setSeguro] = useState(false)
+  if (seguro)
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-[14px] border-[1.5px] border-estado-atencion/40 bg-estado-atencion-suave/40 px-4 py-2.5">
+        <span className="min-w-0 flex-1 text-[14px] text-texto">
+          ¿Sacar el <b>{p.nombre}</b> de la lista? No tiene hacienda.
+        </span>
+        <BotonChico type="button" onClick={onSacar}>
+          Sí, sacarlo
+        </BotonChico>
+        <BotonChico type="button" onClick={() => setSeguro(false)}>
+          No
+        </BotonChico>
+      </div>
+    )
+  return (
+    <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <FilaPotrero p={p} onClick={onDibujar} />
+      </div>
+      <button type="button" onClick={() => setSeguro(true)} aria-label={`El ${p.nombre} ya no existe`} className="shrink-0 px-1 text-[13px] font-semibold text-texto-suave hover:text-principal hover:underline">
+        Ya no existe
+      </button>
+    </div>
+  )
+}
+
+/** Un campo sumado por error, sin hacienda: se saca (con confirmación) en vez de dejar la app trabada. */
+function SacarCampo({ nombre, ocupado, onSacar }: { nombre: string; ocupado: boolean; onSacar: () => void }) {
+  const [seguro, setSeguro] = useState(false)
+  if (!seguro)
+    return (
+      <button type="button" onClick={() => setSeguro(true)} className="self-start text-[13.5px] font-semibold text-texto-suave hover:text-principal hover:underline">
+        Sumé este campo por error: sacarlo
+      </button>
+    )
+  return (
+    <div className="flex flex-col gap-2 rounded-[14px] border-[1.5px] border-estado-atencion/40 bg-estado-atencion-suave/40 p-3">
+      <p className="text-[14px] text-texto">
+        ¿Sacar <b>{nombre}</b>? Se borran sus potreros. No tiene hacienda.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <BotonChico type="button" disabled={ocupado} onClick={onSacar}>
+          Sí, sacar {nombre}
+        </BotonChico>
+        <BotonChico type="button" onClick={() => setSeguro(false)}>
+          No
+        </BotonChico>
+      </div>
+    </div>
+  )
+}
+
 function Inicio({
   campo,
   faltan,
@@ -934,6 +1085,8 @@ function Inicio({
   onElegir,
   onCorregirBorde,
   onSalir,
+  onSacarPotrero,
+  sacarCampo,
 }: {
   campo: CampoMapa
   faltan: PotreroM[]
@@ -942,6 +1095,9 @@ function Inicio({
   onElegir: (id: string) => void
   onCorregirBorde: (() => void) | null
   onSalir: (() => void) | null
+  /** El potrero del alta ya no existe (lo unieron, se cargó de más): se saca de la lista. */
+  onSacarPotrero: ((id: string) => void) | null
+  sacarCampo: React.ReactNode
 }) {
   const total = faltan.length + dibujados.length
   return (
@@ -957,9 +1113,13 @@ function Inicio({
           </BotonPrincipal>
           <section className="flex flex-col gap-2" aria-label="Faltan dibujar">
             <h3 className="text-[13px] font-bold text-texto-suave">{dibujados.length ? 'Faltan' : 'Los que cargaste en el alta'}</h3>
-            {faltan.map((p) => (
-              <FilaPotrero key={p.id} p={p} onClick={() => onDibujar(p.id)} />
-            ))}
+            {faltan.map((p) =>
+              onSacarPotrero && p.cabezas === 0 ? (
+                <FilaFalta key={p.id} p={p} onDibujar={() => onDibujar(p.id)} onSacar={() => onSacarPotrero(p.id)} />
+              ) : (
+                <FilaPotrero key={p.id} p={p} onClick={() => onDibujar(p.id)} />
+              ),
+            )}
           </section>
         </>
       )}
@@ -986,6 +1146,7 @@ function Inicio({
           Listo, volver al campo
         </BotonPrincipal>
       )}
+      {faltan.length > 0 && sacarCampo}
     </Tarjeta>
   )
 }
@@ -1184,6 +1345,7 @@ function BordeListo({
   const ha = haRedondo(hectareasDe(borde))
   const comp = compararBorde(ha, alta)
   const trabado = comp === 'muy-distinto'
+  const lejos = trabado && lejosDelAlta(ha, alta)
   return (
     <Tarjeta titulo={`${nombre} mide unas ${haTexto(ha)} ha`}>
       {ajustando ? (
@@ -1191,10 +1353,19 @@ function BordeListo({
       ) : (
         <Comparacion medido={ha} alta={alta} comp={comp} />
       )}
+      {lejos && !ajustando && !corrigiendo && (
+        <p className="text-[14.5px] text-texto">
+          Es {cuantoSeAleja(ha, alta!)}. Lo más probable es que el borde no siga el alambrado: ajustalo antes de cambiar el alta.
+        </p>
+      )}
       {problema}
       {ajustando && !corrigiendo ? (
         <BotonPrincipal icono="Guardar" onClick={() => onAjustar(false)}>
           Listo, así queda
+        </BotonPrincipal>
+      ) : lejos && !corrigiendo ? (
+        <BotonPrincipal icono="Editar" data-acompana="ajustar-borde" onClick={() => onAjustar(true)}>
+          Ajustar el borde
         </BotonPrincipal>
       ) : trabado && !corrigiendo ? (
         <BotonPrincipal icono="Guardar" data-acompana="corregir-alta" cargando={ocupado} disabled={ocupado} onClick={onCorregirAlta}>
@@ -1206,10 +1377,16 @@ function BordeListo({
         </BotonPrincipal>
       )}
       <div className="flex flex-wrap gap-2">
-        {!ajustando && (
-          <BotonChico type="button" icono="Editar" onClick={() => onAjustar(true)}>
-            Ajustar el borde
+        {lejos && !ajustando && !corrigiendo ? (
+          <BotonChico type="button" disabled={ocupado} onClick={onCorregirAlta}>
+            Mide {haTexto(ha)} ha: corregir el alta
           </BotonChico>
+        ) : (
+          !ajustando && (
+            <BotonChico type="button" icono="Editar" onClick={() => onAjustar(true)}>
+              Ajustar el borde
+            </BotonChico>
+          )
         )}
         {onCancelar ? (
           <BotonChico type="button" onClick={onCancelar}>
@@ -1251,6 +1428,7 @@ function Cual({
   const sel = cs.find((c) => c.id === elegido)
   const comp = sel?.hectareas ? compararBorde(ha, sel.hectareas) : null
   const noCuadra = comp === 'muy-distinto'
+  const lejos = noCuadra && lejosDelAlta(ha, sel?.hectareas ?? null)
   return (
     <Tarjeta titulo="¿Cuál de estos es?" texto={`Lo que dibujaste mide unas ${haTexto(ha)} ha.${dos ? ' Hay dos de tamaño parecido: mirá qué tiene cada uno.' : ''}`}>
       <div role="radiogroup" aria-label="Qué potrero es" className="flex flex-col gap-2" data-acompana={sel ? undefined : 'cual'}>
@@ -1277,7 +1455,16 @@ function Cual({
       </div>
       {sel && comp && <Comparacion medido={ha} alta={sel.hectareas} comp={comp} revisar={`Revisá que hayas seguido el alambrado del ${sel.nombre}. Si mide eso, corregimos el alta.`} />}
       {problema}
-      {sel ? (
+      {sel && lejos && (
+        <p className="text-[14.5px] text-texto">
+          Es {cuantoSeAleja(ha, sel.hectareas!)} para el {sel.nombre}. Lo más probable es que el dibujo no siga el alambrado.
+        </p>
+      )}
+      {sel && lejos ? (
+        <BotonPrincipal icono="Reintentar" data-acompana="cual" disabled={ocupado} onClick={onRedibujar}>
+          Lo dibujo de nuevo
+        </BotonPrincipal>
+      ) : sel ? (
         <BotonPrincipal icono="Siguiente" data-acompana="cual" cargando={ocupado} disabled={ocupado} onClick={() => onEs(sel.id, noCuadra)}>
           {ocupado ? 'Guardando…' : noCuadra ? `Sí, el ${sel.nombre} mide ${haTexto(ha)} ha: lo corrijo` : `Es el ${sel.nombre}`}
         </BotonPrincipal>
@@ -1285,11 +1472,17 @@ function Cual({
         <p className="text-[14px] font-semibold text-texto-suave">Elegí uno para seguir</p>
       )}
       <div className="flex flex-wrap gap-2">
+        {sel && lejos ? (
+          <BotonChico type="button" disabled={ocupado} onClick={() => onEs(sel.id, true)}>
+            El {sel.nombre} mide {haTexto(ha)} ha: corregir el alta
+          </BotonChico>
+        ) : (
+          <BotonChico type="button" icono="Reintentar" onClick={onRedibujar}>
+            Lo dibujo de nuevo
+          </BotonChico>
+        )}
         <BotonChico type="button" onClick={onNuevo}>
           No está en la lista: es uno nuevo
-        </BotonChico>
-        <BotonChico type="button" icono="Reintentar" onClick={onRedibujar}>
-          Lo dibujo de nuevo
         </BotonChico>
       </div>
     </Tarjeta>

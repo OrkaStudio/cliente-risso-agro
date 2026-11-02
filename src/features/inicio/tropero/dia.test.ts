@@ -83,7 +83,7 @@ describe('por dónde va el mapa', () => {
     lon: null,
     hectareas: 100,
     contorno: contorno ? ([[0, 0], [0, 1], [1, 1]] as [number, number][]) : null,
-    potreros: potreros.map((d, i) => ({ id: `${i}`, nombre: `${i}A`, hectareas: 10, poligono: d ? ([[0, 0]] as [number, number][]) : null, cabezas: 0, que: '' })),
+    potreros: potreros.map((d, i) => ({ id: `${i}`, nombre: `${i}A`, hectareas: 10, poligono: d ? ([[0, 0], [0, 1], [1, 1]] as [number, number][]) : null, cabezas: 0, que: '' })),
   })
   it('dice el campo, el paso y los minutos', () => {
     expect(porDondeVaElMapa([c('La Porteña', false, [false, false, false]), c('Los Pampas', false, [false, false])])).toBe(

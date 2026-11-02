@@ -1,13 +1,14 @@
-import { useCallback, useSyncExternalStore } from 'react'
-import { useCampoClima } from '@/features/cotizaciones/campo-clima'
+import { useEffect, useSyncExternalStore } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 
 /**
- * Qué campo mira la Oficina (Inicio, Hacienda): uno, o todos juntos. Con un solo campo no hay nada
- * que elegir. Se recuerda en este dispositivo. Elegir un campo también lleva el
- * clima a ese campo (la barra de arriba y el panel dicen lo mismo).
+ * Qué campo mira la Oficina: uno, o todos juntos. Se elige sólo desde la barra
+ * izquierda y es el primer filtro de todas las pantallas (Lau, 29/10): Inicio,
+ * Hacienda, Campos, Plata, Agenda y el clima de arriba. Con un solo campo no hay
+ * nada que elegir. Se recuerda en este dispositivo.
  */
 const CLAVE = 'inicio-campo-id' // el nombre viejo se conserva: no se pierde lo elegido
 const TODOS = 'todos'
@@ -20,6 +21,17 @@ function leer(): string | null {
     return null
   }
 }
+/** El id elegido tal como está guardado (`'todos'`, un id o nada), para quien no necesita los campos. */
+export function useCampoElegidoId(): string | null {
+  const v = useSyncExternalStore(suscribir, leer, () => null)
+  return v && v !== TODOS ? v : null
+}
+
+/** Elegir un campo (o null para todos) desde cualquier lado. */
+export function elegirCampo(id: string | null) {
+  guardar(id ?? TODOS)
+}
+
 function guardar(v: string) {
   try {
     localStorage.setItem(CLAVE, v)
@@ -43,20 +55,33 @@ export function useCampoElegido(): {
 } {
   const { data: membresia } = useEmpresa()
   const { data } = useMapa(membresia?.empresa_id)
-  const clima = useCampoClima()
   const guardado = useSyncExternalStore(suscribir, leer, () => null)
   const campos = (data ?? []).map((c) => {
     const color = colorDeCampo(c.colorIdx ?? 0)
     return { id: c.id, nombre: c.nombre, letra: color.letra, color: color.hex }
   })
   const elegido = campos.length === 1 ? campos[0]! : guardado && guardado !== TODOS ? (campos.find((c) => c.id === guardado) ?? null) : null
-  const { elegir: elegirClima, opciones } = clima
-  const elegir = useCallback(
-    (id: string | null) => {
-      guardar(id ?? TODOS)
-      if (id && opciones.some((o) => o.id === id)) elegirClima(id)
-    },
-    [elegirClima, opciones],
-  )
+  const elegir = elegirCampo
   return { campos, elegido, elegir }
+}
+
+/**
+ * Un link que trae `?campo=` (el tutorial, el asistente, un aviso) elige ese
+ * campo en la barra y se saca de la URL: la barra es la única que manda.
+ */
+export function useCampoDesdeUrl() {
+  const [params, setParams] = useSearchParams()
+  const pedido = params.get('campo')
+  useEffect(() => {
+    if (!pedido) return
+    elegirCampo(pedido)
+    setParams(
+      (p) => {
+        p.delete('campo')
+        return p
+      },
+      { replace: true },
+    )
+  }, [pedido, setParams])
+  return pedido
 }

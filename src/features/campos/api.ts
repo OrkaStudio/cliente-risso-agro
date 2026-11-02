@@ -307,6 +307,12 @@ export async function crearPotrero(input: {
  * para potreros sin historia: los animales quedan sin potrero (SET NULL),
  * las observaciones se van en cascada.
  */
+/** Saca un campo sumado por error, con sus potreros (la base los borra en cascada). */
+export async function eliminarCampo(id: string): Promise<void> {
+  const { error } = await supabase.from('campo').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function eliminarPotrero(id: string): Promise<void> {
   const { error } = await supabase.from('potrero').delete().eq('id', id)
   if (error) throw new Error(error.message)

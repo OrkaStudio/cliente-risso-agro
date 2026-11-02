@@ -7,12 +7,11 @@ import {
   CreditCard,
   Eye,
   Landmark,
-  MapPin,
   SlidersHorizontal,
   Undo2,
 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
-import { useCampos } from '@/features/campos/hooks'
+import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useVencimientos, useRevertirLiquidacion } from '@/features/agenda/hooks'
 import { useCancelarSerie } from '@/features/analitica/hooks'
 import { medioLabel, type Vencimiento } from '@/features/agenda/api'
@@ -92,13 +91,14 @@ function matchMedio(v: Vencimiento, m: MedioF): boolean {
 
 export function AgendaPage() {
   const venc = useVencimientos()
-  const campos = useCampos()
   const revertir = useRevertirLiquidacion()
 
   const [vista, setVista] = useState<Vista>('proximos')
   const [tipoF, setTipoF] = useState<TipoF>('todos')
   const [medioF, setMedioF] = useState<MedioF>('todos')
-  const [campoF, setCampoF] = useState<string>('todos')
+  // El campo se elige en la barra izquierda: acá es el primer filtro, no se elige.
+  const elegido = useCampoElegido().elegido
+  const campoF = elegido?.id ?? 'todos'
   const [horizonte, setHorizonte] = useState<Horizonte>('mes')
   const [verLiquidados, setVerLiquidados] = useState(false)
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null)
@@ -264,7 +264,7 @@ export function AgendaPage() {
         <div>
           <h1 className="font-heading text-3xl font-bold tracking-tight text-ink">Agenda</h1>
           <p className="mt-1 text-xs text-texto-suave">
-            Lo que hay que hacer, pagar y cobrar en el campo · {vencidos} vencido{vencidos === 1 ? '' : 's'} · {proximos15} en los próximos 15 días
+            {elegido?.nombre ?? 'Todos tus campos'} · Lo que hay que hacer, pagar y cobrar · {vencidos} vencido{vencidos === 1 ? '' : 's'} · {proximos15} en los próximos 15 días
           </p>
         </div>
         <CargarDialog
@@ -318,13 +318,13 @@ export function AgendaPage() {
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-ink">Filtrar agenda</h2>
               <p className="truncate text-[11px] text-texto-suave">
-                {tipoF === 'todos' && campoF === 'todos' && medioF === 'todos'
-                  ? 'Todos los movimientos, campos y medios de pago'
+                {tipoF === 'todos' && medioF === 'todos'
+                  ? 'Todos los movimientos y medios de pago'
                   : 'Mostrando resultados filtrados'}
               </p>
             </div>
           </div>
-          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="min-w-0">
               <span className="mb-1 block text-[10px] font-semibold text-texto-suave">Tipo</span>
               <Dropdown
@@ -341,18 +341,6 @@ export function AgendaPage() {
             </label>
             <label className="min-w-0">
               <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-texto-suave">
-                <MapPin className="size-3" aria-hidden="true" /> Campo
-              </span>
-              <Dropdown
-                ariaLabel="Filtrar por campo"
-                value={campoF}
-                onChange={setCampoF}
-                options={[{ value: 'todos', label: 'Todos los campos' }, ...((campos.data ?? []).map((c) => ({ value: c.id, label: c.nombre })))]}
-                block
-              />
-            </label>
-            <label className="min-w-0">
-              <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-texto-suave">
                 <CreditCard className="size-3" aria-hidden="true" /> Medio de pago
               </span>
               <Dropdown
@@ -363,15 +351,14 @@ export function AgendaPage() {
                 block
               />
             </label>
-            {(tipoF !== 'todos' || campoF !== 'todos' || medioF !== 'todos') && (
+            {(tipoF !== 'todos' || medioF !== 'todos') && (
               <button
                 type="button"
                 onClick={() => {
                   setTipoF('todos')
-                  setCampoF('todos')
                   setMedioF('todos')
                 }}
-                className="h-10 rounded-xl px-3 text-xs font-semibold text-principal transition-colors hover:bg-principal-suave sm:col-span-3 sm:justify-self-end"
+                className="h-10 rounded-xl px-3 text-xs font-semibold text-principal transition-colors hover:bg-principal-suave sm:col-span-2 sm:justify-self-end"
               >
                 Limpiar
               </button>

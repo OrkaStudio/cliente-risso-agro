@@ -31,6 +31,7 @@ export const supabase = createClient<Database>(
   env.supabasePublishableKey,
   {
     auth: {
+      storageKey: env.supabaseStorageKey,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,

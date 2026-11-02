@@ -40,7 +40,7 @@ describe('itemsDe — el camino con nombres vivos', () => {
     const pendientes = items.filter((i) => !i.hecho)
     expect(pendientes[0]?.id).toBe('campo')
     expect(pendientes[0]?.titulo).toBe('Traé el contorno')
-    expect(pendientes[0]?.ruta).toBe('/campos?campo=c1')
+    expect(pendientes[0]?.ruta).toBe('/campos')
     expect(items.find((i) => i.id === 'potreros')?.titulo).toBe('Dibujá los 8 potreros')
     expect(items.find((i) => i.id === 'hacienda')?.hecho).toBe(true)
     const tropas = items.find((i) => i.id === 'tropas')!

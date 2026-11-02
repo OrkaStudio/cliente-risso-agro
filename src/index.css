@@ -792,6 +792,46 @@
 .escena-viento { left: -100px; animation: escena-viento 2.2s linear infinite; }
 @keyframes escena-viento { from { transform: translateX(0); opacity: 0; } 20% { opacity: 1; } to { transform: translateX(560px); opacity: 0; } }
 
+/* «Todos tus campos»: cada campo con su letra y su nombre en una pastilla clara, que se toca para elegirlo. */
+.tropero-campo.leaflet-tooltip,
+.tropero-campo--pin {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.tropero-campo.leaflet-tooltip::before {
+  display: none;
+}
+.tropero-campo b {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  background: rgb(251 250 246 / 0.95);
+  box-shadow: 0 4px 14px rgb(19 27 22 / 0.3);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-texto, #131b16);
+  cursor: pointer;
+}
+.tropero-campo i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-style: normal;
+  font-size: 11px;
+  color: #fff;
+}
+.tropero-campo--pin {
+  transform: translate(-50%, -50%);
+}
+
 /* Campos (Figma 1050:2): el nombre del potrero sobre el satélite, grande y blanco, sin pastilla. */
 .tropero-nombre.leaflet-tooltip {
   display: flex;
@@ -844,3 +884,17 @@
 }
 .tropero-nombre--si b { font-size: 30px; }
 .tropero-nombre--otro { opacity: 0.6; }
+
+/* Lo que el asistente pide tocar (acompanante.tsx): el propio botón, con un anillo sobrio que respira. */
+[data-resaltado] {
+  position: relative;
+  box-shadow: 0 0 0 3px var(--color-fondo, #f5f1ea), 0 0 0 5px rgb(169 85 44 / 0.45);
+  animation: tropero-resaltado 2.4s ease-in-out infinite;
+}
+@keyframes tropero-resaltado {
+  0%, 100% { box-shadow: 0 0 0 3px var(--color-fondo, #f5f1ea), 0 0 0 5px rgb(169 85 44 / 0.45); }
+  50% { box-shadow: 0 0 0 3px var(--color-fondo, #f5f1ea), 0 0 0 7px rgb(169 85 44 / 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-resaltado] { animation: none; }
+}

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarClock, ChevronDown, Receipt } from 'lucide-react'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { useCampoDesdeUrl, useCampoElegido } from '@/features/campos/campo-elegido'
 import { useCamposConPotreros } from '@/features/campos/hooks'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import {
@@ -58,11 +59,10 @@ export function AnaliticaPage() {
   const movs = useMovimientos()
   const pendientes = usePendientes()
   const campos = useCamposConPotreros()
-  // Permite llegar filtrado desde el "Resumen del campo" (/analitica?campo=:id).
-  const [searchParams] = useSearchParams()
-  const [campoF, setCampoF] = useState<string | null>(
-    () => searchParams.get('campo'),
-  )
+  // El campo se elige en la barra izquierda; un link con ?campo= lo elige ahí.
+  const pedido = useCampoDesdeUrl()
+  const elegido = useCampoElegido().elegido
+  const campoF = pedido ?? elegido?.id ?? null
   const [periodo, setPeriodo] = useState<Periodo>('12m')
   const [alquilerAbierto, setAlquilerAbierto] = useState(false)
   const [verTodos, setVerTodos] = useState(false)
@@ -183,7 +183,7 @@ export function AnaliticaPage() {
         meta={
           <>
             Cargá la plata, decidí con la data ·{' '}
-            {nombreCampo ?? 'Toda la empresa'} · {periodoLabel[periodo]}
+            {nombreCampo ?? 'Todos tus campos'} · {periodoLabel[periodo]}
           </>
         }
         action={
@@ -196,18 +196,6 @@ export function AnaliticaPage() {
                 { value: '12m', label: 'Últimos 12 meses' },
                 { value: 'anio', label: 'Este año' },
                 { value: 'todo', label: 'Desde el inicio' },
-              ]}
-            />
-            <Dropdown
-              ariaLabel="Filtrar por campo"
-              value={campoF ?? 'empresa'}
-              onChange={(v) => setCampoF(v === 'empresa' ? null : v)}
-              options={[
-                { value: 'empresa', label: 'Toda la empresa' },
-                ...(campos.data ?? []).map((c) => ({
-                  value: c.id,
-                  label: c.nombre,
-                })),
               ]}
             />
             <div data-guia="analitica-alquiler">

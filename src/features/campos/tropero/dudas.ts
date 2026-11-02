@@ -26,21 +26,22 @@ export function dudasDe(e: string, movil: boolean): Duda[] {
       ]
     case 'encontrar':
       return [
-        { pregunta: 'No encuentro mi campo', respuesta: `${toca} «¿No lo encontrás? Buscá un camino» y escribí una ruta, un camino o un paraje cercano: el mapa va ahí. ${acercate} hasta ver los alambrados.` },
+        { pregunta: 'No encuentro mi campo', respuesta: `Escribí en el buscador un paraje, un pueblo o una ruta cercana: el mapa va ahí. ${acercate} hasta ver los alambrados.` },
         { pregunta: 'No sé bien dónde queda', respuesta: 'Pedile a alguien que lo conozca que te muestre el lugar. Mientras, podés cortar acá: la próxima vez seguís donde quedaste.' },
         SE_GUARDA,
       ]
     case 'tocar':
     case 'parcela':
       return [
-        { pregunta: '¿De dónde sale el borde?', respuesta: 'Del catastro de ARBA: es el dibujo oficial de la parcela, el mismo que figura en la boleta del Inmobiliario Rural.' },
-        { pregunta: 'El borde no es el mío', respuesta: `${toca} «Lo marco a mano» y marcás las esquinas del alambrado sobre el satélite.` },
-        { pregunta: 'Tengo varias parcelas', respuesta: 'Traé una y después corregí el borde moviendo los puntos hasta el alambrado, o marcalo entero a mano.' },
+        { pregunta: '¿De dónde sale el borde?', respuesta: 'Del catastro de ARBA: es el dibujo oficial de la parcela, el mismo de la boleta del Inmobiliario Rural. Fijate que siga tu alambrado.' },
+        { pregunta: 'Me trajo el campo del vecino', respuesta: `${toca} «No, toco otra» y tocá bien adentro de tu campo, lejos del alambrado.` },
+        { pregunta: 'El borde no sigue mi alambrado', respuesta: 'Confirmalo igual: en el paso siguiente, «Ajustar el borde» te deja mover los puntos hasta el alambrado.' },
       ]
     case 'boleta':
       return [
-        { pregunta: '¿Dónde están los números?', respuesta: 'En la boleta del Inmobiliario Rural de ARBA, arriba a la izquierda: partido, circunscripción y parcela. También figuran en la escritura.' },
-        { pregunta: 'No tengo la boleta', respuesta: 'No pasa nada: volvé y marcá el borde a mano sobre el satélite, esquina por esquina.' },
+        { pregunta: '¿Dónde está el número de partida?', respuesta: 'Arriba en la boleta del Inmobiliario Rural de ARBA, donde dice «Partida»: primero el partido (3 números) y después la partida. También está en la web de ARBA.' },
+        { pregunta: 'Mi campo tiene varias partidas', respuesta: 'Poné la principal. Después ajustás el borde moviendo los puntos hasta tu alambrado.' },
+        { pregunta: 'No tengo la boleta', respuesta: 'Tocá «Volver» y elegí «No»: lo buscás en el mapa y lo tocás.' },
       ]
     case 'marcar':
     case 'dibujar':

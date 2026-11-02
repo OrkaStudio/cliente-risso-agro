@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, u
 import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { registrarAyudaLocal } from '@/features/guia/guia-store'
 import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
 import { cn } from '@/lib/utils'
@@ -28,7 +29,6 @@ export type Objetivo = { tipo: 'tarjeta'; resalta?: string } | { tipo: 'punto'; 
 export type Duda = { pregunta: string; respuesta: string }
 
 const TAM = 64
-const ANCHO_GLOBO = 260
 const ANCHO_AYUDA = 320
 /** El viaje: lento al arrancar, sin rebote al llegar. */
 const VUELO = { stiffness: 34, damping: 12.5, mass: 1.15, restDelta: 0.2 }
@@ -139,26 +139,21 @@ export function Acompanante({
   const activo = fase === 'activa'
 
   // ===== Dónde se para y hacia dónde mira =====
-  const enTarjeta = objetivo?.tipo === 'tarjeta' || !activo
+  // Se queda siempre en su lugar de la tarjeta (Lau, 02/11: en el medio del mapa tapaba todo).
+  // Lo que hay que hacer en el mapa lo dice la franja de arriba; él mira hacia ahí.
+  const enTarjeta = true
   let x = 16
   let y = 16
   let destino: { x: number; y: number } | null = null
-  if (enTarjeta && dock) {
+  if (dock) {
     x = dock.left + (dock.width - TAM) / 2
     y = dock.top + (dock.height - TAM) / 2
     if (halo) destino = { x: halo.left + halo.width / 2, y: halo.top + halo.height / 2 }
-  } else if (objetivo?.tipo === 'punto') {
-    destino = { x: objetivo.x, y: objetivo.y }
-    x = objetivo.x + 22
-    y = objetivo.y - TAM * 0.55
   }
-  // En el mapa no se mete debajo de la tarjeta.
-  if (!enTarjeta) {
-    x = Math.max(4, Math.min(x, base.w - margenDerecho - TAM - 4))
-    y = Math.max(4, Math.min(y, base.h - TAM - 4))
-  }
+  const enMapa = !!objetivo && objetivo.tipo !== 'tarjeta'
+  const punto = objetivo?.tipo === 'punto' ? { x: objetivo.x, y: objetivo.y } : null
+  if (punto) destino = punto
   const centro = { x: x + TAM / 2, y: y + TAM / 2 }
-  const aLaDerecha = destino ? destino.x >= centro.x : true
 
   // ===== Viaja con un resorte suave =====
   // Antes de un viaje largo mira a dónde va, toma impulso y recién después arranca.
@@ -288,6 +283,16 @@ export function Acompanante({
     setAyuda(null)
     setElegida(null)
   }
+  // «Preguntale al asistente» (barra lateral) abre esta misma ayuda: un solo asistente.
+  // Desde que se monta, aunque todavía esté llegando: si lo llaman antes, abre al aparecer.
+  const conAyuda = dudas.length > 0
+  useEffect(() => {
+    if (!conAyuda) return
+    return registrarAyudaLocal(() => {
+      setAyuda('toque')
+      setElegida(null)
+    })
+  }, [conAyuda])
   const { user } = useAuth()
   const empresa = useEmpresa()
   const whatsapp = linkWhatsapp({ nombre: nombreDe(user?.user_metadata), empresa: empresa.data?.empresa?.nombre ?? null, seccion: 'Campos' })
@@ -307,7 +312,7 @@ export function Acompanante({
     }
   }, [ayuda])
 
-  const dice = !activo || duerme || ayuda || enTarjeta ? null : texto
+  const dice = !activo || duerme || ayuda || !enMapa ? null : texto
   // Mueve la boca mientras escribe su línea o contesta una duda.
   const respuesta = ayuda && elegida != null ? (dudas[elegida]?.respuesta ?? null) : null
   const voz = ayuda ? respuesta : dice
@@ -323,19 +328,21 @@ export function Acompanante({
     return () => clearTimeout(t)
   }, [voz])
 
+  // El botón que hay que tocar se marca en sí mismo (atributo + CSS): se mueve con el
+  // scroll sin retraso, no flota encima (Lau, 02/11: «se sacude»). Sólo botones, no bloques.
+  const marcar = activo && !duerme && !ayuda ? idResalta : null
+  useEffect(() => {
+    if (!marcar) return
+    const el = raiz.current?.querySelector<HTMLElement>(`[data-acompana="${marcar}"]`)
+    if (!el || el.getBoundingClientRect().height > 72) return
+    el.setAttribute('data-resaltado', '')
+    return () => el.removeAttribute('data-resaltado')
+  }, [marcar, raiz, medir, halo])
+
   if (!visible) return null
 
   const animoMascota: Animo = fase === 'dormida' || duerme ? 'duerme' : fase === 'despierta' || despertando ? 'despierta' : ayuda ? 'normal' : animo
 
-  // La línea va al costado, del lado contrario de lo que señala; si no entra, arriba.
-  const alCostado = aLaDerecha ? x - ANCHO_GLOBO - 6 > 4 : x + TAM + ANCHO_GLOBO + 6 < base.w - margenDerecho
-  const globoArriba = !alCostado
-  const globoX = alCostado
-    ? aLaDerecha
-      ? x - 6
-      : x + TAM + 6
-    : Math.max(4, Math.min(x + TAM / 2 - ANCHO_GLOBO / 2, base.w - margenDerecho - ANCHO_GLOBO - 8))
-  const globoY = alCostado ? y + TAM / 2 : y - 6
   // La ayuda se abre a la izquierda (sobre el mapa, sin tapar la tarjeta); si no entra, arriba.
   const ayudaIzquierda = x - ANCHO_AYUDA - 12 > 4
   const ayudaX = ayudaIzquierda ? x - 12 : Math.max(4, Math.min(x + TAM / 2 - ANCHO_AYUDA / 2, base.w - ANCHO_AYUDA - 8))
@@ -353,57 +360,45 @@ export function Acompanante({
 
   return (
     <>
-      {/* El halo sobre el botón que hay que tocar: nace en su lugar y se desliza al siguiente. */}
+      {/* Lo que hay que hacer en el mapa: una franja arriba, sobre el mapa, que no tapa nada. */}
+      <AnimatePresence mode="wait">
+        {dice && (
+          <motion.div
+            key={dice}
+            role="status"
+            aria-live="polite"
+            data-testid="acompanante"
+            className="pointer-events-none absolute top-4 z-[670] flex w-max max-w-[min(520px,calc(100%-32px))] items-center gap-3 rounded-[16px] bg-tinta/92 py-2.5 pr-5 pl-2.5 text-[14.5px] leading-snug font-semibold text-superficie shadow-[0_12px_32px_rgba(19,27,22,0.35)] ring-1 ring-white/10 backdrop-blur"
+            style={{ left: Math.max(16, (base.w - margenDerecho) / 2), translateX: '-50%' }}
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.2 } }}
+            transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+          >
+            {/* El orbe habla en la franja: un punto que late, en vez de una flecha o una mano. */}
+            <span className="relative grid size-8 shrink-0 place-items-center">
+              <motion.span className="absolute inset-0 rounded-full bg-principal/40" animate={{ scale: [1, 1.5], opacity: [0.6, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }} />
+              <span className="size-3 rounded-full bg-principal" />
+            </span>
+            <span>{dice}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Dónde: un punto que respira, sin tapar el mapa. */}
       <AnimatePresence>
-        {halo && activo && !duerme && !ayuda && (
+        {dice && punto && (
           <motion.span
-            key="halo"
+            key="punto"
             aria-hidden
-            className="pointer-events-none absolute z-[650]"
-            style={{ borderRadius: Math.min((halo.height + 10) / 2, 20) }}
-            initial={{ opacity: 0, left: halo.left - 5, top: halo.top - 5, width: halo.width + 10, height: halo.height + 10 }}
-            animate={{
-              opacity: 1,
-              left: halo.left - 5,
-              top: halo.top - 5,
-              width: halo.width + 10,
-              height: halo.height + 10,
-              boxShadow: '0 0 0 2.5px rgba(236,196,106,0.85), 0 0 14px 4px rgba(169,85,44,0.18)',
-            }}
-            exit={{ opacity: 0, transition: { duration: 0.3 } }}
-            transition={{ type: 'spring', stiffness: 60, damping: 17, opacity: { duration: 0.5 } }}
+            className="pointer-events-none absolute z-[660] size-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-superficie ring-4 ring-principal/70"
+            style={{ left: punto.x, top: punto.y }}
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: [1, 1.25, 1] }}
+            exit={{ opacity: 0 }}
+            transition={{ scale: { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }, opacity: { duration: 0.3 } }}
           />
         )}
       </AnimatePresence>
-
-      {/* Su línea en el mapa, escrita de a poco. Cuelga del asistente y lo sigue. */}
-      <motion.div className="pointer-events-none absolute top-0 left-0 z-[670]" style={{ x: globoSigueX, y: globoSigueY }}>
-        <AnimatePresence>
-          {dice && (
-            <motion.div
-              key="globo"
-              role="status"
-              aria-live="polite"
-              data-testid="acompanante"
-              className="absolute rounded-[14px] bg-superficie/95 px-3.5 py-2 text-[14px] leading-snug font-semibold text-texto shadow-[0_8px_28px_rgba(76,29,11,0.22)] ring-1 ring-[#a9552c]/20 backdrop-blur"
-              style={{ width: 'max-content', maxWidth: ANCHO_GLOBO }}
-              initial={{ opacity: 0, scale: 0.94, left: globoX - x, top: globoY - y }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                left: globoX - x,
-                top: globoY - y,
-                translateX: alCostado && aLaDerecha ? '-100%' : '0%',
-                translateY: globoArriba ? '-100%' : '-50%',
-              }}
-              exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.3, ease: 'easeOut' } }}
-              transition={{ type: 'spring', stiffness: 70, damping: 18, opacity: { duration: 0.4 } }}
-            >
-              <Escribe texto={dice} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
 
       {/* La ayuda: las dudas de este paso y, si no alcanzan, una persona. La colita apunta al asistente. */}
       <AnimatePresence>

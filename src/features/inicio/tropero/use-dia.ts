@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
+import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { supabase } from '@/lib/supabase/client'
 import { hoyEnArgentina } from '@/features/cotizaciones/api'
 import { useTiempo } from '@/features/cotizaciones/hooks'
 import { usePanoramaInicio } from '../hooks'
 import { useParaAtender } from '../para-atender-api'
-import { cosasParaHoy, inicioDeCampania, lluviaDelMes } from './dia'
+import { cosasParaHoy, delCampo, inicioDeCampania, lluviaDelMes } from './dia'
 
 /**
  * La lluvia del último mes (30 días que terminan ayer) en la ubicación del campo,
@@ -32,7 +34,13 @@ export const useGanadoCampania = (campoId: string | null = null) =>
 export function useCuantasHoy(): number {
   const panorama = usePanoramaInicio()
   const atender = useParaAtender()
+  // Lo mismo que muestra el Inicio: del campo elegido en la barra, o de todos.
+  const campoId = useCampoElegido().elegido?.id ?? null
+  // Mientras falta el mapa, el Inicio pide una sola cosa: terminarlo (lo demás es adelanto).
+  const pendiente = useMapaPendiente()
+  if (pendiente) return 1
   if (!panorama.data || !atender.data) return 0
-  return cosasParaHoy(atender.data.potreros, panorama.data.vencimientos, atender.data.sinRecorrer).length
+  const v = delCampo(campoId, panorama.data, atender.data)
+  return cosasParaHoy(v.potreros, v.vencimientos, v.sinRecorrer).length
 }
 

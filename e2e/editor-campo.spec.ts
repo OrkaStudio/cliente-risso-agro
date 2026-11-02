@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
 import { entrar, sesionDePrueba } from './helpers'
+import { borrarCampo } from './mapa-e2e'
+
+// Los campos que crea un test se borran al terminar: uno a medias trabaría la app (primero el mapa).
+const creados: string[] = []
+test.afterEach(() => {
+  for (const n of creados.splice(0)) borrarCampo(n)
+})
+
 
 // Campos · el editor del mapa (Figma 39, «Dibujar en el celular»): dibujar el
 // potrero que falta, volver al campo y dividir otro con una línea. Contra
@@ -40,9 +48,11 @@ async function tocar(page: Page, fx: number, fy: number, trazo = '#b85c2e') {
 
 test('editor del mapa: dibujar el que falta y dividir otro con una línea', async ({ page }) => {
   const token = (await sesionDePrueba()).access_token as string
+  const nombre = `E2E Editor ${Date.now()}`
+  creados.push(nombre)
   const [campo] = await rest(token, 'campo', 'POST', {
     empresa_id: EMPRESA,
-    nombre: `E2E Editor ${Date.now()}`,
+    nombre,
     tipo: 'propio',
     lat: (N + S) / 2,
     lon: M,
@@ -62,12 +72,17 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   await entrar(page)
   if (process.env.MOVIL) await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/campos?campo=${campoId}`)
+  // Al volver, el asistente abre solo su ayuda: se cierra antes de seguir dibujando.
+  await page.getByRole('dialog', { name: '¿En qué te ayudo?' }).waitFor({ timeout: 8000 }).then(() => page.keyboard.press('Escape')).catch(() => {})
+  await page.waitForTimeout(1500) // el mapa recién cargado se encuadra en el campo
 
   // Falta el 2: el editor se abre solo, con la lista del alta (y el asistente acompaña).
   await expect(page.getByRole('heading', { name: 'Dibujá el siguiente' })).toBeVisible()
   // El asistente queda acoplado a la tarjeta: ahí habla la tarjeta, no un globo aparte.
   await expect(page.getByRole('button', { name: /El asistente de Tropero/ })).toBeVisible()
   await expect(page.getByTestId('acompanante')).toHaveCount(0)
+  // Al llegar abre solo su ayuda: se cierra antes de dibujar, para que ningún clic caiga encima.
+  await page.getByRole('dialog', { name: '¿En qué te ayudo?' }).waitFor({ timeout: 8000 }).then(() => page.keyboard.press('Escape')).catch(() => {})
   await captura(page, '1-elegir')
   await page.getByRole('region', { name: 'Faltan dibujar' }).getByRole('button', { name: new RegExp(`^${dos!.nombre}`) }).click()
   await expect(page.getByRole('heading', { name: `Dibujá el ${dos!.nombre}` })).toBeVisible()
@@ -84,7 +99,12 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
 
   await expect(page.getByRole('heading', { name: `El ${dos!.nombre} ya está` })).toBeVisible()
   await captura(page, '3-dibujado')
-  await page.getByRole('button', { name: 'Volver al campo' }).click()
+  // Era lo único que faltaba: el tutorial cierra y abre la app (primero el mapa). Después se vuelve al campo.
+  await page.getByRole('button', { name: `Listo, ${nombre}` }).click()
+  await expect(page.getByRole('heading', { name: /campos?, en el mapa$/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Ir al Inicio' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await page.goto(`/campos?campo=${campoId}`)
 
   // De vuelta en el campo: «Corregir el campo» → «Dibujar en el satélite».
   await page.getByRole('button', { name: 'Corregir el campo' }).click()
@@ -97,8 +117,12 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   await page.waitForTimeout(1200)
 
   // Una línea norte-sur por el medio del 1 (el elegido, en trigo): de afuera a afuera.
-  await tocar(page, 0.5, -0.1, '#ecc46a')
-  await tocar(page, 0.5, 1.1, '#ecc46a')
+  // El potrero se mide una vez: la línea en curso también se pinta en amarillo y la confundiría.
+  const elegido = (await page.locator(`.leaflet-overlay-pane path[stroke="#ecc46a"]`).first().boundingBox())!
+  await page.mouse.click(elegido.x + elegido.width * 0.5, elegido.y + elegido.height * -0.1)
+  await page.waitForTimeout(150)
+  await page.mouse.click(elegido.x + elegido.width * 0.5, elegido.y + elegido.height * 1.1)
+  await page.waitForTimeout(150)
   await captura(page, '5a-linea')
 
   await expect(page.getByRole('heading', { name: 'Revisá la división' })).toBeVisible()
@@ -139,4 +163,26 @@ test('editor del mapa: dibujar el que falta y dividir otro con una línea', asyn
   await expect(page.getByRole('heading', { name: `El ${dos!.nombre} ya está` })).toBeVisible()
   const [corregido] = await rest(token, `potrero?id=eq.${dos!.id}&select=hectareas`, 'GET')
   expect(Number(corregido!.hectareas)).toBeLessThan(47)
+})
+
+test('un potrero del alta que ya no existe se saca, y si era el último el mapa queda listo', async ({ page }) => {
+  const token = (await sesionDePrueba()).access_token as string
+  const nombre = `E2E Sobra ${Date.now()}`
+  creados.push(nombre)
+  const [campo] = await rest(token, 'campo', 'POST', { empresa_id: EMPRESA, nombre, tipo: 'propio', lat: (N + S) / 2, lon: M, contorno: [[N, O], [N, E], [S, E], [S, O]] })
+  await rest(token, 'potrero', 'POST', [
+    { empresa_id: EMPRESA, campo_id: campo!.id, nombre: '1', estado_ciclo: 'descanso', hectareas: 96, poligono: [[N, O], [N, E], [S, E], [S, O]] },
+    { empresa_id: EMPRESA, campo_id: campo!.id, nombre: '2', estado_ciclo: 'descanso', hectareas: 10, poligono: null },
+  ])
+
+  await entrar(page)
+  await page.goto('/hacienda')
+  // Trabado por el 2, que no existe: se saca desde la lista.
+  await expect(page).toHaveURL(/\/campos/)
+  await page.getByRole('dialog', { name: '¿En qué te ayudo?' }).waitFor({ timeout: 8000 }).then(() => page.keyboard.press('Escape')).catch(() => {})
+  await page.getByRole('button', { name: /^El 2\w* ya no existe$/ }).click()
+  await page.getByRole('button', { name: 'Sí, sacarlo' }).click()
+  await expect(page.getByRole('heading', { name: /campos?, en el mapa$/ })).toBeVisible()
+  await page.goto('/hacienda')
+  await expect(page).toHaveURL(/\/hacienda$/)
 })

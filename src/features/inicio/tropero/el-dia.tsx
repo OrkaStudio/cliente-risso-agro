@@ -19,7 +19,7 @@ import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-sen
 import { useParaAtender } from '../para-atender-api'
 import { delCampo, escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
-import { QueCampo } from '@/features/campos/que-campo'
+import { CampoVisto } from '@/features/campos/campo-visto'
 import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluviaDelMes } from './use-dia'
 
@@ -81,7 +81,7 @@ export function ElDia() {
   return (
     <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-5">
       <motion.div {...entra(0)}>
-        <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} campos={inicio.campos} elegido={inicio.elegido} elegir={inicio.elegir} />
+        <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} campos={inicio.campos} elegido={inicio.elegido} />
       </motion.div>
 
       {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
@@ -148,13 +148,11 @@ function Cabecera({
   chips,
   campos,
   elegido,
-  elegir,
 }: {
   titulo: string
   chips: Chip[]
   campos: CampoElegible[]
   elegido: CampoElegible | null
-  elegir: (id: string | null) => void
 }) {
   const ir = useIr()
   return (
@@ -178,7 +176,7 @@ function Cabecera({
           ))}
         </div>
       </div>
-      <QueCampo campos={campos} elegido={elegido} elegir={elegir} />
+      <CampoVisto campos={campos} elegido={elegido} />
     </section>
   )
 }

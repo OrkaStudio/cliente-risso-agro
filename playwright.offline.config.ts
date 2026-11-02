@@ -5,6 +5,10 @@ import { defineConfig } from '@playwright/test'
 // Supabase LOCAL (modo «localdb», .env.localdb.local). Correr con:
 //   pnpm build:local && pnpm test:e2e:offline
 export default defineConfig({
+  // La empresa de pruebas es una sola: un campo a medias de un test trabaría a
+  // otro que corra a la vez (primero el mapa). De a uno, y arrancando completa.
+  workers: 1,
+  globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
   // Los dos corren contra el build real y sin red (Dexie + service worker).
   testMatch: /(offline|manga)\.spec\.ts/,

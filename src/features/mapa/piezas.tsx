@@ -155,14 +155,14 @@ export function Buscador({
   const lista = texto.trim().length < 3 ? [] : lugares
   return (
     <div className={cn('pointer-events-auto relative w-full max-w-[420px]', className)}>
-      <label className="flex items-center gap-2 rounded-[14px] bg-superficie px-4 shadow-md">
+      <label className="flex items-center gap-2 rounded-[14px] border border-borde bg-superficie px-4 focus-within:border-principal/60">
         <Icono nombre="Buscar" tamano={16} className="text-texto-suave" />
         <input
           ref={input}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Buscá un camino, paraje o estancia"
-          aria-label="Buscá un camino, paraje o estancia"
+          placeholder="Paraje, pueblo o ruta cerca de tu campo"
+          aria-label="Paraje, pueblo o ruta cerca de tu campo"
           className="w-full bg-transparent py-3 text-[15px] text-texto outline-none placeholder:text-texto-suave/70"
         />
       </label>
@@ -188,6 +188,55 @@ export function Buscador({
         </ul>
       )}
     </div>
+  )
+}
+
+/**
+ * El número de partida de la boleta del Inmobiliario Rural (Lau, 02/11: «que
+ * usen el número catastral»): partido y partida. Es exacto: una partida, una parcela.
+ */
+export function Partida({
+  ocupado,
+  error,
+  onTraer,
+  onSinBoleta,
+}: {
+  ocupado: boolean
+  error: string | null
+  onTraer: (d: { partido: string; partida: string }) => void
+  /** Sólo después de un error: buscarlo en el mapa. */
+  onSinBoleta: (() => void) | null
+}) {
+  const [partido, setPartido] = useState('')
+  const [partida, setPartida] = useState('')
+  const listo = partido.replace(/\D/g, '') && partida.replace(/\D/g, '')
+  return (
+    <form
+      className="contents"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (listo) onTraer({ partido, partida })
+      }}
+    >
+      {/* Dónde está en la boleta: «Partida», partido y número. */}
+      <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px] text-texto-suave">
+        En la boleta dice
+        <span className="cifra rounded-md bg-fondo px-2 py-0.5 text-[15px] font-bold text-texto ring-1 ring-borde">Partida 058-000146</span>
+      </p>
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2.5 [&_input]:w-full [&_input]:min-w-0">
+        <CampoTexto className="min-w-0" etiqueta="Partido" inputMode="numeric" value={partido} placeholder="058" onChange={(e) => setPartido(e.target.value)} />
+        <CampoTexto className="min-w-0" etiqueta="Partida" inputMode="numeric" value={partida} placeholder="000146" onChange={(e) => setPartida(e.target.value)} />
+      </div>
+      {error && <Aviso tipo="problema" titulo="No salió el borde">{error}</Aviso>}
+      <BotonPrincipal type="submit" icono="Siguiente" cargando={ocupado} disabled={!listo || ocupado}>
+        {ocupado ? 'Buscando en el catastro…' : 'Traer mi campo'}
+      </BotonPrincipal>
+      {onSinBoleta && (
+        <BotonChico type="button" icono="Buscar" className="self-start" onClick={onSinBoleta}>
+          Buscarlo en el mapa
+        </BotonChico>
+      )}
+    </form>
   )
 }
 

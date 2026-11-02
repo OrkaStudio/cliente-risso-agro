@@ -24,7 +24,31 @@ function avisar() {
 
 let panelAbierto = false
 
+// Un solo asistente: mientras el del mapa acompaña Campos, «Preguntale al
+// asistente» abre el suyo, con las dudas de ese paso, y no un panel aparte.
+let ayudaLocal: (() => void) | null = null
+
+/** El asistente que acompaña la pantalla toma la ayuda; devuelve cómo soltarla. */
+export function registrarAyudaLocal(abrir: () => void): () => void {
+  ayudaLocal = abrir
+  avisar()
+  return () => {
+    if (ayudaLocal !== abrir) return
+    ayudaLocal = null
+    avisar()
+  }
+}
+
+export function useHayAyudaLocal(): boolean {
+  return useSyncExternalStore(subscribe, () => ayudaLocal !== null, () => false)
+}
+
 export function abrirPanel(): void {
+  if (ayudaLocal) {
+    registrar('asistente_abierto')
+    ayudaLocal()
+    return
+  }
   if (!panelAbierto) registrar('asistente_abierto')
   panelAbierto = true
   avisar()

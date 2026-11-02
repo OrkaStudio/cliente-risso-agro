@@ -40,8 +40,11 @@ values ('e2e00000-0000-4000-8000-0000000000e1', 'E2E Pruebas', now(), now());
 insert into public.miembro_empresa (user_id, empresa_id, rol)
 values ('e2e00000-0000-4000-8000-000000000001', 'e2e00000-0000-4000-8000-0000000000e1', 'dueno');
 
-insert into public.campo (id, empresa_id, nombre)
-values ('e2e00000-0000-4000-8000-0000000000c1', 'e2e00000-0000-4000-8000-0000000000e1', 'E2E Campo base');
+-- Con su borde y el 1A dibujado: sin el mapa terminado, la app sólo abre el Inicio y Campos.
+insert into public.campo (id, empresa_id, nombre, contorno)
+values ('e2e00000-0000-4000-8000-0000000000c1', 'e2e00000-0000-4000-8000-0000000000e1', 'E2E Campo base',
+  '[[-35.9,-59.2],[-35.9,-59.189],[-35.909,-59.189],[-35.909,-59.2]]'::jsonb);
 
-insert into public.potrero (empresa_id, campo_id, nombre)
-values ('e2e00000-0000-4000-8000-0000000000e1', 'e2e00000-0000-4000-8000-0000000000c1', '1A');
+insert into public.potrero (empresa_id, campo_id, nombre, poligono)
+values ('e2e00000-0000-4000-8000-0000000000e1', 'e2e00000-0000-4000-8000-0000000000c1', '1A',
+  '[[-35.9,-59.2],[-35.9,-59.1945],[-35.909,-59.1945],[-35.909,-59.2]]'::jsonb);

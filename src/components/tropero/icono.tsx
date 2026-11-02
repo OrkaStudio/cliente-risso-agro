@@ -15,7 +15,10 @@ function expandir(nombre: NombreIcono): string {
     .replaceAll("¤", ' fill="currentColor"')
 }
 
-const cache = new Map<NombreIcono, string>()
+// Se guarda el objeto entero, no sólo el texto: si cambia en cada render, React
+// vuelve a escribir el SVG por dentro y un clic que cae sobre el ícono se pierde
+// (el trazo que se apretó ya no existe cuando se suelta).
+const cache = new Map<NombreIcono, { __html: string }>()
 
 export function Icono({
   nombre,
@@ -31,7 +34,7 @@ export function Icono({
 }) {
   let html = cache.get(nombre)
   if (html === undefined) {
-    html = expandir(nombre)
+    html = { __html: expandir(nombre) }
     cache.set(nombre, html)
   }
   return (
@@ -47,7 +50,7 @@ export function Icono({
       role={titulo ? "img" : undefined}
       aria-label={titulo}
       aria-hidden={titulo ? undefined : true}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={html}
     />
   )
 }

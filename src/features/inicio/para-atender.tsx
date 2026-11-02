@@ -7,6 +7,7 @@ type Estado = 'resuelto' | 'sigue'
 import { Panel } from '@/components/panel'
 import { cn } from '@/lib/utils'
 import { nivelUI } from '@/features/inicio/para-atender-ui'
+import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -341,7 +342,8 @@ export function ParaAtenderCampo() {
     }
   })
   const [nivel, setNivel] = React.useState<'todos' | Nivel>('todos')
-  const [campo, setCampo] = React.useState<string>('todos')
+  // El campo lo elige la barra izquierda (primer filtro de toda la app): acá no se elige.
+  const campo = useCampoElegido().elegido?.nombre ?? 'todos'
   const [verTodo, setVerTodo] = React.useState(false)
 
   const potreros = React.useMemo(() => data?.potreros ?? [], [data])
@@ -357,11 +359,6 @@ export function ParaAtenderCampo() {
   const abiertaKey =
     abierta !== undefined ? abierta : primeraVez ? (potreros[0]?.key ?? null) : null
   const sinRecorrer = React.useMemo(() => data?.sinRecorrer ?? [], [data])
-  const campos = React.useMemo(
-    () =>
-      [...new Set([...potreros.map((p) => p.campo), ...sinRecorrer.map((c) => c.campo)])].sort(),
-    [potreros, sinRecorrer],
-  )
   const delCampo = React.useMemo(
     () => (campo === 'todos' ? potreros : potreros.filter((p) => p.campo === campo)),
     [potreros, campo],
@@ -451,7 +448,7 @@ export function ParaAtenderCampo() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {/* Filtros: nivel a la izquierda, campo a la derecha. Solo aparecen
+          {/* Filtros de nivel (el campo ya viene de la barra izquierda). Solo aparecen
               cuando la lista lo amerita (pocas filas no piden filtro). */}
           {potreros.length > FILAS_VISIBLES && (
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -487,21 +484,6 @@ export function ParaAtenderCampo() {
                   </ChipFiltro>
                 )}
               </div>
-              {campos.length > 1 && (
-                <select
-                  value={campo}
-                  onChange={(e) => setCampo(e.target.value)}
-                  aria-label="Filtrar por campo"
-                  className="rounded-full border border-border bg-card px-3 py-1 text-[12px] font-semibold text-muted-foreground outline-none transition-colors hover:border-faint focus-visible:ring-2 focus-visible:ring-field-soft"
-                >
-                  <option value="todos">Todos los campos</option>
-                  {campos.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              )}
             </div>
           )}
 

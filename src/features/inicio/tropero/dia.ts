@@ -182,7 +182,7 @@ export function porDondeVaElMapa(campos: CampoMapa[]): string {
           : ''
   const minutos = pendientes.reduce((s, c) => {
     const x = estadoDe(c)
-    return s + (x.tipo === 'sin-borde' ? 3 : 0) + c.potreros.filter((p) => !p.poligono).length
+    return s + (x.tipo === 'sin-borde' ? 3 + c.potreros.length : x.tipo === 'faltan' ? x.faltan.length : 0)
   }, 0)
   const despues = resto.length ? ` Después, ${resto.map((c) => c.nombre).join(' y ')}.` : ''
   return `${actual!.nombre}: ${donde}.${despues} Unos ${Math.max(2, minutos)} minutos`

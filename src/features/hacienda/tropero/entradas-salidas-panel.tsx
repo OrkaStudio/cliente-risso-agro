@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { CampoFecha } from '@/components/ui/campo-fecha'
-import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { elegirCampo, useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useCrearAnimalesMasivo, useMoverAnimales, useSalidaPorCantidad, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria, type Especie } from '@/features/hacienda/labels'
 import { CroquisDibujo } from '@/features/mapa/croquis-dibujo'
@@ -28,7 +29,8 @@ import {
 } from './entradas-salidas'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
-type Paso = 'que' | 'cuantos' | 'adonde' | 'revisa' | 'listo'
+// Dos pasos cortos (Lau, 30/10): primero el potrero sobre el croquis, después cuántos.
+type Paso = 'que' | 'potrero' | 'cuantos' | 'adonde' | 'revisa' | 'listo'
 type Resultado = { titulo: string; quedan: string; sinIdentificar: number; mov: Mov }
 
 const ICONO_QUE: Record<string, NombreIcono> = {
@@ -154,7 +156,7 @@ export function EntradasSalidas({
     // Entre campos no se preelige nada: el productor elige de dónde y a dónde.
     setCampoId(traer || llevar ? null : origen)
     setDestCampoId(null)
-    setPaso('cuantos')
+    setPaso('potrero')
   }
 
   async function confirmar() {
@@ -198,18 +200,24 @@ export function EntradasSalidas({
       ? modo === 'salieron'
         ? '¿Qué pasó?'
         : '¿De dónde vienen?'
-      : paso === 'cuantos'
+      : paso === 'potrero'
         ? sacan
-          ? '¿De qué potrero y cuántos?'
-          : '¿A qué potrero y cuántos?'
+          ? '¿De qué potrero salen?'
+          : '¿A qué potrero entran?'
+        : paso === 'cuantos'
+          ? `¿Cuántos ${sacan ? 'salen del' : 'entran al'} ${potrero?.nombre ?? ''}?`
         : paso === 'adonde'
           ? `${cuantosTexto(items)} del ${potrero?.nombre ?? ''}${campo ? ` de ${campo.nombre}` : ''}. Elegí el campo y tocá el potrero.`
           : undefined
 
   const pie =
-    paso === 'cuantos' ? (
+    paso === 'potrero' ? (
+      <BotonPrincipal icono="Siguiente" disabled={!potreroId} onClick={() => setPaso('cuantos')}>
+        {potrero ? `Seguir con el ${potrero.nombre}` : 'Tocá un potrero'}
+      </BotonPrincipal>
+    ) : paso === 'cuantos' ? (
       <BotonPrincipal icono="Siguiente" disabled={!potreroId || total === 0} onClick={() => setPaso(mueve ? 'adonde' : 'revisa')}>
-        {total === 0 ? (potreroId ? 'Contá cuántos' : 'Tocá un potrero') : `Revisar: ${cuantosTexto(items)}`}
+        {total === 0 ? 'Contá cuántos' : `Revisar: ${cuantosTexto(items)}`}
       </BotonPrincipal>
     ) : paso === 'adonde' ? (
       <BotonPrincipal icono="Siguiente" disabled={!destinoId} onClick={() => setPaso('revisa')}>
@@ -232,8 +240,8 @@ export function EntradasSalidas({
       titulo={titulo}
       bajada={bajada}
       pie={pie}
-      ancho={paso === 'cuantos' || paso === 'adonde'}
-      onVolver={paso !== 'que' && paso !== 'listo' ? () => setPaso(paso === 'revisa' ? (mueve ? 'adonde' : 'cuantos') : paso === 'adonde' ? 'cuantos' : 'que') : undefined}
+      ancho={paso === 'potrero' || paso === 'cuantos' || paso === 'adonde'}
+      onVolver={paso !== 'que' && paso !== 'listo' ? () => setPaso(paso === 'revisa' ? (mueve ? 'adonde' : 'cuantos') : paso === 'adonde' ? 'cuantos' : paso === 'cuantos' ? 'potrero' : 'que') : undefined}
     >
       {paso === 'que' && (
         <ul className="flex flex-col gap-3">
@@ -281,53 +289,66 @@ export function EntradasSalidas({
         </ul>
       )}
 
-      {paso === 'cuantos' && q && (
-        <>
+      {paso === 'potrero' && q && (
+        <div className="flex min-h-0 flex-col gap-4">
           {mueve ? (
-            <div className="mb-4 grid gap-3 rounded-[18px] bg-superficie p-4">
-              <ElegirCampo
-                titulo="Vienen de"
-                identidad={identidad}
-                campos={campos}
-                valor={campoId}
-                onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}), id === destCampoId && setDestCampoId(null))}
-                apagado={(id) => cabezasDe(id) === 0}
-                nota={(id) => (cabezasDe(id) === 0 ? 'sin hacienda' : `${cabezasDe(id)} cab`)}
-              />
-            </div>
-          ) : null}
+            <ElegirCampo
+              titulo="Vienen de"
+              identidad={identidad}
+              campos={campos}
+              valor={campoId}
+              onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}), id === destCampoId && setDestCampoId(null))}
+              apagado={(id) => cabezasDe(id) === 0}
+              nota={(id) => (cabezasDe(id) === 0 ? 'sin hacienda' : `${cabezasDe(id)} cab`)}
+            />
+          ) : (
+            <ElegirCampo compacto titulo="Campo" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}))} />
+          )}
           {mueve && !campoId ? (
-            <p className="rounded-[14px] border-[1.5px] border-dashed border-borde px-4 py-5 text-center text-[14.5px] text-texto-suave">
-              Elegí de qué campo vienen.
-            </p>
-          ) : !mueve ? (
-            <ElegirCampo titulo="Campo" identidad={identidad} campos={campos} valor={campoId} onCambio={(id) => (setCampoId(id), setPotreroId(null), setCuantos({}))} />
-          ) : null}
-          {campo && (
-            <Potreros
-              campo={campo}
-              elegido={potreroId}
-              onElegir={(id) => (setPotreroId(id), setCuantos({}), setCaravanas([]))}
-              apagado={sacan ? (p) => !(comp.get(p.id)?.size) : undefined}
-              dato={sacan ? (p) => (comp.get(p.id) ? `${[...comp.get(p.id)!.values()].reduce((s, h) => s + h.total, 0)} cab` : null) : undefined}
-            />
+            <p className="rounded-[14px] border-[1.5px] border-dashed border-borde px-4 py-5 text-center text-[14.5px] text-texto-suave">Elegí de qué campo vienen.</p>
+          ) : (
+            campo && (
+              <Potreros
+                campo={campo}
+                elegido={potreroId}
+                grande
+                // Tocar el potrero ya es la respuesta: pasa solo a contar.
+                onElegir={(id) => (setPotreroId(id), setCuantos({}), setCaravanas([]), setPaso('cuantos'))}
+                apagado={sacan ? (p) => !comp.get(p.id)?.size : undefined}
+                dato={(p) => {
+                  const n = [...(comp.get(p.id)?.values() ?? [])].reduce((s, h) => s + h.total, 0)
+                  return n ? `${n} cab` : null
+                }}
+              />
+            )
           )}
-          {potrero && especies.length > 1 && (
-            <div className="mt-5">
-              <p className="mb-2.5 text-[14.5px] font-bold text-texto">Qué {sacan ? 'salió' : 'entró'}</p>
-              <Segmentos etiqueta="Especie" opciones={especies.map((e) => ({ valor: e, texto: NOMBRE_ESPECIE[e] }))} valor={especie} onCambio={setEspecie} />
+        </div>
+      )}
+
+      {paso === 'cuantos' && q && campo && potrero && (
+        <div className="flex flex-col gap-4">
+          {/* El potrero elegido, chico y marcado: se ve dónde, sin ocupar la pantalla. */}
+          <div className="flex items-center gap-3 rounded-[16px] bg-superficie p-2 pr-4">
+            <div className="h-[84px] w-[132px] shrink-0 overflow-hidden rounded-[12px]">
+              {potrero.poligono && potrero.poligono.length >= 3 ? (
+                <CroquisDibujo campo={campo} elegido={potrero.id} llenar className="size-full rounded-[12px]" />
+              ) : (
+                <span className="grid size-full place-items-center bg-pasto-oscuro/20 text-[13px] font-semibold text-texto-suave">Sin dibujar</span>
+              )}
             </div>
-          )}
-          {potrero && (
-            <Contar
-              filas={categoriasParaContar(q, enPotrero, especie)}
-              cuantos={cuantos}
-              setCuantos={setCuantos}
-              potrero={potrero.nombre}
-              sacan={!!sacan}
-            />
-          )}
-        </>
+            <div className="min-w-0 flex-1">
+              <p className="cifra text-[22px] leading-none font-bold text-texto">{potrero.nombre}</p>
+              <p className="mt-1 truncate text-[13.5px] text-texto-suave">
+                {campo.nombre} · hoy hay {cabezasEn(potrero.id)}
+              </p>
+            </div>
+            <button type="button" onClick={() => setPaso('potrero')} className="shrink-0 text-[14px] font-bold text-principal hover:underline">
+              Cambiar
+            </button>
+          </div>
+          {especies.length > 1 && <Segmentos etiqueta="Especie" opciones={especies.map((e) => ({ valor: e, texto: NOMBRE_ESPECIE[e] }))} valor={especie} onCambio={setEspecie} />}
+          <Contar filas={categoriasParaContar(q, enPotrero, especie)} cuantos={cuantos} setCuantos={setCuantos} potrero={potrero.nombre} sacan={!!sacan} />
+        </div>
       )}
 
       {paso === 'adonde' && (
@@ -413,16 +434,39 @@ export function EntradasSalidas({
   )
 }
 
-/** El croquis satelital si el campo está dibujado; si no, sus potreros como botones. */
-export function Potreros(props: React.ComponentProps<typeof CroquisDibujo> & { onElegir: (id: string) => void }) {
-  const { campo } = props
-  // Dibujado, el croquis simple; los potreros sin dibujo, como botones debajo.
+/**
+ * El croquis si el campo está dibujado; los potreros sin dibujar, como botones
+ * debajo con su aviso y el atajo para dibujarlos (no traban la carga).
+ * `grande`: el croquis llena el alto del panel (el paso de elegir el potrero).
+ */
+export function Potreros(props: React.ComponentProps<typeof CroquisDibujo> & { onElegir: (id: string) => void; grande?: boolean }) {
+  const { campo, grande, ...resto } = props
+  const navigate = useNavigate()
   const sueltos = campo.potreros.filter((p) => !p.poligono || p.poligono.length < 3)
-  if (sueltos.length === campo.potreros.length) return <BotonesPotrero {...props} potreros={sueltos} />
+  const todosSueltos = sueltos.length === campo.potreros.length
   return (
-    <div className="flex flex-col gap-2.5">
-      <CroquisDibujo {...props} />
-      {sueltos.length > 0 && <BotonesPotrero {...props} potreros={sueltos} />}
+    <div className="flex flex-col gap-3">
+      {!todosSueltos && <CroquisDibujo {...resto} campo={campo} llenar={grande} className={grande ? 'h-[min(46dvh,440px)]' : undefined} />}
+      {sueltos.length > 0 && (
+        <div className={cn('flex flex-col gap-2', !todosSueltos && 'rounded-[16px] border-[1.5px] border-dashed border-borde p-3')}>
+          {!todosSueltos && (
+            <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-[13.5px] text-texto-suave">
+              <span>Sin dibujar en el mapa</span>
+              <button
+                type="button"
+                onClick={() => {
+                  elegirCampo(campo.id)
+                  navigate('/campos')
+                }}
+                className="font-bold text-principal hover:underline"
+              >
+                Dibujarlos en Campos
+              </button>
+            </p>
+          )}
+          <BotonesPotrero {...props} potreros={sueltos} />
+        </div>
+      )}
     </div>
   )
 }
@@ -475,9 +519,12 @@ export function ElegirCampo({
   excepto,
   apagado,
   nota,
+  compacto = false,
 }: {
   apagado?: (id: string) => boolean
   nota?: (id: string) => string
+  /** Con un campo ya elegido, una línea «El Bajo · Cambiar» en vez de todos los botones. */
+  compacto?: boolean
   titulo: string
   identidad: Identidad[]
   campos: CampoMapa[]
@@ -487,6 +534,20 @@ export function ElegirCampo({
 }) {
   const opciones = campos.filter((c) => c.id !== excepto)
   const de = (id: string) => identidad.find((i) => i.id === id)
+  const [abierto, setAbierto] = useState(false)
+  const actual = opciones.find((c) => c.id === valor)
+  if (compacto && actual && !abierto && opciones.length <= 4)
+    return (
+      <p className="flex items-center gap-2 text-[15px] font-bold text-texto">
+        <Letra c={de(actual.id)} />
+        {actual.nombre}
+        {opciones.length > 1 && (
+          <button type="button" onClick={() => setAbierto(true)} className="ml-1 text-[14px] font-bold text-principal hover:underline">
+            Cambiar
+          </button>
+        )}
+      </p>
+    )
   if (opciones.length > 4)
     return (
       <label className="mb-3 flex items-center gap-3">
@@ -549,39 +610,40 @@ function Contar({
   potrero: string
   sacan: boolean
 }) {
-  if (filas.length === 0) return <p className="mt-5 text-[14.5px] text-texto-suave">En el {potrero} no hay hacienda.</p>
+  if (filas.length === 0) return <p className="text-[14.5px] text-texto-suave">En el {potrero} no hay hacienda.</p>
+  // Una ficha por categoría, en grilla: entran todas a la vista, sin una lista larga.
   return (
-    <ul className="mt-4 divide-y divide-borde border-y border-borde">
+    <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
       {filas.map((f) => {
         const n = cuantos[f.categoria] ?? 0
         const tope = f.max ?? 9999
         const poner = (v: number) => setCuantos((c) => ({ ...c, [f.categoria]: Math.max(0, Math.min(tope, v)) }))
+        const nombre = categoriaNombre(f.categoria, 2)
         return (
-          <li key={f.categoria} className="flex items-center gap-3 py-3">
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15.5px] font-bold text-texto">{categoriaNombre(f.categoria, 2)}</span>
-              {sacan ? (
-                <span className="block text-[13px] text-texto-suave">
-                  de {f.hay} en el {potrero}
-                  {f.max !== null && f.max < f.hay ? ` · ${f.max} sin caravana` : ''}
-                </span>
-              ) : (
-                f.hay > 0 && <span className="block text-[13px] text-texto-suave">hoy hay {f.hay}</span>
-              )}
+          <li key={f.categoria} className={cn('flex flex-col gap-2 rounded-[16px] border-[1.5px] p-3 transition-colors', n ? 'border-principal bg-principal-suave/50' : 'border-borde bg-superficie')}>
+            <span className="min-w-0">
+              <span className="block truncate text-[15px] font-bold text-texto">{nombre}</span>
+              <span className="block truncate text-[12.5px] text-texto-suave">
+                {sacan ? `de ${f.hay}${f.max !== null && f.max < f.hay ? ` · ${f.max} sin caravana` : ''}` : f.hay > 0 ? `hoy hay ${f.hay}` : '\u00a0'}
+              </span>
             </span>
-            <button type="button" aria-label={`Uno menos: ${categoriaNombre(f.categoria, 2)}`} onClick={() => poner(n - 1)} disabled={n === 0} className="grid size-9 place-items-center rounded-full bg-superficie-hundida text-[18px] font-bold text-texto disabled:opacity-40">
-              −
-            </button>
-            <input
-              aria-label={`Cuántos ${categoriaNombre(f.categoria, 2).toLowerCase()}`}
-              inputMode="numeric"
-              value={n}
-              onChange={(e) => poner(Number(e.target.value.replace(/\D/g, '')) || 0)}
-              className={cn('cifra w-14 bg-transparent text-center text-[24px] font-bold outline-none', n ? 'text-texto' : 'text-texto-suave/60')}
-            />
-            <button type="button" aria-label={`Uno más: ${categoriaNombre(f.categoria, 2)}`} onClick={() => poner(n + 1)} disabled={n >= tope} className="grid size-9 place-items-center rounded-full bg-principal text-[18px] font-bold text-principal-texto disabled:opacity-40">
-              +
-            </button>
+            <span className="flex items-center justify-between gap-1">
+              <button type="button" aria-label={`Uno menos: ${nombre}`} onClick={() => poner(n - 1)} disabled={n === 0} className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-[18px] font-bold text-texto disabled:opacity-30">
+                −
+              </button>
+              <input
+                aria-label={`Cuántos ${nombre.toLowerCase()}`}
+                inputMode="numeric"
+                value={n || ''}
+                placeholder="0"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => poner(Number(e.target.value.replace(/\D/g, '')) || 0)}
+                className={cn('cifra w-12 min-w-0 bg-transparent text-center text-[24px] font-bold outline-none placeholder:text-texto-suave/50', n ? 'text-texto' : 'text-texto-suave')}
+              />
+              <button type="button" aria-label={`Uno más: ${nombre}`} onClick={() => poner(n + 1)} disabled={n >= tope} className="grid size-9 shrink-0 place-items-center rounded-full bg-principal text-[18px] font-bold text-principal-texto disabled:opacity-30">
+                +
+              </button>
+            </span>
           </li>
         )
       })}

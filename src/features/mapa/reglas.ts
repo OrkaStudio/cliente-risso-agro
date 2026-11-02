@@ -2,6 +2,7 @@
 // React ni red. Se prueban solas en reglas.test.ts.
 import area from '@turf/area'
 import intersect from '@turf/intersect'
+import union from '@turf/union'
 import { featureCollection, polygon as turfPolygon } from '@turf/helpers'
 
 /** [lat, lng], como se guarda en la base (jsonb). */
@@ -127,11 +128,43 @@ export type EstadoCampo =
   | { tipo: 'faltan'; faltan: PotreroMapa[] }
   | { tipo: 'listo' }
 
+/**
+ * Un potrero cuenta como dibujado si tiene su dibujo y cae dentro del borde del
+ * campo (con más de la mitad afuera, quedó en otro lado: hay que redibujarlo).
+ * Sin borde todavía, alcanza con tener el dibujo.
+ */
+export function dibujadoEn(p: PotreroMapa, contorno: LatLng[] | null): boolean {
+  if (!p.poligono || p.poligono.length < 3) return false
+  return !contorno || fueraDelBorde(p.poligono, contorno) <= 0.5
+}
+
+/** Primero el borde, después cada potrero dibujado adentro (Lau, 30/10). */
 export function estadoDe(c: CampoMapa): EstadoCampo {
   if (!c.contorno) return { tipo: 'sin-borde' }
   if (c.potreros.length === 0) return { tipo: 'sin-potreros' }
-  const faltan = c.potreros.filter((p) => !p.poligono)
+  const faltan = c.potreros.filter((p) => !dibujadoEn(p, c.contorno))
   return faltan.length ? { tipo: 'faltan', faltan } : { tipo: 'listo' }
+}
+
+/**
+ * El borde de un campo que no lo tiene pero sí todos sus potreros dibujados:
+ * el contorno exterior de la unión de los potreros (el caso de Daniel: La
+ * Porteña y Los Pampas). null si falta dibujar alguno o no se pueden unir.
+ */
+export function bordeDesdePotreros(potreros: PotreroMapa[]): LatLng[] | null {
+  if (potreros.length === 0 || potreros.some((p) => !p.poligono || p.poligono.length < 3)) return null
+  try {
+    const todos = potreros.map((p) => turfPolygon([anillo(p.poligono!)]))
+    const u = todos.length === 1 ? todos[0]! : union(featureCollection(todos))
+    if (!u) return null
+    const g = u.geometry
+    // Si quedaron separados (potreros sueltos), el más grande; adentro, sólo el anillo de afuera.
+    const anillos = g.type === 'Polygon' ? [g.coordinates[0]!] : g.coordinates.map((pol) => pol[0]!)
+    const mayor = anillos.reduce((a, b) => (area(turfPolygon([b])) > area(turfPolygon([a])) ? b : a))
+    return mayor.slice(0, -1).map(([lng, lat]) => [lat!, lng!] as LatLng)
+  } catch {
+    return null
+  }
 }
 
 /** El campo por el que sigue: el primero que no está listo (null = todos listos). */
@@ -151,6 +184,23 @@ export function totalesDelMapa(cs: CampoMapa[]): { hectareas: number; potreros: 
     potreros: cs.reduce((s, c) => s + c.potreros.length, 0),
     cabezas: cs.reduce((s, c) => s + c.potreros.reduce((t, p) => t + p.cabezas, 0), 0),
   }
+}
+
+/**
+ * Lo dibujado es el doble o más (o la mitad o menos) de lo cargado en el alta:
+ * lo más probable es que el dibujo no siga el alambrado. Ahí lo primero es
+ * ajustar el dibujo, no pisar el alta (Lau, 30/10: «lo corrijo» rompía datos).
+ */
+export function lejosDelAlta(medido: number, alta: number | null): boolean {
+  if (alta === null || alta <= 0 || medido <= 0) return false
+  const r = medido / alta
+  return r >= 2 || r <= 0.5
+}
+
+/** «unas 6 veces», «la mitad»: cuánto se aleja, dicho como se diría. */
+export function cuantoSeAleja(medido: number, alta: number): string {
+  const r = medido / alta
+  return r >= 2 ? `unas ${Math.round(r)} veces lo que cargaste` : r <= 0.5 ? `menos de la mitad de lo que cargaste` : ''
 }
 
 /** Lo medido en el borde contra lo cargado en el alta (Tutorial · Borde marcado). */
