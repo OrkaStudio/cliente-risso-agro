@@ -36,3 +36,17 @@ export function borrarCamposPendientes() {
 export function borrarCampo(nombre: string) {
   sql(`delete from public.campo where empresa_id = '${EMPRESA}' and nombre = '${nombre.replace(/'/g, "''")}';`)
 }
+
+/**
+ * Animales sin caravana en el 1A del campo base, para los tests que se la ponen
+ * (planilla, ficha). Cada test se siembra los suyos: no dependen de que otro test
+ * los haya dejado (con las corridas se agotaban y fallaban).
+ */
+export function sembrarSinCaravana(categoria: 'ternero' | 'toro', cuantos = 1) {
+  sql(`
+    insert into public.animal (empresa_id, categoria, estado, origen, potrero_id)
+    select '${EMPRESA}', '${categoria}'::public.categoria_animal, 'activo', 'e2e', p.id
+    from public.potrero p, generate_series(1, ${cuantos})
+    where p.campo_id = '${BASE}' and p.nombre = '1A';
+  `)
+}

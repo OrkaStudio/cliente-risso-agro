@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { entrar, sesionDePrueba } from './helpers'
-import { borrarCampo } from './mapa-e2e'
+import { borrarCampo, sembrarSinCaravana } from './mapa-e2e'
 
 // Los campos que crea un test se borran al terminar: uno a medias trabaría la app (primero el mapa).
 const creados: string[] = []
@@ -267,6 +267,9 @@ test('planilla con sólo números: se dice qué son y dónde estaban, sin supone
 })
 
 test('planilla que no cierra: se decide por grupo, y los errores se corrigen en el Revisá', async ({ page }) => {
+  // La planilla trae un toro y un ternero para el 1A: el ternero sin caravana está
+  // (cierra); toros sin caravana no hay (ese grupo no cierra, que es lo que se prueba).
+  sembrarSinCaravana('ternero')
   await entrar(page)
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
   const panel = page.getByRole('dialog')
@@ -286,6 +289,7 @@ test('planilla que no cierra: se decide por grupo, y los errores se corrigen en 
 })
 
 test('desde la ficha: a uno solo se le pone su primera caravana, y la planilla le suma el chip', async ({ page }) => {
+  sembrarSinCaravana('ternero')
   await entrar(page)
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
   await page.getByRole('tab', { name: /Sin caravana/ }).click()
@@ -333,7 +337,9 @@ test('desde la ficha: «¿Fue ésta?» → la vaca queda vendida, el número no 
   // Se ve en Hacienda, pestaña «Salieron».
   await page.getByRole('link', { name: 'Hacienda', exact: true }).first().click()
   await page.getByRole('tab', { name: /Salieron/ }).click()
-  await expect(page.getByRole('row', { name: new RegExp(`${caravana}.*Vendida`) })).toBeVisible()
+  // Por la caravana completa: el final de 4 se repite entre las ventas de otras corridas.
+  await page.getByPlaceholder('Buscá una caravana').fill(numero)
+  await expect(page.getByRole('row', { name: new RegExp(`${caravana}.*Vendida`) })).toHaveCount(1)
 })
 
 test('un campo sin animales: si es agrícola lo dice con lo sembrado; si no, ofrece cargar la hacienda', async ({ page }) => {
