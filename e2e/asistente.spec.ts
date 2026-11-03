@@ -18,7 +18,7 @@ test('se entiende qué es, dice lo que notó y lo que propone lo hace', async ({
   const panel = page.getByRole('dialog', { name: '¿En qué te ayudo?' })
   await expect(panel).toContainText('Lo que vi en tus campos')
   await expect(panel).toContainText('Probá preguntarme')
-  await expect(panel).toContainText('no tienen hacienda cargada')
+  await expect(panel).toContainText(/no tienen? hacienda cargada/)
 
   await panel.getByRole('button', { name: /Cargar la hacienda/ }).click()
   await expect(page).toHaveURL(/\/hacienda$/)

@@ -92,6 +92,8 @@
     --color-acento: var(--acento);
     --color-acento-texto: var(--acento-texto);
     --color-estado-bien: var(--estado-bien);
+    --color-plata-entra: var(--plata-entra);
+    --color-plata-sale: var(--plata-sale);
     --color-estado-bien-suave: var(--estado-bien-suave);
     --color-estado-bien-texto: var(--estado-bien-texto);
     --color-estado-atencion: var(--estado-atencion);
@@ -239,6 +241,10 @@
     --estado-problema: #b23a2a;
     --estado-problema-suave: #f6deda;
     --estado-problema-texto: #8f2e21;
+    /* Plata mes a mes: lo que entra (arriba) y lo que sale (abajo). Validados con el
+       chequeo de daltonismo; la dirección respecto del cero es la segunda señal. */
+    --plata-entra: #3b7a4f;
+    --plata-sale: #c97e5b;
     --estado-aviso: #524c44;
     --estado-aviso-suave: #f4f1e9;
     --estado-aviso-texto: #524c44;
@@ -333,6 +339,8 @@
     --estado-problema: #f08a7a;
     --estado-problema-suave: #4a1812;
     --estado-problema-texto: #f08a7a;
+    --plata-entra: #6fae84;
+    --plata-sale: #e0956c;
     --estado-aviso: #a59d91;
     --estado-aviso-suave: #37322d;
     --estado-aviso-texto: #bfb8ad;

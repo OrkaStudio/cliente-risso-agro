@@ -22,6 +22,24 @@ export function completarCampoBase() {
   `)
 }
 
+/**
+ * Un segundo campo terminado (borde y su potrero dibujados), lejos del base. Con
+ * un solo campo la app no pregunta «Campo» ni muestra «Todos tus campos», y los
+ * tests de Hacienda y Campos los usan: antes dependían de sobrantes de corridas viejas.
+ */
+export function asegurarSegundoCampo() {
+  sql(`
+    insert into public.campo (id, empresa_id, nombre, contorno)
+    values ('e2e00000-0000-4000-8000-0000000000c2', '${EMPRESA}', 'E2E Campo dos',
+            '[[-35.95,-59.25],[-35.95,-59.239],[-35.959,-59.239],[-35.959,-59.25]]'::jsonb)
+    on conflict (id) do nothing;
+    insert into public.potrero (empresa_id, campo_id, nombre, poligono)
+    select '${EMPRESA}', 'e2e00000-0000-4000-8000-0000000000c2', '2A',
+           '[[-35.95,-59.25],[-35.95,-59.239],[-35.959,-59.239],[-35.959,-59.25]]'::jsonb
+    where not exists (select 1 from public.potrero where campo_id = 'e2e00000-0000-4000-8000-0000000000c2');
+  `)
+}
+
 /** Borra los campos de prueba que quedaron sin terminar (sus animales quedan sin potrero). */
 export function borrarCamposPendientes() {
   sql(`

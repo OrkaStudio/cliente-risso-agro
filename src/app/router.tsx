@@ -53,11 +53,9 @@ const PotreroDetailPage = lazy(() =>
     default: m.PotreroDetailPage,
   })),
 )
-const AnaliticaPage = lazy(() =>
-  import('@/features/analitica/analitica-page').then((m) => ({
-    default: m.AnaliticaPage,
-  })),
-)
+// Plata (rediseño, Figma página 35): la plata y los movimientos.
+const AnaliticaPage = lazy(() => import('@/features/analitica/tropero/plata-page').then((m) => ({ default: m.PlataPage })))
+const MovimientosPage = lazy(() => import('@/features/analitica/tropero/movimientos-page').then((m) => ({ default: m.MovimientosPage })))
 const AgendaPage = lazy(() =>
   import('@/features/agenda/agenda-page').then((m) => ({
     default: m.AgendaPage,
@@ -224,6 +222,7 @@ export const router = createBrowserRouter([
               { path: 'potreros', element: <Navigate to="/campos" replace /> },
               { path: 'potrero/:id', element: <PotreroDetailPage /> },
               { path: 'analitica', element: <AnaliticaPage /> },
+              { path: 'analitica/movimientos', element: <MovimientosPage /> },
               { path: 'agenda', element: <AgendaPage /> },
               // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
               { path: 'cheques', element: <Navigate to="/agenda" replace /> },

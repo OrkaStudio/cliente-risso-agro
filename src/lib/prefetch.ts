@@ -48,6 +48,6 @@ export const CHUNKS_CAMPO: Record<string, Thunk> = {
 export const CHUNKS_OFICINA: Record<string, Thunk> = {
   '/hacienda': () => import('@/features/hacienda/tropero/rodeo-page'),
   '/campos': () => import('@/features/campos/tropero/campos-page'),
-  '/analitica': () => import('@/features/analitica/analitica-page'),
+  '/analitica': () => import('@/features/analitica/tropero/plata-page'),
   '/agenda': () => import('@/features/agenda/agenda-page'),
 }

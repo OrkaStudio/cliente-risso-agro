@@ -116,7 +116,7 @@ async function venderUnaVaca(page: Page) {
   const panel = page.getByRole('dialog')
   await page.getByRole('button', { name: 'Salieron', exact: true }).click()
   await panel.getByRole('button', { name: /Los vendí/ }).click()
-  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
+  await elegirCampoBase(page)
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
@@ -140,7 +140,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await page.getByRole('button', { name: 'Salieron', exact: true }).click()
   const panel = page.getByRole('dialog')
   await panel.getByRole('button', { name: /Los vendí/ }).click()
-  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
+  await elegirCampoBase(page)
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
@@ -160,7 +160,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   // Entraron · Nacieron: dos terneros en el 1A, sin caravana.
   await page.getByRole('button', { name: 'Entraron', exact: true }).click()
   await panel.getByRole('button', { name: /Nacieron/ }).click()
-  await panel.getByRole('combobox', { name: 'Campo' }).selectOption({ label: 'E2E Campo base' })
+  await elegirCampoBase(page)
   await tocarPotrero(page, '1A')
   await panel.getByRole('button', { name: 'Uno más: Terneros' }).click()
   await panel.getByRole('button', { name: 'Uno más: Terneros' }).click()
@@ -211,12 +211,21 @@ async function subirPlanilla(page: Page, csv: string) {
   await page.getByRole('dialog').locator('input[type=file]').setInputFiles({ name: 'caravanas.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
 }
 
-/** Elige el campo base y toca el 1A en el croquis (o en sus botones). */
-async function elDelUnoA(page: Page) {
+/** Elige el campo base: ya elegido (el de la barra), lista con más de 4 campos o botones. */
+async function elegirCampoBase(page: Page) {
   const panel = page.getByRole('dialog')
   const select = panel.getByRole('combobox', { name: 'Campo' })
+  const boton = panel.getByRole('radio', { name: /E2E Campo base/ })
+  const elegido = panel.getByRole('group', { name: 'Croquis de E2E Campo base' })
+  await select.or(boton).or(elegido).first().waitFor()
+  if (await elegido.count()) return
   if (await select.count()) await select.selectOption({ label: 'E2E Campo base' })
-  else await panel.getByRole('radio', { name: /E2E Campo base/ }).click()
+  else await boton.click()
+}
+
+/** Elige el campo base y toca el 1A en el croquis (o en sus botones). */
+async function elDelUnoA(page: Page) {
+  await elegirCampoBase(page)
   await tocarPotrero(page, '1A')
 }
 

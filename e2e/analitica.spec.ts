@@ -1,14 +1,16 @@
 import { test, expect } from '@playwright/test'
 import { elegir, entrar } from './helpers'
 
-test('analitica: cargar un gasto y verlo en la lista', async ({ page }) => {
+test('plata: anotar un gasto, verlo en los movimientos y buscarlo', async ({ page }) => {
   const desc = `E2E gasto ${Date.now()}`
   await entrar(page)
 
   await page.getByRole('link', { name: 'Plata', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Analítica', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Lo que viene' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'En qué se va' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Qué rinde' })).toBeVisible()
 
-  await page.getByRole('button', { name: '+ Cargar' }).click()
+  await page.getByRole('button', { name: 'Anotar un gasto' }).click()
   const carga = page.getByRole('dialog', { name: 'Cargar' })
 
   // Paso 1: gasto único
@@ -28,7 +30,9 @@ test('analitica: cargar un gasto y verlo en la lista', async ({ page }) => {
   await carga.getByRole('button', { name: 'Cargar', exact: true }).click()
   await expect(carga).toBeHidden()
 
-  // Aparece en "Todos los movimientos"
-  await page.getByText('Todos los movimientos').click()
-  await expect(page.getByRole('cell', { name: 'Combustible' }).first()).toBeVisible()
+  // En los movimientos del mes, y se encuentra buscándolo.
+  await page.getByRole('link', { name: 'Ver los movimientos' }).click()
+  await page.getByRole('textbox', { name: 'Buscar un movimiento' }).fill(desc)
+  await expect(page.getByText(desc)).toBeVisible()
+  await expect(page.getByText('−$12.345')).toBeVisible()
 })
