@@ -37,12 +37,14 @@ export function PanelLateral({
   return (
     <DialogPrimitive.Root open={abierto} onOpenChange={(v) => !v && onCerrar()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-tinta/40 duration-200 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0" />
+        {/* Fondo y panel salen juntos (300 ms) y se quedan en su final hasta desmontarse:
+            antes el fondo terminaba primero, volvía a oscurecerse y parpadeaba (Lau, 03/11). */}
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-tinta/40 duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0" />
         <DialogPrimitive.Popup
           className={cn(
             'fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full flex-col transition-[max-width] duration-300',
             ancho ? 'max-w-[680px]' : 'max-w-[520px]',
-            ' rounded-l-[28px] bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
+            ' rounded-l-[28px] bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
             className,
           )}
         >

@@ -387,3 +387,21 @@ test('un campo sin animales: si es agrícola lo dice con lo sembrado; si no, ofr
   await page.getByRole('button', { name: /^Entraron/ }).first().click()
   await expect(page.getByText('¿De dónde vienen?')).toBeVisible()
 })
+
+test('en la ficha, elegir en la barra un campo donde el animal no está vuelve al rodeo de ese campo', async ({ page }) => {
+  await entrar(page)
+  const barra = page.getByRole('radiogroup', { name: 'Qué campo estás viendo' })
+  await barra.getByRole('radio', { name: /E2E Campo base \d+ cab/ }).click()
+  await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  await page.getByRole('row').filter({ hasText: '1A' }).getByRole('link').first().click()
+  await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
+
+  // «Todos tus campos» incluye al animal: la ficha se queda.
+  await barra.getByRole('radio', { name: /^Todos tus campos/ }).click()
+  await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
+
+  // Un campo donde no está: vuelve a Hacienda, ya filtrada por ese campo.
+  await barra.getByRole('radio', { name: /E2E Campo dos \d+ cab/ }).click()
+  await expect(page).toHaveURL(/\/hacienda$/)
+  await expect(page.getByText('Estás viendo').locator('..')).toContainText('E2E Campo dos')
+})

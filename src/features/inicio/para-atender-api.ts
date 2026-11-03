@@ -310,7 +310,7 @@ async function getParaAtender(): Promise<ParaAtenderData> {
       nivel: avisos.reduce<Nivel>((peor, a) => (peso[a.nivel] < peso[peor] ? a.nivel : peor), 'nota'),
       urgencia: avisos[0].urgencia,
       hace,
-      to: `/potrero/${o.potrero_id}`,
+      to: `/campos?potrero=${o.potrero_id}`,
     })
   }
 

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import rollos from '@/assets/tropero/rollos-plata.webp'
 import { useDolarHistorico } from './dolar'
 import { MesAMes } from './mes-a-mes'
-import { avisosParaMejorar, campanas as porCampana, comparacionTexto, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Periodo } from './plata'
+import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Periodo } from './plata'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 
@@ -84,9 +84,9 @@ export function PlataPage() {
 
   const vacio = delCampo.length === 0
   const ganando = anio.resultado >= 0
-  const comparacion = comparacionTexto(anio, { doce: 'el año anterior', campana: 'la campaña pasada a esta altura', pasada: 'la campaña anterior' }[clave])
-  const cuando = clave === 'doce' ? 'En los últimos 12 meses' : `En la ${periodo.nombre.toLowerCase()}`
-  const verbo = periodo.enCurso ? (ganando ? 'van ganando' : 'van perdiendo') : ganando ? 'ganaron' : 'perdieron'
+  const comparacion = comparacionCorta(anio)
+  const contra = { doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior' }[clave]
+  const verbo = periodo.enCurso ? (ganando ? 'Van ganando' : 'Van perdiendo') : ganando ? 'Ganaron' : 'Perdieron'
 
   const anotar = (abrir: () => void, texto: string, secundario = false) => (
     <button
@@ -122,39 +122,64 @@ export function PlataPage() {
         </div>
       </motion.div>
 
-      {/* Portada: cómo vienen los últimos 12 meses. */}
-      <motion.section {...entra(1)} className="relative isolate flex flex-wrap items-end justify-between gap-x-8 gap-y-5 overflow-hidden rounded-[24px] bg-tinta px-9 py-7">
-        <img src={rollos} alt="" className="absolute inset-0 -z-20 size-full object-cover object-[50%_65%]" fetchPriority="high" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,rgba(19,27,22,0.82)_25%,rgba(19,27,22,0.35)_60%,rgba(19,27,22,0.05))]" />
-        {!vacio && (
-          <div role="tablist" aria-label="Período" className="absolute top-5 right-5 flex gap-1 rounded-full bg-tinta/55 p-1 backdrop-blur-sm">
-            {todos.map((p) => (
-              <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold transition-colors', clave === p.clave ? 'bg-superficie text-texto' : 'text-[#f7e3b6] hover:bg-white/10')}>
-                {p.nombre}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="min-w-0 pt-8">
-        {vacio ? (
-          <>
-            <p className="text-[16px] font-semibold text-[#f7e3b6]">Todavía no anotaste plata</p>
-            <h1 className="titulo-display mt-1.5 max-w-[560px] text-[34px] leading-[1.05] tracking-[-0.02em] text-superficie">Anotá el primer gasto y empezá a ver cómo viene el campo</h1>
-          </>
-        ) : (
-          <>
-            <p className="text-[16px] font-semibold text-[#f7e3b6]">{cuando} {verbo}</p>
-            <h1 className="titulo-display cifra mt-1 text-[64px] leading-[0.95] tracking-[-0.035em] text-superficie">{pesos(Math.abs(anio.resultado))}</h1>
-            <p className="mt-2.5 max-w-[680px] text-[15.5px] leading-snug text-[#f7e3b6]">
-              Entraron {pesos(anio.entro)} y salieron {pesos(anio.salio)}.
-              {comparacion && ` ${comparacion}`}
-            </p>
-          </>
-        )}
+      {/* Portada: el resultado del período. Alto fijo y una línea por dato: cambiar el
+          período no la mueve (Lau, 03/11). */}
+      <motion.section {...entra(1)} className="relative isolate flex h-[236px] flex-col justify-between overflow-hidden rounded-[24px] bg-tinta px-8 py-6">
+        <img src={rollos} alt="" className="absolute inset-0 -z-20 size-full object-cover object-[50%_80%]" fetchPriority="high" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(19,27,22,0.86)_0%,rgba(19,27,22,0.62)_45%,rgba(19,27,22,0.18)_100%)]" />
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[15px] font-semibold text-[#f7e3b6]">{vacio ? 'Todavía no anotaste plata' : verbo}</p>
+          {!vacio && (
+            <div role="tablist" aria-label="Período" className="flex shrink-0 gap-1 rounded-full bg-tinta/60 p-1 backdrop-blur-sm">
+              {todos.map((p) => (
+                <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-superficie text-texto' : 'text-[#f7e3b6] hover:bg-white/10')}>
+                  {p.nombre}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="flex flex-wrap gap-3">
-          {empresaId && <span data-guia="analitica-cargar" className="contents"><CargarDialog empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(abrir, 'Anotar un gasto')} /></span>}
-          {empresaId && <CargarDialog empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(abrir, 'Escanear un comprobante', true)} />}
+        <div className="flex items-end justify-between gap-6">
+          <div className="min-w-0">
+            {vacio ? (
+              <h1 className="titulo-display max-w-[520px] text-[30px] leading-[1.08] tracking-[-0.02em] text-superficie">Anotá el primer gasto y mirá cómo viene el campo</h1>
+            ) : (
+              <>
+                <h1 className="titulo-display cifra text-[60px] leading-[0.95] tracking-[-0.035em] text-superficie">{pesos(Math.abs(anio.resultado))}</h1>
+                <p className="mt-2.5 flex items-center gap-3 text-[14.5px] whitespace-nowrap text-[#f7e3b6]">
+                  <span>
+                    Entró <b className="cifra text-[16px] text-superficie">{pesos(anio.entro)}</b>
+                  </span>
+                  <span aria-hidden className="text-[#f7e3b6]/50">·</span>
+                  <span>
+                    Salió <b className="cifra text-[16px] text-superficie">{pesos(anio.salio)}</b>
+                  </span>
+                </p>
+                {/* Siempre la línea, aunque no haya con qué comparar: el alto no cambia. */}
+                <p className="mt-2 h-[24px]">
+                  {comparacion && (
+                    <span className={cn('inline-flex h-full items-center gap-1 rounded-full px-2.5 text-[13px] font-bold whitespace-nowrap', comparacion.sube ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
+                      {comparacion.sube ? '▲' : '▼'} {comparacion.texto} {contra}, en dólares
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-2.5">
+            {empresaId && <span data-guia="analitica-cargar" className="contents"><CargarDialog empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(abrir, 'Anotar un gasto')} /></span>}
+            {empresaId && (
+              <CargarDialog
+                empresaId={empresaId}
+                campoInicial={campoId ?? undefined}
+                renderTrigger={(abrir) => (
+                  <button type="button" onClick={abrir} aria-label="Escanear un comprobante" className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto transition-opacity hover:opacity-90">
+                    <Icono nombre="Foto" />
+                  </button>
+                )}
+              />
+            )}
+          </div>
         </div>
       </motion.section>
 

@@ -18,13 +18,13 @@ test('campos: sumar un campo, y si todavía no está en el mapa, ubicarlo', asyn
 
   // Sumar un campo: la localidad sale del buscador (Open-Meteo), nunca texto suelto
   await page.getByRole('button', { name: '+ Sumar un campo' }).click()
-  const alta = page.getByRole('dialog', { name: 'Nuevo campo' })
-  await alta.getByLabel('Nombre').fill(campo)
-  await alta.getByRole('button', { name: 'Ganadera' }).click()
-  await alta.getByRole('combobox', { name: '¿Dónde está el campo?' }).fill('Chascomús')
+  // El mismo alta que en el onboarding, en el panel lateral: las hectáreas son obligatorias.
+  const alta = page.getByRole('dialog', { name: 'Sumar un campo' })
+  await alta.getByLabel('Cómo se llama').fill(campo)
+  await alta.getByRole('combobox', { name: 'Dónde está' }).fill('Chascomús')
   await page.getByRole('option', { name: /Chascom/ }).first().click()
-  await alta.getByLabel('Hectáreas (opcional)').fill('50')
-  await alta.getByRole('button', { name: 'Crear campo' }).click()
+  await alta.getByLabel('Cuántas hectáreas').fill('50')
+  await alta.getByRole('button', { name: 'Guardar el campo' }).click()
   await expect(alta).toBeHidden()
 
   // Queda elegido y, como no tiene borde, Campos se vuelve el mapa para armarlo: sin salir de la web.

@@ -104,6 +104,19 @@ export function RodeoPage() {
   const [todas, setTodas] = useState(false)
   const [nuevo, setNuevo] = useState(false)
   const [entradaSalida, setEntradaSalida] = useState<'entraron' | 'salieron' | null>(null)
+  // Los paneles quedan montados mientras salen (si no, se cortan en seco al cerrar)
+  // y arrancan de cero cada vez que se abren: `vez` cambia su key al abrir, no al cerrar.
+  const [modoES, setModoES] = useState<'entraron' | 'salieron'>('entraron')
+  const [vez, setVez] = useState(0)
+  const abrirES = (m: 'entraron' | 'salieron') => {
+    setModoES(m)
+    setVez((v) => v + 1)
+    setEntradaSalida(m)
+  }
+  const abrirPlanilla = () => {
+    setVez((v) => v + 1)
+    setPanelCaravanas('excel')
+  }
   const [panelCaravanas, setPanelCaravanas] = useState<'excel' | 'identificar' | null>(params.get('salida') ? 'identificar' : null)
   const salidasQ = useSalidasSinIdentificar()
   const [salidaFoco, setSalidaFoco] = useState<string | null>(params.get('salida'))
@@ -239,8 +252,8 @@ export function RodeoPage() {
           <SinHacienda
             cara={cara}
             campo={elegido.elegido?.nombre ?? null}
-            onEntraron={() => setEntradaSalida('entraron')}
-            onPlanilla={() => setPanelCaravanas('excel')}
+            onEntraron={() => abrirES('entraron')}
+            onPlanilla={() => abrirPlanilla()}
             onVerCampo={() => navigate('/campos')}
           />
         ) : (
@@ -278,7 +291,7 @@ export function RodeoPage() {
           <button
             type="button"
             data-guia="hacienda-entraron"
-            onClick={() => setEntradaSalida('entraron')}
+            onClick={() => abrirES('entraron')}
             className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
           >
             Entraron
@@ -288,7 +301,7 @@ export function RodeoPage() {
           </button>
           <button
             type="button"
-            onClick={() => setEntradaSalida('salieron')}
+            onClick={() => abrirES('salieron')}
             className="inline-flex h-10 items-center justify-center rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
           >
             Salieron
@@ -300,10 +313,10 @@ export function RodeoPage() {
         </div>
           </>
         )}
-            {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), setEntradaSalida('entraron'))} />}
+            {membresia?.empresa_id && <AnimalNuevo empresaId={membresia.empresa_id} especie={vista === 'todas' ? 'bovino' : vista} abierto={nuevo} onCerrar={() => setNuevo(false)} onVolver={() => (setNuevo(false), abrirES('entraron'))} />}
             {membresia?.empresa_id && (
               <>
-                <CargarCaravanas key={`x${panelCaravanas}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
+                <CargarCaravanas key={`planilla-${vez}`} empresaId={membresia.empresa_id} abierto={panelCaravanas === 'excel'} onCerrar={() => setPanelCaravanas(null)} />
                 <IdentificarSalidas
                   empresaId={membresia.empresa_id}
                   abierto={panelCaravanas === 'identificar'}
@@ -320,12 +333,12 @@ export function RodeoPage() {
                 />
               </>
             )}
-            {membresia?.empresa_id && entradaSalida && (
+            {membresia?.empresa_id && (
               <EntradasSalidas
-                key={entradaSalida}
-                modo={entradaSalida}
+                key={`${modoES}-${vez}`}
+                modo={modoES}
                 empresaId={membresia.empresa_id}
-                abierto
+                abierto={entradaSalida != null}
                 onCerrar={() => setEntradaSalida(null)}
                 onUnoConCaravana={() => {
                   setEntradaSalida(null)
@@ -430,7 +443,7 @@ export function RodeoPage() {
           </label>
           <button
             type="button"
-            onClick={() => setPanelCaravanas('excel')}
+            onClick={() => abrirPlanilla()}
             className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave"
           >
             <Icono nombre="Comprobante" tamano={16} /> Caravanas desde una planilla

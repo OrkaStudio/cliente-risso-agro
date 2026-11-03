@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icono } from '@/components/tropero/icono'
 import { BotonVolver } from '@/components/tropero/panel-lateral'
-import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { useAlElegirCampo, useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useReabrirSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
@@ -52,6 +52,11 @@ export function FichaPage() {
   const fueEsta = useIdentificarAnimal()
   const reabrir = useReabrirSinSaber()
   const { data: mapa } = useMapa(animal.data?.empresa_id ?? undefined)
+  // Si en la barra se elige un campo donde este animal no está, se vuelve al rodeo de ese campo.
+  useAlElegirCampo((campoId) => {
+    const delAnimal = potreros.data?.find((p) => p.id === animal.data?.potrero_id)?.campo_id
+    if (campoId && campoId !== delAnimal) navigate('/hacienda', { replace: true })
+  })
 
   const resumen = useMemo(
     () => (eventos.data ? resumirEventos(eventos.data.map((e) => ({ animal_id: e.animal_id, tipo: e.tipo, fecha: e.fecha, datos: e.datos }))).get(id) : undefined),

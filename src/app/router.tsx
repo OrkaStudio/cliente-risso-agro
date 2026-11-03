@@ -2,7 +2,7 @@
 // No es un módulo de componentes para Fast Refresh → desactivamos la regla acá.
 /* eslint-disable react-refresh/only-export-components */
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
@@ -43,16 +43,16 @@ const FichaAnimalPage = lazy(() =>
 const CamposPage = lazy(() =>
   import('@/features/campos/tropero/campos-page').then((m) => ({ default: m.CamposPage })),
 )
-const CampoDetailPage = lazy(() =>
-  import('@/features/campos/campo-detail-page').then((m) => ({
-    default: m.CampoDetailPage,
-  })),
-)
-const PotreroDetailPage = lazy(() =>
-  import('@/features/potrero/potrero-detail-page').then((m) => ({
-    default: m.PotreroDetailPage,
-  })),
-)
+// Las páginas viejas del campo y del potrero se borraron (03/11): sus direcciones
+// llevan a Campos, con ese campo elegido o la tarjeta de ese potrero abierta.
+function CampoViejo() {
+  const { id } = useParams()
+  return <Navigate to={`/campos?campo=${id}`} replace />
+}
+function PotreroViejo() {
+  const { id } = useParams()
+  return <Navigate to={`/campos?potrero=${id}`} replace />
+}
 // Plata (rediseño, Figma página 35): la plata y los movimientos.
 const AnaliticaPage = lazy(() => import('@/features/analitica/tropero/plata-page').then((m) => ({ default: m.PlataPage })))
 const MovimientosPage = lazy(() => import('@/features/analitica/tropero/movimientos-page').then((m) => ({ default: m.MovimientosPage })))
@@ -217,10 +217,10 @@ export const router = createBrowserRouter([
               { path: 'hacienda', element: <AnimalesPage /> },
               { path: 'hacienda/:id', element: <FichaAnimalPage /> },
               { path: 'campos', element: <CamposPage /> },
-              { path: 'campos/:id', element: <CampoDetailPage /> },
+              { path: 'campos/:id', element: <CampoViejo /> },
               // Compat: la sección Potreros se unificó dentro de Campos.
               { path: 'potreros', element: <Navigate to="/campos" replace /> },
-              { path: 'potrero/:id', element: <PotreroDetailPage /> },
+              { path: 'potrero/:id', element: <PotreroViejo /> },
               { path: 'analitica', element: <AnaliticaPage /> },
               { path: 'analitica/movimientos', element: <MovimientosPage /> },
               { path: 'agenda', element: <AgendaPage /> },

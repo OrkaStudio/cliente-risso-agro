@@ -250,17 +250,15 @@ export function proximos(pendientes: Pendiente[], hoy: string, n = 3): Pendiente
 }
 
 /**
- * La comparación con el año anterior, en dólares, como se diría. Si los dos años
- * ganaron, el porcentaje; si alguno perdió, el porcentaje confunde: el dato.
+ * La comparación con el mismo período de antes, corta (Lau, 03/11: menos texto):
+ * cuántos dólares más o menos dejó, medido en dólares del día de cada movimiento.
  */
-export function comparacionTexto(a: Anio, antes = 'el año anterior'): string | null {
-  if (a.usdAntes == null || a.variacionUsd == null) return null
-  const usd = (n: number) => `US$ ${Math.round(Math.abs(n) / 1000).toLocaleString('es-AR')} mil`
-  if (a.usd > 0 && a.usdAntes > 0) {
-    const pct = Math.round(Math.abs(a.variacionUsd) * 100)
-    return pct < 1 ? `Lo mismo que ${antes}, en dólares.` : `Un ${pct} % ${a.variacionUsd > 0 ? 'más' : 'menos'} que ${antes}, en dólares.`
-  }
-  return `${antes.replace(/^\w/, (c) => c.toUpperCase())} ${a.usdAntes >= 0 ? 'ganaron' : 'perdieron'} ${usd(a.usdAntes)}; ahora, ${a.usd >= 0 ? 'ganan' : 'pierden'} ${usd(a.usd)}.`
+export function comparacionCorta(a: Anio): { sube: boolean; texto: string } | null {
+  if (a.usdAntes == null) return null
+  const d = a.usd - a.usdAntes
+  const mil = Math.round(Math.abs(d) / 1000)
+  if (mil < 1) return { sube: true, texto: 'Igual, en dólares' }
+  return { sube: d > 0, texto: `US$ ${mil.toLocaleString('es-AR')} mil ${d > 0 ? 'más' : 'menos'}` }
 }
 
 /** El período de la lista de movimientos. */

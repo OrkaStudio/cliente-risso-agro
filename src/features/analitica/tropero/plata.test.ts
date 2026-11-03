@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MovimientoConDetalle, Pendiente } from '@/features/analitica/api'
-import { aCsv, avisosParaMejorar, campanas, coincide, comparacionTexto, mesAMes, periodos, dolarDel, enRango, mesMasApretado, proximos, ultimoAnio, type DolarDia } from './plata'
+import { aCsv, avisosParaMejorar, campanas, coincide, comparacionCorta, mesAMes, periodos, dolarDel, enRango, mesMasApretado, proximos, ultimoAnio, type DolarDia } from './plata'
 
 const mov = (x: Partial<MovimientoConDetalle>): MovimientoConDetalle =>
   ({
@@ -79,12 +79,13 @@ describe('Plata', () => {
     expect(csv).toContain('"Gasoil; 50 l"')
     expect(csv).toContain('-1234,5')
   })
-  it('la comparación: porcentaje si los dos años ganan; si no, el dato en dólares', () => {
-    const base = { entro: 0, salio: 0, resultado: 0 }
-    expect(comparacionTexto({ ...base, usd: 13000, usdAntes: 10000, variacionUsd: 0.3 })).toBe('Un 30 % más que el año anterior, en dólares.')
-    expect(comparacionTexto({ ...base, usd: -34000, usdAntes: 5000, variacionUsd: -7.8 })).toBe('El año anterior ganaron US$ 5 mil; ahora, pierden US$ 34 mil.')
-    expect(comparacionTexto({ ...base, usd: 1000, usdAntes: null, variacionUsd: null })).toBeNull()
+  it('la comparación corta: la diferencia en dólares contra el mismo período de antes', () => {
+    const base = { entro: 0, salio: 0, resultado: 0, variacionUsd: null }
+    expect(comparacionCorta({ ...base, usd: 16_000, usdAntes: -9_000 })).toEqual({ sube: true, texto: 'US$ 25 mil más' })
+    expect(comparacionCorta({ ...base, usd: 3_000, usdAntes: 10_000 })).toEqual({ sube: false, texto: 'US$ 7 mil menos' })
+    expect(comparacionCorta({ ...base, usd: 1000, usdAntes: null })).toBeNull()
   })
+
   it('mes a mes: lo que pasó, y lo anotado que viene (lo vencido cae en este mes)', () => {
     const meses = mesAMes(
       [mov({ tipo: 'ingreso', monto: 500, fecha_cobro_pago: '2026-10-15' }), mov({ monto: 200, fecha_cobro_pago: '2025-10-15' })],

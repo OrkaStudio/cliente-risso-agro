@@ -1,17 +1,17 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
+import { SumarCampo } from './sumar-campo'
 import { Segmentos } from '@/components/tropero/segmentos'
 import { MapErrorBoundary } from '@/components/map-error-boundary'
 import type { CampoConPotreros } from '@/features/campos/api'
-import { useCampoDesdeUrl, useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
+import { elegirCampo as elegirEnBarra, useCampoDesdeUrl, useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
-import { CampoFormDialog } from '@/features/campos/campos-dialogs'
 import { useActualizarCampo, useActualizarPotreroMapa, useCamposConPotreros, useInfraestructura } from '@/features/campos/hooks'
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usoDeEstado, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
@@ -117,6 +117,22 @@ export function CamposPage() {
   const datosQ = useDatosDelCampo(empresaId, campoId, campo?.potreros.map((p) => p.id) ?? [])
   const infraQ = useInfraestructura(campoId)
   const [potreroId, setPotreroId] = useState<string | null>(null)
+  // Un link con ?potrero= (el Inicio, un link viejo a /potrero/:id) elige su campo en la barra y abre su tarjeta.
+  const [params, setParams] = useSearchParams()
+  const pedidoPotrero = params.get('potrero')
+  const delPedido = pedidoPotrero ? campos.find((c) => c.potreros.some((p) => p.id === pedidoPotrero)) : undefined
+  if (pedidoPotrero && delPedido && potreroId !== pedidoPotrero) setPotreroId(pedidoPotrero)
+  useEffect(() => {
+    if (!pedidoPotrero || !camposQ.data) return
+    if (delPedido) elegirEnBarra(delPedido.id)
+    setParams(
+      (p) => {
+        p.delete('potrero')
+        return p
+      },
+      { replace: true },
+    )
+  }, [pedidoPotrero, delPedido, camposQ.data, setParams])
   const [dibujar, setDibujar] = useState(false)
   const pendiente = pendienteMapa
   // Llegó desde una sección que todavía no se abrió: se dice por qué, hasta el primer paso.
@@ -146,7 +162,7 @@ export function CamposPage() {
       <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
         <div className="flex items-end justify-between gap-3">
           <CampoVisto campos={identidad.campos} elegido={null} />
-          <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
+          <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
         </div>
         <VistaGeneral campos={mapaQ.data ?? []} identidad={identidad.campos} onElegir={identidad.elegir} />
       </div>
@@ -155,7 +171,7 @@ export function CamposPage() {
     return (
       <div className="mx-auto flex max-w-[520px] flex-col items-center gap-4 py-16 text-center">
         <h1 className="titulo-display text-[34px] text-texto">Todavía no hay campos</h1>
-        <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName={BOTON} onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
+        <SumarCampo empresaId={empresaId} clase={BOTON} onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
       </div>
     )
 
@@ -189,7 +205,7 @@ export function CamposPage() {
         <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
         {/* En la misma fila: lo que falta para abrir la app, sin quitarle alto al mapa. */}
         {aTerminar && mapaQ.data && <ProgresoMapa campos={mapaQ.data} actual={aTerminar} />}
-        <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
+        <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
       </div>
 
       {/* El mapa, con una sola tarjeta: el campo, o el potrero tocado */}

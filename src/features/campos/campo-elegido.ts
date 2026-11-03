@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
@@ -43,6 +43,27 @@ function guardar(v: string) {
 function suscribir(f: () => void) {
   oyentes.add(f)
   return () => oyentes.delete(f)
+}
+
+/**
+ * Avisa cuando se elige otro campo (en la barra o desde un link), no al cargar.
+ * Para las pantallas de una sola cosa, como la ficha de un animal, que tienen
+ * que irse si lo que muestran no está en el campo nuevo (Lau, 03/11).
+ */
+export function useAlElegirCampo(f: (id: string | null) => void) {
+  const ultimo = useRef(f)
+  useEffect(() => {
+    ultimo.current = f
+  })
+  useEffect(() => {
+    const dejar = suscribir(() => {
+      const v = leer()
+      ultimo.current(v && v !== TODOS ? v : null)
+    })
+    return () => {
+      dejar()
+    }
+  }, [])
 }
 
 export type CampoElegible = { id: string; nombre: string; letra: string; color: string }

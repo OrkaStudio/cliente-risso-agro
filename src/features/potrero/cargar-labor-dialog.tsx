@@ -1,10 +1,8 @@
-import { useState, type FormEvent } from 'react'
-import { motion } from 'framer-motion'
-import { Sprout } from 'lucide-react'
-import { FormDialog, formItem } from '@/components/form-dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from 'react'
+import { BotonPrincipal } from '@/components/tropero/boton'
+import { CampoTexto } from '@/components/tropero/campo-texto'
+import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
+import { Aviso } from '@/components/tropero/aviso'
 import { cn } from '@/lib/utils'
 import { useCategorias } from '@/features/analitica/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
@@ -25,6 +23,8 @@ import { hoyLocal } from '@/lib/fecha'
  * notas: si se carga, el gasto queda imputado a ESTE potrero y a la actividad
  * agrícola, y la Analítica por potrero se llena sola con lo que el productor
  * iba a cargar igual.
+ *
+ * En el panel lateral, como el resto de los formularios del rediseño (Lau, 03/11).
  */
 export function CargarLaborDialog({
   potreroId,
@@ -49,11 +49,24 @@ export function CargarLaborDialog({
   const [nota, setNota] = useState('')
   const [monto, setMonto] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // Cada vez que se abre arranca de cero.
+  const [abiertoAntes, setAbiertoAntes] = useState(open)
+  if (open !== abiertoAntes) {
+    setAbiertoAntes(open)
+    if (open) {
+      setTipo('siembra')
+      setFecha(hoyLocal())
+      setCultivo('')
+      setKg('')
+      setNota('')
+      setMonto('')
+      setError(null)
+    }
+  }
 
   const labor = laborPorTipo.get(tipo)!
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault()
+  async function guardar() {
     setError(null)
     if (!empresaId) return
 
@@ -69,13 +82,9 @@ export function CargarLaborDialog({
 
     // La categoría se resuelve por NOMBRE: son globales y compartidas, así que
     // hardcodear un uuid ataría el código a esta base.
-    const categoriaId = montoNum
-      ? (categorias.data?.find((c) => c.nombre === labor.categoria)?.id ?? null)
-      : null
+    const categoriaId = montoNum ? (categorias.data?.find((c) => c.nombre === labor.categoria)?.id ?? null) : null
     if (montoNum && !categoriaId) {
-      setError(
-        `No encontré la categoría "${labor.categoria}" para imputar el gasto. Cargá la labor sin monto y sumá el gasto desde Plata.`,
-      )
+      setError(`No encontré la categoría "${labor.categoria}" para imputar el gasto. Cargá la labor sin monto y sumá el gasto desde Plata.`)
       return
     }
 
@@ -98,115 +107,72 @@ export function CargarLaborDialog({
   }
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      icon={Sprout}
-      title="Cargar labor"
-      subtitle={`Potrero ${potreroNombre}`}
-      onSubmit={onSubmit}
-      footer={
-        <Button
-          type="submit"
-          disabled={registrar.isPending || !empresaId}
-          className="w-full"
-        >
+    <PanelLateral
+      abierto={open}
+      onCerrar={() => onOpenChange(false)}
+      titulo="Cargar labor"
+      bajada={`Potrero ${potreroNombre}`}
+      pie={
+        <BotonPrincipal icono="Guardar" cargando={registrar.isPending} disabled={registrar.isPending || !empresaId} onClick={() => void guardar()}>
           {registrar.isPending ? 'Guardando…' : 'Guardar labor'}
-        </Button>
+        </BotonPrincipal>
       }
     >
-      <motion.div variants={formItem} className="grid gap-2">
-        <Label>¿Qué se hizo?</Label>
-        <div className="grid grid-cols-3 gap-1.5">
+      <Grupo titulo="¿Qué se hizo?">
+        <div role="radiogroup" aria-label="Qué se hizo" className="grid grid-cols-3 gap-2.5">
           {LABORES.map((l) => {
             const on = tipo === l.tipo
             return (
               <button
                 key={l.tipo}
                 type="button"
-                aria-pressed={on}
+                role="radio"
+                aria-checked={on}
                 onClick={() => setTipo(l.tipo)}
                 className={cn(
-                  'flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-xl border-2 px-1.5 py-2 text-[12px] font-semibold transition-colors',
-                  on
-                    ? 'border-field bg-field-soft text-field-deep'
-                    : 'border-border bg-background text-muted-foreground hover:border-field/40',
+                  'flex h-[84px] flex-col items-start justify-between rounded-[18px] p-3.5 text-left text-[15px] font-bold transition-colors',
+                  on ? 'bg-principal text-principal-texto' : 'bg-superficie text-texto hover:bg-superficie-hundida',
                 )}
               >
-                <l.Icon className="size-[18px]" />
-                <span className="text-center leading-tight">{l.label}</span>
+                <l.Icon className="size-5" />
+                {l.label}
               </button>
             )
           })}
         </div>
-        <p className="text-[12px] text-muted-foreground">{labor.ayuda}</p>
-      </motion.div>
+        <p className="mt-2.5 text-[13.5px] text-texto-suave">{labor.ayuda}</p>
+      </Grupo>
 
-      <motion.div variants={formItem} className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="labor-fecha">¿Cuándo?</Label>
-          <CampoFecha id="labor-fecha" value={fecha} onChange={setFecha} />
+      <Grupo titulo="¿Cuándo?">
+        <CampoFecha value={fecha} onChange={setFecha} ariaLabel="Cuándo" max={hoyLocal()} />
+      </Grupo>
+
+      {/* La única fila que cambia según el tipo. */}
+      {labor.pideCultivo && <CampoTexto className="mt-6" etiqueta="¿Qué se sembró?" value={cultivo} onChange={(e) => setCultivo(e.target.value)} placeholder="Raigrás, avena, soja…" autoComplete="off" />}
+      {labor.pideKg && <CampoTexto className="mt-6" etiqueta="Kilos cosechados" type="number" inputMode="decimal" min="0" unidad="kg" value={kg} onChange={(e) => setKg(e.target.value)} placeholder="38000" />}
+
+      <CampoTexto className="mt-6" etiqueta="Nota · opcional" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Variedad, producto, dosis, quién lo hizo…" autoComplete="off" />
+
+      <CampoTexto
+        className="mt-6"
+        etiqueta="¿Cuánto costó? · opcional"
+        type="number"
+        inputMode="decimal"
+        min="0"
+        unidad="$"
+        value={monto}
+        onChange={(e) => setMonto(e.target.value)}
+        placeholder="Dejalo vacío si todavía no sabés"
+        ayuda={monto.trim() ? `Se carga como gasto en "${labor.categoria}", imputado a este potrero.` : 'Si lo cargás, el gasto queda imputado a este potrero sin volver a tipearlo.'}
+      />
+
+      {error && (
+        <div className="mt-6">
+          <Aviso tipo="problema" titulo="No se pudo guardar">
+            {error}
+          </Aviso>
         </div>
-
-        {/* La única fila que cambia según el tipo. */}
-        {labor.pideCultivo && (
-          <div className="grid gap-2">
-            <Label htmlFor="labor-cultivo">¿Qué se sembró?</Label>
-            <Input
-              id="labor-cultivo"
-              value={cultivo}
-              onChange={(e) => setCultivo(e.target.value)}
-              placeholder="Raigrás, avena, soja…"
-              autoComplete="off"
-            />
-          </div>
-        )}
-        {labor.pideKg && (
-          <div className="grid gap-2">
-            <Label htmlFor="labor-kg">Kilos cosechados</Label>
-            <Input
-              id="labor-kg"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              value={kg}
-              onChange={(e) => setKg(e.target.value)}
-              placeholder="38000"
-            />
-          </div>
-        )}
-      </motion.div>
-
-      <motion.div variants={formItem} className="grid gap-2">
-        <Label htmlFor="labor-nota">Nota · opcional</Label>
-        <Input
-          id="labor-nota"
-          value={nota}
-          onChange={(e) => setNota(e.target.value)}
-          placeholder="Variedad, producto, dosis, quién lo hizo…"
-          autoComplete="off"
-        />
-      </motion.div>
-
-      <motion.div variants={formItem} className="grid gap-2">
-        <Label htmlFor="labor-monto">¿Cuánto costó? · opcional</Label>
-        <Input
-          id="labor-monto"
-          type="number"
-          inputMode="decimal"
-          min="0"
-          value={monto}
-          onChange={(e) => setMonto(e.target.value)}
-          placeholder="Dejalo vacío si todavía no sabés"
-        />
-        <p className="text-[12px] text-muted-foreground">
-          {monto.trim()
-            ? `Se carga como gasto en "${labor.categoria}", imputado a este potrero.`
-            : 'Si lo cargás, el gasto queda imputado a este potrero sin volver a tipearlo.'}
-        </p>
-      </motion.div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </FormDialog>
+      )}
+    </PanelLateral>
   )
 }
