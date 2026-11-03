@@ -131,7 +131,7 @@ export function RodeoPage() {
     return campoId ? filas.filter((f) => f.campoId === campoId) : filas
   }, [animales.data, potreros.data, eventos.data, elegido.campos, campoId, potreroId])
 
-  if (animales.isLoading || potreros.isLoading) return <div className="mx-auto h-[280px] w-full max-w-[1104px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
+  if (animales.isLoading || potreros.isLoading) return <div className="mx-auto h-[280px] w-full ancho-pagina animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
   if (animales.error) return <p className="text-texto-suave">No pudimos cargar la hacienda. Revisá la conexión y probá de nuevo.</p>
 
   // Las salidas que restaron el número sin decir cuál fue (del campo que se mira).
@@ -185,7 +185,7 @@ export function RodeoPage() {
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.05, ease: CURVA } })
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-6">
       {especies.length > 1 && <h1 className="sr-only">Hacienda</h1>}
       {/* Qué campo a la izquierda y qué especie a la derecha, siempre en una línea (Lau).
           Si el ancho no alcanza, las especies muestran sólo su ícono y su número. */}

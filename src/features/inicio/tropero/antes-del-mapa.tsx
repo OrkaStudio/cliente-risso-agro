@@ -34,7 +34,7 @@ export function AntesDelMapa() {
   const otros = cs.filter((c) => c.id !== campo.id && primerPendiente([c]) !== null)
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-4">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-4">
       <motion.p {...entra(0)} className="text-[15px] font-semibold text-texto-suave">
         {primeraVez ? `Hola${nombre ? `, ${nombre}` : ''}. Lo primero es tu campo en el mapa.` : `Sumaste ${campo.nombre}: falta ubicarlo en el mapa.`}
       </motion.p>

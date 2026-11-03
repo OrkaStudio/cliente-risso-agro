@@ -79,7 +79,7 @@ export function ElDia() {
     reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-5">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-5">
       <motion.div {...entra(0)}>
         <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} campos={inicio.campos} elegido={inicio.elegido} />
       </motion.div>

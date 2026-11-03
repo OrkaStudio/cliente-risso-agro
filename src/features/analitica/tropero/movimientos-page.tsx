@@ -53,7 +53,7 @@ export function MovimientosPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-7">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-7">
       <div className="flex items-end justify-between gap-3">
         <Link to="/analitica" className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie pr-4 pl-3 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
           <Icono nombre="Siguiente" tamano={16} className="rotate-180" />

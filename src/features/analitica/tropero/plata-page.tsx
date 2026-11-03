@@ -79,7 +79,7 @@ export function PlataPage() {
   })
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } })
 
-  if (movs.isLoading) return <div className="mx-auto h-[400px] w-full max-w-[1104px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
+  if (movs.isLoading) return <div className="mx-auto h-[400px] w-full ancho-pagina animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (movs.error) return <p className="text-texto-suave">No pudimos cargar la plata. Revisá la conexión y probá de nuevo.</p>
 
   const vacio = delCampo.length === 0
@@ -107,7 +107,7 @@ export function PlataPage() {
   )
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-8">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-8">
       <motion.div {...entra(0)} className="flex items-end justify-between gap-3">
         <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />
         <div className="flex items-center gap-2">

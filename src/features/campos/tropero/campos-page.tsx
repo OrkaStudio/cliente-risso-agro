@@ -143,7 +143,7 @@ export function CamposPage() {
   if (camposQ.error) return <p className="text-texto-suave">No pudimos cargar los campos. Revisá la conexión y probá de nuevo.</p>
   if (todos)
     return (
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
+      <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
         <div className="flex items-end justify-between gap-3">
           <CampoVisto campos={identidad.campos} elegido={null} />
           <CampoFormDialog empresaId={empresaId} triggerLabel="+ Sumar un campo" triggerClassName="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
@@ -183,7 +183,7 @@ export function CamposPage() {
   const lugar = [tipoCampoLabel[campo.tipo], campo.ubicacion.localidad].filter(Boolean).join(' · ')
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
+    <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
       {/* Arriba: qué campo se está viendo (se elige en la barra izquierda) y sumar otro. */}
       <div className="flex items-end justify-between gap-3">
         <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />

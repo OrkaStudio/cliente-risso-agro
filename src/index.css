@@ -786,6 +786,14 @@
   .guia-mano, .guia-onda, .tropero-cerrar-onda { animation: none !important; }
 }
 
+/* El ancho de las páginas: 1104 en una compu común y más en monitores anchos,
+   para que en 2000 px y más no quede una columna angosta en el medio (03/11). */
+@utility ancho-pagina {
+  max-width: 1104px;
+  @media (min-width: 1700px) { max-width: 1320px; }
+  @media (min-width: 2100px) { max-width: 1520px; }
+}
+
 /* Una columna que scrollea no se corta en seco: arriba y abajo se difumina. */
 @utility scroll-difuminado {
   mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);

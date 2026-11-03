@@ -58,7 +58,7 @@ export function FichaPage() {
     [eventos.data, id],
   )
 
-  if (animal.isLoading) return <div className="mx-auto h-[420px] w-full max-w-[1104px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
+  if (animal.isLoading) return <div className="mx-auto h-[420px] w-full ancho-pagina animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (!animal.data) return <p className="text-texto-suave">No encontramos ese animal.</p>
 
   const a = animal.data
@@ -95,7 +95,7 @@ export function FichaPage() {
   const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : a.estado === 'corregido' ? 'Corregido: estaba cargado de más' : 'De baja'
 
   return (
-    <div className="mx-auto flex w-full max-w-[1104px] flex-col gap-6">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-6">
       <nav aria-label="Dónde estás">
         <BotonVolver onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/hacienda'))}>Hacienda</BotonVolver>
       </nav>
