@@ -10,7 +10,9 @@ test('el dueño invita con lo que va a ver, el invitado ve sólo eso y después 
   await entrar(page)
   await page.getByRole('link', { name: 'Configuración' }).click()
   await expect(page.getByRole('heading', { name: 'Configuración', level: 1 })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Plan' })).toContainText('Piloto, sin cargo')
+  await page.getByRole('tab', { name: /Plan/ }).click()
+  await expect(page.getByRole('region', { name: 'Tu plan' })).toContainText('Piloto, sin cargo')
+  await page.getByRole('tab', { name: /Personas/ }).click()
 
   // Invitar: sin rol no hay nada elegido; el rol propone, y se cambia.
   await page.getByRole('button', { name: 'Invitar a alguien' }).click()
@@ -29,7 +31,7 @@ test('el dueño invita con lo que va a ver, el invitado ve sólo eso y después 
   const wa = await listo.getByRole('link', { name: 'Mandárselo por WhatsApp' }).getAttribute('href')
   const token = /invitacion\/([^\s&%]+)/.exec(decodeURIComponent(wa!))![1]!
   await page.getByRole('button', { name: 'Cerrar' }).first().click()
-  await expect(page.getByRole('region', { name: 'Personas' })).toContainText('Invitado, todavía no entró')
+  await expect(page.getByRole('region', { name: 'Invitaciones esperando' })).toContainText('Invitado, todavía no entró')
 
   // El invitado entra por el link: ve Inicio y Hacienda; Plata no se abre ni escribiendo la dirección.
   const otro = await browser.newContext()
@@ -49,15 +51,16 @@ test('el dueño invita con lo que va a ver, el invitado ve sólo eso y después 
   await expect(inv).toHaveURL(/\/$/)
   await inv.goto('/configuracion')
   await expect(inv.getByRole('region', { name: 'Tu cuenta' })).toBeVisible()
-  await expect(inv.getByRole('region', { name: 'Personas' })).toHaveCount(0)
+  await expect(inv.getByRole('tab', { name: /Personas/ })).toHaveCount(0)
   await otro.close()
 
   // El dueño lo ve adentro y le saca el acceso.
   await page.reload()
-  const fila = page.getByRole('region', { name: 'Personas' }).getByRole('listitem').filter({ hasText: nombre })
-  await expect(fila).toContainText('Ve Inicio, Hacienda')
-  await fila.getByRole('button', { name: 'Cambiar lo que ve' }).click()
+  const fila = page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })
+  await expect(fila.getByLabel('Hacienda: lo ve')).toBeVisible()
+  await expect(fila.getByLabel('Plata: no lo ve')).toBeVisible()
+  await fila.getByRole('button', { name: 'Cambiar' }).click()
   await page.getByRole('button', { name: 'Sacarle el acceso' }).click()
   await page.getByRole('button', { name: 'Sí, sacarle el acceso' }).click()
-  await expect(page.getByRole('region', { name: 'Personas' }).getByRole('listitem').filter({ hasText: nombre })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })).toHaveCount(0)
 })

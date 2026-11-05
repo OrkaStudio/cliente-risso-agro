@@ -12,14 +12,12 @@ import { prefetch, CHUNKS_OFICINA } from '@/lib/prefetch'
 import { cn } from '@/lib/utils'
 
 /** Las secciones de la Oficina (página 35, «Barra lateral · Oficina»). */
-const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; seccion: Seccion | null }[] = [
+const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; seccion: Seccion }[] = [
   { to: '/', texto: 'Inicio', icono: 'Inicio', end: true, seccion: 'inicio' },
   { to: '/hacienda', texto: 'Hacienda', icono: 'Hacienda', end: false, seccion: 'hacienda' },
   { to: '/campos', texto: 'Campos', icono: 'Campos', end: false, seccion: 'campos' },
   { to: '/analitica', texto: 'Plata', icono: 'Plata', end: false, seccion: 'plata' },
   { to: '/agenda', texto: 'Agenda', icono: 'Agenda', end: false, seccion: 'agenda' },
-  // Para todos: tu cuenta; el dueño además ve Personas y Plan.
-  { to: '/configuracion', texto: 'Configuración', icono: 'Usuario', end: false, seccion: null },
 ]
 
 /**
@@ -47,7 +45,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 
       <nav aria-label="Oficina" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
         <p className="shrink-0 px-3 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Oficina</p>
-        {SECCIONES.filter((s) => !s.seccion || puedeVer(membresia, s.seccion)).map((s) => {
+        {SECCIONES.filter((s) => puedeVer(membresia, s.seccion)).map((s) => {
           const bloqueada = pendiente && !abiertoSinMapa(s.to)
           return (
             <NavLink
@@ -140,7 +138,26 @@ export function BarraLateral({ hoy }: { hoy: number }) {
         )}
       </nav>
 
-      <div className="mx-3 mt-3 flex items-center gap-1 border-t border-borde py-3">
+      {/* Configuración, sola y abajo, pegada a tu cuenta (Lau, 05/11). */}
+      <div className="mx-3 mt-3 border-t border-borde pt-3">
+      <NavLink
+        to="/configuracion"
+        className={({ isActive }) =>
+          cn('relative flex h-11 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] transition-colors', isActive ? 'font-bold text-texto' : 'font-medium text-texto hover:bg-superficie-hundida/70')
+        }
+      >
+        {({ isActive }) => (
+          <>
+            {isActive && <span aria-hidden className="absolute inset-y-2 -left-3 w-[3px] rounded-full bg-principal" />}
+            <span className={cn(isActive ? 'text-principal' : 'text-texto')}>
+              <Icono nombre="Usuario" />
+            </span>
+            Configuración
+          </>
+        )}
+      </NavLink>
+      </div>
+      <div className="mx-3 flex items-center gap-1 pt-1 pb-3">
         <button type="button" onClick={() => navigate('/configuracion')} aria-label="Tu cuenta y la configuración" className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] px-2 py-1.5 text-left hover:bg-superficie-hundida/70">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-principal font-heading text-[14px] font-extrabold text-principal-texto">
             {(membresia?.empresa?.nombre ?? 'T').charAt(0).toUpperCase()}

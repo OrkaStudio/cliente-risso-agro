@@ -1,355 +1,243 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
-import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
+import type { NombreIcono } from '@/components/tropero/iconos-svg'
 import { useAuth } from '@/features/auth/auth-context'
-import { ROLES, SECCIONES, esDueno, nombreRol, seccionesSugeridas, type Rol, type Seccion } from '@/features/empresa/secciones'
+import { ROLES, SECCIONES, esDueno, nombreRol, seccionesSugeridas, type Rol } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
 import { useAnimales } from '@/features/hacienda/hooks'
 import { useMapa } from '@/features/mapa/api'
 import { cn } from '@/lib/utils'
-import { celularLindo, linkInvitacion, useCambiarNombre, useCambiarSecciones, useInvitar, usePersonas, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
+import { celularLindo, useCambiarNombre, usePersonas, whatsappInvitacion, type Persona } from './api'
+import { EditarPanel, InvitarPanel } from './personas-paneles'
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 const BOTON_CHICO = 'inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto transition-colors hover:border-principal hover:text-principal'
 
+type Pestana = 'personas' | 'cuenta' | 'plan'
+const PESTANAS: { id: Pestana; texto: string; icono: NombreIcono; para: string }[] = [
+  { id: 'personas', texto: 'Personas', icono: 'Usuario', para: 'Quién entra y qué ve' },
+  { id: 'cuenta', texto: 'Tu cuenta', icono: 'Celular', para: 'Tu nombre y tu número' },
+  { id: 'plan', texto: 'Plan', icono: 'Comprobante', para: 'Lo que tenés y usás' },
+]
+
 /**
- * Configuración (Lau, 05/11): tu cuenta para todos; el dueño además ve las
- * Personas (invitar y elegir qué ve cada una) y el Plan.
+ * Configuración (Lau, 05/11), en pestañas, cada una armada para lo suyo:
+ * Personas es una tabla de quién ve qué; Tu cuenta, tu ficha; Plan, el estado
+ * y el uso. Quien no es dueño ve sólo su cuenta.
  */
 export function ConfiguracionPage() {
   const { data: membresia } = useEmpresa()
   const dueno = esDueno(membresia)
+  const [params, setParams] = useSearchParams()
+  const pedida = params.get('tab') as Pestana | null
+  const tab: Pestana = !dueno ? 'cuenta' : pedida && PESTANAS.some((p) => p.id === pedida) ? pedida : 'personas'
+  const elegir = (t: Pestana) => setParams({ tab: t }, { replace: true })
+
   return (
-    <div className="mx-auto flex w-full max-w-[980px] flex-col gap-10">
+    <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-7">
       <header>
         <h1 className="titulo-display text-[44px] leading-none text-texto">Configuración</h1>
-        <p className="mt-3 text-[17px] text-texto-suave">{dueno ? 'Quién entra a tu campo y qué ve, tu cuenta y tu plan.' : 'Tu nombre y tu número.'}</p>
+        <p className="mt-3 text-[17px] text-texto-suave">{dueno ? `Quién entra a ${membresia?.empresa?.nombre ?? 'tu campo'} y qué ve, tu cuenta y tu plan.` : 'Tu nombre y tu número.'}</p>
       </header>
-      {dueno && <Personas empresa={membresia?.empresa?.nombre ?? ''} />}
-      <TuCuenta />
-      {dueno && <Plan />}
+
+      {dueno && (
+        <div role="tablist" aria-label="Configuración" className="grid gap-2 sm:grid-cols-3">
+          {PESTANAS.map((p) => {
+            const si = tab === p.id
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="tab"
+                aria-selected={si}
+                onClick={() => elegir(p.id)}
+                className={cn('flex items-center gap-3.5 rounded-[18px] border-[1.5px] px-4 py-3.5 text-left transition-colors', si ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300')}
+              >
+                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full', si ? 'bg-superficie/15 text-superficie' : 'bg-superficie-hundida text-texto')}>
+                  <Icono nombre={p.icono} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[16.5px] font-bold">{p.texto}</span>
+                  <span className={cn('block truncate text-[14px]', si ? 'text-superficie/70' : 'text-texto-suave')}>{p.para}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      <div role={dueno ? 'tabpanel' : undefined} aria-label={PESTANAS.find((p) => p.id === tab)!.texto}>
+        {tab === 'personas' && <Personas empresa={membresia?.empresa?.nombre ?? ''} />}
+        {tab === 'cuenta' && <TuCuenta empresa={membresia?.empresa?.nombre ?? ''} rol={membresia?.rol ?? ''} />}
+        {tab === 'plan' && <Plan />}
+      </div>
     </div>
   )
 }
 
-function Bloque({ titulo, bajada, accion, children }: { titulo: string; bajada: string; accion?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section aria-label={titulo} className="rounded-[24px] border border-borde bg-superficie">
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-borde px-6 py-5">
-        <div>
-          <h2 className="font-heading text-[24px] leading-tight font-extrabold text-texto">{titulo}</h2>
-          <p className="mt-1 text-[15px] text-texto-suave">{bajada}</p>
-        </div>
-        {accion}
-      </header>
-      <div className="px-6 py-5">{children}</div>
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------- Personas
+// ---------------------------------------------------------------- Personas: quién ve qué, de un vistazo
 
 function Personas({ empresa }: { empresa: string }) {
   const personas = usePersonas(true)
-  const [invitar, setInvitar] = useState(false)
-  const [vezInvitar, setVezInvitar] = useState(0)
+  const [invitar, setInvitar] = useState<{ vez: number; rol?: Rol } | null>(null)
+  const [vez, setVez] = useState(0)
   const [editar, setEditar] = useState<Persona | null>(null)
   const lista = personas.data ?? []
+  const adentro = lista.filter((p) => p.userId)
+  const invitados = lista.filter((p) => p.invitacionId)
+  const abrir = (rol?: Rol) => (setVez((v) => v + 1), setInvitar({ vez: vez + 1, rol }))
+
+  if (personas.isLoading) return <div className="h-64 animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
+  if (personas.error) return <p className="text-texto-suave">No pudimos cargar las personas. Revisá la conexión y probá de nuevo.</p>
+
   return (
-    <Bloque
-      titulo="Personas"
-      bajada="Quién entra a tu campo y qué ve cada uno. Vos ves todo; a los demás les elegís las secciones."
-      accion={
-        <button type="button" onClick={() => (setVezInvitar((v) => v + 1), setInvitar(true))} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-[17px] text-texto">
+          <b className="cifra text-[22px]">{adentro.length}</b> {adentro.length === 1 ? 'persona entra' : 'personas entran'} a tu campo
+          {invitados.length > 0 && (
+            <span className="text-texto-suave">
+              {' '}
+              · {invitados.length} {invitados.length === 1 ? 'invitación esperando' : 'invitaciones esperando'}
+            </span>
+          )}
+        </p>
+        <button type="button" onClick={() => abrir()} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
           Invitar a alguien
           <span className="grid size-10 place-items-center rounded-full bg-acento text-acento-texto">
             <Icono nombre="Agregar" tamano={16} />
           </span>
         </button>
-      }
-    >
-      {personas.isLoading ? (
-        <div className="h-24 animate-pulse rounded-[16px] bg-superficie-hundida" aria-busy />
-      ) : personas.error ? (
-        <p className="text-texto-suave">No pudimos cargar las personas. Revisá la conexión y probá de nuevo.</p>
-      ) : (
-        <ul className="-my-1 divide-y divide-borde/70">
-          {lista.map((p) => (
-            <FilaPersona key={p.userId ?? p.invitacionId} p={p} empresa={empresa} onEditar={() => setEditar(p)} />
+      </div>
+
+      {/* La tabla: una fila por persona, una columna por sección. Se lee quién ve qué sin abrir nada. */}
+      <section aria-label="Quién ve qué" className="overflow-hidden rounded-[24px] border border-borde bg-superficie">
+        <div className="grid grid-cols-[minmax(0,2.2fr)_repeat(5,minmax(0,0.8fr))_150px] items-center border-b border-borde bg-superficie-hundida/60 px-5 py-3 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">
+          <span>Persona</span>
+          {SECCIONES.map((s) => (
+            <span key={s.id} className="text-center">
+              {s.texto}
+            </span>
+          ))}
+          <span />
+        </div>
+        <ul className="divide-y divide-borde/70">
+          {adentro.map((p) => (
+            <li key={p.userId} className="grid grid-cols-[minmax(0,2.2fr)_repeat(5,minmax(0,0.8fr))_150px] items-center px-5 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full font-heading text-[15px] font-extrabold', p.rol === 'dueno' ? 'bg-tinta text-superficie' : 'bg-principal text-principal-texto')}>{p.nombre.charAt(0).toUpperCase()}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-[16px] font-semibold text-texto">
+                    {p.nombre}
+                    {p.soyYo && <span className="font-normal text-texto-suave"> (vos)</span>}
+                  </p>
+                  <p className="truncate text-[14px] text-texto-suave">{[nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}</p>
+                </div>
+              </div>
+              {SECCIONES.map((s) => {
+                const ve = p.secciones === null || p.secciones.includes(s.id)
+                return (
+                  <span key={s.id} className="flex justify-center" aria-label={`${s.texto}: ${ve ? 'lo ve' : 'no lo ve'}`}>
+                    {ve ? (
+                      <span className="grid size-8 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
+                        <Icono nombre="Guardar" tamano={16} />
+                      </span>
+                    ) : (
+                      <span className="h-[2px] w-4 rounded-full bg-neutro-200" />
+                    )}
+                  </span>
+                )
+              })}
+              <span className="flex justify-end">
+                {p.soyYo || p.rol === 'dueno' ? (
+                  <span className="text-[14px] font-semibold text-texto-suave">Ve todo</span>
+                ) : (
+                  <button type="button" onClick={() => setEditar(p)} className={BOTON_CHICO}>
+                    Cambiar
+                  </button>
+                )}
+              </span>
+            </li>
           ))}
         </ul>
+      </section>
+
+      {invitados.length > 0 && (
+        <section aria-label="Invitaciones esperando" className="rounded-[24px] border border-dashed border-borde bg-superficie/60 px-5 py-2">
+          <ul className="divide-y divide-borde/70">
+            {invitados.map((p) => {
+              const vencida = !!p.venceAt && new Date(p.venceAt) < new Date()
+              return (
+                <li key={p.invitacionId} className="flex flex-wrap items-center gap-4 py-3.5">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-borde font-heading text-[15px] font-extrabold text-texto-suave">{p.nombre.charAt(0).toUpperCase()}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[16px] font-semibold text-texto">{p.nombre}</p>
+                    <p className="truncate text-[14px] text-texto-suave">
+                      {nombreRol(p.rol)} · va a ver {SECCIONES.filter((s) => (p.secciones ?? []).includes(s.id)).map((s) => s.texto).join(', ')}
+                    </p>
+                    <p className={cn('text-[14px] font-semibold', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
+                      {vencida ? 'El link venció: cancelala e invitalo de nuevo' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {p.token && !vencida && (
+                      <a href={whatsappInvitacion({ celular: p.celular, nombre: p.nombre, empresa, token: p.token })} target="_blank" rel="noreferrer" className={BOTON_CHICO}>
+                        Mandar por WhatsApp
+                      </a>
+                    )}
+                    <button type="button" onClick={() => setEditar(p)} className={BOTON_CHICO}>
+                      Cancelar invitación
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
-      {lista.length === 1 && <p className="mt-3 text-[15px] text-texto-suave">Todavía estás solo. Invitá al encargado, al peón o al veterinario: les llega por WhatsApp y entran con su celular.</p>}
-      <InvitarPanel key={vezInvitar} abierto={invitar} empresa={empresa} onCerrar={() => setInvitar(false)} />
+
+      {/* Sin nadie más: a quién se suele sumar, con lo que vería, para invitar de un toque. */}
+      {adentro.length === 1 && invitados.length === 0 && (
+        <section aria-label="A quién sumar">
+          <p className="mb-3 text-[15px] text-texto-suave">Todavía estás solo. ¿A quién sumás?</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {ROLES.map((r) => (
+              <button key={r.valor} type="button" onClick={() => abrir(r.valor)} className="group flex flex-col items-start gap-2 rounded-[20px] border-[1.5px] border-borde bg-superficie p-5 text-left transition-colors hover:border-principal">
+                <span className="text-[17px] font-bold text-texto group-hover:text-principal">Al {r.texto.toLowerCase()}</span>
+                <span className="text-[14px] text-texto-suave">Vería {SECCIONES.filter((s) => seccionesSugeridas(r.valor).includes(s.id)).map((s) => s.texto).join(', ')}. Lo cambiás antes de invitarlo.</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {invitar && <InvitarPanel key={invitar.vez} abierto empresa={empresa} rolInicial={invitar.rol} onCerrar={() => setInvitar(null)} />}
       <EditarPanel persona={editar} onCerrar={() => setEditar(null)} />
-    </Bloque>
-  )
-}
-
-function FilaPersona({ p, empresa, onEditar }: { p: Persona; empresa: string; onEditar: () => void }) {
-  const pendiente = !!p.invitacionId
-  const vencida = pendiente && !!p.venceAt && new Date(p.venceAt) < new Date()
-  const ve = p.secciones === null ? 'Ve todo' : `Ve ${SECCIONES.filter((s) => p.secciones!.includes(s.id)).map((s) => s.texto).join(', ')}`
-  return (
-    <li className="flex flex-wrap items-center gap-4 py-4">
-      <span className={cn('grid size-11 shrink-0 place-items-center rounded-full font-heading text-[16px] font-extrabold', pendiente ? 'border-[1.5px] border-dashed border-borde text-texto-suave' : 'bg-principal text-principal-texto')}>
-        {p.nombre.charAt(0).toUpperCase()}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[16.5px] font-semibold text-texto">
-          {p.nombre}
-          {p.soyYo && <span className="font-normal text-texto-suave"> (vos)</span>}
-        </p>
-        <p className="truncate text-[14.5px] text-texto-suave">
-          {[nombreRol(p.rol), celularLindo(p.celular), ve].join(' · ')}
-        </p>
-        {pendiente && (
-          <p className={cn('mt-0.5 text-[14px] font-semibold', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
-            {vencida ? 'La invitación venció: mandale otra' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}
-          </p>
-        )}
-      </div>
-      <div className="flex shrink-0 gap-2">
-        {pendiente && p.token && !vencida && (
-          <a href={whatsappInvitacion({ celular: p.celular, nombre: p.nombre, empresa, token: p.token })} target="_blank" rel="noreferrer" className={BOTON_CHICO}>
-            Mandar por WhatsApp
-          </a>
-        )}
-        {!p.soyYo && (
-          <button type="button" onClick={onEditar} className={BOTON_CHICO}>
-            {pendiente ? 'Cancelar invitación' : 'Cambiar lo que ve'}
-          </button>
-        )}
-      </div>
-    </li>
-  )
-}
-
-/** Qué secciones ve: cada una con lo que hay adentro, para decidir sabiendo. */
-function ElegirSecciones({ elegidas, onCambiar }: { elegidas: Seccion[]; onCambiar: (s: Seccion[]) => void }) {
-  return (
-    <div role="group" aria-label="Qué ve" className="flex flex-col gap-2">
-      {SECCIONES.map((s) => {
-        const si = elegidas.includes(s.id)
-        return (
-          <button
-            key={s.id}
-            type="button"
-            role="checkbox"
-            aria-checked={si}
-            onClick={() => onCambiar(si ? elegidas.filter((x) => x !== s.id) : [...elegidas, s.id])}
-            className={cn('flex items-center gap-4 rounded-[16px] border-[1.5px] px-4 py-3 text-left transition-colors', si ? 'border-principal bg-principal-suave/60' : 'border-borde bg-superficie hover:border-neutro-300')}
-          >
-            <span className={cn('grid size-7 shrink-0 place-items-center rounded-[8px] border-2', si ? 'border-principal bg-principal text-principal-texto' : 'border-texto/40 bg-superficie')}>{si && <Icono nombre="Guardar" tamano={16} />}</span>
-            <Icono nombre={s.icono} />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[16px] font-semibold text-texto">{s.texto}</span>
-              <span className="block text-[14px] text-texto-suave">{s.queVe}</span>
-            </span>
-          </button>
-        )
-      })}
     </div>
   )
 }
 
-function InvitarPanel({ abierto, empresa, onCerrar }: { abierto: boolean; empresa: string; onCerrar: () => void }) {
-  const invitar = useInvitar()
-  const [nombre, setNombre] = useState('')
-  const [celular, setCelular] = useState('')
-  const [rol, setRol] = useState<Rol | ''>('')
-  const [secciones, setSecciones] = useState<Seccion[]>([])
-  const [token, setToken] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+// ---------------------------------------------------------------- Tu cuenta: tu ficha
 
-  async function enviar() {
-    setError(null)
-    if (!nombre.trim()) return setError('Escribí cómo se llama.')
-    if (celular.replace(/\D/g, '').length < 10) return setError('Escribí su celular con la característica, sin el 0 ni el 15.')
-    if (!rol) return setError('Tocá qué hace en el campo.')
-    if (!secciones.length) return setError('Elegí al menos una sección que va a ver.')
-    try {
-      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular, rol, secciones }))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo invitar. Probá de nuevo.')
-    }
-  }
-
-  const cel = `549${celular.replace(/\D/g, '').slice(-10)}`
-  if (token)
-    return (
-      <PanelLateral
-        abierto={abierto}
-        onCerrar={onCerrar}
-        titulo={`Listo: invitaste a ${nombre.trim().split(' ')[0]}`}
-        bajada="Mandale el link por WhatsApp. Entra con su celular, sin contraseña, y ve sólo lo que elegiste. El link vence en 7 días."
-        pie={
-          <div className="flex flex-col gap-3">
-            <a href={whatsappInvitacion({ celular: cel, nombre, empresa, token })} target="_blank" rel="noreferrer" className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600">
-              Mandárselo por WhatsApp
-              <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto">
-                <Icono nombre="Celular" tamano={16} />
-              </span>
-            </a>
-            <button type="button" onClick={() => void navigator.clipboard.writeText(linkInvitacion(token)).then(() => toast.success('Listo: copiaste el link', { description: 'Pegalo donde quieras mandárselo.' }))} className="h-12 rounded-full border-[1.5px] border-borde bg-superficie text-[15.5px] font-bold text-texto hover:border-principal hover:text-principal">
-              Copiar el link
-            </button>
-          </div>
-        }
-      >
-        <div className="rounded-[18px] border border-borde bg-superficie p-5 text-[15px]">
-          <p className="font-semibold text-texto">{nombre.trim()}</p>
-          <p className="text-texto-suave">{[nombreRol(rol), celularLindo(cel)].join(' · ')}</p>
-          <p className="mt-3 text-texto-suave">Va a ver: {SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => s.texto).join(', ')}.</p>
-        </div>
-      </PanelLateral>
-    )
-
-  return (
-    <PanelLateral
-      abierto={abierto}
-      onCerrar={onCerrar}
-      titulo="Invitar a alguien"
-      bajada="Le llega un link por WhatsApp y entra con su celular. Vos elegís qué ve; lo podés cambiar cuando quieras."
-      ancho
-      pie={
-        <>
-          {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-          <BotonPrincipal icono="Siguiente" cargando={invitar.isPending} disabled={invitar.isPending} onClick={() => void enviar()}>
-            {nombre.trim() ? `Invitar a ${nombre.trim().split(' ')[0]}` : 'Invitar'}
-          </BotonPrincipal>
-        </>
-      }
-    >
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-        <CampoTexto etiqueta="Cómo se llama" placeholder="Juan Pérez" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
-        <CampoTexto etiqueta="Su celular, el que tiene WhatsApp" inputMode="tel" placeholder="2241 55-8820" value={celular} onChange={(e) => setCelular(e.target.value)} />
-      </div>
-      <Grupo titulo="Qué hace en el campo" className="mt-6">
-        <Opciones
-          etiqueta="Qué hace"
-          opciones={ROLES}
-          elegidas={rol ? [rol] : []}
-          onTocar={(r) => {
-            setRol(r)
-            // Un punto de partida según lo que hace; lo cambiás abajo.
-            if (!secciones.length || rol) setSecciones(seccionesSugeridas(r))
-          }}
-        />
-      </Grupo>
-      <Grupo titulo={rol ? 'Qué va a ver · te propusimos esto, cambialo como quieras' : 'Qué va a ver'}>
-        <ElegirSecciones elegidas={secciones} onCambiar={setSecciones} />
-      </Grupo>
-      <p className="mt-4 text-[14px] text-texto-suave">Configuración (las personas y el plan) sólo la ves vos.</p>
-    </PanelLateral>
-  )
-}
-
-function EditarPanel({ persona, onCerrar }: { persona: Persona | null; onCerrar: () => void }) {
-  // La última abierta queda mientras el panel sale.
-  const [ultima, setUltima] = useState(persona)
-  if (persona && persona !== ultima) setUltima(persona)
-  const p = persona ?? ultima
-  if (!p) return null
-  return <Editar key={p.userId ?? p.invitacionId} p={p} abierto={!!persona} onCerrar={onCerrar} />
-}
-
-function Editar({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerrar: () => void }) {
-  const cambiar = useCambiarSecciones()
-  const quitar = useQuitarPersona()
-  const [secciones, setSecciones] = useState<Seccion[]>(p.secciones ?? [])
-  const [seguro, setSeguro] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const pendiente = !!p.invitacionId
-  const nombre = p.nombre.split(' ')[0]
-
-  async function guardar() {
-    setError(null)
-    if (!secciones.length) return setError('Tiene que ver al menos una sección. Para que no entre más, sacale el acceso.')
-    try {
-      await cambiar.mutateAsync({ userId: p.userId!, secciones })
-      onCerrar()
-      toast.success(`Listo: ${nombre} ahora ve ${SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => s.texto).join(', ')}`, { description: 'Lo ve la próxima vez que abra Tropero.' })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
-    }
-  }
-  async function sacar() {
-    try {
-      await quitar.mutateAsync(p)
-      onCerrar()
-      toast.success(pendiente ? `Listo: cancelaste la invitación de ${nombre}` : `Listo: ${nombre} ya no entra a tu campo`, { description: pendiente ? 'El link ya no sirve.' : 'Para que vuelva, invitalo de nuevo.' })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo.')
-    }
-  }
-
-  return (
-    <PanelLateral
-      abierto={abierto}
-      onCerrar={onCerrar}
-      titulo={pendiente ? `La invitación de ${nombre}` : `Qué ve ${nombre}`}
-      bajada={[nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
-      ancho
-      pie={
-        <>
-          {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-          {!pendiente && (
-            <BotonPrincipal icono="Guardar" cargando={cambiar.isPending} disabled={cambiar.isPending} onClick={() => void guardar()}>
-              Guardar lo que ve
-            </BotonPrincipal>
-          )}
-          {seguro ? (
-            <div className="mt-3 flex flex-col gap-2 rounded-[16px] bg-estado-problema-suave p-4">
-              <p className="text-[14.5px] font-semibold text-estado-problema-texto">{pendiente ? `¿Cancelás la invitación? El link ya no va a servir.` : `¿Le sacás el acceso a ${nombre}? Deja de entrar a tu campo; lo que cargó queda.`}</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => void sacar()} disabled={quitar.isPending} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie disabled:opacity-50">
-                  {pendiente ? 'Sí, cancelarla' : 'Sí, sacarle el acceso'}
-                </button>
-                <button type="button" onClick={() => setSeguro(false)} className="h-11 flex-1 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
-                  No
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button type="button" onClick={() => setSeguro(true)} className="mt-3 h-12 w-full rounded-full border-[1.5px] border-borde bg-superficie text-[15.5px] font-bold text-estado-problema-texto hover:border-estado-problema">
-              {pendiente ? 'Cancelar la invitación' : 'Sacarle el acceso'}
-            </button>
-          )}
-        </>
-      }
-    >
-      {pendiente ? (
-        <p className="text-[15.5px] text-texto">
-          Va a ver: {SECCIONES.filter((s) => (p.secciones ?? []).includes(s.id)).map((s) => s.texto).join(', ')}. Cuando entre, le podés cambiar lo que ve desde acá.
-        </p>
-      ) : (
-        <ElegirSecciones elegidas={secciones} onCambiar={setSecciones} />
-      )}
-    </PanelLateral>
-  )
-}
-
-// ---------------------------------------------------------------- Tu cuenta
-
-function TuCuenta() {
+function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const cambiar = useCambiarNombre()
   const actual = nombreDe(user?.user_metadata) ?? ''
   const [nombre, setNombre] = useState(actual)
+  const [guardado, setGuardado] = useState(actual)
   const celular = user?.phone ? celularLindo(user.phone) : null
 
   async function guardar() {
     if (!nombre.trim()) return
     try {
       await cambiar.mutateAsync(nombre)
+      setGuardado(nombre.trim())
       toast.success('Listo: guardamos tu nombre', { description: 'Así te saluda el asistente.' })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
@@ -357,33 +245,56 @@ function TuCuenta() {
   }
 
   return (
-    <Bloque titulo="Tu cuenta" bajada="Entrás con tu celular y un código por WhatsApp, sin contraseña.">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-end gap-3">
-          <CampoTexto className="min-w-[260px] flex-1" etiqueta="Tu nombre" placeholder="Daniel" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          <button type="button" onClick={() => void guardar()} disabled={!nombre.trim() || nombre.trim() === actual || cambiar.isPending} className="h-[52px] rounded-full bg-principal px-6 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-40">
-            Guardar el nombre
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] bg-superficie-hundida/60 px-4 py-3.5">
+    <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+      {/* La ficha: quién sos para Tropero. */}
+      <section aria-label="Tu ficha" className="flex flex-col items-start self-start rounded-[24px] bg-tinta p-7 text-superficie">
+        <span className="grid size-20 place-items-center rounded-full bg-principal font-heading text-[34px] font-extrabold text-principal-texto">{(guardado || empresa || 'T').charAt(0).toUpperCase()}</span>
+        <p className="titulo-display mt-5 text-[30px] leading-tight">{guardado || 'Sin nombre'}</p>
+        <p className="mt-1 text-[15.5px] text-superficie/75">
+          {nombreRol(rol)} de {empresa}
+        </p>
+        {celular && <p className="cifra mt-5 text-[20px]">{celular}</p>}
+        <p className="mt-1 text-[14px] text-superficie/60">Entrás con este número y un código por WhatsApp. Sin contraseña.</p>
+      </section>
+
+      <div className="flex flex-col gap-4">
+        <section aria-label="Tu cuenta" className="rounded-[24px] border border-borde bg-superficie p-6">
+          <h2 className="font-heading text-[20px] font-extrabold text-texto">Tu nombre</h2>
+          <p className="mt-1 text-[15px] text-texto-suave">Con este te saluda el asistente y te ven las personas que invitás.</p>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <CampoTexto className="min-w-[240px] flex-1" etiqueta="Cómo te llamás" placeholder="Daniel" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+            <button type="button" onClick={() => void guardar()} disabled={!nombre.trim() || nombre.trim() === guardado || cambiar.isPending} className="h-[52px] rounded-full bg-principal px-6 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-40">
+              Guardar el nombre
+            </button>
+          </div>
+        </section>
+
+        <section aria-label="Tu número" className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-borde bg-superficie p-6">
           <div>
-            <p className="text-[14px] font-semibold text-texto-suave">Tu número</p>
-            <p className="cifra text-[19px] text-texto">{celular ?? '—'}</p>
+            <h2 className="font-heading text-[20px] font-extrabold text-texto">¿Cambiaste de número?</h2>
+            <p className="mt-1 text-[15px] text-texto-suave">Te mandamos un código al nuevo para confirmar que es tuyo. Tus datos quedan iguales.</p>
           </div>
           <button type="button" onClick={() => navigate('/mi-cuenta/numero')} className={BOTON_CHICO}>
             Cambiar mi número
           </button>
-        </div>
-        <button type="button" onClick={() => void signOut()} className={cn(BOTON_CHICO, 'self-start')}>
-          <Icono nombre="Salir" tamano={16} />
-          Salir de Tropero en esta compu
-        </button>
+        </section>
+
+        <section aria-label="Salir" className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-borde bg-superficie p-6">
+          <div>
+            <h2 className="font-heading text-[20px] font-extrabold text-texto">Salir en esta compu</h2>
+            <p className="mt-1 text-[15px] text-texto-suave">Para volver a entrar te pedimos un código nuevo.</p>
+          </div>
+          <button type="button" onClick={() => void signOut()} className={BOTON_CHICO}>
+            <Icono nombre="Salir" tamano={16} />
+            Salir de Tropero
+          </button>
+        </section>
       </div>
-    </Bloque>
+    </div>
   )
 }
 
-// ---------------------------------------------------------------- Plan
+// ---------------------------------------------------------------- Plan: el estado y el uso
 
 /** Lo que es verdad hoy: el piloto, sin cargo, y lo que ya usa (Lau, 05/11: sin precios inventados). */
 function Plan() {
@@ -395,34 +306,63 @@ function Plan() {
   const cabezas = (animales.data ?? []).filter((a) => a.estado === 'activo').length
   const desde = membresia?.empresa?.created_at
   const whatsapp = linkWhatsapp({ nombre: nombreDe(user?.user_metadata), empresa: membresia?.empresa?.nombre ?? null, seccion: 'Configuración, el plan', consulta: 'Quiero saber sobre mi plan.' })
-  const uso: [string, string][] = [
-    ['Campos', String(mapa.data?.length ?? '—')],
-    ['Cabezas', animales.data ? cabezas.toLocaleString('es-AR') : '—'],
-    ['Personas', String(personas.data?.filter((p) => p.userId).length ?? '—')],
+  const uso: { titulo: string; valor: string; icono: NombreIcono }[] = [
+    { titulo: 'Campos', valor: String(mapa.data?.length ?? '—'), icono: 'Campos' },
+    { titulo: 'Cabezas', valor: animales.data ? cabezas.toLocaleString('es-AR') : '—', icono: 'Hacienda' },
+    { titulo: 'Personas', valor: String(personas.data?.filter((p) => p.userId).length ?? '—'), icono: 'Usuario' },
   ]
   return (
-    <Bloque titulo="Plan" bajada="Lo que tenés y lo que usás.">
-      <div className="flex flex-wrap items-center justify-between gap-5">
+    <div className="flex flex-col gap-5">
+      {/* El plan, como una tarjeta: qué tenés y desde cuándo. */}
+      <section aria-label="Tu plan" className="flex flex-wrap items-end justify-between gap-6 rounded-[24px] bg-tinta p-8 text-superficie">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-estado-bien-suave px-3 py-1 text-[13.5px] font-bold text-estado-bien-texto">Activo</p>
-          <p className="titulo-display mt-3 text-[34px] leading-none text-texto">Piloto, sin cargo</p>
-          {desde && <p className="mt-2 text-[15px] text-texto-suave">Usás Tropero desde el {fecha(desde)}.</p>}
+          <span className="inline-flex items-center gap-2 rounded-full bg-estado-bien px-3 py-1 text-[13.5px] font-bold text-superficie">
+            <span className="size-2 rounded-full bg-superficie" />
+            Activo
+          </span>
+          <p className="mt-4 text-[15px] text-superficie/70">Tu plan</p>
+          <p className="titulo-display text-[44px] leading-none">Piloto, sin cargo</p>
+          {desde && <p className="mt-3 text-[15.5px] text-superficie/75">Usás Tropero desde el {fecha(desde)}.</p>}
         </div>
         {whatsapp && (
-          <a href={whatsapp} target="_blank" rel="noreferrer" className={BOTON_CHICO}>
+          <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-full bg-acento px-5 text-[15.5px] font-bold text-acento-texto hover:bg-trigo-300">
             <Icono nombre="Celular" tamano={16} />
             Hablar con nosotros
           </a>
         )}
-      </div>
-      <dl className="mt-6 grid grid-cols-3 gap-3">
-        {uso.map(([k, v]) => (
-          <div key={k} className="rounded-[16px] bg-superficie-hundida/60 px-4 py-3">
-            <dt className="text-[14px] font-semibold text-texto-suave">{k}</dt>
-            <dd className="cifra text-[26px] text-texto">{v}</dd>
-          </div>
-        ))}
-      </dl>
-    </Bloque>
+      </section>
+
+      <section aria-label="Lo que usás">
+        <h2 className="mb-3 font-heading text-[20px] font-extrabold text-texto">Lo que usás</h2>
+        <dl className="grid gap-3 sm:grid-cols-3">
+          {uso.map((u) => (
+            <div key={u.titulo} className="flex items-center gap-4 rounded-[20px] border border-borde bg-superficie px-5 py-4">
+              <span className="grid size-11 place-items-center rounded-full bg-superficie-hundida text-texto">
+                <Icono nombre={u.icono} />
+              </span>
+              <div>
+                <dt className="text-[14px] font-semibold text-texto-suave">{u.titulo}</dt>
+                <dd className="cifra text-[28px] leading-none text-texto">{u.valor}</dd>
+              </div>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section aria-label="Qué incluye" className="rounded-[24px] border border-borde bg-superficie p-6">
+        <h2 className="font-heading text-[20px] font-extrabold text-texto">Qué incluye</h2>
+        <p className="mt-1 text-[15px] text-texto-suave">En el piloto usás Tropero entero.</p>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          {[...SECCIONES.map((s) => `${s.texto}: ${s.queVe.toLowerCase()}`), 'El asistente de Tropero, para tus dudas'].map((t) => (
+            <li key={t} className="flex items-center gap-2.5 text-[15px] text-texto">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
+                <Icono nombre="Guardar" tamano={16} />
+              </span>
+              {t}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
   )
 }
