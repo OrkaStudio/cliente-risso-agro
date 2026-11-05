@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Icono } from '@/components/tropero/icono'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
-import { CargarDialog } from '@/features/analitica/cargar-dialog'
+import { AnotarPlata } from './anotar-plata'
 import { fmtCompact, formatARS } from '@/features/analitica/compute'
 import { useMovimientos } from '@/features/analitica/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
@@ -76,11 +76,11 @@ export function MovimientosPage() {
             Bajar a Excel
           </button>
           {empresaId && (
-            <CargarDialog
+            <AnotarPlata
               empresaId={empresaId}
               campoInicial={campoId ?? undefined}
               renderTrigger={(abrir) => (
-                <button type="button" onClick={abrir} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
+                <button type="button" onClick={() => abrir()} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
                   Anotar
                   <span className="grid size-10 place-items-center rounded-full bg-acento text-acento-texto">
                     <Icono nombre="Agregar" tamano={16} />

@@ -914,3 +914,6 @@
 @media (prefers-reduced-motion: reduce) {
   [data-resaltado] { animation: none; }
 }
+
+/* Plata · «Leyendo el comprobante»: la raya que baja por la foto. */
+@keyframes escaneo { 0% { transform: translateY(24px); } 50% { transform: translateY(316px); } 100% { transform: translateY(24px); } }

@@ -5,7 +5,6 @@ import { Icono } from '@/components/tropero/icono'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { useCampoDesdeUrl, useCampoElegido } from '@/features/campos/campo-elegido'
 import { AlquilerDialog } from '@/features/analitica/alquiler-dialog'
-import { CargarDialog } from '@/features/analitica/cargar-dialog'
 import { actividadLabel, fmtCompact, gastosPorCategoria, porActividad, porCampo } from '@/features/analitica/compute'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import { useCampos } from '@/features/campos/hooks'
@@ -15,6 +14,7 @@ import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import rollos from '@/assets/tropero/rollos-plata.webp'
 import { useDolarHistorico } from './dolar'
+import { AnotarPlata } from './anotar-plata'
 import { MesAMes } from './mes-a-mes'
 import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Periodo } from './plata'
 
@@ -43,6 +43,7 @@ export function PlataPage() {
   const reducir = useReducedMotion()
   const navigate = useNavigate()
   const [alquiler, setAlquiler] = useState(false)
+  const [vezAlquiler, setVezAlquiler] = useState(0)
   const [vista, setVista] = useState<'actividad' | 'campo'>('campo')
   const [clave, setClave] = useState<Periodo['clave']>('doce')
   const hoy = hoyLocal()
@@ -111,7 +112,7 @@ export function PlataPage() {
       <motion.div {...entra(0)} className="flex items-end justify-between gap-3">
         <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />
         <div className="flex items-center gap-2">
-          <button type="button" data-guia="analitica-alquiler" onClick={() => setAlquiler(true)} className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
+          <button type="button" data-guia="analitica-alquiler" onClick={() => (setVezAlquiler((v) => v + 1), setAlquiler(true))} className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
             <Icono nombre="Comprobante" tamano={16} />
             Cargar un alquiler
           </button>
@@ -167,13 +168,13 @@ export function PlataPage() {
             )}
           </div>
           <div className="flex shrink-0 gap-2.5">
-            {empresaId && <span data-guia="analitica-cargar" className="contents"><CargarDialog empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(abrir, 'Anotar un gasto')} /></span>}
+            {empresaId && <span data-guia="analitica-cargar" className="contents"><AnotarPlata empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(() => abrir(), 'Anotar un gasto')} /></span>}
             {empresaId && (
-              <CargarDialog
+              <AnotarPlata
                 empresaId={empresaId}
                 campoInicial={campoId ?? undefined}
                 renderTrigger={(abrir) => (
-                  <button type="button" onClick={abrir} aria-label="Escanear un comprobante" className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto transition-opacity hover:opacity-90">
+                  <button type="button" onClick={() => abrir(true)} aria-label="Escanear un comprobante" className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto transition-opacity hover:opacity-90">
                     <Icono nombre="Foto" />
                   </button>
                 )}
@@ -342,7 +343,8 @@ export function PlataPage() {
         </motion.section>
       )}
 
-      {empresaId && <AlquilerDialog empresaId={empresaId} open={alquiler} onOpenChange={setAlquiler} />}
+      {/* La key cambia al abrir: arranca de cero y sale con su animación. */}
+      {empresaId && <AlquilerDialog key={vezAlquiler} empresaId={empresaId} campoId={campoId ?? undefined} open={alquiler} onOpenChange={setAlquiler} />}
     </div>
   )
 }
