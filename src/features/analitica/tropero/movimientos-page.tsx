@@ -116,23 +116,18 @@ export function MovimientosPage() {
             const f = m.fecha_cobro_pago ?? m.fecha_devengo
             const ingreso = m.tipo === 'ingreso'
             const medio = medioTexto(m)
-            const detalle = [m.categoria?.nombre, m.campo?.nombre, m.contraparte].filter(Boolean).join(', ')
+            // Como las filas de la Agenda: el título y, debajo, todo lo demás en una línea gris.
+            const detalle = [m.categoria?.nombre, m.campo?.nombre, m.contraparte, medio, comprobanteTexto(m)].filter(Boolean).join(' · ')
             return (
               <li key={m.id} className="flex items-center gap-5 border-b border-borde/70 py-4">
-                <span className="cifra w-14 shrink-0 text-[20px] font-bold text-texto-suave">{`${f.slice(8, 10)}/${f.slice(5, 7)}`}
+                <span className="cifra w-14 shrink-0 text-[19px] text-texto-suave">{`${f.slice(8, 10)}/${f.slice(5, 7)}`}
                   {f.slice(0, 4) !== hoy.slice(0, 4) && <span className="block text-[13px] font-semibold">{f.slice(0, 4)}</span>}</span>
-                <span aria-hidden className={cn('h-11 w-1 shrink-0 rounded-full', ingreso ? 'bg-estado-bien' : 'bg-principal')} />
+                <span aria-hidden className={cn('h-10 w-1 shrink-0 rounded-full', ingreso ? 'bg-estado-bien' : 'bg-estado-problema/80')} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[17px] font-bold text-texto">{m.descripcion || m.categoria?.nombre || (ingreso ? 'Ingreso' : 'Gasto')}</p>
-                  <p className="truncate text-[14.5px] text-texto-suave">
-                    {detalle}
-                  </p>
+                  <p className="truncate text-[16.5px] font-semibold text-texto">{m.descripcion || m.categoria?.nombre || (ingreso ? 'Ingreso' : 'Gasto')}</p>
+                  <p className="truncate text-[14.5px] text-texto-suave">{detalle}</p>
                 </div>
-                <div className="hidden shrink-0 gap-2 lg:flex">
-                  {medio && <span className="rounded-full bg-superficie-hundida px-3 py-1 text-[13px] font-semibold text-texto-suave">{medio}</span>}
-                  <span className="rounded-full bg-superficie-hundida px-3 py-1 text-[13px] font-semibold text-texto-suave">{comprobanteTexto(m)}</span>
-                </div>
-                <span className={cn('cifra w-36 shrink-0 text-right text-[21px] font-bold', ingreso ? 'text-estado-bien-texto' : 'text-texto')}>
+                <span className={cn('cifra w-36 shrink-0 text-right text-[19px]', ingreso ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
                   {ingreso ? '+' : '−'}
                   {formatARS(Number(m.monto)).replace('-', '').replace(/\s/g, '')}
                 </span>

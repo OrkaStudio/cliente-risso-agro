@@ -75,7 +75,7 @@ export function cosasParaHoy(
       tono: d < 0 ? 'problema' : 'atencion',
       titulo: v.descripcion,
       detalle: v.monto ? `${cuando}. ${plata(v.monto)}.` : `${cuando}.`,
-      accion: { texto: cobro ? 'Registrar el cobro' : 'Registrar el pago', to: '/agenda' },
+      accion: { texto: cobro ? 'Ya lo cobré' : 'Ya lo pagué', to: `/agenda?mov=${v.id}` },
       icono: 'Plata',
       lugar: v.monto ? plataCorta(cobro ? v.monto : -v.monto, true) : v.descripcion,
       que: v.descripcion,

@@ -36,8 +36,8 @@ describe('para atender hoy', () => {
     )
     expect(cs.map((c) => c.key)).toEqual(['p-11B', 'v-b', 'p-4B', 'v-c'])
     expect(cs[0]).toMatchObject({ tono: 'problema', titulo: 'El eléctrico está cortado en el 11B', detalle: 'Desde hace 3 días. Hay 60 animales adentro.' })
-    expect(cs[1]).toMatchObject({ detalle: 'Venció hace dos días. $350.000.', accion: { texto: 'Registrar el pago' } })
-    expect(cs[3]!.accion.texto).toBe('Registrar el cobro')
+    expect(cs[1]).toMatchObject({ detalle: 'Venció hace dos días. $350.000.', accion: { texto: 'Ya lo pagué' } })
+    expect(cs[3]!.accion.texto).toBe('Ya lo cobré')
   })
   it('sin nada, lista vacía', () => {
     expect(cosasParaHoy([], [venc('a', 20)], [])).toEqual([])

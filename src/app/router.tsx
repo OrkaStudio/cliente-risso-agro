@@ -4,6 +4,7 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
+import { NoEncontrada } from '@/app/pantalla-aviso'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
 import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
@@ -226,6 +227,8 @@ export const router = createBrowserRouter([
               { path: 'agenda', element: <AgendaPage /> },
               // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
               { path: 'cheques', element: <Navigate to="/agenda" replace /> },
+              // Una dirección que no existe: se dice, dentro de la app, con el camino al Inicio.
+              { path: '*', element: <NoEncontrada /> },
             ],
           },
               {
