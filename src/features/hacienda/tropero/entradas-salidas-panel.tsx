@@ -342,7 +342,7 @@ export function EntradasSalidas({
                 {campo.nombre} · hoy hay {cabezasEn(potrero.id)}
               </p>
             </div>
-            <button type="button" onClick={() => setPaso('potrero')} className="shrink-0 text-[14px] font-bold text-principal hover:underline">
+            <button type="button" onClick={() => setPaso('potrero')} className="shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
               Cambiar
             </button>
           </div>
@@ -458,7 +458,7 @@ export function Potreros(props: React.ComponentProps<typeof CroquisDibujo> & { o
                   elegirCampo(campo.id)
                   navigate('/campos')
                 }}
-                className="font-bold text-principal hover:underline"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal"
               >
                 Dibujarlos en Campos
               </button>
@@ -542,7 +542,7 @@ export function ElegirCampo({
         <Letra c={de(actual.id)} />
         {actual.nombre}
         {opciones.length > 1 && (
-          <button type="button" onClick={() => setAbierto(true)} className="ml-1 text-[14px] font-bold text-principal hover:underline">
+          <button type="button" onClick={() => setAbierto(true)} className="ml-1.5 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
             Cambiar
           </button>
         )}

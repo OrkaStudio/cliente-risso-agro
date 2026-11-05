@@ -424,7 +424,7 @@ export function Acompanante({
               <div className="flex items-start gap-3 px-5 pt-4 pb-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   {respuesta ? (
-                    <button type="button" onClick={() => setElegida(null)} className="mb-1 flex items-center gap-1 self-start text-[13px] font-bold text-principal hover:underline">
+                    <button type="button" onClick={() => setElegida(null)} className="mb-1 self-start inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
                       <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
                       Otras dudas
                     </button>

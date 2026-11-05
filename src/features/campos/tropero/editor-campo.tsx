@@ -1044,7 +1044,7 @@ function FilaFalta({ p, onDibujar, onSacar }: { p: PotreroM; onDibujar: () => vo
       <div className="min-w-0 flex-1">
         <FilaPotrero p={p} onClick={onDibujar} />
       </div>
-      <button type="button" onClick={() => setSeguro(true)} aria-label={`El ${p.nombre} ya no existe`} className="shrink-0 px-1 text-[13px] font-semibold text-texto-suave hover:text-principal hover:underline">
+      <button type="button" onClick={() => setSeguro(true)} aria-label={`El ${p.nombre} ya no existe`} className="shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
         Ya no existe
       </button>
     </div>
@@ -1056,7 +1056,7 @@ function SacarCampo({ nombre, ocupado, onSacar }: { nombre: string; ocupado: boo
   const [seguro, setSeguro] = useState(false)
   if (!seguro)
     return (
-      <button type="button" onClick={() => setSeguro(true)} className="self-start text-[13.5px] font-semibold text-texto-suave hover:text-principal hover:underline">
+      <button type="button" onClick={() => setSeguro(true)} className="self-start inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
         Sumé este campo por error: sacarlo
       </button>
     )

@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/auth-context'
-import type { MisionId } from '@/features/guia/misiones'
 import { supabase } from '@/lib/supabase/client'
 import { registrar } from '@/lib/telemetria'
 import { useIsMobile } from '@/lib/use-is-mobile'
@@ -64,76 +63,6 @@ export function usePanelAbierto(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Misión en curso (mision.tsx). Una por vez: mientras dura, la pastilla y
-// los puntitos se corren — el productor está HACIENDO algo y el asistente lo
-// acompaña, no compite (TASK-063).
-// ---------------------------------------------------------------------------
-
-let misionActiva: MisionId | null = null
-
-// Para la telemetría: cuándo arrancó, en qué paso va y si llegó al festejo.
-// "Después" (o pasar a otra misión) sin festejo es un abandono.
-let misionDesde = 0
-let misionPaso = 0
-let misionTerminada = false
-
-/** Desde dónde se lanzó la misión. */
-export type OrigenMision = 'bienvenida' | 'pastilla' | 'asistente'
-
-export function empezarMision(id: MisionId, origen: OrigenMision): void {
-  if (misionActiva === id) return
-  cerrarMisionEnCurso()
-  misionActiva = id
-  misionDesde = Date.now()
-  misionPaso = 0
-  misionTerminada = false
-  registrar('mision_iniciada', { mision: id, origen })
-  avisar()
-}
-
-/** El motor avanzó de paso (se da por hecho cuando pasó lo que esperaba). */
-export function avanzoPasoMision(indice: number, ancla: string): void {
-  if (misionActiva === null || indice === misionPaso) return
-  misionPaso = indice
-  registrar('mision_paso', {
-    mision: misionActiva,
-    indice,
-    ancla,
-    duracion_ms: Date.now() - misionDesde,
-  })
-}
-
-/** Llegó al festejo: la misión está hecha. */
-export function terminoMision(): void {
-  if (misionActiva === null || misionTerminada) return
-  misionTerminada = true
-  registrar('mision_completada', {
-    mision: misionActiva,
-    duracion_ms: Date.now() - misionDesde,
-  })
-}
-
-function cerrarMisionEnCurso(): void {
-  if (misionActiva === null || misionTerminada) return
-  registrar('mision_abandonada', {
-    mision: misionActiva,
-    indice: misionPaso,
-    duracion_ms: Date.now() - misionDesde,
-  })
-}
-
-export function pararMision(): void {
-  if (misionActiva === null) return
-  cerrarMisionEnCurso()
-  misionActiva = null
-  avisar()
-}
-
-export function useMisionActiva(): MisionId | null {
-  return useSyncExternalStore(subscribe, () => misionActiva, () => null)
-}
-
-// ---------------------------------------------------------------------------
 // Persistencia "ya lo vio" — tabla `guia_vista` (user_id, clave), RLS propia.
 //
 // En la DB y no en localStorage (como venía de TASK-043) porque la
@@ -145,11 +74,9 @@ export function useMisionActiva(): MisionId | null {
 
 /** Vocabulario cerrado (comentado también en la migración):
  *  - `recibimiento`: la invitación de llegada ya se respondió (Dale o Después).
- *  - `mision.<id>`: la misión ya se festejó (los datos dicen si está hecha;
- *    esto evita festejarla dos veces).
  *  - `spot.<ancla>`: el puntito de ese panel ya se tocó.
  *  - `presentacion`: el asistente ya se presentó (bienvenida del mapa en Campos). */
-export type ClaveGuia = 'recibimiento' | 'presentacion' | `mision.${MisionId}` | `spot.${string}`
+export type ClaveGuia = 'recibimiento' | 'presentacion' | `spot.${string}`
 
 function queryKey(userId: string) {
   return ['guia-vista', userId] as const

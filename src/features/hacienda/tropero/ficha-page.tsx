@@ -143,7 +143,7 @@ export function FichaPage() {
                 ) : (
                   <dd>
                     {d.cargar && editable ? (
-                      <button type="button" onClick={() => setPanel('corregir')} className="text-[14px] font-bold text-principal hover:underline">
+                      <button type="button" onClick={() => setPanel('corregir')} className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
                         + Cargar
                       </button>
                     ) : (

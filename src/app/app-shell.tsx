@@ -17,7 +17,6 @@ import {
 import { useAuth } from '@/features/auth/auth-context'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { useMedirPuestaAPunto } from '@/features/guia/medir'
-import { Mision } from '@/features/guia/mision'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
@@ -163,7 +162,6 @@ export function AppShell() {
           botón real y un puntito por panel la primera vez. La invitación y la
           lista «Tu campo, en marcha» se reemplazaron por el Inicio «Antes del
           mapa» de Tropero, que muestra los mismos pasos en un solo lugar. */}
-      <Mision />
 
       {/* El asistente, siempre a la vista abajo a la derecha: lo que notó, el progreso y las dudas. */}
       <AsistentePanel />

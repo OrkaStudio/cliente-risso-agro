@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { itemsDe, type Resumen } from '@/features/guia/estado'
-import {
-  MISIONES,
-  misionDeItem,
-  proximaMision,
-  type Contexto,
-} from '@/features/guia/misiones'
 import { saludo } from '@/features/guia/saludo'
 
 // Lo que deja el onboarding v2 en la compu: un campo con localidad pero sin
@@ -86,66 +80,6 @@ describe('itemsDe — el camino con nombres vivos', () => {
     expect(con.find((i) => i.id === 'alquiler')?.hecho).toBe(false)
     const hecho = itemsDe({ ...RECIEN_ONBOARDEADO, alquilados: 1, alquilerPendiente: [] })
     expect(hecho.find((i) => i.id === 'alquiler')?.hecho).toBe(true)
-  })
-})
-
-function ctx(resumen: Resumen, extra: Partial<Contexto> = {}): Contexto {
-  return { resumen, pathname: '/campos', dialogoAbierto: false, anclas: new Set(), ...extra }
-}
-
-describe('misiones — enseñar haciendo', () => {
-  it('recién onboardeado: la próxima es traer el campo al mapa, y la invita con lo suyo', () => {
-    const m = proximaMision(RECIEN_ONBOARDEADO)!
-    expect(m.id).toBe('campo-en-mapa')
-    expect(m.titulo(RECIEN_ONBOARDEADO)).toBe('Traé tu campo al mapa')
-    const inv = m.invitacion(RECIEN_ONBOARDEADO)
-    expect(inv.pregunta).toBe('¿Traemos La Porteña al mapa?')
-    expect(inv.minutos).toBe(2)
-    expect(inv.porQue).toContain('ARBA')
-  })
-
-  it('traer el campo al mapa: lleva a Campos con ese campo y le deja la palabra al editor', () => {
-    const pasos = MISIONES['campo-en-mapa'].pasos(RECIEN_ONBOARDEADO)
-    expect(pasos).toHaveLength(1)
-    expect(pasos[0]!.ruta).toBe('/campos?campo=c1')
-    expect(pasos[0]!.delega).toBe(true)
-    // Termina cuando el borde quedó guardado (el campo ya no está sin contorno).
-    expect(pasos[0]!.hecho(ctx(RECIEN_ONBOARDEADO))).toBe(false)
-    expect(pasos[0]!.hecho(ctx({ ...RECIEN_ONBOARDEADO, sinContorno: [] }))).toBe(true)
-  })
-
-  it('con el contorno puesto sigue el primer potrero; dibujado uno, no insiste', () => {
-    const conContorno = { ...RECIEN_ONBOARDEADO, sinContorno: [] }
-    expect(proximaMision(conContorno)?.id).toBe('primer-potrero')
-    const pasos = MISIONES['primer-potrero'].pasos(conContorno)
-    expect(pasos[0]!.delega).toBe(true)
-    expect(pasos[0]!.hecho(ctx(conContorno))).toBe(false)
-    expect(pasos[0]!.hecho(ctx({ ...conContorno, potrerosDibujados: 1 }))).toBe(true)
-    expect(proximaMision({ ...conContorno, potrerosDibujados: 1 })?.id).toBe('ubicar-hacienda')
-  })
-
-  it('ubicar hacienda: sólo con potreros, y termina cuando bajan los sueltos', () => {
-    expect(misionDeItem('tropas', { ...RECIEN_ONBOARDEADO, potreros: 0 })).toBeNull()
-    const m = misionDeItem('tropas', RECIEN_ONBOARDEADO)!
-    expect(m.id).toBe('ubicar-hacienda')
-    const pasos = m.pasos(RECIEN_ONBOARDEADO)
-    expect(pasos[1]!.hecho(ctx({ ...RECIEN_ONBOARDEADO, sinPotrero: 100 }))).toBe(true)
-    expect(m.festejo({ ...RECIEN_ONBOARDEADO, sinPotrero: 0 }).texto).toContain('Toda la hacienda')
-  })
-
-  it('todo hecho: no hay misión', () => {
-    expect(
-      proximaMision({ ...RECIEN_ONBOARDEADO, sinContorno: [], potrerosDibujados: 8, sinPotrero: 0 }),
-    ).toBeNull()
-    expect(proximaMision(VACIO)).toBeNull()
-  })
-
-  it('cada paso dice una línea corta', () => {
-    for (const m of Object.values(MISIONES)) {
-      for (const p of m.pasos(RECIEN_ONBOARDEADO)) {
-        expect(p.texto.length).toBeLessThanOrEqual(90)
-      }
-    }
   })
 })
 

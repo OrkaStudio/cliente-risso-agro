@@ -47,7 +47,7 @@ export function SinHacienda({
             Ver {campo} en Campos
             <Icono nombre="Siguiente" tamano={16} />
           </button>
-          <button type="button" onClick={onEntraron} className="px-1 text-[14px] font-semibold text-principal hover:underline">
+          <button type="button" onClick={onEntraron} className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
             ¿Entraron animales? Cargalos
           </button>
         </div>
