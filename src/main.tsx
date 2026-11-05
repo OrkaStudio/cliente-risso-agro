@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')!).render(
             trabajo en equipos lentos. */}
         <MotionConfig reducedMotion="user">
           <RouterProvider router={router} />
-          <Toaster richColors position="top-right" />
+          <Toaster />
         </MotionConfig>
       </AuthProvider>
     </QueryClientProvider>

@@ -95,12 +95,15 @@ export function AnotarPlata({
   potreroInicial,
   renderTrigger,
   vence = false,
+  venceInicial,
 }: {
   empresaId: string
   campoInicial?: string
   potreroInicial?: string
   /** «Algo que vence» (la Agenda): arranca como pendiente y pide el vencimiento. */
   vence?: boolean
+  /** El día ya elegido (tocando un día del calendario de la Agenda). */
+  venceInicial?: string
   /** El botón que lo abre; `escanear` arranca pidiendo la foto. */
   renderTrigger: (abrir: (escanear?: boolean) => void) => ReactNode
 }) {
@@ -115,13 +118,14 @@ export function AnotarPlata({
         setAbierto(true)
       })}
       {/* La key cambia al abrir: arranca de cero y sale con su animación. */}
-      <Formulario key={vez} vence={vence} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
+      <Formulario key={vez} vence={vence} venceInicial={venceInicial} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
     </>
   )
 }
 
 function Formulario({
   vence: modoVence,
+  venceInicial,
   empresaId,
   campoInicial,
   potreroInicial,
@@ -130,6 +134,7 @@ function Formulario({
   onCerrar,
 }: {
   vence: boolean
+  venceInicial?: string
   empresaId: string
   campoInicial?: string
   potreroInicial?: string
@@ -160,7 +165,7 @@ function Formulario({
   const [chequeNumero, setChequeNumero] = useState('')
   const [cuando, setCuando] = useState<'hoy' | 'otro'>('hoy')
   const [fecha, setFecha] = useState(hoyLocal())
-  const [vence, setVence] = useState('')
+  const [vence, setVence] = useState(venceInicial ?? '')
   const [factura, setFactura] = useState<ComprobanteTipo | 'no'>('no')
   const [alicuota, setAlicuota] = useState<(typeof ALICUOTAS)[number]>('21')
   const [lineasLeidas, setLineasLeidas] = useState<IvaLinea[] | null>(null)
@@ -174,7 +179,12 @@ function Formulario({
   const [otraCantidad, setOtraCantidad] = useState(false)
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
   const [primera, setPrimera] = useState(hoyLocal())
+  // Cuotas: lo que puso es lo de cada cuota (lo que sabe el productor) o el total. Se repite: un sueldo.
+  const [clase, setClase] = useState<'cuotas' | 'repite'>('cuotas')
+  const [esCadaCuota, setEsCadaCuota] = useState<'cada' | 'total'>('cada')
+  const [durante, setDurante] = useState('12')
   const [error, setError] = useState<string | null>(null)
+  const [mas, setMas] = useState(false)
 
   const potreros = usePotreros(campoId)
   const total = numeroDeFormateado(monto) ?? 0
@@ -197,8 +207,12 @@ function Formulario({
   if (categoriaId && !visibles.some((c) => c.id === categoriaId) && !todasCategorias) setTodasCategorias(true)
 
   const cant = Math.max(0, Math.floor(Number(cantidad) || 0))
-  const cuota = cant > 0 ? Math.round((total / cant) * 100) / 100 : 0
   const pasos = FRECUENCIAS.find((f) => f.valor === frecuencia)!.meses
+  const repite = clase === 'repite'
+  // Cuántas veces: en cuotas, las que dice; si se repite, las que entran en el tiempo elegido.
+  const veces = repite ? Math.max(1, Math.floor(Number(durante) / pasos)) : cant
+  const cuota = repite || esCadaCuota === 'cada' ? total : cant > 0 ? Math.round((total / cant) * 100) / 100 : 0
+  const totalSerie = cuota * veces
   const ocupado = crear.isPending || crearSerie.isPending
   const nombreCategoria = opcionesCategoria.find((c) => c.id === categoriaId)?.nombre
   const nombreCampo = campos.find((c) => c.id === campoId)?.nombre
@@ -207,7 +221,7 @@ function Formulario({
     if (total <= 0) return 'Escribí cuánto fue.'
     if (!categoriaId) return `Tocá en qué ${esGasto ? 'se fue' : 'entró'}.`
     if (!campoId) return 'Tocá de qué campo es.'
-    if (paraCuotas) return cant < 1 ? 'Poné cuántas cuotas.' : null
+    if (paraCuotas) return !repite && cant < 1 ? 'Poné cuántas cuotas.' : null
     if (!cuenta) return esGasto ? 'Tocá cómo lo pagaste, o «Todavía no».' : 'Tocá cómo lo cobraste, o «Todavía no».'
     if (pendiente && !vence) return `Poné cuándo ${esGasto ? 'vence el pago' : 'lo cobrás'}.`
     return null
@@ -268,6 +282,11 @@ function Formulario({
     }
   }
 
+  // Al pasar a cuotas (o volver), el panel arranca arriba: si no, quedaba bajado y se cortaba lo primero.
+  useEffect(() => {
+    document.querySelectorAll('[role="dialog"] .overflow-y-auto').forEach((e) => e.scrollTo(0, 0))
+  }, [modo])
+
   // «Escanear» desde Plata: pide la foto apenas se abre (el formulario se monta de nuevo en cada apertura).
   useEffect(() => {
     if (abierto && escanear) archivo.current?.click()
@@ -324,11 +343,12 @@ function Formulario({
         montoCuota: cuota,
         frecuencia,
         primeraFecha: primera,
-        cantidad: cant,
+        cantidad: veces,
+        sinNumerar: repite,
         descripcion: descripcion.trim() || nombreCategoria || (esGasto ? 'Gasto' : 'Ingreso'),
         medioPago: null,
       })
-      toast.success(`Listo: ${cant} cuotas en la Agenda`, { description: `${pesos(cuota)} cada una, desde el ${Number(primera.slice(8))} de ${nombreMes(primera.slice(0, 7))}.` })
+      toast.success(repite ? `Listo: ${veces} pagos de ${pesos(cuota)} en la Agenda` : `Listo: ${veces} cuotas en la Agenda`, { description: `${pesos(cuota)} cada ${repite ? 'vez' : 'una'}, desde el ${Number(primera.slice(8))} de ${nombreMes(primera.slice(0, 7))}.` })
       onCerrar()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
@@ -371,41 +391,65 @@ function Formulario({
 
   // ===== En cuotas =====
   if (modo === 'cuotas') {
-    const meses = Array.from({ length: Math.min(cant, 12) }, (_, i) => sumarMeses(primera, i * pasos))
+    const meses = Array.from({ length: Math.min(veces, 12) }, (_, i) => sumarMeses(primera, i * pasos))
+    const nombre = esGasto ? 'gasto' : 'ingreso'
     return (
       <PanelLateral
         abierto={abierto}
         onCerrar={onCerrar}
         onVolver={() => (setError(null), setModo('mano'))}
-        titulo={`Un ${esGasto ? 'gasto' : 'ingreso'} en cuotas`}
+        titulo={repite ? `Un ${nombre} que se repite` : `Un ${nombre} en cuotas`}
         bajada={[descripcion.trim(), nombreCategoria, nombreCampo].filter(Boolean).join(', ')}
         pie={
           <>
             {errorAviso}
             <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardarCuotas()}>
-              {cant > 0 ? `Anotar las ${cant} cuotas` : 'Anotar las cuotas'}
+              {repite ? `Anotar ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${fmtCompact(cuota)}` : veces > 0 ? `Anotar las ${veces} cuotas` : 'Anotar las cuotas'}
             </BotonPrincipal>
           </>
         }
       >
-        <p className="titulo-display cifra text-[52px] leading-none tracking-[-0.03em] text-texto">{pesos(total)}</p>
-        {cant > 0 && <p className="mt-2 text-[17px] font-bold text-principal">en {cant} cuotas de {pesos(cuota)}</p>}
-        <Grupo titulo="Cuántas cuotas" className="mt-6">
-          <Opciones
-            etiqueta="Cuántas cuotas"
-            opciones={[...['3', '6', '12'].map((v) => ({ valor: v, texto: v })), { valor: 'otra', texto: 'Otra' }]}
-            elegidas={[otraCantidad ? 'otra' : cantidad]}
-            onTocar={(v) => (v === 'otra' ? setOtraCantidad(true) : (setOtraCantidad(false), setCantidad(v)))}
-          />
-          {otraCantidad && <CampoTexto className="mt-3" etiqueta="Cuántas" inputMode="numeric" value={cantidad} onChange={(e) => setCantidad(e.target.value.replace(/\D/g, ''))} autoFocus />}
-        </Grupo>
-        <Grupo titulo="Cada cuánto">
-          <Opciones etiqueta="Cada cuánto" opciones={FRECUENCIAS} elegidas={[frecuencia]} onTocar={setFrecuencia} />
-        </Grupo>
-        <Grupo titulo="La primera vence">
-          <CampoFecha value={primera} onChange={setPrimera} ariaLabel="La primera vence" />
-        </Grupo>
-        {cant > 0 && (
+        <Segmentos etiqueta="Qué es" valor={clase} onCambio={setClase} opciones={[{ valor: 'cuotas', texto: 'Son cuotas' }, { valor: 'repite', texto: 'Se repite (un sueldo)' }]} />
+
+        {repite ? (
+          <>
+            <p className="titulo-display cifra mt-6 text-[48px] leading-none tracking-[-0.03em] text-texto">{pesos(cuota)}</p>
+            <p className="mt-2 text-[16px] font-bold text-principal">cada vez, {veces} {veces === 1 ? 'vez' : 'veces'}</p>
+            <Grupo titulo="Cada cuánto" className="mt-6">
+              <Opciones etiqueta="Cada cuánto" opciones={FRECUENCIAS} elegidas={[frecuencia]} onTocar={setFrecuencia} />
+            </Grupo>
+            <Grupo titulo="Durante">
+              <Opciones etiqueta="Durante" opciones={[{ valor: '6', texto: '6 meses' }, { valor: '12', texto: 'Un año' }, { valor: '24', texto: 'Dos años' }]} elegidas={[durante]} onTocar={setDurante} />
+            </Grupo>
+            <Grupo titulo="El primero">
+              <CampoFecha value={primera} onChange={setPrimera} ariaLabel="El primero" />
+            </Grupo>
+          </>
+        ) : (
+          <>
+            <Grupo titulo="Lo que escribiste es" className="mt-6">
+              <Segmentos etiqueta="Lo que escribiste es" valor={esCadaCuota} onCambio={setEsCadaCuota} opciones={[{ valor: 'cada', texto: `Cada cuota, ${fmtCompact(total)}` }, { valor: 'total', texto: `El total, ${fmtCompact(total)}` }]} />
+            </Grupo>
+            <p className="titulo-display cifra mt-6 text-[48px] leading-none tracking-[-0.03em] text-texto">{pesos(cuota)}</p>
+            {veces > 0 && <p className="mt-2 text-[16px] font-bold text-principal">por cuota, {veces} cuotas: {pesos(totalSerie)} en total</p>}
+            <Grupo titulo={esCadaCuota === 'cada' ? 'Cuántas te quedan' : 'Cuántas cuotas'} className="mt-6">
+              <Opciones
+                etiqueta="Cuántas cuotas"
+                opciones={[...['3', '6', '12'].map((v) => ({ valor: v, texto: v })), { valor: 'otra', texto: 'Otra' }]}
+                elegidas={[otraCantidad ? 'otra' : cantidad]}
+                onTocar={(v) => (v === 'otra' ? setOtraCantidad(true) : (setOtraCantidad(false), setCantidad(v)))}
+              />
+              {otraCantidad && <CampoTexto className="mt-3" etiqueta="Cuántas" inputMode="numeric" value={cantidad} onChange={(e) => setCantidad(e.target.value.replace(/\D/g, ''))} autoFocus />}
+            </Grupo>
+            <Grupo titulo="Cada cuánto">
+              <Opciones etiqueta="Cada cuánto" opciones={FRECUENCIAS} elegidas={[frecuencia]} onTocar={setFrecuencia} />
+            </Grupo>
+            <Grupo titulo={esCadaCuota === 'cada' ? 'La próxima vence' : 'La primera vence'}>
+              <CampoFecha value={primera} onChange={setPrimera} ariaLabel="La primera vence" />
+            </Grupo>
+          </>
+        )}
+        {veces > 0 && (
           <ol className="mt-5 grid grid-cols-6 gap-y-3 text-center">
             {meses.map((m, i) => (
               <li key={m}>
@@ -418,7 +462,7 @@ function Formulario({
         )}
         <p className="mt-5 flex items-start gap-3 rounded-[16px] bg-superficie-hundida p-4 text-[14px] text-texto">
           <Icono nombre="Agenda" tamano={16} className="mt-0.5 shrink-0" />
-          Las {cant || ''} cuotas van a la Agenda. Cuando pagás una, la marcás y pasa a Plata.
+          {repite ? 'Van a la Agenda. Cuando pagás uno, lo marcás y pasa a Plata.' : `Las ${veces || ''} cuotas van a la Agenda. Cuando pagás una, la marcás y pasa a Plata.`}
         </p>
       </PanelLateral>
     )
@@ -426,6 +470,7 @@ function Formulario({
 
   // ===== A mano, o lo que leyó de la foto =====
   const leyo = modo === 'leyo'
+  const verMas = mas || leyo || !!actividad || !!potreroId || factura !== 'no' || !!contraparte || !!cuit || (modoVence && !!previsto)
   const amarillo = (k: string) => leyo && leidos.has(k)
   return (
     <PanelLateral
@@ -483,6 +528,61 @@ function Formulario({
         </p>
       )}
 
+      {/* Lo que hace falta, en el orden en que se piensa; lo demás, plegado (Lau, 05/11: «simplificá los formularios»). */}
+      {modoVence ? (
+        <>
+      {pendiente ? (
+        <Grupo titulo={esGasto ? 'Cuándo vence' : 'Cuándo lo cobrás'} className="mt-6">
+          <Opciones
+            etiqueta="Cuándo vence"
+            opciones={[
+              { valor: '7', texto: 'En 7 días' },
+              { valor: '30', texto: 'En 30 días' },
+              { valor: 'repite', texto: 'Se repite' },
+              { valor: 'cuotas', texto: 'Son cuotas' },
+            ]}
+            elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
+            onTocar={(x) => {
+              if (x !== 'cuotas' && x !== 'repite') return setVence(enDias(Number(x)))
+              const f = faltante(true)
+              if (f) return setError(f)
+              setError(null)
+              setClase(x === 'repite' ? 'repite' : 'cuotas')
+              if (vence) setPrimera(vence)
+              setModo('cuotas')
+            }}
+          />
+          <div className="mt-3">
+            <CampoFecha value={vence} onChange={setVence} ariaLabel="Cuándo vence" min={hoyLocal()} />
+          </div>
+        </Grupo>
+      ) : (
+        <Grupo titulo="Cuándo">
+          <Opciones
+            etiqueta="Cuándo"
+            opciones={[
+              { valor: 'hoy', texto: 'Hoy' },
+              { valor: 'otro', texto: 'Otro día' },
+              ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }, { valor: 'repite', texto: 'Se repite' }]),
+            ]}
+            elegidas={[cuando]}
+            onTocar={(v) => {
+              if (v !== 'cuotas' && v !== 'repite') return setCuando(v as 'hoy' | 'otro')
+              const f = faltante(true)
+              if (f) return setError(f)
+              setError(null)
+              setClase(v === 'repite' ? 'repite' : 'cuotas')
+              setModo('cuotas')
+            }}
+          />
+          {cuando === 'otro' && (
+            <div className={cn('mt-3 rounded-2xl', amarillo('fecha') && 'ring-4 ring-acento/45')}>
+              <CampoFecha value={fecha} onChange={setFecha} ariaLabel="Qué día" max={hoyLocal()} />
+            </div>
+          )}
+        </Grupo>
+      )}
+
       <Grupo titulo={esGasto ? 'En qué, lo que más usás primero' : 'De qué, lo que más usás primero'} className="mt-6">
         <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > 5 ? [{ valor: '__otra', texto: 'Otra' }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : setCategoriaId(v))} />
         {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
@@ -491,15 +591,17 @@ function Formulario({
       <Grupo titulo="De qué campo">
         <Opciones etiqueta="De qué campo" opciones={campos.map((c) => ({ valor: c.id, texto: c.nombre }))} elegidas={[campoId]} onTocar={(v) => (setCampoId(v), setPotreroId(''))} />
       </Grupo>
-      {campoId && (potreros.data ?? []).length > 0 && (
-        <Grupo titulo="De qué potrero · si es de uno">
-          <Opciones etiqueta="De qué potrero" opciones={(potreros.data ?? []).map((p) => ({ valor: p.id, texto: p.nombre }))} elegidas={[potreroId]} onTocar={(v) => setPotreroId((x) => (x === v ? '' : v))} />
-        </Grupo>
-      )}
-      <Grupo titulo="Para qué actividad · así ves qué rinde">
-        <Opciones etiqueta="Para qué actividad" opciones={(Object.keys(actividadLabel) as Actividad[]).map((a) => ({ valor: a, texto: actividadLabel[a] }))} elegidas={[actividad]} onTocar={(v) => setActividad((x) => (x === v ? '' : v))} />
+        </>
+      ) : (
+        <>
+      <Grupo titulo={esGasto ? 'En qué, lo que más usás primero' : 'De qué, lo que más usás primero'} className="mt-6">
+        <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > 5 ? [{ valor: '__otra', texto: 'Otra' }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : setCategoriaId(v))} />
+        {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
       </Grupo>
 
+      <Grupo titulo="De qué campo">
+        <Opciones etiqueta="De qué campo" opciones={campos.map((c) => ({ valor: c.id, texto: c.nombre }))} elegidas={[campoId]} onTocar={(v) => (setCampoId(v), setPotreroId(''))} />
+      </Grupo>
       <Grupo titulo={modoVence ? (esGasto ? 'Cómo se paga' : 'Cómo se cobra') : esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
         {modoVence ? (
           <Opciones etiqueta="Cómo" opciones={CUENTAS} elegidas={[previsto]} onTocar={(x) => setPrevisto((p) => (p === x ? '' : x))} />
@@ -524,14 +626,17 @@ function Formulario({
             opciones={[
               { valor: '7', texto: 'En 7 días' },
               { valor: '30', texto: 'En 30 días' },
+              { valor: 'repite', texto: 'Se repite' },
               { valor: 'cuotas', texto: 'Son cuotas' },
             ]}
             elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
             onTocar={(x) => {
-              if (x !== 'cuotas') return setVence(enDias(Number(x)))
+              if (x !== 'cuotas' && x !== 'repite') return setVence(enDias(Number(x)))
               const f = faltante(true)
               if (f) return setError(f)
               setError(null)
+              setClase(x === 'repite' ? 'repite' : 'cuotas')
+              if (vence) setPrimera(vence)
               setModo('cuotas')
             }}
           />
@@ -546,14 +651,15 @@ function Formulario({
             opciones={[
               { valor: 'hoy', texto: 'Hoy' },
               { valor: 'otro', texto: 'Otro día' },
-              ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }]),
+              ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }, { valor: 'repite', texto: 'Se repite' }]),
             ]}
             elegidas={[cuando]}
             onTocar={(v) => {
-              if (v !== 'cuotas') return setCuando(v as 'hoy' | 'otro')
+              if (v !== 'cuotas' && v !== 'repite') return setCuando(v as 'hoy' | 'otro')
               const f = faltante(true)
               if (f) return setError(f)
               setError(null)
+              setClase(v === 'repite' ? 'repite' : 'cuotas')
               setModo('cuotas')
             }}
           />
@@ -565,6 +671,54 @@ function Formulario({
         </Grupo>
       )}
 
+        </>
+      )}
+      <div className="mt-6">
+        <Campo leido={amarillo('descripcion')}>
+          <CampoTexto etiqueta="Qué fue" placeholder={esGasto ? 'Gasoil para el tractor' : 'Venta de terneros'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+        </Campo>
+      </div>
+
+      {/* Lo opcional: el potrero, la actividad, cómo se paga, la factura y a quién. Abierto si leyó la foto o ya tiene algo. */}
+      <button type="button" aria-expanded={verMas} onClick={() => setMas((x) => !x)} className="mt-6 flex w-full items-center justify-between gap-3 rounded-[16px] border-[1.5px] border-borde bg-superficie px-4 py-3.5 text-left hover:border-neutro-300">
+        <span className="min-w-0">
+          <span className="block text-[15.5px] font-bold text-texto">Más datos · opcional</span>
+          <span className="block truncate text-[13.5px] text-texto-suave">{[(potreros.data ?? []).length > 0 ? 'Potrero' : null, 'actividad', modoVence ? (esGasto ? 'cómo se paga' : 'cómo se cobra') : null, 'factura', esGasto ? 'a quién' : 'de quién'].filter(Boolean).join(', ')}</span>
+        </span>
+        <span className={cn('shrink-0 transition-transform', verMas ? '-rotate-90' : 'rotate-90')}><Icono nombre="Siguiente" tamano={16} /></span>
+      </button>
+      {verMas && (
+        <div className="pt-6 pb-2">
+      {campoId && (potreros.data ?? []).length > 0 && (
+        <Grupo titulo="De qué potrero · si es de uno">
+          <Opciones etiqueta="De qué potrero" opciones={(potreros.data ?? []).map((p) => ({ valor: p.id, texto: p.nombre }))} elegidas={[potreroId]} onTocar={(v) => setPotreroId((x) => (x === v ? '' : v))} />
+        </Grupo>
+      )}
+      <Grupo titulo="Para qué actividad · así ves qué rinde">
+        <Opciones etiqueta="Para qué actividad" opciones={(Object.keys(actividadLabel) as Actividad[]).map((a) => ({ valor: a, texto: actividadLabel[a] }))} elegidas={[actividad]} onTocar={(v) => setActividad((x) => (x === v ? '' : v))} />
+      </Grupo>
+
+      {modoVence && (
+        <>
+      <Grupo titulo={modoVence ? (esGasto ? 'Cómo se paga' : 'Cómo se cobra') : esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
+        {modoVence ? (
+          <Opciones etiqueta="Cómo" opciones={CUENTAS} elegidas={[previsto]} onTocar={(x) => setPrevisto((p) => (p === x ? '' : x))} />
+        ) : (
+          <Opciones etiqueta="Cómo" opciones={[...CUENTAS, { valor: 'pendiente' as Cuenta, texto: 'Todavía no, va a la Agenda' }]} elegidas={[cuenta]} onTocar={setCuenta} />
+        )}
+        {(modoVence ? previsto : cuenta) === 'cheque' && (
+          <div className="mt-3 flex flex-col gap-3">
+            <Segmentos etiqueta="Qué cheque" valor={esEcheq} onCambio={setEsEcheq} opciones={[{ valor: 'fisico', texto: 'De papel' }, { valor: 'echeq', texto: 'eCheq' }]} />
+            <div className="grid grid-cols-2 gap-3">
+              <CampoTexto etiqueta="Banco" value={chequeBanco} onChange={(e) => setChequeBanco(e.target.value)} />
+              <CampoTexto etiqueta="N° de cheque" inputMode="numeric" value={chequeNumero} onChange={(e) => setChequeNumero(e.target.value)} />
+            </div>
+          </div>
+        )}
+      </Grupo>
+
+        </>
+      )}
       <Grupo titulo="La factura">
         <Opciones etiqueta="La factura" opciones={FACTURAS} elegidas={[factura]} onTocar={(v) => (setFactura(v), setLineasLeidas(null))} />
         {conIva && !lineasLeidas && (
@@ -575,19 +729,16 @@ function Formulario({
         {conIva && lineasLeidas && <p className="mt-2 text-[13.5px] text-texto-suave">El IVA lo leyó de la factura: {lineasLeidas.map((l) => `${String(l.alicuota).replace('.', ',')} %`).join(' y ')}. Tocá otra factura para cambiarlo.</p>}
       </Grupo>
 
-      <div className="mt-6 flex flex-col gap-4">
-        <Campo leido={amarillo('descripcion')}>
-          <CampoTexto etiqueta="Qué fue" placeholder={esGasto ? 'Gasoil para el tractor' : 'Venta de terneros'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-        </Campo>
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
+      <div className="mt-6 grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
           <Campo leido={amarillo('contraparte')}>
             <CampoTexto etiqueta={esGasto ? 'A quién · opcional' : 'De quién · opcional'} placeholder="Shell Deheza S.A." value={contraparte} onChange={(e) => setContraparte(e.target.value)} />
           </Campo>
           <Campo leido={amarillo('cuit')}>
             <CampoTexto etiqueta="CUIT · opcional" inputMode="numeric" placeholder="30-50672834-1" value={cuit} onChange={(e) => setCuit(e.target.value)} />
           </Campo>
-        </div>
       </div>
+        </div>
+      )}
     </PanelLateral>
   )
 }

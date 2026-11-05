@@ -158,6 +158,8 @@ export type NuevaSerie = {
   cantidad: number
   descripcion: string
   medioPago?: MedioPago | null
+  /** Un pago que se repite (un sueldo): sin «(cuota 2/12)» en la descripción. */
+  sinNumerar?: boolean
 }
 
 /** Genera la serie completa de cuotas pendientes, unidas por serie_id. */
@@ -179,7 +181,7 @@ export async function crearSerie(input: NuevaSerie): Promise<void> {
       fecha_cobro_pago: null,
       estado: 'pendiente' as const,
       medio_pago: input.medioPago || null,
-      descripcion: `${input.descripcion.trim()} (cuota ${i + 1}/${input.cantidad})`,
+      descripcion: input.sinNumerar ? input.descripcion.trim() : `${input.descripcion.trim()} (cuota ${i + 1}/${input.cantidad})`,
       serie_id: serieId,
     }
   })

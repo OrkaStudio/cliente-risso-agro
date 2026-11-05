@@ -42,35 +42,6 @@ export function proximos30(items: Vencimiento[], hoy: string) {
   return { cobra, paga, queda: cobra - paga, vencidas }
 }
 
-export type Grupo = { clave: string; titulo: string; items: Vencimiento[] }
-
-/**
- * «Lo que viene» en grupos como se dice: lo vencido, esta semana (de lunes a
- * domingo), la que viene, y después por mes.
- */
-export function gruposLoQueViene(items: Vencimiento[], hoy: string): Grupo[] {
-  const dow = (new Date(dia(hoy)).getUTCDay() + 6) % 7
-  const finSemana = sumarDias(hoy, 6 - dow)
-  const finProxima = sumarDias(finSemana, 7)
-  const grupos = new Map<string, Grupo>()
-  const meter = (clave: string, titulo: string, v: Vencimiento) => {
-    const g = grupos.get(clave) ?? { clave, titulo, items: [] }
-    g.items.push(v)
-    grupos.set(clave, g)
-  }
-  for (const v of items.filter(pendiente).sort((a, b) => a.fechaVencimiento!.localeCompare(b.fechaVencimiento!))) {
-    const f = v.fechaVencimiento!
-    if (f < hoy) meter('0', 'Vencido', v)
-    else if (f <= finSemana) meter('1', 'Esta semana', v)
-    else if (f <= finProxima) meter('2', 'La que viene', v)
-    else {
-      const ym = f.slice(0, 7)
-      meter(`3${ym}`, `${nombreMes(ym).replace(/^\w/, (c) => c.toUpperCase())}${ym.slice(0, 4) !== hoy.slice(0, 4) ? ` ${ym.slice(0, 4)}` : ''}`, v)
-    }
-  }
-  return [...grupos.values()].sort((a, b) => a.clave.localeCompare(b.clave))
-}
-
 /** «Venció hace 2 días», «Vence hoy», «En 9 días»: para el encabezado del panel. */
 export function cuandoVence(f: string, hoy: string): { texto: string; tono: 'mal' | 'atencion' | 'bien' } {
   const d = diasEntre(hoy, f)
@@ -78,33 +49,6 @@ export function cuandoVence(f: string, hoy: string): { texto: string; tono: 'mal
   if (d === 0) return { texto: 'Vence hoy', tono: 'atencion' }
   if (d === 1) return { texto: 'Vence mañana', tono: 'atencion' }
   return { texto: `En ${d} días`, tono: d <= 7 ? 'atencion' : 'bien' }
-}
-
-export type Serie = { serieId: string; nombre: string; detalle: string; total: number; pagadas: number; cuota: number; falta: number; proxima: string | null; tipo: Vencimiento['tipo'] }
-
-/** Las compras en cuotas: cuántas se pagaron, cuánto falta y la próxima. Sólo las que tienen algo pendiente. */
-export function series(items: Vencimiento[]): Serie[] {
-  const porSerie = new Map<string, Vencimiento[]>()
-  for (const v of items) if (v.serieId) porSerie.set(v.serieId, [...(porSerie.get(v.serieId) ?? []), v])
-  const r: Serie[] = []
-  for (const [serieId, vs] of porSerie) {
-    const orden = [...vs].sort((a, b) => (a.fechaVencimiento ?? '').localeCompare(b.fechaVencimiento ?? ''))
-    const pendientes = orden.filter((v) => v.estado === 'pendiente')
-    if (!pendientes.length) continue
-    const v0 = orden[0]!
-    r.push({
-      serieId,
-      nombre: tituloDe(v0),
-      detalle: [v0.campo, v0.categoria].filter(Boolean).join(', '),
-      total: orden.length,
-      pagadas: orden.filter((v) => v.estado === 'liquidado').length,
-      cuota: v0.monto,
-      falta: pendientes.reduce((s, v) => s + v.monto, 0),
-      proxima: pendientes[0]!.fechaVencimiento,
-      tipo: v0.tipo,
-    })
-  }
-  return r.sort((a, b) => (a.proxima ?? '').localeCompare(b.proxima ?? ''))
 }
 
 export type EstadoCheque = 'En cartera' | 'Por debitar' | 'Cobrado' | 'Debitado'
@@ -119,23 +63,6 @@ export function cheques(items: Vencimiento[], hoy: string) {
   const enCartera = lista.filter((c) => c.estado === 'En cartera').reduce((s, c) => s + c.v.monto, 0)
   const emitidos = lista.filter((c) => c.estado === 'Por debitar').reduce((s, c) => s + c.v.monto, 0)
   return { lista, enCartera, emitidos }
-}
-
-export type Mes = { ym: string; entro: number; salio: number; items: Vencimiento[] }
-
-/** «Ya pagado» por mes, del más nuevo al más viejo, con lo que entró y salió. */
-export function pagadoPorMes(items: Vencimiento[]): Mes[] {
-  const meses = new Map<string, Mes>()
-  for (const v of items.filter(pagado)) {
-    const ym = v.fechaCobroPago!.slice(0, 7)
-    const m = meses.get(ym) ?? { ym, entro: 0, salio: 0, items: [] }
-    if (v.tipo === 'ingreso') m.entro += v.monto
-    else m.salio += v.monto
-    m.items.push(v)
-    meses.set(ym, m)
-  }
-  for (const m of meses.values()) m.items.sort((a, b) => b.fechaCobroPago!.localeCompare(a.fechaCobroPago!))
-  return [...meses.values()].sort((a, b) => b.ym.localeCompare(a.ym))
 }
 
 /** Las semanas del mes para el calendario (de lunes a domingo), con los días de afuera para completar. */
@@ -157,4 +84,122 @@ export function semanasDelMes(ym: string): string[][] {
 export const mesVecino = (ym: string, n: number) => {
   const [a, m] = ym.split('-').map(Number) as [number, number]
   return new Date(Date.UTC(a, m - 1 + n, 1)).toISOString().slice(0, 7)
+}
+
+export type Dia = { fecha: string; items: Vencimiento[]; entra: number; sale: number; vencido: boolean; todoPagado: boolean }
+
+/**
+ * Lo de cada día del calendario: qué entra y qué sale (lo pendiente y lo ya
+ * pagado, por la fecha en que cae), si algo quedó atrasado y si ya está todo
+ * resuelto. Ordenado: lo atrasado primero, después lo que falta, al final lo pagado.
+ */
+export function porDia(items: Vencimiento[], hoy: string): Map<string, Dia> {
+  const dias = new Map<string, Dia>()
+  for (const v of items) {
+    const f = fechaDe(v)
+    if (!f) continue
+    const d = dias.get(f) ?? { fecha: f, items: [], entra: 0, sale: 0, vencido: false, todoPagado: true }
+    d.items.push(v)
+    if (v.tipo === 'ingreso') d.entra += v.monto
+    else d.sale += v.monto
+    if (pendiente(v)) {
+      d.todoPagado = false
+      if (f < hoy) d.vencido = true
+    }
+    dias.set(f, d)
+  }
+  const peso = (v: Vencimiento) => (pendiente(v) ? (fechaDe(v) < hoy ? 0 : 1) : 2)
+  for (const d of dias.values()) d.items.sort((a, b) => peso(a) - peso(b) || b.monto - a.monto)
+  return dias
+}
+
+export type Semana = { desde: string; hasta: string; titulo: string; items: Vencimiento[]; sale: number; entra: number }
+
+/** «Cuota 2 de 6», si la descripción la trae. */
+export const cuotaDe = (v: Vencimiento): string | null => {
+  const m = /\(cuota (\d+)\/(\d+)\)/i.exec(v.descripcion ?? '')
+  return m ? `Cuota ${m[1]} de ${m[2]}` : null
+}
+
+/**
+ * Las semanas que vienen (de lunes a domingo), desde la de hoy, con lo que
+ * vence en cada una (lo pendiente, más lo que ya se resolvió esta semana) y
+ * cuánto sale y entra. Lo vencido de antes no va acá: se pregunta aparte.
+ */
+export function semanasQueVienen(items: Vencimiento[], hoy: string, n: number): Semana[] {
+  const dow = (new Date(dia(hoy)).getUTCDay() + 6) % 7
+  const lunes = sumarDias(hoy, -dow)
+  const r: Semana[] = []
+  for (let i = 0; i < n; i++) {
+    const desde = sumarDias(lunes, i * 7)
+    const hasta = sumarDias(desde, 6)
+    const enSemana = items
+      .filter((v) => {
+        const f = fechaDe(v)
+        if (f < desde || f > hasta) return false
+        if (pendiente(v)) return f >= hoy
+        return i === 0 && pagado(v)
+      })
+      .sort((a, b) => fechaDe(a).localeCompare(fechaDe(b)) || Number(pagado(a)) - Number(pagado(b)))
+    const pend = enSemana.filter(pendiente)
+    const rango = desde.slice(5, 7) === hasta.slice(5, 7) ? `${Number(desde.slice(8))} al ${Number(hasta.slice(8))} de ${nombreMes(hasta.slice(0, 7))}` : `${Number(desde.slice(8))} de ${mesCorto(desde)} al ${Number(hasta.slice(8))} de ${mesCorto(hasta)}`
+    r.push({
+      desde,
+      hasta,
+      titulo: i === 0 ? 'Esta semana' : i === 1 ? 'La semana que viene' : `Del ${rango}`,
+      items: enSemana,
+      sale: pend.filter((v) => v.tipo === 'gasto').reduce((s, v) => s + v.monto, 0),
+      entra: pend.filter((v) => v.tipo === 'ingreso').reduce((s, v) => s + v.monto, 0),
+    })
+  }
+  return r
+}
+
+const mayusculaInicial = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const fechaCorta = (f: string) => `${Number(f.slice(8, 10))} de ${mesCorto(f)}`
+
+/** Con qué se paga, en palabras («eCheq Galicia 123», «Mercado Pago»). */
+export const medioDe = (v: Vencimiento): string | null =>
+  v.medio === 'cheque' ? [v.esEcheq ? 'eCheq' : 'Cheque', v.chequeBanco, v.chequeNumero].filter(Boolean).join(' ') : v.medio === 'mercadopago' ? 'Mercado Pago' : v.medio && v.medio !== 'otro' ? mayusculaInicial(v.medio) : null
+
+/**
+ * Qué es cada cosa, para el color y la etiqueta. Lo pagado o cobrado va en
+ * gris: el verde es sólo plata que entra (Lau, 05/11: «lo pagado no puede estar
+ * en verde, se confunde con un ingreso»); lo que debés, en rojo.
+ */
+export type Clase = 'paga' | 'vencido' | 'cobra' | 'hecho'
+export function claseDe(v: Vencimiento, hoy: string): Clase {
+  if (!pendiente(v)) return 'hecho'
+  if (fechaDe(v) < hoy) return 'vencido'
+  return v.tipo === 'ingreso' ? 'cobra' : 'paga'
+}
+
+/** La etiqueta de estado: cuándo vence, hace cuánto venció o cuándo se pagó. */
+export function estadoTexto(v: Vencimiento, hoy: string): { texto: string; clase: Clase } {
+  const clase = claseDe(v, hoy)
+  const cobro = v.tipo === 'ingreso'
+  if (clase === 'hecho') return { texto: `${cobro ? 'Cobrado' : 'Pagado'}${v.fechaCobroPago ? ` el ${fechaCorta(v.fechaCobroPago)}` : ''}`, clase }
+  const c = cuandoVence(fechaDe(v), hoy)
+  return { texto: clase === 'vencido' ? `${c.texto}, sin ${cobro ? 'cobrar' : 'pagar'}` : c.texto, clase }
+}
+
+export const PILDORA: Record<Clase, string> = {
+  paga: 'bg-estado-problema-suave text-estado-problema-texto',
+  vencido: 'bg-estado-problema text-superficie',
+  cobra: 'bg-estado-bien-suave text-estado-bien-texto',
+  hecho: 'bg-superficie-hundida text-texto-suave',
+}
+
+/** Los datos de una cosa, en filas: en qué, de qué campo, a quién, cuota, cómo. */
+export function datosDe(v: Vencimiento): [string, string][] {
+  const cobro = v.tipo === 'ingreso'
+  const filas: [string, string | null][] = [
+    ['En qué', v.categoria],
+    ['Campo', v.campo],
+    [cobro ? 'Te paga' : 'A quién', v.contraparte],
+    ['Cuota', cuotaDe(v)],
+    ['Pactado', pactadoDe(v)],
+    ['Cómo', medioDe(v)],
+  ]
+  return filas.filter((f): f is [string, string] => !!f[1])
 }

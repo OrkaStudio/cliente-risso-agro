@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Vencimiento } from '@/features/agenda/api'
-import { cheques, cuandoVence, pactadoDe, gruposLoQueViene, pagadoPorMes, proximos30, semanasDelMes, series, tituloDe } from './agenda'
+import { cheques, cuandoVence, pactadoDe, proximos30, semanasDelMes, tituloDe } from './agenda'
 
 const v = (x: Partial<Vencimiento>): Vencimiento => ({
   id: crypto.randomUUID(),
@@ -33,17 +33,6 @@ describe('Agenda', () => {
     expect(r).toEqual({ cobra: 1000, paga: 300, queda: 700, vencidas: 1 })
   })
 
-  it('lo que viene: vencido, esta semana (hasta el domingo), la que viene y por mes', () => {
-    const g = gruposLoQueViene([v({ fechaVencimiento: '2026-11-01' }), v({ fechaVencimiento: '2026-11-08' }), v({ fechaVencimiento: '2026-11-09' }), v({ fechaVencimiento: '2026-12-20' }), v({ fechaVencimiento: '2027-01-05' })], HOY)
-    expect(g.map((x) => [x.titulo, x.items.length])).toEqual([
-      ['Vencido', 1],
-      ['Esta semana', 1],
-      ['La que viene', 1],
-      ['Diciembre', 1],
-      ['Enero 2027', 1],
-    ])
-  })
-
   it('cuándo vence, dicho como se dice', () => {
     expect(cuandoVence('2026-11-03', HOY).texto).toBe('Venció hace 2 días')
     expect(cuandoVence('2026-11-05', HOY).texto).toBe('Vence hoy')
@@ -57,29 +46,10 @@ describe('Agenda', () => {
     expect(pactadoDe(v({ descripcion: 'Alquiler La Loma · 1.552 kg de novillo/mes · est. a $3.937' }))).toBe('1.552 kg de novillo/mes')
   })
 
-  it('las cuotas: pagadas, lo que falta y la próxima; las terminadas no aparecen', () => {
-    const s = series([
-      v({ serieId: 's', monto: 300, estado: 'liquidado', fechaVencimiento: '2026-10-10', fechaCobroPago: '2026-10-10', descripcion: 'Cubiertas (cuota 1/3)' }),
-      v({ serieId: 's', monto: 300, fechaVencimiento: '2026-11-10' }),
-      v({ serieId: 's', monto: 300, fechaVencimiento: '2026-12-10' }),
-      v({ serieId: 't', monto: 50, estado: 'liquidado', fechaCobroPago: '2026-10-01' }),
-    ])
-    expect(s).toHaveLength(1)
-    expect(s[0]).toMatchObject({ nombre: 'Cubiertas', total: 3, pagadas: 1, falta: 600, proxima: '2026-11-10' })
-  })
-
   it('los cheques: en cartera, por debitar y los cerrados recientes al final', () => {
     const r = cheques([v({ medio: 'cheque', tipo: 'ingreso', monto: 900 }), v({ medio: 'cheque', monto: 400 }), v({ medio: 'cheque', tipo: 'ingreso', estado: 'liquidado', fechaCobroPago: '2026-10-20' }), v({ medio: 'cheque', estado: 'liquidado', fechaCobroPago: '2026-01-01' }), v({ medio: 'transferencia' })], HOY)
     expect(r.lista.map((c) => c.estado)).toEqual(['En cartera', 'Por debitar', 'Cobrado'])
     expect([r.enCartera, r.emitidos]).toEqual([900, 400])
-  })
-
-  it('ya pagado por mes, del más nuevo al más viejo', () => {
-    const m = pagadoPorMes([v({ estado: 'liquidado', fechaCobroPago: '2026-10-02', tipo: 'ingreso', monto: 10 }), v({ estado: 'liquidado', fechaCobroPago: '2026-11-01', monto: 4 }), v({})])
-    expect(m.map((x) => [x.ym, x.entro, x.salio])).toEqual([
-      ['2026-11', 0, 4],
-      ['2026-10', 10, 0],
-    ])
   })
 
   it('las semanas del calendario arrancan el lunes y completan el mes', () => {
@@ -87,5 +57,48 @@ describe('Agenda', () => {
     expect(s[0]![0]).toBe('2026-10-26')
     expect(s.at(-1)!.at(-1)).toBe('2026-12-06')
     expect(s.every((x) => x.length === 7)).toBe(true)
+  })
+})
+
+describe('Agenda · el calendario', () => {
+  it('cada día: entra, sale, si quedó algo atrasado y si está todo pagado; lo atrasado primero', async () => {
+    const { porDia } = await import('./agenda')
+    const d = porDia(
+      [
+        v({ fechaVencimiento: '2026-11-03', monto: 50 }),
+        v({ estado: 'liquidado', fechaVencimiento: '2026-11-03', fechaCobroPago: '2026-11-03', monto: 500 }),
+        v({ tipo: 'ingreso', fechaVencimiento: '2026-11-14', monto: 900 }),
+        v({ estado: 'liquidado', fechaCobroPago: '2026-11-02', monto: 70 }),
+      ],
+      HOY,
+    )
+    expect(d.get('2026-11-03')).toMatchObject({ sale: 550, vencido: true, todoPagado: false })
+    expect(d.get('2026-11-03')!.items[0]!.monto).toBe(50)
+    expect(d.get('2026-11-02')).toMatchObject({ todoPagado: true, vencido: false })
+  })
+})
+
+describe('Agenda · por semana', () => {
+  it('semanas de lunes a domingo desde la de hoy; lo vencido de antes no entra; lo pagado esta semana sí', async () => {
+    const { semanasQueVienen, cuotaDe } = await import('./agenda')
+    const s = semanasQueVienen(
+      [
+        v({ fechaVencimiento: '2026-11-03', monto: 1 }), // vencido: se pregunta aparte
+        v({ estado: 'liquidado', fechaCobroPago: '2026-11-04', monto: 2 }), // pagado esta semana
+        v({ fechaVencimiento: '2026-11-07', monto: 300 }),
+        v({ tipo: 'ingreso', fechaVencimiento: '2026-11-14', monto: 900 }),
+        v({ fechaVencimiento: '2026-11-30', monto: 50 }),
+      ],
+      HOY,
+      5,
+    )
+    expect(s.map((x) => [x.desde, x.titulo, x.items.length, x.sale, x.entra])).toEqual([
+      ['2026-11-02', 'Esta semana', 2, 300, 0],
+      ['2026-11-09', 'La semana que viene', 1, 0, 900],
+      ['2026-11-16', 'Del 16 al 22 de noviembre', 0, 0, 0],
+      ['2026-11-23', 'Del 23 al 29 de noviembre', 0, 0, 0],
+      ['2026-11-30', 'Del 30 de nov al 6 de dic', 1, 50, 0],
+    ])
+    expect(cuotaDe(v({ descripcion: 'Camioneta (cuota 4/12)' }))).toBe('Cuota 4 de 12')
   })
 })

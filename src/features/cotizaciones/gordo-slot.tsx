@@ -57,7 +57,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
       return setError('Ingresá un valor válido')
     try {
       await cargar.mutateAsync({ empresaId, valor: n, fecha })
-      toast.success('Precio del gordo actualizado')
+      toast.success('Listo: guardamos el precio del gordo', { description: `$${n.toLocaleString('es-AR')} por kilo; lo ves arriba, en la barra.` })
       setOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error')

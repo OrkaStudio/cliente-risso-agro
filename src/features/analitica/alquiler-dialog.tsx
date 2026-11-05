@@ -170,7 +170,7 @@ export function AlquilerDialog({
         }
       }
       invalidar()
-      toast.success(`Alquiler de ${campo.nombre}: ${pesos(montoCuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}, en la Agenda`)
+      toast.success(`Listo: anotamos el alquiler de ${campo.nombre}`, { description: `${pesos(montoCuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}; cada pago lo ves en la Agenda.` })
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el alquiler.')
