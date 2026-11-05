@@ -9,6 +9,7 @@ import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
+import { veePlata } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
@@ -54,6 +55,7 @@ const T = {
 export function ElDia() {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
+  const plata = veePlata(membresia)
   const panorama = usePanoramaInicio()
   const atender = useParaAtender()
   const inicio = useCampoElegido()
@@ -87,10 +89,11 @@ export function ElDia() {
       {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
       <motion.div
         {...entra(1)}
-        className="grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-4 [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l"
+        className={cn('grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l', plata ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}
       >
         <PulsoHacienda total={v.totalCabezas} campos={campoId ? 1 : inicio.campos.length} cats={v.porCategoria} nacimientos={v.nacimientos} />
-        <PulsoPlata vencimientos={v.vencimientos} ganado={ganado.data ?? null} />
+        {/* La plata sólo para quien el dueño se la habilitó (Configuración → Personas). */}
+        {plata && <PulsoPlata vencimientos={v.vencimientos} ganado={ganado.data ?? null} />}
         <PulsoLluvia lugar={lugar?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
         <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} />
       </motion.div>

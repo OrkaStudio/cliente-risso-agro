@@ -3,8 +3,8 @@ import { useMapa } from './api'
 import { bordeDesdePotreros, campoPendiente, type CampoMapa } from './reglas'
 
 /** Lo que anda antes del mapa (decisión del 30/09): el Inicio y Campos; en el
- *  celular, el Hoy del Modo Campo («Hoy, sin campo»). */
-const ABIERTO = [/^\/$/, /^\/campos(\/|$)/, /^\/campo$/]
+ *  celular, el Hoy del Modo Campo («Hoy, sin campo»). Configuración (tu cuenta) siempre. */
+const ABIERTO = [/^\/$/, /^\/campos(\/|$)/, /^\/campo$/, /^\/configuracion$/]
 
 export const abiertoSinMapa = (ruta: string) => ABIERTO.some((r) => r.test(ruta))
 

@@ -832,18 +832,21 @@ export type Database = {
           created_at: string
           empresa_id: string
           rol: string
+          secciones: string[] | null
           user_id: string
         }
         Insert: {
           created_at?: string
           empresa_id: string
           rol?: string
+          secciones?: string[] | null
           user_id: string
         }
         Update: {
           created_at?: string
           empresa_id?: string
           rol?: string
+          secciones?: string[] | null
           user_id?: string
         }
         Relationships: [
@@ -1560,9 +1563,27 @@ export type Database = {
       terminar_onboarding: { Args: never; Returns: string }
       terminar_mapa: { Args: never; Returns: string }
       crear_invitacion: {
-        Args: { p_celular: string; p_nombre: string; p_rol: string }
+        Args: { p_celular: string; p_nombre: string; p_rol: string; p_secciones: string[] }
         Returns: string
       }
+      personas_de_empresa: {
+        Args: never
+        Returns: {
+          celular: string
+          desde: string
+          invitacion_id: string | null
+          nombre: string | null
+          rol: string
+          secciones: string[] | null
+          soy_yo: boolean
+          token: string | null
+          user_id: string | null
+          vence_at: string | null
+        }[]
+      }
+      cambiar_secciones: { Args: { p_secciones: string[]; p_user: string }; Returns: undefined }
+      quitar_persona: { Args: { p_invitacion: string | null; p_user: string | null }; Returns: undefined }
+      auth_empresa_ids_plata: { Args: never; Returns: string[] }
       invitacion_por_token: {
         Args: { p_token: string }
         Returns: {

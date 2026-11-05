@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase/client'
 export type Membresia = {
   empresa_id: string
   rol: string
+  /** Lo que ve (null = todo: el dueño). Ver `secciones.ts`. */
+  secciones?: string[] | null
   empresa: {
     id: string
     nombre: string
@@ -19,6 +21,8 @@ export type Membresia = {
     onboarding_completo_at?: string | null
     /** null = todavía no ubicó sus campos en el mapa (la app queda cerrada). */
     mapa_completo_at?: string | null
+    /** Desde cuándo usa Tropero (la pantalla Plan). */
+    created_at?: string
   } | null
 }
 
@@ -59,7 +63,7 @@ export function useEmpresa() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('miembro_empresa')
-        .select('empresa_id, rol, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at)')
+        .select('empresa_id, rol, secciones, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
         .limit(1)
         .maybeSingle()
       if (error) throw error

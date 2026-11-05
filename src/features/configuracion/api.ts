@@ -1,0 +1,101 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { Rol, Seccion } from '@/features/empresa/secciones'
+import { supabase } from '@/lib/supabase/client'
+
+/** Alguien de la empresa: ya entra (userId) o está invitado y no aceptó (invitacionId). */
+export type Persona = {
+  userId: string | null
+  invitacionId: string | null
+  nombre: string
+  /** E.164 sin «+» (549…). */
+  celular: string
+  rol: string
+  secciones: Seccion[] | null
+  desde: string
+  venceAt: string | null
+  token: string | null
+  soyYo: boolean
+}
+
+export function usePersonas(activo: boolean) {
+  return useQuery({
+    queryKey: ['personas'],
+    enabled: activo,
+    queryFn: async (): Promise<Persona[]> => {
+      const { data, error } = await supabase.rpc('personas_de_empresa')
+      if (error) throw error
+      return (data ?? []).map((p) => ({
+        userId: p.user_id,
+        invitacionId: p.invitacion_id,
+        nombre: p.nombre ?? 'Sin nombre',
+        celular: p.celular.replace(/\D/g, ''),
+        rol: p.rol,
+        secciones: (p.secciones as Seccion[] | null) ?? null,
+        desde: p.desde,
+        venceAt: p.vence_at,
+        token: p.token,
+        soyYo: p.soy_yo,
+      }))
+    },
+  })
+}
+
+export function useInvitar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (x: { nombre: string; celular: string; rol: Rol; secciones: Seccion[] }) => {
+      const { data, error } = await supabase.rpc('crear_invitacion', { p_celular: x.celular, p_nombre: x.nombre, p_rol: x.rol, p_secciones: x.secciones })
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['personas'] }),
+  })
+}
+
+export function useCambiarSecciones() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (x: { userId: string; secciones: Seccion[] }) => {
+      const { error } = await supabase.rpc('cambiar_secciones', { p_user: x.userId, p_secciones: x.secciones })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['personas'] }),
+  })
+}
+
+export function useQuitarPersona() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (p: Pick<Persona, 'userId' | 'invitacionId'>) => {
+      const { error } = await supabase.rpc('quitar_persona', { p_user: p.userId, p_invitacion: p.invitacionId })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['personas'] }),
+  })
+}
+
+/** El nombre de quien usa la cuenta (lo usa el asistente para saludar). */
+export function useCambiarNombre() {
+  return useMutation({
+    mutationFn: async (nombre: string) => {
+      const { error } = await supabase.auth.updateUser({ data: { nombre: nombre.trim() } })
+      if (error) throw error
+    },
+  })
+}
+
+/** El link de la invitación y el WhatsApp ya escrito para mandarlo. */
+export function linkInvitacion(token: string) {
+  return `${window.location.origin}/invitacion/${token}`
+}
+export function whatsappInvitacion(p: { celular: string; nombre: string; empresa: string; token: string }) {
+  const texto = `Hola ${p.nombre.split(' ')[0]}, te sumé a ${p.empresa} en Tropero. Entrá desde acá con tu celular: ${linkInvitacion(p.token)}`
+  return `https://wa.me/${p.celular}?text=${encodeURIComponent(texto)}`
+}
+
+/** «+54 9 2241 55-8820» para mostrar un número guardado como 549… */
+export function celularLindo(c: string) {
+  const d = c.replace(/\D/g, '')
+  const local = d.startsWith('549') ? d.slice(3) : d
+  return local.length === 10 ? `+54 9 ${local.slice(0, 4)} ${local.slice(4, 6)}-${local.slice(6)}` : `+${d}`
+}

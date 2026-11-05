@@ -5,6 +5,7 @@ import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
 import { NoEncontrada } from '@/app/pantalla-aviso'
+import { SeccionPermitida } from '@/app/seccion-permitida'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
 import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
@@ -57,6 +58,7 @@ function PotreroViejo() {
 // Plata (rediseño, Figma página 35): la plata y los movimientos.
 const AnaliticaPage = lazy(() => import('@/features/analitica/tropero/plata-page').then((m) => ({ default: m.PlataPage })))
 const MovimientosPage = lazy(() => import('@/features/analitica/tropero/movimientos-page').then((m) => ({ default: m.MovimientosPage })))
+const ConfiguracionPage = lazy(() => import('@/features/configuracion/configuracion-page').then((m) => ({ default: m.ConfiguracionPage })))
 const AgendaPage = lazy(() =>
   import('@/features/agenda/tropero/agenda-page').then((m) => ({
     default: m.AgendaPage,
@@ -214,6 +216,10 @@ export const router = createBrowserRouter([
               </Suspense>
             ),
             children: [
+              {
+              // Cada uno ve lo que el dueño le habilitó (Configuración → Personas).
+              element: <SeccionPermitida />,
+              children: [
               { index: true, element: <InicioPage /> },
               { path: 'hacienda', element: <AnimalesPage /> },
               { path: 'hacienda/:id', element: <FichaAnimalPage /> },
@@ -227,8 +233,11 @@ export const router = createBrowserRouter([
               { path: 'agenda', element: <AgendaPage /> },
               // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
               { path: 'cheques', element: <Navigate to="/agenda" replace /> },
+              { path: 'configuracion', element: <ConfiguracionPage /> },
               // Una dirección que no existe: se dice, dentro de la app, con el camino al Inicio.
               { path: '*', element: <NoEncontrada /> },
+              ],
+              },
             ],
           },
               {
@@ -239,6 +248,9 @@ export const router = createBrowserRouter([
                   </Suspense>
                 ),
                 children: [
+                  {
+                  element: <SeccionPermitida />,
+                  children: [
                   { path: 'campo', element: <CampoInicioPage /> },
                   { path: 'campo/manga', element: <MangaPage /> },
                   // Laboratorio: probar un bastón RFID antes de comprarlo.
@@ -247,6 +259,8 @@ export const router = createBrowserRouter([
                   { path: 'campo/recorrida', element: <RecorridaPage /> },
                   { path: 'campo/plata', element: <PlataPage /> },
                   { path: 'campo/historial', element: <HistorialPage /> },
+                  ],
+                  },
                 ],
               },
             ],

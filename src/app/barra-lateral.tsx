@@ -4,6 +4,7 @@ import { Logo } from '@/components/tropero/logo'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
+import { puedeVer, type Seccion } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 import { abiertoSinMapa, primerPendiente, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
@@ -11,12 +12,14 @@ import { prefetch, CHUNKS_OFICINA } from '@/lib/prefetch'
 import { cn } from '@/lib/utils'
 
 /** Las secciones de la Oficina (página 35, «Barra lateral · Oficina»). */
-const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean }[] = [
-  { to: '/', texto: 'Inicio', icono: 'Inicio', end: true },
-  { to: '/hacienda', texto: 'Hacienda', icono: 'Hacienda', end: false },
-  { to: '/campos', texto: 'Campos', icono: 'Campos', end: false },
-  { to: '/analitica', texto: 'Plata', icono: 'Plata', end: false },
-  { to: '/agenda', texto: 'Agenda', icono: 'Agenda', end: false },
+const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; seccion: Seccion | null }[] = [
+  { to: '/', texto: 'Inicio', icono: 'Inicio', end: true, seccion: 'inicio' },
+  { to: '/hacienda', texto: 'Hacienda', icono: 'Hacienda', end: false, seccion: 'hacienda' },
+  { to: '/campos', texto: 'Campos', icono: 'Campos', end: false, seccion: 'campos' },
+  { to: '/analitica', texto: 'Plata', icono: 'Plata', end: false, seccion: 'plata' },
+  { to: '/agenda', texto: 'Agenda', icono: 'Agenda', end: false, seccion: 'agenda' },
+  // Para todos: tu cuenta; el dueño además ve Personas y Plan.
+  { to: '/configuracion', texto: 'Configuración', icono: 'Usuario', end: false, seccion: null },
 ]
 
 /**
@@ -44,7 +47,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 
       <nav aria-label="Oficina" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
         <p className="shrink-0 px-3 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Oficina</p>
-        {SECCIONES.map((s) => {
+        {SECCIONES.filter((s) => !s.seccion || puedeVer(membresia, s.seccion)).map((s) => {
           const bloqueada = pendiente && !abiertoSinMapa(s.to)
           return (
             <NavLink
@@ -137,14 +140,16 @@ export function BarraLateral({ hoy }: { hoy: number }) {
         )}
       </nav>
 
-      <div className="mx-3 mt-3 flex items-center gap-3 border-t border-borde px-2 py-4">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-principal font-heading text-[14px] font-extrabold text-principal-texto">
-          {(membresia?.empresa?.nombre ?? 'T').charAt(0).toUpperCase()}
-        </span>
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[14px] font-bold text-texto">{membresia?.empresa?.nombre ?? '—'}</p>
-          {contacto && <p className="truncate text-[12px] text-texto-suave">{contacto}</p>}
-        </div>
+      <div className="mx-3 mt-3 flex items-center gap-1 border-t border-borde py-3">
+        <button type="button" onClick={() => navigate('/configuracion')} aria-label="Tu cuenta y la configuración" className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] px-2 py-1.5 text-left hover:bg-superficie-hundida/70">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-principal font-heading text-[14px] font-extrabold text-principal-texto">
+            {(membresia?.empresa?.nombre ?? 'T').charAt(0).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-[14px] font-bold text-texto">{membresia?.empresa?.nombre ?? '—'}</span>
+            {contacto && <span className="block truncate text-[12px] text-texto-suave">{contacto}</span>}
+          </span>
+        </button>
         <button type="button" onClick={() => void signOut()} aria-label="Salir" className="grid size-9 place-items-center rounded-full text-texto-suave hover:bg-superficie-hundida">
           <Icono nombre="Salir" />
         </button>
