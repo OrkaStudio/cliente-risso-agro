@@ -23,8 +23,8 @@ export function useInvalidarMovimientos() {
 export function useLiquidar() {
   const invalidar = useInvalidarMovimientos()
   return useMutation({
-    mutationFn: ({ id, fecha, monto }: { id: string; fecha: string; monto?: number }) =>
-      liquidarMovimiento(id, fecha, monto),
+    mutationFn: ({ id, fecha, monto, extra }: { id: string; fecha: string; monto?: number; extra?: Parameters<typeof liquidarMovimiento>[3] }) =>
+      liquidarMovimiento(id, fecha, monto, extra),
     onSuccess: invalidar,
   })
 }

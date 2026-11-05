@@ -99,7 +99,7 @@ export type NuevoMovimiento = {
 }
 
 /** Sube la imagen del comprobante al bucket privado (RLS por empresa). */
-async function subirComprobante(
+export async function subirComprobante(
   empresaId: string,
   movimientoId: string,
   img: Blob,

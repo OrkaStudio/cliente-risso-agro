@@ -60,6 +60,7 @@ const FRECUENCIAS: { valor: Frecuencia; texto: string; meses: number }[] = [
   { valor: 'anual', texto: 'Una vez al año', meses: 12 },
 ]
 const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
+const enDias = (n: number) => new Date(Date.parse(`${hoyLocal()}T12:00:00`) + n * 86_400_000).toISOString().slice(0, 10)
 const sumarMeses = (f: string, n: number) => {
   const [y, m, d] = f.split('-').map(Number) as [number, number, number]
   const x = new Date(y, m - 1 + n, d)
@@ -93,10 +94,13 @@ export function AnotarPlata({
   campoInicial,
   potreroInicial,
   renderTrigger,
+  vence = false,
 }: {
   empresaId: string
   campoInicial?: string
   potreroInicial?: string
+  /** «Algo que vence» (la Agenda): arranca como pendiente y pide el vencimiento. */
+  vence?: boolean
   /** El botón que lo abre; `escanear` arranca pidiendo la foto. */
   renderTrigger: (abrir: (escanear?: boolean) => void) => ReactNode
 }) {
@@ -111,12 +115,13 @@ export function AnotarPlata({
         setAbierto(true)
       })}
       {/* La key cambia al abrir: arranca de cero y sale con su animación. */}
-      <Formulario key={vez} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
+      <Formulario key={vez} vence={vence} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
     </>
   )
 }
 
 function Formulario({
+  vence: modoVence,
   empresaId,
   campoInicial,
   potreroInicial,
@@ -124,6 +129,7 @@ function Formulario({
   escanear,
   onCerrar,
 }: {
+  vence: boolean
   empresaId: string
   campoInicial?: string
   potreroInicial?: string
@@ -146,7 +152,9 @@ function Formulario({
   const [campoId, setCampoId] = useState(campoInicial ?? elegido?.id ?? (campos.length === 1 ? campos[0]!.id : ''))
   const [potreroId, setPotreroId] = useState(potreroInicial ?? '')
   const [actividad, setActividad] = useState<Actividad | ''>('')
-  const [cuenta, setCuenta] = useState<Cuenta | ''>('')
+  const [cuenta, setCuenta] = useState<Cuenta | ''>(modoVence ? 'pendiente' : '')
+  // En «Algo que vence», cómo se va a pagar (queda pendiente igual).
+  const [previsto, setPrevisto] = useState<Medio | ''>('')
   const [esEcheq, setEsEcheq] = useState<'fisico' | 'echeq'>('fisico')
   const [chequeBanco, setChequeBanco] = useState('')
   const [chequeNumero, setChequeNumero] = useState('')
@@ -270,6 +278,7 @@ function Formulario({
     const f = faltante()
     if (f) return setError(f)
     const dia = cuando === 'hoy' ? hoyLocal() : fecha
+    const medioFinal = pendiente ? previsto : cuenta
     try {
       await crear.mutateAsync({
         empresaId,
@@ -281,12 +290,12 @@ function Formulario({
         fechaDevengo: pendiente ? vence : dia,
         fechaVencimiento: pendiente ? vence : null,
         fechaCobroPago: pendiente ? null : dia,
-        medioPago: pendiente ? null : (cuenta as Medio),
+        medioPago: pendiente ? previsto || null : (cuenta as Medio),
         actividad: actividad || null,
         descripcion,
-        esEcheq: cuenta === 'cheque' && esEcheq === 'echeq',
-        chequeNumero: cuenta === 'cheque' ? chequeNumero : '',
-        chequeBanco: cuenta === 'cheque' ? chequeBanco : '',
+        esEcheq: medioFinal === 'cheque' && esEcheq === 'echeq',
+        chequeNumero: medioFinal === 'cheque' ? chequeNumero : '',
+        chequeBanco: medioFinal === 'cheque' ? chequeBanco : '',
         contraparte,
         cuit,
         comprobanteTipo: factura === 'no' ? null : factura,
@@ -424,14 +433,14 @@ function Formulario({
       onCerrar={onCerrar}
       onVolver={leyo ? () => (setModo('mano'), setLeidos(new Set())) : undefined}
       volverTexto="Cargarlo a mano"
-      titulo={leyo ? 'Esto es lo que leyó' : 'Anotar plata'}
-      bajada={leyo ? 'Lo marcado en amarillo lo sacó de la foto. Tocá cualquier dato para corregirlo.' : undefined}
+      titulo={leyo ? 'Esto es lo que leyó' : modoVence ? 'Algo que vence' : 'Anotar plata'}
+      bajada={leyo ? 'Lo marcado en amarillo lo sacó de la foto. Tocá cualquier dato para corregirlo.' : modoVence ? 'Lo vas a pagar o cobrar más adelante: queda en la Agenda y en lo que viene de Plata.' : undefined}
       pie={
         <>
         {errorAviso}
         <div className="flex items-center gap-3">
           <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardar()} className="flex-1">
-            {total > 0 ? `Anotar ${pesos(total)}` : 'Anotar'}
+            {total > 0 ? (pendiente && vence ? `Anotar: ${esGasto ? 'pagás' : 'cobrás'} ${fmtCompact(total)} el ${Number(vence.slice(8))}/${Number(vence.slice(5, 7))}` : `Anotar ${pesos(total)}`) : 'Anotar'}
           </BotonPrincipal>
           {!leyo && (
             <button type="button" onClick={() => archivo.current?.click()} aria-label="Escanear un comprobante" className="grid size-16 shrink-0 place-items-center rounded-full border-[1.5px] border-principal text-principal hover:bg-principal-suave">
@@ -460,7 +469,7 @@ function Formulario({
         </div>
       )}
 
-      {!leyo && <Segmentos etiqueta="Salió o entró" valor={tipo === 'gasto' ? 'salio' : 'entro'} onCambio={(v) => (setTipo(v === 'salio' ? 'gasto' : 'ingreso'), setCategoriaId(''))} opciones={[{ valor: 'salio', texto: 'Salió' }, { valor: 'entro', texto: 'Entró' }]} />}
+      {!leyo && <Segmentos etiqueta="Salió o entró" valor={tipo === 'gasto' ? 'salio' : 'entro'} onCambio={(v) => (setTipo(v === 'salio' ? 'gasto' : 'ingreso'), setCategoriaId(''))} opciones={modoVence ? [{ valor: 'salio', texto: 'A pagar' }, { valor: 'entro', texto: 'A cobrar' }] : [{ valor: 'salio', texto: 'Salió' }, { valor: 'entro', texto: 'Entró' }]} />}
 
       {/* El monto, grande: es lo primero que se mira. */}
       <label className={cn('mt-5 flex items-baseline gap-1 rounded-[18px] px-1', amarillo('monto') && 'bg-acento/35 px-3', leyo && !fotoUrl && 'mt-0')}>
@@ -491,9 +500,13 @@ function Formulario({
         <Opciones etiqueta="Para qué actividad" opciones={(Object.keys(actividadLabel) as Actividad[]).map((a) => ({ valor: a, texto: actividadLabel[a] }))} elegidas={[actividad]} onTocar={(v) => setActividad((x) => (x === v ? '' : v))} />
       </Grupo>
 
-      <Grupo titulo={esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
-        <Opciones etiqueta="Cómo" opciones={[...CUENTAS, { valor: 'pendiente' as Cuenta, texto: 'Todavía no, va a la Agenda' }]} elegidas={[cuenta]} onTocar={setCuenta} />
-        {cuenta === 'cheque' && (
+      <Grupo titulo={modoVence ? (esGasto ? 'Cómo se paga' : 'Cómo se cobra') : esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
+        {modoVence ? (
+          <Opciones etiqueta="Cómo" opciones={CUENTAS} elegidas={[previsto]} onTocar={(x) => setPrevisto((p) => (p === x ? '' : x))} />
+        ) : (
+          <Opciones etiqueta="Cómo" opciones={[...CUENTAS, { valor: 'pendiente' as Cuenta, texto: 'Todavía no, va a la Agenda' }]} elegidas={[cuenta]} onTocar={setCuenta} />
+        )}
+        {(modoVence ? previsto : cuenta) === 'cheque' && (
           <div className="mt-3 flex flex-col gap-3">
             <Segmentos etiqueta="Qué cheque" valor={esEcheq} onCambio={setEsEcheq} opciones={[{ valor: 'fisico', texto: 'De papel' }, { valor: 'echeq', texto: 'eCheq' }]} />
             <div className="grid grid-cols-2 gap-3">
@@ -506,7 +519,25 @@ function Formulario({
 
       {pendiente ? (
         <Grupo titulo={esGasto ? 'Cuándo vence' : 'Cuándo lo cobrás'}>
-          <CampoFecha value={vence} onChange={setVence} ariaLabel="Cuándo vence" />
+          <Opciones
+            etiqueta="Cuándo vence"
+            opciones={[
+              { valor: '7', texto: 'En 7 días' },
+              { valor: '30', texto: 'En 30 días' },
+              { valor: 'cuotas', texto: 'Son cuotas' },
+            ]}
+            elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
+            onTocar={(x) => {
+              if (x !== 'cuotas') return setVence(enDias(Number(x)))
+              const f = faltante(true)
+              if (f) return setError(f)
+              setError(null)
+              setModo('cuotas')
+            }}
+          />
+          <div className="mt-3">
+            <CampoFecha value={vence} onChange={setVence} ariaLabel="Cuándo vence" min={hoyLocal()} />
+          </div>
         </Grupo>
       ) : (
         <Grupo titulo="Cuándo">

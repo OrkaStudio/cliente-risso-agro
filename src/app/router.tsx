@@ -57,7 +57,7 @@ function PotreroViejo() {
 const AnaliticaPage = lazy(() => import('@/features/analitica/tropero/plata-page').then((m) => ({ default: m.PlataPage })))
 const MovimientosPage = lazy(() => import('@/features/analitica/tropero/movimientos-page').then((m) => ({ default: m.MovimientosPage })))
 const AgendaPage = lazy(() =>
-  import('@/features/agenda/agenda-page').then((m) => ({
+  import('@/features/agenda/tropero/agenda-page').then((m) => ({
     default: m.AgendaPage,
   })),
 )

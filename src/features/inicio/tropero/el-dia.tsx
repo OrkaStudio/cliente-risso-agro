@@ -455,7 +455,7 @@ function FilaCosa({ c, empresaId }: { c: Cosa; empresaId: string }) {
 }
 
 /** «Se solucionó»: marca la señal de la recorrida. Queda confirmada con «Deshacer»; la lista se refresca después. */
-function SeSoluciono({ senal, empresaId, compacto = false }: { senal: NonNullable<Cosa['senal']>; empresaId: string; compacto?: boolean }) {
+export function SeSoluciono({ senal, empresaId, compacto = false }: { senal: NonNullable<Cosa['senal']>; empresaId: string; compacto?: boolean }) {
   const qc = useQueryClient()
   const marcar = useMarcarSenal()
   const deshacer = useDeshacerMarca()
