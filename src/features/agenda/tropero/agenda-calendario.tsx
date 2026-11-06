@@ -44,6 +44,8 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
   const vencidosMes = pagos.filter((v) => fechaDe(v) < hoy).length
   const suma = (vs: Vencimiento[]) => vs.reduce((s, v) => s + v.monto, 0)
   const cuantosEn = (ym: string) => items.filter((v) => pendiente(v) && v.fechaVencimiento!.startsWith(ym)).length
+  // Lo que quedó sin resolver antes de este mes (cualquier mes anterior): se marca en la flecha de atrás.
+  const antesSinResolver = items.filter((v) => pendiente(v) && v.fechaVencimiento! < `${mes}-01`).length
   const siguiente = mesVecino(mes, 1)
   const anterior = mesVecino(mes, -1)
   const verDia = ultimoDia ? (dias.get(ultimoDia)?.items ?? []) : []
@@ -66,6 +68,7 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
         <div className="flex items-center gap-1 rounded-full bg-superficie-hundida p-1">
           <button type="button" onClick={() => setMes(anterior)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-bold text-texto hover:bg-superficie">
             <Icono nombre="Atrás" tamano={16} /> {mayuscula(nombreMes(anterior))}
+            {antesSinResolver > 0 && <span className="rounded-full bg-estado-problema px-2 py-0.5 text-[12.5px] text-superficie">{antesSinResolver} sin resolver</span>}
           </button>
           <span aria-hidden className="h-5 w-px bg-borde" />
           <button type="button" onClick={() => setMes(siguiente)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-bold text-texto hover:bg-superficie">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import { OpcionesCampo } from '@/features/campos/opciones-campo'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
@@ -560,7 +561,7 @@ function Formulario({
   // El campo: si ya está elegido en la barra o hay uno solo, no se pregunta (se puede cambiar en «De dónde»).
   const bloqueCampo = (campos.length > 1 || !campoId) && (
     <Grupo titulo="De qué campo">
-      <Opciones etiqueta="De qué campo" opciones={campos.map((c) => ({ valor: c.id, texto: c.nombre }))} elegidas={[campoId]} onTocar={(v) => (setCampoId(v), setPotreroId(''))} />
+      <OpcionesCampo campos={campos} elegido={campoId} onElegir={(v) => (setCampoId(v), setPotreroId(''))} />
     </Grupo>
   )
   const bloqueComo = (

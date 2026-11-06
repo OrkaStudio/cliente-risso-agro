@@ -10,6 +10,8 @@ import { useCampos } from '@/features/campos/hooks'
 import { cargarGordo } from '@/features/cotizaciones/api'
 import { useDolarBlue, useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
 import { formatearNumero, numeroDeFormateado } from '@/features/onboarding/numeros'
+import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { MarcaCampo } from '@/features/campos/opciones-campo'
 import { cn } from '@/lib/utils'
 
 /**
@@ -64,6 +66,7 @@ export function AlquilerDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { campos: identidadCampos } = useCampoElegido()
   const campos = useCampos()
   const dolar = useDolarBlue()
   const gordo = useGordoActual(empresaId)
@@ -247,7 +250,7 @@ export function AlquilerDialog({
         {sub === 'campo' && (
           <div className="flex flex-col gap-3">
             {alquilados.map((c) => (
-              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" titulo={c.nombre} detalle={c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : ''} onClick={() => (setCampoId(c.id), setSub('unidad'))} />
+              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" marca={(() => { const id = identidadCampos.find((x) => x.id === c.id); return id ? <MarcaCampo letra={id.letra} color={id.color} className="size-12 text-[18px] ring-2 ring-superficie" /> : undefined })()} titulo={c.nombre} detalle={c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : ''} onClick={() => (setCampoId(c.id), setSub('unidad'))} />
             ))}
           </div>
         )}
@@ -354,12 +357,14 @@ export function AlquilerDialog({
 }
 
 /** Una opción grande del panel: se toca y avanza. */
-function OpcionGrande({ activa, onClick, titulo, detalle, icono }: { activa: boolean; onClick: () => void; titulo: string; detalle?: string; icono: NombreIcono }) {
+function OpcionGrande({ activa, onClick, titulo, detalle, icono, marca }: { activa: boolean; onClick: () => void; titulo: string; detalle?: string; icono: NombreIcono; marca?: React.ReactNode }) {
   return (
     <button type="button" onClick={onClick} className={cn('flex w-full items-center gap-4 rounded-[20px] px-5 py-4 text-left transition-colors', activa ? 'bg-principal text-principal-texto' : 'bg-superficie text-texto hover:bg-superficie-hundida')}>
-      <span className={cn('grid size-12 shrink-0 place-items-center rounded-full', activa ? 'bg-acento text-acento-texto' : 'bg-superficie-hundida text-texto')}>
-        <Icono nombre={icono} />
-      </span>
+      {marca ?? (
+        <span className={cn('grid size-12 shrink-0 place-items-center rounded-full', activa ? 'bg-acento text-acento-texto' : 'bg-superficie-hundida text-texto')}>
+          <Icono nombre={icono} />
+        </span>
+      )}
       <span className="min-w-0">
         <span className="block font-heading text-[18px] font-extrabold">{titulo}</span>
         {detalle ? <span className={cn('block text-[14px]', activa ? 'text-principal-texto/85' : 'text-texto-suave')}>{detalle}</span> : null}

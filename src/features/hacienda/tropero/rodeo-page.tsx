@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
+import pastura from '@/assets/tropero/pastura-camino.webp'
+import { Cabecera } from '@/components/tropero/cabecera'
 import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { useCamposConPotreros } from '@/features/campos/hooks'
@@ -199,51 +201,58 @@ export function RodeoPage() {
 
   return (
     <div className="mx-auto flex w-full ancho-pagina flex-col gap-6">
-      {especies.length > 1 && <h1 className="sr-only">Hacienda</h1>}
-      {/* Qué campo a la izquierda y qué especie a la derecha, siempre en una línea (Lau).
-          Si el ancho no alcanza, las especies muestran sólo su ícono y su número. */}
-      <motion.div {...entra(0)} className="@container flex items-end justify-between gap-3">
-        {potreroFiltro ? (
-          <button
-            type="button"
-            onClick={() => setParams((p) => (p.delete('potrero'), p))}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-texto px-4 text-[14.5px] font-bold text-superficie"
-            aria-label={`Ver toda la hacienda, no sólo la del ${potreroFiltro.nombre}`}
-          >
-            Sólo el {potreroFiltro.nombre}
-            <Icono nombre="Cerrar" tamano={16} />
-          </button>
-        ) : (
-          <CampoVisto campos={elegido.campos} elegido={elegido.elegido} />
-        )}
-        {especies.length > 1 ? (
-          <div role="tablist" aria-label="Especie" className="flex shrink-0 gap-0.5 rounded-full border border-borde bg-superficie p-1">
-            {especies.map((e) => (
-              <button
-                key={e.especie}
-                type="button"
-                role="tab"
-                aria-selected={vista === e.especie}
-                onClick={() => {
-                  setEspecie(e.especie)
-                  setCategoria('')
-                }}
-                aria-label={`${e.nombre} ${cuantosDe(e.especie)}`}
-                title={e.nombre}
-                className={cn(
-                  'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-bold whitespace-nowrap transition-colors',
-                  vista === e.especie ? 'bg-tinta text-superficie' : 'text-texto hover:bg-superficie-hundida',
-                )}
-              >
-                <Icono nombre={e.icono} tamano={16} />
-                <span className="hidden @[1040px]:inline">{e.nombre}</span>
-                <span className="cifra">{cuantosDe(e.especie)}</span>
-              </button>
-            ))}
-          </div>
-        ) : (
+      {/* El encabezado, como el de cada sección (Lau, 06/11): Hacienda, las especies y qué campo. */}
+      <motion.div {...entra(0)} className="@container">
+        <Cabecera
+          imagen={pastura}
+          posicion="50% 45%"
+          derecha={
+            potreroFiltro ? (
+                    <button
+                      type="button"
+                      onClick={() => setParams((p) => (p.delete('potrero'), p))}
+                      className="inline-flex h-10 items-center gap-2 rounded-full bg-texto px-4 text-[14.5px] font-bold text-superficie"
+                      aria-label={`Ver toda la hacienda, no sólo la del ${potreroFiltro.nombre}`}
+                    >
+                      Sólo el {potreroFiltro.nombre}
+                      <Icono nombre="Cerrar" tamano={16} />
+                    </button>
+                  ) : (
+                    <CampoVisto campos={elegido.campos} elegido={elegido.elegido} />
+                  )
+          }
+        >
           <h1 className="t-pagina text-texto">Hacienda</h1>
-        )}
+          {especies.length > 1 && (
+            <div className="mt-3 flex">
+          <div role="tablist" aria-label="Especie" className="flex shrink-0 gap-0.5 rounded-full border border-borde bg-superficie p-1">
+                {especies.map((e) => (
+                  <button
+                    key={e.especie}
+                    type="button"
+                    role="tab"
+                    aria-selected={vista === e.especie}
+                    onClick={() => {
+                      setEspecie(e.especie)
+                      setCategoria('')
+                    }}
+                    aria-label={`${e.nombre} ${cuantosDe(e.especie)}`}
+                    title={e.nombre}
+                    className={cn(
+                      'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-bold whitespace-nowrap transition-colors',
+                      vista === e.especie ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida',
+                    )}
+                  >
+                    <Icono nombre={e.icono} tamano={16} />
+                    <span>{e.nombre}</span>
+                    <span className="cifra">{cuantosDe(e.especie)}</span>
+                  </button>
+                ))}
+              </div>
+    
+            </div>
+          )}
+        </Cabecera>
       </motion.div>
 
       {/* El número del rodeo, de dónde y de qué está hecho, y lo que se hace: una sola tarjeta. */}

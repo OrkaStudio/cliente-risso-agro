@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { BotonChico } from '@/components/tropero/boton'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import lotes from '@/assets/tropero/lotes-del-campo.webp'
+import { Cabecera as CabeceraSeccion } from '@/components/tropero/cabecera'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
@@ -159,11 +160,8 @@ function Cabecera({
 }) {
   const ir = useIr()
   return (
-    <section className="relative isolate flex min-h-[112px] flex-wrap items-center gap-x-6 gap-y-4 overflow-hidden rounded-[20px] border border-borde bg-superficie px-7 py-5">
-      {/* La ilustración de la 31 («Lotes y sombra de nube»), a la derecha, fundida con el fondo. */}
-      <img src={lotes} alt="" className="absolute inset-y-0 right-0 -z-20 h-full w-[62%] object-cover object-[50%_35%]" />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,var(--superficie)_38%,color-mix(in_srgb,var(--superficie)_70%,transparent)_58%,transparent_85%)]" />
-      <div className="min-w-0 flex-1">
+    // La ilustración de la 31 («Lotes y sombra de nube»): el mismo encabezado de todas las secciones.
+    <CabeceraSeccion imagen={lotes} posicion="50% 35%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
         <h1 className="t-pagina text-texto">{titulo}</h1>
         <div className="mt-2.5 flex flex-wrap gap-2">
           {chips.map((c) => (
@@ -178,9 +176,7 @@ function Cabecera({
             </button>
           ))}
         </div>
-      </div>
-      <CampoVisto campos={campos} elegido={elegido} />
-    </section>
+    </CabeceraSeccion>
   )
 }
 

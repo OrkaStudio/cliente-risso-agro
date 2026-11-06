@@ -12,7 +12,8 @@ import { useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hook
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import rollos from '@/assets/tropero/rollos-plata.webp'
+import textura from '@/assets/tropero/textura-campo.webp'
+import { Cabecera } from '@/components/tropero/cabecera'
 import { useDolarHistorico } from './dolar'
 import { AnotarPlata } from './anotar-plata'
 import { MesAMes } from './mes-a-mes'
@@ -89,6 +90,7 @@ export function PlataPage() {
   const contra = { doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior' }[clave]
   const verbo = periodo.enCurso ? (ganando ? 'Van ganando' : 'Van perdiendo') : ganando ? 'Ganaron' : 'Perdieron'
 
+  const BOTON_SEC = 'inline-flex h-12 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie/90 px-5 text-[15px] font-bold text-texto backdrop-blur-sm hover:border-principal hover:text-principal'
   const anotar = (abrir: () => void, texto: string, secundario = false) => (
     <button
       type="button"
@@ -109,80 +111,79 @@ export function PlataPage() {
 
   return (
     <div className="mx-auto flex w-full ancho-pagina flex-col gap-8">
-      <motion.div {...entra(0)} className="flex items-end justify-between gap-3">
-        <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />
-        <div className="flex items-center gap-2">
-          <button type="button" data-guia="analitica-alquiler" onClick={() => (setVezAlquiler((v) => v + 1), setAlquiler(true))} className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
-            <Icono nombre="Comprobante" tamano={16} />
-            Cargar un alquiler
-          </button>
-          <Link to="/analitica/movimientos" className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
-            Ver los movimientos
-            <Icono nombre="Siguiente" tamano={16} />
-          </Link>
-        </div>
-      </motion.div>
-
-      {/* Portada: el resultado del período. Alto fijo y una línea por dato: cambiar el
-          período no la mueve (Lau, 03/11). */}
-      <motion.section {...entra(1)} className="relative isolate flex h-[236px] flex-col justify-between overflow-hidden rounded-[24px] bg-tinta px-8 py-6">
-        <img src={rollos} alt="" className="absolute inset-0 -z-20 size-full object-cover object-[50%_80%]" fetchPriority="high" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(19,27,22,0.86)_0%,rgba(19,27,22,0.62)_45%,rgba(19,27,22,0.18)_100%)]" />
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-[15px] font-semibold text-[#f7e3b6]">{vacio ? 'Todavía no anotaste plata' : verbo}</p>
-          {!vacio && (
-            <div role="tablist" aria-label="Período" className="flex shrink-0 gap-1 rounded-full bg-tinta/60 p-1 backdrop-blur-sm">
-              {todos.map((p) => (
-                <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-superficie text-texto' : 'text-[#f7e3b6] hover:bg-white/10')}>
-                  {p.nombre}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="flex items-end justify-between gap-6">
-          <div className="min-w-0">
-            {vacio ? (
-              <h1 className="t-seccion max-w-[520px] text-superficie">Anotá el primer gasto y mirá cómo viene el campo</h1>
-            ) : (
-              <>
-                <h1 className="t-numero-hero text-superficie">{pesos(Math.abs(anio.resultado))}</h1>
-                <p className="mt-2.5 flex items-center gap-3 text-[14.5px] whitespace-nowrap text-[#f7e3b6]">
+      {/* El encabezado, como el de cada sección (Lau, 06/11): el resultado del período y lo que se hace. */}
+      <motion.div {...entra(0)}>
+        <Cabecera imagen={textura} posicion="50% 40%" derecha={
+            <>
+              <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />
+              <Link to="/analitica/movimientos" className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
+                Ver los movimientos
+                <Icono nombre="Siguiente" tamano={16} />
+              </Link>
+            </>
+          }>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="t-pagina text-texto">Plata</h1>
+            {!vacio && (
+              <div role="tablist" aria-label="Período" className="flex shrink-0 gap-1 rounded-full border border-borde bg-superficie p-1">
+                {todos.map((p) => (
+                  <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida')}>
+                    {p.nombre}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {vacio ? (
+            <p className="mt-3 text-[17px] text-texto-suave">Anotá el primer gasto y mirá cómo viene el campo.</p>
+          ) : (
+            <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-2">
+              <div>
+                <p className="text-[14.5px] font-semibold text-texto-suave">{verbo}</p>
+                <p className={cn('t-numero-hero', ganando ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{pesos(Math.abs(anio.resultado))}</p>
+              </div>
+              <div className="flex flex-col gap-1.5 pb-1">
+                <p className="flex items-center gap-3 text-[14.5px] whitespace-nowrap text-texto-suave">
                   <span>
-                    Entró <b className="t-cifra text-superficie">{pesos(anio.entro)}</b>
+                    Entró <b className="t-cifra text-estado-bien-texto">{pesos(anio.entro)}</b>
                   </span>
-                  <span aria-hidden className="text-[#f7e3b6]/50">·</span>
+                  <span aria-hidden>·</span>
                   <span>
-                    Salió <b className="t-cifra text-superficie">{pesos(anio.salio)}</b>
+                    Salió <b className="t-cifra text-estado-problema-texto">{pesos(anio.salio)}</b>
                   </span>
                 </p>
-                {/* Siempre la línea, aunque no haya con qué comparar: el alto no cambia. */}
-                <p className="mt-2 h-[24px]">
+                <p className="h-[24px]">
                   {comparacion && (
                     <span className={cn('inline-flex h-full items-center gap-1 rounded-full px-2.5 text-[13px] font-bold whitespace-nowrap', comparacion.sube ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
                       {comparacion.sube ? '▲' : '▼'} {comparacion.texto} {contra}, en dólares
                     </span>
                   )}
                 </p>
-              </>
-            )}
-          </div>
-          <div className="flex shrink-0 gap-2.5">
+              </div>
+            </div>
+          )}
+          {/* Lo que se hace con la plata, todo junto y a la vista. */}
+          <div className="mt-5 flex flex-wrap gap-2.5">
             {empresaId && <span data-guia="analitica-cargar" className="contents"><AnotarPlata empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(() => abrir(), 'Anotar un gasto')} /></span>}
             {empresaId && (
               <AnotarPlata
                 empresaId={empresaId}
                 campoInicial={campoId ?? undefined}
                 renderTrigger={(abrir) => (
-                  <button type="button" onClick={() => abrir(true)} aria-label="Escanear un comprobante" className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto transition-opacity hover:opacity-90">
-                    <Icono nombre="Foto" />
+                  <button type="button" onClick={() => abrir(true)} className={BOTON_SEC}>
+                    <Icono nombre="Foto" tamano={16} />
+                    Escanear un comprobante
                   </button>
                 )}
               />
             )}
+            <button type="button" data-guia="analitica-alquiler" onClick={() => (setVezAlquiler((v) => v + 1), setAlquiler(true))} className={BOTON_SEC}>
+              <Icono nombre="Comprobante" tamano={16} />
+              Cargar un alquiler
+            </button>
           </div>
-        </div>
-      </motion.section>
+        </Cabecera>
+      </motion.div>
 
       {/* Para mejorar: lo que conviene mirar, cada cosa con adónde ir a hacer algo. */}
       {!vacio && avisos.length > 0 && (
