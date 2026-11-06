@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
-import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { useCamposConPotreros } from '@/features/campos/hooks'
 import { caraSinHacienda } from './sin-hacienda'
@@ -264,23 +264,17 @@ export function RodeoPage() {
             <span className="t-numero-hero text-texto">{r.total.toLocaleString('es-AR')}</span>
             <span className="t-tarjeta text-texto">{nombreVista}</span>
           </p>
-          {campoId ? (
-            <p className="mt-2 text-[14px] text-texto-suave">en {elegido.elegido!.nombre}</p>
+          {/* De qué campo: la letra y el color de cada uno, como en la barra (Lau, 05/11). */}
+          {campoId && elegido.elegido ? (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              <PastillaCampo campo={elegido.elegido} />
+            </ul>
           ) : (
             r.porCampo.length > 1 && (
-              <ul className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
+              <ul className="mt-3 flex flex-wrap gap-2">
                 {r.porCampo.map((c) => {
                   const id = elegido.campos.find((x) => x.id === c.id)
-                  return (
-                    <li key={c.id} className="flex items-center gap-1.5 text-[14px] text-texto-suave">
-                      {id && (
-                        <span className="grid size-[18px] place-items-center rounded-[5px] text-[10px] font-extrabold text-white" style={{ background: id.color }}>
-                          {id.letra}
-                        </span>
-                      )}
-                      {c.nombre} <b className="t-cifra text-texto">{c.cabezas}</b>
-                    </li>
-                  )
+                  return id ? <PastillaCampo key={c.id} campo={id} cabezas={c.cabezas} /> : null
                 })}
               </ul>
             )
@@ -654,5 +648,18 @@ function Pildora({ activo, onClick, texto, n, punto }: { activo: boolean; onClic
       {texto}
       <span className={cn('t-cifra-chica', activo ? 'text-superficie/75' : 'text-texto-suave')}>{n}</span>
     </button>
+  )
+}
+
+/** Un campo con su letra y su color, en una pastilla teñida de ese color (con sus cabezas si hay varios). */
+function PastillaCampo({ campo, cabezas }: { campo: CampoElegible; cabezas?: number }) {
+  return (
+    <li className="inline-flex items-center gap-2 rounded-full py-1 pr-3.5 pl-1 text-[14.5px] font-semibold text-texto" style={{ background: `color-mix(in srgb, ${campo.color} 14%, transparent)`, boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${campo.color} 35%, transparent)` }}>
+      <span className="grid size-6 place-items-center rounded-full text-[12px] font-extrabold text-white" style={{ background: campo.color }}>
+        {campo.letra}
+      </span>
+      {cabezas === undefined ? `En ${campo.nombre}` : campo.nombre}
+      {cabezas !== undefined && <b className="t-cifra text-texto">{cabezas}</b>}
+    </li>
   )
 }
