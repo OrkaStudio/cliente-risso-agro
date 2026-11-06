@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Rol, Seccion } from '@/features/empresa/secciones'
 import { supabase } from '@/lib/supabase/client'
+import { formatearCelularAR } from '@/lib/telefono'
 
 /** Alguien de la empresa: ya entra (userId) o está invitado y no aceptó (invitacionId). */
 export type Persona = {
@@ -93,9 +94,7 @@ export function whatsappInvitacion(p: { celular: string; nombre: string; empresa
   return `https://wa.me/${p.celular}?text=${encodeURIComponent(texto)}`
 }
 
-/** «+54 9 2241 55-8820» para mostrar un número guardado como 549… */
+/** «+54 9 2244 42-9015» para mostrar un número guardado como 549…, con la característica bien cortada. */
 export function celularLindo(c: string) {
-  const d = c.replace(/\D/g, '')
-  const local = d.startsWith('549') ? d.slice(3) : d
-  return local.length === 10 ? `+54 9 ${local.slice(0, 4)} ${local.slice(4, 6)}-${local.slice(6)}` : `+${d}`
+  return formatearCelularAR(`+${c.replace(/\D/g, '')}`)
 }

@@ -622,7 +622,7 @@ function CorregirCampo({ campo, abierto, onCerrar, empresaId, onDibujar }: { cam
     }
   }
   return (
-    <PanelLateral
+    <PanelLateral chico
       abierto={abierto}
       onCerrar={onCerrar}
       titulo="Corregir el campo"
@@ -687,7 +687,7 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
     }
   }
   return (
-    <PanelLateral
+    <PanelLateral chico
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={`Corregir el ${p.nombre}`}

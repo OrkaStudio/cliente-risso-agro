@@ -14,6 +14,7 @@ import { useAnimales } from '@/features/hacienda/hooks'
 import { useMapa } from '@/features/mapa/api'
 import { cn } from '@/lib/utils'
 import { celularLindo, useCambiarNombre, usePersonas, whatsappInvitacion, type Persona } from './api'
+import { nombrePropio } from '@/lib/texto'
 import { EditarPanel, InvitarPanel } from './personas-paneles'
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -218,7 +219,7 @@ function Personas({ empresa }: { empresa: string }) {
       )}
 
       {invitar && <InvitarPanel key={invitar.vez} abierto empresa={empresa} rolInicial={invitar.rol} onCerrar={() => setInvitar(null)} />}
-      <EditarPanel persona={editar} onCerrar={() => setEditar(null)} />
+      <EditarPanel persona={editar} empresa={empresa} onCerrar={() => setEditar(null)} />
     </div>
   )
 }
@@ -263,7 +264,7 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
           <h2 className="font-heading text-[20px] font-extrabold text-texto">Tu nombre</h2>
           <p className="mt-1 text-[15px] text-texto-suave">Con este te saluda el asistente y te ven las personas que invitás.</p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
-            <CampoTexto className="min-w-[240px] flex-1" etiqueta="Cómo te llamás" placeholder="Daniel" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+            <CampoTexto className="min-w-[240px] flex-1" etiqueta="Cómo te llamás" placeholder="Daniel" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} />
             <button type="button" onClick={() => void guardar()} disabled={!nombre.trim() || nombre.trim() === guardado || cambiar.isPending} className="h-[52px] rounded-full bg-principal px-6 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-40">
               Guardar el nombre
             </button>

@@ -107,7 +107,7 @@ export function CargarLaborDialog({
   }
 
   return (
-    <PanelLateral
+    <PanelLateral chico
       abierto={open}
       onCerrar={() => onOpenChange(false)}
       titulo="Cargar labor"

@@ -4,7 +4,10 @@ import { BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
-import { ROLES, SECCIONES, nombreRol, seccionesSugeridas, type Rol, type Seccion } from '@/features/empresa/secciones'
+import { CampoCelular } from '@/features/acceso/campo-celular'
+import { ROLES, SECCIONES, nombreRol, seccionesSugeridas, type Rol, type RolConocido, type Seccion } from '@/features/empresa/secciones'
+import { normalizarCelularAR } from '@/lib/telefono'
+import { nombrePropio, primeraMayuscula } from '@/lib/texto'
 import { cn } from '@/lib/utils'
 import { celularLindo, linkInvitacion, useCambiarSecciones, useInvitar, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
 
@@ -41,7 +44,10 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   const invitar = useInvitar()
   const [nombre, setNombre] = useState('')
   const [celular, setCelular] = useState('')
-  const [rol, setRol] = useState<Rol | ''>(rolInicial ?? '')
+  // Qué hace: uno de los conocidos u «Otro», que escribe el dueño («Contador»).
+  const [tipoRol, setTipoRol] = useState<RolConocido | 'otro' | ''>((rolInicial as RolConocido | undefined) ?? '')
+  const [otroRol, setOtroRol] = useState('')
+  const rol: Rol | '' = tipoRol === 'otro' ? otroRol.trim() : tipoRol
   const [secciones, setSecciones] = useState<Seccion[]>(rolInicial ? seccionesSugeridas(rolInicial) : [])
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -49,26 +55,28 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   async function enviar() {
     setError(null)
     if (!nombre.trim()) return setError('Escribí cómo se llama.')
-    if (celular.replace(/\D/g, '').length < 10) return setError('Escribí su celular con la característica, sin el 0 ni el 15.')
-    if (!rol) return setError('Tocá qué hace en el campo.')
+    if (!cel) return setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.')
+    if (!tipoRol) return setError('Tocá qué hace en el campo.')
+    if (tipoRol === 'otro' && otroRol.trim().length < 2) return setError('Escribí qué hace en el campo.')
     if (!secciones.length) return setError('Elegí al menos una sección que va a ver.')
     try {
-      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular, rol, secciones }))
+      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, secciones }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo invitar. Probá de nuevo.')
     }
   }
 
-  const cel = `549${celular.replace(/\D/g, '').slice(-10)}`
-  if (token)
+  const cel = normalizarCelularAR(celular)?.slice(1) ?? null
+  if (token && cel)
     return (
       <PanelLateral
         abierto={abierto}
         onCerrar={onCerrar}
         titulo={`Listo: invitaste a ${nombre.trim().split(' ')[0]}`}
-        bajada="Mandale el link por WhatsApp. Entra con su celular, sin contraseña, y ve sólo lo que elegiste. El link vence en 7 días."
+        bajada="Mandale el link por WhatsApp: entra con su celular, sin contraseña. Vence en 7 días."
+        chico
         pie={
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             <a href={whatsappInvitacion({ celular: cel, nombre, empresa, token })} target="_blank" rel="noreferrer" className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600">
               Mandárselo por WhatsApp
               <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto">
@@ -81,11 +89,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
           </div>
         }
       >
-        <div className="rounded-[18px] border border-borde bg-superficie p-5 text-[15px]">
-          <p className="font-semibold text-texto">{nombre.trim()}</p>
-          <p className="text-texto-suave">{[nombreRol(rol), celularLindo(cel)].join(' · ')}</p>
-          <p className="mt-3 text-texto-suave">Va a ver: {SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => s.texto).join(', ')}.</p>
-        </div>
+        <TarjetaPersona nombre={nombre.trim()} rol={rol} celular={cel} secciones={secciones} />
       </PanelLateral>
     )
 
@@ -106,22 +110,25 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
       }
     >
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-        <CampoTexto etiqueta="Cómo se llama" placeholder="Juan Pérez" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
-        <CampoTexto etiqueta="Su celular, el que tiene WhatsApp" inputMode="tel" placeholder="2241 55-8820" value={celular} onChange={(e) => setCelular(e.target.value)} />
+        <CampoTexto etiqueta="Cómo se llama" placeholder="Juan Pérez" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} autoFocus />
+        <CampoCelular etiqueta="Su celular, el que tiene WhatsApp" valor={celular} onCambio={setCelular} />
       </div>
       <Grupo titulo="Qué hace en el campo" className="mt-6">
         <Opciones
           etiqueta="Qué hace"
-          opciones={ROLES}
-          elegidas={rol ? [rol] : []}
+          opciones={[...ROLES, { valor: 'otro' as const, texto: 'Otro' }]}
+          elegidas={tipoRol ? [tipoRol] : []}
           onTocar={(r) => {
-            setRol(r)
-            // Un punto de partida según lo que hace; lo cambiás abajo.
-            if (!secciones.length || rol) setSecciones(seccionesSugeridas(r))
+            setTipoRol(r)
+            // Un punto de partida según lo que hace; lo cambiás abajo. Para «Otro», elegís vos.
+            if (r !== 'otro') setSecciones(seccionesSugeridas(r))
           }}
         />
+        {tipoRol === 'otro' && (
+          <CampoTexto className="mt-3" etiqueta="Qué hace" placeholder="Contador, ingeniero agrónomo…" value={otroRol} onChange={(e) => setOtroRol(primeraMayuscula(e.target.value))} autoFocus maxLength={40} />
+        )}
       </Grupo>
-      <Grupo titulo={rol ? 'Qué va a ver · te propusimos esto, cambialo como quieras' : 'Qué va a ver'}>
+      <Grupo titulo={tipoRol && tipoRol !== 'otro' ? 'Qué va a ver · te propusimos esto, cambialo como quieras' : 'Qué va a ver'}>
         <ElegirSecciones elegidas={secciones} onCambiar={setSecciones} />
       </Grupo>
       <p className="mt-4 text-[14px] text-texto-suave">Configuración (las personas y el plan) sólo la ves vos.</p>
@@ -129,22 +136,24 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   )
 }
 
-export function EditarPanel({ persona, onCerrar }: { persona: Persona | null; onCerrar: () => void }) {
+export function EditarPanel({ persona, empresa, onCerrar }: { persona: Persona | null; empresa: string; onCerrar: () => void }) {
   // La última abierta queda mientras el panel sale.
   const [ultima, setUltima] = useState(persona)
   if (persona && persona !== ultima) setUltima(persona)
   const p = persona ?? ultima
   if (!p) return null
-  return <Editar key={p.userId ?? p.invitacionId} p={p} abierto={!!persona} onCerrar={onCerrar} />
+  return <Editar key={p.userId ?? p.invitacionId} p={p} empresa={empresa} abierto={!!persona} onCerrar={onCerrar} />
 }
 
-function Editar({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerrar: () => void }) {
+function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string; abierto: boolean; onCerrar: () => void }) {
   const cambiar = useCambiarSecciones()
   const quitar = useQuitarPersona()
   const [secciones, setSecciones] = useState<Seccion[]>(p.secciones ?? [])
   const [seguro, setSeguro] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pendiente = !!p.invitacionId
+  const vencida = pendiente && !!p.venceAt && new Date(p.venceAt) < new Date()
+  const venceEl = p.venceAt ? new Date(p.venceAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : ''
   const nombre = p.nombre.split(' ')[0]
 
   async function guardar() {
@@ -173,11 +182,20 @@ function Editar({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerr
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={pendiente ? `La invitación de ${nombre}` : `Qué ve ${nombre}`}
-      bajada={[nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
-      ancho
+      bajada={pendiente ? (vencida ? 'El link venció. Cancelala e invitalo de nuevo.' : `Todavía no entró. El link vence el ${venceEl}.`) : [nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
+      ancho={!pendiente}
+      chico={pendiente}
       pie={
         <>
           {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
+          {pendiente && p.token && !vencida && !seguro && (
+            <a href={whatsappInvitacion({ celular: p.celular, nombre: p.nombre, empresa, token: p.token })} target="_blank" rel="noreferrer" className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600">
+              Mandárselo de nuevo por WhatsApp
+              <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto">
+                <Icono nombre="Celular" tamano={16} />
+              </span>
+            </a>
+          )}
           {!pendiente && (
             <BotonPrincipal icono="Guardar" cargando={cambiar.isPending} disabled={cambiar.isPending} onClick={() => void guardar()}>
               Guardar lo que ve
@@ -204,12 +222,42 @@ function Editar({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerr
       }
     >
       {pendiente ? (
-        <p className="text-[15.5px] text-texto">
-          Va a ver: {SECCIONES.filter((s) => (p.secciones ?? []).includes(s.id)).map((s) => s.texto).join(', ')}. Cuando entre, le podés cambiar lo que ve desde acá.
-        </p>
+        <>
+          <TarjetaPersona nombre={p.nombre} rol={p.rol} celular={p.celular} secciones={p.secciones ?? []} pendiente />
+          <p className="mt-3 text-[14px] text-texto-suave">Cuando entre, le cambiás lo que ve desde la tabla.</p>
+        </>
       ) : (
         <ElegirSecciones elegidas={secciones} onCambiar={setSecciones} />
       )}
     </PanelLateral>
+  )
+}
+
+/** Quién es y qué va a ver, de un vistazo: para confirmar una invitación o revisarla. */
+function TarjetaPersona({ nombre, rol, celular, secciones, pendiente = false }: { nombre: string; rol: string; celular: string; secciones: Seccion[]; pendiente?: boolean }) {
+  return (
+    <div className="overflow-hidden rounded-[22px] border border-principal/25 bg-gradient-to-br from-terracota-50 to-trigo-100">
+      <div className="flex items-center gap-4 px-5 pt-5">
+        <span className={cn('grid size-14 shrink-0 place-items-center rounded-full font-heading text-[22px] font-extrabold', pendiente ? 'border-2 border-dashed border-principal/60 bg-superficie text-principal' : 'bg-principal text-principal-texto')}>
+          {nombre.charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[19px] font-bold text-texto">{nombre}</p>
+          <p className="truncate text-[14.5px] text-texto-suave">{nombreRol(rol)}</p>
+          <p className="cifra text-[16px] text-texto">{celularLindo(celular)}</p>
+        </div>
+      </div>
+      <div className="mt-4 border-t border-principal/15 bg-superficie/70 px-5 py-4">
+        <p className="text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">Va a ver</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => (
+            <span key={s.id} className="inline-flex items-center gap-1.5 rounded-full bg-principal-suave px-3 py-1 text-[14px] font-semibold text-acento-texto">
+              <Icono nombre={s.icono} tamano={16} />
+              {s.texto}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }

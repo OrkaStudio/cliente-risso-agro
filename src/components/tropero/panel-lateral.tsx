@@ -17,6 +17,7 @@ export function PanelLateral({
   children,
   className,
   ancho = false,
+  chico = false,
   onVolver,
   volverTexto = 'Volver',
 }: {
@@ -25,6 +26,8 @@ export function PanelLateral({
   volverTexto?: string
   /** Más ancho, para cuando adentro hay un croquis. */
   ancho?: boolean
+  /** Poco contenido (confirmar, un dato, un aviso): una tarjeta del alto de lo que tiene, no toda la pantalla. */
+  chico?: boolean
   abierto: boolean
   onCerrar: () => void
   titulo: React.ReactNode
@@ -42,13 +45,15 @@ export function PanelLateral({
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-tinta/40 duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0" />
         <DialogPrimitive.Popup
           className={cn(
-            'fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full flex-col transition-[max-width] duration-300',
-            ancho ? 'max-w-[680px]' : 'max-w-[520px]',
-            ' rounded-l-[28px] bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
+            'fixed z-50 flex w-full flex-col transition-[max-width] duration-300',
+            chico
+              ? cn('top-4 right-4 max-h-[calc(100dvh-32px)] rounded-[28px] max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-3 max-sm:w-auto', ancho ? 'max-w-[600px]' : 'max-w-[460px]')
+              : cn('inset-y-0 right-0 h-[100dvh] rounded-l-[28px]', ancho ? 'max-w-[680px]' : 'max-w-[520px]'),
+            ' bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
             className,
           )}
         >
-          <header className="flex items-start gap-4 px-8 pt-8 pb-5">
+          <header className={cn('flex items-start gap-4 px-8 pb-5', chico ? 'pt-7' : 'pt-8')}>
             <div className="min-w-0 flex-1">
               {onVolver && <BotonVolver onClick={onVolver} className="mb-4">{volverTexto}</BotonVolver>}
               <DialogPrimitive.Title className="font-heading text-[28px] leading-[1.05] font-extrabold tracking-[-0.02em] text-texto">{titulo}</DialogPrimitive.Title>
@@ -58,8 +63,8 @@ export function PanelLateral({
               <Icono nombre="Cerrar" />
             </DialogPrimitive.Close>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 pb-6">{children}</div>
-          {pie && <footer className="border-t border-borde bg-fondo px-8 py-5">{pie}</footer>}
+          <div className={cn('min-h-0 overflow-y-auto overscroll-contain px-8 pb-6', !chico && 'flex-1')}>{children}</div>
+          {pie && <footer className={cn('border-t border-borde px-8 py-5', chico ? 'rounded-b-[28px]' : 'bg-fondo')}>{pie}</footer>}
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

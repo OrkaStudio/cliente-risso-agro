@@ -20,6 +20,14 @@ describe('celulares argentinos', () => {
     expect(normalizarCelularAR('2241 55-8820')).toBe('+5492241558820')
     expect(normalizarCelularAR('02241 15 558820')).toBe('+5492241558820')
   })
+  it('escribiendo de a una tecla con 0 y 15, queda bien', () => {
+    let v = ''
+    for (const c of '02244 15 429015') v = formatearMientrasEscribe(v + c)
+    expect(v).toBe('2244 42-9015')
+    v = ''
+    for (const c of '011 15 5555 4444') v = formatearMientrasEscribe(v + c)
+    expect(v).toBe('11 5555-4444')
+  })
   it('rechaza números incompletos o que no son argentinos', () => {
     expect(normalizarCelularAR('2241 55-882')).toBeNull()
     expect(normalizarCelularAR('5241558820')).toBeNull()

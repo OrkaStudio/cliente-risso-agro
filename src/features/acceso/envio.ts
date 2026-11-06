@@ -140,7 +140,8 @@ export type Invitacion = {
   empresa: string
   invita: string
   nombre: string
-  rol: 'encargado' | 'peon' | 'vet'
+  /** encargado, peon, vet o lo que escribió el dueño. */
+  rol: string
   /** E.164 */
   celular: string
   vencida: boolean
@@ -153,7 +154,7 @@ export async function leerInvitacion(token: string): Promise<Invitacion | null |
   if (error) return errorAlPedir(error).tipo === 'sin-senal' ? 'sin-senal' : null
   const fila = data?.[0]
   if (!fila) return null
-  return { ...fila, rol: fila.rol as Invitacion['rol'], celular: `+${fila.celular}` }
+  return { ...fila, celular: `+${fila.celular}` }
 }
 
 /** Ya con la sesión del celular invitado: queda en la empresa con su rol. */

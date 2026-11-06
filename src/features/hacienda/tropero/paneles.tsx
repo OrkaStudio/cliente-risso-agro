@@ -404,7 +404,7 @@ export function DarDeBaja({ animal, abierto, onCerrar }: { animal: AnimalPanel; 
   }
 
   return (
-    <PanelLateral
+    <PanelLateral chico
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={`Sale el ${nombreDe(animal)}`}

@@ -92,7 +92,7 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
   const estado = estadoTexto(v, hoy)
 
   return (
-    <PanelLateral
+    <PanelLateral chico={ya}
       abierto={abierto}
       onCerrar={onCerrar}
       onVolver={onVolver}

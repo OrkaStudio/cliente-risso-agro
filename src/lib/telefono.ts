@@ -42,11 +42,11 @@ function digitosLocales(entrada: string): string {
     if (d.startsWith('9')) d = d.slice(1)
   }
   if (d.startsWith('0')) d = d.slice(1)
-  // "área 15 número" (12 dígitos): sacar el 15 que sigue al código de área.
-  if (d.length === 12) {
-    const largo = largoArea(d)
-    if (d.slice(largo, largo + 2) === '15') d = d.slice(0, largo) + d.slice(largo + 2)
-  }
+  // "área 15 número": el 15 que sigue al código de área es el prefijo de
+  // celular, nunca parte del número. Se saca apenas se escribe (no hace falta
+  // esperar los 12 dígitos), así al tipear «2244 15 42…» no se corta mal.
+  const largo = largoArea(d)
+  if (d.length >= largo + 2 && d.slice(largo, largo + 2) === '15') d = d.slice(0, largo) + d.slice(largo + 2)
   return d
 }
 

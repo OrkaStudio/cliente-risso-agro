@@ -122,7 +122,7 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir }: { 
       </Tooltip.Provider>
 
       {/* Un día entero, en el panel lateral: cada cosa con todo y su botón. */}
-      <PanelLateral
+      <PanelLateral chico
         abierto={!!dia}
         onCerrar={() => setDia(null)}
         titulo={ultimoDia ? `${diaLargo(ultimoDia)}${ultimoDia === hoy ? ', hoy' : ''}` : ''}

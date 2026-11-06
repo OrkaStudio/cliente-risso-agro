@@ -379,7 +379,7 @@ function Formulario({
   // ===== Leyendo el comprobante =====
   if (modo === 'leyendo') {
     return (
-      <PanelLateral abierto={abierto} onCerrar={onCerrar} titulo="Leyendo el comprobante…" bajada="Un momento. Después revisás lo que leyó." pie={<p className="text-center text-[13.5px] text-texto-suave">Si no la lee bien, la cargás a mano y la foto queda guardada.</p>}>
+      <PanelLateral chico abierto={abierto} onCerrar={onCerrar} titulo="Leyendo el comprobante…" bajada="Un momento. Después revisás lo que leyó." pie={<p className="text-center text-[13.5px] text-texto-suave">Si no la lee bien, la cargás a mano y la foto queda guardada.</p>}>
         {inputFoto}
         <div className="relative grid h-[340px] place-items-center overflow-hidden rounded-[24px] bg-superficie-hundida">
           {fotoUrl ? <img src={fotoUrl} alt="El comprobante" className="max-h-[300px] max-w-[85%] rotate-[-1.5deg] rounded-[6px] shadow-[0_12px_30px_rgba(19,27,22,0.18)]" /> : <Icono nombre="Comprobante" />}

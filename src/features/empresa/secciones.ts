@@ -16,17 +16,21 @@ export const SECCIONES: { id: Seccion; texto: string; ruta: string; icono: Nombr
   { id: 'agenda', texto: 'Agenda', ruta: '/agenda', icono: 'Agenda', queVe: 'Los pagos y cobros que vencen' },
 ]
 
-export type Rol = 'encargado' | 'peon' | 'vet'
-export const ROLES: { valor: Rol; texto: string }[] = [
+/** Los que se tocan; cualquier otro lo escribe el dueño («Contador») y se guarda tal cual. */
+export type RolConocido = 'encargado' | 'peon' | 'vet'
+export type Rol = RolConocido | (string & {})
+export const ROLES: { valor: RolConocido; texto: string }[] = [
   { valor: 'encargado', texto: 'Encargado' },
   { valor: 'peon', texto: 'Peón' },
   { valor: 'vet', texto: 'Veterinario' },
 ]
 export const nombreRol = (r: string) => (r === 'dueno' ? 'Dueño' : (ROLES.find((x) => x.valor === r)?.texto ?? r))
 
-/** Un punto de partida al invitar según el rol; el dueño lo cambia como quiera. */
+/** Un punto de partida al invitar según el rol; para uno escrito no se propone nada: elige el dueño. */
 export function seccionesSugeridas(rol: Rol): Seccion[] {
-  return rol === 'vet' ? ['hacienda'] : ['inicio', 'hacienda', 'campos']
+  if (rol === 'vet') return ['hacienda']
+  if (rol === 'encargado' || rol === 'peon') return ['inicio', 'hacienda', 'campos']
+  return []
 }
 
 export const esDueno = (m: Membresia | null | undefined) => m?.rol === 'dueno'

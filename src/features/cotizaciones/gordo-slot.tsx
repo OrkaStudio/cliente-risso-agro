@@ -95,7 +95,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
       )}
 
       {/* Panel lateral, como el resto de los formularios del rediseño (Lau, 03/11). */}
-      <PanelLateral
+      <PanelLateral chico
         abierto={open}
         onCerrar={() => setOpen(false)}
         titulo="Precio del gordo"

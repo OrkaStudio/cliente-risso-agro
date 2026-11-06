@@ -202,7 +202,7 @@ export function AgendaPage() {
           <span className="inline-flex h-10 items-center rounded-full bg-principal px-5 text-[15px] font-bold text-principal-texto">Revisarlas</span>
         </motion.button>
       )}
-      <PanelLateral abierto={revisar} onCerrar={() => setRevisar(false)} titulo="¿Ya pagaste esto?" bajada="Vencieron y no los marcaste. Lo que ya está, queda en Plata con la fecha en que vencía. Tildá lo que ya pagaste o cobraste." ancho>
+      <PanelLateral chico abierto={revisar} onCerrar={() => setRevisar(false)} titulo="¿Ya pagaste esto?" bajada="Vencieron y no los marcaste. Lo que ya está, queda en Plata con la fecha en que vencía. Tildá lo que ya pagaste o cobraste." ancho>
         {vencidos.length > 0 ? <YaPagaste key={vencidos.map((v) => v.id).join()} vencidos={vencidos} hoy={hoy} onAbrir={(v) => (setRevisar(false), setDesdeRevisar(true), setAbierto(v))} /> : <p className="text-[15.5px] text-texto">Listo: no queda nada vencido sin marcar.</p>}
       </PanelLateral>
 

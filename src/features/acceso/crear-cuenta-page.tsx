@@ -8,6 +8,7 @@ import { useIsMobile } from '@/lib/use-is-mobile'
 import { AccesoLayout, Preguntas, TarjetaWhatsApp } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { celularTieneCuenta, marcarEnviado, pedirCodigo } from './envio'
+import { nombrePropio } from '@/lib/texto'
 import { mailValido, separarNombre } from './reglas'
 
 /** A3 · Crear cuenta: nombre, celular y mail si quiere. Sin contraseña. */
@@ -90,7 +91,7 @@ export function CrearCuentaPage() {
             etiqueta="Tu nombre"
             autoComplete="name"
             value={nombreCompleto}
-            onChange={(e) => setNombreCompleto(e.target.value)}
+            onChange={(e) => setNombreCompleto(nombrePropio(e.target.value))}
             error={errorDe('nombre')}
             autoFocus
           />
@@ -100,7 +101,7 @@ export function CrearCuentaPage() {
               etiqueta="Nombre"
               autoComplete="given-name"
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={(e) => setNombre(nombrePropio(e.target.value))}
               error={errorDe('nombre')}
               autoFocus
             />
@@ -108,7 +109,7 @@ export function CrearCuentaPage() {
               etiqueta="Apellido"
               autoComplete="family-name"
               value={apellido}
-              onChange={(e) => setApellido(e.target.value)}
+              onChange={(e) => setApellido(nombrePropio(e.target.value))}
             />
           </div>
         )}

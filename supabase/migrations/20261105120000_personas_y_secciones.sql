@@ -9,6 +9,13 @@
 --   plata son security_invoker, heredan esto).
 
 alter table public.miembro_empresa add column secciones text[];
+
+-- Qué hace en el campo: encargado, peón, veterinario u otro que escribe el dueño
+-- («Contador», «Ingeniero agrónomo»). Nunca «dueno»: ese rol ve todo.
+alter table public.invitacion drop constraint invitacion_rol_check;
+alter table public.invitacion add constraint invitacion_rol_check
+  check (lower(btrim(rol)) not in ('dueno', 'dueño') and length(btrim(rol)) between 2 and 40);
+
 alter table public.invitacion add column secciones text[] not null default '{}';
 
 -- Los invitados que ya estaban arrancan con la tabla propuesta (05/11); el dueño la cambia.

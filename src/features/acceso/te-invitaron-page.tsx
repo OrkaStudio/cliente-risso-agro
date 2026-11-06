@@ -7,7 +7,7 @@ import { leerInvitacion, marcarEnviado, pedirCodigo, type Invitacion } from './e
 
 // Lo que ve cada rol al entrar (A4). La 35 sólo diseña la veterinaria; el resto
 // sigue el mismo tono y se ajusta cuando se definan los permisos por rol.
-const ROLES: Record<Invitacion['rol'], { etiqueta: string; puede: string }> = {
+const ROLES: Record<string, { etiqueta: string; puede: string }> = {
   vet: { etiqueta: 'Veterinaria', puede: 'Cargar sanidad y tacto en la manga' },
   encargado: { etiqueta: 'Encargado', puede: 'Recorrer, cargar la manga y la hacienda' },
   peon: { etiqueta: 'Peón', puede: 'Hacer la recorrida y la manga' },
@@ -76,7 +76,8 @@ export function TeInvitaronPage() {
   }
 
   const inv = carga.inv
-  const rol = ROLES[inv.rol]
+  // Un rol que escribió el dueño («Contador»): se muestra tal cual.
+  const rol = ROLES[inv.rol] ?? { etiqueta: inv.rol, puede: 'Ver lo que te habilitó el dueño' }
 
   async function entrar() {
     setMandando(true)
