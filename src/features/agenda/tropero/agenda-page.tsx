@@ -16,7 +16,7 @@ import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { cheques, pendiente, semanasQueVienen, tituloDe, mesCorto, type Semana } from './agenda'
 import { AgendaCalendario } from './agenda-calendario'
-import arroyo from '@/assets/tropero/arroyo-mapa.webp'
+import campoArriba from '@/assets/tropero/campo-de-arriba.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
 import { Cosa } from './agenda-cosa'
 import { PagarPanel } from './pagar-panel'
@@ -119,8 +119,8 @@ export function AgendaPage() {
       {/* El encabezado, como el de cada sección (Lau, 06/11): qué viene, qué mostrar y anotar. */}
       <motion.div {...entra(0)}>
         <Cabecera
-          imagen={arroyo}
-          posicion="40% 45%"
+          imagen={campoArriba}
+          posicion="50% 50%"
           derecha={
             <>
               <CampoVisto campos={campos} elegido={elegido} />
