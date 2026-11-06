@@ -160,14 +160,16 @@ export type NuevaSerie = {
   medioPago?: MedioPago | null
   /** Un pago que se repite (un sueldo): sin «(cuota 2/12)» en la descripción. */
   sinNumerar?: boolean
+  /** Las fechas exactas de cada pago (a 30, 60, 90 días): si están, mandan sobre frecuencia y cantidad. */
+  fechas?: string[]
 }
 
 /** Genera la serie completa de cuotas pendientes, unidas por serie_id. */
 export async function crearSerie(input: NuevaSerie): Promise<void> {
   const serieId = crypto.randomUUID()
   const off = MESES_FREQ[input.frecuencia]
-  const filas = Array.from({ length: input.cantidad }, (_, i) => {
-    const fecha = addMeses(input.primeraFecha, i * off)
+  const fechas = input.fechas ?? Array.from({ length: input.cantidad }, (_, i) => addMeses(input.primeraFecha, i * off))
+  const filas = fechas.map((fecha, i) => {
     return {
       empresa_id: input.empresaId,
       tipo: input.tipo,
@@ -181,7 +183,7 @@ export async function crearSerie(input: NuevaSerie): Promise<void> {
       fecha_cobro_pago: null,
       estado: 'pendiente' as const,
       medio_pago: input.medioPago || null,
-      descripcion: input.sinNumerar ? input.descripcion.trim() : `${input.descripcion.trim()} (cuota ${i + 1}/${input.cantidad})`,
+      descripcion: input.sinNumerar ? input.descripcion.trim() : `${input.descripcion.trim()} (cuota ${i + 1}/${fechas.length})`,
       serie_id: serieId,
     }
   })

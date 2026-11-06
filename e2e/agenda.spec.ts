@@ -13,7 +13,7 @@ test('agenda: algo que vence aparece en su semana, se marca pagado y se deshace'
   const panel = page.getByRole('dialog', { name: 'Algo que vence' })
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('4200')
   const enQue = panel.getByRole('group', { name: 'En qué' })
-  if (!(await enQue.getByRole('button', { name: 'Combustible', exact: true }).count())) await enQue.getByRole('button', { name: 'Otra' }).click()
+  if (!(await enQue.getByRole('button', { name: 'Combustible', exact: true }).count())) await enQue.getByRole('button', { name: /^Ver las \d+$/ }).click()
   await enQue.getByRole('button', { name: 'Combustible', exact: true }).click()
   // En pasos: cuánto y en qué; cuándo vence y de dónde; el detalle.
   await panel.getByRole('button', { name: 'Seguir' }).click()

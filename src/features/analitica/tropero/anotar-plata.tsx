@@ -21,7 +21,6 @@ import { nombreMes } from './plata'
 type Tipo = Database['public']['Enums']['tipo_movimiento']
 type Medio = Database['public']['Enums']['medio_pago']
 type Actividad = Database['public']['Enums']['actividad_movimiento']
-type Frecuencia = 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'
 type Modo = 'mano' | 'leyendo' | 'leyo' | 'cuotas'
 /** Cómo se pagó: un medio real, o todavía no (va a la Agenda con su vencimiento). */
 type Cuenta = Medio | 'pendiente'
@@ -52,15 +51,11 @@ const FACTURAS: { valor: ComprobanteTipo | 'no'; texto: string }[] = [
   { valor: 'c', texto: 'Factura C' },
 ]
 const ALICUOTAS = ['21', '10.5', '27'] as const
-const FRECUENCIAS: { valor: Frecuencia; texto: string; meses: number }[] = [
-  { valor: 'mensual', texto: 'Todos los meses', meses: 1 },
-  { valor: 'bimestral', texto: 'Cada 2 meses', meses: 2 },
-  { valor: 'trimestral', texto: 'Cada 3 meses', meses: 3 },
-  { valor: 'semestral', texto: 'Cada 6 meses', meses: 6 },
-  { valor: 'anual', texto: 'Una vez al año', meses: 12 },
-]
 const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
 const enDias = (n: number) => new Date(Date.parse(`${hoyLocal()}T12:00:00`) + n * 86_400_000).toISOString().slice(0, 10)
+const sumarDias = (f: string, n: number) => new Date(Date.parse(`${f}T12:00:00`) + n * 86_400_000).toISOString().slice(0, 10)
+const fechaCorta = (f: string) => `${Number(f.slice(8))} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(f.slice(5, 7)) - 1]}`
+const PLAZOS = [30, 60, 90, 120, 150, 180]
 const sumarMeses = (f: string, n: number) => {
   const [y, m, d] = f.split('-').map(Number) as [number, number, number]
   const x = new Date(y, m - 1 + n, d)
@@ -176,14 +171,15 @@ function Formulario({
   const [foto, setFoto] = useState<Blob | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [leidos, setLeidos] = useState<Set<string>>(new Set())
-  const [cantidad, setCantidad] = useState('6')
-  const [otraCantidad, setOtraCantidad] = useState(false)
-  const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
+  // En varios pagos (Lau, 06/11): a plazos (30, 60, 90 días, como cobran las consignatarias) o todos los meses.
+  const [forma, setForma] = useState<'plazos' | 'mensual' | ''>('')
+  const [plazos, setPlazos] = useState<number[]>([])
+  const [otroPlazo, setOtroPlazo] = useState('')
+  const [meses, setMeses] = useState('')
+  const [otrosMeses, setOtrosMeses] = useState(false)
   const [primera, setPrimera] = useState(hoyLocal())
-  // Cuotas: lo que puso es lo de cada cuota (lo que sabe el productor) o el total. Se repite: un sueldo.
-  const [clase, setClase] = useState<'cuotas' | 'repite'>('cuotas')
-  const [esCadaCuota, setEsCadaCuota] = useState<'cada' | 'total'>('cada')
-  const [durante, setDurante] = useState('12')
+  // Lo que escribió: el total (una venta que se cobra en partes) o lo de cada pago (un sueldo, una cuota).
+  const [esTotal, setEsTotal] = useState<'total' | 'cada'>('total')
   const [error, setError] = useState<string | null>(null)
   // A mano, en tres pasos chicos (Lau, 05/11: «el form es un quilombo»): cuánto y en qué; de dónde y cuándo; el detalle.
   const [paso, setPaso] = useState<1 | 2 | 3>(1)
@@ -205,15 +201,16 @@ function Formulario({
     for (const m of movs.data ?? []) if (m.tipo === tipo && m.categoria_id) usos.set(m.categoria_id, (usos.get(m.categoria_id) ?? 0) + 1)
     return deTipo.sort((a, b) => (usos.get(b.id) ?? 0) - (usos.get(a.id) ?? 0) || a.nombre.localeCompare(b.nombre))
   }, [categorias.data, movs.data, tipo])
-  const visibles = todasCategorias ? opcionesCategoria : opcionesCategoria.slice(0, 5)
-  if (categoriaId && !visibles.some((c) => c.id === categoriaId) && !todasCategorias) setTodasCategorias(true)
+  // Las 5 que más usa (y la elegida, si es otra); el resto, a un toque, y se cierra al elegir.
+  const masUsadas = opcionesCategoria.slice(0, 5)
+  const elegidaAparte = opcionesCategoria.find((c) => c.id === categoriaId && !masUsadas.includes(c))
+  const visibles = todasCategorias ? opcionesCategoria : elegidaAparte ? [...masUsadas, elegidaAparte] : masUsadas
 
-  const cant = Math.max(0, Math.floor(Number(cantidad) || 0))
-  const pasos = FRECUENCIAS.find((f) => f.valor === frecuencia)!.meses
-  const repite = clase === 'repite'
-  // Cuántas veces: en cuotas, las que dice; si se repite, las que entran en el tiempo elegido.
-  const veces = repite ? Math.max(1, Math.floor(Number(durante) / pasos)) : cant
-  const cuota = repite || esCadaCuota === 'cada' ? total : cant > 0 ? Math.round((total / cant) * 100) / 100 : 0
+  // Las fechas de cada pago: a N días desde «desde», o un pago por mes.
+  const nMeses = Math.max(0, Math.min(60, Math.floor(Number(meses) || 0)))
+  const fechasSerie = forma === 'plazos' ? [...plazos].sort((a, b) => a - b).map((d) => sumarDias(primera, d)) : forma === 'mensual' ? Array.from({ length: nMeses }, (_, i) => sumarMeses(primera, i)) : []
+  const veces = fechasSerie.length
+  const cuota = esTotal === 'cada' ? total : veces > 0 ? Math.round((total / veces) * 100) / 100 : 0
   const totalSerie = cuota * veces
   const ocupado = crear.isPending || crearSerie.isPending
   const nombreCategoria = opcionesCategoria.find((c) => c.id === categoriaId)?.nombre
@@ -223,7 +220,7 @@ function Formulario({
     if (total <= 0) return 'Escribí cuánto fue.'
     if (!categoriaId) return `Tocá en qué ${esGasto ? 'se fue' : 'entró'}.`
     if (!campoId) return 'Tocá de qué campo es.'
-    if (paraCuotas) return !repite && cant < 1 ? 'Poné cuántas cuotas.' : null
+    if (paraCuotas) return null
     if (!cuenta) return esGasto ? 'Tocá cómo lo pagaste, o «Todavía no».' : 'Tocá cómo lo cobraste, o «Todavía no».'
     if (pendiente && !vence) return `Poné cuándo ${esGasto ? 'vence el pago' : 'lo cobrás'}.`
     if (!pendiente && !cuando && modo !== 'leyo') return `Tocá cuándo ${esGasto ? 'salió' : 'entró'}.`
@@ -342,6 +339,8 @@ function Formulario({
     setError(null)
     const f = faltante(true)
     if (f) return setError(f)
+    if (!forma) return setError(`Tocá cómo ${esGasto ? 'se paga' : 'se cobra'}: a plazos o todos los meses.`)
+    if (!veces) return setError(forma === 'plazos' ? 'Tocá a cuántos días es cada pago.' : 'Tocá cuántos meses.')
     try {
       await crearSerie.mutateAsync({
         empresaId,
@@ -351,14 +350,16 @@ function Formulario({
         potreroId: potreroId || null,
         actividad: actividad || null,
         montoCuota: cuota,
-        frecuencia,
-        primeraFecha: primera,
+        frecuencia: 'mensual',
+        primeraFecha: fechasSerie[0]!,
         cantidad: veces,
-        sinNumerar: repite,
+        fechas: fechasSerie,
+        // Un sueldo o un alquiler (lo mismo cada mes) no lleva «cuota 3/12».
+        sinNumerar: forma === 'mensual' && esTotal === 'cada',
         descripcion: descripcion.trim() || nombreCategoria || (esGasto ? 'Gasto' : 'Ingreso'),
         medioPago: null,
       })
-      toast.success(repite ? `Listo: ${veces} pagos de ${pesos(cuota)} en la Agenda` : `Listo: ${veces} cuotas en la Agenda`, { description: `${pesos(cuota)} cada ${repite ? 'vez' : 'una'}, desde el ${Number(primera.slice(8))} de ${nombreMes(primera.slice(0, 7))}.` })
+      toast.success(`Listo: ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${pesos(cuota)} en la Agenda`, { description: `El primero el ${Number(fechasSerie[0]!.slice(8))} de ${nombreMes(fechasSerie[0]!.slice(0, 7))}.` })
       onCerrar()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
@@ -401,78 +402,117 @@ function Formulario({
 
   // ===== En cuotas =====
   if (modo === 'cuotas') {
-    const meses = Array.from({ length: Math.min(veces, 12) }, (_, i) => sumarMeses(primera, i * pasos))
-    const nombre = esGasto ? 'gasto' : 'ingreso'
+    const verbo = esGasto ? 'pagás' : 'cobrás'
+    const color = esGasto ? 'text-estado-problema-texto' : 'text-estado-bien-texto'
+    const elegirForma = (f: 'plazos' | 'mensual') => {
+      setForma(f)
+      // Lo esperable de cada una: una venta a plazos es el total; un sueldo, lo de cada mes.
+      setEsTotal(f === 'plazos' ? 'total' : 'cada')
+    }
     return (
       <PanelLateral
         abierto={abierto}
         onCerrar={onCerrar}
-        onVolver={() => (setError(null), setModo('mano'))}
-        titulo={repite ? `Un ${nombre} que se repite` : `Un ${nombre} en cuotas`}
+        chico
+        ancho
+        onVolver={() => (setError(null), setModo('mano'), setPaso(2))}
+        titulo={esGasto ? 'Lo pagás en varios pagos' : 'Lo cobrás en varios pagos'}
         bajada={[descripcion.trim(), nombreCategoria, nombreCampo].filter(Boolean).join(', ')}
         pie={
           <>
             {errorAviso}
             <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardarCuotas()}>
-              {repite ? `Anotar ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${fmtCompact(cuota)}` : veces > 0 ? `Anotar las ${veces} cuotas` : 'Anotar las cuotas'}
+              {veces > 0 ? `Anotar ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${fmtCompact(cuota)}` : 'Anotar los pagos'}
             </BotonPrincipal>
           </>
         }
       >
-        <Segmentos etiqueta="Qué es" valor={clase} onCambio={setClase} opciones={[{ valor: 'cuotas', texto: 'Son cuotas' }, { valor: 'repite', texto: 'Se repite (un sueldo)' }]} />
+        {/* Cómo se paga: dos tarjetas, cada una con su ejemplo. */}
+        <div role="radiogroup" aria-label="Cómo" className="grid grid-cols-2 gap-2.5">
+          {(
+            [
+              ['plazos', 'A plazos', esGasto ? 'A 30, 60, 90 días' : 'A 30, 60, 90 días, como pagan las consignatarias'],
+              ['mensual', 'Todos los meses', esGasto ? 'Un sueldo, un alquiler, una cuota' : 'Un alquiler que cobrás'],
+            ] as const
+          ).map(([v, t, ej]) => (
+            <button key={v} type="button" role="radio" aria-checked={forma === v} onClick={() => elegirForma(v)} className={cn('flex flex-col gap-1 rounded-[18px] border-[1.5px] p-4 text-left transition-colors', forma === v ? 'border-principal bg-principal-suave/70' : 'border-borde bg-superficie hover:border-neutro-300')}>
+              <span className="t-tarjeta text-texto">{t}</span>
+              <span className="text-[13.5px] leading-snug text-texto-suave">{ej}</span>
+            </button>
+          ))}
+        </div>
 
-        {repite ? (
+        {forma === 'plazos' && (
           <>
-            <p className="titulo-display cifra mt-6 text-[48px] leading-none tracking-[-0.03em] text-texto">{pesos(cuota)}</p>
-            <p className="mt-2 text-[16px] font-bold text-principal">cada vez, {veces} {veces === 1 ? 'vez' : 'veces'}</p>
-            <Grupo titulo="Cada cuánto" className="mt-6">
-              <Opciones etiqueta="Cada cuánto" opciones={FRECUENCIAS} elegidas={[frecuencia]} onTocar={setFrecuencia} />
+            <Grupo titulo="A cuántos días · tocá todos los que sean" className="mt-5">
+              <div role="group" aria-label="A cuántos días" className="flex flex-wrap gap-2">
+                {[...new Set([...PLAZOS, ...plazos])].sort((a, b) => a - b).map((d) => {
+                  const si = plazos.includes(d)
+                  return (
+                    <button key={d} type="button" aria-pressed={si} onClick={() => setPlazos((xs) => (si ? xs.filter((x) => x !== d) : [...xs, d]))} className={cn('inline-flex h-10 items-center rounded-full border-[1.5px] px-4 text-[14.5px] font-semibold transition-colors', si ? 'border-acento bg-acento text-acento-texto' : 'border-borde bg-superficie text-texto hover:border-neutro-300')}>
+                      {d} días
+                    </button>
+                  )
+                })}
+                <span className="inline-flex h-10 items-center gap-1 rounded-full border-[1.5px] border-dashed border-borde bg-superficie pr-1 pl-3">
+                  <input aria-label="Otro plazo, en días" inputMode="numeric" placeholder="Otro" value={otroPlazo} onChange={(e) => setOtroPlazo(e.target.value.replace(/\D/g, '').slice(0, 3))} className="w-12 bg-transparent text-[14.5px] font-semibold outline-none placeholder:text-texto-suave" />
+                  <button type="button" disabled={!Number(otroPlazo)} onClick={() => (setPlazos((xs) => [...new Set([...xs, Number(otroPlazo)])]), setOtroPlazo(''))} className="h-8 rounded-full bg-principal px-3 text-[13px] font-bold text-principal-texto disabled:opacity-40">
+                    Sumar
+                  </button>
+                </span>
+              </div>
             </Grupo>
-            <Grupo titulo="Durante">
-              <Opciones etiqueta="Durante" opciones={[{ valor: '6', texto: '6 meses' }, { valor: '12', texto: 'Un año' }, { valor: '24', texto: 'Dos años' }]} elegidas={[durante]} onTocar={setDurante} />
+            <Grupo titulo={esGasto ? 'Contando desde · el día de la compra' : 'Contando desde · el día de la venta'}>
+              <CampoFecha value={primera} onChange={setPrimera} ariaLabel="Contando desde" />
             </Grupo>
-            <Grupo titulo="El primero">
+          </>
+        )}
+        {forma === 'mensual' && (
+          <>
+            <Grupo titulo="Cuántos meses" className="mt-5">
+              <Opciones etiqueta="Cuántos meses" opciones={[...['3', '6', '12', '24'].map((v) => ({ valor: v, texto: v === '12' ? '12 · un año' : v === '24' ? '24 · dos años' : v })), { valor: 'otra', texto: 'Otro' }]} elegidas={[otrosMeses ? 'otra' : meses]} onTocar={(v) => (v === 'otra' ? (setOtrosMeses(true), setMeses('')) : (setOtrosMeses(false), setMeses(v)))} />
+              {otrosMeses && <CampoTexto className="mt-3" etiqueta="Cuántos meses" inputMode="numeric" value={meses} onChange={(e) => setMeses(e.target.value.replace(/\D/g, '').slice(0, 2))} autoFocus />}
+            </Grupo>
+            <Grupo titulo={esGasto ? 'El primero vence' : 'El primero lo cobrás'}>
               <CampoFecha value={primera} onChange={setPrimera} ariaLabel="El primero" />
             </Grupo>
           </>
-        ) : (
-          <>
-            <Grupo titulo="Lo que escribiste es" className="mt-6">
-              <Segmentos etiqueta="Lo que escribiste es" valor={esCadaCuota} onCambio={setEsCadaCuota} opciones={[{ valor: 'cada', texto: `Cada cuota, ${fmtCompact(total)}` }, { valor: 'total', texto: `El total, ${fmtCompact(total)}` }]} />
-            </Grupo>
-            <p className="titulo-display cifra mt-6 text-[48px] leading-none tracking-[-0.03em] text-texto">{pesos(cuota)}</p>
-            {veces > 0 && <p className="mt-2 text-[16px] font-bold text-principal">por cuota, {veces} cuotas: {pesos(totalSerie)} en total</p>}
-            <Grupo titulo={esCadaCuota === 'cada' ? 'Cuántas te quedan' : 'Cuántas cuotas'} className="mt-6">
-              <Opciones
-                etiqueta="Cuántas cuotas"
-                opciones={[...['3', '6', '12'].map((v) => ({ valor: v, texto: v })), { valor: 'otra', texto: 'Otra' }]}
-                elegidas={[otraCantidad ? 'otra' : cantidad]}
-                onTocar={(v) => (v === 'otra' ? setOtraCantidad(true) : (setOtraCantidad(false), setCantidad(v)))}
-              />
-              {otraCantidad && <CampoTexto className="mt-3" etiqueta="Cuántas" inputMode="numeric" value={cantidad} onChange={(e) => setCantidad(e.target.value.replace(/\D/g, ''))} autoFocus />}
-            </Grupo>
-            <Grupo titulo="Cada cuánto">
-              <Opciones etiqueta="Cada cuánto" opciones={FRECUENCIAS} elegidas={[frecuencia]} onTocar={setFrecuencia} />
-            </Grupo>
-            <Grupo titulo={esCadaCuota === 'cada' ? 'La próxima vence' : 'La primera vence'}>
-              <CampoFecha value={primera} onChange={setPrimera} ariaLabel="La primera vence" />
-            </Grupo>
-          </>
         )}
+
+        {forma && (
+          <Grupo titulo={`Los ${fmtCompact(total)} que escribiste son`}>
+            <Segmentos etiqueta="Lo que escribiste es" valor={esTotal} onCambio={setEsTotal} opciones={[{ valor: 'total', texto: 'El total, se divide' }, { valor: 'cada', texto: 'Lo de cada pago' }]} />
+          </Grupo>
+        )}
+
+        {/* Cómo queda: cada pago con su fecha y su monto. */}
         {veces > 0 && (
-          <ol className="mt-5 grid grid-cols-6 gap-y-3 text-center">
-            {meses.map((m, i) => (
-              <li key={m}>
-                <span aria-hidden className={cn('mx-auto block size-3.5 rounded-full border-2 border-principal', i === 0 && 'bg-principal')} />
-                <p className="mt-1 text-[13px] font-bold text-texto">{nombreMes(m.slice(0, 7)).slice(0, 3).replace(/^\w/, (c) => c.toUpperCase())}</p>
-                <p className="t-cifra-mini text-texto-suave">{fmtCompact(cuota)}</p>
-              </li>
-            ))}
-          </ol>
+          <section aria-label="Cómo queda" className="mt-5 overflow-hidden rounded-[18px] border border-borde bg-superficie">
+            <p className="flex items-baseline justify-between border-b border-borde px-4 py-3 text-[14px] font-semibold text-texto-suave">
+              <span>
+                {veces} {veces === 1 ? 'pago' : 'pagos'} · {verbo}
+              </span>
+              <b className={cn('t-cifra', color)}>
+                {esGasto ? '−' : '+'}
+                {pesos(totalSerie)} en total
+              </b>
+            </p>
+            <ol className={cn('grid gap-x-4 px-4 py-3', veces > 6 ? 'grid-cols-3' : 'grid-cols-1')}>
+              {fechasSerie.slice(0, 24).map((f, i) => (
+                <li key={f + i} className="flex items-baseline justify-between gap-2 py-1 text-[14.5px]">
+                  <span className="text-texto">
+                    {forma === 'plazos' ? <b className="font-semibold">{[...plazos].sort((a, b) => a - b)[i]} días</b> : null}
+                    <span className={cn(forma === 'plazos' && 'ml-1.5 text-texto-suave')}>{fechaCorta(f)}</span>
+                  </span>
+                  <span className={cn('t-cifra-chica', color)}>{fmtCompact(cuota)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
         )}
-        <p className="mt-5 flex items-start gap-3 rounded-[16px] bg-superficie-hundida p-4 text-[14px] text-texto">
+        <p className="mt-4 flex items-start gap-2.5 text-[13.5px] text-texto-suave">
           <Icono nombre="Agenda" tamano={16} className="mt-0.5 shrink-0" />
-          {repite ? 'Van a la Agenda. Cuando pagás uno, lo marcás y pasa a Plata.' : `Las ${veces || ''} cuotas van a la Agenda. Cuando pagás una, la marcás y pasa a Plata.`}
+          Van a la Agenda. Cuando {esGasto ? 'pagás uno, lo marcás' : 'cobrás uno, lo marcás'} y pasa a Plata.
         </p>
       </PanelLateral>
     )
@@ -500,8 +540,8 @@ function Formulario({
     <>
       {/* El monto, grande: es lo primero que se mira. */}
       <label className={cn('mt-5 flex items-baseline gap-1 rounded-[18px] px-1', amarillo('monto') && 'bg-acento/35 px-3', leyo && !fotoUrl && 'mt-0')}>
-        <span className="titulo-display shrink-0 text-[44px] whitespace-nowrap text-texto-suave">{esGasto ? '−$' : '+$'}</span>
-        <input aria-label="Cuánto" inputMode="numeric" placeholder="0" value={monto} onChange={(e) => (setMonto(formatearNumero(e.target.value)), setLeidos((s) => (s.delete('monto'), new Set(s))))} autoFocus={!leyo} className="titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight tracking-[-0.03em] text-texto outline-none placeholder:text-texto/25" />
+        <span className={cn('titulo-display shrink-0 text-[44px] whitespace-nowrap', esGasto ? 'text-estado-problema-texto/70' : 'text-estado-bien-texto/70')}>{esGasto ? '−$' : '+$'}</span>
+        <input aria-label="Cuánto" inputMode="numeric" placeholder="0" value={monto} onChange={(e) => (setMonto(formatearNumero(e.target.value)), setLeidos((s) => (s.delete('monto'), new Set(s))))} autoFocus={!leyo} className={cn('titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight tracking-[-0.03em] outline-none placeholder:text-texto/25', esGasto ? 'text-estado-problema-texto' : 'text-estado-bien-texto')} />
       </label>
       {!leyo && conIva && iva > 0 && (
         <p className="mt-1 text-[14px] text-texto-suave">
@@ -512,8 +552,8 @@ function Formulario({
     </>
   )
   const bloqueEnQue = (
-    <Grupo titulo={esGasto ? 'En qué, lo que más usás primero' : 'De qué, lo que más usás primero'} className="mt-6">
-      <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > 5 ? [{ valor: '__otra', texto: 'Otra' }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : setCategoriaId(v))} />
+    <Grupo titulo={todasCategorias ? (esGasto ? 'En qué · todas' : 'De qué · todas') : esGasto ? 'En qué · las que más usás' : 'De qué · las que más usás'} className="mt-6">
+      <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > visibles.length ? [{ valor: '__otra', texto: `Ver las ${opcionesCategoria.length}` }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : (setCategoriaId(v), setTodasCategorias(false)))} />
       {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
     </Grupo>
   )
@@ -548,16 +588,14 @@ function Formulario({
         opciones={[
           { valor: '7', texto: 'En 7 días' },
           { valor: '30', texto: 'En 30 días' },
-          { valor: 'repite', texto: 'Se repite' },
-          { valor: 'cuotas', texto: 'Son cuotas' },
+          { valor: 'varios', texto: 'En varios pagos' },
         ]}
         elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
         onTocar={(x) => {
-          if (x !== 'cuotas' && x !== 'repite') return setVence(enDias(Number(x)))
+          if (x !== 'varios') return setVence(enDias(Number(x)))
           const f = faltante(true)
           if (f) return setError(f)
           setError(null)
-          setClase(x === 'repite' ? 'repite' : 'cuotas')
           if (vence) setPrimera(vence)
           setModo('cuotas')
         }}
@@ -573,15 +611,14 @@ function Formulario({
         opciones={[
           { valor: 'hoy', texto: 'Hoy' },
           { valor: 'otro', texto: 'Otro día' },
-          ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }, { valor: 'repite', texto: 'Se repite' }]),
+          ...(leyo ? [] : [{ valor: 'varios', texto: 'En varios pagos' }]),
         ]}
         elegidas={[cuando]}
         onTocar={(v) => {
-          if (v !== 'cuotas' && v !== 'repite') return setCuando(v as 'hoy' | 'otro')
+          if (v !== 'varios') return setCuando(v as 'hoy' | 'otro')
           const f = faltante(true)
           if (f) return setError(f)
           setError(null)
-          setClase(v === 'repite' ? 'repite' : 'cuotas')
           setModo('cuotas')
         }}
       />
