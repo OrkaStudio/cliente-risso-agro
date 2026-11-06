@@ -9,6 +9,7 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 import { abiertoSinMapa, primerPendiente, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
 import { prefetch, CHUNKS_OFICINA } from '@/lib/prefetch'
+import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
 
 /** Las secciones de la Oficina (página 35, «Barra lateral · Oficina»). */
@@ -35,7 +36,8 @@ export function BarraLateral({ hoy }: { hoy: number }) {
   const { data: campos } = useMapa(membresia?.empresa_id)
   const { elegido, elegir } = useCampoElegido()
   const navigate = useNavigate()
-  const contacto = user?.email || user?.phone || ''
+  // El celular con formato (+54 9 2240 00-0004), no los dígitos sueltos.
+  const contacto = user?.phone ? formatearCelularAR(`+${user.phone.replace(/\D/g, '')}`) : user?.email || ''
 
   return (
     <aside className="hidden h-full w-[256px] shrink-0 flex-col border-r border-borde bg-fondo md:flex">

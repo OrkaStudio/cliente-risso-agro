@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
+import { primeraMayuscula } from '@/lib/texto'
 
 /**
  * Empresa del usuario actual (multi-tenant). Por ahora un usuario pertenece a
@@ -67,8 +68,10 @@ export function useEmpresa() {
         .limit(1)
         .maybeSingle()
       if (error) throw error
-      guardarMembresiaPersistida(data)
-      return data
+      // El nombre como se lee: primera letra en mayúscula aunque se haya cargado «risso Agro».
+      const m = data?.empresa ? { ...data, empresa: { ...data.empresa, nombre: primeraMayuscula(data.empresa.nombre) } } : data
+      guardarMembresiaPersistida(m)
+      return m
     },
   })
 }

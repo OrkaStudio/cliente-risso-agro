@@ -1,5 +1,5 @@
-import { useId } from 'react'
-import { formatearMientrasEscribe } from '@/lib/telefono'
+import { useId, useState } from 'react'
+import { formatearMientrasEscribe, prefijosSacados } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
 
 /**
@@ -31,7 +31,10 @@ export function CampoCelular({
   children?: React.ReactNode
 }) {
   const id = useId()
-  const mensaje = error ?? ayuda
+  // Si escribió el 0 o el 15, se sacan solos; se avisa para que no parezca que no lo deja.
+  const [sacados, setSacados] = useState<string[]>([])
+  const aviso = sacados.length ? `Sacamos ${sacados.map((x) => `el ${x}`).join(' y ')}: con +54 9 adelante no ${sacados.length > 1 ? 'van' : 'va'}. El número queda bien.` : null
+  const mensaje = error ?? aviso ?? ayuda
   return (
     <div className={cn('flex flex-col gap-[7px] md:gap-2', className)}>
       <label htmlFor={id} className="text-[14px] font-semibold text-texto md:text-[14.5px]">
@@ -56,7 +59,12 @@ export function CampoCelular({
           autoFocus={autoFocus}
           aria-invalid={error || invalido ? true : undefined}
           aria-describedby={mensaje ? `${id}-ayuda` : undefined}
-          onChange={(e) => onCambio(formatearMientrasEscribe(e.target.value))}
+          onChange={(e) => {
+            const x = prefijosSacados(e.target.value)
+            if (x.length) setSacados((ya) => [...new Set([...ya, ...x])].sort())
+            if (!e.target.value.trim()) setSacados([])
+            onCambio(formatearMientrasEscribe(e.target.value))
+          }}
           className="min-w-0 flex-1 bg-transparent py-4 outline-none placeholder:text-texto-suave/60 md:py-[17px]"
         />
       </div>

@@ -50,6 +50,27 @@ function digitosLocales(entrada: string): string {
   return d
 }
 
+/**
+ * Qué prefijos de discado traía lo que escribió (el 0 de larga distancia, el
+ * 15 de celular), para avisarle que se sacaron y no parezca que el campo no
+ * lo deja escribir. El +54 9 no se avisa: ya está fijo adelante.
+ */
+export function prefijosSacados(entrada: string): ('0' | '15')[] {
+  let d = entrada.replace(/\D/g, '')
+  if (d.startsWith('54')) {
+    d = d.slice(2)
+    if (d.startsWith('9')) d = d.slice(1)
+  }
+  const out: ('0' | '15')[] = []
+  if (d.startsWith('0')) {
+    out.push('0')
+    d = d.slice(1)
+  }
+  const largo = largoArea(d)
+  if (d.length >= largo + 2 && d.slice(largo, largo + 2) === '15') out.push('15')
+  return out
+}
+
 /** Devuelve el celular en E.164 (`+5492923456789`) o `null` si no es válido. */
 export function normalizarCelularAR(entrada: string): string | null {
   const d = digitosLocales(entrada)

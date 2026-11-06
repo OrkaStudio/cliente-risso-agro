@@ -119,15 +119,17 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
         )
       }
     >
-      {/* Lo que es: el monto grande y sus datos en una sola tarjeta. */}
-      <div className="rounded-[20px] border border-borde bg-superficie p-5">
-        <div className="flex items-end justify-between gap-3">
+      {/* Lo que es, en la tarjeta de Troppero (la misma de las invitaciones): arriba el monto, abajo sus datos. */}
+      <div className="overflow-hidden rounded-[22px] border border-principal/25">
+        <div className={cn('px-5 pt-5 pb-5', ya ? 'bg-superficie-hundida/70' : 'bg-gradient-to-br from-terracota-50 to-trigo-100')}>
+        <p className="text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">{ya ? (cobro ? 'Cobraste' : 'Pagaste') : cobro ? 'Vas a cobrar' : 'Tenés que pagar'}</p>
+        <div className="mt-1 flex items-end justify-between gap-3">
           <p className={cn('titulo-display cifra text-[40px] leading-none tracking-[-0.03em]', ya ? 'text-texto-suave' : cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
             {cobro ? '+' : '−'}
             {pesos(ya ? v.monto : montoReal)}
           </p>
           {!ya && !otroMonto && (
-            <button type="button" onClick={() => setOtroMonto(true)} className="mb-1 h-10 shrink-0 rounded-full border-[1.5px] border-borde px-4 text-[14px] font-bold text-texto hover:border-principal hover:text-principal">
+            <button type="button" onClick={() => setOtroMonto(true)} className="mb-1 h-10 shrink-0 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14px] font-bold text-texto hover:border-principal hover:text-principal">
               Fue otro monto
             </button>
           )}
@@ -135,8 +137,9 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
         {!ya && otroMonto && (
           <CampoTexto className="mt-4" etiqueta={estimado ? 'Cuánto fue al precio de ese día' : 'Cuánto fue'} inputMode="numeric" unidad="$" value={monto} onChange={(e) => setMonto(formatearNumero(e.target.value))} autoFocus={!estimado} ayuda={estimado ? `Lo anotado era una estimación: ${pesos(v.monto)}.` : `Lo previsto era ${pesos(v.monto)}.`} />
         )}
+        </div>
         {(datosDe(v).length > 0 || v.fechaVencimiento) && (
-          <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-1.5 border-t border-borde pt-4 text-[14.5px]">
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-1.5 border-t border-principal/15 bg-superficie/80 px-5 py-4 text-[14.5px]">
             {[...datosDe(v), ...(v.fechaVencimiento ? [[ya || v.fechaVencimiento < hoy ? 'Vencía' : 'Vence', fechaLarga(v.fechaVencimiento)] as [string, string]] : []), ...(esCheque ? [['Tipo', v.esEcheq ? 'eCheq' : 'De papel'] as [string, string]] : [])].map(([k, val]) => (
               <div key={k} className="contents">
                 <dt className="text-texto-suave">{k}</dt>
