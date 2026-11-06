@@ -20,8 +20,8 @@ import { cn } from '@/lib/utils'
 import { registrar } from '@/lib/telemetria'
 
 /**
- * El asistente de Tropero en toda la Oficina (Lau, 28–29/10). Cerrado es una
- * barra oscura abajo a la derecha con el orbe adentro y «Preguntale a Tropero»:
+ * El asistente de Troppero en toda la Oficina (Lau, 28–29/10). Cerrado es una
+ * barra oscura abajo a la derecha con el orbe adentro y «Preguntale a Troppero»:
  * que se entienda que es una IA. Abierto es una tarjeta angosta: lo que vio en
  * los campos (avisos.ts), ejemplos de qué preguntarle y la charla, con la caja
  * para escribir abajo. Lo que propone lo hace: el orbe sale de la barra, vuela
@@ -337,7 +337,7 @@ export function AsistentePanel() {
   const nAvisos = avisos.length
   // Al bajar por la página la barra se achica al orbe y el número: no tapa la tabla.
   const verTexto = !compacta || sobre || !!globo || abierto
-  const etiqueta = nAvisos > 0 ? `El asistente de Tropero: notó ${nAvisos === 1 ? 'una cosa' : `${nAvisos} cosas`}` : 'El asistente de Tropero'
+  const etiqueta = nAvisos > 0 ? `El asistente de Troppero: notó ${nAvisos === 1 ? 'una cosa' : `${nAvisos} cosas`}` : 'El asistente de Troppero'
   // Debajo de los diálogos (z-50) mientras espera; arriba cuando está abierto o trabajando.
   const arriba = abierto || !!marca
 
@@ -378,7 +378,7 @@ export function AsistentePanel() {
               <header className="flex items-center gap-3 border-b border-borde/70 px-5 py-4">
                 <Mascota tam={40} parpadea={parpadea} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15.5px] leading-tight font-bold">Asistente de Tropero</p>
+                  <p className="text-[15.5px] leading-tight font-bold">Asistente de Troppero</p>
                   <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">Te respondo sobre tus campos y cómo usar la app</p>
                 </div>
                 <button type="button" aria-label="Cerrar el asistente" onClick={cerrarPanel} className="grid size-9 shrink-0 place-items-center rounded-full text-texto-suave hover:bg-fondo hover:text-texto">
@@ -545,7 +545,7 @@ export function AsistentePanel() {
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18 }}
           >
-            {abierto ? 'Cerrar' : (globo ?? 'Preguntale a Tropero')}
+            {abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')}
           </motion.span>
           )}
         </AnimatePresence>

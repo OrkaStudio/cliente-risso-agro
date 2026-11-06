@@ -122,7 +122,7 @@ export function TarjetaWhatsApp({
     <div className="flex flex-col gap-2.5 rounded-[18px] border border-borde bg-superficie px-[18px] py-4">
       <p className="text-[13px] font-bold text-texto-suave">Así te llega, por WhatsApp</p>
       <div aria-hidden className="flex flex-col gap-1 rounded-[14px] bg-estado-bien-suave px-3.5 py-2.5">
-        <p className="text-[13px] font-bold text-estado-bien-texto">Tropero</p>
+        <p className="text-[13px] font-bold text-estado-bien-texto">Troppero</p>
         <p className="text-[14px] text-estado-bien-texto">
           Tu código de verificación es 482913. Por tu seguridad, no lo compartas. Este código caduca en 10 minutos.
         </p>

@@ -36,7 +36,7 @@ import {
 import { PasoCampo, PasoEmpresa, PasoOtro, PasoPotreros, PasoQueHay } from './tropero/pasos'
 
 /**
- * Onboarding de Tropero (spec «Tropero para código», sección 2; pantallas de
+ * Onboarding de Troppero (spec «Troppero para código», sección 2; pantallas de
  * la página 35): empresa → por cada campo (datos · potreros · qué hay en cada
  * potrero) → ¿otro campo? → cierre. Cada paso guarda al tocar su botón y el
  * progreso queda en este equipo para retomar donde quedó; desde otro equipo

@@ -1,4 +1,4 @@
-// Onboarding de Tropero: lo que va a la base en cada paso. Cada paso guarda al
+// Onboarding de Troppero: lo que va a la base en cada paso. Cada paso guarda al
 // tocar su botón principal (spec 2), y todo es idempotente: volver atrás y
 // guardar de nuevo reescribe, no duplica.
 import { supabase } from '@/lib/supabase/client'

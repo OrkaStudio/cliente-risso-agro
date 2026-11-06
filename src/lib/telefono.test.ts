@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { formatearCelularAR, formatearMientrasEscribe, normalizarCelularAR } from './telefono'
 
 describe('celulares argentinos', () => {
-  it('se muestran como en las pantallas de Tropero', () => {
+  it('se muestran como en las pantallas de Troppero', () => {
     expect(formatearMientrasEscribe('2241558820')).toBe('2241 55-8820')
     expect(formatearMientrasEscribe('3511234567')).toBe('351 123-4567')
     expect(formatearMientrasEscribe('1155554444')).toBe('11 5555-4444')

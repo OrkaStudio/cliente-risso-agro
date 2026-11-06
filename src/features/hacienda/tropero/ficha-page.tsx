@@ -221,7 +221,7 @@ export function FichaPage() {
           </section>
       </section>
 
-      {/* Salió «sin identificar»: la eligió Tropero porque no se supo cuál fue. */}
+      {/* Salió «sin identificar»: la eligió Troppero porque no se supo cuál fue. */}
       {(() => {
         const baja = !activo ? (eventos.data ?? []).filter((e) => e.tipo === 'baja').sort((x, y) => y.created_at.localeCompare(x.created_at))[0] : undefined
         const d = baja?.datos as Record<string, unknown> | undefined
@@ -238,7 +238,7 @@ export function FichaPage() {
                 Figura como {como} sin identificar
               </p>
               <p className="text-[14px] text-texto-suave">
-                El {fecha} salió una del {potrero?.nombre ?? 'potrero'} y no se supo cuál; la eligió Tropero. Si la ves en el campo, no fue ésta: vuelve al rodeo y la salida queda otra vez sin identificar.
+                El {fecha} salió una del {potrero?.nombre ?? 'potrero'} y no se supo cuál; la eligió Troppero. Si la ves en el campo, no fue ésta: vuelve al rodeo y la salida queda otra vez sin identificar.
               </p>
             </div>
             <button

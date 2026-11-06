@@ -3,8 +3,8 @@
 @import "shadcn/tailwind.css";
 
 /* ============================================================
-   Tropero — sistema visual (Figma iwikybSRHYJMtHuSCpGLyE, página 34)
-   Colores: colección «Tropero · App» (modos Día y Noche) sobre la
+   Troppero — sistema visual (Figma iwikybSRHYJMtHuSCpGLyE, página 34)
+   Colores: colección «Troppero · App» (modos Día y Noche) sobre la
    paleta «Terracota tostada». Los nombres de las variables son los
    mismos que en Figma: --fondo, --superficie, --principal, --estado-bien…
    Tipografía (medida en las pantallas de la 35): Inter para el texto,
@@ -76,7 +76,7 @@
     --font-display: 'Archivo Black', 'Archivo', system-ui, sans-serif;
     --font-cifra: 'Barlow Condensed', 'Inter', system-ui, sans-serif;
 
-    /* Roles de Tropero como utilidades (bg-fondo, text-texto-suave, bg-estado-bien-suave…) */
+    /* Roles de Troppero como utilidades (bg-fondo, text-texto-suave, bg-estado-bien-suave…) */
     --color-fondo: var(--fondo);
     --color-superficie: var(--superficie);
     --color-superficie-hundida: var(--superficie-hundida);
@@ -217,7 +217,7 @@
 }
 
 :root {
-    /* ---- Tropero · App, modo Día (Figma: colección «Tropero · App») ---- */
+    /* ---- Troppero · App, modo Día (Figma: colección «Troppero · App») ---- */
     --fondo: #f4f1e9;                 /* neutro/100 */
     --superficie: #fbfaf6;            /* neutro/50 */
     --superficie-hundida: #ece7de;
@@ -252,7 +252,7 @@
     --barra-activo: #d9d4cb;
     --barra-texto: #131b16;
 
-    /* ---- Nombres heredados de Risso Agro, apuntados a Tropero ----
+    /* ---- Nombres heredados de Risso Agro, apuntados a Troppero ----
        Las pantallas viejas los usan; se van retirando a medida que cada
        módulo se rehace con los roles de arriba. */
     --field: var(--principal);
@@ -285,7 +285,7 @@
     --g7: #524c44;
     --g-mute: #d9d4cb;
 
-    /* Semánticos (shadcn) → roles de Tropero */
+    /* Semánticos (shadcn) → roles de Troppero */
     --background: var(--fondo);
     --foreground: var(--texto);
     --card: var(--superficie);
@@ -320,7 +320,7 @@
     --sidebar-ring: var(--principal);
 }
 
-/* ---- Tropero · App, modo Noche ---- */
+/* ---- Troppero · App, modo Noche ---- */
 .dark {
     --fondo: #131b16;
     --superficie: #1e1b18;
@@ -689,7 +689,7 @@
   border-color: transparent;
 }
 
-/* ===== Tutorial del mapa (Tropero): etiqueta de cada potrero ===== */
+/* ===== Tutorial del mapa (Troppero): etiqueta de cada potrero ===== */
 .tropero-etiqueta.leaflet-tooltip {
   display: flex;
   flex-direction: column;

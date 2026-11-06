@@ -88,7 +88,7 @@ test('de punta a punta: borde a mano, los dos potreros y se abre la app', async 
   await expect(page.getByRole('textbox', { name: 'Paraje, pueblo o ruta cerca de tu campo' })).toBeVisible()
   await captura(page, 't2-encontrar')
   // Un solo asistente: mientras el del mapa acompaña, el de abajo a la derecha se corre.
-  await expect(page.getByRole('button', { name: /^El asistente de Tropero(: notó|$)/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^El asistente de Troppero(: notó|$)/ })).toHaveCount(0)
   // Marcar a mano aparece recién si no encuentra su campo dos veces (acá, en la laguna: sin parcela).
   await expect(page.getByRole('button', { name: 'No aparece: lo marco a mano' })).toHaveCount(0)
   for (const [x, y] of [[420, 520], [440, 540]] as const) {

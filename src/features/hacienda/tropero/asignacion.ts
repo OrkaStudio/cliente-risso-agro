@@ -4,7 +4,7 @@ import { soloDigitos, type Fila } from './planilla'
 
 // A qué animal va cada número de la planilla. Puro y sin suponer nada: cada
 // número va a un grupo exacto (potrero + categoría) que dijo la planilla o
-// eligió el productor. Dentro de un grupo los animales son iguales en Tropero
+// eligió el productor. Dentro de un grupo los animales son iguales en Troppero
 // (ninguno tiene un dato propio), así que da lo mismo a cuál le toca cada
 // número. Si el grupo no alcanza, no entra ninguno: lo resuelve el productor.
 

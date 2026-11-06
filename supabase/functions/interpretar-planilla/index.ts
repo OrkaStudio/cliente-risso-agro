@@ -29,7 +29,7 @@ type HojaMuestra = { nombre: string; filas: number; primeras: string[][]; valore
 
 const COLUMNAS = ['visual', 'rfid', 'categoria', 'potrero', 'nacimiento', 'raza'] as const
 
-const PROMPT = `Sos parte de Tropero, una app de gestión ganadera argentina. Un productor subió una planilla para ponerle número de caravana a animales que ya tiene cargados. Tu trabajo es decir CÓMO leerla; no copies ni corrijas los números.
+const PROMPT = `Sos parte de Troppero, una app de gestión ganadera argentina. Un productor subió una planilla para ponerle número de caravana a animales que ya tiene cargados. Tu trabajo es decir CÓMO leerla; no copies ni corrijas los números.
 
 Te paso una muestra de cada hoja: las primeras filas tal como vienen y, por columna (empezando en 0), los valores distintos que aparecen.
 

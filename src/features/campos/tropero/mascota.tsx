@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { AnimatePresence, motion, useAnimationFrame, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from 'framer-motion'
 
-// El asistente de Tropero hecho personaje, sin nombre propio (Lau, 22/10).
+// El asistente de Troppero hecho personaje, sin nombre propio (Lau, 22/10).
 // Referencia que pasó Lau el 20/10: el orbe «Sage» de un dashboard con IA. Una esfera lisa terracota
 // oscura, con brillo de vidrio y un resplandor quieto. Nada titila (Lau, 20/10:
 // «esa visual que titila es muy molesta»).

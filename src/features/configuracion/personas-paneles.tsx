@@ -153,7 +153,7 @@ function Editar({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerr
     try {
       await cambiar.mutateAsync({ userId: p.userId!, secciones })
       onCerrar()
-      toast.success(`Listo: ${nombre} ahora ve ${SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => s.texto).join(', ')}`, { description: 'Lo ve la próxima vez que abra Tropero.' })
+      toast.success(`Listo: ${nombre} ahora ve ${SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => s.texto).join(', ')}`, { description: 'Lo ve la próxima vez que abra Troppero.' })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar.')
     }

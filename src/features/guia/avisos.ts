@@ -83,7 +83,7 @@ export function avisosDe(r: Resumen, campos: CampoMapa[], mapaPendiente: boolean
   return avisos
 }
 
-/** Cuánto del campo está armado en Tropero. El alquiler cuenta sólo si hay campos alquilados. */
+/** Cuánto del campo está armado en Troppero. El alquiler cuenta sólo si hay campos alquilados. */
 export function progresoDe(r: Resumen, campos: CampoMapa[], mapaPendiente: boolean): PasoProgreso[] {
   return [
     { id: 'mapa', texto: 'Tus campos en el mapa', hecho: !mapaPendiente },

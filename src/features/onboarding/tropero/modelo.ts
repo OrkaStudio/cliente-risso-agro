@@ -1,4 +1,4 @@
-// Onboarding de Tropero: las reglas, sin React ni red (spec «Tropero para
+// Onboarding de Troppero: las reglas, sin React ni red (spec «Troppero para
 // código», sección 2). Se prueban solas en modelo.test.ts.
 import type { Database } from '@/lib/supabase/types'
 import { letraDeIndice, type Uso } from '@/features/campos/use-campo-mapa'
@@ -82,7 +82,7 @@ export function desdeCorto(fecha: string): string {
   return `desde el ${d}/${m}`
 }
 
-/** El ícono del set de Tropero para cada especie. */
+/** El ícono del set de Troppero para cada especie. */
 export const ICONO_ESPECIE = { bovino: 'Vaca', ovino: 'Oveja', equino: 'Caballo' } as const satisfies Record<Especie, string>
 
 /** Las especies que hay en un potrero (para dibujar un ícono por cada una). */

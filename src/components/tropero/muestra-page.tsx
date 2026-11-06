@@ -1,4 +1,4 @@
-// Página interna de desarrollo (/estilo): los componentes base de Tropero
+// Página interna de desarrollo (/estilo): los componentes base de Troppero
 // juntos, para compararlos con la página 34 del Figma. No existe en producción.
 import { useState } from "react"
 

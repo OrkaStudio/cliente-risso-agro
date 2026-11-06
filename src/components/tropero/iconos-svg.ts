@@ -1,4 +1,4 @@
-// Íconos de Tropero exportados del Figma (componente «Ícono app», 262:817, a 24 px).
+// Íconos de Troppero exportados del Figma (componente «Ícono app», 262:817, a 24 px).
 // Se guardan comprimidos: «§» es el trazo y «¤» el relleno. <Icono> los expande
 // con currentColor, así que el ícono toma el color del texto.
 // Para agregar o corregir uno: exportarlo desde Figma y reemplazar su línea.

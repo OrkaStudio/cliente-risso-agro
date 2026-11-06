@@ -47,7 +47,7 @@ export function ErrorNuevaVersion() {
     <PantallaAviso
       pantallaEntera
       titulo={deVersion ? 'Hay una versión nueva' : 'Algo salió mal'}
-      texto={deVersion ? 'Tropero se actualizó mientras lo tenías abierto. Con recargar alcanza; no perdés nada.' : 'Recargá la página. Si sigue pasando, avisanos por WhatsApp y lo vemos.'}
+      texto={deVersion ? 'Troppero se actualizó mientras lo tenías abierto. Con recargar alcanza; no perdés nada.' : 'Recargá la página. Si sigue pasando, avisanos por WhatsApp y lo vemos.'}
       accion="Recargar"
       icono="Reintentar"
       onAccion={recargar}

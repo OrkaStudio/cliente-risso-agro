@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import type { LatLng, PotreroMapa } from './reglas'
 import { ponerSatelite } from './satelite'
 
-// Colores de Tropero (Leaflet dibuja en SVG: no lee las clases de Tailwind).
+// Colores de Troppero (Leaflet dibuja en SVG: no lee las clases de Tailwind).
 const TERRACOTA = '#b85c2e'
 const TRIGO = '#ecc46a'
 const HUESO = '#fbfaf6'

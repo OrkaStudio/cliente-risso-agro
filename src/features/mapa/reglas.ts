@@ -1,4 +1,4 @@
-// Mapa del campo (spec «Tropero para código», sección 3): las reglas, sin
+// Mapa del campo (spec «Troppero para código», sección 3): las reglas, sin
 // React ni red. Se prueban solas en reglas.test.ts.
 import area from '@turf/area'
 import intersect from '@turf/intersect'

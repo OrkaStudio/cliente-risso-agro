@@ -9,7 +9,7 @@ const circulo = (fondo: string, icono: React.ComponentProps<typeof Icono>["nombr
 )
 
 /**
- * Las confirmaciones de Tropero («Listo: …» con su «Deshacer»): una tarjeta
+ * Las confirmaciones de Troppero («Listo: …» con su «Deshacer»): una tarjeta
  * tinta abajo al centro, que no tapa el título de los paneles; el ícono dice
  * cómo salió y la acción va como botón trigo (Lau, 05/11).
  */

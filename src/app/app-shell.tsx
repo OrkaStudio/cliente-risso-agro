@@ -161,7 +161,7 @@ export function AppShell() {
       {/* El asistente enseña haciendo (TASK-063): la misión en curso pegada al
           botón real y un puntito por panel la primera vez. La invitación y la
           lista «Tu campo, en marcha» se reemplazaron por el Inicio «Antes del
-          mapa» de Tropero, que muestra los mismos pasos en un solo lugar. */}
+          mapa» de Troppero, que muestra los mismos pasos en un solo lugar. */}
 
       {/* El asistente, siempre a la vista abajo a la derecha: lo que notó, el progreso y las dudas. */}
       <AsistentePanel />

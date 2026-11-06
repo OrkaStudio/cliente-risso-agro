@@ -59,7 +59,7 @@ export function normalizarCelularAR(entrada: string): string | null {
 }
 
 /**
- * Formato "mientras escribe", el de las pantallas de Tropero: característica,
+ * Formato "mientras escribe", el de las pantallas de Troppero: característica,
  * espacio y el número con un guion antes de los últimos 4 dígitos
  * (2241 55-8820 · 351 123-4567 · 11 5555-4444). Corta en 10 dígitos.
  */

@@ -60,7 +60,7 @@ export function dudasDe(e: string, movil: boolean): Duda[] {
     case 'sin-potreros':
       return [
         { pregunta: '¿Y si no lo divido?', respuesta: 'Queda como un solo potrero con todo el campo. Lo podés dividir cuando quieras, con una línea por donde va el alambrado.' },
-        { pregunta: 'No sé dónde están', respuesta: `${toca} «No sé bien dónde están» y te ayuda una persona de Tropero por WhatsApp a ubicarlos.` },
+        { pregunta: 'No sé dónde están', respuesta: `${toca} «No sé bien dónde están» y te ayuda una persona de Troppero por WhatsApp a ubicarlos.` },
       ]
     case 'inicio':
     case 'cual':

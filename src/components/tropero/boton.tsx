@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 import { Icono, type NombreIcono } from "./icono"
 
-// Botones de Tropero, con las medidas del Figma (página 34, «Botón» 267:13379).
+// Botones de Troppero, con las medidas del Figma (página 34, «Botón» 267:13379).
 // Regla de la marca: no hay links; todo lo que se toca es un botón.
 
 const FOCO =

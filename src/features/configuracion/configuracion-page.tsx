@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
+import { Logo } from '@/components/tropero/logo'
 import type { NombreIcono } from '@/components/tropero/iconos-svg'
 import { useAuth } from '@/features/auth/auth-context'
 import { ROLES, SECCIONES, esDueno, nombreRol, seccionesSugeridas, type Rol } from '@/features/empresa/secciones'
@@ -56,14 +57,14 @@ export function ConfiguracionPage() {
                 role="tab"
                 aria-selected={si}
                 onClick={() => elegir(p.id)}
-                className={cn('flex items-center gap-3.5 rounded-[18px] border-[1.5px] px-4 py-3.5 text-left transition-colors', si ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300')}
+                className={cn('flex items-center gap-3.5 rounded-[18px] border-[1.5px] px-4 py-3.5 text-left transition-colors', si ? 'border-principal bg-principal-suave text-texto shadow-[0_8px_22px_-14px_rgba(184,92,46,0.6)]' : 'border-borde bg-superficie text-texto hover:border-principal/50')}
               >
-                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full', si ? 'bg-superficie/15 text-superficie' : 'bg-superficie-hundida text-texto')}>
+                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full', si ? 'bg-principal text-principal-texto' : 'bg-superficie-hundida text-texto')}>
                   <Icono nombre={p.icono} />
                 </span>
                 <span className="min-w-0">
                   <span className="block text-[16.5px] font-bold">{p.texto}</span>
-                  <span className={cn('block truncate text-[14px]', si ? 'text-superficie/70' : 'text-texto-suave')}>{p.para}</span>
+                  <span className={cn('block truncate text-[14px]', si ? 'text-acento-texto' : 'text-texto-suave')}>{p.para}</span>
                 </span>
               </button>
             )
@@ -130,7 +131,7 @@ function Personas({ empresa }: { empresa: string }) {
           {adentro.map((p) => (
             <li key={p.userId} className="grid grid-cols-[minmax(0,2.2fr)_repeat(5,minmax(0,0.8fr))_150px] items-center px-5 py-4">
               <div className="flex min-w-0 items-center gap-3">
-                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full font-heading text-[15px] font-extrabold', p.rol === 'dueno' ? 'bg-tinta text-superficie' : 'bg-principal text-principal-texto')}>{p.nombre.charAt(0).toUpperCase()}</span>
+                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full font-heading text-[15px] font-extrabold', p.rol === 'dueno' ? 'bg-principal text-principal-texto' : 'bg-acento text-acento-texto')}>{p.nombre.charAt(0).toUpperCase()}</span>
                 <div className="min-w-0">
                   <p className="truncate text-[16px] font-semibold text-texto">
                     {p.nombre}
@@ -246,15 +247,15 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
 
   return (
     <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
-      {/* La ficha: quién sos para Tropero. */}
-      <section aria-label="Tu ficha" className="flex flex-col items-start self-start rounded-[24px] bg-tinta p-7 text-superficie">
+      {/* La ficha: quién sos para Troppero. */}
+      <section aria-label="Tu ficha" className="relative flex flex-col items-start self-start overflow-hidden rounded-[24px] border border-principal/25 bg-gradient-to-br from-terracota-50 to-trigo-100 p-7 text-texto">
         <span className="grid size-20 place-items-center rounded-full bg-principal font-heading text-[34px] font-extrabold text-principal-texto">{(guardado || empresa || 'T').charAt(0).toUpperCase()}</span>
         <p className="titulo-display mt-5 text-[30px] leading-tight">{guardado || 'Sin nombre'}</p>
-        <p className="mt-1 text-[15.5px] text-superficie/75">
+        <p className="mt-1 text-[15.5px] text-texto-suave">
           {nombreRol(rol)} de {empresa}
         </p>
-        {celular && <p className="cifra mt-5 text-[20px]">{celular}</p>}
-        <p className="mt-1 text-[14px] text-superficie/60">Entrás con este número y un código por WhatsApp. Sin contraseña.</p>
+        {celular && <p className="cifra mt-5 rounded-full bg-superficie/80 px-4 py-1.5 text-[19px] text-texto">{celular}</p>}
+        <p className="mt-2 text-[14px] text-texto-suave">Entrás con este número y un código por WhatsApp. Sin contraseña.</p>
       </section>
 
       <div className="flex flex-col gap-4">
@@ -286,7 +287,7 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
           </div>
           <button type="button" onClick={() => void signOut()} className={BOTON_CHICO}>
             <Icono nombre="Salir" tamano={16} />
-            Salir de Tropero
+            Salir de Troppero
           </button>
         </section>
       </div>
@@ -314,18 +315,19 @@ function Plan() {
   return (
     <div className="flex flex-col gap-5">
       {/* El plan, como una tarjeta: qué tenés y desde cuándo. */}
-      <section aria-label="Tu plan" className="flex flex-wrap items-end justify-between gap-6 rounded-[24px] bg-tinta p-8 text-superficie">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-estado-bien px-3 py-1 text-[13.5px] font-bold text-superficie">
-            <span className="size-2 rounded-full bg-superficie" />
+      <section aria-label="Tu plan" className="relative flex flex-wrap items-end justify-between gap-6 overflow-hidden rounded-[24px] bg-principal p-8 text-principal-texto">
+        <Logo soloIsotipo tono="hueso" alto={220} className="pointer-events-none absolute -top-6 -right-8 opacity-[0.12]" />
+        <div className="relative">
+          <span className="inline-flex items-center gap-2 rounded-full bg-superficie px-3 py-1 text-[13.5px] font-bold text-estado-bien-texto">
+            <span className="size-2 rounded-full bg-estado-bien" />
             Activo
           </span>
-          <p className="mt-4 text-[15px] text-superficie/70">Tu plan</p>
+          <p className="mt-4 text-[15px] text-principal-texto/80">Tu plan</p>
           <p className="titulo-display text-[44px] leading-none">Piloto, sin cargo</p>
-          {desde && <p className="mt-3 text-[15.5px] text-superficie/75">Usás Tropero desde el {fecha(desde)}.</p>}
+          {desde && <p className="mt-3 text-[15.5px] text-principal-texto/85">Usás Troppero desde el {fecha(desde)}.</p>}
         </div>
         {whatsapp && (
-          <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-full bg-acento px-5 text-[15.5px] font-bold text-acento-texto hover:bg-trigo-300">
+          <a href={whatsapp} target="_blank" rel="noreferrer" className="relative inline-flex h-12 items-center gap-2 rounded-full bg-acento px-5 text-[15.5px] font-bold text-acento-texto hover:bg-trigo-300">
             <Icono nombre="Celular" tamano={16} />
             Hablar con nosotros
           </a>
@@ -351,9 +353,9 @@ function Plan() {
 
       <section aria-label="Qué incluye" className="rounded-[24px] border border-borde bg-superficie p-6">
         <h2 className="font-heading text-[20px] font-extrabold text-texto">Qué incluye</h2>
-        <p className="mt-1 text-[15px] text-texto-suave">En el piloto usás Tropero entero.</p>
+        <p className="mt-1 text-[15px] text-texto-suave">En el piloto usás Troppero entero.</p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-          {[...SECCIONES.map((s) => `${s.texto}: ${s.queVe.toLowerCase()}`), 'El asistente de Tropero, para tus dudas'].map((t) => (
+          {[...SECCIONES.map((s) => `${s.texto}: ${s.queVe.toLowerCase()}`), 'El asistente de Troppero, para tus dudas'].map((t) => (
             <li key={t} className="flex items-center gap-2.5 text-[15px] text-texto">
               <span className="grid size-6 shrink-0 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
                 <Icono nombre="Guardar" tamano={16} />

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { codigoDelLog } from './helpers'
 
-// Onboarding (spec «Tropero para código», 2 · Onboarding), contra Supabase local.
+// Onboarding (spec «Troppero para código», 2 · Onboarding), contra Supabase local.
 // Cada test crea su propia cuenta: el onboarding es de una empresa nueva.
 
 test.use({ viewport: { width: 1440, height: 900 } })

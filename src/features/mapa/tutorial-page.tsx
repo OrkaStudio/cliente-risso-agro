@@ -154,7 +154,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
   const faltan = useMemo(() => (campo ? campo.potreros.filter((p) => !p.poligono) : []), [campo])
   const ubicados = campo ? campo.potreros.filter((p) => p.poligono) : []
   const siguienteCampo = campos.find((c) => c.id !== campo?.id && estadoDe(c).tipo !== 'listo')
-  const ayuda = `Hola, estoy ubicando ${campo?.nombre ?? 'mi campo'} en el mapa de Tropero y tengo una duda.`
+  const ayuda = `Hola, estoy ubicando ${campo?.nombre ?? 'mi campo'} en el mapa de Troppero y tengo una duda.`
 
   // ===== El mapa, según el paso =====
   const modo: ModoMapa =
@@ -941,7 +941,7 @@ function PrimeroEnLaCompu({
             onClick={() => {
               const link = `${window.location.origin}/mapa${campo ? `/${campo.id}` : ''}`
               window.open(
-                `https://wa.me/${(celular ?? '').replace(/\D/g, '')}?text=${encodeURIComponent(`Tropero: abrí este link en la compu para armar tu campo en el mapa ${link}`)}`,
+                `https://wa.me/${(celular ?? '').replace(/\D/g, '')}?text=${encodeURIComponent(`Troppero: abrí este link en la compu para armar tu campo en el mapa ${link}`)}`,
                 '_blank',
                 'noopener',
               )

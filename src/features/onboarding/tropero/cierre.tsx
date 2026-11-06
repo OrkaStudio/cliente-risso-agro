@@ -240,7 +240,7 @@ export function Cierre({
 
   function mandarALaCompu() {
     const link = `${window.location.origin}${alMapa}`
-    const texto = `Tropero: abrí este link en la compu para ubicar ${primero.nombre} en el mapa ${link}`
+    const texto = `Troppero: abrí este link en la compu para ubicar ${primero.nombre} en el mapa ${link}`
     const destino = celular ? celular.replace(/\D/g, '') : ''
     window.open(`https://wa.me/${destino}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener')
     setMandado(true)

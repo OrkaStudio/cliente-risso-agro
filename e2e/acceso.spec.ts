@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { CELULAR_E2E, CODIGO_E2E, codigoDelLog, entrar, invitarComoDueno } from './helpers'
 
-// Acceso (spec «Tropero para código», 1 · Acceso): se entra con un código por
+// Acceso (spec «Troppero para código», 1 · Acceso): se entra con un código por
 // WhatsApp. La cuenta E2E usa el código fijo de la base local.
 
 test('A1 → A2 → adentro: el código correcto entra solo', async ({ page }) => {

@@ -47,7 +47,7 @@ export function AsistenteMuestra() {
       <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
         <header className="flex flex-wrap items-center gap-4">
           <Logo alto={28} />
-          <h1 className="titulo-display text-[28px]">El asistente de Tropero · sus gestos</h1>
+          <h1 className="titulo-display text-[28px]">El asistente de Troppero · sus gestos</h1>
         </header>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setGrande((g) => !g)} className="h-9 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold">

@@ -3,7 +3,7 @@ import type { CampoSinRecorrer, ParaAtenderData, PotreroAtencion, TipoSenal } fr
 import type { CategoriaConteo, PanoramaInicio, Vencimiento } from '../api'
 import { estadoDe, type CampoMapa } from '@/features/mapa/reglas'
 
-// El Inicio de Tropero (página 35, «Inicio · El día»): qué se dice arriba, qué
+// El Inicio de Troppero (página 35, «Inicio · El día»): qué se dice arriba, qué
 // hay para atender hoy y los números del rodeo. Puro, para probarlo sin base.
 
 export type Tono = 'problema' | 'atencion' | 'aviso'

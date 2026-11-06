@@ -26,7 +26,7 @@ const desde = (s: string) => {
 };
 
 /**
- * Calendario grande de Tropero, dentro de la pantalla (no un desplegable):
+ * Calendario grande de Troppero, dentro de la pantalla (no un desplegable):
  * días de 44 px, el mes en grande y flechas grandes. Las fechas se manejan en
  * hora local ('YYYY-MM-DD'), nunca con toISOString.
  */

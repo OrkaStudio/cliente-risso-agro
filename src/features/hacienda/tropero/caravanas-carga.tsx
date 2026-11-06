@@ -545,7 +545,7 @@ function Aviso({ tono, children, accion }: { tono: 'neutro' | 'atencion' | 'prob
 
 const Sugerido = () => <span className="rounded-full bg-superficie-hundida px-2 py-0.5 text-[12px] font-semibold text-texto-suave">sugerido</span>
 
-/** «Vq» · 40 animales → lo que es en Tropero. */
+/** «Vq» · 40 animales → lo que es en Troppero. */
 function Linea({ texto, filas, falta, children }: { texto: string; filas: number; falta: boolean; children: React.ReactNode }) {
   return (
     <div className={cn('grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 rounded-[16px] border bg-superficie py-3.5 pr-4 pl-5', falta ? 'border-principal ring-1 ring-principal' : 'border-borde')}>
@@ -741,7 +741,7 @@ function NoCierra({ g, lugar, d, mapa, rodeo, onCambio }: { g: Plan['noCierran']
         </div>
         <div>
           <span className="titulo-display block text-[34px] leading-none">{g.hay}</span>
-          <span className="text-[13.5px] text-texto-suave">sin caravana en Tropero</span>
+          <span className="text-[13.5px] text-texto-suave">sin caravana en Troppero</span>
         </div>
       </div>
       <div role="radiogroup" aria-label="Qué pasó" className="flex flex-col gap-2">

@@ -89,7 +89,7 @@ export function linkInvitacion(token: string) {
   return `${window.location.origin}/invitacion/${token}`
 }
 export function whatsappInvitacion(p: { celular: string; nombre: string; empresa: string; token: string }) {
-  const texto = `Hola ${p.nombre.split(' ')[0]}, te sumé a ${p.empresa} en Tropero. Entrá desde acá con tu celular: ${linkInvitacion(p.token)}`
+  const texto = `Hola ${p.nombre.split(' ')[0]}, te sumé a ${p.empresa} en Troppero. Entrá desde acá con tu celular: ${linkInvitacion(p.token)}`
   return `https://wa.me/${p.celular}?text=${encodeURIComponent(texto)}`
 }
 

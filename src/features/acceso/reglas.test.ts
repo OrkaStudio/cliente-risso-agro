@@ -52,7 +52,7 @@ describe('pegar el código', () => {
   })
   it('toma el código del mensaje entero de WhatsApp', () => {
     expect(
-      codigoDeLoPegado('482 913 es tu código para entrar a Tropero. Vence en 10 minutos.'),
+      codigoDeLoPegado('482 913 es tu código para entrar a Troppero. Vence en 10 minutos.'),
     ).toBe('482913')
   })
   it('toma el código del mensaje real de la plantilla de Meta', () => {

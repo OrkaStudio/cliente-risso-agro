@@ -4,7 +4,7 @@ import { buscarLocalidades, etiquetaLocalidad, type Localidad } from '@/lib/geoc
 import { cn } from '@/lib/utils'
 
 /**
- * «Dónde está» con el estilo de Tropero: se escribe el pueblo y se elige de la
+ * «Dónde está» con el estilo de Troppero: se escribe el pueblo y se elige de la
  * lista (sólo localidades argentinas; de ahí salen la provincia y el clima).
  * Escribir después de elegir vuelve a «sin elegir»: nunca se guarda texto suelto.
  */

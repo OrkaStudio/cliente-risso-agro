@@ -9,7 +9,7 @@ import { linkWhatsapp } from '@/features/guia/whatsapp'
 import { cn } from '@/lib/utils'
 import { Mascota, type Animo } from './mascota'
 
-// El asistente de Tropero mientras se arma el mapa en Campos (Lau, 22/10).
+// El asistente de Troppero mientras se arma el mapa en Campos (Lau, 22/10).
 // Vive acoplado arriba de la tarjeta: la tarjeta es su voz, así que ahí no
 // habla aparte. Sólo sale volando cuando lo que hay que hacer está en el mapa
 // (tocar el campo, marcar una esquina), lo señala con una línea corta y vuelve.
@@ -472,7 +472,7 @@ export function Acompanante({
       <motion.button
         ref={botonAsistente}
         type="button"
-        aria-label="El asistente de Tropero: tocalo si tenés una duda"
+        aria-label="El asistente de Troppero: tocalo si tenés una duda"
         aria-expanded={!!ayuda}
         onClick={() => {
           setAyuda((a) => (a ? null : 'toque'))

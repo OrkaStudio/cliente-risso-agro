@@ -1,4 +1,4 @@
-// Reglas de Acceso (spec «Tropero para código», sección 1). Sin React ni red:
+// Reglas de Acceso (spec «Troppero para código», sección 1). Sin React ni red:
 // se prueban solas en reglas.test.ts.
 
 /** El código vence a los 10 minutos de mandado. */
@@ -8,7 +8,7 @@ export const REENVIO_MS = 60 * 1000
 /** Con 3 intentos fallidos el código se invalida. */
 export const INTENTOS = 3
 
-/** El número de Tropero en WhatsApp (el del bot), para «Abrir WhatsApp». */
+/** El número de Troppero en WhatsApp (el del bot), para «Abrir WhatsApp». */
 export const WHATSAPP_TROPERO = '5492244472369'
 
 export type EstadoCodigo =
@@ -43,7 +43,7 @@ export function relojMinutos(segundos: number): string {
 /**
  * Busca los 6 números del código en lo que el usuario pegó: el código solo
  * («482913», «482 913») o el mensaje entero de WhatsApp («482 913 es tu código
- * para entrar a Tropero…»). Si no hay exactamente un código, null.
+ * para entrar a Troppero…»). Si no hay exactamente un código, null.
  */
 export function codigoDeLoPegado(texto: string): string | null {
   const juntos = texto.replace(/(\d)[\s-](?=\d)/g, '$1')

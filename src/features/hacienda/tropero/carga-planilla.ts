@@ -113,7 +113,7 @@ export function clasificar(filas: Fila[], rodeo: DelRodeo[]) {
       continue
     }
     if (conVisual) {
-      if (r && conVisual.rfid && soloDigitos(conVisual.rfid) !== r) clase.set(f.clave, { clase: 'error', motivo: `La ${v} ya tiene otro chip en Tropero` })
+      if (r && conVisual.rfid && soloDigitos(conVisual.rfid) !== r) clase.set(f.clave, { clase: 'error', motivo: `La ${v} ya tiene otro chip en Troppero` })
       else if (r && !conVisual.rfid) clase.set(f.clave, { clase: 'chip', animalId: conVisual.id })
       else clase.set(f.clave, { clase: 'ya' })
       continue

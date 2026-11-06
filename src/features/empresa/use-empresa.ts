@@ -21,7 +21,7 @@ export type Membresia = {
     onboarding_completo_at?: string | null
     /** null = todavía no ubicó sus campos en el mapa (la app queda cerrada). */
     mapa_completo_at?: string | null
-    /** Desde cuándo usa Tropero (la pantalla Plan). */
+    /** Desde cuándo usa Troppero (la pantalla Plan). */
     created_at?: string
   } | null
 }

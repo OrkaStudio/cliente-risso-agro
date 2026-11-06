@@ -5,7 +5,7 @@ import { AccesoLayout, Preguntas } from './acceso-layout'
 /** WhatsApp de una PERSONA de Orka (no el del bot). Sin la variable no se ofrece. */
 const SOPORTE = (import.meta.env.VITE_WHATSAPP_SOPORTE as string | undefined)?.replace(/\D/g, '')
 
-const MENSAJE = 'Hola, cambié de número y no puedo entrar a Tropero. Soy el dueño de la cuenta.'
+const MENSAJE = 'Hola, cambié de número y no puedo entrar a Troppero. Soy el dueño de la cuenta.'
 
 /**
  * A5 · ¿Cambiaste de número? (decisión de Lau, 05/10: sin CUIT, que es público).
@@ -49,7 +49,7 @@ export function CambieDeNumeroPage() {
             window.open(`https://wa.me/${SOPORTE}?text=${encodeURIComponent(MENSAJE)}`, '_blank', 'noopener')
           }
         >
-          Escribirle a Tropero
+          Escribirle a Troppero
         </BotonPrincipal>
       )}
       <Preguntas

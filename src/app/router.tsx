@@ -124,7 +124,7 @@ const MuestraPage = lazy(() =>
 )
 
 export const router = createBrowserRouter([
-  // Sólo en desarrollo: los componentes de Tropero juntos (/estilo).
+  // Sólo en desarrollo: los componentes de Troppero juntos (/estilo).
   ...(import.meta.env.DEV
     ? [
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },

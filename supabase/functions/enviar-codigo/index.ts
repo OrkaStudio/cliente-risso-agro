@@ -3,7 +3,7 @@
 // Hook «Send SMS» de Supabase Auth: cuando alguien pide entrar con su celular,
 // Supabase genera el código de 6 números y, en vez de mandar un SMS, llama a
 // esta función. Acá se manda por WhatsApp con la plantilla de autenticación de
-// Meta (la que trae el botón «Copiar código»), desde el número de Tropero.
+// Meta (la que trae el botón «Copiar código»), desde el número de Troppero.
 //
 // La llamada viene firmada por Supabase (Standard Webhooks). Sin firma válida
 // no se manda nada: nadie más puede usar esta función para mandar mensajes.

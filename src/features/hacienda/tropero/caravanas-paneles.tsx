@@ -188,7 +188,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
         {(
           [
             { m: 'sabe', titulo: n === 1 ? 'Sé cuál fue' : 'Sé cuáles fueron', bajada: 'La tocás o la buscás por su caravana.' },
-            { m: 'nosabe', titulo: 'No sé cuál fue', bajada: `Tropero marca una como ${como}; se puede corregir.` },
+            { m: 'nosabe', titulo: 'No sé cuál fue', bajada: `Troppero marca una como ${como}; se puede corregir.` },
             { m: 'error', titulo: 'Me equivoqué al cargarla', bajada: 'Corregís el potrero o la cantidad, o la anulás.' },
           ] as const
         ).map((o) => (
@@ -270,7 +270,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
               Queda como {como} la {nums(quedan)}
             </p>
             <ul className="mt-2 flex flex-col gap-1 text-texto-suave">
-              <li>· La elige Tropero entre las {posibles.length} posibles del {pot}.</li>
+              <li>· La elige Troppero entre las {posibles.length} posibles del {pot}.</li>
               <li>· Su ficha dice «{como} sin identificar». Las demás no cambian.</li>
               <li>· Si la ves en el campo, en su ficha tocás «Sigue en el campo».</li>
             </ul>

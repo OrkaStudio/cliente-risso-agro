@@ -1,20 +1,20 @@
 import { test, expect } from '@playwright/test'
 import { entrar } from './helpers'
 
-// El asistente de Tropero fuera del mapa: abajo a la derecha, con su invitación
+// El asistente de Troppero fuera del mapa: abajo a la derecha, con su invitación
 // a preguntarle. Se le escribe lo que sea; arranca con lo que notó.
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
 test('se entiende qué es, dice lo que notó y lo que propone lo hace', async ({ page }) => {
   await entrar(page)
-  const barra = page.getByRole('button', { name: /^El asistente de Tropero: notó/ })
+  const barra = page.getByRole('button', { name: /^El asistente de Troppero: notó/ })
   await expect(barra).toBeVisible()
   // La barra invita a preguntarle y, un rato, cuenta lo que notó.
-  await expect(barra).toContainText('Preguntale a Tropero')
+  await expect(barra).toContainText('Preguntale a Troppero')
   await expect(barra).toContainText(/Noté \w+ cosas? en tus campos/, { timeout: 8000 })
 
-  await page.getByRole('button', { name: /^El asistente de Tropero/ }).click()
+  await page.getByRole('button', { name: /^El asistente de Troppero/ }).click()
   const panel = page.getByRole('dialog', { name: '¿En qué te ayudo?' })
   await expect(panel).toContainText('Lo que vi en tus campos')
   await expect(panel).toContainText('Probá preguntarme')
@@ -28,7 +28,7 @@ test('se entiende qué es, dice lo que notó y lo que propone lo hace', async ({
 
 test('se le escribe: una duda la contesta, un número lleva a WhatsApp', async ({ page }) => {
   await entrar(page)
-  await page.getByRole('button', { name: /^El asistente de Tropero/ }).click()
+  await page.getByRole('button', { name: /^El asistente de Troppero/ }).click()
   const panel = page.getByRole('dialog', { name: '¿En qué te ayudo?' })
   // Ejemplos con sus campos, para arrancar.
   await expect(panel.getByRole('button', { name: /^¿Cuántos animales tengo/ })).toBeVisible()

@@ -351,7 +351,7 @@ function HoySinCampo() {
             onClick={() => {
               const link = `${window.location.origin}/mapa${primero ? `/${primero.id}` : ''}`
               const celular = (user?.phone ?? '').replace(/\D/g, '')
-              window.open(`https://wa.me/${celular}?text=${encodeURIComponent(`Tropero: abrí este link en la compu para armar tu campo en el mapa ${link}`)}`, '_blank', 'noopener')
+              window.open(`https://wa.me/${celular}?text=${encodeURIComponent(`Troppero: abrí este link en la compu para armar tu campo en el mapa ${link}`)}`, '_blank', 'noopener')
               setMandado(true)
             }}
           >

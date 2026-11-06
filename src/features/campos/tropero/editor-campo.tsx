@@ -564,7 +564,7 @@ export default function EditorCampo({
           <div className="sticky -top-5 z-10 -mx-5 -mt-5 flex items-center gap-3 bg-superficie px-5 pt-5 pb-2 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-6 after:bg-gradient-to-b after:from-superficie after:to-transparent">
             <span data-acompana="dock" aria-hidden className="size-16 shrink-0 rounded-full bg-[radial-gradient(circle,rgba(169,85,44,0.18)_0%,rgba(169,85,44,0)_68%)]" />
             <div className="flex min-w-0 flex-col">
-              <span className="text-[14px] font-bold text-texto">Asistente de Tropero</span>
+              <span className="text-[14px] font-bold text-texto">Asistente de Troppero</span>
               <span className="text-[13.5px] text-texto-suave">Tocame si tenés una duda</span>
             </div>
           </div>
