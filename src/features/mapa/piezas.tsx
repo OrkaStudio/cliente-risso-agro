@@ -77,12 +77,12 @@ export function Comparacion({
       tono === 'problema' ? 'border-estado-problema/60' : tono === 'bien' ? 'border-estado-bien' : 'border-estado-atencion/60')}>
       <div className="flex items-end gap-6">
         <div>
-          <p className="titulo-display text-[34px] leading-none text-texto">{haTexto(medido)}</p>
+          <p className="t-numero text-texto">{haTexto(medido)}</p>
           <p className="mt-1 text-[13px] font-semibold text-texto-suave">ha en el mapa</p>
         </div>
         {alta !== null && (
           <div>
-            <p className="titulo-display text-[34px] leading-none text-texto-suave">{haTexto(alta)}</p>
+            <p className="t-numero text-texto-suave">{haTexto(alta)}</p>
             <p className="mt-1 text-[13px] font-semibold text-texto-suave">ha en el alta</p>
           </div>
         )}
@@ -108,7 +108,7 @@ export function Totales({ t }: { t: { hectareas: number; potreros: number; cabez
         [t.cabezas, 'cabezas'],
       ].map(([v, n]) => (
         <div key={n} className="flex flex-col">
-          <span className="titulo-display text-[40px] leading-none text-texto">{v}</span>
+          <span className="t-numero text-texto">{v}</span>
           <span className="mt-1 text-[13.5px] text-texto-suave">{n}</span>
         </div>
       ))}
@@ -221,7 +221,7 @@ export function Partida({
       {/* Dónde está en la boleta: «Partida», partido y número. */}
       <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px] text-texto-suave">
         En la boleta dice
-        <span className="cifra rounded-md bg-fondo px-2 py-0.5 text-[15px] font-bold text-texto ring-1 ring-borde">Partida 058-000146</span>
+        <span className="t-cifra-chica rounded-md bg-fondo px-2 py-0.5 font-bold text-texto ring-1 ring-borde">Partida 058-000146</span>
       </p>
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2.5 [&_input]:w-full [&_input]:min-w-0">
         <CampoTexto className="min-w-0" etiqueta="Partido" inputMode="numeric" value={partido} placeholder="058" onChange={(e) => setPartido(e.target.value)} />
@@ -265,7 +265,7 @@ export function Boleta({
     >
       <div className="flex flex-col gap-1 rounded-[14px] bg-estado-atencion-suave px-4 py-3">
         <p className="text-[12.5px] font-semibold text-estado-atencion-texto">Impuesto inmobiliario rural, arriba a la izquierda</p>
-        <p className="cifra text-[18px] font-bold text-estado-atencion-texto">Partido 027, Circ. II, Parcela 1758A</p>
+        <p className="t-cifra font-bold text-estado-atencion-texto">Partido 027, Circ. II, Parcela 1758A</p>
       </div>
       <div className="grid grid-cols-3 gap-2.5">
         <CampoTexto etiqueta="Partido" inputMode="numeric" value={partido} placeholder="027" onChange={(e) => setPartido(e.target.value)} />

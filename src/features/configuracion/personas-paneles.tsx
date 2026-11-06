@@ -244,7 +244,7 @@ function TarjetaPersona({ nombre, rol, celular, secciones, pendiente = false }: 
         <div className="min-w-0">
           <p className="truncate text-[19px] font-bold text-texto">{nombre}</p>
           <p className="truncate text-[14.5px] text-texto-suave">{nombreRol(rol)}</p>
-          <p className="cifra text-[16px] text-texto">{celularLindo(celular)}</p>
+          <p className="t-cifra text-texto">{celularLindo(celular)}</p>
         </div>
       </div>
       <div className="mt-4 border-t border-principal/15 bg-superficie/70 px-5 py-4">

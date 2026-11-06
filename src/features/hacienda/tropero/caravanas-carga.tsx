@@ -317,7 +317,7 @@ export function CargarCaravanas({ empresaId, abierto, onCerrar }: { empresaId: s
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {g.numeros.slice(0, 24).map((x) => (
-                  <span key={x} className="cifra rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 text-[15px] font-bold text-principal">
+                  <span key={x} className="t-cifra-chica rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 font-bold text-principal">
                     {x}
                   </span>
                 ))}
@@ -363,7 +363,7 @@ export function CargarCaravanas({ empresaId, abierto, onCerrar }: { empresaId: s
           <ul className="divide-y divide-borde rounded-[14px] border border-borde bg-superficie">
             {plan.errores.map(({ fila: f, motivo }) => (
               <li key={f.clave} className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-2.5 px-4 py-2.5">
-                <input aria-label={`Caravana de la fila ${f.fila}`} value={f.visual} onChange={(e) => setFilas((fs) => fs.map((x) => (x.clave === f.clave ? { ...x, visual: e.target.value } : x)))} className="cifra h-10 rounded-[10px] border-[1.5px] border-borde bg-superficie px-2.5 text-[16px] font-bold" />
+                <input aria-label={`Caravana de la fila ${f.fila}`} value={f.visual} onChange={(e) => setFilas((fs) => fs.map((x) => (x.clave === f.clave ? { ...x, visual: e.target.value } : x)))} className="t-cifra h-10 rounded-[10px] border-[1.5px] border-borde bg-superficie px-2.5 font-bold" />
                 <span className="text-[13.5px] text-estado-problema-texto">
                   <span className="text-texto-suave">Fila {f.fila} · </span>
                   {motivo}
@@ -634,7 +634,7 @@ function SinQue({ r, cambiarR, poner, faltan }: { r: Respuestas; cambiarR: (f: (
                 <input aria-label={`Hasta, tramo ${i + 1}`} inputMode="numeric" value={t.hasta} onChange={(e) => tramo(i, 'hasta', e.target.value)} className={NUM} />
                 <span className="text-texto-suave">son</span>
                 <SelCategoria valor={t.categoria} onCambio={(c) => tramo(i, 'categoria', c)} etiqueta={`Qué son, tramo ${i + 1}`} />
-                {t.categoria && soloDigitos(t.desde) && <span className="cifra text-[15px] text-texto-suave">{poner.filter((f) => enRango(f, t.desde, t.hasta)).length}</span>}
+                {t.categoria && soloDigitos(t.desde) && <span className="t-cifra-chica text-texto-suave">{poner.filter((f) => enRango(f, t.desde, t.hasta)).length}</span>}
               </div>
             ))}
             <button type="button" onClick={() => cambiarR((x) => ({ ...x, sinQue: { ...x.sinQue, tramos: [...x.sinQue.tramos, { desde: '', hasta: '', categoria: '' }] } }))} className={CHICO}>

@@ -77,7 +77,7 @@ export function OnboardingLayout({
               </BotonChico>
             )}
             <div className="flex flex-col gap-3">
-              <h1 className="titulo-display text-[30px] leading-[1.02] text-texto md:text-[46px] md:tracking-[-0.02em]">
+              <h1 className="t-pagina text-texto max-md:text-[30px]">
                 {titulo}
               </h1>
               {bajada && <p className="text-[15px] leading-[1.4] text-texto-suave md:text-[16.5px]">{bajada}</p>}

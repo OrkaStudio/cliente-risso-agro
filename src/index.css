@@ -401,6 +401,73 @@
     line-height: 0.98;
     letter-spacing: -0.025em;
   }
+  /* ===== Escala tipográfica de Troppero (Lau, 05/11): una sola para toda la web =====
+     Títulos y números grandes en Archivo Black; títulos de tarjeta en Archivo
+     ExtraBold; montos dentro de listas en Barlow Condensed; el texto en Inter.
+     No usar otros tamaños para estas piezas: si hace falta uno nuevo, se suma acá. */
+  /* Título de página (Agenda, Configuración, el nombre del campo). */
+  .t-pagina {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+  }
+  /* Título de sección dentro de la página (Para mejorar, Mes a mes, Noviembre). */
+  .t-seccion {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  /* Título de una tarjeta, bloque o fila (Tu nombre, Lo que usás, una semana). */
+  .t-tarjeta {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 19px;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+  /* El número protagonista de una pantalla (17 cabezas, $81,1M). */
+  .t-numero-hero {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 64px;
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+  /* El número de una tarjeta de datos (+$14,4M, 985 ha, $6.100.000). */
+  .t-numero {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Un monto o número dentro de una lista o fila (−$300k, 17 cab). */
+  .t-cifra {
+    font-family: var(--font-cifra);
+    font-size: 18px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Número mini: al lado de un nombre en la barra o un eje («17 cab»). */
+  .t-cifra-mini {
+    font-family: var(--font-cifra);
+    font-size: 12.5px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Número chico: chips, etiquetas, ejes. */
+  .t-cifra-chica {
+    font-family: var(--font-cifra);
+    font-size: 15px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
   .tnum-prop {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;

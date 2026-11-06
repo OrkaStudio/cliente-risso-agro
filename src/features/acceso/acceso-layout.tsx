@@ -54,7 +54,7 @@ export function AccesoLayout({
         <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:gap-[22px]">
           {encabezado && (
             <div className="hidden flex-col gap-2.5 pb-1.5 md:flex">
-              <h2 className="titulo-display text-[44px] leading-none tracking-[-0.02em] text-texto">
+              <h2 className="t-pagina text-texto">
                 {encabezado.titulo}
               </h2>
               {encabezado.bajada && (

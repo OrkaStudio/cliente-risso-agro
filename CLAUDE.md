@@ -9,6 +9,7 @@
 - **Producto:** app **única** agnóstica de dispositivo — web de escritorio (Modo Oficina) + iOS/Android nativo vía **Capacitor** (Modo Campo, offline-first). Hacienda por caravana RFID, recorridas por potrero, contable, planificación. Multi-cliente desde el día 1 (`empresa_id`). ~500 cabezas.
 - **Cerebro:** `orka-brain/clientes/risso-agro/`.
 - **Marca: Troppero, con doble p** (Lau, 05/11). Así en todo texto que lea alguien: pantallas, WhatsApp, mails, títulos, legales. El logo sale de `troppero-web/assets/troppero-logo.svg` (`src/components/tropero/logo.tsx`). Las carpetas y nombres internos `tropero/` quedan como están.
+- **Tipografía: una sola escala** (Lau, 05/11), en `src/index.css`. Títulos y números con estas clases, sin `text-[Npx]` sueltos: `t-pagina` (título de página, Archivo Black 40), `t-seccion` (sección, Archivo Black 26), `t-tarjeta` (título de tarjeta o fila, Archivo ExtraBold 19), `t-numero-hero` (el número protagonista, 64), `t-numero` (número de tarjeta, 34), `t-cifra` (monto en una lista, Barlow Condensed 18), `t-cifra-chica` (15) y `t-cifra-mini` (12,5). El texto va en Inter. Si hace falta otro tamaño, se suma a la escala, no se inventa en la pantalla.
 
 ## Stack — NO es el boilerplate Next.js de Orka
 

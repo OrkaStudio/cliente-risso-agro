@@ -95,7 +95,7 @@ export function LayoutMapa({
           )}
           {ficha}
           {encima}
-          <h1 className="titulo-display text-[28px] leading-[1.04] text-texto md:text-[38px]">{titulo}</h1>
+          <h1 className="t-pagina text-texto max-md:text-[28px]">{titulo}</h1>
           {children}
           {salidas && (
             <div className="flex flex-wrap gap-2 pt-1">

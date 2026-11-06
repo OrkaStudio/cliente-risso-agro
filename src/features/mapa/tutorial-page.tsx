@@ -926,7 +926,7 @@ function PrimeroEnLaCompu({
         </div>
         <div className="mx-[-14px] h-2.5 rounded-b-lg bg-tinta" />
       </div>
-      <h1 className="titulo-display mt-10 text-[38px] leading-[1.02]">Primero, armá tu campo en la compu.</h1>
+      <h1 className="t-pagina mt-10">Primero, armá tu campo en la compu.</h1>
       <p className="mt-5 text-[16px] text-superficie/90">
         Marcás el campo y sus potreros en el mapa. Después el celular te ubica en cada uno.
       </p>

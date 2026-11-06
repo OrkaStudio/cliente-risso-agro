@@ -29,9 +29,9 @@ export function SinHacienda({
           <Icono nombre="Campos" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="titulo-display text-[28px] leading-tight text-texto">{campo} es agrícola</h2>
+          <h2 className="t-seccion text-texto">{campo} es agrícola</h2>
           <p className="mt-1 text-[15px] text-texto-suave">No tiene hacienda. Esto es lo que tiene:</p>
-          <p className="cifra mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[15px] text-texto">
+          <p className="t-cifra-chica mt-3 flex flex-wrap gap-x-4 gap-y-1 text-texto">
             <span>
               <b>{ha(cara.hectareas)}</b> ha
             </span>
@@ -61,7 +61,7 @@ export function SinHacienda({
   return (
     <div className="flex flex-col gap-5 px-7 py-7 lg:col-span-2">
       <div>
-        <h2 className="titulo-display text-[28px] leading-tight text-texto">Todavía no cargaste la hacienda {campo ? `de ${campo}` : 'de tus campos'}</h2>
+        <h2 className="t-seccion text-texto">Todavía no cargaste la hacienda {campo ? `de ${campo}` : 'de tus campos'}</h2>
         <p className="mt-1 text-[15px] text-texto-suave">Elegí cómo cargarla:</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

@@ -455,7 +455,7 @@ function Formulario({
               <li key={m}>
                 <span aria-hidden className={cn('mx-auto block size-3.5 rounded-full border-2 border-principal', i === 0 && 'bg-principal')} />
                 <p className="mt-1 text-[13px] font-bold text-texto">{nombreMes(m.slice(0, 7)).slice(0, 3).replace(/^\w/, (c) => c.toUpperCase())}</p>
-                <p className="cifra text-[12.5px] text-texto-suave">{fmtCompact(cuota)}</p>
+                <p className="t-cifra-mini text-texto-suave">{fmtCompact(cuota)}</p>
               </li>
             ))}
           </ol>

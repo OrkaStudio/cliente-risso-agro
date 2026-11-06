@@ -43,7 +43,7 @@ export function ConfiguracionPage() {
   return (
     <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-7">
       <header>
-        <h1 className="titulo-display text-[44px] leading-none text-texto">Configuración</h1>
+        <h1 className="t-pagina text-texto">Configuración</h1>
         <p className="mt-3 text-[17px] text-texto-suave">{dueno ? `Quién entra a ${membresia?.empresa?.nombre ?? 'tu campo'} y qué ve, tu cuenta y tu plan.` : 'Tu nombre y tu número.'}</p>
       </header>
 
@@ -101,7 +101,7 @@ function Personas({ empresa }: { empresa: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-[17px] text-texto">
-          <b className="cifra text-[22px]">{adentro.length}</b> {adentro.length === 1 ? 'persona entra' : 'personas entran'} a tu campo
+          <b className="t-cifra">{adentro.length}</b> {adentro.length === 1 ? 'persona entra' : 'personas entran'} a tu campo
           {invitados.length > 0 && (
             <span className="text-texto-suave">
               {' '}
@@ -251,17 +251,17 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
       {/* La ficha: quién sos para Troppero. */}
       <section aria-label="Tu ficha" className="relative flex flex-col items-start self-start overflow-hidden rounded-[24px] border border-principal/25 bg-gradient-to-br from-terracota-50 to-trigo-100 p-7 text-texto">
         <span className="grid size-20 place-items-center rounded-full bg-principal font-heading text-[34px] font-extrabold text-principal-texto">{(guardado || empresa || 'T').charAt(0).toUpperCase()}</span>
-        <p className="titulo-display mt-5 text-[30px] leading-tight">{guardado || 'Sin nombre'}</p>
+        <p className="t-seccion mt-5">{guardado || 'Sin nombre'}</p>
         <p className="mt-1 text-[15.5px] text-texto-suave">
           {nombreRol(rol)} de {empresa}
         </p>
-        {celular && <p className="cifra mt-5 rounded-full bg-superficie/80 px-4 py-1.5 text-[19px] text-texto">{celular}</p>}
+        {celular && <p className="t-cifra mt-5 rounded-full bg-superficie/80 px-4 py-1.5 text-texto">{celular}</p>}
         <p className="mt-2 text-[14px] text-texto-suave">Entrás con este número y un código por WhatsApp. Sin contraseña.</p>
       </section>
 
       <div className="flex flex-col gap-4">
         <section aria-label="Tu cuenta" className="rounded-[24px] border border-borde bg-superficie p-6">
-          <h2 className="font-heading text-[20px] font-extrabold text-texto">Tu nombre</h2>
+          <h2 className="t-tarjeta text-texto">Tu nombre</h2>
           <p className="mt-1 text-[15px] text-texto-suave">Con este te saluda el asistente y te ven las personas que invitás.</p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <CampoTexto className="min-w-[240px] flex-1" etiqueta="Cómo te llamás" placeholder="Daniel" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} />
@@ -273,7 +273,7 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
 
         <section aria-label="Tu número" className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-borde bg-superficie p-6">
           <div>
-            <h2 className="font-heading text-[20px] font-extrabold text-texto">¿Cambiaste de número?</h2>
+            <h2 className="t-tarjeta text-texto">¿Cambiaste de número?</h2>
             <p className="mt-1 text-[15px] text-texto-suave">Te mandamos un código al nuevo para confirmar que es tuyo. Tus datos quedan iguales.</p>
           </div>
           <button type="button" onClick={() => navigate('/mi-cuenta/numero')} className={BOTON_CHICO}>
@@ -283,7 +283,7 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
 
         <section aria-label="Salir" className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-borde bg-superficie p-6">
           <div>
-            <h2 className="font-heading text-[20px] font-extrabold text-texto">Salir en esta compu</h2>
+            <h2 className="t-tarjeta text-texto">Salir en esta compu</h2>
             <p className="mt-1 text-[15px] text-texto-suave">Para volver a entrar te pedimos un código nuevo.</p>
           </div>
           <button type="button" onClick={() => void signOut()} className={BOTON_CHICO}>
@@ -324,7 +324,7 @@ function Plan() {
             Activo
           </span>
           <p className="mt-4 text-[15px] text-principal-texto/80">Tu plan</p>
-          <p className="titulo-display text-[44px] leading-none">Piloto, sin cargo</p>
+          <p className="t-pagina">Piloto, sin cargo</p>
           {desde && <p className="mt-3 text-[15.5px] text-principal-texto/85">Usás Troppero desde el {fecha(desde)}.</p>}
         </div>
         {whatsapp && (
@@ -336,7 +336,7 @@ function Plan() {
       </section>
 
       <section aria-label="Lo que usás">
-        <h2 className="mb-3 font-heading text-[20px] font-extrabold text-texto">Lo que usás</h2>
+        <h2 className="mb-3 t-tarjeta text-texto">Lo que usás</h2>
         <dl className="grid gap-3 sm:grid-cols-3">
           {uso.map((u) => (
             <div key={u.titulo} className="flex items-center gap-4 rounded-[20px] border border-borde bg-superficie px-5 py-4">
@@ -345,7 +345,7 @@ function Plan() {
               </span>
               <div>
                 <dt className="text-[14px] font-semibold text-texto-suave">{u.titulo}</dt>
-                <dd className="cifra text-[28px] leading-none text-texto">{u.valor}</dd>
+                <dd className="t-numero text-texto">{u.valor}</dd>
               </div>
             </div>
           ))}
@@ -353,7 +353,7 @@ function Plan() {
       </section>
 
       <section aria-label="Qué incluye" className="rounded-[24px] border border-borde bg-superficie p-6">
-        <h2 className="font-heading text-[20px] font-extrabold text-texto">Qué incluye</h2>
+        <h2 className="t-tarjeta text-texto">Qué incluye</h2>
         <p className="mt-1 text-[15px] text-texto-suave">En el piloto usás Troppero entero.</p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {[...SECCIONES.map((s) => `${s.texto}: ${s.queVe.toLowerCase()}`), 'El asistente de Troppero, para tus dudas'].map((t) => (

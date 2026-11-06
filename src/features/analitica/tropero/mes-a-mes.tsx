@@ -64,7 +64,7 @@ export function MesAMes({ meses, apretado: aprieta }: { meses: Mes[]; apretado: 
           <span className="inline-flex items-center gap-2 rounded-full bg-estado-problema-suave py-1.5 pr-3.5 pl-3 text-[14.5px] font-bold text-estado-problema-texto">
             <span aria-hidden className="size-2 rounded-full bg-estado-problema" />
             {mayuscula(nombreMes(aprieta.mes))} viene apretado
-            <span className="cifra text-[16px]">{conSigno(aprieta.entra - aprieta.sale)}</span>
+            <span className="t-cifra">{conSigno(aprieta.entra - aprieta.sale)}</span>
           </span>
           {vuelve && <span className="text-[14px] text-texto-suave">Vuelve a entrar plata en {vuelve}</span>}
         </p>
@@ -73,7 +73,7 @@ export function MesAMes({ meses, apretado: aprieta }: { meses: Mes[]; apretado: 
           <span className="inline-flex items-center gap-2 rounded-full bg-estado-bien-suave py-1.5 pr-3.5 pl-3 text-[14.5px] font-bold text-estado-bien-texto">
             <span aria-hidden className="size-2 rounded-full bg-estado-bien" />
             Lo que viene queda a favor
-            <span className="cifra text-[16px]">{conSigno(vieneAFavor)}</span>
+            <span className="t-cifra">{conSigno(vieneAFavor)}</span>
           </span>
         </p>
       ) : null}
@@ -97,13 +97,13 @@ export function MesAMes({ meses, apretado: aprieta }: { meses: Mes[]; apretado: 
         </p>
         <p className="flex flex-wrap gap-x-6 text-[13.5px] text-texto-suave">
           <span>
-            {m.futuro ? 'Entra' : 'Entró'} <b className="cifra text-[17px] text-texto">{fmtCompact(m.entro)}</b>
+            {m.futuro ? 'Entra' : 'Entró'} <b className="t-cifra text-texto">{fmtCompact(m.entro)}</b>
           </span>
           <span>
-            {m.futuro ? 'Sale' : 'Salió'} <b className="cifra text-[17px] text-texto">{fmtCompact(m.salio)}</b>
+            {m.futuro ? 'Sale' : 'Salió'} <b className="t-cifra text-texto">{fmtCompact(m.salio)}</b>
           </span>
           <span>
-            {m.futuro ? 'Queda' : 'Quedó'} <b className={cn('cifra text-[17px]', neto >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{conSigno(neto)}</b>
+            {m.futuro ? 'Queda' : 'Quedó'} <b className={cn('t-cifra', neto >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{conSigno(neto)}</b>
           </span>
         </p>
           </>
@@ -160,7 +160,7 @@ export function MesAMes({ meses, apretado: aprieta }: { meses: Mes[]; apretado: 
                     />
                   )}
                   {mes.mes === apretado && (
-                    <text x={x(i)} y={cero + a + 14} textAnchor="middle" className="cifra fill-estado-problema-texto text-[12.5px] font-bold">
+                    <text x={x(i)} y={cero + a + 14} textAnchor="middle" className="t-cifra-mini fill-estado-problema-texto font-bold">
                       {conSigno(n)}
                     </text>
                   )}
@@ -194,7 +194,7 @@ function Dato({ titulo, valor, tono }: { titulo: string; valor: string; tono?: '
   return (
     <p className="flex items-baseline gap-2 text-[13.5px] text-texto-suave">
       {titulo}
-      <b className={cn('cifra text-[17px]', tono === 'bien' ? 'text-estado-bien-texto' : tono === 'mal' ? 'text-estado-problema-texto' : 'text-texto')}>{valor}</b>
+      <b className={cn('t-cifra', tono === 'bien' ? 'text-estado-bien-texto' : tono === 'mal' ? 'text-estado-problema-texto' : 'text-texto')}>{valor}</b>
     </p>
   )
 }

@@ -1,6 +1,6 @@
-import { Suspense, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import { Suspense, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
 import {
@@ -57,7 +57,7 @@ function Ticker() {
       >
         <CircleDollarSign className="size-4 text-estado-bien" />
         <span className="text-[13px] text-texto-suave">Blue</span>
-        <b className="cifra text-[15px] font-bold text-texto">${blue.data.venta.toLocaleString('es-AR')}</b>
+        <b className="t-cifra-chica font-bold text-texto">${blue.data.venta.toLocaleString('es-AR')}</b>
       </div>
     ) : null,
     // El slot del clima decide solo si tiene algo que mostrar (campo elegido
@@ -112,6 +112,25 @@ export function AppShell() {
         }
       : {}
 
+  // El scroll de la columna (Lau, 05/11): al ir a otra pantalla, arranca arriba;
+  // con «atrás» del navegador, vuelve a donde estaba. Sólo cambia con la ruta,
+  // no con los filtros de la misma pantalla (?tab=, ?q=).
+  const principal = useRef<HTMLElement>(null)
+  const tipoNav = useNavigationType()
+  const posiciones = useRef(new Map<string, number>())
+  useLayoutEffect(() => {
+    const el = principal.current
+    if (!el) return
+    const destino = tipoNav === 'POP' ? (posiciones.current.get(location.key) ?? 0) : 0
+    el.scrollTop = destino
+    // Volviendo atrás la pantalla puede tardar un instante en tener su alto: se reintenta.
+    const r = destino ? requestAnimationFrame(() => requestAnimationFrame(() => (el.scrollTop = destino))) : 0
+    const guardar = () => posiciones.current.set(location.key, el.scrollTop)
+    el.addEventListener('scroll', guardar, { passive: true })
+    return () => (cancelAnimationFrame(r), el.removeEventListener('scroll', guardar))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo con la ruta: los filtros de la misma pantalla no suben el scroll
+  }, [location.pathname])
+
   // Precarga los chunks de las secciones en reposo → navegar entre Hacienda/
   // Campos/Analítica/Agenda es instantáneo (sin flash de "Cargando…").
   useEffect(() => prefetchEnReposo(Object.values(CHUNKS_OFICINA)), [])
@@ -141,7 +160,7 @@ export function AppShell() {
 
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
             burbuja flotante del Asistente (no tapa la última card). */}
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main ref={principal} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
             className="w-full px-4 pb-28 pt-7 sm:px-10 sm:pt-8"

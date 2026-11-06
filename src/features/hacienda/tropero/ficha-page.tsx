@@ -127,7 +127,7 @@ export function FichaPage() {
             </span>
             {aviso && <span className={cn('rounded-full px-3 py-1 text-[13.5px] font-bold', AVISO[aviso.tono])}>{aviso.texto}</span>}
           </div>
-          <h1 className="font-heading text-[40px] leading-[0.95] font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
+          <h1 className="t-pagina text-texto">{titulo}</h1>
           {!activo && <p className="max-w-[460px] text-[15.5px] text-texto-suave">{fraseDelAnimal({ fecha_nacimiento: null, raza: null, pelaje: null }, potrero ? { potrero: potrero.nombre, campo } : null, new Date(), salio)}</p>}
 
           {/* Lo primero que se mira: cada dato una vez; lo que falta, para cargarlo */}
@@ -204,7 +204,7 @@ export function FichaPage() {
               // Los potreros que todavía no están dibujados, con éste marcado.
               <ul className="flex flex-wrap gap-1.5" aria-label={`Potreros de ${campoMapa.nombre} sin dibujar`}>
                 {campoMapa.potreros.filter((p) => !p.poligono).map((p) => (
-                  <li key={p.id} aria-current={p.id === a.potrero_id || undefined} className={cn('cifra grid h-8 min-w-[42px] place-items-center rounded-[9px] px-2 text-[15px] font-bold', p.id === a.potrero_id ? 'bg-principal text-principal-texto' : 'bg-superficie-hundida text-texto-suave')}>
+                  <li key={p.id} aria-current={p.id === a.potrero_id || undefined} className={cn('t-cifra-chica grid h-8 min-w-[42px] place-items-center rounded-[9px] px-2 font-bold', p.id === a.potrero_id ? 'bg-principal text-principal-texto' : 'bg-superficie-hundida text-texto-suave')}>
                     {p.nombre}
                   </li>
                 ))}
@@ -313,7 +313,7 @@ export function FichaPage() {
               {historia.map((h, i) => (
                 <li key={h.id} className="flex gap-4">
                   <span className="w-[64px] shrink-0 pt-0.5 text-right">
-                    <span className="cifra block text-[17px] leading-none font-bold text-texto">{h.dia}</span>
+                    <span className="t-cifra block font-bold text-texto">{h.dia}</span>
                     {i > 0 && historia[i - 1]!.anio !== h.anio && <span className="text-[12px] text-texto-suave">{h.anio}</span>}
                   </span>
                   <span className="flex w-3 shrink-0 flex-col items-center">
@@ -351,7 +351,7 @@ export function FichaPage() {
 function Panel({ titulo, bajada, children }: { titulo: string; bajada?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[20px] border border-borde bg-superficie px-6 py-5">
-      <h2 className="mb-2 flex items-baseline gap-3 font-heading text-[19px] font-extrabold text-texto">
+      <h2 className="t-tarjeta mb-2 flex items-baseline gap-3 text-texto">
         {titulo}
         {bajada && <span className="font-sans text-[13.5px] font-normal text-texto-suave">{bajada}</span>}
       </h2>

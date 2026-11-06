@@ -143,17 +143,17 @@ export function PlataPage() {
         <div className="flex items-end justify-between gap-6">
           <div className="min-w-0">
             {vacio ? (
-              <h1 className="titulo-display max-w-[520px] text-[30px] leading-[1.08] tracking-[-0.02em] text-superficie">Anotá el primer gasto y mirá cómo viene el campo</h1>
+              <h1 className="t-seccion max-w-[520px] text-superficie">Anotá el primer gasto y mirá cómo viene el campo</h1>
             ) : (
               <>
-                <h1 className="titulo-display cifra text-[60px] leading-[0.95] tracking-[-0.035em] text-superficie">{pesos(Math.abs(anio.resultado))}</h1>
+                <h1 className="t-numero-hero text-superficie">{pesos(Math.abs(anio.resultado))}</h1>
                 <p className="mt-2.5 flex items-center gap-3 text-[14.5px] whitespace-nowrap text-[#f7e3b6]">
                   <span>
-                    Entró <b className="cifra text-[16px] text-superficie">{pesos(anio.entro)}</b>
+                    Entró <b className="t-cifra text-superficie">{pesos(anio.entro)}</b>
                   </span>
                   <span aria-hidden className="text-[#f7e3b6]/50">·</span>
                   <span>
-                    Salió <b className="cifra text-[16px] text-superficie">{pesos(anio.salio)}</b>
+                    Salió <b className="t-cifra text-superficie">{pesos(anio.salio)}</b>
                   </span>
                 </p>
                 {/* Siempre la línea, aunque no haya con qué comparar: el alto no cambia. */}
@@ -187,7 +187,7 @@ export function PlataPage() {
       {/* Para mejorar: lo que conviene mirar, cada cosa con adónde ir a hacer algo. */}
       {!vacio && avisos.length > 0 && (
         <motion.section {...entra(2)}>
-          <h2 className="titulo-display pb-3 text-[22px] text-texto">Para mejorar</h2>
+          <h2 className="t-seccion pb-3 text-texto">Para mejorar</h2>
           <ul className="grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
             {avisos.map((a) => (
               <AvisoTarjeta key={a.id} aviso={a} onIr={() => navigate(a.accion.a)} />
@@ -200,7 +200,7 @@ export function PlataPage() {
       {!vacio && (
         <motion.section {...entra(2)} className="rounded-[22px] border border-borde bg-superficie px-7 pt-6 pb-3 shadow-[0_1px_0_rgba(19,27,22,0.04),0_12px_32px_-20px_rgba(19,27,22,0.25)]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="titulo-display text-[22px] text-texto">Mes a mes</h2>
+            <h2 className="t-seccion text-texto">Mes a mes</h2>
             <p className="flex items-center gap-4 text-[13.5px] font-semibold text-texto-suave">
               <span className="flex items-center gap-1.5"><span aria-hidden className="size-2.5 rounded-[3px] bg-plata-entra" />Quedó a favor</span>
               <span className="flex items-center gap-1.5"><span aria-hidden className="size-2.5 rounded-[3px] bg-plata-sale" />En contra</span>
@@ -215,7 +215,7 @@ export function PlataPage() {
         {/* Lo que viene: el mes más apretado y los próximos cobros y pagos. */}
         <motion.section {...entra(3)}>
           <div className="flex items-center justify-between gap-3 border-b border-borde pb-2">
-            <h2 className="titulo-display text-[22px] text-texto">Lo que viene</h2>
+            <h2 className="t-seccion text-texto">Lo que viene</h2>
             <button type="button" onClick={() => navigate('/agenda')} className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
               Ver la agenda
             </button>
@@ -230,7 +230,7 @@ export function PlataPage() {
                   color={p.tipo === 'ingreso' ? 'bg-estado-bien' : 'bg-acento'}
                   titulo={p.descripcion}
                   detalle={diaYmes(p.fechaVencimiento!)}
-                  derecha={<span className={cn('cifra text-[18px] font-bold', p.tipo === 'ingreso' ? 'text-estado-bien-texto' : 'text-texto')}>{conSigno((p.tipo === 'ingreso' ? 1 : -1) * (p.monto ?? 0))}</span>}
+                  derecha={<span className={cn('t-cifra font-bold', p.tipo === 'ingreso' ? 'text-estado-bien-texto' : 'text-texto')}>{conSigno((p.tipo === 'ingreso' ? 1 : -1) * (p.monto ?? 0))}</span>}
                 />
               ))}
             </ul>
@@ -239,7 +239,7 @@ export function PlataPage() {
 
         {/* En qué se va: las categorías de gasto de los últimos 12 meses. */}
         <motion.section {...entra(3)}>
-          <h2 className="titulo-display border-b border-borde pb-2 text-[22px] text-texto">En qué se va</h2>
+          <h2 className="t-seccion border-b border-borde pb-2 text-texto">En qué se va</h2>
           {gastos.length === 0 ? (
             <p className="py-6 text-[15px] text-texto-suave">Cuando anotes gastos, acá ves en qué se va la plata.</p>
           ) : (
@@ -266,7 +266,7 @@ export function PlataPage() {
       {/* Qué rinde: por campo o por actividad, en los últimos 12 meses. */}
       <motion.section {...entra(4)}>
         <div className="flex items-center justify-between gap-3 border-b border-borde pb-3">
-          <h2 className="titulo-display text-[22px] text-texto">Qué rinde</h2>
+          <h2 className="t-seccion text-texto">Qué rinde</h2>
           <div role="tablist" aria-label="Qué rinde" className="flex gap-1 rounded-full bg-superficie-hundida p-1">
             {(['campo', 'actividad'] as const).map((v) => (
               <button key={v} type="button" role="tab" aria-selected={vista === v} onClick={() => setVista(v)} className={cn('h-9 rounded-full px-4 text-[14.5px] font-bold transition-colors', vista === v ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie')}>
@@ -295,7 +295,7 @@ export function PlataPage() {
                       style={{ width: `${Math.max(1, ancho)}%` }}
                     />
                   </div>
-                  <span className={cn('cifra text-right text-[19px] font-bold', r.resultado >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{conSigno(r.resultado)}</span>
+                  <span className={cn('t-cifra text-right font-bold', r.resultado >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{conSigno(r.resultado)}</span>
                 </li>
               )
             })}
@@ -307,7 +307,7 @@ export function PlataPage() {
       {/* Campaña por campaña: julio a junio, en pesos y en dólares. */}
       {filasCampana.length > 0 && (
         <motion.section {...entra(5)}>
-          <h2 className="titulo-display border-b border-borde pb-3 text-[22px] text-texto">Campaña por campaña</h2>
+          <h2 className="t-seccion border-b border-borde pb-3 text-texto">Campaña por campaña</h2>
           <table className="w-full text-left">
             <thead>
               <tr className="text-[13px] text-texto-suave">
@@ -328,10 +328,10 @@ export function PlataPage() {
                       {c.nombre}
                       {c.enCurso && <span className="ml-2 text-[13px] font-semibold text-texto-suave">hasta hoy</span>}
                     </td>
-                    <td className="cifra py-3.5 text-right text-[17px] text-texto">{pesos(c.entro)}</td>
-                    <td className="cifra py-3.5 text-right text-[17px] text-texto">{pesos(c.salio)}</td>
-                    <td className={cn('cifra py-3.5 text-right text-[18px] font-bold', c.resultado >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{conSigno(c.resultado)}</td>
-                    <td className="cifra py-3.5 text-right text-[17px] text-texto">
+                    <td className="t-cifra py-3.5 text-right text-texto">{pesos(c.entro)}</td>
+                    <td className="t-cifra py-3.5 text-right text-texto">{pesos(c.salio)}</td>
+                    <td className={cn('t-cifra py-3.5 text-right font-bold', c.resultado >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{conSigno(c.resultado)}</td>
+                    <td className="t-cifra py-3.5 text-right text-texto">
                       {c.usd == null ? '—' : `${c.usd >= 0 ? '+' : '−'}US$ ${Math.round(Math.abs(c.usd) / 1000).toLocaleString('es-AR')} mil`}
                       {cambio != null && <span className={cn('ml-2 text-[14px] font-bold', cambio >= 0 ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{cambio >= 0 ? '▲' : '▼'} {Math.round(Math.abs(cambio) * 100)} %</span>}
                     </td>

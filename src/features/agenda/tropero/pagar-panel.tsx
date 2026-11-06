@@ -124,7 +124,7 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
         <div className={cn('px-5 pt-5 pb-5', ya ? 'bg-superficie-hundida/70' : 'bg-gradient-to-br from-terracota-50 to-trigo-100')}>
         <p className="text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">{ya ? (cobro ? 'Cobraste' : 'Pagaste') : cobro ? 'Vas a cobrar' : 'Tenés que pagar'}</p>
         <div className="mt-1 flex items-end justify-between gap-3">
-          <p className={cn('titulo-display cifra text-[40px] leading-none tracking-[-0.03em]', ya ? 'text-texto-suave' : cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+          <p className={cn('t-numero', ya ? 'text-texto-suave' : cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
             {cobro ? '+' : '−'}
             {pesos(ya ? v.monto : montoReal)}
           </p>

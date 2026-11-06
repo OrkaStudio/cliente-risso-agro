@@ -53,7 +53,7 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir }: { 
     <section aria-label={`Calendario de ${nombreMes(mes)}`} className="rounded-[28px] border border-borde bg-superficie shadow-[0_1px_2px_rgba(19,27,22,0.04),0_12px_32px_-18px_rgba(19,27,22,0.18)]">
       <header className="flex flex-wrap items-center justify-between gap-4 px-6 pt-6 pb-5">
         <div className="flex items-center gap-3">
-          <h2 className="titulo-display text-[32px] leading-none text-texto">
+          <h2 className="t-seccion text-texto">
             {mayuscula(nombreMes(mes))}
             {mes.slice(0, 4) !== hoy.slice(0, 4) ? ` ${mes.slice(0, 4)}` : ''}
           </h2>
@@ -102,7 +102,7 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir }: { 
             return (
               <div key={f} className={cn('flex min-h-[128px] min-w-0 flex-col gap-1.5 p-2', borde, esHoy && 'bg-trigo-50')}>
                 <button type="button" onClick={() => setDia(f)} aria-label={`Ver el ${diaLargo(f)}: ${vs.length ? `${vs.length} ${vs.length === 1 ? 'cosa' : 'cosas'}` : 'nada'}`} className="group/num flex flex-col items-center self-center rounded-[12px] px-2 pt-0.5 pb-1">
-                  <span className={cn('cifra grid size-9 place-items-center rounded-full text-[17px] leading-none font-bold transition-colors', esHoy ? 'bg-principal text-principal-texto' : f < hoy ? 'text-texto-suave group-hover/num:bg-superficie-hundida' : 'text-texto group-hover/num:bg-superficie-hundida')}>
+                  <span className={cn('t-cifra grid size-9 place-items-center rounded-full font-bold transition-colors', esHoy ? 'bg-principal text-principal-texto' : f < hoy ? 'text-texto-suave group-hover/num:bg-superficie-hundida' : 'text-texto group-hover/num:bg-superficie-hundida')}>
                     {Number(f.slice(8))}
                   </span>
                   {esHoy && <span className="mt-0.5 text-[11.5px] font-bold tracking-[0.06em] text-principal uppercase">Hoy</span>}
@@ -168,7 +168,7 @@ function Numero({ titulo, monto, tono, detalle, alerta = false }: { titulo: stri
   return (
     <div className={cn('flex flex-col gap-1 rounded-[20px] px-5 py-4', tono === 'problema' ? 'bg-estado-problema-suave/70' : tono === 'bien' ? 'bg-estado-bien-suave/70' : 'bg-superficie-hundida/70')}>
       <span className="text-[14.5px] font-bold text-texto">{titulo}</span>
-      <b className={cn('cifra text-[30px] leading-none', tono === 'problema' ? 'text-estado-problema-texto' : tono === 'bien' ? 'text-estado-bien-texto' : 'text-texto-suave')}>{pesos(monto)}</b>
+      <b className={cn('t-numero', tono === 'problema' ? 'text-estado-problema-texto' : tono === 'bien' ? 'text-estado-bien-texto' : 'text-texto-suave')}>{pesos(monto)}</b>
       <span className={cn('text-[14px] font-semibold', alerta ? 'text-estado-problema-texto' : 'text-texto-suave')}>{detalle}</span>
     </div>
   )
@@ -190,7 +190,7 @@ function Chip({ v, hoy, onAbrir }: { v: Vencimiento; hoy: string; onAbrir: (v: V
             {/* En pantallas angostas manda el monto: el color ya dice qué es. */}
             <span className="hidden 2xl:inline">{clase === 'hecho' ? '✓ ' : ''}{verbo} </span>
             <span className="2xl:hidden">{clase === 'hecho' ? '✓ ' : clase === 'vencido' ? '! ' : cobro ? '+' : '−'}</span>
-            <span className="cifra text-[15px]">{fmtCompact(v.monto)}</span>
+            <span className="t-cifra-chica">{fmtCompact(v.monto)}</span>
           </span>
           <span className={cn('block truncate text-[13px] leading-tight font-semibold', e.nombre)}>{tituloDe(v)}</span>
         </span>

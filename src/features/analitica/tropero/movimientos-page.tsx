@@ -65,7 +65,7 @@ export function MovimientosPage() {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="text-[18px] font-semibold text-texto-suave">{cuando} salieron</p>
-          <h1 className="titulo-display cifra text-[96px] leading-[0.95] tracking-[-0.04em] text-texto">{fmtCompact(salio)}</h1>
+          <h1 className="t-numero-hero text-texto">{fmtCompact(salio)}</h1>
           <p className="mt-2 text-[16px] text-texto-suave">
             en {lista.length} {lista.length === 1 ? 'movimiento' : 'movimientos'}
             {entro > 0 && `, y entraron ${fmtCompact(entro)}`}
@@ -120,14 +120,14 @@ export function MovimientosPage() {
             const detalle = [m.categoria?.nombre, m.campo?.nombre, m.contraparte, medio, comprobanteTexto(m)].filter(Boolean).join(' · ')
             return (
               <li key={m.id} className="flex items-center gap-5 border-b border-borde/70 py-4">
-                <span className="cifra w-14 shrink-0 text-[19px] text-texto-suave">{`${f.slice(8, 10)}/${f.slice(5, 7)}`}
+                <span className="t-cifra w-14 shrink-0 text-texto-suave">{`${f.slice(8, 10)}/${f.slice(5, 7)}`}
                   {f.slice(0, 4) !== hoy.slice(0, 4) && <span className="block text-[13px] font-semibold">{f.slice(0, 4)}</span>}</span>
                 <span aria-hidden className={cn('h-10 w-1 shrink-0 rounded-full', ingreso ? 'bg-estado-bien' : 'bg-estado-problema/80')} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[16.5px] font-semibold text-texto">{m.descripcion || m.categoria?.nombre || (ingreso ? 'Ingreso' : 'Gasto')}</p>
                   <p className="truncate text-[14.5px] text-texto-suave">{detalle}</p>
                 </div>
-                <span className={cn('cifra w-36 shrink-0 text-right text-[19px]', ingreso ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+                <span className={cn('t-cifra w-36 shrink-0 text-right', ingreso ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
                   {ingreso ? '+' : '−'}
                   {formatARS(Number(m.monto)).replace('-', '').replace(/\s/g, '')}
                 </span>

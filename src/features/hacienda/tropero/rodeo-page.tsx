@@ -242,7 +242,7 @@ export function RodeoPage() {
             ))}
           </div>
         ) : (
-          <h1 className="font-heading text-[22px] font-extrabold text-texto">Hacienda</h1>
+          <h1 className="t-pagina text-texto">Hacienda</h1>
         )}
       </motion.div>
 
@@ -261,8 +261,8 @@ export function RodeoPage() {
         <div className="flex flex-col gap-5 px-6 py-5">
         <div>
           <p className="flex items-baseline gap-3">
-            <span className="titulo-display text-[64px] leading-[0.85] tracking-[-0.03em] text-texto">{r.total.toLocaleString('es-AR')}</span>
-            <span className="font-heading text-[19px] font-extrabold text-texto">{nombreVista}</span>
+            <span className="t-numero-hero text-texto">{r.total.toLocaleString('es-AR')}</span>
+            <span className="t-tarjeta text-texto">{nombreVista}</span>
           </p>
           {campoId ? (
             <p className="mt-2 text-[14px] text-texto-suave">en {elegido.elegido!.nombre}</p>
@@ -278,7 +278,7 @@ export function RodeoPage() {
                           {id.letra}
                         </span>
                       )}
-                      {c.nombre} <b className="cifra text-[16px] text-texto">{c.cabezas}</b>
+                      {c.nombre} <b className="t-cifra text-texto">{c.cabezas}</b>
                     </li>
                   )
                 })}
@@ -522,7 +522,7 @@ function StockPorCategoria({ cats, total }: { cats: { categoria: string; cabezas
           <li key={c.categoria} className="flex items-center gap-2 text-[14.5px] text-texto">
             <span className={cn('size-2.5 shrink-0 rounded-full', PALETA[i % PALETA.length])} />
             <span>{categoriaNombre(c.categoria as never, c.cabezas)}</span>
-            <b className="cifra text-[17px]">{c.cabezas}</b>
+            <b className="t-cifra">{c.cabezas}</b>
           </li>
         ))}
       </ul>
@@ -557,13 +557,13 @@ function Fila({ f, filtro, onClick }: { f: FilaRodeo; filtro: Filtro | null; onC
           className="inline-flex flex-col items-start"
         >
           {f.visual ? (
-            <span className="cifra rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 text-[19px] leading-tight font-bold text-principal">{f.visual}</span>
+            <span className="t-cifra rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 font-bold text-principal">{f.visual}</span>
           ) : f.rfid ? (
-            <span className="cifra rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 text-[15px] leading-tight font-bold text-texto">{f.rfid}</span>
+            <span className="t-cifra-chica rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 font-bold text-texto">{f.rfid}</span>
           ) : (
             <span className="rounded-[8px] border-[1.5px] border-dashed border-neutro-300 px-2 py-1 text-[12.5px] font-semibold text-texto-suave">sin caravana</span>
           )}
-          {(f.visual || f.rfid) && <span className="cifra mt-1 text-[12px] text-texto-suave">{f.visual ? (f.rfid ?? 'sin electrónica') : 'sin visible'}</span>}
+          {(f.visual || f.rfid) && <span className="t-cifra-mini mt-1 text-texto-suave">{f.visual ? (f.rfid ?? 'sin electrónica') : 'sin visible'}</span>}
         </a>
       </td>
       <td className="py-3 pr-4 text-[15px] font-semibold text-texto">{f.queEs}</td>
@@ -620,7 +620,7 @@ function FilaSalido({ a, b, donde, onClick, conEstado = true }: { conEstado?: bo
   return (
     <tr onClick={onClick} className="cursor-pointer text-texto-suave transition-colors hover:bg-superficie-hundida/50">
       <td className="py-3 pl-5">
-        <span className="cifra rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 text-[19px] leading-tight font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
+        <span className="t-cifra rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
       </td>
       <td className="py-3 pr-4 text-[15px] font-semibold">{a.categoria ? categoriaNombre(a.categoria as never, 1) : ''}</td>
       <td className="py-3 pr-4 text-[14.5px] max-md:hidden">{donde ? (conEstado ? `Salió del ${donde}` : donde) : ''}</td>
@@ -652,7 +652,7 @@ function Pildora({ activo, onClick, texto, n, punto }: { activo: boolean; onClic
     >
       {punto && <span className={cn('size-2 rounded-full', punto)} />}
       {texto}
-      <span className={cn('cifra text-[14px]', activo ? 'text-superficie/75' : 'text-texto-suave')}>{n}</span>
+      <span className={cn('t-cifra-chica', activo ? 'text-superficie/75' : 'text-texto-suave')}>{n}</span>
     </button>
   )
 }

@@ -134,11 +134,11 @@ export function AgendaPage() {
       <motion.header {...entra(1)} className="flex flex-wrap items-center justify-between gap-6 rounded-[24px] bg-tinta px-7 py-6 text-superficie">
         <div className="flex flex-col justify-center gap-5">
           <div>
-            <h1 className="titulo-display text-[44px] leading-none">Agenda</h1>
+            <h1 className="t-pagina">Agenda</h1>
             <p className="mt-3 max-w-[600px] text-[19px] leading-snug text-superficie/85">
               {sale4 || entra4 ? (
                 <>
-                  En las próximas 4 semanas pagás <b className="cifra text-[19px] text-[#f4a493]">{fmtCompact(sale4)}</b> y cobrás <b className="cifra text-[19px] text-[#b9dcae]">{fmtCompact(entra4)}</b>.
+                  En las próximas 4 semanas pagás <b className="t-cifra text-[#f4a493]">{fmtCompact(sale4)}</b> y cobrás <b className="t-cifra text-[#b9dcae]">{fmtCompact(entra4)}</b>.
                 </>
               ) : (
                 'No hay nada por pagar ni cobrar en las próximas 4 semanas.'
@@ -170,7 +170,7 @@ export function AgendaPage() {
           </div>
           {enCartera && (
             <p className="text-[15px] text-superficie/85">
-              Cheques: tenés <b className="cifra text-[17px] text-[#b9dcae]">{fmtCompact(enCartera.enCartera)}</b> para cobrar y diste <b className="cifra text-[17px] text-[#f4a493]">{fmtCompact(enCartera.emitidos)}</b> que te van a debitar.
+              Cheques: tenés <b className="t-cifra text-[#b9dcae]">{fmtCompact(enCartera.enCartera)}</b> para cobrar y diste <b className="t-cifra text-[#f4a493]">{fmtCompact(enCartera.emitidos)}</b> que te van a debitar.
             </p>
           )}
         </div>
@@ -308,7 +308,7 @@ function YaPagaste({ vencidos, hoy, onAbrir }: { vencidos: Vencimiento[]; hoy: s
                   </span>
                   <span className="block truncate text-[14px] text-texto-suave">{[v.contraparte, v.campo, `venció hace ${dias} ${dias === 1 ? 'día' : 'días'}`].filter(Boolean).join(' · ')}</span>
                 </span>
-                <span className={cn('cifra shrink-0 text-[18px]', cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+                <span className={cn('t-cifra shrink-0', cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
                   {cobro ? '+' : '−'}
                   {pesos(v.monto)}
                 </span>
@@ -360,18 +360,18 @@ function FranjaSemana({ s, hoy, tareas, empresaId, onAbrir }: { s: Semana; hoy: 
     <div className="grid border-b border-borde last:border-b-0 md:grid-cols-[220px_minmax(0,1fr)]">
       <div className="flex flex-col gap-0.5 px-6 pt-5 md:py-6">
         {actual && <span className="text-[13px] font-semibold text-principal">Ahora</span>}
-        <h2 className="font-heading text-[20px] leading-tight font-extrabold text-texto">{s.titulo.startsWith('Del') ? rango.charAt(0).toUpperCase() + rango.slice(1) : s.titulo}</h2>
+        <h2 className="t-tarjeta text-texto">{s.titulo.startsWith('Del') ? rango.charAt(0).toUpperCase() + rango.slice(1) : s.titulo}</h2>
         {!s.titulo.startsWith('Del') && <p className="text-[14px] font-semibold text-texto-suave">{rango}</p>}
         {(s.sale > 0 || s.entra > 0) && (
           <div className="mt-3 flex flex-col gap-0.5 text-[15px] text-texto-suave">
             {s.sale > 0 && (
               <span>
-                Pagás <span className="cifra text-[18px] text-estado-problema-texto">{fmtCompact(s.sale)}</span>
+                Pagás <span className="t-cifra text-estado-problema-texto">{fmtCompact(s.sale)}</span>
               </span>
             )}
             {s.entra > 0 && (
               <span>
-                Cobrás <span className="cifra text-[18px] text-estado-bien-texto">{fmtCompact(s.entra)}</span>
+                Cobrás <span className="t-cifra text-estado-bien-texto">{fmtCompact(s.entra)}</span>
               </span>
             )}
           </div>

@@ -32,7 +32,7 @@ const TARJETA = 'rounded-[20px] border border-borde bg-superficie px-6 py-5'
  */
 const T = {
   /** Título de cada panel. */
-  titulo: 'font-heading text-[19px] font-extrabold text-texto',
+  titulo: 't-seccion text-texto',
   /** La línea de «para qué sirve» debajo del título. */
   bajada: 'text-[14px] text-texto-suave',
   /** Nombres, filas y etiquetas dentro de un gráfico. */
@@ -40,9 +40,9 @@ const T = {
   /** Fechas, aclaraciones y ejes. */
   chico: 'text-[13px] text-texto-suave',
   /** Un número destacado dentro de un panel. */
-  numero: 'titulo-display leading-none tracking-[-0.02em]',
+  numero: 't-numero',
   /** Un número de fila (pronóstico, montos de una lista). */
-  numeroChico: 'cifra text-[20px] leading-none font-bold',
+  numeroChico: 't-cifra font-bold',
 } as const
 
 /**
@@ -164,7 +164,7 @@ function Cabecera({
       <img src={lotes} alt="" className="absolute inset-y-0 right-0 -z-20 h-full w-[62%] object-cover object-[50%_35%]" />
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,var(--superficie)_38%,color-mix(in_srgb,var(--superficie)_70%,transparent)_58%,transparent_85%)]" />
       <div className="min-w-0 flex-1">
-        <h1 className="font-heading text-[28px] leading-tight font-extrabold tracking-[-0.02em] text-texto">{titulo}</h1>
+        <h1 className="t-pagina text-texto">{titulo}</h1>
         <div className="mt-2.5 flex flex-wrap gap-2">
           {chips.map((c) => (
             <button
@@ -186,7 +186,7 @@ function Cabecera({
 
 // ===== El pulso del campo: cuatro números, cada uno lleva a su lugar =====
 
-const NUMERO = 'titulo-display text-[32px] leading-none tracking-[-0.02em] text-texto'
+const NUMERO = 't-numero text-texto'
 
 function Pulso({
   titulo,
@@ -345,7 +345,7 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
             <Icono nombre="Guardar" />
           </span>
           <div>
-            <p className="font-heading text-[17px] font-extrabold text-texto">Todo en orden</p>
+            <p className="t-tarjeta text-texto">Todo en orden</p>
             <p className="text-[14px] text-texto-suave">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
           </div>
         </div>
@@ -378,7 +378,7 @@ function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
         </span>
         <span className="text-[13px] font-bold tracking-[0.02em] text-texto-suave uppercase">Lo primero</span>
       </div>
-      <p className="mt-4 truncate font-heading text-[36px] leading-none font-extrabold tracking-[-0.02em] text-texto">{c.lugar}</p>
+      <p className="t-numero mt-4 truncate text-texto">{c.lugar}</p>
       <p className="mt-2 text-[17px] leading-snug font-semibold text-texto">{c.que}</p>
       <p className={cn('mt-1 text-[14px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
       <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -409,7 +409,7 @@ function Unica({ c, empresaId }: { c: Cosa; empresaId: string }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[17px] text-texto">
-          <b className="font-heading text-[22px] font-extrabold tracking-[-0.01em]">{c.lugar}</b>
+          <b className="t-tarjeta">{c.lugar}</b>
           <span className="text-texto-suave"> · </span>
           <span className="font-semibold">{c.que}</span>
         </p>
@@ -553,7 +553,7 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-3">
         <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-texto" />
         <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-texto" />
-        <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} grande />
+        <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} />
         {sinPagar > 0 && <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">{plataCorta(sinPagar)} vencido sin pagar</span>}
         {sinCobrar > 0 && <span className="mb-1 rounded-full bg-estado-bien-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-bien-texto">{plataCorta(sinCobrar)} vencido sin cobrar</span>}
       </div>
@@ -620,11 +620,11 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   )
 }
 
-function Cifra({ nombre, valor, clase, grande = false }: { nombre: string; valor: string; clase: string; grande?: boolean }) {
+function Cifra({ nombre, valor, clase }: { nombre: string; valor: string; clase: string }) {
   return (
     <div>
       <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
-      <p className={cn('titulo-display leading-none tracking-[-0.02em]', grande ? 'text-[38px]' : 'text-[28px]', clase)}>{valor}</p>
+      <p className={cn('t-numero', clase)}>{valor}</p>
     </div>
   )
 }
@@ -704,7 +704,7 @@ function Clima({ lugar: actual }: { lugar: OpcionClima | null }) {
           </p>
         )}
         {clima.data && (
-          <p className="cifra text-[14px] opacity-90">
+          <p className="t-cifra-chica opacity-90">
             {ahora < 18 ? 'Hoy' : 'Hoy hasta la noche'} {clima.data.max}° / {clima.data.min}°
           </p>
         )}
@@ -751,8 +751,8 @@ function DiaCorto({ d }: { d: DiaPronostico }) {
       <span className={cn(T.texto, 'font-semibold text-texto-suave')}>{DIA_CORTO[f.getDay()]}</span>
       <IconoDia d={d} />
       <span className={cn(T.numeroChico, 'text-texto')}>{d.max}°</span>
-      <span className="cifra text-[16px] leading-none text-texto-suave">{d.min}°</span>
-      <span className="cifra h-5 text-[15px] font-bold text-texto-suave">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
+      <span className="t-cifra text-texto-suave">{d.min}°</span>
+      <span className="t-cifra-chica h-5 font-bold text-texto-suave">{d.lluviaProb >= 40 ? `${d.lluviaProb} %` : ''}</span>
     </li>
   )
 }
@@ -820,7 +820,7 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
           <span className="grid size-14 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
             <Icono nombre="Vaca" />
           </span>
-          <p className="font-heading text-[17px] font-extrabold text-texto">{campo ? `${campo} no tiene hacienda` : 'Todavía no hay hacienda'}</p>
+          <p className="t-tarjeta text-texto">{campo ? `${campo} no tiene hacienda` : 'Todavía no hay hacienda'}</p>
           <p className="max-w-[340px] text-[14px] text-texto-suave">Cuando entren animales, acá ves cuántas vacas, toros y terneros hay, y cómo viene la cría.</p>
         </div>
       ) : (
@@ -831,7 +831,7 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
             <span className="flex items-center gap-2">
               <span className={cn('size-3.5 rounded-[4px]', HEMBRA)} /> {hembras} hembras
             </span>
-            <span className="titulo-display text-[28px] text-texto">{hembras + machos} cabezas</span>
+            <span className="t-numero text-texto">{hembras + machos} cabezas</span>
             <span className="flex items-center gap-2">
               <span className={cn('size-3.5 rounded-[4px]', MACHO)} /> {machos} machos
             </span>
@@ -848,7 +848,7 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
                 <div className="flex items-center gap-3">
                   <span className="w-[108px] shrink-0 text-[16px] text-texto">{f.h[0]}</span>
                   <div className="flex h-10 flex-1 items-center justify-end gap-2.5">
-                    <span className={cn('cifra text-[22px] font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
+                    <span className={cn('t-cifra font-bold', f.h[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.h[1]}</span>
                     <div
                       className={cn('h-full rounded-l-[10px]', f.h[1] ? HEMBRA : 'bg-superficie-hundida')}
                       style={{ width: f.h[1] ? `${(f.h[1] / max) * 82}%` : 6 }}
@@ -862,7 +862,7 @@ function EstructuraDelRodeo({ cats, total, campo }: { cats: CategoriaConteo[]; t
                       className={cn('h-full rounded-r-[10px]', f.m[1] ? MACHO : 'bg-superficie-hundida')}
                       style={{ width: f.m[1] ? `${(f.m[1] / max) * 82}%` : 6 }}
                     />
-                    <span className={cn('cifra text-[22px] font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
+                    <span className={cn('t-cifra font-bold', f.m[1] ? 'text-texto' : 'text-texto-suave/50')}>{f.m[1]}</span>
                   </div>
                   <span className="w-[108px] shrink-0 text-right text-[16px] text-texto">{f.m[0]}</span>
                 </div>
@@ -890,7 +890,7 @@ function Indicador({ nombre, valor, nota, alerta = false }: { nombre: string; va
   return (
     <div className="flex flex-col items-center gap-1">
       <p className="text-[14px] font-semibold text-texto-suave">{nombre}</p>
-      <p className="titulo-display text-[36px] leading-none text-texto">{valor}</p>
+      <p className="t-numero text-texto">{valor}</p>
       <p className={cn('text-[14px]', alerta ? 'font-semibold text-estado-atencion-texto' : 'text-texto-suave')}>{nota}</p>
     </div>
   )

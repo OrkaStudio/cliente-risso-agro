@@ -76,7 +76,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
         >
           <Beef className="size-4 text-principal" />
           <span className="text-[13px] text-texto-suave">Gordo</span>
-          <b className="cifra text-[15px] font-bold text-texto">
+          <b className="t-cifra-chica font-bold text-texto">
             ${Math.round(gordo.data.valor).toLocaleString('es-AR')}
             <span className="ml-0.5 text-[12px] font-medium text-texto-suave">/kg</span>
           </b>

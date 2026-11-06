@@ -170,7 +170,7 @@ export function CamposPage() {
   if (!campo || !mapa)
     return (
       <div className="mx-auto flex max-w-[520px] flex-col items-center gap-4 py-16 text-center">
-        <h1 className="titulo-display text-[34px] text-texto">Todavía no hay campos</h1>
+        <h1 className="t-pagina text-texto">Todavía no hay campos</h1>
         <SumarCampo empresaId={empresaId} clase={BOTON} onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
       </div>
     )
@@ -286,7 +286,7 @@ const BOTON = 'inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] b
 function Numero({ n, texto }: { n: string; texto: string }) {
   return (
     <div>
-      <dd className="titulo-display text-[30px] leading-none text-texto">{n}</dd>
+      <dd className="t-numero text-texto">{n}</dd>
       <dt className="mt-1 text-[13px] text-texto-suave">{texto}</dt>
     </div>
   )
@@ -317,7 +317,7 @@ function ResumenCampo({
     <>
       <div>
         {lugar && <p className="text-[14px] font-semibold text-texto-suave">{lugar}</p>}
-        <h1 className="titulo-display text-[38px] leading-[1] tracking-[-0.02em] text-texto">{campo.nombre}</h1>
+        <h1 className="t-pagina text-texto">{campo.nombre}</h1>
       </div>
       <dl className="flex gap-6">
         <Numero n={ha(campo.totalHa)} texto="hectáreas" />
@@ -414,7 +414,7 @@ function DetallePotrero({
         {volver}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="titulo-display text-[26px] leading-[1.05] text-texto">Lo que pasó en el {p.nombre}</h2>
+            <h2 className="t-seccion text-texto">Lo que pasó en el {p.nombre}</h2>
             <p className="mt-1 text-[14px] text-texto-suave">{[p.hectareas ? `${ha(p.hectareas)} ha` : null, p.cabezas ? `${p.cabezas} cabezas` : null].filter(Boolean).join(', ')}</p>
           </div>
           </div>
@@ -424,7 +424,7 @@ function DetallePotrero({
           <ol className="flex flex-col">
             {historia.slice(0, 30).map((h, i) => (
               <li key={i} className="grid grid-cols-[52px_12px_minmax(0,1fr)] gap-x-3">
-                <span className="cifra pt-0.5 text-right text-[15px] font-bold text-texto">{ddmm(h.fecha)}</span>
+                <span className="t-cifra-chica pt-0.5 text-right font-bold text-texto">{ddmm(h.fecha)}</span>
                 <span className="flex flex-col items-center">
                   <span className={cn('mt-1.5 size-2.5 rounded-full', h.tipo === 'recorrida' ? 'bg-salvia' : h.tipo === 'labor' ? 'bg-trigo-400' : 'bg-principal')} />
                   {i < Math.min(historia.length, 30) - 1 && <span className="w-px flex-1 bg-borde" />}
@@ -588,7 +588,7 @@ function QueHay({ cats }: { cats: Potrero['porCategoria'] }) {
               <span className="block h-full rounded-full bg-principal" style={{ width: `${(100 * c.cabezas) / max}%` }} />
             </span>
           </span>
-          <b className="titulo-display min-w-[2ch] text-right text-[24px] leading-none text-texto">{c.cabezas}</b>
+          <b className="t-cifra min-w-[2ch] text-right font-bold text-texto">{c.cabezas}</b>
         </li>
       ))}
     </ul>
@@ -743,15 +743,15 @@ function VistaGeneral({ campos, identidad, onElegir }: { campos: CampoMapa[]; id
       <aside className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto">
         <div>
           <p className="text-[13.5px] font-semibold text-texto-suave">{campos.length} campos</p>
-          <h1 className="titulo-display text-[34px] leading-[1.05] text-texto">Todos tus campos</h1>
+          <h1 className="t-pagina text-texto">Todos tus campos</h1>
         </div>
         <div className="flex gap-7">
           <p className="flex flex-col">
-            <span className="titulo-display cifra text-[32px] leading-none">{ha(totalHa)}</span>
+            <span className="t-numero">{ha(totalHa)}</span>
             <span className="mt-1 text-[13.5px] text-texto-suave">hectáreas</span>
           </p>
           <p className="flex flex-col">
-            <span className="titulo-display cifra text-[32px] leading-none">{totalCab.toLocaleString('es-AR')}</span>
+            <span className="t-numero">{totalCab.toLocaleString('es-AR')}</span>
             <span className="mt-1 text-[13.5px] text-texto-suave">cabezas</span>
           </p>
         </div>
@@ -767,7 +767,7 @@ function VistaGeneral({ campos, identidad, onElegir }: { campos: CampoMapa[]; id
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-bold text-texto">{c.nombre}</span>
-                    <span className="cifra block text-[13px] text-texto-suave">
+                    <span className="t-cifra-mini block text-texto-suave">
                       {ha(hectareas(c))} ha · {cabezas(c)} cab
                     </span>
                   </span>

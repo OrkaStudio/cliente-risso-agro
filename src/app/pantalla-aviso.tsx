@@ -34,7 +34,7 @@ export function PantallaAviso({
         <span className="grid size-16 place-items-center rounded-[20px] bg-principal-suave">
           <Logo soloIsotipo alto={30} />
         </span>
-        <h1 className="titulo-display mt-6 text-[40px] leading-[1.02] text-texto">{titulo}</h1>
+        <h1 className="t-pagina mt-6 text-texto">{titulo}</h1>
         <p className="mt-3 text-[17px] leading-snug text-texto-suave">{texto}</p>
         <div className="mt-8 flex w-full flex-col gap-3">
           <BotonPrincipal icono={icono} onClick={onAccion}>

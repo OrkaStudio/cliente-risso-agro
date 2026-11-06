@@ -337,7 +337,7 @@ export function EntradasSalidas({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="cifra text-[22px] leading-none font-bold text-texto">{potrero.nombre}</p>
+              <p className="t-cifra font-bold text-texto">{potrero.nombre}</p>
               <p className="mt-1 truncate text-[13.5px] text-texto-suave">
                 {campo.nombre} · hoy hay {cabezasEn(potrero.id)}
               </p>
@@ -489,7 +489,7 @@ function BotonesPotrero({ potreros, elegido, onElegir, dato, apagado }: React.Co
               elegido === p.id ? 'border-principal bg-principal text-principal-texto' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
             )}
           >
-            <span className="cifra text-[18px] leading-none font-bold">{p.nombre}</span>
+            <span className="t-cifra font-bold">{p.nombre}</span>
             {d && <span className="mt-0.5 text-[11.5px] font-semibold opacity-80">{d}</span>}
           </button>
         )
@@ -749,7 +749,7 @@ function CajaLado({ l, rol, hecho }: { l?: Lado; rol: string; hecho: boolean }) 
       <p className="mt-2 flex items-center gap-1.5 text-[15px]">
         <span className={cn('cifra font-bold text-texto-suave', hecho && 'line-through')}>{l.antes}</span>
         <Icono nombre="Siguiente" tamano={16} />
-        <span className="cifra text-[18px] font-bold text-texto">{l.despues}</span>
+        <span className="t-cifra font-bold text-texto">{l.despues}</span>
         <span className="text-[13px] text-texto-suave">cab</span>
       </p>
     </div>

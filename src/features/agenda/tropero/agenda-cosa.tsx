@@ -36,7 +36,7 @@ export function Cosa({ v, hoy, onAbrir, compacto = false }: { v: Vencimiento; ho
       <button type="button" onClick={() => onAbrir(v)} className="group flex w-full items-center gap-4 rounded-[14px] px-3 py-3.5 text-left transition-colors hover:bg-superficie-hundida/60">
         <span className="w-10 shrink-0 text-center">
           <span className={cn('block text-[12.5px] font-semibold', f === hoy ? 'text-principal' : 'text-texto-suave')}>{f === hoy ? 'Hoy' : diaSemana(f)}</span>
-          <span className={cn('cifra block text-[22px] leading-none', f === hoy ? 'text-principal' : 'text-texto')}>{Number(f.slice(8))}</span>
+          <span className={cn('t-cifra block', f === hoy ? 'text-principal' : 'text-texto')}>{Number(f.slice(8))}</span>
         </span>
         <span aria-hidden className={cn('h-10 w-1 shrink-0 rounded-full', hecho ? 'bg-neutro-200' : cobro ? 'bg-estado-bien' : 'bg-estado-problema/80')} />
         <span className="min-w-0 flex-1">
@@ -49,7 +49,7 @@ export function Cosa({ v, hoy, onAbrir, compacto = false }: { v: Vencimiento; ho
           </span>
         </span>
         <span className={cn('flex shrink-0 items-center gap-5', compacto && 'flex-col items-end gap-1.5')}>
-          <span className={cn('cifra shrink-0 text-right text-[19px]', hecho ? 'text-texto-suave' : cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+          <span className={cn('t-cifra shrink-0 text-right', hecho ? 'text-texto-suave' : cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
             {cobro ? '+' : '−'}
             {pesos(v.monto)}
           </span>

@@ -71,7 +71,7 @@ export function CambieDeNumeroPage() {
 function Caso({ paso, titulo, texto }: { paso: string; titulo: string; texto: string }) {
   return (
     <li className="flex gap-3 rounded-[18px] border border-borde bg-superficie px-[18px] py-4">
-      <span className="cifra grid size-7 shrink-0 place-items-center rounded-full bg-principal-suave text-[15px] font-bold text-acento-texto">
+      <span className="t-cifra-chica grid size-7 shrink-0 place-items-center rounded-full bg-principal-suave font-bold text-acento-texto">
         {paso}
       </span>
       <div className="flex flex-col gap-1">

@@ -195,7 +195,7 @@ function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }:
         <span className="block truncate">{nombre}</span>
         {falta && <span className={cn('block text-[12px] font-bold', activo ? 'text-white/75' : 'text-principal')}>Falta el mapa</span>}
       </span>
-      <span className={cn('cifra shrink-0 text-[12px]', activo ? 'text-white/70' : 'text-texto-suave')}>{cabezas} cab</span>
+      <span className={cn('t-cifra-mini shrink-0', activo ? 'text-white/70' : 'text-texto-suave')}>{cabezas} cab</span>
     </button>
   )
 }

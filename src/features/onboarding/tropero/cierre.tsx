@@ -320,7 +320,7 @@ export function Cierre({
         {/* Panel */}
         <div className="flex w-full max-w-[476px] flex-col gap-[22px]">
           <Arranque />
-          <h1 className="titulo-display text-[34px] leading-[1.02] text-texto md:text-[48px]">Tus campos están cargados.</h1>
+          <h1 className="t-pagina text-texto max-md:text-[34px]">Tus campos están cargados.</h1>
           <p className="text-[15.5px] text-texto-suave md:text-[17px]">Falta ubicarlos en el mapa y se abre toda la app.</p>
           <LoQueSigue />
 

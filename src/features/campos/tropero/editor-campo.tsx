@@ -987,7 +987,7 @@ function Tarjeta({ titulo, texto, children }: { titulo: string; texto?: string; 
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <h2 className="titulo-display text-[26px] leading-[1.05] text-texto">{titulo}</h2>
+        <h2 className="t-seccion text-texto">{titulo}</h2>
         {texto && <p className="text-[14.5px] text-texto-suave">{texto}</p>}
       </div>
       {children}

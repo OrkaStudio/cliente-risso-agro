@@ -35,8 +35,8 @@ export function ClimaSlot() {
     >
       <WmoIcon code={d.code} className="size-4 text-estado-atencion" />
       <span className="text-[13px] text-texto-suave">{actual.nombre}</span>
-      <b className="cifra text-[15px] font-bold text-texto">{d.temp}°</b>
-      <span className="cifra hidden text-[12.5px] text-texto-suave lg:inline">
+      <b className="t-cifra-chica font-bold text-texto">{d.temp}°</b>
+      <span className="t-cifra-mini hidden text-texto-suave lg:inline">
         {d.max}° / {d.min}°
       </span>
       {d.helada && (

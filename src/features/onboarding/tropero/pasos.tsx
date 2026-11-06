@@ -513,7 +513,7 @@ export function PasoQueHay({
               ...e,
               marca:
                 e.valor !== especie && delEspecie(e.valor) > 0 ? (
-                  <span className="cifra rounded-full bg-principal-suave px-1.5 text-[12px] font-bold text-acento-texto">
+                  <span className="t-cifra-mini rounded-full bg-principal-suave px-1.5 font-bold text-acento-texto">
                     {delEspecie(e.valor)}
                   </span>
                 ) : undefined,

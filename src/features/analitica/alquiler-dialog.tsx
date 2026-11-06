@@ -328,11 +328,11 @@ export function AlquilerDialog({
                 {proximos.map((p, i) => (
                   <li key={i} className="flex items-center gap-4 border-b border-borde py-3.5">
                     <span className="w-10 text-center">
-                      <b className="cifra block text-[22px] leading-none text-texto">{p.dia}</b>
+                      <b className="t-cifra block text-texto">{p.dia}</b>
                       <span className="text-[12.5px] font-semibold text-texto-suave">{p.mes}</span>
                     </span>
                     <span>
-                      <b className="cifra text-[18px] text-texto">
+                      <b className="t-cifra text-texto">
                         {i > 0 && unidad !== 'pesos' ? '≈ ' : ''}
                         {pesos(montoCuota)}
                       </b>

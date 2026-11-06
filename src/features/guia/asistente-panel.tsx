@@ -550,7 +550,7 @@ export function AsistentePanel() {
           )}
         </AnimatePresence>
         {nAvisos > 0 && !abierto && (
-          <span className="cifra grid size-6 shrink-0 place-items-center rounded-full bg-principal text-[12.5px] font-bold text-principal-texto">{nAvisos}</span>
+          <span className="t-cifra-mini grid size-6 shrink-0 place-items-center rounded-full bg-principal font-bold text-principal-texto">{nAvisos}</span>
         )}
       </button>
 
