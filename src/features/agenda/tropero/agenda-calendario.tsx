@@ -31,8 +31,8 @@ const verboDe = (v: Vencimiento, c: Clase) => (c === 'hecho' ? (v.tipo === 'ingr
  * con el monto y el nombre; al pasar el mouse muestra su detalle y al tocarla
  * abre «¿Lo pagaste?». Tocar el número del día abre ese día entero.
  */
-export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir }: { items: Vencimiento[]; hoy: string; empresaId: string; campoId?: string; onAbrir: (v: Vencimiento) => void }) {
-  const [mes, setMes] = useState(hoy.slice(0, 7))
+export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesInicial }: { items: Vencimiento[]; hoy: string; empresaId: string; campoId?: string; onAbrir: (v: Vencimiento) => void; mesInicial?: string }) {
+  const [mes, setMes] = useState(mesInicial ?? hoy.slice(0, 7))
   const [dia, setDia] = useState<string | null>(null)
   const [ultimoDia, setUltimoDia] = useState<string | null>(null)
   if (dia && dia !== ultimoDia) setUltimoDia(dia)

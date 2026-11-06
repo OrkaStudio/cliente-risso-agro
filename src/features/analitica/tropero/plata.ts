@@ -141,7 +141,20 @@ export function gastosUsdPorCategoria(movs: MovimientoConDetalle[], desde: strin
 }
 
 /** Un aviso de «Para mejorar»: qué pasa, por qué importa y adónde ir a hacer algo. */
-export type Aviso = { id: string; tono: 'mal' | 'atencion'; titulo: string; detalle: string; accion: { texto: string; a: string } }
+/** Una barra de la comparación del aviso (entra contra sale, antes contra ahora). */
+export type BarraAviso = { texto: string; valor: number; muestra: string; tono: 'entra' | 'sale' | 'neutro' }
+export type Aviso = {
+  id: string
+  tono: 'mal' | 'atencion'
+  /** De qué trata, en una palabra («Lo que viene», «Un gasto», «Un campo»). */
+  tema: string
+  titulo: string
+  detalle: string
+  /** Las dos cifras que se comparan, para verlo sin leer. */
+  barras: [BarraAviso, BarraAviso]
+  /** Adónde lleva: a la pantalla exacta donde se resuelve, con el campo elegido si es de uno. */
+  accion: { texto: string; a: string; campoId?: string }
+}
 
 /**
  * Lo que conviene mirar, de lo más urgente a lo menos (Lau, 03/11: que Plata
@@ -153,7 +166,7 @@ export function avisosParaMejorar(x: {
   gordo: number | null
   gastosAhora: Map<string, number>
   gastosAntes: Map<string, number>
-  campos: { nombre: string; resultado: number; gastos: number; ingresos: number; hectareas: number | null }[]
+  campos: { campoId: string; nombre: string; resultado: number; gastos: number; ingresos: number; hectareas: number | null }[]
   periodo: Periodo
 }): Aviso[] {
   const avisos: Aviso[] = []
@@ -166,11 +179,15 @@ export function avisosParaMejorar(x: {
     avisos.push({
       id: 'apretado',
       tono: 'mal',
+      tema: 'Lo que viene',
       titulo: `Para cubrir ${mes} faltan ${pesos(falta)}`,
-      detalle: kg
-        ? `A precio de hoy son unos ${kg.toLocaleString('es-AR')} kg de gordo. Se puede adelantar una venta o correr un pago.`
-        : 'Se puede adelantar una venta o correr un pago.',
-      accion: { texto: 'Ver la agenda', a: '/agenda' },
+      detalle: kg ? `Son unos ${kg.toLocaleString('es-AR')} kg de gordo a precio de hoy. Adelantá una venta o corré un pago.` : 'Adelantá una venta o corré un pago.',
+      barras: [
+        { texto: 'Entra', valor: x.apretado.entra, muestra: pesos(x.apretado.entra), tono: 'entra' },
+        { texto: 'Sale', valor: x.apretado.sale, muestra: pesos(x.apretado.sale), tono: 'sale' },
+      ],
+      // La Agenda abierta en ese mes: ahí se ve qué se puede correr.
+      accion: { texto: `Ver ${mes} en la Agenda`, a: `/agenda?mes=${x.apretado.mes}` },
     })
   }
 
@@ -187,9 +204,14 @@ export function avisosParaMejorar(x: {
     avisos.push({
       id: 'subio',
       tono: 'atencion',
-      titulo: `${subio.nombre} subió ${Math.round((subio.ratio - 1) * 100)} % en dólares`,
-      detalle: `Contra el mismo período del año anterior: de ${usd(subio.antes)} a ${usd(subio.ahora)}. Vale revisar precios o proveedor.`,
-      accion: { texto: 'Ver esos gastos', a: `/analitica/movimientos?rango=todo&q=${encodeURIComponent(subio.nombre)}` },
+      tema: 'Un gasto',
+      titulo: `${subio.nombre} subió ${Math.round((subio.ratio - 1) * 100)} %`,
+      detalle: 'En dólares, contra el mismo período del año anterior. Revisá precios o proveedor.',
+      barras: [
+        { texto: 'Año anterior', valor: subio.antes, muestra: usd(subio.antes), tono: 'neutro' },
+        { texto: 'Este año', valor: subio.ahora, muestra: usd(subio.ahora), tono: 'sale' },
+      ],
+      accion: { texto: 'Ver cada compra', a: `/analitica/movimientos?rango=todo&q=${encodeURIComponent(subio.nombre)}` },
     })
   }
 
@@ -199,9 +221,15 @@ export function avisosParaMejorar(x: {
     avisos.push({
       id: 'campo',
       tono: 'atencion',
+      tema: 'Un campo',
       titulo: `${peor.nombre} pierde plata`,
-      detalle: `${peor.ingresos ? `Entró ${pesos(peor.ingresos)} y salió ${pesos(peor.gastos)}` : `Salió ${pesos(peor.gastos)} y no entró nada`}${porHa ? `: ${pesos(porHa)} por hectárea` : ''}${porHa && x.gordo ? `, unos ${Math.round(Math.abs(porHa) / x.gordo)} kg de gordo por ha` : ''}.`,
-      accion: { texto: 'Ver sus movimientos', a: `/analitica/movimientos?rango=todo&q=${encodeURIComponent(peor.nombre)}` },
+      detalle: porHa ? `${pesos(porHa)} por hectárea${x.gordo ? `, unos ${Math.round(Math.abs(porHa) / x.gordo)} kg de gordo por ha` : ''}.` : peor.ingresos ? 'Salió más de lo que entró.' : 'Todavía no entró nada.',
+      barras: [
+        { texto: 'Entró', valor: peor.ingresos, muestra: pesos(peor.ingresos), tono: 'entra' },
+        { texto: 'Salió', valor: peor.gastos, muestra: pesos(peor.gastos), tono: 'sale' },
+      ],
+      // Sus movimientos de verdad: se elige el campo en la barra (no una búsqueda por texto).
+      accion: { texto: `Ver la plata de ${peor.nombre}`, a: '/analitica/movimientos?rango=todo', campoId: peor.campoId },
     })
   }
   return avisos.slice(0, 3)

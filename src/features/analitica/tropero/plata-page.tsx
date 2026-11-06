@@ -75,7 +75,7 @@ export function PlataPage() {
     gordo,
     gastosAhora: gastosUsdPorCategoria(delCampo, periodo.desde, periodo.hasta, serie),
     gastosAntes: gastosUsdPorCategoria(delCampo, periodo.antesDesde, periodo.antesHasta, serie),
-    campos: porCampo(doce, 'caja').map((c) => ({ nombre: c.nombre, resultado: c.resultado, gastos: c.gastos, ingresos: c.ingresos, hectareas: hectareas.get(c.campoId) ?? null })),
+    campos: porCampo(doce, 'caja').map((c) => ({ campoId: c.campoId, nombre: c.nombre, resultado: c.resultado, gastos: c.gastos, ingresos: c.ingresos, hectareas: hectareas.get(c.campoId) ?? null })),
     periodo,
   })
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } })
@@ -190,7 +190,10 @@ export function PlataPage() {
           <h2 className="t-seccion pb-3 text-texto">Para mejorar</h2>
           <ul className="grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
             {avisos.map((a) => (
-              <AvisoTarjeta key={a.id} aviso={a} onIr={() => navigate(a.accion.a)} />
+              <AvisoTarjeta key={a.id} aviso={a} onIr={() => {
+                if (a.accion.campoId) identidad.elegir(a.accion.campoId)
+                navigate(a.accion.a)
+              }} />
             ))}
           </ul>
         </motion.section>
@@ -363,14 +366,27 @@ function Fila({ color, titulo, detalle, derecha }: { color: string; titulo: stri
 }
 
 function AvisoTarjeta({ aviso, onIr }: { aviso: Aviso; onIr: () => void }) {
+  const max = Math.max(aviso.barras[0].valor, aviso.barras[1].valor, 1)
   return (
-    <li className="flex flex-col gap-2 rounded-[18px] border border-borde bg-superficie p-5">
-      <p className="flex items-start gap-2.5 text-[16px] leading-snug font-bold text-texto">
-        <span aria-hidden className={cn('mt-[7px] size-2 shrink-0 rounded-full', aviso.tono === 'mal' ? 'bg-estado-problema' : 'bg-estado-atencion')} />
-        {aviso.titulo}
-      </p>
-      <p className="flex-1 pl-[18px] text-[14px] leading-snug text-texto-suave">{aviso.detalle}</p>
-      <button type="button" onClick={onIr} className="mt-1 ml-[18px] inline-flex h-9 w-fit items-center gap-1.5 rounded-full border-[1.5px] border-principal px-3.5 text-[14px] font-bold text-principal hover:bg-principal-suave">
+    <li className="flex flex-col rounded-[20px] border border-borde bg-superficie p-5">
+      <span className={cn('w-fit rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', aviso.tono === 'mal' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>{aviso.tema}</span>
+      <p className="t-tarjeta mt-2.5 text-texto">{aviso.titulo}</p>
+      {/* Las dos cifras, para verlo sin leer. */}
+      <div className="mt-4 flex flex-col gap-2.5">
+        {aviso.barras.map((b) => (
+          <div key={b.texto}>
+            <p className="flex items-baseline justify-between text-[13.5px]">
+              <span className="font-semibold text-texto-suave">{b.texto}</span>
+              <b className={cn('t-cifra', b.tono === 'entra' ? 'text-estado-bien-texto' : b.tono === 'sale' ? 'text-estado-problema-texto' : 'text-texto')}>{b.muestra}</b>
+            </p>
+            <span className="mt-1 block h-2 rounded-full bg-superficie-hundida">
+              <span className={cn('block h-full rounded-full', b.tono === 'entra' ? 'bg-plata-entra' : b.tono === 'sale' ? 'bg-plata-sale' : 'bg-neutro-300')} style={{ width: `${Math.max(2, (b.valor / max) * 100)}%` }} />
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 flex-1 text-[14px] leading-snug text-texto-suave">{aviso.detalle}</p>
+      <button type="button" onClick={onIr} className="mt-4 inline-flex h-10 w-fit items-center gap-1.5 rounded-full border-[1.5px] border-principal px-4 text-[14px] font-bold text-principal hover:bg-principal hover:text-principal-texto">
         {aviso.accion.texto}
         <Icono nombre="Siguiente" tamano={16} />
       </button>

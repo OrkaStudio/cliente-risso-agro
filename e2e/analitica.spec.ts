@@ -20,13 +20,19 @@ test('plata: anotar un gasto, verlo en los movimientos y buscarlo', async ({ pag
   await page.getByRole('button', { name: 'Anotar un gasto' }).click()
   const panel = page.getByRole('dialog', { name: 'Anotar plata' })
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('12345')
-  // Sin decir en qué, no se guarda: lo dice.
-  await panel.getByRole('button', { name: 'Anotar $12.345' }).click()
+  // En pasos: sin decir en qué, no sigue: lo dice.
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await expect(panel.getByText('Tocá en qué se fue.')).toBeVisible()
 
   await enQue(panel, 'Combustible')
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await panel.getByRole('group', { name: 'De qué campo' }).getByRole('button', { name: 'E2E Campo base' }).click()
   await panel.getByRole('group', { name: 'Cómo' }).getByRole('button', { name: 'Efectivo' }).click()
+  // Cuándo no viene elegido: hay que tocarlo.
+  await panel.getByRole('button', { name: 'Seguir' }).click()
+  await expect(panel.getByText('Tocá cuándo salió.')).toBeVisible()
+  await panel.getByRole('group', { name: 'Cuándo' }).getByRole('button', { name: 'Hoy' }).click()
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await panel.getByRole('textbox', { name: 'Qué fue' }).fill(desc)
   await panel.getByRole('button', { name: 'Anotar $12.345' }).click()
   await expect(panel).toBeHidden()
@@ -45,8 +51,8 @@ test('plata: un gasto en cuotas va a la Agenda', async ({ page }) => {
   const panel = page.getByRole('dialog', { name: 'Anotar plata' })
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('90000')
   await enQue(panel, 'Combustible')
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await panel.getByRole('group', { name: 'De qué campo' }).getByRole('button', { name: 'E2E Campo base' }).click()
-  await panel.getByRole('textbox', { name: 'Qué fue' }).fill('E2E cubiertas')
   await panel.getByRole('group', { name: 'Cuándo' }).getByRole('button', { name: 'En cuotas' }).click()
 
   const cuotas = page.getByRole('dialog', { name: 'Un gasto en cuotas' })
@@ -87,8 +93,8 @@ test('plata: un sueldo que se repite queda con el mismo monto cada mes', async (
   const panel = page.getByRole('dialog', { name: 'Algo que vence' })
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('2900000')
   await enQue(panel, 'Combustible')
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await panel.getByRole('group', { name: 'De qué campo' }).getByRole('button', { name: 'E2E Campo base' }).click()
-  await panel.getByRole('textbox', { name: 'Qué fue' }).fill(`E2E sueldo ${Date.now()}`)
   await panel.getByRole('group', { name: 'Cuándo vence' }).getByRole('button', { name: 'Se repite' }).click()
   const repite = page.getByRole('dialog', { name: 'Un gasto que se repite' })
   await repite.getByRole('group', { name: 'Durante' }).getByRole('button', { name: '6 meses' }).click()

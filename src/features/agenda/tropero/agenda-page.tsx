@@ -58,7 +58,10 @@ export function AgendaPage() {
   const [filtro, setFiltro] = useState<Filtro>('todo')
   const [cuantas, setCuantas] = useState(5)
   // El calendario es lo principal (Lau, 05/11); la lista por semana, la otra forma. Se recuerda en este navegador.
-  const [forma, setForma] = useState<Forma>(leerForma)
+  // Un link con ?mes=2026-12 (desde «Para mejorar» de Plata) abre el calendario en ese mes.
+  const [paramsMes] = useSearchParams()
+  const mesPedido = /^\d{4}-\d{2}$/.test(paramsMes.get('mes') ?? '') ? paramsMes.get('mes') : null
+  const [forma, setForma] = useState<Forma>(() => (mesPedido ? 'calendario' : leerForma()))
   const elegirForma = (f: Forma) => {
     setForma(f)
     try {
@@ -210,7 +213,7 @@ export function AgendaPage() {
         venc.isLoading ? (
           <div className="h-[520px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
         ) : (
-          <AgendaCalendario items={items} hoy={hoy} empresaId={empresaId} campoId={elegido?.id} onAbrir={setAbierto} />
+          <AgendaCalendario key={mesPedido ?? 'hoy'} mesInicial={mesPedido ?? undefined} items={items} hoy={hoy} empresaId={empresaId} campoId={elegido?.id} onAbrir={setAbierto} />
         )
       ) : (
         <>

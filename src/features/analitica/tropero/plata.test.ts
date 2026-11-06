@@ -124,13 +124,17 @@ describe('Plata', () => {
       gordo: 4000,
       gastosAhora: new Map([['Combustible', 13_800], ['Sueldos', 50_000]]),
       gastosAntes: new Map([['Combustible', 10_000], ['Sueldos', 49_000]]),
-      campos: [{ nombre: 'La Loma', resultado: -30_000_000, gastos: 30_000_000, ingresos: 0, hectareas: 500 }],
+      campos: [{ campoId: 'c2', nombre: 'La Loma', resultado: -30_000_000, gastos: 30_000_000, ingresos: 0, hectareas: 500 }],
       periodo: periodos('2026-11-03')[0]!,
     })
     expect(avisos.map((a) => a.id)).toEqual(['apretado', 'subio', 'campo'])
-    expect(avisos[0]!.detalle).toContain('unos 5.250 kg de gordo.')
+    expect(avisos[0]!.detalle).toContain('unos 5.250 kg de gordo')
     expect(avisos[0]!.detalle).not.toMatch(/novillo/)
-    expect(avisos[1]!.titulo).toBe('Combustible subió 38 % en dólares')
+    expect(avisos[1]!.titulo).toBe('Combustible subió 38 %')
     expect(avisos[2]!.detalle).toContain('15 kg de gordo por ha')
+    // Cada uno lleva a donde se resuelve: la Agenda en ese mes, y el campo elegido en la barra.
+    expect(avisos[0]!.accion.a).toBe('/agenda?mes=2026-12')
+    expect(avisos[2]!.accion.campoId).toBe('c2')
+    expect(avisos[0]!.barras.map((b) => b.texto)).toEqual(['Entra', 'Sale'])
   })
 })

@@ -15,8 +15,11 @@ test('agenda: algo que vence aparece en su semana, se marca pagado y se deshace'
   const enQue = panel.getByRole('group', { name: 'En qué' })
   if (!(await enQue.getByRole('button', { name: 'Combustible', exact: true }).count())) await enQue.getByRole('button', { name: 'Otra' }).click()
   await enQue.getByRole('button', { name: 'Combustible', exact: true }).click()
+  // En pasos: cuánto y en qué; cuándo vence y de dónde; el detalle.
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await panel.getByRole('group', { name: 'De qué campo' }).getByRole('button', { name: 'E2E Campo base' }).click()
   await panel.getByRole('group', { name: 'Cuándo vence' }).getByRole('button', { name: 'En 7 días' }).click()
+  await panel.getByRole('button', { name: 'Seguir' }).click()
   await panel.getByRole('textbox', { name: 'Qué fue' }).fill(que)
   await panel.getByRole('button', { name: /^Anotar: pagás/ }).click()
   await expect(panel).toBeHidden()

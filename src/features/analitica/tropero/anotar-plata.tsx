@@ -163,7 +163,8 @@ function Formulario({
   const [esEcheq, setEsEcheq] = useState<'fisico' | 'echeq'>('fisico')
   const [chequeBanco, setChequeBanco] = useState('')
   const [chequeNumero, setChequeNumero] = useState('')
-  const [cuando, setCuando] = useState<'hoy' | 'otro'>('hoy')
+  // Sin preelegir (Lau, 05/11): el productor toca cuándo fue.
+  const [cuando, setCuando] = useState<'hoy' | 'otro' | ''>('')
   const [fecha, setFecha] = useState(hoyLocal())
   const [vence, setVence] = useState(venceInicial ?? '')
   const [factura, setFactura] = useState<ComprobanteTipo | 'no'>('no')
@@ -184,7 +185,8 @@ function Formulario({
   const [esCadaCuota, setEsCadaCuota] = useState<'cada' | 'total'>('cada')
   const [durante, setDurante] = useState('12')
   const [error, setError] = useState<string | null>(null)
-  const [mas, setMas] = useState(false)
+  // A mano, en tres pasos chicos (Lau, 05/11: «el form es un quilombo»): cuánto y en qué; de dónde y cuándo; el detalle.
+  const [paso, setPaso] = useState<1 | 2 | 3>(1)
 
   const potreros = usePotreros(campoId)
   const total = numeroDeFormateado(monto) ?? 0
@@ -224,6 +226,14 @@ function Formulario({
     if (paraCuotas) return !repite && cant < 1 ? 'Poné cuántas cuotas.' : null
     if (!cuenta) return esGasto ? 'Tocá cómo lo pagaste, o «Todavía no».' : 'Tocá cómo lo cobraste, o «Todavía no».'
     if (pendiente && !vence) return `Poné cuándo ${esGasto ? 'vence el pago' : 'lo cobrás'}.`
+    if (!pendiente && !cuando && modo !== 'leyo') return `Tocá cuándo ${esGasto ? 'salió' : 'entró'}.`
+    return null
+  }
+
+  /** Lo que falta para pasar del paso 1 (cuánto y en qué) al 2. */
+  function faltaPaso1(): string | null {
+    if (total <= 0) return 'Escribí cuánto fue.'
+    if (!categoriaId) return `Tocá en qué ${esGasto ? 'se fue' : 'entró'}.`
     return null
   }
 
@@ -296,7 +306,7 @@ function Formulario({
     setError(null)
     const f = faltante()
     if (f) return setError(f)
-    const dia = cuando === 'hoy' ? hoyLocal() : fecha
+    const dia = cuando === 'otro' ? fecha : hoyLocal()
     const medioFinal = pendiente ? previsto : cuenta
     try {
       await crear.mutateAsync({
@@ -468,31 +478,206 @@ function Formulario({
     )
   }
 
-  // ===== A mano, o lo que leyó de la foto =====
+  // ===== A mano (en pasos), o lo que leyó de la foto (todo junto, para revisar) =====
   const leyo = modo === 'leyo'
-  const verMas = mas || leyo || !!actividad || !!potreroId || factura !== 'no' || !!contraparte || !!cuit || (modoVence && !!previsto)
   const amarillo = (k: string) => leyo && leidos.has(k)
+  const ve = (n: 1 | 2 | 3) => leyo || paso === n
+  const PASOS = ['Cuánto y en qué', modoVence ? 'Cuándo vence y de dónde' : 'De dónde y cuándo', 'El detalle, si querés'] as const
+  function seguir() {
+    setError(null)
+    if (paso === 1) {
+      const f = faltaPaso1()
+      if (f) return setError(f)
+      return setPaso(2)
+    }
+    const f = faltante()
+    if (f) return setError(f)
+    setPaso(3)
+  }
+
+  const bloqueTipo = !leyo && <Segmentos etiqueta="Salió o entró" valor={tipo === 'gasto' ? 'salio' : 'entro'} onCambio={(v) => (setTipo(v === 'salio' ? 'gasto' : 'ingreso'), setCategoriaId(''))} opciones={modoVence ? [{ valor: 'salio', texto: 'A pagar' }, { valor: 'entro', texto: 'A cobrar' }] : [{ valor: 'salio', texto: 'Salió' }, { valor: 'entro', texto: 'Entró' }]} />
+  const bloqueMonto = (
+    <>
+      {/* El monto, grande: es lo primero que se mira. */}
+      <label className={cn('mt-5 flex items-baseline gap-1 rounded-[18px] px-1', amarillo('monto') && 'bg-acento/35 px-3', leyo && !fotoUrl && 'mt-0')}>
+        <span className="titulo-display shrink-0 text-[44px] whitespace-nowrap text-texto-suave">{esGasto ? '−$' : '+$'}</span>
+        <input aria-label="Cuánto" inputMode="numeric" placeholder="0" value={monto} onChange={(e) => (setMonto(formatearNumero(e.target.value)), setLeidos((s) => (s.delete('monto'), new Set(s))))} autoFocus={!leyo} className="titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight tracking-[-0.03em] text-texto outline-none placeholder:text-texto/25" />
+      </label>
+      {!leyo && conIva && iva > 0 && (
+        <p className="mt-1 text-[14px] text-texto-suave">
+          Neto {pesos(neto)} + IVA {lineasLeidas ? '' : `${alicuota.replace('.', ',')} % `}
+          {pesos(iva)}.{factura === 'a' && esGasto ? ' Con factura A, el IVA es crédito.' : ''}
+        </p>
+      )}
+    </>
+  )
+  const bloqueEnQue = (
+    <Grupo titulo={esGasto ? 'En qué, lo que más usás primero' : 'De qué, lo que más usás primero'} className="mt-6">
+      <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > 5 ? [{ valor: '__otra', texto: 'Otra' }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : setCategoriaId(v))} />
+      {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
+    </Grupo>
+  )
+  // El campo: si ya está elegido en la barra o hay uno solo, no se pregunta (se puede cambiar en «De dónde»).
+  const bloqueCampo = (campos.length > 1 || !campoId) && (
+    <Grupo titulo="De qué campo">
+      <Opciones etiqueta="De qué campo" opciones={campos.map((c) => ({ valor: c.id, texto: c.nombre }))} elegidas={[campoId]} onTocar={(v) => (setCampoId(v), setPotreroId(''))} />
+    </Grupo>
+  )
+  const bloqueComo = (
+    <Grupo titulo={modoVence ? (esGasto ? 'Cómo se paga · si ya sabés' : 'Cómo se cobra · si ya sabés') : esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
+      {modoVence ? (
+        <Opciones etiqueta="Cómo" opciones={CUENTAS} elegidas={[previsto]} onTocar={(x) => setPrevisto((p) => (p === x ? '' : x))} />
+      ) : (
+        <Opciones etiqueta="Cómo" opciones={[...CUENTAS, { valor: 'pendiente' as Cuenta, texto: 'Todavía no, va a la Agenda' }]} elegidas={[cuenta]} onTocar={setCuenta} />
+      )}
+      {(modoVence || pendiente ? previsto : cuenta) === 'cheque' && (
+        <div className="mt-3 flex flex-col gap-3">
+          <Segmentos etiqueta="Qué cheque" valor={esEcheq} onCambio={setEsEcheq} opciones={[{ valor: 'fisico', texto: 'De papel' }, { valor: 'echeq', texto: 'eCheq' }]} />
+          <div className="grid grid-cols-2 gap-3">
+            <CampoTexto etiqueta="Banco" value={chequeBanco} onChange={(e) => setChequeBanco(e.target.value)} />
+            <CampoTexto etiqueta="N° de cheque" inputMode="numeric" value={chequeNumero} onChange={(e) => setChequeNumero(e.target.value)} />
+          </div>
+        </div>
+      )}
+    </Grupo>
+  )
+  const bloqueCuando = pendiente ? (
+    <Grupo titulo={esGasto ? 'Cuándo vence' : 'Cuándo lo cobrás'} className="mt-6">
+      <Opciones
+        etiqueta="Cuándo vence"
+        opciones={[
+          { valor: '7', texto: 'En 7 días' },
+          { valor: '30', texto: 'En 30 días' },
+          { valor: 'repite', texto: 'Se repite' },
+          { valor: 'cuotas', texto: 'Son cuotas' },
+        ]}
+        elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
+        onTocar={(x) => {
+          if (x !== 'cuotas' && x !== 'repite') return setVence(enDias(Number(x)))
+          const f = faltante(true)
+          if (f) return setError(f)
+          setError(null)
+          setClase(x === 'repite' ? 'repite' : 'cuotas')
+          if (vence) setPrimera(vence)
+          setModo('cuotas')
+        }}
+      />
+      <div className="mt-3">
+        <CampoFecha value={vence} onChange={setVence} ariaLabel="Cuándo vence" min={hoyLocal()} />
+      </div>
+    </Grupo>
+  ) : (
+    <Grupo titulo={esGasto ? 'Cuándo salió' : 'Cuándo entró'}>
+      <Opciones
+        etiqueta="Cuándo"
+        opciones={[
+          { valor: 'hoy', texto: 'Hoy' },
+          { valor: 'otro', texto: 'Otro día' },
+          ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }, { valor: 'repite', texto: 'Se repite' }]),
+        ]}
+        elegidas={[cuando]}
+        onTocar={(v) => {
+          if (v !== 'cuotas' && v !== 'repite') return setCuando(v as 'hoy' | 'otro')
+          const f = faltante(true)
+          if (f) return setError(f)
+          setError(null)
+          setClase(v === 'repite' ? 'repite' : 'cuotas')
+          setModo('cuotas')
+        }}
+      />
+      {cuando === 'otro' && (
+        <div className={cn('mt-3 rounded-2xl', amarillo('fecha') && 'ring-4 ring-acento/45')}>
+          <CampoFecha value={fecha} onChange={setFecha} ariaLabel="Qué día" max={hoyLocal()} />
+        </div>
+      )}
+    </Grupo>
+  )
+  const bloqueDetalle = (
+    <>
+      <div className={cn(!leyo && paso === 3 ? '' : 'mt-6')}>
+        <Campo leido={amarillo('descripcion')}>
+          <CampoTexto etiqueta="Qué fue" placeholder={esGasto ? 'Gasoil para el tractor' : 'Venta de terneros'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} autoFocus={!leyo} />
+        </Campo>
+      </div>
+      <div className="mt-4 grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
+        <Campo leido={amarillo('contraparte')}>
+          <CampoTexto etiqueta={esGasto ? 'A quién' : 'De quién'} placeholder="Shell Deheza S.A." value={contraparte} onChange={(e) => setContraparte(e.target.value)} />
+        </Campo>
+        <Campo leido={amarillo('cuit')}>
+          <CampoTexto etiqueta="CUIT" inputMode="numeric" placeholder="30-50672834-1" value={cuit} onChange={(e) => setCuit(e.target.value)} />
+        </Campo>
+      </div>
+      {campoId && (potreros.data ?? []).length > 0 && (
+        <Grupo titulo="De qué potrero · si es de uno" className="mt-6">
+          <Opciones etiqueta="De qué potrero" opciones={(potreros.data ?? []).map((p) => ({ valor: p.id, texto: p.nombre }))} elegidas={[potreroId]} onTocar={(v) => setPotreroId((x) => (x === v ? '' : v))} />
+        </Grupo>
+      )}
+      <Grupo titulo="Para qué actividad · así ves qué rinde" className="mt-6">
+        <Opciones etiqueta="Para qué actividad" opciones={(Object.keys(actividadLabel) as Actividad[]).map((a) => ({ valor: a, texto: actividadLabel[a] }))} elegidas={[actividad]} onTocar={(v) => setActividad((x) => (x === v ? '' : v))} />
+      </Grupo>
+      <Grupo titulo="La factura">
+        <Opciones etiqueta="La factura" opciones={FACTURAS} elegidas={[factura]} onTocar={(v) => (setFactura(v), setLineasLeidas(null))} />
+        {conIva && !lineasLeidas && (
+          <div className="mt-3">
+            <Opciones etiqueta="El IVA" opciones={ALICUOTAS.map((a) => ({ valor: a, texto: `IVA ${a.replace('.', ',')} %` }))} elegidas={[alicuota]} onTocar={setAlicuota} />
+          </div>
+        )}
+        {conIva && lineasLeidas && <p className="mt-2 text-[13.5px] text-texto-suave">El IVA lo leyó de la factura: {lineasLeidas.map((l) => `${String(l.alicuota).replace('.', ',')} %`).join(' y ')}. Tocá otra factura para cambiarlo.</p>}
+      </Grupo>
+    </>
+  )
+
+  const botonAnotar = (
+    <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardar()} className="flex-1">
+      {total > 0 ? (pendiente && vence ? `Anotar: ${esGasto ? 'pagás' : 'cobrás'} ${fmtCompact(total)} el ${Number(vence.slice(8))}/${Number(vence.slice(5, 7))}` : `Anotar ${pesos(total)}`) : 'Anotar'}
+    </BotonPrincipal>
+  )
   return (
     <PanelLateral
       abierto={abierto}
       onCerrar={onCerrar}
-      onVolver={leyo ? () => (setModo('mano'), setLeidos(new Set())) : undefined}
-      volverTexto="Cargarlo a mano"
+      chico={!leyo}
+      onVolver={leyo ? () => (setModo('mano'), setLeidos(new Set())) : paso > 1 ? () => (setError(null), setPaso((p) => (p - 1) as 1 | 2)) : undefined}
+      volverTexto={leyo ? 'Cargarlo a mano' : 'Volver'}
       titulo={leyo ? 'Esto es lo que leyó' : modoVence ? 'Algo que vence' : 'Anotar plata'}
-      bajada={leyo ? 'Lo marcado en amarillo lo sacó de la foto. Tocá cualquier dato para corregirlo.' : modoVence ? 'Lo vas a pagar o cobrar más adelante: queda en la Agenda y en lo que viene de Plata.' : undefined}
+      bajada={
+        leyo ? (
+          'Lo marcado en amarillo lo sacó de la foto. Tocá cualquier dato para corregirlo.'
+        ) : (
+          <span className="flex flex-col gap-2">
+            <span className="flex gap-1.5" aria-hidden>
+              {[1, 2, 3].map((n) => (
+                <span key={n} className={cn('h-1.5 w-8 rounded-full', n <= paso ? 'bg-principal' : 'bg-borde')} />
+              ))}
+            </span>
+            <span>
+              Paso {paso} de 3: {PASOS[paso - 1]}
+            </span>
+          </span>
+        )
+      }
       pie={
         <>
-        {errorAviso}
-        <div className="flex items-center gap-3">
-          <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardar()} className="flex-1">
-            {total > 0 ? (pendiente && vence ? `Anotar: ${esGasto ? 'pagás' : 'cobrás'} ${fmtCompact(total)} el ${Number(vence.slice(8))}/${Number(vence.slice(5, 7))}` : `Anotar ${pesos(total)}`) : 'Anotar'}
-          </BotonPrincipal>
-          {!leyo && (
-            <button type="button" onClick={() => archivo.current?.click()} aria-label="Escanear un comprobante" className="grid size-16 shrink-0 place-items-center rounded-full border-[1.5px] border-principal text-principal hover:bg-principal-suave">
-              <Icono nombre="Foto" />
+          {errorAviso}
+          <div className="flex items-center gap-3">
+            {leyo || paso === 3 ? (
+              botonAnotar
+            ) : (
+              <BotonPrincipal icono="Siguiente" onClick={seguir} className="flex-1">
+                Seguir
+              </BotonPrincipal>
+            )}
+            {!leyo && paso === 1 && (
+              <button type="button" onClick={() => archivo.current?.click()} aria-label="Escanear un comprobante" className="grid size-16 shrink-0 place-items-center rounded-full border-[1.5px] border-principal text-principal hover:bg-principal-suave">
+                <Icono nombre="Foto" />
+              </button>
+            )}
+          </div>
+          {!leyo && paso === 2 && (
+            <button type="button" onClick={() => void guardar()} disabled={ocupado} className="mt-2.5 h-12 w-full rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto hover:border-principal hover:text-principal disabled:opacity-50">
+              Anotar así, sin más detalle
             </button>
           )}
-        </div>
         </>
       }
     >
@@ -514,231 +699,32 @@ function Formulario({
         </div>
       )}
 
-      {!leyo && <Segmentos etiqueta="Salió o entró" valor={tipo === 'gasto' ? 'salio' : 'entro'} onCambio={(v) => (setTipo(v === 'salio' ? 'gasto' : 'ingreso'), setCategoriaId(''))} opciones={modoVence ? [{ valor: 'salio', texto: 'A pagar' }, { valor: 'entro', texto: 'A cobrar' }] : [{ valor: 'salio', texto: 'Salió' }, { valor: 'entro', texto: 'Entró' }]} />}
-
-      {/* El monto, grande: es lo primero que se mira. */}
-      <label className={cn('mt-5 flex items-baseline gap-1 rounded-[18px] px-1', amarillo('monto') && 'bg-acento/35 px-3', leyo && !fotoUrl && 'mt-0')}>
-        <span className="titulo-display shrink-0 text-[44px] whitespace-nowrap text-texto-suave">{esGasto ? '−$' : '+$'}</span>
-        <input aria-label="Cuánto" inputMode="numeric" placeholder="0" value={monto} onChange={(e) => (setMonto(formatearNumero(e.target.value)), setLeidos((s) => (s.delete('monto'), new Set(s))))} autoFocus={!leyo} className="titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight tracking-[-0.03em] text-texto outline-none placeholder:text-texto/25" />
-      </label>
-      {!leyo && conIva && iva > 0 && (
-        <p className="mt-1 text-[14px] text-texto-suave">
-          Neto {pesos(neto)} + IVA {lineasLeidas ? '' : `${alicuota.replace('.', ',')} % `}
-          {pesos(iva)}.{factura === 'a' && esGasto ? ' Con factura A, el IVA es crédito.' : ''}
-        </p>
-      )}
-
-      {/* Lo que hace falta, en el orden en que se piensa; lo demás, plegado (Lau, 05/11: «simplificá los formularios»). */}
-      {modoVence ? (
+      {ve(1) && (
         <>
-      {pendiente ? (
-        <Grupo titulo={esGasto ? 'Cuándo vence' : 'Cuándo lo cobrás'} className="mt-6">
-          <Opciones
-            etiqueta="Cuándo vence"
-            opciones={[
-              { valor: '7', texto: 'En 7 días' },
-              { valor: '30', texto: 'En 30 días' },
-              { valor: 'repite', texto: 'Se repite' },
-              { valor: 'cuotas', texto: 'Son cuotas' },
-            ]}
-            elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
-            onTocar={(x) => {
-              if (x !== 'cuotas' && x !== 'repite') return setVence(enDias(Number(x)))
-              const f = faltante(true)
-              if (f) return setError(f)
-              setError(null)
-              setClase(x === 'repite' ? 'repite' : 'cuotas')
-              if (vence) setPrimera(vence)
-              setModo('cuotas')
-            }}
-          />
-          <div className="mt-3">
-            <CampoFecha value={vence} onChange={setVence} ariaLabel="Cuándo vence" min={hoyLocal()} />
-          </div>
-        </Grupo>
-      ) : (
-        <Grupo titulo="Cuándo">
-          <Opciones
-            etiqueta="Cuándo"
-            opciones={[
-              { valor: 'hoy', texto: 'Hoy' },
-              { valor: 'otro', texto: 'Otro día' },
-              ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }, { valor: 'repite', texto: 'Se repite' }]),
-            ]}
-            elegidas={[cuando]}
-            onTocar={(v) => {
-              if (v !== 'cuotas' && v !== 'repite') return setCuando(v as 'hoy' | 'otro')
-              const f = faltante(true)
-              if (f) return setError(f)
-              setError(null)
-              setClase(v === 'repite' ? 'repite' : 'cuotas')
-              setModo('cuotas')
-            }}
-          />
-          {cuando === 'otro' && (
-            <div className={cn('mt-3 rounded-2xl', amarillo('fecha') && 'ring-4 ring-acento/45')}>
-              <CampoFecha value={fecha} onChange={setFecha} ariaLabel="Qué día" max={hoyLocal()} />
-            </div>
+          {bloqueTipo}
+          {bloqueMonto}
+          {bloqueEnQue}
+        </>
+      )}
+      {ve(2) && (
+        <div className={cn(!leyo && '[&>fieldset:first-child]:mt-0')}>
+          {/* Algo que vence: primero cuándo; si no, primero de dónde y cómo. */}
+          {modoVence ? (
+            <>
+              {bloqueCuando}
+              {bloqueCampo}
+              {bloqueComo}
+            </>
+          ) : (
+            <>
+              {bloqueCampo}
+              {bloqueComo}
+              {bloqueCuando}
+            </>
           )}
-        </Grupo>
-      )}
-
-      <Grupo titulo={esGasto ? 'En qué, lo que más usás primero' : 'De qué, lo que más usás primero'} className="mt-6">
-        <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > 5 ? [{ valor: '__otra', texto: 'Otra' }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : setCategoriaId(v))} />
-        {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
-      </Grupo>
-
-      <Grupo titulo="De qué campo">
-        <Opciones etiqueta="De qué campo" opciones={campos.map((c) => ({ valor: c.id, texto: c.nombre }))} elegidas={[campoId]} onTocar={(v) => (setCampoId(v), setPotreroId(''))} />
-      </Grupo>
-        </>
-      ) : (
-        <>
-      <Grupo titulo={esGasto ? 'En qué, lo que más usás primero' : 'De qué, lo que más usás primero'} className="mt-6">
-        <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > 5 ? [{ valor: '__otra', texto: 'Otra' }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : setCategoriaId(v))} />
-        {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
-      </Grupo>
-
-      <Grupo titulo="De qué campo">
-        <Opciones etiqueta="De qué campo" opciones={campos.map((c) => ({ valor: c.id, texto: c.nombre }))} elegidas={[campoId]} onTocar={(v) => (setCampoId(v), setPotreroId(''))} />
-      </Grupo>
-      <Grupo titulo={modoVence ? (esGasto ? 'Cómo se paga' : 'Cómo se cobra') : esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
-        {modoVence ? (
-          <Opciones etiqueta="Cómo" opciones={CUENTAS} elegidas={[previsto]} onTocar={(x) => setPrevisto((p) => (p === x ? '' : x))} />
-        ) : (
-          <Opciones etiqueta="Cómo" opciones={[...CUENTAS, { valor: 'pendiente' as Cuenta, texto: 'Todavía no, va a la Agenda' }]} elegidas={[cuenta]} onTocar={setCuenta} />
-        )}
-        {(modoVence ? previsto : cuenta) === 'cheque' && (
-          <div className="mt-3 flex flex-col gap-3">
-            <Segmentos etiqueta="Qué cheque" valor={esEcheq} onCambio={setEsEcheq} opciones={[{ valor: 'fisico', texto: 'De papel' }, { valor: 'echeq', texto: 'eCheq' }]} />
-            <div className="grid grid-cols-2 gap-3">
-              <CampoTexto etiqueta="Banco" value={chequeBanco} onChange={(e) => setChequeBanco(e.target.value)} />
-              <CampoTexto etiqueta="N° de cheque" inputMode="numeric" value={chequeNumero} onChange={(e) => setChequeNumero(e.target.value)} />
-            </div>
-          </div>
-        )}
-      </Grupo>
-
-      {pendiente ? (
-        <Grupo titulo={esGasto ? 'Cuándo vence' : 'Cuándo lo cobrás'}>
-          <Opciones
-            etiqueta="Cuándo vence"
-            opciones={[
-              { valor: '7', texto: 'En 7 días' },
-              { valor: '30', texto: 'En 30 días' },
-              { valor: 'repite', texto: 'Se repite' },
-              { valor: 'cuotas', texto: 'Son cuotas' },
-            ]}
-            elegidas={[vence === enDias(7) ? '7' : vence === enDias(30) ? '30' : '']}
-            onTocar={(x) => {
-              if (x !== 'cuotas' && x !== 'repite') return setVence(enDias(Number(x)))
-              const f = faltante(true)
-              if (f) return setError(f)
-              setError(null)
-              setClase(x === 'repite' ? 'repite' : 'cuotas')
-              if (vence) setPrimera(vence)
-              setModo('cuotas')
-            }}
-          />
-          <div className="mt-3">
-            <CampoFecha value={vence} onChange={setVence} ariaLabel="Cuándo vence" min={hoyLocal()} />
-          </div>
-        </Grupo>
-      ) : (
-        <Grupo titulo="Cuándo">
-          <Opciones
-            etiqueta="Cuándo"
-            opciones={[
-              { valor: 'hoy', texto: 'Hoy' },
-              { valor: 'otro', texto: 'Otro día' },
-              ...(leyo ? [] : [{ valor: 'cuotas', texto: 'En cuotas' }, { valor: 'repite', texto: 'Se repite' }]),
-            ]}
-            elegidas={[cuando]}
-            onTocar={(v) => {
-              if (v !== 'cuotas' && v !== 'repite') return setCuando(v as 'hoy' | 'otro')
-              const f = faltante(true)
-              if (f) return setError(f)
-              setError(null)
-              setClase(v === 'repite' ? 'repite' : 'cuotas')
-              setModo('cuotas')
-            }}
-          />
-          {cuando === 'otro' && (
-            <div className={cn('mt-3 rounded-2xl', amarillo('fecha') && 'ring-4 ring-acento/45')}>
-              <CampoFecha value={fecha} onChange={setFecha} ariaLabel="Qué día" max={hoyLocal()} />
-            </div>
-          )}
-        </Grupo>
-      )}
-
-        </>
-      )}
-      <div className="mt-6">
-        <Campo leido={amarillo('descripcion')}>
-          <CampoTexto etiqueta="Qué fue" placeholder={esGasto ? 'Gasoil para el tractor' : 'Venta de terneros'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-        </Campo>
-      </div>
-
-      {/* Lo opcional: el potrero, la actividad, cómo se paga, la factura y a quién. Abierto si leyó la foto o ya tiene algo. */}
-      <button type="button" aria-expanded={verMas} onClick={() => setMas((x) => !x)} className="mt-6 flex w-full items-center justify-between gap-3 rounded-[16px] border-[1.5px] border-borde bg-superficie px-4 py-3.5 text-left hover:border-neutro-300">
-        <span className="min-w-0">
-          <span className="block text-[15.5px] font-bold text-texto">Más datos · opcional</span>
-          <span className="block truncate text-[13.5px] text-texto-suave">{[(potreros.data ?? []).length > 0 ? 'Potrero' : null, 'actividad', modoVence ? (esGasto ? 'cómo se paga' : 'cómo se cobra') : null, 'factura', esGasto ? 'a quién' : 'de quién'].filter(Boolean).join(', ')}</span>
-        </span>
-        <span className={cn('shrink-0 transition-transform', verMas ? '-rotate-90' : 'rotate-90')}><Icono nombre="Siguiente" tamano={16} /></span>
-      </button>
-      {verMas && (
-        <div className="pt-6 pb-2">
-      {campoId && (potreros.data ?? []).length > 0 && (
-        <Grupo titulo="De qué potrero · si es de uno">
-          <Opciones etiqueta="De qué potrero" opciones={(potreros.data ?? []).map((p) => ({ valor: p.id, texto: p.nombre }))} elegidas={[potreroId]} onTocar={(v) => setPotreroId((x) => (x === v ? '' : v))} />
-        </Grupo>
-      )}
-      <Grupo titulo="Para qué actividad · así ves qué rinde">
-        <Opciones etiqueta="Para qué actividad" opciones={(Object.keys(actividadLabel) as Actividad[]).map((a) => ({ valor: a, texto: actividadLabel[a] }))} elegidas={[actividad]} onTocar={(v) => setActividad((x) => (x === v ? '' : v))} />
-      </Grupo>
-
-      {modoVence && (
-        <>
-      <Grupo titulo={modoVence ? (esGasto ? 'Cómo se paga' : 'Cómo se cobra') : esGasto ? 'Cómo lo pagaste' : 'Cómo lo cobraste'}>
-        {modoVence ? (
-          <Opciones etiqueta="Cómo" opciones={CUENTAS} elegidas={[previsto]} onTocar={(x) => setPrevisto((p) => (p === x ? '' : x))} />
-        ) : (
-          <Opciones etiqueta="Cómo" opciones={[...CUENTAS, { valor: 'pendiente' as Cuenta, texto: 'Todavía no, va a la Agenda' }]} elegidas={[cuenta]} onTocar={setCuenta} />
-        )}
-        {(modoVence ? previsto : cuenta) === 'cheque' && (
-          <div className="mt-3 flex flex-col gap-3">
-            <Segmentos etiqueta="Qué cheque" valor={esEcheq} onCambio={setEsEcheq} opciones={[{ valor: 'fisico', texto: 'De papel' }, { valor: 'echeq', texto: 'eCheq' }]} />
-            <div className="grid grid-cols-2 gap-3">
-              <CampoTexto etiqueta="Banco" value={chequeBanco} onChange={(e) => setChequeBanco(e.target.value)} />
-              <CampoTexto etiqueta="N° de cheque" inputMode="numeric" value={chequeNumero} onChange={(e) => setChequeNumero(e.target.value)} />
-            </div>
-          </div>
-        )}
-      </Grupo>
-
-        </>
-      )}
-      <Grupo titulo="La factura">
-        <Opciones etiqueta="La factura" opciones={FACTURAS} elegidas={[factura]} onTocar={(v) => (setFactura(v), setLineasLeidas(null))} />
-        {conIva && !lineasLeidas && (
-          <div className="mt-3">
-            <Opciones etiqueta="El IVA" opciones={ALICUOTAS.map((a) => ({ valor: a, texto: `IVA ${a.replace('.', ',')} %` }))} elegidas={[alicuota]} onTocar={setAlicuota} />
-          </div>
-        )}
-        {conIva && lineasLeidas && <p className="mt-2 text-[13.5px] text-texto-suave">El IVA lo leyó de la factura: {lineasLeidas.map((l) => `${String(l.alicuota).replace('.', ',')} %`).join(' y ')}. Tocá otra factura para cambiarlo.</p>}
-      </Grupo>
-
-      <div className="mt-6 grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
-          <Campo leido={amarillo('contraparte')}>
-            <CampoTexto etiqueta={esGasto ? 'A quién · opcional' : 'De quién · opcional'} placeholder="Shell Deheza S.A." value={contraparte} onChange={(e) => setContraparte(e.target.value)} />
-          </Campo>
-          <Campo leido={amarillo('cuit')}>
-            <CampoTexto etiqueta="CUIT · opcional" inputMode="numeric" placeholder="30-50672834-1" value={cuit} onChange={(e) => setCuit(e.target.value)} />
-          </Campo>
-      </div>
         </div>
       )}
+      {ve(3) && bloqueDetalle}
     </PanelLateral>
   )
 }
