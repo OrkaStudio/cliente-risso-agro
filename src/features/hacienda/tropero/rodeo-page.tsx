@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
-import pastura from '@/assets/tropero/pastura-camino.webp'
+import arreo from '@/assets/tropero/arreo.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
 import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
@@ -204,8 +204,8 @@ export function RodeoPage() {
       {/* El encabezado, como el de cada sección (Lau, 06/11): Hacienda, las especies y qué campo. */}
       <motion.div {...entra(0)} className="@container">
         <Cabecera
-          imagen={pastura}
-          posicion="50% 45%"
+          imagen={arreo}
+          posicion="40% 78%"
           derecha={
             potreroFiltro ? (
                     <button

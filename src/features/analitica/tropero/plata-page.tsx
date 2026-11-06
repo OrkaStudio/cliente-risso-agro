@@ -12,7 +12,7 @@ import { useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hook
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import textura from '@/assets/tropero/textura-campo.webp'
+import campoArriba from '@/assets/tropero/campo-de-arriba.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
 import { useDolarHistorico } from './dolar'
 import { AnotarPlata } from './anotar-plata'
@@ -113,7 +113,7 @@ export function PlataPage() {
     <div className="mx-auto flex w-full ancho-pagina flex-col gap-8">
       {/* El encabezado, como el de cada sección (Lau, 06/11): el resultado del período y lo que se hace. */}
       <motion.div {...entra(0)}>
-        <Cabecera imagen={textura} posicion="50% 40%" derecha={
+        <Cabecera imagen={campoArriba} posicion="50% 50%" derecha={
             <>
               <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />
               <Link to="/analitica/movimientos" className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">

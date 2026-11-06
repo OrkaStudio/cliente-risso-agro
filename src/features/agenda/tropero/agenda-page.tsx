@@ -16,7 +16,7 @@ import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { cheques, pendiente, semanasQueVienen, tituloDe, mesCorto, type Semana } from './agenda'
 import { AgendaCalendario } from './agenda-calendario'
-import arroyo from '@/assets/tropero/arroyo.webp'
+import arroyo from '@/assets/tropero/arroyo-mapa.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
 import { Cosa } from './agenda-cosa'
 import { PagarPanel } from './pagar-panel'
@@ -120,7 +120,7 @@ export function AgendaPage() {
       <motion.div {...entra(0)}>
         <Cabecera
           imagen={arroyo}
-          posicion="60% 50%"
+          posicion="40% 45%"
           derecha={
             <>
               <CampoVisto campos={campos} elegido={elegido} />

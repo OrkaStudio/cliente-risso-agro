@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
 import { BotonChico } from '@/components/tropero/boton'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
-import lotes from '@/assets/tropero/lotes-del-campo.webp'
+import tranquera from '@/assets/tropero/tranquera.webp'
 import { Cabecera as CabeceraSeccion } from '@/components/tropero/cabecera'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
@@ -160,8 +160,8 @@ function Cabecera({
 }) {
   const ir = useIr()
   return (
-    // La ilustración de la 31 («Lotes y sombra de nube»): el mismo encabezado de todas las secciones.
-    <CabeceraSeccion imagen={lotes} posicion="50% 35%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
+    // La tranquera y el camino (Figma 233:113): el mismo encabezado de todas las secciones.
+    <CabeceraSeccion imagen={tranquera} posicion="50% 42%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
         <h1 className="t-pagina text-texto">{titulo}</h1>
         <div className="mt-2.5 flex flex-wrap gap-2">
           {chips.map((c) => (
