@@ -544,8 +544,8 @@ export function AsistentePanel() {
         aria-label={etiqueta}
         aria-expanded={abierto}
         className={cn(
-          'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-tinta p-2 text-white shadow-[0_12px_32px_rgba(28,18,10,0.35)] ring-1 ring-white/10 transition-colors hover:bg-tinta/90',
-          nAvisos > 0 ? 'pr-3' : verTexto ? 'md:pr-2' : '',
+          'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-tinta p-2 text-white shadow-[0_12px_32px_rgba(28,18,10,0.35)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#26302a] hover:shadow-[0_16px_38px_rgba(28,18,10,0.42)] active:translate-y-0',
+          verTexto ? 'md:pr-3' : '',
           arriba ? 'z-[76]' : 'z-[45]',
         )}
       >
@@ -555,20 +555,21 @@ export function AsistentePanel() {
               <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
             </motion.span>
           )}
+          {/* Tiene algo para contarte: un puntito en el orbe (antes un «1» que no se entendía). */}
+          <AnimatePresence>
+            {nAvisos > 0 && !abierto && (
+              <motion.span
+                className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-tinta"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+              />
+            )}
+          </AnimatePresence>
         </span>
         {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
         <TextoDeLaBarra texto={abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')} visible={verTexto} estado={!!globo && !abierto} />
-        {/* El número de avisos entra y sale con el mismo resorte que el texto: la barra no salta. */}
-        {nAvisos > 0 && (
-          <motion.span
-            className="flex shrink-0 justify-end overflow-hidden"
-            initial={false}
-            animate={{ width: abierto ? 0 : 24, opacity: abierto ? 0 : 1, scale: abierto ? 0.6 : 1 }}
-            transition={{ width: { type: 'spring', stiffness: 210, damping: 30, mass: 0.9 }, opacity: { duration: 0.2 }, scale: { type: 'spring', stiffness: 300, damping: 24 } }}
-          >
-            <span className="t-cifra-mini grid size-6 shrink-0 place-items-center rounded-full bg-principal font-bold text-principal-texto">{nAvisos}</span>
-          </motion.span>
-        )}
       </button>
 
       {/* El orbe: descansa en su hueco de la barra y sale a volar cuando hace algo. */}
@@ -603,30 +604,36 @@ function Burbuja({ children }: { children: React.ReactNode }) {
  */
 function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: boolean; estado: boolean }) {
   const regla = React.useRef<HTMLSpanElement>(null)
+  const base = React.useRef<HTMLSpanElement>(null)
   const [ancho, setAncho] = React.useState(0)
+  // Nunca más angosta que «Preguntale a Troppero»: abrir y cerrar no cambia el ancho, sólo el texto.
   React.useLayoutEffect(() => {
-    if (regla.current) setAncho(Math.min(260, Math.ceil(regla.current.getBoundingClientRect().width)) + 14)
+    const w = Math.max(regla.current?.getBoundingClientRect().width ?? 0, base.current?.getBoundingClientRect().width ?? 0)
+    setAncho(Math.min(260, Math.ceil(w)))
   }, [texto])
   return (
     <motion.span
-      className="relative grid h-10 items-center overflow-hidden whitespace-nowrap max-md:hidden"
+      className="relative grid h-10 items-center justify-items-start overflow-hidden whitespace-nowrap max-md:hidden"
       initial={false}
       animate={{ width: visible ? ancho : 0, opacity: visible ? 1 : 0 }}
       transition={{ width: { type: 'spring', stiffness: 210, damping: 30, mass: 0.9 }, opacity: { duration: 0.2, ease: 'easeOut' } }}
     >
-      {/* La regla: mide el texto que viene, sin verse. */}
+      {/* Las reglas: miden el texto que viene y el de siempre, sin verse. */}
       <span ref={regla} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 text-[15px] font-bold">
         {texto}
+      </span>
+      <span ref={base} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 text-[15px] font-bold">
+        Preguntale a Troppero
       </span>
       <AnimatePresence initial={false}>
         <motion.span
           key={texto}
           role={estado ? 'status' : undefined}
           className="max-w-[260px] truncate text-[15px] font-bold [grid-area:1/1]"
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
         >
           {texto}
         </motion.span>
