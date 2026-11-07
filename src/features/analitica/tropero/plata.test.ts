@@ -130,7 +130,8 @@ describe('Plata', () => {
     expect(avisos.map((a) => a.id)).toEqual(['apretado', 'subio', 'campo'])
     expect(avisos[0]!.detalle).toContain('unos 5.250 kg de gordo')
     expect(avisos[0]!.detalle).not.toMatch(/novillo/)
-    expect(avisos[1]!.titulo).toBe('Combustible subió 38 %')
+    expect(avisos[1]!.titulo).toBe('Subió 38 %')
+    expect(avisos[1]!.tema).toBe('Combustible')
     expect(avisos[2]!.detalle).toContain('15 kg de gordo por ha')
     // Cada uno lleva a donde se resuelve: la Agenda en ese mes, y el campo elegido en la barra.
     expect(avisos[0]!.accion.a).toBe('/agenda?mes=2026-12')

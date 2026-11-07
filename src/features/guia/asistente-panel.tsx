@@ -369,10 +369,11 @@ export function AsistentePanel() {
               aria-label="¿En qué te ayudo?"
               className="fixed z-[75] flex flex-col overflow-hidden bg-superficie text-texto shadow-[0_24px_60px_rgba(40,22,10,0.28)] ring-1 ring-[#a9552c]/12 max-md:inset-x-2 max-md:bottom-2 max-md:h-[85dvh] max-md:rounded-[24px] md:right-6 md:bottom-[92px] md:h-[min(720px,calc(100dvh-116px))] md:w-[380px] md:rounded-[24px]"
               style={{ transformOrigin: 'bottom right' }}
-              initial={{ opacity: 0, y: 16, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.18 } }}
-              transition={{ type: 'spring', stiffness: 170, damping: 22, opacity: { duration: 0.25 } }}
+              // Nace de la barra y vuelve a ella: resorte sin rebote al abrir, salida suave al cerrar (Lau, 07/11).
+              initial={{ opacity: 0, y: 24, scale: 0.92, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: 24, scale: 0.94, filter: 'blur(3px)', transition: { duration: 0.24, ease: [0.4, 0, 0.6, 1] } }}
+              transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.9, opacity: { duration: 0.22 }, filter: { duration: 0.22 } }}
             >
               {/* Cabecera: quién es y para qué sirve. */}
               <header className="flex items-center gap-3 border-b border-borde/70 px-5 py-4">
@@ -529,24 +530,36 @@ export function AsistentePanel() {
         aria-expanded={abierto}
         className={cn(
           'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-tinta p-2 text-white shadow-[0_12px_32px_rgba(28,18,10,0.35)] ring-1 ring-white/10 transition-colors hover:bg-tinta/90',
-          verTexto ? 'md:pr-5' : nAvisos > 0 ? 'pr-3' : '',
+          nAvisos > 0 ? 'pr-3' : verTexto ? 'md:pr-2' : '',
           arriba ? 'z-[76]' : 'z-[45]',
         )}
       >
         <span ref={hueco} aria-hidden className="size-10 shrink-0" />
-        <AnimatePresence mode="wait" initial={false}>
+        {/* El texto abre y cierra su ancho con un resorte (antes aparecía de golpe y la barra saltaba). */}
+        <AnimatePresence initial={false}>
           {verTexto && (
-          <motion.span
-            key={abierto ? 'cerrar' : (globo ?? 'invita')}
-            role={globo && !abierto ? 'status' : undefined}
-            className="max-w-[260px] truncate text-[15px] font-bold max-md:hidden"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.18 }}
-          >
-            {abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')}
-          </motion.span>
+            <motion.span
+              key="texto"
+              className="relative overflow-hidden whitespace-nowrap max-md:hidden"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 'auto', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 34, opacity: { duration: 0.18 } }}
+            >
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={abierto ? 'cerrar' : (globo ?? 'invita')}
+                  role={globo && !abierto ? 'status' : undefined}
+                  className="block max-w-[260px] truncate pr-3 text-[15px] font-bold"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+                >
+                  {abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')}
+                </motion.span>
+              </AnimatePresence>
+            </motion.span>
           )}
         </AnimatePresence>
         {nAvisos > 0 && !abierto && (

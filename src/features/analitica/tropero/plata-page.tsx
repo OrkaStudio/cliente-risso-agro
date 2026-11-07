@@ -50,8 +50,10 @@ export function PlataPage() {
   const hoy = hoyLocal()
   const campos = useCampos()
   // El precio del gordo como en la barra de arriba: el más reciente, a igual fecha el manual.
-  const manual = useGordoActual(empresaId).data
-  const canuelas = useNovilloCanuelas().data
+  const manualQ = useGordoActual(empresaId)
+  const canuelasQ = useNovilloCanuelas()
+  const manual = manualQ.data
+  const canuelas = canuelasQ.data
   const gordo = (canuelas && (!manual || canuelas.fecha > manual.fecha) ? canuelas.valor : manual?.valor) ?? null
   const serie = useMemo(() => dolar.data ?? [], [dolar.data])
   const todos = useMemo(() => periodos(hoy), [hoy])
@@ -81,7 +83,9 @@ export function PlataPage() {
   })
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } })
 
-  if (movs.isLoading) return <div className="mx-auto h-[400px] w-full ancho-pagina animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
+  // Todo junto o nada (Lau, 07/11): si se muestra antes de tener el dólar, lo anotado y el gordo,
+  // «Para mejorar» y «Mes a mes» aparecen y cambian solos (el parpadeo).
+  if (movs.isLoading || pend.isLoading || dolar.isLoading || campos.isLoading || manualQ.isLoading || canuelasQ.isLoading) return <div className="mx-auto h-[400px] w-full ancho-pagina animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (movs.error) return <p className="text-texto-suave">No pudimos cargar la plata. Revisá la conexión y probá de nuevo.</p>
 
   const vacio = delCampo.length === 0
@@ -370,8 +374,9 @@ function AvisoTarjeta({ aviso, onIr }: { aviso: Aviso; onIr: () => void }) {
   const max = Math.max(aviso.barras[0].valor, aviso.barras[1].valor, 1)
   return (
     <li className="flex flex-col rounded-[20px] border border-borde bg-superficie p-5">
-      <span className={cn('w-fit rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', aviso.tono === 'mal' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>{aviso.tema}</span>
-      <p className="t-tarjeta mt-2.5 text-texto">{aviso.titulo}</p>
+      {/* De qué se trata (chico) y lo importante en una sola línea: las tres tarjetas quedan parejas. */}
+      <span className={cn('max-w-full truncate self-start rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', aviso.tono === 'mal' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>{aviso.tema}</span>
+      <p className={cn('t-numero mt-2.5 truncate', aviso.tono === 'mal' ? 'text-estado-problema-texto' : 'text-texto')}>{aviso.titulo}</p>
       {/* Las dos cifras, para verlo sin leer. */}
       <div className="mt-4 flex flex-col gap-2.5">
         {aviso.barras.map((b) => (
@@ -386,7 +391,7 @@ function AvisoTarjeta({ aviso, onIr }: { aviso: Aviso; onIr: () => void }) {
           </div>
         ))}
       </div>
-      <p className="mt-3 flex-1 text-[14px] leading-snug text-texto-suave">{aviso.detalle}</p>
+      <p className="mt-3 line-clamp-2 min-h-[2lh] flex-1 text-[14px] leading-snug text-texto-suave">{aviso.detalle}</p>
       <button type="button" onClick={onIr} className="mt-4 inline-flex h-10 w-fit items-center gap-1.5 rounded-full border-[1.5px] border-principal px-4 text-[14px] font-bold text-principal hover:bg-principal hover:text-principal-texto">
         {aviso.accion.texto}
         <Icono nombre="Siguiente" tamano={16} />

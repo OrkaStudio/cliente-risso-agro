@@ -163,7 +163,7 @@ export function AppShell() {
         <main ref={principal} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
-            className="w-full px-4 pb-28 pt-7 sm:px-10 sm:pt-8"
+            className="w-full px-4 pb-14 pt-7 sm:px-10 sm:pt-8"
             style={bienvenida && !contenidoListo ? { opacity: 0 } : undefined}
           >
             <Suspense

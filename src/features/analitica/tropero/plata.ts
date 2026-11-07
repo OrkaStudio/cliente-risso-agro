@@ -179,8 +179,8 @@ export function avisosParaMejorar(x: {
     avisos.push({
       id: 'apretado',
       tono: 'mal',
-      tema: 'Lo que viene',
-      titulo: `Para cubrir ${mes} faltan ${pesos(falta)}`,
+      tema: `${mes.charAt(0).toUpperCase()}${mes.slice(1)} viene apretado`,
+      titulo: `Faltan ${pesos(falta)}`,
       detalle: kg ? `Son unos ${kg.toLocaleString('es-AR')} kg de gordo a precio de hoy. Adelantá una venta o corré un pago.` : 'Adelantá una venta o corré un pago.',
       barras: [
         { texto: 'Entra', valor: x.apretado.entra, muestra: pesos(x.apretado.entra), tono: 'entra' },
@@ -204,8 +204,8 @@ export function avisosParaMejorar(x: {
     avisos.push({
       id: 'subio',
       tono: 'atencion',
-      tema: 'Un gasto',
-      titulo: `${subio.nombre} subió ${Math.round((subio.ratio - 1) * 100)} %`,
+      tema: subio.nombre,
+      titulo: `Subió ${Math.round((subio.ratio - 1) * 100)} %`,
       detalle: 'En dólares, contra el mismo período del año anterior. Revisá precios o proveedor.',
       barras: [
         { texto: 'Año anterior', valor: subio.antes, muestra: usd(subio.antes), tono: 'neutro' },
@@ -221,8 +221,8 @@ export function avisosParaMejorar(x: {
     avisos.push({
       id: 'campo',
       tono: 'atencion',
-      tema: 'Un campo',
-      titulo: `${peor.nombre} pierde plata`,
+      tema: peor.nombre,
+      titulo: 'Pierde plata',
       detalle: porHa ? `${pesos(porHa)} por hectárea${x.gordo ? `, unos ${Math.round(Math.abs(porHa) / x.gordo)} kg de gordo por ha` : ''}.` : peor.ingresos ? 'Salió más de lo que entró.' : 'Todavía no entró nada.',
       barras: [
         { texto: 'Entró', valor: peor.ingresos, muestra: pesos(peor.ingresos), tono: 'entra' },
