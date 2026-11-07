@@ -49,7 +49,7 @@ export function PanelLateral({
             chico
               ? cn('top-4 right-4 max-h-[calc(100dvh-32px)] rounded-[28px] max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-3 max-sm:w-auto', ancho ? 'max-w-[600px]' : 'max-w-[460px]')
               : cn('inset-y-0 right-0 h-[100dvh] rounded-l-[28px]', ancho ? 'max-w-[680px]' : 'max-w-[520px]'),
-            ' bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right',
+            ' bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right data-open:ease-[cubic-bezier(0.22,1,0.36,1)] data-closed:ease-[cubic-bezier(0.4,0,0.6,1)]',
             className,
           )}
         >

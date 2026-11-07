@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
@@ -99,10 +100,10 @@ function Lista({ campo }: { campo: CampoMapa }) {
       </div>
       <p className="text-[15px] text-texto">Marcá en el satélite su borde y cada potrero.</p>
       <ol className="flex flex-col gap-0.5">
-        {fila(borde, sigue === 'borde', <b>Borde del campo</b>, borde ? 'listo' : '')}
+        <Fragment key="borde">{fila(borde, sigue === 'borde', <b>Borde del campo</b>, borde ? 'listo' : '')}</Fragment>
         {potreros.map((p) => {
           const hecho = borde && dibujadoEn(p, campo.contorno)
-          return fila(hecho, sigue === p.id, <b className="cifra">{p.nombre}</b>, [p.hectareas ? `${haTexto(p.hectareas)} ha` : null, p.que].filter(Boolean).join(' · '))
+          return <Fragment key={p.id}>{fila(hecho, sigue === p.id, <b className="cifra">{p.nombre}</b>, [p.hectareas ? `${haTexto(p.hectareas)} ha` : null, p.que].filter(Boolean).join(' · '))}</Fragment>
         })}
       </ol>
       <button

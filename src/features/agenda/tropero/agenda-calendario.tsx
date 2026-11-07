@@ -200,7 +200,7 @@ function Chip({ v, hoy, onAbrir }: { v: Vencimiento; hoy: string; onAbrir: (v: V
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Positioner side="right" sideOffset={10} collisionPadding={16} className="z-40">
-          <Tooltip.Popup className="w-[290px] origin-[var(--transform-origin)] rounded-[20px] border border-borde bg-superficie p-4 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] transition-[opacity,transform] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <Tooltip.Popup className="w-[290px] popup-suave rounded-[20px] border border-borde bg-superficie p-4 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)]">
             <span className={cn('inline-block rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', PILDORA[estado.clase])}>{estado.texto}</span>
             <p className="mt-2 text-[16px] leading-snug font-bold text-texto">
               {clase === 'hecho' ? (cobro ? 'Cobraste' : 'Pagaste') : cobro ? 'Cobrás' : 'Pagás'}: {tituloDe(v)}

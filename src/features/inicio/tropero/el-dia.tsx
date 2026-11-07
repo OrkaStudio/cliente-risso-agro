@@ -187,7 +187,7 @@ function Avisos({ chips, onIr }: { chips: Chip[]; onIr: (destino: string) => voi
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="start" sideOffset={8} collisionPadding={16} className="z-40">
-          <Popover.Popup className="w-[380px] origin-[var(--transform-origin)] rounded-[22px] border border-borde bg-superficie p-2 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <Popover.Popup className="w-[380px] popup-suave rounded-[22px] border border-borde bg-superficie p-2 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] outline-none">
             <Popover.Title className="px-3 pt-2 pb-1 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">Para hoy</Popover.Title>
             <ul className="flex flex-col">
               {chips.map((c) => (
@@ -691,7 +691,7 @@ function ConDetalle({ p, hoy, children }: { p: PuntoPlata; hoy: Date; children: 
       <Tooltip.Trigger render={children} />
       <Tooltip.Portal>
         <Tooltip.Positioner side="top" sideOffset={10} collisionPadding={16} className="z-40">
-          <Tooltip.Popup className="w-[270px] origin-[var(--transform-origin)] rounded-[20px] border border-borde bg-superficie p-4 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] transition-[opacity,transform] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <Tooltip.Popup className="w-[270px] popup-suave rounded-[20px] border border-borde bg-superficie p-4 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)]">
             <span className={cn('inline-block rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', dias < 0 ? 'bg-estado-problema text-superficie' : p.cobro ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
               {estado}
               {dias < 0 ? (p.cobro ? ', sin cobrar' : ', sin pagar') : ''}

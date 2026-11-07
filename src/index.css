@@ -468,6 +468,26 @@
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
   }
+  /* Los popups chicos (detalle al pasar el mouse, avisos): entran subiendo y salen bajando,
+     con una curva suave y un cierre un poco más lento que la apertura (Lau, 07/11). */
+  .popup-suave {
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      filter 220ms ease-out;
+  }
+  .popup-suave[data-starting-style] {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  .popup-suave[data-ending-style] {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    transition:
+      opacity 240ms cubic-bezier(0.4, 0, 0.6, 1),
+      transform 280ms cubic-bezier(0.4, 0, 0.6, 1);
+  }
   .tnum-prop {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
