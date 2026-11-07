@@ -556,35 +556,18 @@ export function AsistentePanel() {
             </motion.span>
           )}
         </span>
-        {/* El texto abre y cierra su ancho con un resorte (antes aparecía de golpe y la barra saltaba). */}
-        <AnimatePresence initial={false}>
-          {verTexto && (
-            <motion.span
-              key="texto"
-              className="relative overflow-hidden whitespace-nowrap max-md:hidden"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 'auto', opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 32, opacity: { type: 'tween', duration: 0.2 } }}
-            >
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={abierto ? 'cerrar' : (globo ?? 'invita')}
-                  role={globo && !abierto ? 'status' : undefined}
-                  className="block max-w-[260px] truncate pr-3 text-[15px] font-bold"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-                >
-                  {abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')}
-                </motion.span>
-              </AnimatePresence>
-            </motion.span>
-          )}
-        </AnimatePresence>
-        {nAvisos > 0 && !abierto && (
-          <span className="t-cifra-mini grid size-6 shrink-0 place-items-center rounded-full bg-principal font-bold text-principal-texto">{nAvisos}</span>
+        {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
+        <TextoDeLaBarra texto={abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')} visible={verTexto} estado={!!globo && !abierto} />
+        {/* El número de avisos entra y sale con el mismo resorte que el texto: la barra no salta. */}
+        {nAvisos > 0 && (
+          <motion.span
+            className="flex shrink-0 justify-end overflow-hidden"
+            initial={false}
+            animate={{ width: abierto ? 0 : 24, opacity: abierto ? 0 : 1, scale: abierto ? 0.6 : 1 }}
+            transition={{ width: { type: 'spring', stiffness: 210, damping: 30, mass: 0.9 }, opacity: { duration: 0.2 }, scale: { type: 'spring', stiffness: 300, damping: 24 } }}
+          >
+            <span className="t-cifra-mini grid size-6 shrink-0 place-items-center rounded-full bg-principal font-bold text-principal-texto">{nAvisos}</span>
+          </motion.span>
         )}
       </button>
 
@@ -611,4 +594,43 @@ function Titulo({ children }: { children: React.ReactNode }) {
 /** Lo que dice el asistente en la charla. */
 function Burbuja({ children }: { children: React.ReactNode }) {
   return <div className="max-w-[88%] self-start rounded-[18px] rounded-bl-[6px] bg-fondo px-4 py-3 text-[14.5px] leading-relaxed text-texto">{children}</div>
+}
+
+/**
+ * El texto de la barra, sin saltos (Lau, 07/11): se mide el texto nuevo
+ * antes de mostrarlo y el ancho viaja hasta esa medida; el viejo se va y el
+ * nuevo entra en el mismo lugar, cruzándose.
+ */
+function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: boolean; estado: boolean }) {
+  const regla = React.useRef<HTMLSpanElement>(null)
+  const [ancho, setAncho] = React.useState(0)
+  React.useLayoutEffect(() => {
+    if (regla.current) setAncho(Math.min(260, Math.ceil(regla.current.getBoundingClientRect().width)) + 14)
+  }, [texto])
+  return (
+    <motion.span
+      className="relative grid h-10 items-center overflow-hidden whitespace-nowrap max-md:hidden"
+      initial={false}
+      animate={{ width: visible ? ancho : 0, opacity: visible ? 1 : 0 }}
+      transition={{ width: { type: 'spring', stiffness: 210, damping: 30, mass: 0.9 }, opacity: { duration: 0.2, ease: 'easeOut' } }}
+    >
+      {/* La regla: mide el texto que viene, sin verse. */}
+      <span ref={regla} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 text-[15px] font-bold">
+        {texto}
+      </span>
+      <AnimatePresence initial={false}>
+        <motion.span
+          key={texto}
+          role={estado ? 'status' : undefined}
+          className="max-w-[260px] truncate text-[15px] font-bold [grid-area:1/1]"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {texto}
+        </motion.span>
+      </AnimatePresence>
+    </motion.span>
+  )
 }
