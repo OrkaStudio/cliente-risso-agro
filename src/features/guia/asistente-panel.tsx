@@ -171,6 +171,15 @@ export function AsistentePanel() {
     const t = setTimeout(() => (volando.current = false), 2500)
     return () => clearTimeout(t)
   }, [marca, destino.x, destino.y, quieto, metaX, metaY, posX, posY])
+  // En reposo el orbe vive adentro de la barra (se mueve con ella, sin atraso: antes la
+  // perseguía un cuadro tarde y se trababa); sólo sale a volar para señalar algo y volver.
+  const [vuela, setVuela] = React.useState(false)
+  if (marca && !vuela) setVuela(true)
+  React.useEffect(() => {
+    if (marca || !vuela) return
+    const t = setTimeout(() => setVuela(false), 2500)
+    return () => clearTimeout(t)
+  }, [marca, vuela])
   const velX = useVelocity(posX)
   const velY = useVelocity(posY)
 
@@ -234,8 +243,12 @@ export function AsistentePanel() {
       clearTimeout(t)
       t = setTimeout(() => setDuerme(true), DORMIR_MS)
     }
+    // Un cuadro por vez: antes cada pixel del mouse redibujaba todo el asistente (y trababa la animación).
+    let cuadro = 0
     const mover = (e: MouseEvent) => {
-      setMouse({ x: e.clientX, y: e.clientY })
+      const x = e.clientX
+      const y = e.clientY
+      if (!cuadro) cuadro = requestAnimationFrame(() => ((cuadro = 0), setMouse({ x, y })))
       activo()
     }
     activo()
@@ -244,6 +257,7 @@ export function AsistentePanel() {
     window.addEventListener('keydown', activo)
     return () => {
       clearTimeout(t)
+      cancelAnimationFrame(cuadro)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('pointerdown', activo)
       window.removeEventListener('keydown', activo)
@@ -368,12 +382,13 @@ export function AsistentePanel() {
               role="dialog"
               aria-label="¿En qué te ayudo?"
               className="fixed z-[75] flex flex-col overflow-hidden bg-superficie text-texto shadow-[0_24px_60px_rgba(40,22,10,0.28)] ring-1 ring-[#a9552c]/12 max-md:inset-x-2 max-md:bottom-2 max-md:h-[85dvh] max-md:rounded-[24px] md:right-6 md:bottom-[92px] md:h-[min(720px,calc(100dvh-116px))] md:w-[380px] md:rounded-[24px]"
-              style={{ transformOrigin: 'bottom right' }}
+              style={{ transformOrigin: 'bottom right', willChange: 'transform, opacity' }}
               // Nace de la barra y vuelve a ella: resorte sin rebote al abrir, salida suave al cerrar (Lau, 07/11).
-              initial={{ opacity: 0, y: 24, scale: 0.92, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: 24, scale: 0.94, filter: 'blur(3px)', transition: { duration: 0.24, ease: [0.4, 0, 0.6, 1] } }}
-              transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.9, opacity: { duration: 0.22 }, filter: { duration: 0.22 } }}
+              // Sólo transform y opacidad (lo que la placa de video mueve sin esfuerzo): sin trabas.
+              initial={{ opacity: 0, y: 28, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.94, transition: { type: 'tween', duration: 0.26, ease: [0.4, 0, 0.2, 1] } }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.85, opacity: { type: 'tween', duration: 0.2, ease: 'easeOut' } }}
             >
               {/* Cabecera: quién es y para qué sirve. */}
               <header className="flex items-center gap-3 border-b border-borde/70 px-5 py-4">
@@ -534,7 +549,13 @@ export function AsistentePanel() {
           arriba ? 'z-[76]' : 'z-[45]',
         )}
       >
-        <span ref={hueco} aria-hidden className="size-10 shrink-0" />
+        <span ref={hueco} aria-hidden className="relative size-10 shrink-0">
+          {!vuela && (
+            <motion.span className="absolute inset-0 grid place-items-center" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
+              <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+            </motion.span>
+          )}
+        </span>
         {/* El texto abre y cierra su ancho con un resorte (antes aparecía de golpe y la barra saltaba). */}
         <AnimatePresence initial={false}>
           {verTexto && (
@@ -544,7 +565,7 @@ export function AsistentePanel() {
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 'auto', opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 34, opacity: { duration: 0.18 } }}
+              transition={{ type: 'spring', stiffness: 260, damping: 32, opacity: { type: 'tween', duration: 0.2 } }}
             >
               <AnimatePresence mode="popLayout" initial={false}>
                 <motion.span
@@ -568,7 +589,7 @@ export function AsistentePanel() {
       </button>
 
       {/* El orbe: descansa en su hueco de la barra y sale a volar cuando hace algo. */}
-      <motion.div
+      {vuela && <motion.div
         aria-hidden
         className={cn('pointer-events-none fixed top-0 left-0', arriba ? 'z-[77]' : 'z-[46]')}
         style={{ width: TAM, height: TAM, x: posX, y: posY }}
@@ -576,7 +597,7 @@ export function AsistentePanel() {
         transition={{ type: 'spring', stiffness: 120, damping: 16 }}
       >
         <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
-      </motion.div>
+      </motion.div>}
     </MotionConfig>,
     document.body,
   )
