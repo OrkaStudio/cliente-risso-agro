@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PotreroAtencion } from '../para-atender-api'
 import type { Vencimiento } from '../api'
-import { delCampo, lluviaDelMes, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+import { delCampo, enCarriles, lluviaDelMes, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
 
 const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
   key: nombre,
@@ -97,12 +97,13 @@ describe('los chips de la cabecera', () => {
   const cosa = (key: string): import('./dia').Cosa => ({ key, tono: 'problema', titulo: '', detalle: '', accion: { texto: '', to: '' }, icono: 'Plata', lugar: '', que: '', datos: [] })
   it('lo del campo, lo vencido y la lluvia, en ese orden', () => {
     const cs = chipsDelDia({ cosas: [cosa('p-1'), cosa('p-2'), cosa('v-1')], vencimientos: [venc('a', -2)], lluviaManana: 82 })
-    expect(cs.map((c) => c.texto)).toEqual(['2 cosas en el campo', '1 pago vencido', '82 % de lluvia mañana'])
-    expect(cs[1]!.destino).toBe('/agenda')
+    expect(cs.map((c) => c.texto)).toEqual(['2 avisos de la recorrida', 'Un pago vencido · $350.000', '82 % de lluvia mañana'])
+    expect(cs.map((c) => c.accion)).toEqual(['Ver', 'Marcar', 'Pronóstico'])
+    expect(cs[1]!.destino).toBe('/agenda?revisar=1')
   })
-  it('sin vencidos avisa lo de la semana; sin nada, que está todo en orden', () => {
-    expect(chipsDelDia({ cosas: [], vencimientos: [venc('a', 4)], lluviaManana: 10 }).map((c) => c.texto)).toEqual(['1 vence esta semana'])
-    expect(chipsDelDia({ cosas: [], vencimientos: [], lluviaManana: null })[0]!.texto).toBe('Todo en orden hoy')
+  it('sin vencidos lleva a lo de la semana; sin nada, no hay chips', () => {
+    expect(chipsDelDia({ cosas: [], vencimientos: [venc('a', 4)], lluviaManana: 10 }).map((c) => c.texto)).toEqual(['1 pago vence esta semana'])
+    expect(chipsDelDia({ cosas: [], vencimientos: [], lluviaManana: null })).toEqual([])
   })
 })
 
@@ -182,5 +183,32 @@ describe('el Inicio de un campo', () => {
     expect(v.totalCabezas).toBe(30)
     expect(v.potreros).toHaveLength(2)
     expect(v.vencimientos).toHaveLength(2)
+  })
+})
+
+describe('la línea de la plata: nada se pisa', () => {
+  // Ninguna etiqueta pisa otra del mismo carril, y ningún tallo cruza una etiqueta de un carril de adentro.
+  const limpio = (u: { xb: number; carril: number }[], ancho: number) =>
+    u.every((a, i) => u.every((b, j) => i === j || (a.carril === b.carril ? Math.abs(a.xb - b.xb) >= ancho : a.carril < b.carril ? Math.abs(b.xb - a.xb) >= ancho / 2 : true)))
+  it('las que caen el mismo día o cerca no se pisan', () => {
+    const { ubicadas } = enCarriles([
+      { id: 'a', x: 500, ancho: 120 },
+      { id: 'b', x: 500, ancho: 120 },
+      { id: 'c', x: 540, ancho: 120 },
+      { id: 'd', x: 900, ancho: 120 },
+    ])
+    expect(ubicadas.find((u) => u.id === 'd')!.carril).toBe(0)
+    expect(limpio(ubicadas, 120)).toBe(true)
+  })
+  it('con muchas en pocos días, ninguna se pisa y termina', () => {
+    const muchas = Array.from({ length: 15 }, (_, i) => ({ id: String(i), x: 100 + (i % 5) * 30, ancho: 120 }))
+    const { ubicadas } = enCarriles(muchas)
+    expect(ubicadas).toHaveLength(15)
+    expect(limpio(ubicadas, 120)).toBe(true)
+  })
+  it('separadas, todas en el primer carril y en su día', () => {
+    const r = enCarriles([{ id: 'a', x: 100, ancho: 100 }, { id: 'b', x: 400, ancho: 100 }])
+    expect(r.carriles).toBe(1)
+    expect(r.ubicadas.every((u) => u.xb === u.x)).toBe(true)
   })
 })

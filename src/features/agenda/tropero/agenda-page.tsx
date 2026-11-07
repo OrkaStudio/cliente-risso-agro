@@ -72,7 +72,8 @@ export function AgendaPage() {
       /* sin storage: queda en esta visita */
     }
   }
-  const [revisar, setRevisar] = useState(false)
+  // Desde el Inicio («Marcar los pagos vencidos»): ?revisar=1 abre «¿Ya pagaste esto?».
+  const [revisar, setRevisar] = useState(() => new URLSearchParams(window.location.search).get('revisar') === '1')
   // Si el detalle se abrió desde «¿Ya pagaste esto?», tiene «Volver a la lista».
   const [desdeRevisar, setDesdeRevisar] = useState(false)
 

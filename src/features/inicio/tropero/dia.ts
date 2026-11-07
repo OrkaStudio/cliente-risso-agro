@@ -189,7 +189,8 @@ export function porDondeVaElMapa(campos: CampoMapa[]): string {
 }
 
 /** Un dato del día en la cabecera: lo más importante, de un vistazo, y adónde lleva. */
-export type Chip = { key: string; texto: string; tono: Tono | 'bien' | 'info'; destino: string }
+/** Un aviso del día: qué pasa (corto), el botón que lo resuelve y adónde lleva. */
+export type Chip = { key: string; texto: string; accion: string; tono: Tono | 'bien' | 'info'; destino: string }
 
 /**
  * Lo que dice la cabecera, en orden de importancia (como mucho tres): lo que
@@ -206,24 +207,29 @@ export function chipsDelDia({
   /** Probabilidad de lluvia de mañana (%), si hay pronóstico. */
   lluviaManana: number | null
 }): Chip[] {
+  // Qué pasa, corto, y el verbo del botón que lo resuelve (Lau, 07/11: en un panel de avisos, no chips sueltos).
   const chips: Chip[] = []
-  const atender = cosas.filter((c) => !c.key.startsWith('v-')).length
-  if (atender > 0)
-    chips.push({ key: 'atender', texto: `${atender} ${atender === 1 ? 'cosa' : 'cosas'} en el campo`, tono: 'problema', destino: '#para-atender' })
+  const delCampo = cosas.filter((c) => !c.key.startsWith('v-'))
+  if (delCampo.length === 1) {
+    const c = delCampo[0]!
+    chips.push({ key: 'atender', texto: c.lugar && c.que ? `${c.lugar}: ${c.que.charAt(0).toLowerCase()}${c.que.slice(1)}` : 'Un aviso de la recorrida', accion: 'Ver', tono: 'problema', destino: '#para-atender' })
+  } else if (delCampo.length > 1) chips.push({ key: 'atender', texto: `${delCampo.length} avisos de la recorrida`, accion: 'Ver', tono: 'problema', destino: '#para-atender' })
   const vencidos = vencimientos.filter((v) => (v.diasParaVencer ?? 0) < 0)
-  if (vencidos.length > 0)
-    chips.push({ key: 'vencidos', texto: `${vencidos.length} ${vencidos.length === 1 ? 'pago vencido' : 'pagos vencidos'}`, tono: 'problema', destino: '/agenda' })
-  else {
+  if (vencidos.length > 0) {
+    const monto = vencidos.reduce((t, v) => t + (v.monto ?? 0), 0)
+    // Lleva directo a «¿Ya pagaste esto?», donde se marcan de una vez.
+    chips.push({ key: 'vencidos', texto: `${vencidos.length === 1 ? 'Un pago vencido' : `${vencidos.length} pagos vencidos`}${monto ? ` · ${plataCorta(monto)}` : ''}`, accion: 'Marcar', tono: 'problema', destino: '/agenda?revisar=1' })
+  } else {
     const semana = vencimientos.filter((v) => v.diasParaVencer !== null && v.diasParaVencer >= 0 && v.diasParaVencer <= 7).length
-    if (semana > 0) chips.push({ key: 'semana', texto: `${semana} ${semana === 1 ? 'vence' : 'vencen'} esta semana`, tono: 'atencion', destino: '/agenda' })
+    if (semana > 0) chips.push({ key: 'semana', texto: `${semana} ${semana === 1 ? 'pago vence' : 'pagos vencen'} esta semana`, accion: 'Ver', tono: 'atencion', destino: '/agenda' })
   }
   if (lluviaManana !== null && lluviaManana >= 40)
-    chips.push({ key: 'lluvia', texto: `${lluviaManana} % de lluvia mañana`, tono: 'info', destino: '#clima' })
-  if (chips.length === 0) chips.push({ key: 'ok', texto: 'Todo en orden hoy', tono: 'bien', destino: '#para-atender' })
+    chips.push({ key: 'lluvia', texto: `${lluviaManana} % de lluvia mañana`, accion: 'Pronóstico', tono: 'info', destino: '#clima' })
+  // Sin nada urgente no se muestra un botón vacío: el saludo ya dice que está todo bien.
   return chips.slice(0, 3)
 }
 
-export type PuntoPlata = { id: string; dia: number; monto: number; cobro: boolean; descripcion: string; fecha: string | null }
+export type PuntoPlata = { id: string; dia: number; monto: number; cobro: boolean; descripcion: string; fecha: string | null; /** Varios del mismo día, juntos en una burbuja. */ grupo?: PuntoPlata[] }
 
 /**
  * La plata de los próximos días como línea de tiempo: lo que entra (arriba),
@@ -326,4 +332,41 @@ export function delCampo(campoId: string | null, p: Pick<PanoramaInicio, 'totalC
     vencimientos: p.vencimientos.filter((v) => v.campoId === campoId),
     ultimaRecorridaHace: a?.ultimaPorCampo[campoId] ?? null,
   }
+}
+
+// ===== La línea de la plata, sin que nada se pise =====
+
+/** Dónde va cada burbuja: su x y en qué carril (0 = pegado a la línea). */
+/** x: el día en la línea; xb: dónde queda la burbuja (corrida si el día ya estaba ocupado). */
+export type Ubicada = { id: string; x: number; xb: number; carril: number }
+
+/**
+ * Reparte las burbujas en carriles para que ninguna (ni su etiqueta) pise a
+ * otra (Lau, 07/11: «no debería suceder en ningún caso»). Cada una ocupa
+ * `ancho(id)` px centrados en su x; va al primer carril donde entra con
+ * `separacion` px de aire, o abre uno nuevo.
+ */
+export function enCarriles(puntos: { id: string; x: number; ancho: number }[], separacion = 10): { ubicadas: Ubicada[]; carriles: number } {
+  // Lo ocupado en cada carril: cada burbuja con su etiqueta, y los tallos de las de más afuera que lo cruzan.
+  const ocupado: [number, number][][] = []
+  const libre = (c: number, a: number, b: number) => (ocupado[c] ?? []).every(([x, y]) => b + separacion <= x || a >= y + separacion)
+  const TALLO = 3
+  const entra = (c: number, xb: number, ancho: number) =>
+    libre(c, xb - ancho / 2, xb + ancho / 2) && Array.from({ length: c }, (_, k) => libre(k, xb - TALLO, xb + TALLO)).every(Boolean)
+  const ubicadas = [...puntos]
+    .sort((a, b) => a.x - b.x)
+    .map((p) => {
+      // Primero en su día, de adentro hacia afuera; si no entra, corrida a un costado (cada vez un poco más).
+      const corrimientos = [0, ...Array.from({ length: 36 }, (_, i) => (i % 2 ? -1 : 1) * Math.ceil((i + 1) / 2) * (p.ancho / 6))]
+      let lugar: { c: number; xb: number } | null = null
+      for (const d of corrimientos) {
+        for (let c = 0; c < 6 && !lugar; c++) if (entra(c, p.x + d, p.ancho)) lugar = { c, xb: p.x + d }
+        if (lugar) break
+      }
+      // Sin lugar cerca (muchísimas en pocos días): a la derecha de todo, en el primer carril; ahí siempre entra.
+      lugar ??= { c: 0, xb: Math.max(...ocupado.flat().map(([, b]) => b)) + separacion + p.ancho / 2 }
+      for (let k = 0; k <= lugar.c; k++) (ocupado[k] ??= []).push(k === lugar.c ? [lugar.xb - p.ancho / 2, lugar.xb + p.ancho / 2] : [lugar.xb - TALLO, lugar.xb + TALLO])
+      return { id: p.id, x: p.x, xb: lugar.xb, carril: lugar.c }
+    })
+  return { ubicadas, carriles: ocupado.length }
 }

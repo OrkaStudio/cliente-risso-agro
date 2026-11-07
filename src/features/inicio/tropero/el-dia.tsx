@@ -1,3 +1,6 @@
+import { Popover } from '@base-ui/react/popover'
+import { Tooltip } from '@base-ui/react/tooltip'
+import { BellIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -19,7 +22,7 @@ import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
 import { useParaAtender } from '../para-atender-api'
-import { delCampo, escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
+import { delCampo, enCarriles, escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { EscenaClima } from './escena-clima'
@@ -132,13 +135,6 @@ function useIr() {
 
 // ===== La cabecera: el saludo, lo importante en chips y los accesos =====
 
-const CHIP: Record<Chip['tono'], string> = {
-  problema: 'border border-borde bg-superficie text-texto',
-  atencion: 'border border-borde bg-superficie text-texto',
-  aviso: 'border border-borde bg-superficie text-texto',
-  info: 'border border-borde bg-superficie text-texto',
-  bien: 'border border-borde bg-superficie text-texto',
-}
 const PUNTO: Record<Chip['tono'], string> = {
   problema: 'bg-estado-problema',
   atencion: 'bg-estado-atencion',
@@ -163,20 +159,57 @@ function Cabecera({
     // La tranquera y el camino (Figma 233:113): el mismo encabezado de todas las secciones.
     <CabeceraSeccion imagen={tranquera} posicion="50% 42%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
         <h1 className="t-pagina text-texto">{titulo}</h1>
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {chips.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => ir(c.destino)}
-              className={cn('inline-flex h-7 items-center gap-2 rounded-full px-3 text-[13px] font-bold transition-transform hover:-translate-y-px', CHIP[c.tono])}
-            >
-              <span className={cn('size-2 rounded-full', PUNTO[c.tono])} />
-              {c.texto}
-            </button>
-          ))}
-        </div>
+        {/* Los avisos del día, en un botón con su número: se abren en un panelito, cada uno con su acción (Lau, 07/11). */}
+        <Avisos chips={chips} onIr={ir} />
     </CabeceraSeccion>
+  )
+}
+
+function Avisos({ chips, onIr }: { chips: Chip[]; onIr: (destino: string) => void }) {
+  const urgentes = chips.filter((c) => c.tono === 'problema').length
+  if (!chips.length)
+    return (
+      <p className="mt-2.5 inline-flex items-center gap-2 text-[15px] font-semibold text-estado-bien-texto">
+        <span className="size-2 rounded-full bg-estado-bien" />
+        Todo en orden hoy
+      </p>
+    )
+  return (
+    <Popover.Root>
+      <Popover.Trigger className="group mt-2.5 inline-flex h-10 items-center gap-2.5 rounded-full border-[1.5px] border-borde bg-superficie/95 py-1 pr-3.5 pl-1 text-[14.5px] font-bold text-texto transition-colors hover:border-principal data-[popup-open]:border-principal">
+        <span className={cn('grid size-8 place-items-center rounded-full', urgentes ? 'bg-estado-problema text-superficie' : 'bg-acento text-acento-texto')}>
+          <BellIcon className="size-4" />
+        </span>
+        {chips.length === 1 ? 'Un aviso para hoy' : `${chips.length} avisos para hoy`}
+        <span className="text-texto-suave transition-transform group-data-[popup-open]:rotate-90">
+          <Icono nombre="Siguiente" tamano={16} />
+        </span>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner side="bottom" align="start" sideOffset={8} collisionPadding={16} className="z-40">
+          <Popover.Popup className="w-[380px] origin-[var(--transform-origin)] rounded-[22px] border border-borde bg-superficie p-2 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            <Popover.Title className="px-3 pt-2 pb-1 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">Para hoy</Popover.Title>
+            <ul className="flex flex-col">
+              {chips.map((c) => (
+                <li key={c.key}>
+                  <Popover.Close
+                    onClick={() => onIr(c.destino)}
+                    className="group flex w-full items-center gap-3 rounded-[16px] px-3 py-3 text-left transition-colors hover:bg-superficie-hundida/70"
+                  >
+                    <span className={cn('size-2.5 shrink-0 rounded-full', PUNTO[c.tono])} />
+                    <span className="min-w-0 flex-1 text-[15px] font-semibold text-texto">{c.texto}</span>
+                    <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border-[1.5px] border-principal/60 px-3 text-[13.5px] font-bold text-principal transition-colors group-hover:bg-principal group-hover:text-principal-texto">
+                      {c.accion}
+                      <Icono nombre="Siguiente" tamano={16} />
+                    </span>
+                  </Popover.Close>
+                </li>
+              ))}
+            </ul>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   )
 }
 
@@ -508,6 +541,11 @@ const HORIZONTE = 30
 /** Ancho de la columna de lo vencido, a la izquierda de la línea. */
 const VENCIDO = 190
 
+/** Lo que ocupa cada burbuja a lo ancho (con su monto y su nombre), para repartirlas sin que se pisen. */
+const ANCHO_ETIQUETA = 124
+/** Alto de un carril: la burbuja más grande, su monto y su nombre, y aire. */
+const CARRIL = 104
+
 function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const navigate = useNavigate()
   const l = lineaDePlata(vencimientos, HORIZONTE)
@@ -517,20 +555,38 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
     d.setDate(d.getDate() + dia)
     return `${d.getDate()} ${MES[d.getMonth()]}`
   }
-  // Tamaño por monto (área ∝ plata), entre 20 y 72 px.
-  const maxFuturo = Math.max(1, ...l.futuros.map((p) => p.monto))
-  const tam = (m: number) => 20 + 52 * Math.sqrt(m / maxFuturo)
-  // Dos niveles de etiqueta para que no se pisen las que caen cerca.
-  const nivel = (lista: PuntoPlata[]) => {
-    const orden = [...lista].sort((a, b) => a.dia - b.dia)
-    return new Map(orden.map((p, i) => [p.id, i > 0 && p.dia - orden[i - 1]!.dia < 6 && i % 2 === 1 ? 1 : 0]))
+  // El ancho real de la línea: las posiciones se calculan en píxeles para repartir en carriles.
+  const [ancho, setAncho] = useState(900)
+  const medir = (el: HTMLDivElement | null) => {
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setAncho(Math.round(e!.contentRect.width)))
+    ro.observe(el)
   }
-  const nivelArriba = nivel(l.futuros.filter((p) => p.cobro))
-  const nivelAbajo = nivel(l.futuros.filter((p) => !p.cobro))
+  const largo = Math.max(200, ancho - VENCIDO - 38)
+  const xDe = (dia: number) => VENCIDO + 16 + (largo * Math.max(0, dia)) / HORIZONTE
+  // Lo del mismo día y del mismo lado, en una burbuja («3 pagos»): el detalle, al pasar el mouse.
+  const juntos = (lista: PuntoPlata[]) => {
+    const m = new Map<string, PuntoPlata[]>()
+    for (const p of lista) m.set(`${p.dia}-${p.cobro}`, [...(m.get(`${p.dia}-${p.cobro}`) ?? []), p])
+    return [...m.values()].map((g) => (g.length === 1 ? g[0]! : { ...g[0]!, id: g.map((x) => x.id).join('+'), monto: g.reduce((t, x) => t + x.monto, 0), descripcion: `${g.length} ${g[0]!.cobro ? 'cobros' : 'pagos'}: ${g.map((x) => x.descripcion).join(', ')}`, grupo: g }))
+  }
+  const futuros = juntos(l.futuros)
+  // Tamaño por monto (área ∝ plata), entre 16 y 48 px.
+  const maxFuturo = Math.max(1, ...futuros.map((p) => p.monto))
+  const tam = (m: number) => 16 + 32 * Math.sqrt(m / maxFuturo)
+  const reparto = (lista: PuntoPlata[]) => enCarriles(lista.map((p) => ({ id: p.id, x: xDe(p.dia), ancho: Math.max(tam(p.monto), ANCHO_ETIQUETA) })))
+  const arriba = reparto(futuros.filter((p) => p.cobro))
+  const abajo = reparto(futuros.filter((p) => !p.cobro))
+  // Arriba se deja lugar para los carriles; abajo, además, la fila de fechas pegada a la línea.
+  const alto = Math.max(1, arriba.carriles) * CARRIL + 16
+  const altoAbajo = 34 + Math.max(1, abajo.carriles) * CARRIL
+  const lugarDe = new Map([...arriba.ubicadas, ...abajo.ubicadas].map((u) => [u.id, u]))
   const vacio = l.futuros.length === 0 && l.vencidos.length === 0
   // Lo vencido no es todo pérdida: lo que no se pagó y lo que no se cobró van separados.
   const sinPagar = l.vencidos.filter((p) => !p.cobro).reduce((t, p) => t + p.monto, 0)
   const sinCobrar = l.vencidos.filter((p) => p.cobro).reduce((t, p) => t + p.monto, 0)
+  // Uno solo abre «¿Lo pagaste?»; varios del mismo día, la Agenda en ese mes.
+  const abrir = (p: PuntoPlata & { grupo?: PuntoPlata[] }) => navigate(p.grupo ? `/agenda?mes=${(p.fecha ?? '').slice(0, 7)}` : `/agenda?mov=${p.id}`)
 
   return (
     <section className={TARJETA} aria-labelledby="la-plata">
@@ -539,7 +595,7 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
           <h2 id="la-plata" className={cn(T.titulo)}>
             La plata de los próximos 30 días
           </h2>
-          <p className={T.bajada}>Arriba lo que entra, abajo lo que sale. El tamaño es el monto.</p>
+          <p className={T.bajada}>Arriba lo que entra, abajo lo que sale. El tamaño es el monto; pasá el mouse para ver cada uno.</p>
         </div>
         <BotonChico type="button" onClick={() => navigate('/agenda')}>
           Ver en Agenda
@@ -547,8 +603,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-3">
-        <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-texto" />
-        <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-texto" />
+        <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-estado-bien-texto" />
+        <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-estado-problema-texto" />
         <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} />
         {sinPagar > 0 && <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">{plataCorta(sinPagar)} vencido sin pagar</span>}
         {sinCobrar > 0 && <span className="mb-1 rounded-full bg-estado-bien-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-bien-texto">{plataCorta(sinCobrar)} vencido sin cobrar</span>}
@@ -557,60 +613,59 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
       {vacio ? (
         <p className="mt-6 rounded-[14px] bg-superficie-hundida/60 px-5 py-4 text-[15px] text-texto-suave">Nada por cobrar ni por pagar en los próximos 30 días.</p>
       ) : (
-        <div className="relative mt-6 h-[290px]">
-          {/* Lo vencido, antes de hoy */}
-          {/* Lo vencido no tiene lugar en la línea: va en lista, de lo más grande a lo más chico */}
-          <div className="absolute inset-y-0 left-0 flex flex-col gap-1.5 rounded-[12px] bg-superficie-hundida/70 px-3 py-3" style={{ width: VENCIDO - 12 }}>
-            <p className="text-[14px] font-bold text-texto">Vencido</p>
-            {l.vencidos.length === 0 ? (
-              <p className="text-[13px] text-texto-suave">Nada</p>
-            ) : (
-              <ul className="flex flex-col gap-1.5">
-                {[...l.vencidos]
-                  .sort((x, y) => y.monto - x.monto)
-                  .slice(0, 4)
-                  .map((p) => (
-                    <li key={p.id}>
-                      <button type="button" onClick={() => navigate('/agenda')} className="flex w-full flex-col items-start rounded-[8px] px-1.5 py-1 text-left hover:bg-superficie/70" aria-label={`${p.cobro ? 'Cobro' : 'Pago'} vencido de ${plataCorta(p.monto)}: ${p.descripcion}`}>
-                        <span className={cn('flex items-center gap-1.5 text-[15px] leading-tight font-bold', p.cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
-                          <span className={cn('size-2 shrink-0 rounded-full', p.cobro ? 'bg-salvia' : 'bg-estado-problema')} aria-hidden />
-                          <span className="cifra">
-                            {p.cobro ? '+' : '−'}
-                            {plataCorta(p.monto)}
-                          </span>
-                          <span className="text-[11.5px] font-semibold">{p.cobro ? 'sin cobrar' : 'sin pagar'}</span>
-                        </span>
-                        <span className="w-full truncate text-[12.5px] text-texto-suave">{p.descripcion}</span>
+        <Tooltip.Provider delay={150} closeDelay={60}>
+          <div ref={medir} className="relative mt-6" style={{ height: alto + altoAbajo }}>
+            {/* Lo vencido: una lista de botones (cada uno abre «¿Lo pagaste?»), de lo más grande a lo más chico. */}
+            <div className="absolute inset-y-0 left-0 flex flex-col gap-1.5 rounded-[12px] bg-superficie-hundida/70 px-2.5 py-3" style={{ width: VENCIDO - 12 }}>
+              <p className="px-1.5 text-[14px] font-bold text-texto">Vencido</p>
+              {l.vencidos.length === 0 ? (
+                <p className="px-1.5 text-[13px] text-texto-suave">Nada</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {[...l.vencidos]
+                    .sort((x, y) => y.monto - x.monto)
+                    .slice(0, 4)
+                    .map((p) => (
+                      <li key={p.id}>
+                        <ConDetalle p={p} hoy={hoy}>
+                          <button type="button" onClick={() => abrir(p)} className="group flex w-full items-center gap-2 rounded-[10px] border border-borde bg-superficie px-2.5 py-2 text-left transition-colors hover:border-principal" aria-label={`${p.cobro ? 'Cobro' : 'Pago'} vencido de ${plataCorta(p.monto)}: ${p.descripcion}`}>
+                            <span className="min-w-0 flex-1">
+                              <span className={cn('t-cifra-chica block font-bold', p.cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+                                {p.cobro ? '+' : '−'}
+                                {plataCorta(p.monto)}
+                              </span>
+                              <span className="block truncate text-[12.5px] text-texto-suave">{p.descripcion}</span>
+                            </span>
+                            <span className="shrink-0 text-texto-suave transition-colors group-hover:text-principal">
+                              <Icono nombre="Siguiente" tamano={16} />
+                            </span>
+                          </button>
+                        </ConDetalle>
+                      </li>
+                    ))}
+                  {l.vencidos.length > 4 && (
+                    <li>
+                      <button type="button" onClick={() => navigate('/agenda?revisar=1')} className="w-full rounded-[10px] px-2.5 py-1.5 text-left text-[13px] font-bold text-principal hover:bg-superficie">
+                        Ver los {l.vencidos.length}
                       </button>
                     </li>
-                  ))}
-                {l.vencidos.length > 4 && <li className="px-1.5 text-[12.5px] font-semibold text-texto-suave">y {l.vencidos.length - 4} más</li>}
-              </ul>
-            )}
+                  )}
+                </ul>
+              )}
+            </div>
+            {/* El eje: hoy → 30 días, con las fechas pegadas abajo (los pagos van más abajo, nunca encima). */}
+            <div className="absolute right-0 h-[2px] bg-borde" style={{ left: VENCIDO, top: alto }} />
+            {[0, 7, 14, 21, 30].map((d) => (
+              <span key={d} className="absolute -translate-x-1/2 text-[13.5px] font-semibold whitespace-nowrap text-texto-suave" style={{ left: xDe(d), top: alto + 8 }}>
+                {d === 0 ? 'Hoy' : fechaDe(d)}
+              </span>
+            ))}
+            {futuros.map((p) => {
+              const u = lugarDe.get(p.id)!
+              return <Burbuja key={p.id} p={p} hoy={hoy} tam={tam(p.monto)} x={u.x} xb={u.xb} eje={alto} carril={u.carril} onClick={() => abrir(p)} />
+            })}
           </div>
-          {/* El eje: hoy → 30 días */}
-          <div className="absolute top-1/2 right-0 h-[2px] -translate-y-1/2 bg-borde" style={{ left: VENCIDO }} />
-          {[0, 7, 14, 21, 30].map((d) => (
-            <span
-              key={d}
-              className="absolute top-1/2 -translate-x-1/2 translate-y-2.5 text-[14px] font-semibold whitespace-nowrap text-texto-suave"
-              style={{ left: `calc(${VENCIDO}px + (100% - ${VENCIDO + 38}px) * ${d / HORIZONTE} + 16px)` }}
-            >
-              {d === 0 ? 'Hoy' : fechaDe(d)}
-            </span>
-          ))}
-          {l.futuros.map((p) => (
-            <Burbuja
-              key={p.id}
-              p={p}
-              tam={tam(p.monto)}
-              izquierda={`calc(${VENCIDO}px + (100% - ${VENCIDO + 38}px) * ${p.dia / HORIZONTE} + 16px)`}
-              arriba={p.cobro}
-              nivel={(p.cobro ? nivelArriba : nivelAbajo).get(p.id) ?? 0}
-              onClick={() => navigate('/agenda')}
-            />
-          ))}
-        </div>
+        </Tooltip.Provider>
       )}
     </section>
   )
@@ -625,42 +680,84 @@ function Cifra({ nombre, valor, clase }: { nombre: string; valor: string; clase:
   )
 }
 
-/** Un cobro o un pago en la línea: la burbuja (tamaño = monto) y su etiqueta corta. */
-function Burbuja({
-  p,
-  tam,
-  izquierda,
-  arriba,
-  nivel,
-  onClick,
-}: {
-  p: PuntoPlata
-  tam: number
-  izquierda: string
-  arriba: boolean
-  nivel: number
-  onClick: () => void
-}) {
-  const color = p.cobro ? 'bg-salvia' : 'bg-principal'
-  const tallo = 20 + nivel * 44
+/** La tarjeta al pasar el mouse, como en el calendario de la Agenda. */
+function ConDetalle({ p, hoy, children }: { p: PuntoPlata; hoy: Date; children: React.ReactElement }) {
+  const dias = p.dia
+  const estado = dias < 0 ? `Venció hace ${-dias === 1 ? 'un día' : `${-dias} días`}` : dias === 0 ? 'Vence hoy' : dias === 1 ? 'Vence mañana' : `En ${dias} días`
+  const fecha = p.fecha ? new Date(`${p.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : null
+  void hoy
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`${p.cobro ? 'Cobro' : 'Pago'} de ${plataCorta(p.monto)}: ${p.descripcion}`}
-      className="group absolute top-1/2 flex flex-col items-center"
-      style={{ left: izquierda, transform: `translate(-50%, ${arriba ? `calc(-100% - 1px)` : '1px'})`, flexDirection: arriba ? 'column' : 'column-reverse' }}
-    >
-      <span className="flex flex-col items-center" style={{ flexDirection: arriba ? 'column' : 'column-reverse' }}>
-        <span className={'cifra text-[15px] font-bold whitespace-nowrap text-texto'}>
-          {p.cobro ? '+' : '−'}
-          {plataCorta(p.monto)}
-        </span>
-        <span className={'max-w-[150px] truncate text-[13px] text-texto-suave'}>{p.descripcion}</span>
+    <Tooltip.Root>
+      <Tooltip.Trigger render={children} />
+      <Tooltip.Portal>
+        <Tooltip.Positioner side="top" sideOffset={10} collisionPadding={16} className="z-40">
+          <Tooltip.Popup className="w-[270px] origin-[var(--transform-origin)] rounded-[20px] border border-borde bg-superficie p-4 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] transition-[opacity,transform] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            <span className={cn('inline-block rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', dias < 0 ? 'bg-estado-problema text-superficie' : p.cobro ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
+              {estado}
+              {dias < 0 ? (p.cobro ? ', sin cobrar' : ', sin pagar') : ''}
+            </span>
+            <p className="mt-2 text-[16px] leading-snug font-bold text-texto">
+              {p.cobro ? 'Cobrás' : 'Pagás'}: {p.descripcion}
+            </p>
+            <p className={cn('t-numero mt-1', p.cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+              {p.cobro ? '+' : '−'}
+              {`$${Math.round(p.monto).toLocaleString('es-AR')}`}
+            </p>
+            {fecha && <p className="mt-2 border-t border-borde pt-2 text-[14px] text-texto-suave">{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</p>}
+            <p className="mt-2 text-[13px] font-bold text-principal">{p.cobro ? 'Tocá si ya lo cobraste' : 'Tocá si ya lo pagaste'}</p>
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  )
+}
+
+/**
+ * Un cobro o un pago en la línea: la burbuja (tamaño = monto), su monto y su
+ * nombre, en su carril (`enCarriles`): así nunca se pisan. Al pasar el mouse,
+ * su detalle; al tocarla, «¿Lo pagaste?».
+ */
+function Burbuja({ p, hoy, tam, x, xb, eje, carril, onClick }: { p: PuntoPlata; hoy: Date; tam: number; x: number; xb: number; eje: number; carril: number; onClick: () => void }) {
+  const arriba = p.cobro
+  // Distancia del centro de la burbuja a la línea: el carril y, abajo, la fila de fechas.
+  const desde = arriba ? 14 + carril * CARRIL : 34 + carril * CARRIL
+  const centro = arriba ? eje - desde - CARRIL / 2 + 10 : eje + desde + CARRIL / 2 - 10
+  const etiqueta = (
+    <span className="flex flex-col items-center rounded-[8px] bg-superficie/90 px-1.5">
+      <span className={cn('t-cifra-chica font-bold whitespace-nowrap', p.cobro ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
+        {p.cobro ? '+' : '−'}
+        {plataCorta(p.monto)}
       </span>
-      <span className={cn('my-1 rounded-full opacity-90 shadow-sm transition-transform group-hover:scale-110', color)} style={{ width: tam, height: tam }} />
-      <span className="w-[2px] bg-borde" style={{ height: tallo }} />
-    </button>
+      <span className="max-w-[118px] truncate text-[12.5px] text-texto-suave">{p.descripcion}</span>
+    </span>
+  )
+  return (
+    <>
+      {/* El tallo, de la línea a la burbuja: queda debajo de todo. */}
+      {/* El tallo: del día en la línea a la burbuja. Abajo arranca después de la fila de fechas (no las
+          cruza); si la burbuja quedó corrida porque el día estaba ocupado, se dobla hasta ella. */}
+      <svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
+        <polyline
+          points={arriba ? `${x},${eje} ${x},${eje - 6} ${xb},${eje - 14} ${xb},${centro}` : `${x},${eje + 30} ${xb},${eje + 38} ${xb},${centro}`}
+          fill="none"
+          stroke="var(--borde)"
+          strokeWidth={2}
+        />
+      </svg>
+      <span aria-hidden className={cn('absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full', p.cobro ? 'bg-estado-bien' : 'bg-estado-problema')} style={{ left: x, top: eje + 1 }} />
+      <ConDetalle p={p} hoy={hoy}>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={`${p.cobro ? 'Cobro' : 'Pago'} de ${plataCorta(p.monto)}: ${p.descripcion}`}
+          className="group absolute z-10 flex w-[124px] flex-col items-center gap-1"
+          style={{ left: xb - 62, top: arriba ? centro - tam / 2 - 38 : centro - tam / 2, flexDirection: arriba ? 'column' : 'column-reverse' }}
+        >
+          {etiqueta}
+          <span className={cn('rounded-full shadow-sm ring-2 ring-superficie transition-transform group-hover:scale-110', p.cobro ? 'bg-[color-mix(in_srgb,var(--estado-bien)_85%,var(--superficie))]' : 'bg-[color-mix(in_srgb,var(--estado-problema)_80%,var(--superficie))]')} style={{ width: tam, height: tam }} />
+        </button>
+      </ConDetalle>
+    </>
   )
 }
 
