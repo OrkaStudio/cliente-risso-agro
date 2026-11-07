@@ -7,6 +7,7 @@ import {
   BarChart3,
   Beef,
   CalendarClock,
+  CalendarDays,
   CircleDollarSign,
   LayoutDashboard,
   Lock,
@@ -26,7 +27,7 @@ import { MARCA } from '@/lib/marca'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { PILDORA } from '@/features/cotizaciones/pildora'
+import { ICONO_PILDORA, PILDORA } from '@/features/cotizaciones/pildora'
 import { BarraLateral } from './barra-lateral'
 import { useCuantasHoy } from '@/features/inicio/tropero/use-dia'
 
@@ -55,7 +56,7 @@ function Ticker() {
         className={PILDORA}
         title={`Dólar blue: compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
       >
-        <CircleDollarSign className="size-4 text-estado-bien" />
+        <span className={cn(ICONO_PILDORA, 'bg-estado-bien-suave text-estado-bien-texto')}><CircleDollarSign /></span>
         <span className="text-[13px] text-texto-suave">Blue</span>
         <b className="t-cifra-chica font-bold text-texto">${blue.data.venta.toLocaleString('es-AR')}</b>
       </div>
@@ -144,9 +145,15 @@ export function AppShell() {
       {/* ===== Columna principal ===== */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <motion.header {...entra(0.15)} className="flex h-14 shrink-0 items-center gap-4 border-b border-borde bg-fondo px-4 text-texto sm:px-10">
-          <div className="hidden shrink-0 text-[14px] font-semibold text-texto sm:block">
-            {fechaHoy()}
+        <motion.header {...entra(0.15)} className="flex h-16 shrink-0 items-center gap-4 border-b border-borde bg-fondo/95 px-4 text-texto backdrop-blur-sm sm:px-10">
+          <div className="hidden shrink-0 items-center gap-2.5 sm:flex">
+            <span className={cn(ICONO_PILDORA, 'bg-principal-suave text-principal')}>
+              <CalendarDays />
+            </span>
+            <span className="leading-tight">
+              <span className="block text-[14.5px] font-bold text-texto">{fechaHoy().split(',')[0]}</span>
+              <span className="block text-[13px] text-texto-suave">{fechaHoy().split(', ')[1]}</span>
+            </span>
           </div>
 
           {isMobile && (

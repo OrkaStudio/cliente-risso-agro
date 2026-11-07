@@ -1,3 +1,6 @@
 /** La píldora de la barra superior (gordo, blue, clima): etiqueta suave y el número en negrita. */
 export const PILDORA =
-  'flex h-9 shrink-0 items-center gap-2 rounded-full border border-borde bg-superficie px-3.5 transition-colors hover:border-texto-suave/40'
+  'flex h-10 shrink-0 items-center gap-2 rounded-full border border-borde bg-superficie py-1 pr-4 pl-1 transition-colors hover:border-principal/50'
+
+/** El ícono de cada píldora, en un círculo teñido (el mismo lenguaje que los botones con ícono). */
+export const ICONO_PILDORA = 'grid size-8 shrink-0 place-items-center rounded-full [&>svg]:size-4'

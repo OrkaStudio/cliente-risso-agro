@@ -10,7 +10,7 @@ import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { PILDORA } from './pildora'
+import { ICONO_PILDORA, PILDORA } from './pildora'
 
 const hoy = hoyLocal
 
@@ -74,7 +74,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           title={`Gordo — $${gordo.data.valor.toLocaleString('es-AR')}/kg · ${fmtFecha(gordo.data.fecha)}${gordo.data.auto ? ' · Cañuelas, promedio novillos' : ' · cargado a mano'} · tocá para actualizar`}
           className={PILDORA}
         >
-          <Beef className="size-4 text-principal" />
+          <span className={cn(ICONO_PILDORA, 'bg-principal-suave text-principal')}><Beef /></span>
           <span className="text-[13px] text-texto-suave">Gordo</span>
           <b className="t-cifra-chica font-bold text-texto">
             ${Math.round(gordo.data.valor).toLocaleString('es-AR')}
@@ -89,7 +89,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
           title="Cargar el precio del gordo"
           className={cn(PILDORA, 'text-[13px] font-semibold text-principal')}
         >
-          <Beef className="size-4 text-principal" />
+          <span className={cn(ICONO_PILDORA, 'bg-principal-suave text-principal')}><Beef /></span>
           Cargar el gordo
         </button>
       )}

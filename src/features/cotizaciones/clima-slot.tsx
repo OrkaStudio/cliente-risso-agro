@@ -4,7 +4,7 @@ import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { cn } from '@/lib/utils'
-import { PILDORA } from './pildora'
+import { ICONO_PILDORA, PILDORA } from './pildora'
 
 /**
  * El clima en la barra superior (Open-Meteo): temperatura, máx/mín y aviso de
@@ -21,7 +21,7 @@ export function ClimaSlot() {
   if (!actual) {
     return (
       <button type="button" onClick={() => navigate('/campos')} className={cn(PILDORA, 'text-[13px] font-semibold text-principal')}>
-        <MapPin className="size-4" />
+        <span className={cn(ICONO_PILDORA, 'bg-principal-suave')}><MapPin /></span>
         Ubicá tu campo para ver el clima
       </button>
     )
@@ -33,7 +33,7 @@ export function ClimaSlot() {
       title={`${d.descripcion} · lluvia ${d.lluviaProb} %${d.lluviaMm > 0 ? ` (${d.lluviaMm} mm)` : ''}`}
       className={cn(PILDORA, 'cursor-default hover:border-borde')}
     >
-      <WmoIcon code={d.code} className="size-4 text-estado-atencion" />
+      <span className={cn(ICONO_PILDORA, 'bg-trigo-100 text-trigo-700')}><WmoIcon code={d.code} className="size-4" /></span>
       <span className="text-[13px] text-texto-suave">{actual.nombre}</span>
       <b className="t-cifra-chica font-bold text-texto">{d.temp}°</b>
       <span className="t-cifra-mini hidden text-texto-suave lg:inline">

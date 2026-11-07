@@ -350,7 +350,8 @@ export function AsistentePanel() {
 
   const nAvisos = avisos.length
   // Al bajar por la página la barra se achica al orbe y el número: no tapa la tabla.
-  const verTexto = !compacta || sobre || !!globo || abierto
+  // Abierto, la barra se recoge al orbe (el panel ya tiene su ×): no queda «Cerrar» estirado (Lau, 07/11).
+  const verTexto = !abierto && (!compacta || sobre || !!globo)
   const etiqueta = nAvisos > 0 ? `El asistente de Troppero: notó ${nAvisos === 1 ? 'una cosa' : `${nAvisos} cosas`}` : 'El asistente de Troppero'
   // Debajo de los diálogos (z-50) mientras espera; arriba cuando está abierto o trabajando.
   const arriba = abierto || !!marca
@@ -544,7 +545,7 @@ export function AsistentePanel() {
         aria-label={etiqueta}
         aria-expanded={abierto}
         className={cn(
-          'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-tinta p-2 text-white shadow-[0_12px_32px_rgba(28,18,10,0.35)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#26302a] hover:shadow-[0_16px_38px_rgba(28,18,10,0.42)] active:translate-y-0',
+          'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
           verTexto ? 'md:pr-3' : '',
           arriba ? 'z-[76]' : 'z-[45]',
         )}
@@ -559,7 +560,7 @@ export function AsistentePanel() {
           <AnimatePresence>
             {nAvisos > 0 && !abierto && (
               <motion.span
-                className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-tinta"
+                className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-terracota-900"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0 }}
@@ -569,7 +570,7 @@ export function AsistentePanel() {
           </AnimatePresence>
         </span>
         {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
-        <TextoDeLaBarra texto={abierto ? 'Cerrar' : (globo ?? 'Preguntale a Troppero')} visible={verTexto} estado={!!globo && !abierto} />
+        <TextoDeLaBarra texto={globo ?? 'Preguntale a Troppero'} visible={verTexto} estado={!!globo} />
       </button>
 
       {/* El orbe: descansa en su hueco de la barra y sale a volar cuando hace algo. */}
