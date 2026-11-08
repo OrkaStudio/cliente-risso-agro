@@ -118,30 +118,9 @@ export function AgendaPage() {
 
   return (
     <div className="ancho-pagina mx-auto flex w-full flex-col gap-5">
-      {/* El encabezado, como el de cada sección (Lau, 06/11): qué viene, qué mostrar y anotar. */}
+      {/* El encabezado, como el del Inicio (Lau, 08/11): qué es, cuánto se mueve y lo vencido. Nada más. */}
       <motion.div {...entra(0)}>
-        <Cabecera
-          imagen={campoArriba}
-          posicion="50% 50%"
-          derecha={
-            <>
-              <CampoVisto campos={campos} elegido={elegido} />
-              <div role="radiogroup" aria-label="Verlo como" className="flex gap-1 rounded-full border border-borde bg-superficie p-1">
-                {(
-                  [
-                    ['calendario', 'Calendario', 'Agenda'],
-                    ['lista', 'Lista por semana', 'Comprobante'],
-                  ] as const
-                ).map(([v, t, ic]) => (
-                  <button key={v} type="button" role="radio" aria-checked={forma === v} onClick={() => elegirForma(v)} className={cn('inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14.5px] font-bold transition-colors', forma === v ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida')}>
-                    <Icono nombre={ic} tamano={16} />
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </>
-          }
-        >
+        <Cabecera imagen={campoArriba} posicion="50% 50%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
           <h1 className="t-pagina text-texto">Agenda</h1>
           <p className="mt-2 max-w-[600px] text-[17px] leading-snug text-texto-suave">
             {sale4 || entra4 ? (
@@ -152,12 +131,6 @@ export function AgendaPage() {
               'No hay nada por pagar ni cobrar en las próximas 4 semanas.'
             )}
           </p>
-          {enCartera && (
-            <p className="mt-1 text-[15px] text-texto-suave">
-              Cheques: tenés <b className="t-cifra text-estado-bien-texto">{fmtCompact(enCartera.enCartera)}</b> para cobrar y diste <b className="t-cifra text-estado-problema-texto">{fmtCompact(enCartera.emitidos)}</b> que te van a debitar.
-            </p>
-          )}
-          {/* Lo vencido sin marcar: el mismo botón que «N cosas para hoy» del Inicio (Lau, 08/11). */}
           {vencidos.length > 0 && (
             <button type="button" onClick={() => setRevisar(true)} className="group mt-3 inline-flex h-10 items-center gap-2.5 rounded-full border-[1.5px] border-estado-problema/40 bg-superficie/95 py-1 pr-3.5 pl-1 text-[14.5px] font-bold text-texto transition-colors hover:border-principal">
               <span className="grid size-8 place-items-center rounded-full bg-estado-problema text-superficie">
@@ -170,41 +143,62 @@ export function AgendaPage() {
               </span>
             </button>
           )}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {empresaId && (
-              <AnotarPlata
-                empresaId={empresaId}
-                campoInicial={elegido?.id}
-                vence
-                renderTrigger={(abrir) => (
-                  <button type="button" onClick={() => abrir()} className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
-                    Anotar un pago o un cobro
-                    <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
-                      <Icono nombre="Agregar" tamano={16} />
-                    </span>
-                  </button>
-                )}
-              />
-            )}
-            {/* Los filtros: botones para elegir, con su tilde el elegido. */}
-            <div role="radiogroup" aria-label="Qué mostrar" className="flex flex-wrap gap-2">
-              {(
-                [
-                  ['todo', 'Todo'],
-                  ['pagos', 'Lo que pago'],
-                  ['cobros', 'Lo que cobro'],
-                  ['cheques', 'Cheques'],
-                ] as [Filtro, string][]
-              ).map(([v, t]) => (
-                <button key={v} type="button" role="radio" aria-checked={filtro === v} onClick={() => setFiltro(v)} className={cn('inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] px-4 text-[14.5px] font-bold transition-colors', filtro === v ? 'border-acento bg-acento text-acento-texto' : 'border-borde bg-superficie/90 text-texto hover:border-neutro-300')}>
-                  {filtro === v && <Icono nombre="Guardar" tamano={16} />}
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
         </Cabecera>
       </motion.div>
+
+      {/* Las herramientas, arriba de lo que manejan: qué mostrar y cómo verlo a la izquierda, anotar a la derecha. */}
+      <motion.div {...entra(1)} className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+        <div role="radiogroup" aria-label="Qué mostrar" className="flex flex-wrap gap-2">
+          {(
+            [
+              ['todo', 'Todo'],
+              ['pagos', 'Lo que pago'],
+              ['cobros', 'Lo que cobro'],
+              ['cheques', 'Cheques'],
+            ] as [Filtro, string][]
+          ).map(([v, t]) => (
+            <button key={v} type="button" role="radio" aria-checked={filtro === v} onClick={() => setFiltro(v)} className={cn('inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] px-4 text-[14.5px] font-bold transition-colors', filtro === v ? 'border-acento bg-acento text-acento-texto' : 'border-borde bg-superficie/90 text-texto hover:border-neutro-300')}>
+              {filtro === v && <Icono nombre="Guardar" tamano={16} />}
+              {t}
+            </button>
+          ))}
+        </div>
+        <div role="radiogroup" aria-label="Verlo como" className="flex gap-1 rounded-full border border-borde bg-superficie p-1">
+          {(
+            [
+              ['calendario', 'Calendario', 'Agenda'],
+              ['lista', 'Lista por semana', 'Comprobante'],
+            ] as const
+          ).map(([v, t, ic]) => (
+            <button key={v} type="button" role="radio" aria-checked={forma === v} onClick={() => elegirForma(v)} className={cn('inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14.5px] font-bold transition-colors', forma === v ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida')}>
+              <Icono nombre={ic} tamano={16} />
+              {t}
+            </button>
+          ))}
+        </div>
+        </div>
+        {empresaId && (
+          <AnotarPlata
+            empresaId={empresaId}
+            campoInicial={elegido?.id}
+            vence
+            renderTrigger={(abrir) => (
+              <button type="button" onClick={() => abrir()} className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
+                Anotar un pago o un cobro
+                <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
+                  <Icono nombre="Agregar" tamano={16} />
+                </span>
+              </button>
+            )}
+          />
+        )}
+      </motion.div>
+      {enCartera && (
+        <p className="-mt-2 text-[15px] text-texto-suave">
+          Cheques: tenés <b className="t-cifra text-estado-bien-texto">{fmtCompact(enCartera.enCartera)}</b> para cobrar y diste <b className="t-cifra text-estado-problema-texto">{fmtCompact(enCartera.emitidos)}</b> que te van a debitar.
+        </p>
+      )}
 
       <PanelLateral chico abierto={revisar} onCerrar={() => setRevisar(false)} titulo="¿Ya pagaste esto?" bajada="Vencieron y no los marcaste. Lo que ya está, queda en Plata con la fecha en que vencía. Tildá lo que ya pagaste o cobraste." ancho>
         {vencidos.length > 0 ? <YaPagaste key={vencidos.map((v) => v.id).join()} vencidos={vencidos} hoy={hoy} onAbrir={(v) => (setRevisar(false), setDesdeRevisar(true), setAbierto(v))} /> : <p className="text-[15.5px] text-texto">Listo: no queda nada vencido sin marcar.</p>}
