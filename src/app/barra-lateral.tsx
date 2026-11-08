@@ -62,8 +62,9 @@ export function BarraLateral({ hoy }: { hoy: number }) {
               className={({ isActive }) =>
                 cn(
                   'relative flex h-11 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] transition-colors',
+                  // La sección en la que estás: fondo terracota suave, texto e ícono terracota (Lau, 08/11).
                   isActive && !bloqueada
-                    ? 'font-bold text-texto'
+                    ? 'bg-principal-suave font-bold text-acento-texto shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--principal)_22%,transparent)]'
                     : bloqueada
                       ? 'text-texto-suave/60 hover:bg-superficie-hundida/60'
                       : 'font-medium text-texto hover:bg-superficie-hundida/70',
@@ -72,7 +73,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
             >
               {({ isActive }) => (
                 <>
-                  {isActive && !bloqueada && <span aria-hidden className="absolute inset-y-2 -left-3 w-[3px] rounded-full bg-principal" />}
+                  {isActive && !bloqueada && <span aria-hidden className="absolute inset-y-1.5 -left-3 w-[4px] rounded-r-full bg-principal" />}
                   <span className={cn(isActive && !bloqueada ? 'text-principal' : bloqueada ? 'opacity-60' : 'text-texto')}>
                     <Icono nombre={s.icono} />
                   </span>
@@ -145,12 +146,12 @@ export function BarraLateral({ hoy }: { hoy: number }) {
       <NavLink
         to="/configuracion"
         className={({ isActive }) =>
-          cn('relative flex h-11 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] transition-colors', isActive ? 'font-bold text-texto' : 'font-medium text-texto hover:bg-superficie-hundida/70')
+          cn('relative flex h-11 shrink-0 items-center gap-3 rounded-[12px] px-3 text-[15px] transition-colors', isActive ? 'bg-principal-suave font-bold text-acento-texto shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--principal)_22%,transparent)]' : 'font-medium text-texto hover:bg-superficie-hundida/70')
         }
       >
         {({ isActive }) => (
           <>
-            {isActive && <span aria-hidden className="absolute inset-y-2 -left-3 w-[3px] rounded-full bg-principal" />}
+            {isActive && <span aria-hidden className="absolute inset-y-1.5 -left-3 w-[4px] rounded-r-full bg-principal" />}
             <span className={cn(isActive ? 'text-principal' : 'text-texto')}>
               <Icono nombre="Usuario" />
             </span>

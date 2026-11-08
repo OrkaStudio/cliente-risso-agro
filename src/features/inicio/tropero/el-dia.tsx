@@ -1,6 +1,6 @@
 import { Popover } from '@base-ui/react/popover'
 import { Tooltip } from '@base-ui/react/tooltip'
-import { BellIcon } from 'lucide-react'
+import { BellIcon, CloudRain } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -87,7 +87,7 @@ export function ElDia() {
   return (
     <div className="mx-auto flex w-full ancho-pagina flex-col gap-5">
       <motion.div {...entra(0)}>
-        <Cabecera titulo={saludo(new Date().getHours(), nombre)} chips={chips} campos={inicio.campos} elegido={inicio.elegido} />
+        <Cabecera titulo={saludo(new Date().getHours(), nombre)} cosas={cosas} lluvia={chips.find((c) => c.key === 'lluvia') ?? null} campos={inicio.campos} elegido={inicio.elegido} />
       </motion.div>
 
       {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
@@ -135,22 +135,17 @@ function useIr() {
 
 // ===== La cabecera: el saludo, lo importante en chips y los accesos =====
 
-const PUNTO: Record<Chip['tono'], string> = {
-  problema: 'bg-estado-problema',
-  atencion: 'bg-estado-atencion',
-  aviso: 'bg-acento-texto',
-  info: 'bg-neutro-500',
-  bien: 'bg-estado-bien',
-}
 
 function Cabecera({
   titulo,
-  chips,
+  cosas,
+  lluvia,
   campos,
   elegido,
 }: {
   titulo: string
-  chips: Chip[]
+  cosas: Cosa[]
+  lluvia: Chip | null
   campos: CampoElegible[]
   elegido: CampoElegible | null
 }) {
@@ -160,14 +155,19 @@ function Cabecera({
     <CabeceraSeccion imagen={tranquera} posicion="50% 42%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
         <h1 className="t-pagina text-texto">{titulo}</h1>
         {/* Los avisos del día, en un botón con su número: se abren en un panelito, cada uno con su acción (Lau, 07/11). */}
-        <Avisos chips={chips} onIr={ir} />
+        <Avisos cosas={cosas} lluvia={lluvia} onIr={ir} />
     </CabeceraSeccion>
   )
 }
 
-function Avisos({ chips, onIr }: { chips: Chip[]; onIr: (destino: string) => void }) {
-  const urgentes = chips.filter((c) => c.tono === 'problema').length
-  if (!chips.length)
+/**
+ * Los avisos del día (Lau, 07/11): lo mismo que «Para atender hoy», cosa por
+ * cosa (el número de la barra lateral y éste son el mismo), cada una con su
+ * ícono, qué pasa, cuándo y su botón. La lluvia, aparte, al pie.
+ */
+function Avisos({ cosas, lluvia, onIr }: { cosas: Cosa[]; lluvia: Chip | null; onIr: (destino: string) => void }) {
+  const urgentes = cosas.filter((c) => c.tono === 'problema').length
+  if (!cosas.length && !lluvia)
     return (
       <p className="mt-2.5 inline-flex items-center gap-2 text-[15px] font-semibold text-estado-bien-texto">
         <span className="size-2 rounded-full bg-estado-bien" />
@@ -177,35 +177,52 @@ function Avisos({ chips, onIr }: { chips: Chip[]; onIr: (destino: string) => voi
   return (
     <Popover.Root>
       <Popover.Trigger className="group mt-2.5 inline-flex h-10 items-center gap-2.5 rounded-full border-[1.5px] border-borde bg-superficie/95 py-1 pr-3.5 pl-1 text-[14.5px] font-bold text-texto transition-colors hover:border-principal data-[popup-open]:border-principal">
-        <span className={cn('grid size-8 place-items-center rounded-full', urgentes ? 'bg-estado-problema text-superficie' : 'bg-acento text-acento-texto')}>
+        <span className={cn('relative grid size-8 place-items-center rounded-full', urgentes ? 'bg-estado-problema text-superficie' : 'bg-acento text-acento-texto')}>
           <BellIcon className="size-4" />
         </span>
-        {chips.length === 1 ? 'Un aviso para hoy' : `${chips.length} avisos para hoy`}
-        <span className="text-texto-suave transition-transform group-data-[popup-open]:rotate-90">
+        {cosas.length === 0 ? 'Mañana llueve' : cosas.length === 1 ? 'Una cosa para hoy' : `${cosas.length} cosas para hoy`}
+        <span className="text-texto-suave transition-transform duration-300 group-data-[popup-open]:rotate-90">
           <Icono nombre="Siguiente" tamano={16} />
         </span>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner side="bottom" align="start" sideOffset={8} collisionPadding={16} className="z-40">
-          <Popover.Popup className="w-[380px] popup-suave rounded-[22px] border border-borde bg-superficie p-2 shadow-[0_18px_40px_-12px_rgba(19,27,22,0.35)] outline-none">
-            <Popover.Title className="px-3 pt-2 pb-1 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">Para hoy</Popover.Title>
-            <ul className="flex flex-col">
-              {chips.map((c) => (
-                <li key={c.key}>
-                  <Popover.Close
-                    onClick={() => onIr(c.destino)}
-                    className="group flex w-full items-center gap-3 rounded-[16px] px-3 py-3 text-left transition-colors hover:bg-superficie-hundida/70"
-                  >
-                    <span className={cn('size-2.5 shrink-0 rounded-full', PUNTO[c.tono])} />
-                    <span className="min-w-0 flex-1 text-[15px] font-semibold text-texto">{c.texto}</span>
-                    <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border-[1.5px] border-principal/60 px-3 text-[13.5px] font-bold text-principal transition-colors group-hover:bg-principal group-hover:text-principal-texto">
-                      {c.accion}
-                      <Icono nombre="Siguiente" tamano={16} />
-                    </span>
-                  </Popover.Close>
-                </li>
-              ))}
+        <Popover.Positioner side="bottom" align="start" sideOffset={10} collisionPadding={16} className="z-40">
+          <Popover.Popup className="popup-suave w-[480px] overflow-hidden rounded-[24px] border border-borde bg-superficie shadow-[0_24px_56px_-16px_rgba(58,26,13,0.38)] outline-none">
+            <div className="flex items-center justify-between gap-3 border-b border-borde bg-fondo/60 px-5 py-3.5">
+              <Popover.Title className="t-tarjeta text-texto">Para hoy</Popover.Title>
+              {urgentes > 0 && <span className="rounded-full bg-estado-problema-suave px-2.5 py-0.5 text-[12.5px] font-bold text-estado-problema-texto">{urgentes === 1 ? '1 urgente' : `${urgentes} urgentes`}</span>}
+            </div>
+            <ul className="flex max-h-[min(440px,60vh)] flex-col divide-y divide-borde/70 overflow-y-auto">
+              {cosas.map((c) => {
+                const tono = TONO[c.tono as keyof typeof TONO] ?? TONO.aviso
+                return (
+                  <li key={c.key}>
+                    <Popover.Close onClick={() => onIr(c.accion.to)} className="group flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition-colors hover:bg-principal-suave/40">
+                      <span className={cn('grid size-10 shrink-0 place-items-center rounded-[12px]', tono.icono)}>
+                        <Icono nombre={c.icono} tamano={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-bold text-texto">
+                          {c.lugar} <span className="font-semibold text-texto-suave">· {c.que}</span>
+                        </span>
+                        {c.datos[0] && <span className={cn('block truncate text-[13.5px] font-semibold', tono.dato)}>{c.datos[0]}</span>}
+                      </span>
+                      <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-superficie-hundida px-3 text-[13px] font-bold text-texto transition-colors group-hover:bg-principal group-hover:text-principal-texto">
+                        {c.accion.texto}
+                        <Icono nombre="Siguiente" tamano={16} />
+                      </span>
+                    </Popover.Close>
+                  </li>
+                )
+              })}
             </ul>
+            {lluvia && (
+              <Popover.Close onClick={() => onIr(lluvia.destino)} className="flex w-full items-center gap-3 border-t border-borde bg-trigo-50/70 px-5 py-3 text-left text-[14px] font-semibold text-texto hover:bg-trigo-100/70">
+                <CloudRain className="size-4 text-trigo-700" />
+                <span className="flex-1">{lluvia.texto}</span>
+                <span className="text-[13px] font-bold text-principal">Pronóstico</span>
+              </Popover.Close>
+            )}
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
