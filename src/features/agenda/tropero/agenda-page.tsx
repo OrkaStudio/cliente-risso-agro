@@ -131,11 +131,11 @@ export function AgendaPage() {
             )}
           </p>
           {vencidos.length > 0 && (
-            <button type="button" onClick={() => setRevisar(true)} className="group mt-3 inline-flex items-center gap-2 text-[15px] font-bold text-estado-problema-texto">
+            <button type="button" onClick={() => setRevisar(true)} className="group mt-3 inline-flex h-10 items-center gap-2.5 rounded-full bg-estado-problema-suave pr-3 pl-4 text-[14.5px] font-bold text-estado-problema-texto transition-colors hover:bg-[#f0cfc9]">
               <span className="size-2 rounded-full bg-estado-problema" />
-              <span className="underline decoration-estado-problema/30 underline-offset-4 group-hover:decoration-estado-problema">{vencidos.length === 1 ? 'Una vencida sin marcar' : `${vencidos.length} vencidas sin marcar`}</span>
-              <span className="text-[14px] font-semibold text-texto-suave">· ¿Ya {vencidos.every((v) => v.tipo === 'ingreso') ? 'las cobraste' : 'están pagadas'}?</span>
-              <span className="text-estado-problema-texto transition-transform group-hover:translate-x-0.5">
+              {vencidos.length === 1 ? 'Una vencida sin marcar' : `${vencidos.length} vencidas sin marcar`}
+              <span className="font-semibold text-estado-problema-texto/75">· Revisarlas</span>
+              <span className="grid size-6 place-items-center rounded-full bg-estado-problema text-superficie transition-transform group-hover:translate-x-0.5">
                 <Icono nombre="Siguiente" tamano={16} />
               </span>
             </button>

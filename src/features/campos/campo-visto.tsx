@@ -9,7 +9,7 @@ export function CampoVisto({ campos, elegido }: { campos: CampoElegible[]; elegi
   if (campos.length === 0) return null
   return (
     // Sólo texto (Lau, 08/11: sin cápsulas): lo que se ve y, en chico, que se cambia en la barra.
-    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+    <div className="flex shrink-0 flex-col items-end gap-0.5 rounded-[16px] bg-superficie/90 px-4 py-2.5 text-right shadow-[0_4px_18px_-6px_rgba(58,26,13,0.25)] backdrop-blur-md">
       <span className="text-[12.5px] font-semibold tracking-[0.04em] text-texto-suave uppercase">Estás viendo</span>
       <span className="inline-flex items-center gap-2 text-[16px] font-bold whitespace-nowrap text-texto">
         {elegido ? (

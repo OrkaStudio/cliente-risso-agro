@@ -60,22 +60,27 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
             {mes.slice(0, 4) !== hoy.slice(0, 4) ? ` ${mes.slice(0, 4)}` : ''}
           </h2>
           {mes !== hoy.slice(0, 7) && (
-            <button type="button" onClick={() => setMes(hoy.slice(0, 7))} className="text-[14.5px] font-bold text-principal underline-offset-4 hover:underline">
+            <button type="button" onClick={() => setMes(hoy.slice(0, 7))} className="h-9 rounded-full border-[1.5px] border-principal px-3.5 text-[14px] font-bold text-principal hover:bg-principal-suave">
               Volver a hoy
             </button>
           )}
         </div>
         {/* Los meses: texto con flecha; lo pendiente, en el color de su urgencia (sin cápsulas). */}
         <div className="flex items-center gap-5">
-          <button type="button" onClick={() => setMes(anterior)} className="group inline-flex items-center gap-1.5 text-[15px] font-bold text-texto">
-            <Icono nombre="Atrás" tamano={16} /> <span className="group-hover:text-principal">{mayuscula(nombreMes(anterior))}</span>
+          <button type="button" onClick={() => setMes(anterior)} className="group inline-flex items-center gap-2.5 text-[15px] font-bold text-texto">
+            <span className="grid size-9 place-items-center rounded-full border-[1.5px] border-borde transition-colors group-hover:border-principal group-hover:bg-principal group-hover:text-principal-texto">
+              <Icono nombre="Atrás" tamano={16} />
+            </span>
+            {mayuscula(nombreMes(anterior))}
             {antesSinResolver > 0 && <span className="text-[13.5px] font-semibold text-estado-problema-texto">· {antesSinResolver} sin resolver</span>}
           </button>
           <span aria-hidden className="h-5 w-px bg-borde" />
-          <button type="button" onClick={() => setMes(siguiente)} className="group inline-flex items-center gap-1.5 text-[15px] font-bold text-texto">
-            <span className="group-hover:text-principal">{mayuscula(nombreMes(siguiente))}</span>
+          <button type="button" onClick={() => setMes(siguiente)} className="group inline-flex items-center gap-2.5 text-[15px] font-bold text-texto">
+            {mayuscula(nombreMes(siguiente))}
             {cuantosEn(siguiente) > 0 && <span className="text-[13.5px] font-semibold text-principal">· {cuantosEn(siguiente)} por resolver</span>}
-            <Icono nombre="Siguiente" tamano={16} />
+            <span className="grid size-9 place-items-center rounded-full border-[1.5px] border-borde transition-colors group-hover:border-principal group-hover:bg-principal group-hover:text-principal-texto">
+              <Icono nombre="Siguiente" tamano={16} />
+            </span>
           </button>
         </div>
       </header>
