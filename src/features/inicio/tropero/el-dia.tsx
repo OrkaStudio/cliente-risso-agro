@@ -155,7 +155,7 @@ function Cabecera({
   const ir = useIr()
   return (
     // La tranquera y el camino (Figma 233:113): el mismo encabezado de todas las secciones.
-    <CabeceraSeccion imagen={tranquera} posicion="50% 42%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
+    <CabeceraSeccion imagen={tranquera} posicion="50% 42%" encima={<CampoVisto campos={campos} elegido={elegido} />}>
         <h1 className="t-pagina text-texto">{titulo}</h1>
         {/* Los avisos del día, en un botón con su número: se abren en un panelito, cada uno con su acción (Lau, 07/11). */}
         <Avisos cosas={cosas} lluvia={lluvia} onIr={ir} />

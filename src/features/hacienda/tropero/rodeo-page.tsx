@@ -206,6 +206,7 @@ export function RodeoPage() {
         <Cabecera
           imagen={arreo}
           posicion="40% 78%"
+          encima={<CampoVisto campos={elegido.campos} elegido={elegido.elegido} />}
           derecha={
             potreroFiltro ? (
                     <button
@@ -217,9 +218,7 @@ export function RodeoPage() {
                       Sólo el {potreroFiltro.nombre}
                       <Icono nombre="Cerrar" tamano={16} />
                     </button>
-                  ) : (
-                    <CampoVisto campos={elegido.campos} elegido={elegido.elegido} />
-                  )
+                  ) : null
           }
         >
           <h1 className="t-pagina text-texto">Hacienda</h1>

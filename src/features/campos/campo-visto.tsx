@@ -8,19 +8,17 @@ import type { CampoElegible } from '@/features/campos/campo-elegido'
 export function CampoVisto({ campos, elegido }: { campos: CampoElegible[]; elegido: CampoElegible | null }) {
   if (campos.length === 0) return null
   return (
-    // Sólo texto (Lau, 08/11: sin cápsulas): lo que se ve y, en chico, que se cambia en la barra.
-    <div className="flex shrink-0 flex-col items-end gap-0.5 rounded-[16px] bg-superficie/90 px-4 py-2.5 text-right shadow-[0_4px_18px_-6px_rgba(58,26,13,0.25)] backdrop-blur-md">
-      <span className="text-[12.5px] font-semibold tracking-[0.04em] text-texto-suave uppercase">Estás viendo</span>
-      <span className="inline-flex items-center gap-2 text-[16px] font-bold whitespace-nowrap text-texto">
-        {elegido ? (
-          <span className="grid size-[20px] shrink-0 place-items-center rounded-[6px] text-[10.5px] font-extrabold text-white" style={{ background: elegido.color }}>
-            {elegido.letra}
-          </span>
-        ) : (
-          <Icono nombre="Campos" tamano={16} className="text-texto-suave" />
-        )}
-        {elegido ? elegido.nombre : 'Todos tus campos'}
-      </span>
-    </div>
+    // Una línea chica arriba del título, del lado del texto: se lee siempre (Lau, 08/11).
+    <p className="flex items-center gap-2 text-[14px] font-semibold text-texto-suave">
+      Estás viendo
+      {elegido ? (
+        <span className="grid size-[18px] shrink-0 place-items-center rounded-[5px] text-[10px] font-extrabold text-white" style={{ background: elegido.color }}>
+          {elegido.letra}
+        </span>
+      ) : (
+        <Icono nombre="Campos" tamano={16} className="text-texto-suave" />
+      )}
+      <b className="text-texto">{elegido ? elegido.nombre : 'Todos tus campos'}</b>
+    </p>
   )
 }

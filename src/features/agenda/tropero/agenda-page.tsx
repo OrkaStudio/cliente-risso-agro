@@ -119,7 +119,7 @@ export function AgendaPage() {
     <div className="ancho-pagina mx-auto flex w-full flex-col gap-5">
       {/* El encabezado, como el del Inicio (Lau, 08/11): qué es, cuánto se mueve y lo vencido. Nada más. */}
       <motion.div {...entra(0)}>
-        <Cabecera imagen={campoArriba} posicion="50% 50%" derecha={<CampoVisto campos={campos} elegido={elegido} />}>
+        <Cabecera imagen={campoArriba} posicion="50% 50%" encima={<CampoVisto campos={campos} elegido={elegido} />}>
           <h1 className="t-pagina text-texto">Agenda</h1>
           <p className="mt-2 max-w-[600px] text-[17px] leading-snug text-texto-suave">
             {sale4 || entra4 ? (
