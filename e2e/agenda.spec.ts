@@ -61,7 +61,7 @@ test('agenda: lo vencido sin marcar se pregunta y se resuelve de una vez', async
   await page.getByRole('radio', { name: 'Cheques' }).click()
   await expect(page.getByText(/Cheques: tenés/)).toBeVisible()
   await page.getByRole('radio', { name: 'Todo', exact: true }).click()
-  const revisar = page.getByRole('button', { name: /Revisarlas/ })
+  const revisar = page.getByRole('button', { name: /vencidas? sin marcar/ })
   if (await revisar.count()) {
     await revisar.click()
     const pregunta = page.getByRole('region', { name: 'Vencido sin marcar' })

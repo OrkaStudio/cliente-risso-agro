@@ -15,6 +15,7 @@ import { SeSoluciono } from '@/features/inicio/tropero/el-dia'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { cheques, pendiente, semanasQueVienen, tituloDe, mesCorto, type Semana } from './agenda'
+import { BellIcon } from 'lucide-react'
 import { AgendaCalendario } from './agenda-calendario'
 import campoArriba from '@/assets/tropero/campo-de-arriba.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
@@ -156,6 +157,19 @@ export function AgendaPage() {
               Cheques: tenés <b className="t-cifra text-estado-bien-texto">{fmtCompact(enCartera.enCartera)}</b> para cobrar y diste <b className="t-cifra text-estado-problema-texto">{fmtCompact(enCartera.emitidos)}</b> que te van a debitar.
             </p>
           )}
+          {/* Lo vencido sin marcar: el mismo botón que «N cosas para hoy» del Inicio (Lau, 08/11). */}
+          {vencidos.length > 0 && (
+            <button type="button" onClick={() => setRevisar(true)} className="group mt-3 inline-flex h-10 items-center gap-2.5 rounded-full border-[1.5px] border-estado-problema/40 bg-superficie/95 py-1 pr-3.5 pl-1 text-[14.5px] font-bold text-texto transition-colors hover:border-principal">
+              <span className="grid size-8 place-items-center rounded-full bg-estado-problema text-superficie">
+                <BellIcon className="size-4" />
+              </span>
+              {vencidos.length === 1 ? 'Una vencida sin marcar' : `${vencidos.length} vencidas sin marcar`}
+              <span className="text-[13.5px] font-semibold text-texto-suave">· ¿Ya {vencidos.every((v) => v.tipo === 'ingreso') ? 'las cobraste' : 'están pagadas'}?</span>
+              <span className="text-texto-suave transition-colors group-hover:text-principal">
+                <Icono nombre="Siguiente" tamano={16} />
+              </span>
+            </button>
+          )}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {empresaId && (
               <AnotarPlata
@@ -192,16 +206,6 @@ export function AgendaPage() {
         </Cabecera>
       </motion.div>
 
-      {/* Lo vencido sin marcar: se pregunta, no se grita. */}
-      {vencidos.length > 0 && (
-        <motion.button {...entra(2)} type="button" onClick={() => setRevisar(true)} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[20px] border-[1.5px] border-estado-atencion/50 bg-estado-atencion-suave/70 px-5 py-3.5 text-left transition-colors hover:bg-estado-atencion-suave">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-estado-atencion text-[17px] font-black text-superficie">!</span>
-          <span className="min-w-0 flex-1 text-[16px] text-texto">
-            <b>{vencidos.length === 1 ? 'Una cosa venció' : `${vencidos.length} cosas vencieron`} y no {vencidos.length === 1 ? 'la' : 'las'} marcaste.</b> ¿Ya {vencidos.every((v) => v.tipo === 'ingreso') ? 'las cobraste' : 'están pagadas'}?
-          </span>
-          <span className="inline-flex h-10 items-center rounded-full bg-principal px-5 text-[15px] font-bold text-principal-texto">Revisarlas</span>
-        </motion.button>
-      )}
       <PanelLateral chico abierto={revisar} onCerrar={() => setRevisar(false)} titulo="¿Ya pagaste esto?" bajada="Vencieron y no los marcaste. Lo que ya está, queda en Plata con la fecha en que vencía. Tildá lo que ya pagaste o cobraste." ancho>
         {vencidos.length > 0 ? <YaPagaste key={vencidos.map((v) => v.id).join()} vencidos={vencidos} hoy={hoy} onAbrir={(v) => (setRevisar(false), setDesdeRevisar(true), setAbierto(v))} /> : <p className="text-[15.5px] text-texto">Listo: no queda nada vencido sin marcar.</p>}
       </PanelLateral>

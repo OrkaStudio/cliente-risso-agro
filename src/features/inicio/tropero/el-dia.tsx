@@ -9,6 +9,7 @@ import { BotonChico } from '@/components/tropero/boton'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import tranquera from '@/assets/tropero/tranquera.webp'
 import { Cabecera as CabeceraSeccion } from '@/components/tropero/cabecera'
+import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
@@ -128,6 +129,8 @@ export function ElDia() {
 function useIr() {
   const navigate = useNavigate()
   return (destino: string) => {
+    // «whatsapp:texto»: el WhatsApp de Troppero con el mensaje empezado (la recorrida se cuenta ahí).
+    if (destino.startsWith('whatsapp:')) return void window.open(`https://wa.me/${WHATSAPP_TROPERO}?text=${encodeURIComponent(destino.slice(9))}`, '_blank', 'noopener')
     if (destino.startsWith('#')) document.getElementById(destino.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     else navigate(destino)
   }
@@ -234,31 +237,54 @@ function Avisos({ cosas, lluvia, onIr }: { cosas: Cosa[]; lluvia: Chip | null; o
 
 const NUMERO = 't-numero text-texto'
 
+/**
+ * Una tarjeta del pulso, leída en orden (Lau, 08/11): 1) el número grande;
+ * 2) el estado, en una etiqueta de color si pide atención; 3) de qué es y el
+ * detalle, en chico. El ícono, en el color de su tema.
+ */
 function Pulso({
   titulo,
   icono,
+  tinte,
   destino,
   pie,
+  pieTono = null,
   children,
 }: {
   titulo: string
   icono: NombreIcono
+  /** El círculo del ícono: el color del tema de la tarjeta. */
+  tinte: string
   destino: string
   pie: React.ReactNode
+  /** Si el pie pide atención, va en una etiqueta de ese color. */
+  pieTono?: 'problema' | 'atencion' | 'bien' | null
   children: React.ReactNode
 }) {
   const ir = useIr()
   return (
-    <button type="button" onClick={() => ir(destino)} className="group flex min-h-[128px] flex-col px-5 py-4 text-left transition-colors hover:bg-superficie-hundida/50">
-      <span className="flex items-center gap-2 text-[13.5px] font-semibold text-texto-suave">
-        <Icono nombre={icono} tamano={16} />
+    <button type="button" onClick={() => ir(destino)} className="group flex min-h-[136px] flex-col px-5 py-4 text-left transition-colors hover:bg-superficie-hundida/50">
+      <span className="flex items-center gap-2.5 text-[13.5px] font-semibold text-texto-suave">
+        <span className={cn('grid size-7 shrink-0 place-items-center rounded-full', tinte)}>
+          <Icono nombre={icono} tamano={16} />
+        </span>
         {titulo}
         <span className="ml-auto text-principal opacity-0 transition-opacity group-hover:opacity-100">
           <Icono nombre="Siguiente" tamano={16} />
         </span>
       </span>
       <span className="mt-3 flex-1">{children}</span>
-      <span className="mt-2 text-[13px] leading-snug text-texto-suave">{pie}</span>
+      <span
+        className={cn(
+          'mt-2.5 w-fit text-[13px] leading-snug',
+          pieTono === 'problema' && 'rounded-full bg-estado-problema-suave px-2.5 py-0.5 font-bold text-estado-problema-texto',
+          pieTono === 'atencion' && 'rounded-full bg-estado-atencion-suave px-2.5 py-0.5 font-bold text-estado-atencion-texto',
+          pieTono === 'bien' && 'rounded-full bg-estado-bien-suave px-2.5 py-0.5 font-bold text-estado-bien-texto',
+          !pieTono && 'text-texto-suave',
+        )}
+      >
+        {pie}
+      </span>
     </button>
   )
 }
@@ -269,8 +295,10 @@ function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; ca
     <Pulso
       titulo="Hacienda"
       icono="Vaca"
+      tinte="bg-principal-suave text-principal"
       destino="/hacienda"
-      pie={nacimientos > 0 ? <b className="text-texto">+{nacimientos} nacimientos sin caravana</b> : campos > 1 ? `En tus ${campos} campos` : 'Ver por potrero'}
+      pieTono={nacimientos > 0 ? 'atencion' : null}
+      pie={nacimientos > 0 ? `+${nacimientos} nacimientos sin caravana` : campos > 1 ? `En tus ${campos} campos` : 'Ver por potrero'}
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>{total.toLocaleString('es-AR')}</span>
@@ -295,13 +323,15 @@ function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; gan
     <Pulso
       titulo="Próximos 30 días"
       icono="Plata"
+      tinte={p30 < 0 ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-bien-suave text-estado-bien-texto'}
       destino="/agenda"
+      pieTono={vencidos.length > 0 ? 'problema' : null}
       pie={
         vencidos.length > 0 ? (
-          <b className="text-estado-problema-texto">
+          <>
             {vencidos.length === 1 ? '1 vencido' : `${vencidos.length} vencidos`}
             {deuda > 0 ? ` · ${plataCorta(deuda)}` : ''}
-          </b>
+          </>
         ) : ganado !== null && ganado !== 0 ? (
           `Desde julio: ${plataCorta(ganado, true)}`
         ) : (
@@ -309,7 +339,7 @@ function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; gan
         )
       }
     >
-      <span className={cn(NUMERO, p30 < 0 ? 'text-estado-problema-texto' : 'text-texto')}>
+      <span className={cn(NUMERO, p30 < 0 ? 'text-estado-problema-texto' : 'text-estado-bien-texto')}>
         {p30 === 0 ? '$0' : plataCorta(p30, true)}
       </span>
       <span className="mt-1 block truncate text-[12.5px] text-texto-suave">cobros menos pagos</span>
@@ -322,8 +352,10 @@ function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number |
     <Pulso
       titulo={lugar ? `Lluvia en ${lugar}` : 'Lluvia'}
       icono="Lluvia"
+      tinte="bg-sky-soft text-sky"
       destino="#clima"
-      pie={manana ? (manana.lluviaProb >= 40 ? <b className="text-texto">Mañana {manana.lluviaProb} % de lluvia</b> : `Mañana ${manana.max}°, sin lluvia`) : 'Pronóstico abajo'}
+      pieTono={manana && manana.lluviaProb >= 40 ? 'atencion' : null}
+      pie={manana ? (manana.lluviaProb >= 40 ? `Mañana ${manana.lluviaProb} % de lluvia` : `Mañana ${manana.max}°, sin lluvia`) : 'Pronóstico abajo'}
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>
@@ -339,14 +371,18 @@ function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number |
 }
 
 function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | null; potreros: number; sinRecorrer: { campo: string }[] }) {
+  // Más de dos semanas sin recorrer (o nunca): el número en color de atención.
+  const vieja = ultima === null || ultima > 14
   return (
     <Pulso
       titulo="Última recorrida"
       icono="Recorrida"
+      tinte={vieja ? 'bg-estado-atencion-suave text-estado-atencion-texto' : 'bg-estado-bien-suave text-estado-bien-texto'}
       destino="#para-atender"
+      pieTono={potreros > 0 ? 'problema' : sinRecorrer.length > 0 ? 'atencion' : 'bien'}
       pie={
         potreros > 0 ? (
-          <b className="text-estado-problema-texto">Dejó {potreros} {potreros === 1 ? 'potrero' : 'potreros'} para mirar</b>
+          `Dejó ${potreros} ${potreros === 1 ? 'potrero' : 'potreros'} para mirar`
         ) : sinRecorrer.length > 0 ? (
           `${sinRecorrer[0]!.campo} sin recorrer`
         ) : (
@@ -355,11 +391,11 @@ function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | nu
       }
     >
       {ultima === null || ultima <= 1 ? (
-        <span className={NUMERO}>{ultima === null ? 'Nunca' : ultima === 0 ? 'Hoy' : 'Ayer'}</span>
+        <span className={cn(NUMERO, vieja && 'text-estado-atencion-texto')}>{ultima === null ? 'Nunca' : ultima === 0 ? 'Hoy' : 'Ayer'}</span>
       ) : (
         <span className="flex items-baseline gap-2">
           <span className="text-[14px] font-semibold text-texto-suave">hace</span>
-          <span className={NUMERO}>{ultima}</span>
+          <span className={cn(NUMERO, vieja && 'text-estado-atencion-texto')}>{ultima}</span>
           <span className="text-[14px] font-semibold text-texto-suave">días</span>
         </span>
       )}
@@ -414,7 +450,7 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
 
 /** Lo primero que hay que hacer: grande, con el color de su urgencia. */
 function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
-  const navigate = useNavigate()
+  const ir = useIr()
   const t = TONO[c.tono]
   return (
     <article className="flex flex-col p-6">
@@ -430,7 +466,7 @@ function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => navigate(c.accion.to)}
+          onClick={() => ir(c.accion.to)}
           className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
         >
           {c.accion.texto}
@@ -446,7 +482,7 @@ function Destacada({ c, empresaId }: { c: Cosa; empresaId: string }) {
 
 /** Una sola cosa para atender: en una franja, no un bloque grande y vacío. */
 function Unica({ c, empresaId }: { c: Cosa; empresaId: string }) {
-  const navigate = useNavigate()
+  const ir = useIr()
   const t = TONO[c.tono]
   return (
     <article className="flex flex-wrap items-center gap-x-5 gap-y-3 px-6 py-5">
@@ -465,7 +501,7 @@ function Unica({ c, empresaId }: { c: Cosa; empresaId: string }) {
         {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} />}
         <button
           type="button"
-          onClick={() => navigate(c.accion.to)}
+          onClick={() => ir(c.accion.to)}
           className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600"
         >
           {c.accion.texto}
@@ -480,7 +516,7 @@ function Unica({ c, empresaId }: { c: Cosa; empresaId: string }) {
 
 /** El resto: una fila compacta con el color de la urgencia a la izquierda. */
 function FilaCosa({ c, empresaId }: { c: Cosa; empresaId: string }) {
-  const navigate = useNavigate()
+  const ir = useIr()
   const t = TONO[c.tono]
   return (
     <li className="flex items-center gap-4 px-5 py-3.5">
@@ -496,7 +532,7 @@ function FilaCosa({ c, empresaId }: { c: Cosa; empresaId: string }) {
         <p className={cn('text-[13px] font-semibold', t.dato)}>{c.datos.join(' · ')}</p>
       </div>
       {c.senal && <SeSoluciono senal={c.senal} empresaId={empresaId} compacto />}
-      <BotonChico type="button" onClick={() => navigate(c.accion.to)}>
+      <BotonChico type="button" onClick={() => ir(c.accion.to)}>
         {c.accion.texto.replace(' el potrero', '')}
       </BotonChico>
     </li>

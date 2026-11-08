@@ -92,8 +92,9 @@ export function cosasParaHoy(
     key: `r-${c.key}`,
     tono: 'aviso',
     titulo: c.hace === null ? `${c.campo} todavía no se recorrió` : `${c.campo} no se recorre hace ${dias(c.hace)}`,
-    detalle: c.cabezas > 0 ? `Tiene ${c.cabezas} cabezas.` : 'Una vuelta alcanza para saber cómo está.',
-    accion: { texto: 'Recorrerlo', to: c.to },
+    detalle: 'Recorrelo y mandá por WhatsApp lo que viste: un audio alcanza.',
+    // Lo que lo resuelve no es abrir el mapa: es contar lo que se vio (Lau, 08/11).
+    accion: { texto: 'Mandar la recorrida', to: `whatsapp:Recorrí ${c.campo}. ` },
     icono: 'Recorrida',
     lugar: c.campo,
     que: c.hace === null ? 'Nunca se recorrió' : 'Sin recorrer',
