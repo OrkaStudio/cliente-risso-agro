@@ -60,27 +60,29 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
             {mes.slice(0, 4) !== hoy.slice(0, 4) ? ` ${mes.slice(0, 4)}` : ''}
           </h2>
           {mes !== hoy.slice(0, 7) && (
-            <button type="button" onClick={() => setMes(hoy.slice(0, 7))} className="h-9 rounded-full bg-tinta px-3.5 text-[14px] font-bold text-superficie hover:bg-neutro-800">
+            <button type="button" onClick={() => setMes(hoy.slice(0, 7))} className="text-[14.5px] font-bold text-principal underline-offset-4 hover:underline">
               Volver a hoy
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-superficie-hundida p-1">
-          <button type="button" onClick={() => setMes(anterior)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-bold text-texto hover:bg-superficie">
-            <Icono nombre="Atrás" tamano={16} /> {mayuscula(nombreMes(anterior))}
-            {antesSinResolver > 0 && <span className="rounded-full bg-estado-problema px-2 py-0.5 text-[12.5px] text-superficie">{antesSinResolver} sin resolver</span>}
+        {/* Los meses: texto con flecha; lo pendiente, en el color de su urgencia (sin cápsulas). */}
+        <div className="flex items-center gap-5">
+          <button type="button" onClick={() => setMes(anterior)} className="group inline-flex items-center gap-1.5 text-[15px] font-bold text-texto">
+            <Icono nombre="Atrás" tamano={16} /> <span className="group-hover:text-principal">{mayuscula(nombreMes(anterior))}</span>
+            {antesSinResolver > 0 && <span className="text-[13.5px] font-semibold text-estado-problema-texto">· {antesSinResolver} sin resolver</span>}
           </button>
           <span aria-hidden className="h-5 w-px bg-borde" />
-          <button type="button" onClick={() => setMes(siguiente)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[14.5px] font-bold text-texto hover:bg-superficie">
-            {mayuscula(nombreMes(siguiente))}
-            {cuantosEn(siguiente) > 0 && <span className="rounded-full bg-principal px-2 py-0.5 text-[12.5px] text-principal-texto">{cuantosEn(siguiente)} por resolver</span>}
+          <button type="button" onClick={() => setMes(siguiente)} className="group inline-flex items-center gap-1.5 text-[15px] font-bold text-texto">
+            <span className="group-hover:text-principal">{mayuscula(nombreMes(siguiente))}</span>
+            {cuantosEn(siguiente) > 0 && <span className="text-[13.5px] font-semibold text-principal">· {cuantosEn(siguiente)} por resolver</span>}
             <Icono nombre="Siguiente" tamano={16} />
           </button>
         </div>
       </header>
 
       {/* El mes en tres números: lo que debés (rojo), lo que entra (verde) y lo ya pagado (gris). */}
-      <div className="grid gap-3 px-6 pb-6 sm:grid-cols-3">
+      {/* Tres columnas separadas por líneas, no tres cajas: el color está en el número. */}
+      <div className="grid px-6 pb-6 sm:grid-cols-3 sm:divide-x sm:divide-borde">
         <Numero titulo="Te falta pagar" monto={suma(pagos)} tono="problema" detalle={pagos.length ? `${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'}${vencidosMes ? ` · ${vencidosMes} ${vencidosMes === 1 ? 'vencido' : 'vencidos'}` : ''}` : 'Nada por pagar'} alerta={vencidosMes > 0} />
         <Numero titulo="Te falta cobrar" monto={suma(cobros)} tono="bien" detalle={cobros.length ? `${cobros.length} ${cobros.length === 1 ? 'cobro' : 'cobros'}` : 'Nada por cobrar'} />
         <Numero titulo="Ya pagaste" monto={suma(pagados)} tono="neutro" detalle={pagados.length ? `${pagados.length} ${pagados.length === 1 ? 'pago' : 'pagos'} de ${nombreMes(mes)}` : 'Todavía nada'} />
@@ -169,8 +171,8 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
 
 function Numero({ titulo, monto, tono, detalle, alerta = false }: { titulo: string; monto: number; tono: 'problema' | 'bien' | 'neutro'; detalle: string; alerta?: boolean }) {
   return (
-    <div className={cn('flex flex-col gap-1 rounded-[20px] px-5 py-4', tono === 'problema' ? 'bg-estado-problema-suave/70' : tono === 'bien' ? 'bg-estado-bien-suave/70' : 'bg-superficie-hundida/70')}>
-      <span className="text-[14.5px] font-bold text-texto">{titulo}</span>
+    <div className="flex flex-col gap-1 py-1 sm:px-6 sm:first:pl-0">
+      <span className="text-[14px] font-semibold text-texto-suave">{titulo}</span>
       <b className={cn('t-numero', tono === 'problema' ? 'text-estado-problema-texto' : tono === 'bien' ? 'text-estado-bien-texto' : 'text-texto-suave')}>{pesos(monto)}</b>
       <span className={cn('text-[14px] font-semibold', alerta ? 'text-estado-problema-texto' : 'text-texto-suave')}>{detalle}</span>
     </div>

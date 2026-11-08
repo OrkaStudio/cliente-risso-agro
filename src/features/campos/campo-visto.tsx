@@ -8,9 +8,10 @@ import type { CampoElegible } from '@/features/campos/campo-elegido'
 export function CampoVisto({ campos, elegido }: { campos: CampoElegible[]; elegido: CampoElegible | null }) {
   if (campos.length === 0) return null
   return (
-    <div className="flex shrink-0 flex-col items-start gap-1.5">
-      <span className="rounded-full bg-superficie/90 px-2 text-[12.5px] font-semibold text-texto-suave">Estás viendo</span>
-      <span className="inline-flex h-11 items-center gap-2 rounded-full bg-superficie px-4 text-[15px] font-bold whitespace-nowrap text-texto shadow-[0_2px_10px_rgba(19,27,22,0.12)]">
+    // Sólo texto (Lau, 08/11: sin cápsulas): lo que se ve y, en chico, que se cambia en la barra.
+    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+      <span className="text-[12.5px] font-semibold tracking-[0.04em] text-texto-suave uppercase">Estás viendo</span>
+      <span className="inline-flex items-center gap-2 text-[16px] font-bold whitespace-nowrap text-texto">
         {elegido ? (
           <span className="grid size-[20px] shrink-0 place-items-center rounded-[6px] text-[10.5px] font-extrabold text-white" style={{ background: elegido.color }}>
             {elegido.letra}

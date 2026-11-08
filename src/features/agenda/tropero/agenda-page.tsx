@@ -15,7 +15,6 @@ import { SeSoluciono } from '@/features/inicio/tropero/el-dia'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { cheques, pendiente, semanasQueVienen, tituloDe, mesCorto, type Semana } from './agenda'
-import { BellIcon } from 'lucide-react'
 import { AgendaCalendario } from './agenda-calendario'
 import campoArriba from '@/assets/tropero/campo-de-arriba.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
@@ -132,13 +131,11 @@ export function AgendaPage() {
             )}
           </p>
           {vencidos.length > 0 && (
-            <button type="button" onClick={() => setRevisar(true)} className="group mt-3 inline-flex h-10 items-center gap-2.5 rounded-full border-[1.5px] border-estado-problema/40 bg-superficie/95 py-1 pr-3.5 pl-1 text-[14.5px] font-bold text-texto transition-colors hover:border-principal">
-              <span className="grid size-8 place-items-center rounded-full bg-estado-problema text-superficie">
-                <BellIcon className="size-4" />
-              </span>
-              {vencidos.length === 1 ? 'Una vencida sin marcar' : `${vencidos.length} vencidas sin marcar`}
-              <span className="text-[13.5px] font-semibold text-texto-suave">· ¿Ya {vencidos.every((v) => v.tipo === 'ingreso') ? 'las cobraste' : 'están pagadas'}?</span>
-              <span className="text-texto-suave transition-colors group-hover:text-principal">
+            <button type="button" onClick={() => setRevisar(true)} className="group mt-3 inline-flex items-center gap-2 text-[15px] font-bold text-estado-problema-texto">
+              <span className="size-2 rounded-full bg-estado-problema" />
+              <span className="underline decoration-estado-problema/30 underline-offset-4 group-hover:decoration-estado-problema">{vencidos.length === 1 ? 'Una vencida sin marcar' : `${vencidos.length} vencidas sin marcar`}</span>
+              <span className="text-[14px] font-semibold text-texto-suave">· ¿Ya {vencidos.every((v) => v.tipo === 'ingreso') ? 'las cobraste' : 'están pagadas'}?</span>
+              <span className="text-estado-problema-texto transition-transform group-hover:translate-x-0.5">
                 <Icono nombre="Siguiente" tamano={16} />
               </span>
             </button>
@@ -147,9 +144,10 @@ export function AgendaPage() {
       </motion.div>
 
       {/* Las herramientas, arriba de lo que manejan: qué mostrar y cómo verlo a la izquierda, anotar a la derecha. */}
-      <motion.div {...entra(1)} className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-        <div role="radiogroup" aria-label="Qué mostrar" className="flex flex-wrap gap-2">
+      {/* Sin cajas (Lau, 08/11: demasiadas burbujas): pestañas de texto con su subrayado; la única caja, anotar. */}
+      <motion.div {...entra(1)} className="flex flex-wrap items-end justify-between gap-3 border-b border-borde">
+        <div className="flex flex-wrap items-end gap-8">
+        <div role="radiogroup" aria-label="Qué mostrar" className="flex flex-wrap gap-6">
           {(
             [
               ['todo', 'Todo'],
@@ -158,20 +156,20 @@ export function AgendaPage() {
               ['cheques', 'Cheques'],
             ] as [Filtro, string][]
           ).map(([v, t]) => (
-            <button key={v} type="button" role="radio" aria-checked={filtro === v} onClick={() => setFiltro(v)} className={cn('inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] px-4 text-[14.5px] font-bold transition-colors', filtro === v ? 'border-acento bg-acento text-acento-texto' : 'border-borde bg-superficie/90 text-texto hover:border-neutro-300')}>
-              {filtro === v && <Icono nombre="Guardar" tamano={16} />}
+            <button key={v} type="button" role="radio" aria-checked={filtro === v} onClick={() => setFiltro(v)} className={cn('-mb-px border-b-2 pb-3 text-[15px] font-bold transition-colors', filtro === v ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto')}>
               {t}
             </button>
           ))}
         </div>
-        <div role="radiogroup" aria-label="Verlo como" className="flex gap-1 rounded-full border border-borde bg-superficie p-1">
+        <span aria-hidden className="mb-3 h-5 w-px bg-borde" />
+        <div role="radiogroup" aria-label="Verlo como" className="flex gap-6">
           {(
             [
               ['calendario', 'Calendario', 'Agenda'],
               ['lista', 'Lista por semana', 'Comprobante'],
             ] as const
           ).map(([v, t, ic]) => (
-            <button key={v} type="button" role="radio" aria-checked={forma === v} onClick={() => elegirForma(v)} className={cn('inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14.5px] font-bold transition-colors', forma === v ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida')}>
+            <button key={v} type="button" role="radio" aria-checked={forma === v} onClick={() => elegirForma(v)} className={cn('-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[15px] font-bold transition-colors', forma === v ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto')}>
               <Icono nombre={ic} tamano={16} />
               {t}
             </button>
@@ -184,7 +182,7 @@ export function AgendaPage() {
             campoInicial={elegido?.id}
             vence
             renderTrigger={(abrir) => (
-              <button type="button" onClick={() => abrir()} className="inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
+              <button type="button" onClick={() => abrir()} className="mb-2 inline-flex h-10 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
                 Anotar un pago o un cobro
                 <span className="grid size-8 place-items-center rounded-full bg-acento text-acento-texto">
                   <Icono nombre="Agregar" tamano={16} />
