@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { CampoMapa } from '@/features/mapa/reglas'
-import { ponerSatelite } from '@/features/mapa/satelite'
+import { ponerSatelite, precargarVista } from '@/features/mapa/satelite'
 import { VIAJE, recordarCampo, vistaGeneral } from './vista-mapa'
 import { ICONOS_SVG } from '@/components/tropero/iconos-svg'
 
@@ -61,6 +61,7 @@ export function MapaCampo({
   useEffect(() => {
     if (!host.current) return
     const map = L.map(host.current, { fadeAnimation: false, zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
+    let vivo = true
     mapa.current = map
     const quitar = ponerSatelite(map)
     // Los potreros en su capa: durante el viaje no se ven (estirados se ven borrosos) y al llegar aparecen.
@@ -76,16 +77,19 @@ export function MapaCampo({
       map.fitBounds(L.latLngBounds(puntos), { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70] })
     }
     const desde = entrando ? vistaGeneral() : null
-    let timer: ReturnType<typeof setTimeout> | undefined
     if (desde && puntos.length) {
       // El viaje: desde donde estaba la vista general hasta el campo, en un solo movimiento.
       capaPotreros.style.opacity = '0'
       map.setView([desde.lat, desde.lng], desde.zoom, { animate: false })
       const derecha = (host.current?.clientWidth ?? 0) > 900 ? margenDerecho : 0
-      timer = setTimeout(() => {
+      const destino = L.latLngBounds(puntos)
+      const z = map.getBoundsZoom(destino, false, L.point(derecha + 80, 190))
+      // Antes de viajar, pide las imágenes de donde va a llegar (sin huecos oscuros en el camino).
+      void precargarVista(map, destino.pad(0.6), z).then(() => {
+        if (!vivo) return
         map.once('moveend', () => (capaPotreros.style.opacity = '1'))
-        map.flyToBounds(L.latLngBounds(puntos), { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70], duration: VIAJE, easeLinearity: 0.1 })
-      }, 40)
+        map.flyToBounds(destino, { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70], duration: VIAJE, easeLinearity: 0.1 })
+      })
     } else encuadrar()
     // Dónde quedó: la vuelta a «Todos tus campos» arranca acá.
     map.on('moveend', () => {
@@ -102,7 +106,7 @@ export function MapaCampo({
     })
     ro.observe(host.current)
     return () => {
-      clearTimeout(timer)
+      vivo = false
       ro.disconnect()
       map.off()
       map.stop()

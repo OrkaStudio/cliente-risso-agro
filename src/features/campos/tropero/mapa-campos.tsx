@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { CampoMapa } from '@/features/mapa/reglas'
-import { ponerSatelite } from '@/features/mapa/satelite'
+import { ponerSatelite, precargarVista } from '@/features/mapa/satelite'
 import { VIAJE, recordarGeneral, vistaDeCampo } from './vista-mapa'
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
@@ -36,6 +36,7 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
   useEffect(() => {
     if (!host.current) return
     const map = L.map(host.current, { fadeAnimation: false, zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
+    let vivo = true
     const quitar = ponerSatelite(map)
     // Los bordes van en su propia capa: durante el viaje de la cámara se desvanecen (estirados se
     // veían como una mancha borrosa, Lau 09/11) y vuelven al llegar.
@@ -141,7 +142,11 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
         verFormas(true)
         ponerEtiquetas()
       })
-      timers.push(setTimeout(() => map.flyToBounds(todo, { ...opciones(), duration: VIAJE, easeLinearity: 0.1 }), 60))
+      // Antes de alejarse, pide las imágenes de donde va a llegar: así no aparecen huecos oscuros.
+      const z = map.getBoundsZoom(todo, false, L.point(140 + margen(), 140))
+      void precargarVista(map, todo.pad(0.8), z).then(() => {
+        if (vivo) map.flyToBounds(todo, { ...opciones(), duration: VIAJE, easeLinearity: 0.1 })
+      })
     } else encuadrar()
     ponerEtiquetas()
 
@@ -156,6 +161,7 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
     })
     ro.observe(host.current)
     return () => {
+      vivo = false
       timers.forEach(clearTimeout)
       ro.disconnect()
       map.off()
