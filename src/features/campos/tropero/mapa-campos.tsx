@@ -39,6 +39,11 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
     if (!host.current) return
     const map = L.map(host.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
     const quitar = ponerSatelite(map)
+    // Los bordes van en su propia capa: durante el viaje de la cámara se desvanecen (estirados se
+    // veían como una mancha borrosa, Lau 09/11) y vuelven al llegar.
+    const capaFormas = map.createPane('formas')
+    capaFormas.style.transition = 'opacity 260ms ease'
+    const verFormas = (si: boolean) => (capaFormas.style.opacity = si ? '1' : '0')
     const formas = L.layerGroup().addTo(map)
     const etiquetas = L.layerGroup().addTo(map)
     // La tarjeta flota sobre el mapa desde el ancho «lg» (1024 px): ahí los campos se encuadran a su izquierda.
@@ -53,6 +58,7 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
       if (!b || viajando) return
       viajando = true
       etiquetas.clearLayers()
+      verFormas(false)
       // Se abre un instante después de llegar: el mapa termina su animación antes de desarmarse.
       map.once('moveend', () => (timers.push(setTimeout(() => elegir.current(c.id), 60))))
       map.flyToBounds(b, { ...opciones(), maxZoom: 16, duration: VIAJE, easeLinearity: 0.2 })
@@ -64,12 +70,12 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
     }
     const todos = campos.map((x) => ({ ...x, b: limites(x.campo) })).filter((x): x is CampoEnMapa & { b: L.LatLngBounds } => !!x.b)
     for (const { campo, color, b } of todos) {
-      for (const p of campo.potreros) if (p.poligono) L.polygon(p.poligono, { color: '#fbfaf6', weight: 1, opacity: 0.7, fill: false, interactive: false }).addTo(formas)
+      for (const p of campo.potreros) if (p.poligono) L.polygon(p.poligono, { pane: 'formas', color: '#fbfaf6', weight: 1, opacity: 0.7, fill: false, interactive: false }).addTo(formas)
       if (campo.contorno?.length) {
-        const borde = L.polygon(campo.contorno, { color, weight: 3, opacity: 1, fillColor: color, fillOpacity: 0.18 }).addTo(formas)
+        const borde = L.polygon(campo.contorno, { pane: 'formas', color, weight: 3, opacity: 1, fillColor: color, fillOpacity: 0.18 }).addTo(formas)
         borde.on('click', () => entrar(campo))
       } else {
-        L.circleMarker(b.getCenter(), { radius: 7, color: '#fbfaf6', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(formas).on('click', () => entrar(campo))
+        L.circleMarker(b.getCenter(), { pane: 'formas', radius: 7, color: '#fbfaf6', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(formas).on('click', () => entrar(campo))
       }
     }
 
@@ -121,7 +127,18 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
     // Volviendo de un campo: arranca en él y se aleja hasta ver todos (el zoom al revés).
     const de = desde ? todos.find((t) => t.campo.id === desde) : null
     if (de && todo) {
-      map.fitBounds(de.b, { ...opciones(), maxZoom: 16 })
+      // Arranca cerca del campo, pero no tan cerca: con un salto más corto el satélite llega a cargar
+      // mientras se aleja (de muy cerca quedaban cuadros grises).
+      // En viaje desde antes de mover la cámara: las etiquetas recién aparecen al llegar.
+      viajando = true
+      verFormas(false)
+      const lejos = map.getBoundsZoom(todo, false, L.point(140 + margen(), 140))
+      map.setView(de.b.getCenter(), Math.min(map.getBoundsZoom(de.b), lejos + 2), { animate: false })
+      map.once('moveend', () => {
+        viajando = false
+        verFormas(true)
+        ponerEtiquetas()
+      })
       timers.push(setTimeout(() => map.flyToBounds(todo, { ...opciones(), duration: VIAJE, easeLinearity: 0.2 }), 120))
     } else encuadrar()
     ponerEtiquetas()

@@ -1011,3 +1011,8 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Lo que el satélite todavía no cargó, en un tono de campo (no el gris de Leaflet): durante el zoom no se ven cuadros grises. */
+.leaflet-container {
+  background: #3d4630;
+}
