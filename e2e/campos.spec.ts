@@ -85,6 +85,6 @@ test('el campo se elige en la barra: filtra donde estás y «Todos» es la vista
 
   await page.getByRole('link', { name: 'Campos', exact: true }).click()
   await barra.getByRole('radio', { name: /^Todos tus campos/ }).click()
-  await expect(page.getByRole('heading', { name: 'Todos tus campos' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Tus \d+ campos$/ })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Mapa de todos tus campos' })).toBeVisible()
 })

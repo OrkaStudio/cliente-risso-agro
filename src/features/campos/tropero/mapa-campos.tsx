@@ -41,7 +41,8 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
     const quitar = ponerSatelite(map)
     const formas = L.layerGroup().addTo(map)
     const etiquetas = L.layerGroup().addTo(map)
-    const margen = () => ((host.current?.clientWidth ?? 0) > 900 ? margenDerecho : 0)
+    // La tarjeta flota sobre el mapa desde el ancho «lg» (1024 px): ahí los campos se encuadran a su izquierda.
+    const margen = () => (window.innerWidth >= 1024 ? margenDerecho : 0)
     const opciones = (): L.FitBoundsOptions => ({ paddingTopLeft: [70, 70], paddingBottomRight: [margen() + 70, 70], maxZoom: 15 })
     let viajando = false
     const timers: ReturnType<typeof setTimeout>[] = []
@@ -72,42 +73,45 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
       }
     }
 
-    // Las etiquetas, sin pisarse: se miden en pantalla y las que se tocan se juntan en una.
+    // Las etiquetas, cada campo con la suya y sin pisarse (Lau, 09/11): si su lugar está ocupado,
+    // se corre al primer lugar libre alrededor y una línea fina la une a su campo.
     const ponerEtiquetas = () => {
-      if (viajando) return
+      if (viajando || !host.current) return
       etiquetas.clearLayers()
-      const cajas = todos.map((t) => {
+      const W = host.current.clientWidth
+      const H = host.current.clientHeight
+      const limiteDerecho = W - margen() - 12
+      const ocupado: { x0: number; x1: number; y0: number; y1: number }[] = []
+      const choca = (r: { x0: number; x1: number; y0: number; y1: number }) => ocupado.some((o) => r.x0 < o.x1 + 8 && o.x0 < r.x1 + 8 && r.y0 < o.y1 + 6 && o.y0 < r.y1 + 6)
+      const orden = [...todos].sort((a, b) => map.latLngToContainerPoint(a.b.getCenter()).y - map.latLngToContainerPoint(b.b.getCenter()).y)
+      for (const t of orden) {
         const p = map.latLngToContainerPoint(t.b.getCenter())
-        const w = 52 + t.campo.nombre.length * 8.6
-        return { t, p, x0: p.x - w / 2 - 6, x1: p.x + w / 2 + 6, y0: p.y - 22, y1: p.y + 22 }
-      })
-      const grupo = cajas.map((_, i) => i)
-      const raiz = (i: number): number => (grupo[i] === i ? i : (grupo[i] = raiz(grupo[i]!)))
-      for (let i = 0; i < cajas.length; i++)
-        for (let j = i + 1; j < cajas.length; j++) {
-          const a = cajas[i]!
-          const c = cajas[j]!
-          if (a.x0 < c.x1 && c.x0 < a.x1 && a.y0 < c.y1 && c.y0 < a.y1) grupo[raiz(i)] = raiz(j)
+        const w = Math.round(48 + t.campo.nombre.length * 8.8)
+        const h = 36
+        // Lugares a probar: el propio, y después alrededor, cada vez más lejos.
+        const lugares: [number, number][] = [[0, 0]]
+        for (const r of [46, 84, 124, 170, 220])
+          for (const [dx, dy] of [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [-1, -1], [1, 1], [-1, 1]] as const) lugares.push([dx * (r + w / 2 - 20), dy * r])
+        let elegido: { cx: number; cy: number } | null = null
+        for (const [dx, dy] of lugares) {
+          const cx = p.x + dx
+          const cy = p.y + dy
+          const r = { x0: cx - w / 2, x1: cx + w / 2, y0: cy - h / 2, y1: cy + h / 2 }
+          if (r.x0 < 8 || r.y0 < 8 || r.x1 > limiteDerecho || r.y1 > H - 8 || choca(r)) continue
+          elegido = { cx, cy }
+          ocupado.push(r)
+          break
         }
-      const grupos = new Map<number, typeof cajas>()
-      cajas.forEach((c, i) => grupos.set(raiz(i), [...(grupos.get(raiz(i)) ?? []), c]))
-      for (const g of grupos.values()) {
-        if (g.length === 1) {
-          const { t } = g[0]!
-          const html = `<b><i style="background:${t.color}">${esc(t.letra)}</i>${esc(t.campo.nombre)}</b>`
-          L.marker(t.b.getCenter(), { icon: L.divIcon({ className: 'tropero-campo tropero-campo--pin', html, iconSize: undefined }), keyboard: false })
-            .addTo(etiquetas)
-            .on('click', () => entrar(t.campo))
-          continue
+        elegido ??= { cx: p.x, cy: p.y }
+        const centro = map.containerPointToLatLng([elegido.cx, elegido.cy])
+        if (Math.hypot(elegido.cx - p.x, elegido.cy - p.y) > 4) {
+          L.polyline([t.b.getCenter(), centro], { color: '#fbfaf6', weight: 2, opacity: 0.9, interactive: false }).addTo(etiquetas)
+          L.circleMarker(t.b.getCenter(), { radius: 4, color: '#fbfaf6', weight: 2, fillColor: t.color, fillOpacity: 1, interactive: false }).addTo(etiquetas)
         }
-        // Varios juntos: una etiqueta con sus letras; tocarla acerca hasta que se separan.
-        const centro = L.latLngBounds(g.map((c) => c.t.b.getCenter())).getCenter()
-        const letras = g.map((c) => `<i style="background:${c.t.color}">${esc(c.t.letra)}</i>`).join('')
-        const html = `<b class="tropero-campo-grupo">${letras}<span>${g.length} campos</span></b>`
-        const caja = g.reduce((acc, c) => acc.extend(c.t.b), L.latLngBounds(g[0]!.t.b.getSouthWest(), g[0]!.t.b.getNorthEast()))
-        L.marker(centro, { icon: L.divIcon({ className: 'tropero-campo tropero-campo--pin', html, iconSize: undefined }), keyboard: false })
+        const html = `<b><i style="background:${t.color}">${esc(t.letra)}</i>${esc(t.campo.nombre)}</b>`
+        L.marker(centro, { icon: L.divIcon({ className: 'tropero-campo tropero-campo--pin', html, iconSize: [w, h], iconAnchor: [w / 2, h / 2] }), keyboard: false, riseOnHover: true })
           .addTo(etiquetas)
-          .on('click', () => map.flyToBounds(caja, { ...opciones(), maxZoom: 16, duration: 0.7 }))
+          .on('click', () => entrar(t.campo))
       }
     }
     map.on('zoomend moveend', ponerEtiquetas)

@@ -212,15 +212,7 @@ export function CamposPage() {
       <div className="flex items-end justify-between gap-3">
         <div>
           <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
-          <div className="mt-1.5 flex items-center gap-3">
-            {/* Volver a todos: el mapa se aleja desde este campo (el zoom al revés). */}
-            {campos.length > 1 && !pendienteMapa && (
-              <button type="button" onClick={() => identidad.elegir(null)} aria-label="Volver a todos tus campos" className="grid size-10 place-items-center rounded-full border-[1.5px] border-borde bg-superficie text-texto hover:border-principal hover:text-principal">
-                <Icono nombre="Atrás" tamano={16} />
-              </button>
-            )}
-            <h1 className="t-pagina text-texto">Campos</h1>
-          </div>
+          <h1 className="t-pagina mt-1.5 text-texto">Campos</h1>
         </div>
         {/* En la misma fila: lo que falta para abrir la app, sin quitarle alto al mapa. */}
         {aTerminar && mapaQ.data && <ProgresoMapa campos={mapaQ.data} actual={aTerminar} />}
@@ -229,6 +221,15 @@ export function CamposPage() {
 
       {/* El mapa, con una sola tarjeta: el campo, o el potrero tocado */}
       <section data-guia="campos-mapa" className={cn('relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta', editando && 'max-lg:h-[calc(100dvh-190px)]')}>
+        {/* Volver a la vista de todos: el mapa se aleja desde este campo (el zoom al revés). */}
+        {campos.length > 1 && !pendienteMapa && !editando && (
+          <button type="button" onClick={() => identidad.elegir(null)} className="absolute top-4 left-4 z-[600] inline-flex h-11 items-center gap-2 rounded-full bg-superficie py-1 pr-5 pl-1.5 text-[15px] font-bold text-texto shadow-[0_8px_24px_-6px_rgba(19,27,22,0.4)] transition-colors hover:text-principal">
+            <span className="grid size-8 place-items-center rounded-full bg-principal text-principal-texto">
+              <Icono nombre="Atrás" tamano={16} />
+            </span>
+            Todos tus campos
+          </button>
+        )}
         <div className="absolute inset-0">
           {editando ? (
             <MapErrorBoundary>
@@ -336,7 +337,7 @@ function ResumenCampo({
     <>
       <div>
         {lugar && <p className="text-[14px] font-semibold text-texto-suave">{lugar}</p>}
-        <h1 className="t-pagina text-texto">{campo.nombre}</h1>
+        <h2 className="t-seccion text-texto">{campo.nombre}</h2>
       </div>
       <dl className="flex gap-6">
         <Numero n={ha(campo.totalHa)} texto="hectáreas" />
@@ -764,10 +765,7 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
         </MapErrorBoundary>
       </div>
       <aside className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto">
-        <div>
-          <p className="text-[13.5px] font-semibold text-texto-suave">{campos.length} campos</p>
-          <h1 className="t-pagina text-texto">Todos tus campos</h1>
-        </div>
+        <h2 className="t-seccion text-texto">Tus {campos.length} campos</h2>
         <div className="flex gap-7">
           <p className="flex flex-col">
             <span className="t-numero">{ha(totalHa)}</span>
