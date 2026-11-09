@@ -134,6 +134,7 @@ export function CamposPage() {
     )
   }, [pedidoPotrero, delPedido, camposQ.data, setParams])
   const [dibujar, setDibujar] = useState(false)
+  const [ultimoVisto, setUltimoVisto] = useState<string | null>(null)
   const pendiente = pendienteMapa
   // Llegó desde una sección que todavía no se abrió: se dice por qué, hasta el primer paso.
   const bloqueada = (useLocation().state as { bloqueada?: string } | null)?.bloqueada
@@ -155,16 +156,23 @@ export function CamposPage() {
   const ultima = ultimaPorPotrero(datosQ.data?.observaciones ?? [])
   const marcas: Marca[] = (infraQ.data ?? []).map((m) => ({ id: m.id, tipo: m.tipo, lat: m.lat, lng: m.lng }))
 
+  // El último campo abierto: al volver a «Todos», el mapa se aleja desde ahí.
+  if (!todos && campoId && ultimoVisto !== campoId) setUltimoVisto(campoId)
+  const volviendo = todos ? ultimoVisto : null
   if (camposQ.isLoading || mapaQ.isLoading) return <div className="mx-auto h-[560px] w-full max-w-[1280px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (camposQ.error) return <p className="text-texto-suave">No pudimos cargar los campos. Revisá la conexión y probá de nuevo.</p>
   if (todos)
     return (
       <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
+        {/* El encabezado, con la misma letra que el resto: «Estás viendo» chico y el título grande (Lau, 09/11). */}
         <div className="flex items-end justify-between gap-3">
-          <CampoVisto campos={identidad.campos} elegido={null} />
-          <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
+          <div>
+            <CampoVisto campos={identidad.campos} elegido={null} />
+            <h1 className="t-pagina mt-1.5 text-texto">Campos</h1>
+          </div>
+          <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
         </div>
-        <VistaGeneral campos={mapaQ.data ?? []} identidad={identidad.campos} onElegir={identidad.elegir} />
+        <VistaGeneral campos={mapaQ.data ?? []} identidad={identidad.campos} onElegir={identidad.elegir} desde={volviendo} />
       </div>
     )
   if (!campo || !mapa)
@@ -202,10 +210,21 @@ export function CamposPage() {
     <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
       {/* Arriba: qué campo se está viendo (se elige en la barra izquierda) y sumar otro. */}
       <div className="flex items-end justify-between gap-3">
-        <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
+        <div>
+          <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
+          <div className="mt-1.5 flex items-center gap-3">
+            {/* Volver a todos: el mapa se aleja desde este campo (el zoom al revés). */}
+            {campos.length > 1 && !pendienteMapa && (
+              <button type="button" onClick={() => identidad.elegir(null)} aria-label="Volver a todos tus campos" className="grid size-10 place-items-center rounded-full border-[1.5px] border-borde bg-superficie text-texto hover:border-principal hover:text-principal">
+                <Icono nombre="Atrás" tamano={16} />
+              </button>
+            )}
+            <h1 className="t-pagina text-texto">Campos</h1>
+          </div>
+        </div>
         {/* En la misma fila: lo que falta para abrir la app, sin quitarle alto al mapa. */}
         {aTerminar && mapaQ.data && <ProgresoMapa campos={mapaQ.data} actual={aTerminar} />}
-        <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center rounded-full px-3 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
+        <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
       </div>
 
       {/* El mapa, con una sola tarjeta: el campo, o el potrero tocado */}
@@ -723,12 +742,14 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
  * «Todos tus campos» (Lau, 29/10): todos juntos sobre el satélite y, al lado,
  * lo que suman y cada campo con lo suyo. Tocar uno lo elige, como en la barra.
  */
-function VistaGeneral({ campos, identidad, onElegir }: { campos: CampoMapa[]; identidad: CampoElegible[]; onElegir: (id: string) => void }) {
+function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMapa[]; identidad: CampoElegible[]; onElegir: (id: string) => void; desde: string | null }) {
   const marca = (id: string) => identidad.find((c) => c.id === id)
   const cabezas = (c: CampoMapa) => c.potreros.reduce((n, p) => n + p.cabezas, 0)
   const hectareas = (c: CampoMapa) => c.hectareas ?? c.potreros.reduce((n, p) => n + (p.hectareas ?? 0), 0)
   const totalHa = campos.reduce((n, c) => n + hectareas(c), 0)
   const totalCab = campos.reduce((n, c) => n + cabezas(c), 0)
+  // Tocar uno en la lista también viaja hasta él en el mapa antes de abrirlo.
+  const [pedido, setPedido] = useState<string | null>(null)
   return (
     <section className="relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta">
       <div className="absolute inset-0">
@@ -737,6 +758,8 @@ function VistaGeneral({ campos, identidad, onElegir }: { campos: CampoMapa[]; id
             campos={campos.map((c) => ({ campo: c, letra: marca(c.id)?.letra ?? '', color: marca(c.id)?.color ?? '#a9552c' }))}
             onElegir={onElegir}
             margenDerecho={420}
+            desde={desde}
+            pedido={pedido}
           />
         </MapErrorBoundary>
       </div>
@@ -761,7 +784,7 @@ function VistaGeneral({ campos, identidad, onElegir }: { campos: CampoMapa[]; id
             const listo = estadoDe(c).tipo === 'listo'
             return (
               <li key={c.id} className="border-b border-borde/70 last:border-b-0">
-                <button type="button" onClick={() => onElegir(c.id)} className="group flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-fondo">
+                <button type="button" onClick={() => setPedido(c.id)} className="group flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-fondo">
                   <span className="grid size-[24px] shrink-0 place-items-center rounded-[7px] text-[11.5px] font-extrabold text-white" style={{ background: m?.color }}>
                     {m?.letra}
                   </span>

@@ -1004,3 +1004,15 @@
 
 /* Plata · «Leyendo el comprobante»: la raya que baja por la foto. */
 @keyframes escaneo { 0% { transform: translateY(24px); } 50% { transform: translateY(316px); } 100% { transform: translateY(24px); } }
+
+/* Varios campos juntos en una etiqueta: sus letras encimadas y cuántos son; tocarla acerca. */
+.tropero-campo .tropero-campo-grupo {
+  gap: 0;
+  padding-right: 14px;
+}
+.tropero-campo .tropero-campo-grupo i + i {
+  margin-left: 3px;
+}
+.tropero-campo .tropero-campo-grupo span {
+  margin-left: 10px;
+}
