@@ -3,13 +3,11 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { CampoMapa } from '@/features/mapa/reglas'
 import { ponerSatelite } from '@/features/mapa/satelite'
+import { VIAJE, recordarGeneral, vistaDeCampo } from './vista-mapa'
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 export type CampoEnMapa = { campo: CampoMapa; letra: string; color: string }
-
-/** Cuánto dura el viaje de la cámara al entrar a un campo y al volver (s). */
-const VIAJE = 0.9
 
 /** Los límites de un campo: su borde o, si todavía no lo tiene, un recuadro chico en su pueblo. */
 function limites(c: CampoMapa): L.LatLngBounds | null {
@@ -37,7 +35,7 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
   const clave = campos.map((c) => c.campo.id).join(',')
   useEffect(() => {
     if (!host.current) return
-    const map = L.map(host.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
+    const map = L.map(host.current, { fadeAnimation: false, zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
     const quitar = ponerSatelite(map)
     // Los bordes van en su propia capa: durante el viaje de la cámara se desvanecen (estirados se
     // veían como una mancha borrosa, Lau 09/11) y vuelven al llegar.
@@ -53,15 +51,14 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
     const timers: ReturnType<typeof setTimeout>[] = []
 
     // Entrar a un campo: la cámara viaja hasta él y, al llegar, se abre.
+    // Entrar a un campo: se guarda dónde está la cámara y se abre; el mapa del campo arranca
+    // en esta misma vista (sin parpadeo: el satélite ya está cargado) y hace el viaje él.
     const entrar = (c: CampoMapa) => {
-      const b = limites(c)
-      if (!b || viajando) return
+      if (viajando) return
       viajando = true
-      etiquetas.clearLayers()
-      verFormas(false)
-      // Se abre un instante después de llegar: el mapa termina su animación antes de desarmarse.
-      map.once('moveend', () => (timers.push(setTimeout(() => elegir.current(c.id), 60))))
-      map.flyToBounds(b, { ...opciones(), maxZoom: 16, duration: VIAJE, easeLinearity: 0.2 })
+      const m = map.getCenter()
+      recordarGeneral({ lat: m.lat, lng: m.lng, zoom: map.getZoom() })
+      elegir.current(c.id)
     }
 
     irA.current = (id: string) => {
@@ -111,8 +108,7 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
         elegido ??= { cx: p.x, cy: p.y }
         const centro = map.containerPointToLatLng([elegido.cx, elegido.cy])
         if (Math.hypot(elegido.cx - p.x, elegido.cy - p.y) > 4) {
-          L.polyline([t.b.getCenter(), centro], { color: '#fbfaf6', weight: 2, opacity: 0.9, interactive: false }).addTo(etiquetas)
-          L.circleMarker(t.b.getCenter(), { radius: 4, color: '#fbfaf6', weight: 2, fillColor: t.color, fillOpacity: 1, interactive: false }).addTo(etiquetas)
+          L.polyline([t.b.getCenter(), centro], { color: '#fbfaf6', weight: 1.5, opacity: 0.75, interactive: false }).addTo(etiquetas)
         }
         const html = `<b><i style="background:${t.color}">${esc(t.letra)}</i>${esc(t.campo.nombre)}</b>`
         L.marker(centro, { icon: L.divIcon({ className: 'tropero-campo tropero-campo--pin', html, iconSize: [w, h], iconAnchor: [w / 2, h / 2] }), keyboard: false, riseOnHover: true })
@@ -121,6 +117,11 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
       }
     }
     map.on('zoomend moveend', ponerEtiquetas)
+    map.on('moveend', () => {
+      if (viajando) return
+      const m = map.getCenter()
+      recordarGeneral({ lat: m.lat, lng: m.lng, zoom: map.getZoom() })
+    })
 
     const todo = todos.length ? todos.reduce((acc, t) => acc.extend(t.b), L.latLngBounds(todos[0]!.b.getSouthWest(), todos[0]!.b.getNorthEast())) : null
     const encuadrar = () => todo && map.fitBounds(todo, opciones())
@@ -132,14 +133,15 @@ export function MapaCampos({ campos, onElegir, margenDerecho = 0, desde = null, 
       // En viaje desde antes de mover la cámara: las etiquetas recién aparecen al llegar.
       viajando = true
       verFormas(false)
-      const lejos = map.getBoundsZoom(todo, false, L.point(140 + margen(), 140))
-      map.setView(de.b.getCenter(), Math.min(map.getBoundsZoom(de.b), lejos + 2), { animate: false })
+      const v = vistaDeCampo(de.campo.id)
+      if (v) map.setView([v.lat, v.lng], v.zoom, { animate: false })
+      else map.fitBounds(de.b, { ...opciones(), maxZoom: 16 })
       map.once('moveend', () => {
         viajando = false
         verFormas(true)
         ponerEtiquetas()
       })
-      timers.push(setTimeout(() => map.flyToBounds(todo, { ...opciones(), duration: VIAJE, easeLinearity: 0.2 }), 120))
+      timers.push(setTimeout(() => map.flyToBounds(todo, { ...opciones(), duration: VIAJE, easeLinearity: 0.1 }), 60))
     } else encuadrar()
     ponerEtiquetas()
 

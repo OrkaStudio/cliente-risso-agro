@@ -46,7 +46,8 @@ type Potrero = CampoConPotreros['potreros'][number]
 const COLOR: Record<Uso, string> = {
   ganadero: 'var(--color-principal)',
   agricola: 'var(--color-trigo-400)',
-  vacio: 'var(--color-salvia)',
+  // Azul grisáceo calmo: el verde se perdía contra el pasto del satélite (Lau, 09/11).
+  vacio: '#8aa5c4',
 }
 const USO_TEXTO: Record<Uso, string> = { ganadero: 'Con hacienda', agricola: 'Sembrado', vacio: 'Descansa' }
 const ha = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: 1 })
@@ -135,6 +136,8 @@ export function CamposPage() {
   }, [pedidoPotrero, delPedido, camposQ.data, setParams])
   const [dibujar, setDibujar] = useState(false)
   const [ultimoVisto, setUltimoVisto] = useState<string | null>(null)
+  // El campo al que se entró desde «Todos tus campos»: su mapa hace el viaje de la cámara.
+  const [entrando, setEntrando] = useState<string | null>(null)
   const pendiente = pendienteMapa
   // Llegó desde una sección que todavía no se abrió: se dice por qué, hasta el primer paso.
   const bloqueada = (useLocation().state as { bloqueada?: string } | null)?.bloqueada
@@ -172,7 +175,7 @@ export function CamposPage() {
           </div>
           <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), identidad.elegir(id))} />
         </div>
-        <VistaGeneral campos={mapaQ.data ?? []} identidad={identidad.campos} onElegir={identidad.elegir} desde={volviendo} />
+        <VistaGeneral campos={mapaQ.data ?? []} identidad={identidad.campos} onElegir={(id) => (setEntrando(id), identidad.elegir(id))} desde={volviendo} />
       </div>
     )
   if (!campo || !mapa)
@@ -223,7 +226,7 @@ export function CamposPage() {
       <section data-guia="campos-mapa" className={cn('relative isolate min-h-[560px] flex-1 overflow-hidden rounded-[24px] border border-borde bg-tinta', editando && 'max-lg:h-[calc(100dvh-190px)]')}>
         {/* Volver a la vista de todos: el mapa se aleja desde este campo (el zoom al revés). */}
         {campos.length > 1 && !pendienteMapa && !editando && (
-          <button type="button" onClick={() => identidad.elegir(null)} className="absolute top-4 left-4 z-[600] inline-flex h-11 items-center gap-2 rounded-full bg-superficie py-1 pr-5 pl-1.5 text-[15px] font-bold text-texto shadow-[0_8px_24px_-6px_rgba(19,27,22,0.4)] transition-colors hover:text-principal">
+          <button type="button" onClick={() => (setEntrando(null), identidad.elegir(null))} className="absolute top-4 left-4 z-[600] inline-flex h-11 items-center gap-2 rounded-full bg-superficie py-1 pr-5 pl-1.5 text-[15px] font-bold text-texto shadow-[0_8px_24px_-6px_rgba(19,27,22,0.4)] transition-colors hover:text-principal">
             <span className="grid size-8 place-items-center rounded-full bg-principal text-principal-texto">
               <Icono nombre="Atrás" tamano={16} />
             </span>
@@ -249,7 +252,7 @@ export function CamposPage() {
               </Suspense>
             </MapErrorBoundary>
           ) : (
-            <MapaCampo campo={mapa} elegido={potreroId} onElegir={tocar} onFondo={() => setPotreroId(null)} color={(p) => COLOR[usoDe(p.id)]} dato={() => null} marcas={marcas} margenDerecho={420} />
+            <MapaCampo campo={mapa} elegido={potreroId} onElegir={tocar} onFondo={() => setPotreroId(null)} color={(p) => COLOR[usoDe(p.id)]} dato={() => null} marcas={marcas} margenDerecho={420} entrando={entrando === mapa.id} />
           )}
         </div>
 
@@ -489,7 +492,7 @@ function DetallePotrero({
           {adentro != null && descanso != null && (
             <div>
               <div className="flex h-2 gap-1 overflow-hidden rounded-full">
-                <span className="h-full rounded-full bg-salvia" style={{ flexGrow: descanso || 1 }} />
+                <span className="h-full rounded-full" style={{ flexGrow: descanso || 1, background: COLOR.vacio }} />
                 <span className="h-full rounded-full bg-principal" style={{ flexGrow: adentro || 1 }} />
               </div>
               <div className="mt-1.5 flex justify-between text-[13.5px]">

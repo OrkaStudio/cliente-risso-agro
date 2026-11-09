@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { CampoMapa } from '@/features/mapa/reglas'
 import { ponerSatelite } from '@/features/mapa/satelite'
+import { VIAJE, recordarCampo, vistaGeneral } from './vista-mapa'
 import { ICONOS_SVG } from '@/components/tropero/iconos-svg'
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
@@ -29,6 +30,7 @@ export function MapaCampo({
   dato,
   marcas = [],
   margenDerecho = 0,
+  entrando = false,
 }: {
   campo: CampoMapa
   elegido: string | null
@@ -42,6 +44,8 @@ export function MapaCampo({
   /** Molinos, lagunas, tranqueras y mangas del campo. */
   marcas?: Marca[]
   margenDerecho?: number
+  /** Viene de «Todos tus campos»: arranca en esa vista y viaja hasta el campo. */
+  entrando?: boolean
 }) {
   const host = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
@@ -56,9 +60,12 @@ export function MapaCampo({
   // Montar una vez por campo, encuadrado en el campo y dejando lugar a la tarjeta.
   useEffect(() => {
     if (!host.current) return
-    const map = L.map(host.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
+    const map = L.map(host.current, { fadeAnimation: false, zoomControl: false, attributionControl: true, scrollWheelZoom: true, zoomSnap: 0.25 })
     mapa.current = map
     const quitar = ponerSatelite(map)
+    // Los potreros en su capa: durante el viaje no se ven (estirados se ven borrosos) y al llegar aparecen.
+    const capaPotreros = map.createPane('potreros')
+    capaPotreros.style.transition = 'opacity 420ms cubic-bezier(0.22, 1, 0.36, 1)'
     capa.current = L.layerGroup().addTo(map)
     map.on('click', () => fondo.current?.())
     const puntos = [...(campo.contorno ?? []), ...campo.potreros.flatMap((p) => p.poligono ?? [])]
@@ -68,14 +75,37 @@ export function MapaCampo({
       const derecha = ancho > 900 ? margenDerecho : 0
       map.fitBounds(L.latLngBounds(puntos), { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70] })
     }
-    encuadrar()
+    const desde = entrando ? vistaGeneral() : null
+    let timer: ReturnType<typeof setTimeout> | undefined
+    if (desde && puntos.length) {
+      // El viaje: desde donde estaba la vista general hasta el campo, en un solo movimiento.
+      capaPotreros.style.opacity = '0'
+      map.setView([desde.lat, desde.lng], desde.zoom, { animate: false })
+      const derecha = (host.current?.clientWidth ?? 0) > 900 ? margenDerecho : 0
+      timer = setTimeout(() => {
+        map.once('moveend', () => (capaPotreros.style.opacity = '1'))
+        map.flyToBounds(L.latLngBounds(puntos), { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70], duration: VIAJE, easeLinearity: 0.1 })
+      }, 40)
+    } else encuadrar()
+    // Dónde quedó: la vuelta a «Todos tus campos» arranca acá.
+    map.on('moveend', () => {
+      const m = map.getCenter()
+      recordarCampo(campo.id, { lat: m.lat, lng: m.lng, zoom: map.getZoom() })
+    })
+    let ancho = host.current.clientWidth
     const ro = new ResizeObserver(() => {
       map.invalidateSize()
-      encuadrar()
+      if (host.current && Math.abs(host.current.clientWidth - ancho) > 4) {
+        ancho = host.current.clientWidth
+        encuadrar()
+      }
     })
     ro.observe(host.current)
     return () => {
+      clearTimeout(timer)
       ro.disconnect()
+      map.off()
+      map.stop()
       quitar()
       map.remove()
       mapa.current = null
@@ -95,8 +125,8 @@ export function MapaCampo({
         [89, 179],
         [89, -179],
       ]
-      L.polygon([mundo, campo.contorno], { stroke: false, fillColor: '#131b16', fillOpacity: 0.5, interactive: false }).addTo(g)
-      L.polygon(campo.contorno, { color: '#fbfaf6', weight: 2.5, opacity: 0.9, fill: false, interactive: false }).addTo(g)
+      L.polygon([mundo, campo.contorno], { pane: 'potreros', stroke: false, fillColor: '#131b16', fillOpacity: 0.5, interactive: false }).addTo(g)
+      L.polygon(campo.contorno, { pane: 'potreros', color: '#fbfaf6', weight: 2.5, opacity: 0.9, fill: false, interactive: false }).addTo(g)
     }
     for (const p of campo.potreros) {
       if (!p.poligono) continue
@@ -104,8 +134,9 @@ export function MapaCampo({
       // Con uno elegido, los demás se apagan: el elegido se lee solo.
       const otro = !!elegido && !si
       const c = color(p)
-      if (si) L.polygon(p.poligono, { color: '#131b16', weight: 12, opacity: 0.45, fill: false, interactive: false }).addTo(g)
+      if (si) L.polygon(p.poligono, { pane: 'potreros', color: '#131b16', weight: 12, opacity: 0.45, fill: false, interactive: false }).addTo(g)
       const pol = L.polygon(p.poligono, {
+        pane: 'potreros',
         color: '#fbfaf6',
         weight: si ? 5 : 1.75,
         opacity: otro ? 0.55 : 1,
@@ -118,12 +149,13 @@ export function MapaCampo({
       })
       const d = dato(p)
       pol
-        .bindTooltip(`<b>${esc(p.nombre)}</b>${d ? `<span>${esc(d)}</span>` : ''}`, { permanent: true, direction: 'center', className: si ? 'tropero-nombre tropero-nombre--si' : otro ? 'tropero-nombre tropero-nombre--otro' : 'tropero-nombre' })
+        .bindTooltip(`<b>${esc(p.nombre)}</b>${d ? `<span>${esc(d)}</span>` : ''}`, { pane: 'potreros', permanent: true, direction: 'center', className: si ? 'tropero-nombre tropero-nombre--si' : otro ? 'tropero-nombre tropero-nombre--otro' : 'tropero-nombre' })
         .openTooltip()
       if (si) pol.bringToFront()
     }
     for (const m of marcas)
       L.marker([m.lat, m.lng], {
+        pane: 'potreros',
         interactive: false,
         icon: L.divIcon({ className: 'tropero-marca', html: `<span title="${m.tipo}">${svg(ICONO[m.tipo])}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] }),
       }).addTo(g)
