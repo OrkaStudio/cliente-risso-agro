@@ -277,9 +277,9 @@ function Pulso({
       <span
         className={cn(
           'mt-2.5 w-fit text-[13px] leading-snug',
-          pieTono === 'problema' && 'rounded-full bg-estado-problema-suave px-2.5 py-0.5 font-bold text-estado-problema-texto',
-          pieTono === 'atencion' && 'rounded-full bg-estado-atencion-suave px-2.5 py-0.5 font-bold text-estado-atencion-texto',
-          pieTono === 'bien' && 'rounded-full bg-estado-bien-suave px-2.5 py-0.5 font-bold text-estado-bien-texto',
+          pieTono === 'problema' && 'font-bold text-estado-problema-texto',
+          pieTono === 'atencion' && 'font-bold text-estado-atencion-texto',
+          pieTono === 'bien' && 'font-bold text-estado-bien-texto',
           !pieTono && 'text-texto-suave',
         )}
       >
@@ -659,8 +659,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
         <Cifra nombre="Entra" valor={plataCorta(l.entra)} clase="text-estado-bien-texto" />
         <Cifra nombre="Sale" valor={plataCorta(-l.sale)} clase="text-estado-problema-texto" />
         <Cifra nombre="Queda" valor={plataCorta(l.queda, true)} clase={l.queda >= 0 ? 'text-texto' : 'text-estado-problema-texto'} />
-        {sinPagar > 0 && <span className="mb-1 rounded-full bg-estado-problema-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-problema-texto">{plataCorta(sinPagar)} vencido sin pagar</span>}
-        {sinCobrar > 0 && <span className="mb-1 rounded-full bg-estado-bien-suave px-3.5 py-1.5 text-[14px] font-bold text-estado-bien-texto">{plataCorta(sinCobrar)} vencido sin cobrar</span>}
+        {sinPagar > 0 && <span className="mb-1.5 inline-flex items-center gap-2 text-[14.5px] font-bold text-estado-problema-texto"><span className="size-2 rounded-full bg-estado-problema" />{plataCorta(sinPagar)} vencido sin pagar</span>}
+        {sinCobrar > 0 && <span className="mb-1.5 inline-flex items-center gap-2 text-[14.5px] font-bold text-estado-bien-texto"><span className="size-2 rounded-full bg-estado-bien" />{plataCorta(sinCobrar)} vencido sin cobrar</span>}
       </div>
 
       {vacio ? (

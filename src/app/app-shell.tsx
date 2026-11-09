@@ -66,7 +66,7 @@ function Ticker() {
     <ClimaSlot key="clima" />,
   ].filter(Boolean)
 
-  return <div className="ml-auto flex min-w-0 items-center gap-2">{slots}</div>
+  return <div className="ml-auto flex min-w-0 items-center gap-4 [&>*+*]:border-l [&>*+*]:border-borde [&>*+*]:pl-4">{slots}</div>
 }
 
 /**

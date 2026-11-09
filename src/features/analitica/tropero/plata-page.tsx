@@ -128,9 +128,9 @@ export function PlataPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="t-pagina text-texto">Plata</h1>
             {!vacio && (
-              <div role="tablist" aria-label="Período" className="flex shrink-0 gap-1 rounded-full border border-borde bg-superficie p-1">
+              <div role="tablist" aria-label="Período" className="flex shrink-0 gap-5 self-end pb-1">
                 {todos.map((p) => (
-                  <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida')}>
+                  <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('border-b-2 pb-1 text-[14.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto')}>
                     {p.nombre}
                   </button>
                 ))}
@@ -374,7 +374,10 @@ function AvisoTarjeta({ aviso, onIr }: { aviso: Aviso; onIr: () => void }) {
   return (
     <li className="flex flex-col rounded-[20px] border border-borde bg-superficie p-5">
       {/* De qué se trata (chico) y lo importante en una sola línea: las tres tarjetas quedan parejas. */}
-      <span className={cn('max-w-full truncate self-start rounded-full px-2.5 py-0.5 text-[12.5px] font-bold', aviso.tono === 'mal' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>{aviso.tema}</span>
+      <span className={cn('flex max-w-full items-center gap-2 truncate text-[13px] font-bold tracking-[0.03em] uppercase', aviso.tono === 'mal' ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
+        <span className={cn('size-2 shrink-0 rounded-full', aviso.tono === 'mal' ? 'bg-estado-problema' : 'bg-estado-atencion')} />
+        {aviso.tema}
+      </span>
       <p className={cn('t-numero mt-2.5 truncate', aviso.tono === 'mal' ? 'text-estado-problema-texto' : 'text-texto')}>{aviso.titulo}</p>
       {/* Las dos cifras, para verlo sin leer. */}
       <div className="mt-4 flex flex-col gap-2.5">

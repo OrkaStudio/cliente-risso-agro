@@ -61,7 +61,7 @@ export function MesAMes({ meses, apretado: aprieta }: { meses: Mes[]; apretado: 
       {/* Lo que hay que saber, en una línea: el mes que se viene apretado o que lo que viene queda a favor. */}
       {aprieta ? (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="inline-flex items-center gap-2 rounded-full bg-estado-problema-suave py-1.5 pr-3.5 pl-3 text-[14.5px] font-bold text-estado-problema-texto">
+          <span className="inline-flex items-center gap-2 text-[15px] font-bold text-estado-problema-texto">
             <span aria-hidden className="size-2 rounded-full bg-estado-problema" />
             {mayuscula(nombreMes(aprieta.mes))} viene apretado
             <span className="t-cifra">{conSigno(aprieta.entra - aprieta.sale)}</span>

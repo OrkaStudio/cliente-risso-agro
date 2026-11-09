@@ -224,7 +224,7 @@ export function RodeoPage() {
           <h1 className="t-pagina text-texto">Hacienda</h1>
           {especies.length > 1 && (
             <div className="mt-3 flex">
-          <div role="tablist" aria-label="Especie" className="flex shrink-0 gap-0.5 rounded-full border border-borde bg-superficie p-1">
+          <div role="tablist" aria-label="Especie" className="flex shrink-0 gap-6">
                 {especies.map((e) => (
                   <button
                     key={e.especie}
@@ -238,8 +238,8 @@ export function RodeoPage() {
                     aria-label={`${e.nombre} ${cuantosDe(e.especie)}`}
                     title={e.nombre}
                     className={cn(
-                      'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-bold whitespace-nowrap transition-colors',
-                      vista === e.especie ? 'bg-principal text-principal-texto' : 'text-texto hover:bg-superficie-hundida',
+                      'inline-flex items-center gap-1.5 border-b-2 pb-1.5 text-[15px] font-bold whitespace-nowrap transition-colors',
+                      vista === e.especie ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto',
                     )}
                   >
                     <Icono nombre={e.icono} tamano={16} />
@@ -274,12 +274,12 @@ export function RodeoPage() {
           </p>
           {/* De qué campo: la letra y el color de cada uno, como en la barra (Lau, 05/11). */}
           {campoId && elegido.elegido ? (
-            <ul className="mt-3 flex flex-wrap gap-2">
+            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
               <PastillaCampo campo={elegido.elegido} />
             </ul>
           ) : (
             r.porCampo.length > 1 && (
-              <ul className="mt-3 flex flex-wrap gap-2">
+              <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {r.porCampo.map((c) => {
                   const id = elegido.campos.find((x) => x.id === c.id)
                   return id ? <PastillaCampo key={c.id} campo={id} cabezas={c.cabezas} /> : null
@@ -374,7 +374,7 @@ export function RodeoPage() {
         {/* Filtrar: agrupado por intención (para atender, datos que faltan, los que ya no están). */}
         {(FILTROS.some((f) => r.porEstado[f.estado]) || sinIdentificar > 0 || nSalieron > 0) && (
           <div className="border-b border-borde px-5 pt-4 pb-3.5">
-            <div role="tablist" aria-label="Mostrar" className="flex flex-wrap items-center gap-x-2 gap-y-2.5">
+            <div role="tablist" aria-label="Mostrar" className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
               <Pildora activo={!verSinIdentificar && !verSalieron && !estado} onClick={() => elegirEstado(null)} texto="Todos" n={r.total} />
               {(GRUPO_ATENDER.some((e) => (e === 'sinIdentificar' ? sinIdentificar : r.porEstado[e])) ) && (
                 <>
@@ -402,7 +402,7 @@ export function RodeoPage() {
                   role="tab"
                   aria-selected={verSalieron}
                   onClick={() => elegirEstado(verSalieron ? null : 'salieron')}
-                  className={cn('ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-dashed px-3.5 text-[14px] font-bold transition-colors', verSalieron ? 'border-tinta bg-tinta text-superficie' : 'border-neutro-300 text-texto-suave hover:border-neutro-400 hover:text-texto')}
+                  className={cn('ml-auto inline-flex h-9 items-center gap-1.5 border-b-2 px-1 text-[14.5px] font-bold transition-colors', verSalieron ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto')}
                 >
                   Salieron <span className="cifra">{nSalieron}</span>
                 </button>
@@ -648,13 +648,13 @@ function Pildora({ activo, onClick, texto, n, punto }: { activo: boolean; onClic
       aria-selected={activo}
       onClick={onClick}
       className={cn(
-        'inline-flex h-9 items-center gap-2 rounded-full border-[1.5px] px-3.5 text-[14px] font-bold transition-colors',
-        activo ? 'border-tinta bg-tinta text-superficie' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
+        'inline-flex h-9 items-center gap-2 border-b-2 px-1 text-[14.5px] font-bold transition-colors',
+        activo ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto',
       )}
     >
       {punto && <span className={cn('size-2 rounded-full', punto)} />}
       {texto}
-      <span className={cn('t-cifra-chica', activo ? 'text-superficie/75' : 'text-texto-suave')}>{n}</span>
+      <span className={cn('t-cifra-chica', activo ? 'text-principal' : 'text-texto-suave')}>{n}</span>
     </button>
   )
 }
@@ -662,8 +662,8 @@ function Pildora({ activo, onClick, texto, n, punto }: { activo: boolean; onClic
 /** Un campo con su letra y su color, en una pastilla teñida de ese color (con sus cabezas si hay varios). */
 function PastillaCampo({ campo, cabezas }: { campo: CampoElegible; cabezas?: number }) {
   return (
-    <li className="inline-flex items-center gap-2 rounded-full py-1 pr-3.5 pl-1 text-[14.5px] font-semibold text-texto" style={{ background: `color-mix(in srgb, ${campo.color} 14%, transparent)`, boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${campo.color} 35%, transparent)` }}>
-      <span className="grid size-6 place-items-center rounded-full text-[12px] font-extrabold text-white" style={{ background: campo.color }}>
+    <li className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
+      <span className="grid size-5 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: campo.color }}>
         {campo.letra}
       </span>
       {cabezas === undefined ? `En ${campo.nombre}` : campo.nombre}
