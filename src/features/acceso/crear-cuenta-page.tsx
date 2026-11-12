@@ -4,6 +4,7 @@ import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { useAuth } from '@/features/auth/auth-context'
 import { formatearMientrasEscribe, normalizarCelularAR, queFaltaCelular } from '@/lib/telefono'
+import { recordarQueAcepto } from '@/features/legales/aceptacion'
 import { AccesoLayout, Legales, Preguntas, TarjetaWhatsApp } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { celularTieneCuenta, marcarEnviado, pedirCodigo } from './envio'
@@ -50,6 +51,7 @@ export function CrearCuentaPage() {
       setMandando(false)
       return
     }
+    recordarQueAcepto('registro')
     const r = await pedirCodigo(e164, { ...datosNombre, mail })
     setMandando(false)
     if (r.ok || r.error.tipo === 'esperar') {

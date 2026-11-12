@@ -1,3 +1,4 @@
+import { VERSION_LEGALES } from '@/features/legales/textos'
 import { supabase } from '@/lib/supabase/client'
 import { errorAlPedir, REENVIO_MS, type ErrorAlPedir } from './reglas'
 
@@ -98,6 +99,8 @@ export async function pedirCodigo(
               apellido: alta.apellido.trim(),
               celular,
               ...(alta.mail.trim() ? { mail: alta.mail.trim() } : {}),
+              // Qué versión de los términos aceptó al crear la cuenta (se registra al entrar).
+              acepto_legales: VERSION_LEGALES,
             },
           }
         : { shouldCreateUser: false },

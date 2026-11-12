@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
-import { AccesoLayout, TarjetaWhatsApp } from './acceso-layout'
+import { recordarQueAcepto } from '@/features/legales/aceptacion'
+import { AccesoLayout, Legales, TarjetaWhatsApp } from './acceso-layout'
 import { leerInvitacion, marcarEnviado, pedirCodigo, type Invitacion } from './envio'
 
 // Lo que ve cada rol al entrar (A4). La 35 sólo diseña la veterinaria; el resto
@@ -80,6 +81,7 @@ export function TeInvitaronPage() {
     setFallo(null)
     const partes = inv.nombre.trim().split(/\s+/)
     // Crea la cuenta del invitado si no existe; si ya tiene, sólo le manda el código.
+    recordarQueAcepto('invitacion')
     const r = await pedirCodigo(inv.celular, {
       nombre: partes.slice(0, -1).join(' ') || inv.nombre,
       apellido: partes.length > 1 ? partes.at(-1)! : '',
@@ -127,6 +129,7 @@ export function TeInvitaronPage() {
       <BotonPrincipal icono="Celular" cargando={mandando} disabled={mandando} onClick={() => void entrar()}>
         {mandando ? 'Mandando el código…' : 'Entrar con mi celular'}
       </BotonPrincipal>
+      <Legales aceptas />
       <p className="text-center text-[14.5px] text-texto-suave">
         La plata del campo no la ves: queda para {inv.invita}.
       </p>

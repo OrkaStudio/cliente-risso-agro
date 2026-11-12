@@ -6,8 +6,10 @@ import fotoCampo from '@/assets/tropero/campo-aereo.webp'
 // Marco de las pantallas de Acceso (página 35, sección Acceso).
 // Compu (≥ md): foto a la izquierda (760 de 1440) con el título grande abajo y
 // el formulario de 420 centrado a la derecha.
-// Celular (QA 10/11, B1): la foto es una franja de 150 px con el logo; el título
-// y la bajada van arriba del formulario, así el botón queda cerca y a la vista.
+// Celular (Lau 12/11): la foto ocupa lo que el formulario no usa, con la frase de
+// la marca; nunca baja de un mínimo (no aprieta) y, si el formulario es largo, la
+// pantalla se desliza en vez de achicar. Así no queda blanco sin sentido en
+// ningún tamaño. El formulario va en una hoja que abraza su contenido.
 
 const FOTOS = { campo: fotoCampo } as const
 
@@ -28,6 +30,8 @@ export function AccesoLayout({
   children: React.ReactNode
 }) {
   const src = FOTOS[foto]
+  // Si el título del celular es la misma frase de la foto, en la hoja va el del formulario.
+  const tituloHoja = tituloCelu !== tituloCompu ? tituloCelu : encabezado?.titulo
   const raiz = useRef<HTMLDivElement>(null)
   // Con el teclado abierto, el botón principal queda a la vista (QA 10/11, A2).
   useEffect(() => {
@@ -52,8 +56,8 @@ export function AccesoLayout({
   return (
     <div ref={raiz} className="flex h-full flex-col overflow-y-auto bg-fondo md:flex-row md:overflow-hidden">
       {/* Foto: una franja arriba en el celular, a la izquierda en la compu. Mientras carga, terracota oscuro (M5). */}
-      <div className="relative flex h-[150px] shrink-0 flex-col overflow-hidden bg-terracota-800 md:h-full md:w-[52.8%] md:flex-none">
-        <img src={src} alt="" className="absolute inset-0 size-full object-cover" />
+      <div className="relative flex min-h-[clamp(200px,36svh,300px)] flex-1 flex-col overflow-hidden bg-terracota-800 md:h-full md:min-h-0 md:w-[52.8%] md:flex-none">
+        <img src={src} alt="" className="foto-llega absolute inset-0 size-full object-cover" />
         <div
           aria-hidden
           className="absolute inset-0 bg-gradient-to-b from-[rgba(19,27,22,0.35)] to-[rgba(19,27,22,0.85)] md:bg-[linear-gradient(180deg,rgba(19,27,22,0.5)_0%,rgba(19,27,22,0)_30%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.9)_100%)]"
@@ -62,19 +66,21 @@ export function AccesoLayout({
           <Logo tono="hueso" alto={26} className="md:hidden" />
           <Logo tono="hueso" alto={34} className="hidden md:block" />
         </div>
-        <p className="titulo-display relative mt-auto hidden w-full max-w-[724px] px-[52px] pb-[110px] text-[76px] leading-[0.96] tracking-[-0.04em] text-superficie md:block">
+        <h1 className="titulo-display relative mt-auto w-full max-w-[724px] px-6 pb-12 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:px-[52px] md:pb-[110px] md:text-[76px] md:leading-[0.96] md:tracking-[-0.04em]">
           {tituloCompu}
-        </p>
+        </h1>
       </div>
 
       {/* Formulario: hoja abajo en el celular, columna a la derecha en la compu */}
-      <main className="relative z-10 -mt-6 rounded-t-[28px] bg-fondo px-[18px] pt-7 pb-[max(28px,env(safe-area-inset-bottom))] md:mt-0 md:flex md:flex-1 md:items-center md:justify-center md:overflow-y-auto md:rounded-none md:px-10 md:py-12">
+      <main className="relative z-10 -mt-6 shrink-0 rounded-t-[28px] bg-fondo px-5 pt-7 pb-[max(24px,env(safe-area-inset-bottom))] md:mt-0 md:flex md:flex-1 md:items-center md:justify-center md:overflow-y-auto md:rounded-none md:px-10 md:py-12">
         <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:gap-[22px]">
           {/* En el celular, el título y la bajada arriba del formulario (B1, M2). */}
-          <div className="flex flex-col gap-1.5 md:hidden">
-            <h1 className="titulo-display text-[30px] leading-[1.05] text-texto">{tituloCelu}</h1>
-            {encabezado?.bajada && <p className="text-[15px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>}
-          </div>
+          {(tituloHoja || encabezado?.bajada) && (
+            <div className="flex flex-col gap-1 md:hidden">
+              {tituloHoja && <h2 className="t-seccion text-texto">{tituloHoja}</h2>}
+              {encabezado?.bajada && <p className="text-[15px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>}
+            </div>
+          )}
           {encabezado && (
             <div className="hidden flex-col gap-2.5 pb-1.5 md:flex">
               <h2 className="t-pagina text-texto">
@@ -149,9 +155,9 @@ export function TarjetaWhatsApp({
   return <p className="text-[14px] text-texto-suave">Te llega un código por WhatsApp. Sin contraseñas.</p>
 }
 
-/** Dónde están los términos y la privacidad. [DEFINIR] los términos: todavía no hay página. */
-const TERMINOS_URL: string | null = null
-const PRIVACIDAD_URL = '/privacidad.html'
+/** Dónde están los términos y la privacidad (features/legales). */
+const TERMINOS_URL: string | null = '/terminos'
+const PRIVACIDAD_URL = '/privacidad'
 
 /** Términos y privacidad, en letra chica (QA 10/11, A6). En registro con «Al seguir aceptás…». */
 export function Legales({ aceptas = false }: { aceptas?: boolean }) {

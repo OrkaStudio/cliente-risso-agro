@@ -1016,3 +1016,8 @@
 .leaflet-container.leaflet-container {
   background: #3d4630 !important;
 }
+
+/* Acceso: la foto del campo se asienta despacio al entrar, como una cámara que llega (Lau 12/11). Una vez, sin loop. */
+@keyframes foto-llega { from { transform: scale(1.09); } to { transform: scale(1); } }
+.foto-llega { animation: foto-llega 14s cubic-bezier(.16, 1, .3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .foto-llega { animation: none; } }

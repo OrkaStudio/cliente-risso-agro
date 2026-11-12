@@ -119,6 +119,9 @@ const TutorialMapaPage = lazy(() =>
 const AsistenteMuestra = lazy(() =>
   import('@/features/campos/tropero/asistente-muestra').then((m) => ({ default: m.AsistenteMuestra })),
 )
+const LegalesPage = lazy(() =>
+  import('@/features/legales/legales-page').then((m) => ({ default: m.LegalesPage })),
+)
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -159,6 +162,10 @@ export const router = createBrowserRouter([
     errorElement: <ErrorNuevaVersion />,
     element: <CambieDeNumeroPage />,
   },
+  // Términos, privacidad y su resumen: abiertos, sin sesión.
+  { path: '/legales', element: <Suspense fallback={null}><LegalesPage doc="resumen" /></Suspense> },
+  { path: '/terminos', element: <Suspense fallback={null}><LegalesPage doc="terminos" /></Suspense> },
+  { path: '/privacidad', element: <Suspense fallback={null}><LegalesPage doc="privacidad" /></Suspense> },
   // Sin contraseñas no hay nada que recuperar: los links viejos van a entrar.
   { path: '/recuperar', element: <Navigate to="/login" replace /> },
   { path: '/restablecer', element: <Navigate to="/login" replace /> },
