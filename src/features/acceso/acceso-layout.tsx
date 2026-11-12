@@ -99,11 +99,12 @@ export function AccesoLayout({
  * vez de filas centradas cada una por su lado.
  */
 export function Preguntas({ filas }: { filas: { texto: string; boton: React.ReactNode }[] }) {
-  // Cada fila centrada y en una sola línea (QA 10/11, M4).
+  // Cada fila centrada y en una sola línea; la acción va como texto de color, sin caja (Lau 12/11: con
+  // dos píldoras se veía desordenado).
   return (
-    <div className="flex flex-col items-center gap-2.5 border-t border-borde pt-[18px] text-[14.5px] text-texto-suave md:text-[15px]">
+    <div className="flex flex-col items-center border-t border-borde pt-3 text-[14.5px] text-texto-suave md:text-[15px] [&_button]:min-h-10 [&_button]:border-0 [&_button]:px-1 [&_button]:hover:bg-transparent [&_button]:hover:underline">
       {filas.map((f) => (
-        <div key={f.texto} className="flex items-center justify-center gap-2 whitespace-nowrap">
+        <div key={f.texto} className="flex items-center justify-center gap-1 whitespace-nowrap">
           <span>{f.texto}</span>
           {f.boton}
         </div>
@@ -112,8 +113,7 @@ export function Preguntas({ filas }: { filas: { texto: string; boton: React.Reac
   )
 }
 
-/** La tarjeta «Así te llega, por WhatsApp» con el mensaje real, y sus variantes
- *  de estado (sin cuenta, sin señal). */
+/** Cómo llega el código (una línea) y las tarjetas de estado (sin cuenta, sin señal, error). */
 export function TarjetaWhatsApp({
   tipo = 'asi-llega',
   pie,
@@ -145,23 +145,8 @@ export function TarjetaWhatsApp({
       </div>
     )
   }
-  return (
-    <>
-      {/* Celular: una sola línea, el botón queda pegado al campo (B2). */}
-      <p className="text-[14px] text-texto-suave md:hidden">Te mandamos un código por WhatsApp. Sin contraseñas que olvidar.</p>
-      {/* Compu: el ejemplo, que se nota que es un ejemplo y no se puede tocar (A9). */}
-      <div className="hidden flex-col gap-2.5 rounded-[18px] border border-borde bg-superficie px-[18px] py-4 md:flex">
-        <p className="text-[13px] font-bold text-texto-suave">Así te llega, por WhatsApp</p>
-        <div aria-hidden className="flex flex-col gap-1 rounded-[14px] bg-estado-bien-suave/60 px-3.5 py-2.5 select-none">
-          <p className="text-[13px] font-bold text-estado-bien-texto/80">Troppero</p>
-          <p className="text-[14px] text-estado-bien-texto/80">
-            Tu código de verificación es <span className="t-cifra-chica text-estado-bien-texto/50">123 456</span>. Por tu seguridad, no lo compartas. Este código vence en 10 minutos.
-          </p>
-        </div>
-        {pie && <p className="text-[13px] text-texto-suave">{pie}</p>}
-      </div>
-    </>
-  )
+  // Una sola línea, en celu y en compu (Lau 12/11: el ejemplo del mensaje era mucho texto).
+  return <p className="text-[14px] text-texto-suave">Te llega un código por WhatsApp. Sin contraseñas.</p>
 }
 
 /** Dónde están los términos y la privacidad. [DEFINIR] los términos: todavía no hay página. */
@@ -170,7 +155,7 @@ const PRIVACIDAD_URL = '/privacidad.html'
 
 /** Términos y privacidad, en letra chica (QA 10/11, A6). En registro con «Al seguir aceptás…». */
 export function Legales({ aceptas = false }: { aceptas?: boolean }) {
-  const link = 'font-semibold text-texto underline underline-offset-2 hover:text-principal'
+  const link = 'underline decoration-borde underline-offset-2 hover:text-principal'
   const terminos = TERMINOS_URL ? (
     <a href={TERMINOS_URL} target="_blank" rel="noreferrer" className={link}>
       Términos
@@ -182,7 +167,7 @@ export function Legales({ aceptas = false }: { aceptas?: boolean }) {
     </a>
   )
   return (
-    <p className="text-center text-[12.5px] leading-snug text-texto-suave">
+    <p className="-mt-2 text-center text-[12px] leading-snug text-texto-suave">
       {aceptas ? 'Al seguir aceptás ' : ''}
       {terminos && (
         <>

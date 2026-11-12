@@ -137,7 +137,7 @@ export function CrearCuentaPage() {
         {fallo && <TarjetaWhatsApp tipo="error" pie={fallo} />}
         {!valido && !mandando && <p className="-mb-2 text-center text-[13.5px] font-semibold text-texto-suave">{falta}</p>}
         <BotonPrincipal type="submit" icono="Celular" cargando={mandando} disabled={mandando || !valido}>
-          {mandando ? 'Mandando el código…' : 'Seguir, mandame el código'}
+          {mandando ? 'Mandando el código…' : 'Mandame el código'}
         </BotonPrincipal>
         <Legales aceptas />
       </form>

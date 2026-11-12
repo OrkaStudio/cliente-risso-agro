@@ -25,33 +25,30 @@ export function CambieDeNumeroPage() {
   return (
     <AccesoLayout
       tituloCompu="Tu campo no se pierde."
-      tituloCelu="Cambiaste de número."
+      tituloCelu="¿Cambiaste de número?"
       encabezado={{
-        titulo: 'Cambiaste de número',
-        bajada: 'La cuenta es de la empresa, no del teléfono.',
+        titulo: '¿Cambiaste de número?',
+        bajada: 'Tranqui: tu campo sigue ahí. Elegí lo que te pasa.',
       }}
     >
-      <p className="t-tarjeta text-texto">¿Cuál es tu caso?</p>
-      <ul className="flex flex-col gap-3">
+      {/* Una sola lista, sin una caja por caso (Lau 12/11: breve y claro). */}
+      <ul className="divide-y divide-borde overflow-hidden rounded-[18px] border border-borde bg-superficie">
         <Caso
-          titulo="¿Seguís adentro en la compu o en otro celular?"
-          texto="Cambialo desde ahí. Te mandamos un código al número nuevo y listo."
-          accion="Cambiar mi número"
           icono="Celular"
+          titulo="Todavía tengo Troppero abierto"
+          texto="Lo cambiás vos en un minuto."
           onClick={() => navigate('/mi-cuenta/numero')}
         />
         <Caso
-          titulo="¿Te invitaron?"
-          texto="El dueño cambia tu número desde Personas. Después entrás con el nuevo."
-          accion="Pedírselo al dueño"
           icono="Usuario"
+          titulo="Me invitó el dueño"
+          texto="Le avisás y lo cambia él."
           onClick={() => whatsapp('', MENSAJE_DUENO)}
         />
         <Caso
-          titulo="¿Sos el dueño y no entrás desde ningún lado?"
-          texto="Lo verificamos con vos. Por seguridad, eso no se hace solo."
-          accion="Escribinos por WhatsApp"
           icono="Ayuda"
+          titulo="Soy el dueño y no puedo entrar"
+          texto="Escribinos y lo resolvemos juntos."
           onClick={() => whatsapp(SOPORTE, MENSAJE_SOPORTE)}
         />
       </ul>
@@ -71,21 +68,19 @@ export function CambieDeNumeroPage() {
   )
 }
 
-/** Un caso: la tarjeta entera se toca y lleva a su acción. */
-function Caso({ titulo, texto, accion, icono, onClick }: { titulo: string; texto: string; accion: string; icono: NombreIcono; onClick: () => void }) {
+/** Un caso: la fila entera se toca y lleva a lo suyo. */
+function Caso({ icono, titulo, texto, onClick }: { icono: NombreIcono; titulo: string; texto: string; onClick: () => void }) {
   return (
     <li>
-      <button
-        type="button"
-        onClick={onClick}
-        className="group flex w-full flex-col gap-1 rounded-[18px] border border-borde bg-superficie px-[18px] py-4 text-left transition-colors hover:border-principal"
-      >
-        <span className="text-[14.5px] font-semibold text-texto">{titulo}</span>
-        <span className="text-[13.5px] text-texto-suave">{texto}</span>
-        <span className="mt-1.5 inline-flex items-center gap-1.5 text-[14.5px] font-bold text-principal">
+      <button type="button" onClick={onClick} className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-principal-suave/50">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-principal-suave text-principal">
           <Icono nombre={icono} tamano={16} />
-          {accion}
         </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-semibold text-texto">{titulo}</span>
+          <span className="text-[13.5px] text-texto-suave">{texto}</span>
+        </span>
+        <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-principal" />
       </button>
     </li>
   )

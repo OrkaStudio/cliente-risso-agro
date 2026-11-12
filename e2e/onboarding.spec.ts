@@ -12,7 +12,7 @@ async function cuentaNueva(page: Page): Promise<string> {
   await page.getByLabel('Nombre').fill('Daniel')
   await page.getByLabel('Apellido').fill('Risso')
   await page.locator('input[type=tel]').fill(numero)
-  await page.getByRole('button', { name: 'Seguir, mandame el código' }).click()
+  await page.getByRole('button', { name: 'Mandame el código' }).click()
   await page.waitForURL('**/login/codigo')
   await page.waitForTimeout(800)
   await page.locator('#codigo').fill(codigoDelLog(`549${numero}`))

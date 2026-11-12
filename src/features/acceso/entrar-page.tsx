@@ -75,14 +75,14 @@ export function EntrarPage() {
           onCambio={cambiarCelular}
           invalido={estado === 'sin-cuenta'}
           autoFocus={!celular}
-          falta={estado === 'base' && !e164 ? (queFaltaCelular(celular) ?? undefined) : undefined}
+          falta={estado === 'base' && celular && !e164 ? (queFaltaCelular(celular) ?? undefined) : undefined}
         />
         {estado === 'sin-cuenta' || estado === 'sin-senal' ? (
           <TarjetaWhatsApp tipo={estado} />
         ) : estado === 'error' ? (
           <TarjetaWhatsApp tipo="error" pie="No pudimos mandar el código. Probá de nuevo en un rato." />
         ) : (
-          <TarjetaWhatsApp pie="Sin contraseñas que olvidar: cada vez que entrás desde una compu o un celular nuevo, te mandamos un código." />
+          <TarjetaWhatsApp />
         )}
         <BotonPrincipal
           type="submit"
