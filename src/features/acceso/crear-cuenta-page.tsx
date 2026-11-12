@@ -3,23 +3,20 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { useAuth } from '@/features/auth/auth-context'
-import { formatearMientrasEscribe, normalizarCelularAR } from '@/lib/telefono'
-import { useIsMobile } from '@/lib/use-is-mobile'
-import { AccesoLayout, Preguntas, TarjetaWhatsApp } from './acceso-layout'
+import { formatearMientrasEscribe, normalizarCelularAR, queFaltaCelular } from '@/lib/telefono'
+import { AccesoLayout, Legales, Preguntas, TarjetaWhatsApp } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { celularTieneCuenta, marcarEnviado, pedirCodigo } from './envio'
 import { nombrePropio } from '@/lib/texto'
-import { mailValido, separarNombre } from './reglas'
+import { mailValido } from './reglas'
 
 /** A3 · Crear cuenta: nombre, celular y mail si quiere. Sin contraseña. */
 export function CrearCuentaPage() {
   const { session, loading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const movil = useIsMobile()
   const inicial = (location.state as { celular?: string } | null)?.celular ?? ''
 
-  const [nombreCompleto, setNombreCompleto] = useState('')
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [celular, setCelular] = useState(() => (inicial ? formatearMientrasEscribe(inicial) : ''))
@@ -32,13 +29,16 @@ export function CrearCuentaPage() {
   if (!loading && session) return <Navigate to="/" replace />
 
   const e164 = normalizarCelularAR(celular)
-  const datosNombre = movil ? separarNombre(nombreCompleto) : { nombre: nombre.trim(), apellido: apellido.trim() }
+  // Los mismos campos en el celular y en la compu (QA 10/11, B4).
+  const datosNombre = { nombre: nombre.trim(), apellido: apellido.trim() }
   const errores = {
     nombre: !datosNombre.nombre ? 'Falta tu nombre.' : null,
-    celular: !e164 ? 'Escribí el número con la característica, sin el 0 ni el 15.' : null,
+    celular: !e164 ? (queFaltaCelular(celular) ?? 'Escribí el número con la característica.') : null,
     mail: !mailValido(mail) ? 'Ese mail no parece completo. Revisalo o dejalo vacío.' : null,
   }
   const valido = !errores.nombre && !errores.celular && !errores.mail
+  // Si el botón está apagado, se dice qué falta (A5).
+  const falta = errores.nombre ?? errores.celular ?? errores.mail
 
   async function seguir() {
     setIntento(true)
@@ -86,41 +86,32 @@ export function CrearCuentaPage() {
           void seguir()
         }}
       >
-        {movil ? (
+        {/* Nombre y Apellido: apilados en el celular, al lado en la compu. */}
+        <div className="grid gap-3.5 md:grid-cols-2">
           <CampoTexto
-            etiqueta="Tu nombre"
-            autoComplete="name"
-            value={nombreCompleto}
-            onChange={(e) => setNombreCompleto(nombrePropio(e.target.value))}
+            etiqueta="Nombre"
+            autoComplete="given-name"
+            value={nombre}
+            onChange={(e) => setNombre(nombrePropio(e.target.value))}
             error={errorDe('nombre')}
             autoFocus
           />
-        ) : (
-          <div className="grid grid-cols-2 gap-3.5">
-            <CampoTexto
-              etiqueta="Nombre"
-              autoComplete="given-name"
-              value={nombre}
-              onChange={(e) => setNombre(nombrePropio(e.target.value))}
-              error={errorDe('nombre')}
-              autoFocus
-            />
-            <CampoTexto
-              etiqueta="Apellido"
-              autoComplete="family-name"
-              value={apellido}
-              onChange={(e) => setApellido(nombrePropio(e.target.value))}
-            />
-          </div>
-        )}
+          <CampoTexto
+            etiqueta="Apellido"
+            autoComplete="family-name"
+            value={apellido}
+            onChange={(e) => setApellido(nombrePropio(e.target.value))}
+          />
+        </div>
         <CampoCelular
-          etiqueta={movil ? 'Tu celular' : 'Tu celular, el que tiene WhatsApp'}
+          etiqueta="Tu celular, el que tiene WhatsApp"
           valor={celular}
           onCambio={(v) => {
             setCelular(v)
             setYaTiene(false)
           }}
-          ayuda={movil ? undefined : 'Acá te llega el código para entrar y los avisos del campo.'}
+          ayuda="Acá te llega el código para entrar y los avisos del campo."
+          falta={celular && !e164 ? (queFaltaCelular(celular) ?? undefined) : undefined}
           error={yaTiene ? 'Ese número ya tiene cuenta.' : errorDe('celular')}
         >
           {yaTiene && (
@@ -140,17 +131,15 @@ export function CrearCuentaPage() {
           autoComplete="email"
           value={mail}
           onChange={(e) => setMail(e.target.value)}
-          ayuda={
-            movil
-              ? 'Para las facturas del plan y lo que pida tu contador.'
-              : 'Para mandarte las facturas del plan y lo que pida tu contador.'
-          }
+          ayuda="Para mandarte las facturas del plan y lo que pida tu contador."
           error={errorDe('mail')}
         />
         {fallo && <TarjetaWhatsApp tipo="error" pie={fallo} />}
-        <BotonPrincipal type="submit" icono="Celular" cargando={mandando} disabled={mandando}>
+        {!valido && !mandando && <p className="-mb-2 text-center text-[13.5px] font-semibold text-texto-suave">{falta}</p>}
+        <BotonPrincipal type="submit" icono="Celular" cargando={mandando} disabled={mandando || !valido}>
           {mandando ? 'Mandando el código…' : 'Seguir, mandame el código'}
         </BotonPrincipal>
+        <Legales aceptas />
       </form>
       <Preguntas
         filas={[

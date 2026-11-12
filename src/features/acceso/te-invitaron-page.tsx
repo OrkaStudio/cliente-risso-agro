@@ -48,20 +48,16 @@ export function TeInvitaronPage() {
 
   if (carga.tipo !== 'lista' || carga.inv.vencida || carga.inv.usada) {
     const inv = carga.tipo === 'lista' ? carga.inv : null
-    const texto =
+    // Un solo mensaje, según lo que pasó (QA 10/11, A10).
+    const caso =
       carga.tipo === 'sin-senal'
-        ? 'Sin señal. Para abrir la invitación hace falta conexión.'
-        : carga.tipo === 'no-existe'
-          ? 'Ese link no es de una invitación. Revisá que esté completo o pedí que te manden otro.'
-          : inv?.usada
-            ? 'Esta invitación ya se usó. Si sos vos, entrá con tu celular.'
-            : `La invitación venció: duran 7 días. Pedile a ${inv?.invita} que te mande otra.`
+        ? { titulo: 'No pudimos abrir la invitación', texto: 'Hace falta señal. Probá de nuevo cuando tengas.' }
+        : inv?.usada
+          ? { titulo: 'Esta invitación ya se usó', texto: 'Si sos vos, entrá con tu celular.' }
+          : { titulo: 'Esta invitación ya no sirve', texto: 'Pedile al dueño que te mande una nueva.' }
     return (
-      <AccesoLayout
-        tituloCompu="Te esperan en el campo."
-        tituloCelu={inv?.usada ? 'Ya estás adentro.' : 'La invitación no sirve.'}
-      >
-        <TarjetaWhatsApp tipo="error" pie={texto} />
+      <AccesoLayout tituloCompu="Te esperan en el campo." tituloCelu="Te esperan en el campo.">
+        <TarjetaWhatsApp tipo="error" titulo={caso.titulo} pie={caso.texto} />
         {carga.tipo === 'sin-senal' ? (
           <BotonPrincipal icono="Reintentar" onClick={() => window.location.reload()}>
             Probar de nuevo

@@ -12,6 +12,7 @@ export function CampoCelular({
   valor,
   onCambio,
   ayuda,
+  falta,
   error,
   invalido = false,
   autoFocus,
@@ -22,6 +23,8 @@ export function CampoCelular({
   valor: string
   onCambio: (formateado: string) => void
   ayuda?: React.ReactNode
+  /** Qué le falta al número mientras se escribe (QA 10/11). */
+  falta?: string
   error?: React.ReactNode
   /** Borde rojo sin mensaje (el mensaje está en otra tarjeta). */
   invalido?: boolean
@@ -34,7 +37,8 @@ export function CampoCelular({
   // Si escribió el 0 o el 15, se sacan solos; se avisa para que no parezca que no lo deja.
   const [sacados, setSacados] = useState<string[]>([])
   const aviso = sacados.length ? `Sacamos ${sacados.map((x) => `el ${x}`).join(' y ')}: con +54 9 adelante no ${sacados.length > 1 ? 'van' : 'va'}. El número queda bien.` : null
-  const mensaje = error ?? aviso ?? ayuda
+  // Si todavía falta algo, eso pesa más que «el número queda bien».
+  const mensaje = error ?? (falta ? (aviso ? `Sacamos ${sacados.map((x) => `el ${x}`).join(' y ')}. ${falta}` : falta) : (aviso ?? ayuda))
   return (
     <div className={cn('flex flex-col gap-[7px] md:gap-2', className)}>
       <label htmlFor={id} className="text-[14px] font-semibold text-texto md:text-[14.5px]">

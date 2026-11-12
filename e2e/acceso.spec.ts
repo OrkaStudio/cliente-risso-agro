@@ -68,11 +68,13 @@ test('A3: con un número que ya tiene cuenta, avisa y ofrece entrar', async ({ p
 test('A3: el mail es opcional, pero si se escribe tiene que estar completo', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/registro')
-  await page.getByLabel('Tu nombre').fill('Daniel Risso')
-  await page.getByLabel('Tu celular').fill('2241600999')
+  await page.getByLabel('Nombre').fill('Daniel')
+  await page.getByLabel('Apellido').fill('Risso')
+  await page.getByLabel('Tu celular, el que tiene WhatsApp').fill('2241600999')
   await page.getByLabel('Tu mail, si querés').fill('daniel@')
-  await page.getByRole('button', { name: 'Seguir, mandame el código' }).click()
-  await expect(page.getByText('Ese mail no parece completo')).toBeVisible()
+  // El botón queda apagado y abajo dice qué falta.
+  await expect(page.getByRole('button', { name: 'Seguir, mandame el código' })).toBeDisabled()
+  await expect(page.getByText('Ese mail no parece completo').first()).toBeVisible()
   await expect(page).toHaveURL(/\/registro$/)
 })
 
@@ -97,7 +99,7 @@ test('A4: el invitado entra por el link con su código y queda en la empresa, si
 
 test('A4: un link que no es de una invitación avisa', async ({ page }) => {
   await page.goto('/invitacion/no-existe')
-  await expect(page.getByText('Ese link no es de una invitación')).toBeVisible()
+  await expect(page.getByText('Esta invitación ya no sirve')).toBeVisible()
 })
 
 test('A5 afuera: explica los tres caminos, sin pedir el CUIT', async ({ page }) => {
@@ -116,8 +118,9 @@ test('A5 adentro: con la sesión abierta, el número se cambia con un código al
   await page.setViewportSize({ width: 390, height: 844 })
   // Una cuenta nueva (no la de prueba, que usan los demás tests).
   await page.goto('/registro')
-  await page.getByLabel('Tu nombre').fill('Cambio Número')
-  await page.getByLabel('Tu celular').fill(viejo)
+  await page.getByLabel('Nombre').fill('Cambio')
+  await page.getByLabel('Apellido').fill('Número')
+  await page.getByLabel('Tu celular, el que tiene WhatsApp').fill(viejo)
   await page.getByRole('button', { name: 'Seguir, mandame el código' }).click()
   await page.waitForURL('**/login/codigo')
   await page.waitForTimeout(800)

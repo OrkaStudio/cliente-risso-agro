@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
-import { AccesoLayout, Preguntas } from './acceso-layout'
+import { AccesoLayout } from './acceso-layout'
 import { CampoCodigo } from './campo-codigo'
 import { aceptarInvitacion, borrarEnvio, guardarEnvio, leerEnvio, marcarEnviado, pedirCodigo, verificarCodigo, type Envio } from './envio'
 import {
@@ -192,14 +192,7 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
             )}
           >
             {aviso ?? mensaje ?? (
-              <>
-                <span className="md:hidden">
-                  Vence en 10 minutos. Si estás en el campo sin señal, entrás igual con el celular que ya usabas.
-                </span>
-                <span className="hidden md:inline">
-                  Vence en 10 minutos. En el celular se completa solo cuando llega el mensaje.
-                </span>
-              </>
+'Vence en 10 minutos. En el celular se completa solo cuando llega el mensaje.'
             )}
           </p>
         </div>
@@ -213,19 +206,14 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
           </BotonPrincipal>
         )}
       </form>
+      {/* «¿No llegó?» arriba y el botón a lo ancho: el reloj no se corta en el celular (A3). */}
       {!vencido && (
-        <Preguntas
-          filas={[
-            {
-              texto: '¿No llegó?',
-              boton: (
-                <BotonChico type="button" disabled={faltan > 0 || reenviando} onClick={() => void mandarOtro()}>
-                  {faltan > 0 ? `Mandarlo de nuevo en ${relojMinutos(faltan)}` : 'Mandarlo de nuevo'}
-                </BotonChico>
-              ),
-            },
-          ]}
-        />
+        <div className="flex flex-col items-center gap-2.5 border-t border-borde pt-[18px] text-[14.5px] text-texto-suave md:text-[15px]">
+          <span>¿No llegó?</span>
+          <BotonChico type="button" className="w-full justify-center" disabled={faltan > 0 || reenviando} onClick={() => void mandarOtro()}>
+            {faltan > 0 ? `Mandarlo de nuevo en ${relojMinutos(faltan)}` : 'Mandarlo de nuevo'}
+          </BotonChico>
+        </div>
       )}
     </AccesoLayout>
   )

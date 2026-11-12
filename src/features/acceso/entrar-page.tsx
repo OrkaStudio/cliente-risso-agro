@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { useAuth } from '@/features/auth/auth-context'
-import { formatearCelularAR, formatearMientrasEscribe, normalizarCelularAR } from '@/lib/telefono'
-import { AccesoLayout, Preguntas, TarjetaWhatsApp } from './acceso-layout'
+import { formatearCelularAR, formatearMientrasEscribe, normalizarCelularAR, queFaltaCelular } from '@/lib/telefono'
+import { AccesoLayout, Legales, Preguntas, TarjetaWhatsApp } from './acceso-layout'
 import { CampoCelular } from './campo-celular'
 import { leerEnvio, marcarEnviado, pedirCodigo } from './envio'
 
@@ -75,6 +75,7 @@ export function EntrarPage() {
           onCambio={cambiarCelular}
           invalido={estado === 'sin-cuenta'}
           autoFocus={!celular}
+          falta={estado === 'base' && !e164 ? (queFaltaCelular(celular) ?? undefined) : undefined}
         />
         {estado === 'sin-cuenta' || estado === 'sin-senal' ? (
           <TarjetaWhatsApp tipo={estado} />
@@ -119,6 +120,7 @@ export function EntrarPage() {
           },
         ]}
       />
+      <Legales />
       {estado === 'sin-cuenta' && e164 && (
         <p className="sr-only" role="status">
           {formatearCelularAR(e164)} no tiene cuenta.

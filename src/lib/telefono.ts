@@ -42,6 +42,9 @@ function digitosLocales(entrada: string): string {
     if (d.startsWith('9')) d = d.slice(1)
   }
   if (d.startsWith('0')) d = d.slice(1)
+  // «15 área número» (el 15 adelante de todo): ninguna característica empieza con 15, así que
+  // es siempre el prefijo de celular puesto al revés. Se saca (QA, 10/11).
+  if (d.startsWith('15')) d = d.slice(2)
   // "área 15 número": el 15 que sigue al código de área es el prefijo de
   // celular, nunca parte del número. Se saca apenas se escribe (no hace falta
   // esperar los 12 dígitos), así al tipear «2244 15 42…» no se corta mal.
@@ -65,6 +68,10 @@ export function prefijosSacados(entrada: string): ('0' | '15')[] {
   if (d.startsWith('0')) {
     out.push('0')
     d = d.slice(1)
+  }
+  if (d.startsWith('15')) {
+    out.push('15')
+    d = d.slice(2)
   }
   const largo = largoArea(d)
   if (d.length >= largo + 2 && d.slice(largo, largo + 2) === '15') out.push('15')
@@ -102,4 +109,16 @@ export function formatearCelularAR(e164: string): string {
   const m = /^\+549(\d{10})$/.exec(e164)
   if (!m) return e164
   return `+54 9 ${formatearMientrasEscribe(m[1])}`
+}
+
+/**
+ * Qué le falta a lo escrito para ser un celular, dicho para el productor
+ * (el botón apagado siempre dice por qué). null si ya está completo.
+ */
+export function queFaltaCelular(entrada: string): string | null {
+  const d = digitosLocales(entrada)
+  if (!d) return 'Escribí tu celular, con la característica.'
+  if (d.length < 10) return `Faltan ${10 - d.length === 1 ? 'un número' : `${10 - d.length} números`}: un celular tiene 10 sin el +54 9.`
+  if (!normalizarCelularAR(entrada)) return 'Ese número no parece de un celular argentino. Revisá la característica.'
+  return null
 }

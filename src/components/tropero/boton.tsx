@@ -60,14 +60,16 @@ export function BotonPrincipal({
     <ButtonPrimitive
       className={cn(
         BASE,
-        "w-full justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-left text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600",
+        "group/principal w-full justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-left text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600",
+        // Apagado (no cargando): gris de la marca, que se distingue hasta en blanco y negro (QA 10/11, B3).
+        "disabled:opacity-100 [&:disabled:not([aria-busy])]:bg-[#D9D4CB] [&:disabled:not([aria-busy])]:text-[#6E675C]",
         className,
       )}
       aria-busy={cargando || undefined}
       {...props}
     >
       <span className="min-w-0 flex-1 truncate">{children}</span>
-      <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto">
+      <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto group-[&:disabled:not([aria-busy])]/principal:bg-transparent group-[&:disabled:not([aria-busy])]/principal:text-[#6E675C]">
         {cargando ? (
           <span className="size-5 animate-spin rounded-full border-2 border-acento-texto/30 border-t-acento-texto" />
         ) : (
@@ -85,7 +87,8 @@ export function BotonChico({ className, icono, children, ...props }: ButtonPrimi
     <ButtonPrimitive
       className={cn(
         BASE,
-        "gap-1.5 rounded-full border-[1.5px] border-principal px-3.5 py-[7px] text-[14.5px] font-bold text-principal hover:bg-principal-suave",
+        // 44 px de alto como mínimo: se toca con el dedo (QA 10/11, A7).
+        "min-h-11 gap-1.5 rounded-full border-[1.5px] border-principal px-3.5 py-[7px] text-[14.5px] font-bold text-principal hover:bg-principal-suave",
         className,
       )}
       {...props}

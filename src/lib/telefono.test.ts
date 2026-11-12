@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatearCelularAR, formatearMientrasEscribe, normalizarCelularAR, prefijosSacados } from './telefono'
+import { formatearCelularAR, formatearMientrasEscribe, normalizarCelularAR, prefijosSacados, queFaltaCelular } from './telefono'
 
 describe('celulares argentinos', () => {
   it('se muestran como en las pantallas de Troppero', () => {
@@ -32,6 +32,14 @@ describe('celulares argentinos', () => {
     expect(prefijosSacados('011 15 5555')).toEqual(['0', '15'])
     expect(prefijosSacados('02244')).toEqual(['0'])
     expect(prefijosSacados('2244 42')).toEqual([])
+  })
+  it('el 15 puesto adelante de todo se saca y se avisa (QA 10/11)', () => {
+    expect(normalizarCelularAR('152240000007')).toBe('+5492240000007')
+    expect(normalizarCelularAR('0152240000007')).toBe('+5492240000007')
+    expect(prefijosSacados('152240000007')).toEqual(['15'])
+    expect(prefijosSacados('0152240000007')).toEqual(['0', '15'])
+    expect(queFaltaCelular('2240')).toBe('Faltan 6 números: un celular tiene 10 sin el +54 9.')
+    expect(queFaltaCelular('2240000007')).toBeNull()
   })
   it('rechaza números incompletos o que no son argentinos', () => {
     expect(normalizarCelularAR('2241 55-882')).toBeNull()
