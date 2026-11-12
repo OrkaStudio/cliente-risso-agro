@@ -16,7 +16,10 @@ export function ponerSatelite(map: L.Map): () => void {
   // Debajo de todo, el mismo satélite en baja resolución: pocos cuadros grandes que cargan al
   // toque. Mientras la cámara viaja, donde la imagen nítida no llegó se ve el campo borroso, no
   // negro (Lau, 09/11: «los bordes parpadean en negro»).
-  L.tileLayer(ESRI, { maxZoom: 21, maxNativeZoom: 9, minZoom: 0, keepBuffer: 4, zIndex: 0, updateWhenZooming: false }).addTo(map)
+  // Dos fondos: a nivel provincia (z6: un puñado de imágenes cubre cualquier campo del país, nunca
+  // queda un hueco) y a nivel partido (z9: más definido). Encima, el nítido.
+  L.tileLayer(ESRI, { maxZoom: 21, maxNativeZoom: 6, keepBuffer: 10, zIndex: -1, updateWhenZooming: false, updateWhenIdle: false }).addTo(map)
+  L.tileLayer(ESRI, { maxZoom: 21, maxNativeZoom: 9, minZoom: 0, keepBuffer: 6, zIndex: 0, updateWhenZooming: false }).addTo(map)
   // Conserva más cuadros alrededor de la vista: al moverse, los bordes ya están.
   const esri = L.tileLayer(ESRI, { maxZoom: 19, maxNativeZoom: 17, attribution: '© Esri', keepBuffer: 6, zIndex: 1 }).addTo(map)
   const caminos = L.tileLayer(ESRI_CAMINOS, { maxZoom: 19, maxNativeZoom: 17, opacity: 0.9, keepBuffer: 6, zIndex: 3 }).addTo(map)
@@ -69,6 +72,7 @@ export function precargarVista(map: L.Map, limites: L.LatLngBounds, zoom: number
   // A mitad del viaje la cámara se aleja un poco más que el destino: también ese nivel.
   cuadros(Math.max(3, Math.min(17, Math.round(zoom) - 1)))
   cuadros(Math.min(9, Math.round(zoom)))
+  cuadros(Math.min(6, Math.round(zoom)))
   const cargas = urls.slice(0, 140).map(
     (u) =>
       new Promise<void>((ok) => {

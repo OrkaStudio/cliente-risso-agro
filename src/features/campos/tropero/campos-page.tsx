@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { AnimatePresence, motion } from 'framer-motion'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
@@ -268,7 +269,24 @@ export function CamposPage() {
         )}
 
         {!editando && (
-          <aside className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto">
+          // La tarjeta entra deslizándose y con fundido; si se viene de «Todos», espera a que la cámara casi llegue (Lau, 12/11).
+          <motion.aside
+            key={campo.id}
+            className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto"
+            initial={{ opacity: 0, x: 28, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 30, delay: entrando === campo.id ? 1.05 : 0.15, opacity: { duration: 0.35, delay: entrando === campo.id ? 1.05 : 0.15 } }}
+          >
+            {/* Campo ↔ potrero: el contenido se cruza, no cambia de golpe. */}
+            <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={potrero ? potrero.id : 'campo'}
+              className="flex flex-col gap-4"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
             {potrero ? (
               <DetallePotrero
                 key={potrero.id}
@@ -294,7 +312,9 @@ export function CamposPage() {
                 onCorregir={() => setPanel('campo')}
               />
             )}
-          </aside>
+            </motion.div>
+            </AnimatePresence>
+          </motion.aside>
         )}
       </section>
 
@@ -767,7 +787,12 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
           />
         </MapErrorBoundary>
       </div>
-      <aside className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto">
+      <motion.aside
+        className="relative z-[500] m-3 flex flex-col gap-4 rounded-[22px] bg-superficie p-5 shadow-[0_12px_40px_rgba(19,27,22,0.22)] lg:absolute lg:top-3 lg:right-3 lg:m-0 lg:max-h-[calc(100%-24px)] lg:w-[380px] lg:overflow-y-auto"
+        initial={{ opacity: 0, x: 28, scale: 0.98 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 30, delay: desde ? 1.0 : 0.1, opacity: { duration: 0.35, delay: desde ? 1.0 : 0.1 } }}
+      >
         <h2 className="t-seccion text-texto">Tus {campos.length} campos</h2>
         <div className="flex gap-7">
           <p className="flex flex-col">
@@ -803,7 +828,7 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
           })}
         </ul>
         <p className="text-[13.5px] text-texto-suave">Tocá un campo, acá o en el mapa, para ver sus potreros.</p>
-      </aside>
+      </motion.aside>
     </section>
   )
 }
