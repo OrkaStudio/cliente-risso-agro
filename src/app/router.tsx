@@ -11,6 +11,7 @@ import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
 import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
 import { CambieDeNumeroPage } from '@/features/acceso/cambie-de-numero-page'
 import { EntrarPage } from '@/features/acceso/entrar-page'
+import { FondoAcceso } from '@/features/acceso/fondo-acceso'
 import { TeInvitaronPage } from '@/features/acceso/te-invitaron-page'
 import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
 import { ProtectedRoute } from '@/features/auth/protected-route'
@@ -134,33 +135,20 @@ export const router = createBrowserRouter([
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
       ]
     : []),
-  // Acceso (A1–A3): se entra con un código por WhatsApp, sin contraseñas.
+  // Acceso (A1–A5): se entra con un código por WhatsApp, sin contraseñas. Comparten la foto
+  // y el sello (FondoAcceso), que no se recargan al pasar de una pantalla a otra.
   {
-    path: '/login',
+    element: <FondoAcceso />,
     errorElement: <ErrorNuevaVersion />,
-    element: <EntrarPage />,
-  },
-  {
-    path: '/login/codigo',
-    errorElement: <ErrorNuevaVersion />,
-    element: <CodigoPage />,
-  },
-  {
-    path: '/registro',
-    errorElement: <ErrorNuevaVersion />,
-    element: <CrearCuentaPage />,
-  },
-  {
-    // A4: el link que manda el dueño desde Personas.
-    path: '/invitacion/:token',
-    errorElement: <ErrorNuevaVersion />,
-    element: <TeInvitaronPage />,
-  },
-  {
-    // A5 (afuera): qué hacer si cambiaste de número.
-    path: '/cambie-de-numero',
-    errorElement: <ErrorNuevaVersion />,
-    element: <CambieDeNumeroPage />,
+    children: [
+      { path: '/login', element: <EntrarPage /> },
+      { path: '/login/codigo', element: <CodigoPage /> },
+      { path: '/registro', element: <CrearCuentaPage /> },
+      // A4: el link que manda el dueño desde Personas.
+      { path: '/invitacion/:token', element: <TeInvitaronPage /> },
+      // A5 (afuera): qué hacer si cambiaste de número.
+      { path: '/cambie-de-numero', element: <CambieDeNumeroPage /> },
+    ],
   },
   // Términos, privacidad y su resumen: abiertos, sin sesión.
   { path: '/legales', element: <Suspense fallback={null}><LegalesPage doc="resumen" /></Suspense> },

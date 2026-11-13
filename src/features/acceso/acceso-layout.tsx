@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useContext, useEffect, useRef } from 'react'
 import { Logo } from '@/components/tropero/logo'
 import { cn } from '@/lib/utils'
 // Foto aérea del Figma (nodo 217:40587): caminos de tierra, la aguada y la hacienda.
 import fotoCampo from '@/assets/tropero/campo-aereo.webp'
+import { DentroDelFondo } from './fondo-contexto'
 
 // Marco de las pantallas de Acceso (página 35, sección Acceso).
 // Compu (≥ md): foto a la izquierda (760 de 1440) con el título grande abajo y
@@ -34,6 +35,7 @@ export function AccesoLayout({
   children: React.ReactNode
 }) {
   const src = FOTOS[foto]
+  const enFondo = useContext(DentroDelFondo)
   // Si el título del celular es la misma frase de la foto, en la hoja va el del formulario.
   const tituloHoja = tituloCelu !== tituloCompu ? tituloCelu : encabezado?.titulo
   const raiz = useRef<HTMLDivElement>(null)
@@ -58,17 +60,15 @@ export function AccesoLayout({
     }
   }, [])
   return (
-    <div ref={raiz} className="relative isolate flex h-full flex-col overflow-y-auto bg-terracota-800 md:flex-row md:overflow-hidden">
-      {/* La foto del campo cubre toda la pantalla y queda quieta detrás. Mientras carga, terracota oscuro (M5). */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <img src={src} alt="" className="foto-llega absolute -top-[20%] h-[120%] w-full object-cover md:top-0 md:left-[-20%] md:h-full md:w-[120%] md:max-w-none" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.3)_0%,rgba(19,27,22,0.05)_28%,rgba(19,27,22,0.5)_62%,rgba(19,27,22,0.72)_100%)] md:bg-[radial-gradient(ellipse_75%_60%_at_0%_100%,rgba(19,27,22,0.9),transparent)]" />
-      </div>
+    <div ref={raiz} className={cn('relative isolate flex h-full flex-col overflow-y-auto md:flex-row md:overflow-hidden', !enFondo && 'bg-terracota-800')}>
+      {/* Fuera de <FondoAcceso> (cambiar el número, ya adentro) la pantalla pone su propia foto. */}
+      {!enFondo && <FotoDeFondo src={src} />}
 
       {/* Arriba el sello de la marca, solo. La frase va lejos de él (Lau 13/11: pegados competían):
           en el celular, justo sobre la tarjeta; en la compu, abajo a la izquierda. */}
       <div className="flex shrink-0 flex-col items-start px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:flex-1 md:justify-between md:px-14 md:pt-12 md:pb-16">
-        <Sello />
+        {/* Dentro del fondo el sello real es el de <FondoAcceso>, que no se mueve al navegar: acá sólo guarda su lugar. */}
+        {enFondo ? <span aria-hidden className="invisible"><Sello /></span> : <Sello />}
         <h1 className="titulo-display hidden max-w-[640px] text-[clamp(56px,5.4vw,76px)] leading-[0.96] tracking-[-0.04em] text-superficie md:block">{tituloCompu}</h1>
       </div>
 
@@ -105,8 +105,18 @@ export function AccesoLayout({
   )
 }
 
+/** La foto del campo a pantalla completa, quieta detrás. Mientras carga, terracota oscuro (M5). */
+export function FotoDeFondo({ src = fotoCampo }: { src?: string }) {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <img src={src} alt="" className="foto-llega absolute -top-[20%] h-[120%] w-full object-cover md:top-0 md:left-[-20%] md:h-full md:w-[120%] md:max-w-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.3)_0%,rgba(19,27,22,0.05)_28%,rgba(19,27,22,0.5)_62%,rgba(19,27,22,0.72)_100%)] md:bg-[radial-gradient(ellipse_75%_60%_at_0%_100%,rgba(19,27,22,0.9),transparent)]" />
+    </div>
+  )
+}
+
 /** El logo en sus colores, sobre una pastilla crema: se distingue del título blanco sin agrandarse. */
-function Sello() {
+export function Sello() {
   return (
     <span className="inline-flex items-center rounded-full bg-fondo px-4 py-2.5 shadow-[0_6px_20px_rgba(19,27,22,0.25)] md:px-5 md:py-3">
       <Logo alto={22} className="md:hidden" />
