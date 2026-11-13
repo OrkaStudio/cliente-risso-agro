@@ -1601,6 +1601,7 @@ export type Database = {
           celular: string
           vencida: boolean
           usada: boolean
+          secciones: string[]
         }[]
       }
       aceptar_invitacion: { Args: { p_token: string }; Returns: string }

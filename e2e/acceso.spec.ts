@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { CELULAR_E2E, CODIGO_E2E, codigoDelLog, entrar, invitarComoDueno } from './helpers'
+import { VERSION_LEGALES } from '../src/features/legales/textos'
+import { CELULAR_E2E, CODIGO_E2E, aceptacionesDe, codigoDelLog, entrar, invitarComoDueno } from './helpers'
 
 // Acceso (spec «Troppero para código», 1 · Acceso): se entra con un código por
 // WhatsApp. La cuenta E2E usa el código fijo de la base local.
@@ -84,13 +85,17 @@ test('A4: el invitado entra por el link con su código y queda en la empresa, si
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/invitacion/${token}`)
   await expect(page.getByRole('heading', { name: 'Prueba te sumó a E2E Pruebas.' })).toBeVisible()
-  await expect(page.getByText('Veterinaria · Dra. Paula Ríos')).toBeVisible()
+  await expect(page.getByText('Veterinario · Dra. Paula Ríos')).toBeVisible()
+  // Lo que le habilitó el dueño, no lo que se supone del rol.
+  await expect(page.getByText('Hacienda', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Entrar con mi celular' }).click()
   await page.waitForURL('**/login/codigo')
   await page.waitForTimeout(800)
   await page.locator('#codigo').fill(codigoDelLog(`549${numero}`))
   await page.waitForURL((u) => !u.pathname.startsWith('/login'))
   await expect(page).not.toHaveURL(/\/onboarding/)
+  // Al entrar queda registrado que aceptó los términos, y por dónde.
+  await expect.poll(() => aceptacionesDe(`549${numero}`)).toEqual([`${VERSION_LEGALES}:invitacion`])
 
   // El link ya no sirve otra vez.
   await page.goto(`/invitacion/${token}`)
@@ -126,6 +131,7 @@ test('A5 adentro: con la sesión abierta, el número se cambia con un código al
   await page.waitForTimeout(800)
   await page.locator('#codigo').fill(codigoDelLog(`549${viejo}`))
   await page.waitForURL((u) => !u.pathname.startsWith('/login'))
+  await expect.poll(() => aceptacionesDe(`549${viejo}`)).toEqual([`${VERSION_LEGALES}:registro`])
 
   await page.goto('/mi-cuenta/numero')
   await page.getByLabel('Tu número nuevo, el que tiene WhatsApp').fill(nuevo)

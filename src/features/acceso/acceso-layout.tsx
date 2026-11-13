@@ -155,36 +155,20 @@ export function TarjetaWhatsApp({
   return <p className="text-[14px] text-texto-suave">Te llega un código por WhatsApp. Sin contraseñas.</p>
 }
 
-/** Dónde están los términos y la privacidad (features/legales). */
-const TERMINOS_URL: string | null = '/terminos'
-const PRIVACIDAD_URL = '/privacidad'
-
-/** Términos y privacidad, en letra chica (QA 10/11, A6). En registro con «Al seguir aceptás…». */
+/** Términos y privacidad en letra chica (QA 10/11, A6). En registro e invitación, con «Al seguir aceptás…». */
 export function Legales({ aceptas = false }: { aceptas?: boolean }) {
   const link = 'underline decoration-borde underline-offset-2 hover:text-principal'
-  const terminos = TERMINOS_URL ? (
-    <a href={TERMINOS_URL} target="_blank" rel="noreferrer" className={link}>
-      Términos
-    </a>
-  ) : null
-  const privacidad = (
-    <a href={PRIVACIDAD_URL} target="_blank" rel="noreferrer" className={link}>
-      Política de privacidad
-    </a>
-  )
   return (
     <p className="-mt-2 text-center text-[12px] leading-snug text-texto-suave">
-      {aceptas ? 'Al seguir aceptás ' : ''}
-      {terminos && (
-        <>
-          {aceptas ? 'los ' : ''}
-          {terminos}
-          {aceptas ? ' y la ' : ' · '}
-        </>
-      )}
-      {!terminos && aceptas ? 'la ' : ''}
-      {privacidad}
-      {aceptas ? '.' : ''}
+      {aceptas && 'Al seguir aceptás los '}
+      <a href="/terminos" target="_blank" rel="noreferrer" className={link}>
+        Términos
+      </a>
+      {aceptas ? ' y la ' : ' · '}
+      <a href="/privacidad" target="_blank" rel="noreferrer" className={link}>
+        Política de privacidad
+      </a>
+      {aceptas && '.'}
     </p>
   )
 }

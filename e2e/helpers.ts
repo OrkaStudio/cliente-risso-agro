@@ -92,3 +92,9 @@ export async function elegir(page: Page, desplegable: string, opcion: string | R
   await page.getByRole('listbox').getByRole('button', { name: opcion }).first().click()
   await expect(page.getByRole('listbox')).toBeHidden()
 }
+
+/** Por dónde aceptó los términos cada versión una cuenta (tabla aceptacion_legal de la base local). */
+export function aceptacionesDe(celularSinMas: string): string[] {
+  const sql = `select a.version || ':' || a.via from public.aceptacion_legal a join auth.users u on u.id = a.user_id where u.phone = '${celularSinMas.replace(/\D/g, '')}'`
+  return execSync(`docker exec supabase_db_cliente-risso-agro psql -U postgres -d postgres -tAc "${sql}"`).toString().trim().split('\n').filter(Boolean)
+}

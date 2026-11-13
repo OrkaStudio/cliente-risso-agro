@@ -2,17 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
+import { SECCIONES, nombreRol } from '@/features/empresa/secciones'
 import { recordarQueAcepto } from '@/features/legales/aceptacion'
 import { AccesoLayout, Legales, TarjetaWhatsApp } from './acceso-layout'
 import { leerInvitacion, marcarEnviado, pedirCodigo, type Invitacion } from './envio'
-
-// Lo que ve cada rol al entrar (A4). La 35 sólo diseña la veterinaria; el resto
-// sigue el mismo tono y se ajusta cuando se definan los permisos por rol.
-const ROLES: Record<string, { etiqueta: string; puede: string }> = {
-  vet: { etiqueta: 'Veterinaria', puede: 'Cargar sanidad y tacto en la manga' },
-  encargado: { etiqueta: 'Encargado', puede: 'Recorrer, cargar la manga y la hacienda' },
-  peon: { etiqueta: 'Peón', puede: 'Hacer la recorrida y la manga' },
-}
 
 type Carga = { tipo: 'cargando' } | { tipo: 'sin-senal' } | { tipo: 'no-existe' } | { tipo: 'lista'; inv: Invitacion }
 
@@ -73,8 +66,8 @@ export function TeInvitaronPage() {
   }
 
   const inv = carga.inv
-  // Un rol que escribió el dueño («Contador»): se muestra tal cual.
-  const rol = ROLES[inv.rol] ?? { etiqueta: inv.rol, puede: 'Ver lo que te habilitó el dueño' }
+  // Lo que le habilitó el dueño, sección por sección (desde el 05/11 lo elige él).
+  const ve = SECCIONES.filter((x) => inv.secciones.includes(x.id)).map((x) => x.texto)
 
   async function entrar() {
     setMandando(true)
@@ -117,12 +110,12 @@ export function TeInvitaronPage() {
         <div className="flex flex-col gap-2">
           <dt className="text-[14px] font-semibold text-texto">Entrás como</dt>
           <dd className="text-[18px] font-bold text-texto">
-            {rol.etiqueta} · {inv.nombre}
+            {nombreRol(inv.rol)} · {inv.nombre}
           </dd>
         </div>
         <div className="flex flex-col gap-2">
-          <dt className="text-[14px] font-semibold text-texto">Vas a poder</dt>
-          <dd className="text-[18px] font-bold text-texto">{rol.puede}</dd>
+          <dt className="text-[14px] font-semibold text-texto">Vas a ver</dt>
+          <dd className="text-[18px] font-bold text-texto">{ve.length ? ve.join(', ') : 'Lo que te habilite el dueño'}</dd>
         </div>
       </dl>
       {fallo && <TarjetaWhatsApp tipo="error" pie={fallo} />}
@@ -130,9 +123,6 @@ export function TeInvitaronPage() {
         {mandando ? 'Mandando el código…' : 'Entrar con mi celular'}
       </BotonPrincipal>
       <Legales aceptas />
-      <p className="text-center text-[14.5px] text-texto-suave">
-        La plata del campo no la ves: queda para {inv.invita}.
-      </p>
     </AccesoLayout>
   )
 }

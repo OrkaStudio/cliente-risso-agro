@@ -149,6 +149,8 @@ export type Invitacion = {
   celular: string
   vencida: boolean
   usada: boolean
+  /** Lo que le habilitó el dueño: inicio, hacienda, campos, plata, agenda. */
+  secciones: string[]
 }
 
 /** A4: lo que muestra el link de invitación (sin sesión). null si no existe. */

@@ -28,11 +28,13 @@ export function LegalesPage({ doc }: { doc: Doc }) {
   return (
     <div className="h-full overflow-y-auto bg-fondo">
       <header className="sticky top-0 z-10 border-b border-borde bg-fondo/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1040px] items-center justify-between gap-4 px-5">
+        <div className="mx-auto flex h-16 max-w-[1040px] items-center justify-between gap-3 px-4 sm:px-5">
           <button type="button" onClick={() => navigate('/')} aria-label="Ir a Troppero">
-            <Logo alto={24} />
+            {/* En el celular sólo el isotipo: así entran las tres pestañas en una línea. */}
+            <Logo soloIsotipo alto={26} className="sm:hidden" />
+            <Logo alto={24} className="hidden sm:block" />
           </button>
-          <nav className="flex gap-1" aria-label="Documentos">
+          <nav className="flex gap-0.5 sm:gap-1" aria-label="Documentos">
             {PESTANAS.map((p) => (
               <button
                 key={p.doc}
@@ -40,7 +42,7 @@ export function LegalesPage({ doc }: { doc: Doc }) {
                 onClick={() => navigate(p.ruta, { replace: true })}
                 aria-current={p.doc === doc ? 'page' : undefined}
                 className={cn(
-                  'min-h-10 rounded-full px-3 text-[14px] font-semibold transition-colors',
+                  'min-h-10 rounded-full px-3 text-[14px] font-semibold whitespace-nowrap transition-colors',
                   p.doc === doc ? 'bg-principal-suave text-principal' : 'text-texto-suave hover:text-texto',
                 )}
               >
@@ -56,7 +58,7 @@ export function LegalesPage({ doc }: { doc: Doc }) {
           <h1 className="t-pagina text-texto">{titulo}</h1>
           <p className="text-[17px] leading-snug text-texto-suave">{bajada}</p>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-texto-suave">
-            Vigente desde el {FECHA_LEGALES}
+            {BORRADOR ? 'Versión del' : 'Vigente desde el'} {FECHA_LEGALES}
             {BORRADOR && <span className="rounded-full bg-acento/40 px-2.5 py-0.5 text-[12px] font-bold text-acento-texto">Borrador: falta la revisión legal</span>}
           </p>
         </div>
