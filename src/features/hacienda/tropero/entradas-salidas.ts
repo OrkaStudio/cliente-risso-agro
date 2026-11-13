@@ -14,7 +14,7 @@ export type Que = { modo: 'salieron'; que: Salida } | { modo: 'entraron'; que: E
 export const OPCIONES_SALIDA: { que: Salida; titulo: string; bajada: string }[] = [
   { que: 'venta', titulo: 'Los vendí', bajada: 'En el camión, hoy o antes' },
   { que: 'muerte', titulo: 'Murieron', bajada: 'Cuentan para la mortandad' },
-  { que: 'otroCampo', titulo: 'Los llevé a otro campo', bajada: 'Pasan a otro de tus campos' },
+  { que: 'otroCampo', titulo: 'Los llevé a otro campo', bajada: 'Pasan a otro campo' },
   { que: 'correccion', titulo: 'Corregir cabezas', bajada: 'Había cargados de más: no es venta ni muerte' },
 ]
 export const OPCIONES_ENTRADA: { que: Entrada; titulo: string; bajada: string }[] = [

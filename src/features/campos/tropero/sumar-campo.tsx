@@ -9,6 +9,7 @@ import { useCrearCampo } from '@/features/campos/hooks'
 import { LocalidadCampo } from '@/features/onboarding/tropero/localidad-campo'
 import { leerHectareas, nombrePropio } from '@/features/onboarding/tropero/modelo'
 import type { Localidad } from '@/lib/geocoding'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
 
 /**
  * «+ Sumar un campo» en el panel lateral (Lau, 03/11: todos los formularios con
@@ -19,6 +20,8 @@ import type { Localidad } from '@/lib/geocoding'
 export function SumarCampo({ empresaId, clase, onCreado }: { empresaId: string; clase: string; onCreado: (id: string) => void }) {
   const [abierto, setAbierto] = useState(false)
   const [vez, setVez] = useState(0)
+  // Sumar un campo es del dueño, no se delega (permisos, 13/11).
+  if (!useQuienMira().dueno) return null
   return (
     <>
       <button

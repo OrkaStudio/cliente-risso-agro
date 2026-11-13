@@ -27,7 +27,18 @@ describe('la conversación', () => {
 
   it('tres ejemplos: animales del campo con más hacienda, plata y una duda de la sección', () => {
     const s = sugerenciasDe([campo('La Loma', 0), campo('La Porteña', 17)], 'campos', FICHAS)
-    expect(s.map((x) => x.texto)).toEqual(['¿Cuántos animales tengo en La Porteña?', '¿Cuánto gasté este mes?', FICHAS.find((f) => f.categoria === 'campos')!.chip])
+    expect(s.map((x) => x.texto)).toEqual(['¿Cuántos animales hay en La Porteña?', '¿Cuánto gasté este mes?', FICHAS.find((f) => f.categoria === 'campos')!.chip])
     expect(s.map((x) => x.icono)).toEqual(['Vaca', 'Plata', 'Ayuda'])
+  })
+  it('a quien no ve la plata ni la hacienda no le sugiere esas preguntas (permisos, 13/11)', () => {
+    const s = sugerenciasDe([campo('La Porteña', 17)], 'campos', FICHAS, { plata: false, hacienda: false, campos: true })
+    expect(s.map((x) => x.icono)).toEqual(['Ayuda'])
+  })
+  it('lo que no tiene habilitado se dice; no lo manda a WhatsApp (permisos, 13/11)', () => {
+    const r = responderLocal('¿Cuánto gasté este mes?', FICHAS, { plata: false, hacienda: true, campos: true })
+    expect(r.texto).toContain('la plata la maneja el dueño del campo')
+    expect(r.persona).toBeUndefined()
+    expect(responderLocal('¿cuántas cabezas hay?', FICHAS, { plata: true, hacienda: false, campos: true }).texto).toContain('la hacienda la maneja')
+    expect(responderLocal('¿cuánto llovió?', FICHAS, { plata: true, hacienda: true, campos: false }).texto).toContain('los campos los maneja')
   })
 })

@@ -19,8 +19,9 @@ describe('qué ve cada uno', () => {
   it('una membresía vieja sin secciones no esconde nada (la base igual niega la plata)', () => {
     expect(puedeVer({ empresa_id: 'e', rol: 'peon', empresa: null }, 'campos')).toBe(true)
   })
-  it('lo que no ve lleva a su primera sección', () => {
-    expect(primeraRuta(m('vet', ['hacienda']))).toBe('/hacienda')
+  it('el Inicio lo tienen todos, así que es la primera sección de cualquiera (13/11)', () => {
+    expect(puedeVer(m('vet', ['hacienda']), 'inicio')).toBe(true)
+    expect(primeraRuta(m('vet', ['hacienda']))).toBe('/')
     expect(primeraRuta(m('peon', ['inicio', 'hacienda']))).toBe('/')
   })
   it('cada ruta es de su sección; Configuración no es de ninguna', () => {

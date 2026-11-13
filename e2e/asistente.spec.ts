@@ -31,7 +31,7 @@ test('se le escribe: una duda la contesta, un número lleva a WhatsApp', async (
   await page.getByRole('button', { name: /^El asistente de Troppero/ }).click()
   const panel = page.getByRole('dialog', { name: '¿En qué te ayudo?' })
   // Ejemplos con sus campos, para arrancar.
-  await expect(panel.getByRole('button', { name: /^¿Cuántos animales tengo/ })).toBeVisible()
+  await expect(panel.getByRole('button', { name: /^¿Cuántos animales hay/ })).toBeVisible()
 
   await panel.getByRole('textbox', { name: 'Escribí tu pregunta' }).fill('¿cómo dibujo los potreros?')
   await panel.getByRole('button', { name: 'Preguntar' }).click()

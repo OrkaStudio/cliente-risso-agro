@@ -37,6 +37,8 @@ export const esDueno = (m: Membresia | null | undefined) => m?.rol === 'dueno'
 
 /** ¿Esta persona ve esa sección? El dueño, todo; sin membresía todavía, nada se esconde. */
 export function puedeVer(m: Membresia | null | undefined, s: Seccion): boolean {
+  // El Inicio lo tienen todos, filtrado por lo que cada uno ve (permisos, 13/11).
+  if (s === 'inicio') return true
   // Una membresía guardada de antes (sin señal) no trae las secciones: no se
   // esconde nada hasta que llegue la de la base, que igual niega la plata.
   if (!m || esDueno(m) || m.secciones === undefined || m.secciones === null) return true

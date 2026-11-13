@@ -4,13 +4,15 @@ import { Logo } from '@/components/tropero/logo'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
-import { puedeVer, type Seccion } from '@/features/empresa/secciones'
+import { nombreRol, puedeVer, type Seccion } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 import { abiertoSinMapa, primerPendiente, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
 import { prefetch, CHUNKS_OFICINA } from '@/lib/prefetch'
 import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
+import { nombreDe } from '@/features/guia/nombre-usuario'
 
 /** Las secciones de la Oficina (página 35, «Barra lateral · Oficina»). */
 const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; seccion: Seccion }[] = [
@@ -32,12 +34,17 @@ const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; 
 export function BarraLateral({ hoy }: { hoy: number }) {
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
+  const quien = useQuienMira()
   const pendiente = useMapaPendiente()
   const { data: campos } = useMapa(membresia?.empresa_id)
   const { elegido, elegir } = useCampoElegido()
   const navigate = useNavigate()
   // El celular con formato (+54 9 2240 00-0004), no los dígitos sueltos.
   const contacto = user?.phone ? formatearCelularAR(`+${user.phone.replace(/\D/g, '')}`) : user?.email || ''
+  // El dueño ve su empresa y su número; un invitado, su nombre y qué es en ese campo (permisos, 13/11).
+  const pie = quien.dueno
+    ? { titulo: membresia?.empresa?.nombre ?? null, bajada: contacto }
+    : { titulo: [nombreDe(user?.user_metadata), user?.user_metadata?.apellido].filter(Boolean).join(' ') || contacto, bajada: `${nombreRol(membresia?.rol ?? '')} de ${membresia?.empresa?.nombre ?? 'el campo'}` }
 
   return (
     <aside className="hidden h-full w-[256px] shrink-0 flex-col border-r border-borde bg-fondo md:flex">
@@ -97,7 +104,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
         {!!campos?.length && (
           <>
             <p className="shrink-0 px-3 pt-7 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">
-              Tus campos
+              {quien.losCampos}
             </p>
             {/* El único lugar donde se elige el campo: filtra toda la app y te quedás donde estás. */}
             <div role="radiogroup" aria-label="Qué campo estás viendo" className="-mx-1 flex shrink-0 flex-col gap-0.5">
@@ -110,7 +117,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
                       <Icono nombre="Campos" tamano={16} />
                     </span>
                   }
-                  nombre="Todos tus campos"
+                  nombre={quien.todosLosCampos}
                   cabezas={campos.reduce((n, c) => n + c.potreros.reduce((s, p) => s + p.cabezas, 0), 0)}
                 />
               )}
@@ -163,11 +170,11 @@ export function BarraLateral({ hoy }: { hoy: number }) {
       <div className="mx-3 flex items-center gap-1 pt-1 pb-3">
         <button type="button" onClick={() => navigate('/configuracion')} aria-label="Tu cuenta y la configuración" className="flex min-w-0 flex-1 items-center gap-3 rounded-[12px] px-2 py-1.5 text-left hover:bg-superficie-hundida/70">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-principal font-heading text-[14px] font-extrabold text-principal-texto">
-            {(membresia?.empresa?.nombre ?? 'T').charAt(0).toUpperCase()}
+            {(pie.titulo ?? 'T').charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-[14px] font-bold text-texto">{membresia?.empresa?.nombre ?? '—'}</span>
-            {contacto && <span className="block truncate text-[12px] text-texto-suave">{contacto}</span>}
+            <span className="block truncate text-[14px] font-bold text-texto">{pie.titulo ?? '—'}</span>
+            {pie.bajada && <span className="block truncate text-[12px] text-texto-suave">{pie.bajada}</span>}
           </span>
         </button>
         <button type="button" onClick={() => void signOut()} aria-label="Salir" className="grid size-9 place-items-center rounded-full text-texto-suave hover:bg-superficie-hundida">

@@ -32,6 +32,7 @@ import { MapaCampo, type Marca } from './mapa-campo'
 import { MapaCampos } from './mapa-campos'
 import { ProgresoMapa } from './progreso-mapa'
 import { AGUA, avisosDelCampo, lluviaDesde, PASTO, textoDias, ultimaPorPotrero, type Aviso, type Lluvia, type Observacion } from './panorama'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
 
 const EditorCampo = lazy(() => import('./editor-campo'))
 
@@ -94,6 +95,7 @@ function useDatosDelCampo(empresaId: string, campoId: string, potreroIds: string
 }
 
 export function CamposPage() {
+  const quien = useQuienMira()
   const { data: membresia } = useEmpresa()
   const empresaId = membresia?.empresa_id ?? ''
   const camposQ = useCamposConPotreros()
@@ -231,7 +233,7 @@ export function CamposPage() {
             <span className="grid size-8 place-items-center rounded-full bg-principal text-principal-texto">
               <Icono nombre="Atrás" tamano={16} />
             </span>
-            Todos tus campos
+            {quien.todosLosCampos}
           </button>
         )}
         <div className="absolute inset-0">
@@ -352,6 +354,7 @@ function ResumenCampo({
   onAviso: (potreroId: string | null) => void
   onCorregir: () => void
 }) {
+  const quien = useQuienMira()
   const usos = (['ganadero', 'agricola', 'vacio'] as Uso[])
     .map((u) => [u, campo.potreros.filter((p) => usoDeEstado(p.estadoCiclo) === u)] as const)
     .map(([u, ps]) => ({ u, ha: ps.reduce((t, p) => t + (p.hectareas ?? 0), 0), n: ps.length }))
@@ -398,9 +401,12 @@ function ResumenCampo({
         </ul>
       )}
       <p className="text-[14px] text-texto-suave">{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.'}</p>
-      <button type="button" onClick={onCorregir} className={cn(BOTON, 'self-start')}>
-        <Icono nombre="Editar" tamano={16} /> Corregir el campo
-      </button>
+      {/* El nombre, la tenencia y el dibujo del campo son del dueño (permisos, 13/11). */}
+      {quien.dueno && (
+        <button type="button" onClick={onCorregir} className={cn(BOTON, 'self-start')}>
+          <Icono nombre="Editar" tamano={16} /> Corregir el campo
+        </button>
+      )}
     </>
   )
 }
@@ -767,6 +773,7 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
  * lo que suman y cada campo con lo suyo. Tocar uno lo elige, como en la barra.
  */
 function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMapa[]; identidad: CampoElegible[]; onElegir: (id: string) => void; desde: string | null }) {
+  const quien = useQuienMira()
   const marca = (id: string) => identidad.find((c) => c.id === id)
   const cabezas = (c: CampoMapa) => c.potreros.reduce((n, p) => n + p.cabezas, 0)
   const hectareas = (c: CampoMapa) => c.hectareas ?? c.potreros.reduce((n, p) => n + (p.hectareas ?? 0), 0)
@@ -793,7 +800,7 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
         animate={{ opacity: 1, x: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 220, damping: 30, delay: desde ? 1.0 : 0.1, opacity: { duration: 0.35, delay: desde ? 1.0 : 0.1 } }}
       >
-        <h2 className="t-seccion text-texto">Tus {campos.length} campos</h2>
+        <h2 className="t-seccion text-texto">{quien.dueno ? 'Tus' : 'Los'} {campos.length} campos</h2>
         <div className="flex gap-7">
           <p className="flex flex-col">
             <span className="t-numero">{ha(totalHa)}</span>

@@ -18,6 +18,8 @@ import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
 import { registrar } from '@/lib/telemetria'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
+import { puedeVer, veePlata } from '@/features/empresa/secciones'
 
 /**
  * El asistente de Troppero en toda la Oficina (Lau, 28–29/10). Cerrado es una
@@ -75,6 +77,9 @@ export function AsistentePanel() {
   const mapaPendiente = useMapaPendiente()
   const { user } = useAuth()
   const empresa = useEmpresa()
+  const quien = useQuienMira()
+  // Lo que ve quien pregunta: el asistente no sugiere ni contesta lo que no tiene habilitado.
+  const ve = React.useMemo(() => ({ plata: veePlata(empresa.data), hacienda: puedeVer(empresa.data, 'hacienda'), campos: puedeVer(empresa.data, 'campos') }), [empresa.data])
   const estado = useEstadoPuestaAPunto()
   const { data: campos } = useMapa(empresa.data?.empresa_id)
   const nombre = nombreDe(user?.user_metadata)
@@ -87,7 +92,7 @@ export function AsistentePanel() {
   // ===== La conversación =====
   // Se le escribe lo que sea. Arranca con lo que notó y ejemplos hechos con sus campos.
   const categoria = mapaPendiente ? 'campos' : seccion ? CATEGORIA_DE_SECCION[seccion] : 'hacienda'
-  const sugerencias = sugerenciasDe(campos ?? [], categoria, FICHAS)
+  const sugerencias = sugerenciasDe(campos ?? [], categoria, FICHAS, ve)
   const [mensajes, setMensajes] = React.useState<Mensaje[]>([])
   const [borrador, setBorrador] = React.useState('')
   const [pensando, setPensando] = React.useState(false)
@@ -108,7 +113,7 @@ export function AsistentePanel() {
     setPensando(true)
     // Un instante pensando: la respuesta no aparece de golpe.
     setTimeout(() => {
-      const r = responderLocal(t, FICHAS)
+      const r = responderLocal(t, FICHAS, ve)
       setMensajes((m) => [...m, { id: ++idMensaje.current, de: 'tropero', ...r }])
       setPensando(false)
     }, quieto ? 0 : 700)
@@ -313,10 +318,10 @@ export function AsistentePanel() {
       } catch {
         /* idem */
       }
-      setGlobo((g) => g ?? `Noté ${avisos.length === 1 ? 'una cosa' : `${avisos.length} cosas`} en tus campos.`)
+      setGlobo((g) => g ?? `Noté ${avisos.length === 1 ? 'una cosa' : `${avisos.length} cosas`} en ${quien.enLosCampos}.`)
     }, 1800)
     return () => clearTimeout(t)
-  }, [uid, avisos.length])
+  }, [uid, avisos.length, quien.enLosCampos])
   React.useEffect(() => {
     if (!globo) return
     const t = setTimeout(() => setGlobo(null), 8000)
@@ -396,7 +401,7 @@ export function AsistentePanel() {
                 <Mascota tam={40} parpadea={parpadea} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[15.5px] leading-tight font-bold">Asistente de Troppero</p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">Te respondo sobre tus campos y cómo usar la app</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">Te respondo sobre {quien.enLosCampos} y cómo usar la app</p>
                 </div>
                 <button type="button" aria-label="Cerrar el asistente" onClick={cerrarPanel} className="grid size-9 shrink-0 place-items-center rounded-full text-texto-suave hover:bg-fondo hover:text-texto">
                   <Icono nombre="Cerrar" tamano={16} />
@@ -409,7 +414,7 @@ export function AsistentePanel() {
                 {/* Lo que la app detectó en sus datos, cada cosa con el botón que la resuelve. */}
                 {nAvisos > 0 && (
                   <section className="flex flex-col gap-2">
-                    <Titulo>Lo que vi en tus campos</Titulo>
+                    <Titulo>Lo que vi en {quien.enLosCampos}</Titulo>
                     {avisos.map((a) => (
                       <div key={a.id} className="rounded-[18px] border border-borde bg-fondo/60 p-3.5">
                         <div className="flex items-start gap-3">

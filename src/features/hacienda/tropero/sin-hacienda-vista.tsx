@@ -1,5 +1,6 @@
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import type { CaraSinHacienda } from './sin-hacienda'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
 
 const ha = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: 1 })
 
@@ -22,6 +23,7 @@ export function SinHacienda({
   onPlanilla: () => void
   onVerCampo: () => void
 }) {
+  const quien = useQuienMira()
   if (cara.tipo === 'agricola')
     return (
       <div className="flex flex-col gap-5 px-7 py-7 lg:col-span-2 lg:flex-row lg:items-center lg:gap-8">
@@ -61,7 +63,7 @@ export function SinHacienda({
   return (
     <div className="flex flex-col gap-5 px-7 py-7 lg:col-span-2">
       <div>
-        <h2 className="t-seccion text-texto">Todavía no cargaste la hacienda {campo ? `de ${campo}` : 'de tus campos'}</h2>
+        <h2 className="t-seccion text-texto">Todavía no cargaste la hacienda {campo ? `de ${campo}` : `de ${quien.enLosCampos}`}</h2>
         <p className="mt-1 text-[15px] text-texto-suave">Elegí cómo cargarla:</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

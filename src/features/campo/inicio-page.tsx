@@ -19,6 +19,7 @@ import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import { useRecorrida } from './recorrida/use-recorrida'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const BARRA: Record<Cosa['tono'], string> = { problema: 'bg-[#b3372a]', atencion: 'bg-[#d38f1d]', aviso: 'bg-acento' }
@@ -37,6 +38,7 @@ function Hoy() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
+  const quien = useQuienMira()
   const r = useRecorrida()
   const panorama = usePanoramaInicio()
   const atender = useParaAtender()
@@ -193,7 +195,7 @@ function Hoy() {
             <p className="pb-3 text-[16px] leading-tight font-semibold text-texto-suave">
               cabezas en
               <br />
-              {campo?.nombre ?? 'tus campos'}
+              {campo?.nombre ?? quien.enLosCampos}
             </p>
           </div>
           {franjas.length > 0 && (

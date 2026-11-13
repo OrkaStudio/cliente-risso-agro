@@ -28,6 +28,7 @@ import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-ele
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluviaDelMes } from './use-dia'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const TARJETA = 'rounded-[20px] border border-borde bg-superficie px-6 py-5'
@@ -118,9 +119,12 @@ export function ElDia() {
         </div>
       </motion.div>
 
-      <motion.div {...entra(4)}>
-        <LaPlata vencimientos={v.vencimientos} />
-      </motion.div>
+      {/* Sólo para quien tiene la plata habilitada (permisos, 13/11): antes salía en $0. */}
+      {plata && (
+        <motion.div {...entra(4)}>
+          <LaPlata vencimientos={v.vencimientos} />
+        </motion.div>
+      )}
     </div>
   )
 }
@@ -290,6 +294,7 @@ function Pulso({
 }
 
 function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; campos: number; cats: CategoriaConteo[]; nacimientos: number }) {
+  const quien = useQuienMira()
   const franjas = franjasDelRodeo(cats)
   return (
     <Pulso
@@ -298,7 +303,7 @@ function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; ca
       tinte="bg-principal-suave text-principal"
       destino="/hacienda"
       pieTono={nacimientos > 0 ? 'atencion' : null}
-      pie={nacimientos > 0 ? `+${nacimientos} nacimientos sin caravana` : campos > 1 ? `En tus ${campos} campos` : 'Ver por potrero'}
+      pie={nacimientos > 0 ? `+${nacimientos} nacimientos sin caravana` : campos > 1 ? `En ${quien.dueno ? 'tus' : 'los'} ${campos} campos` : 'Ver por potrero'}
     >
       <span className="flex items-baseline gap-2">
         <span className={NUMERO}>{total.toLocaleString('es-AR')}</span>
