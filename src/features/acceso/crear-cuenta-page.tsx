@@ -153,6 +153,14 @@ export function CrearCuentaPage() {
               </BotonChico>
             ),
           },
+          {
+            texto: '¿Cambiaste de número?',
+            boton: (
+              <BotonChico type="button" onClick={() => navigate('/cambie-de-numero')}>
+                Te ayudamos
+              </BotonChico>
+            ),
+          },
         ]}
       />
     </AccesoLayout>

@@ -6,10 +6,10 @@ import fotoCampo from '@/assets/tropero/campo-aereo.webp'
 // Marco de las pantallas de Acceso (página 35, sección Acceso).
 // Compu (≥ md): foto a la izquierda (760 de 1440) con el título grande abajo y
 // el formulario de 420 centrado a la derecha.
-// Celular (Lau 12/11): la foto ocupa lo que el formulario no usa, con la frase de
-// la marca; nunca baja de un mínimo (no aprieta) y, si el formulario es largo, la
-// pantalla se desliza en vez de achicar. Así no queda blanco sin sentido en
-// ningún tamaño. El formulario va en una hoja que abraza su contenido.
+// Celular (Lau 13/11): la foto del campo cubre toda la pantalla, quieta detrás, y
+// la frase con el formulario van juntos, centrados, en una tarjeta. En cualquier
+// alto lo que sobra es campo alrededor del bloque, nunca un hueco en blanco; si
+// el formulario es largo, el bloque se desliza sobre la foto.
 
 const FOTOS = { campo: fotoCampo } as const
 
@@ -54,46 +54,54 @@ export function AccesoLayout({
     }
   }, [])
   return (
-    <div ref={raiz} className="flex h-full flex-col overflow-y-auto bg-fondo md:flex-row md:overflow-hidden">
-      {/* Foto: una franja arriba en el celular, a la izquierda en la compu. Mientras carga, terracota oscuro (M5). */}
-      <div className="relative flex min-h-[clamp(200px,36svh,300px)] flex-1 flex-col overflow-hidden bg-terracota-800 md:h-full md:min-h-0 md:w-[52.8%] md:flex-none">
-        <img src={src} alt="" className="foto-llega absolute inset-0 size-full object-cover" />
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-gradient-to-b from-[rgba(19,27,22,0.35)] to-[rgba(19,27,22,0.85)] md:bg-[linear-gradient(180deg,rgba(19,27,22,0.5)_0%,rgba(19,27,22,0)_30%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.9)_100%)]"
-        />
-        <div className="relative px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:px-14 md:pt-[52px]">
-          <Logo tono="hueso" alto={26} className="md:hidden" />
-          <Logo tono="hueso" alto={34} className="hidden md:block" />
-        </div>
-        <h1 className="titulo-display relative mt-auto w-full max-w-[724px] px-6 pb-12 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:px-[52px] md:pb-[110px] md:text-[76px] md:leading-[0.96] md:tracking-[-0.04em]">
-          {tituloCompu}
-        </h1>
+    <div ref={raiz} className="relative isolate flex h-full flex-col overflow-y-auto bg-terracota-800 md:flex-row md:overflow-hidden md:bg-fondo">
+      {/* Celular: la foto cubre toda la pantalla y queda quieta detrás; lo que sobra es campo, no blanco. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden md:hidden">
+        <img src={src} alt="" className="foto-llega size-full object-cover" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.55)_0%,rgba(19,27,22,0.2)_35%,rgba(19,27,22,0.35)_65%,rgba(19,27,22,0.75)_100%)]" />
       </div>
 
-      {/* Formulario: hoja abajo en el celular, columna a la derecha en la compu */}
-      <main className="relative z-10 -mt-6 shrink-0 rounded-t-[28px] bg-fondo px-5 pt-7 pb-[max(24px,env(safe-area-inset-bottom))] md:mt-0 md:flex md:flex-1 md:items-center md:justify-center md:overflow-y-auto md:rounded-none md:px-10 md:py-12">
-        <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:gap-[22px]">
-          {/* En el celular, el título y la bajada arriba del formulario (B1, M2). */}
-          {(tituloHoja || encabezado?.bajada) && (
-            <div className="flex flex-col gap-1 md:hidden">
-              {tituloHoja && <h2 className="t-seccion text-texto">{tituloHoja}</h2>}
-              {encabezado?.bajada && <p className="text-[15px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>}
-            </div>
-          )}
-          {encabezado && (
-            <div className="hidden flex-col gap-2.5 pb-1.5 md:flex">
-              <h2 className="t-pagina text-texto">
-                {encabezado.titulo}
-              </h2>
-              {encabezado.bajada && (
-                <p className="text-[16.5px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>
-              )}
-            </div>
-          )}
-          {children}
+      {/* Compu: la foto a la izquierda, con el título grande abajo. Mientras carga, terracota oscuro (M5). */}
+      <div className="relative hidden h-full w-[52.8%] flex-none flex-col overflow-hidden bg-terracota-800 md:flex">
+        <img src={src} alt="" className="foto-llega absolute inset-0 size-full object-cover" />
+        <div aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.5)_0%,rgba(19,27,22,0)_30%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.9)_100%)]" />
+        <div className="relative px-14 pt-[52px]">
+          <Logo tono="hueso" alto={34} />
         </div>
-      </main>
+        <h1 className="titulo-display relative mt-auto w-full max-w-[724px] px-[52px] pb-[110px] text-[76px] leading-[0.96] tracking-[-0.04em] text-superficie">{tituloCompu}</h1>
+      </div>
+
+      {/* Celular: el logo arriba y, centrados como un solo bloque, la frase y el formulario. */}
+      <div className="shrink-0 px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:hidden">
+        <Logo tono="hueso" alto={26} />
+      </div>
+      <div className="my-auto flex w-full flex-col gap-5 px-3 pt-8 pb-[max(12px,env(safe-area-inset-bottom))] md:contents">
+        <h1 className="titulo-display mx-auto w-full max-w-[444px] px-3 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:hidden">{tituloCompu}</h1>
+
+        {/* Formulario: una tarjeta sobre la foto en el celular, columna a la derecha en la compu */}
+        <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] md:m-0 md:flex md:max-w-none md:flex-1 md:items-center md:justify-center md:overflow-y-auto md:rounded-none md:px-10 md:py-12 md:shadow-none">
+          <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:gap-[22px]">
+            {/* En el celular, el título y la bajada arriba del formulario (B1, M2). */}
+            {(tituloHoja || encabezado?.bajada) && (
+              <div className="flex flex-col gap-1 md:hidden">
+                {tituloHoja && <h2 className="t-seccion text-texto">{tituloHoja}</h2>}
+                {encabezado?.bajada && <p className="text-[15px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>}
+              </div>
+            )}
+            {encabezado && (
+              <div className="hidden flex-col gap-2.5 pb-1.5 md:flex">
+                <h2 className="t-pagina text-texto">
+                  {encabezado.titulo}
+                </h2>
+                {encabezado.bajada && (
+                  <p className="text-[16.5px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>
+                )}
+              </div>
+            )}
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

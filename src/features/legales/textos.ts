@@ -146,7 +146,7 @@ export const TERMINOS: Seccion[] = [
     id: 'baja',
     titulo: 'Baja, arrepentimiento y tu copia',
     bloques: [
-      'Podés darte de baja cuando quieras, sin dar explicaciones, escribiéndonos a {mail} o por WhatsApp.',
+      'Podés darte de baja cuando quieras, sin dar explicaciones, desde la aplicación (Configuración → Plan → Dar de baja), escribiéndonos a {mail} o por WhatsApp. Te damos un número de trámite.',
       'Si contrataste a distancia, tenés 10 días corridos desde que contrataste para arrepentirte, sin costo y con la devolución de lo que hayas pagado.',
       'Después de la baja, tenés {diasBorrado} días para pedirnos una copia de tus datos. Pasado ese plazo los borramos, salvo lo que la ley nos obligue a guardar (por ejemplo, las facturas).',
     ],

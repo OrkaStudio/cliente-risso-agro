@@ -13,8 +13,9 @@ import { linkWhatsapp } from '@/features/guia/whatsapp'
 import { useAnimales } from '@/features/hacienda/hooks'
 import { useMapa } from '@/features/mapa/api'
 import { cn } from '@/lib/utils'
-import { celularLindo, useCambiarNombre, usePersonas, whatsappInvitacion, type Persona } from './api'
+import { celularLindo, useBaja, useCambiarNombre, usePersonas, whatsappInvitacion, type Persona } from './api'
 import { nombrePropio } from '@/lib/texto'
+import { Baja } from './baja'
 import { EditarPanel, InvitarPanel } from './personas-paneles'
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -305,6 +306,7 @@ function Plan() {
   const mapa = useMapa(membresia?.empresa_id)
   const animales = useAnimales()
   const personas = usePersonas(true)
+  const baja = useBaja(membresia?.empresa_id)
   const cabezas = (animales.data ?? []).filter((a) => a.estado === 'activo').length
   const desde = membresia?.empresa?.created_at
   const whatsapp = linkWhatsapp({ nombre: nombreDe(user?.user_metadata), empresa: membresia?.empresa?.nombre ?? null, seccion: 'Configuración, el plan', consulta: 'Quiero saber sobre mi plan.' })
@@ -319,10 +321,17 @@ function Plan() {
       <section aria-label="Tu plan" className="relative flex flex-wrap items-end justify-between gap-6 overflow-hidden rounded-[24px] bg-principal p-8 text-principal-texto">
         <Logo soloIsotipo tono="hueso" alto={220} className="pointer-events-none absolute -top-6 -right-8 opacity-[0.12]" />
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full bg-superficie px-3 py-1 text-[13.5px] font-bold text-estado-bien-texto">
-            <span className="size-2 rounded-full bg-estado-bien" />
-            Activo
-          </span>
+          {baja.data ? (
+            <span className="inline-flex items-center gap-2 rounded-full bg-superficie px-3 py-1 text-[13.5px] font-bold text-estado-problema-texto">
+              <span className="size-2 rounded-full bg-estado-problema" />
+              Baja pedida
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2 rounded-full bg-superficie px-3 py-1 text-[13.5px] font-bold text-estado-bien-texto">
+              <span className="size-2 rounded-full bg-estado-bien" />
+              Activo
+            </span>
+          )}
           <p className="mt-4 text-[15px] text-principal-texto/80">Tu plan</p>
           <p className="t-pagina">Piloto, sin cargo</p>
           {desde && <p className="mt-3 text-[15.5px] text-principal-texto/85">Usás Troppero desde el {fecha(desde)}.</p>}
@@ -366,6 +375,8 @@ function Plan() {
           ))}
         </ul>
       </section>
+
+      <Baja empresaId={membresia?.empresa_id} empresa={membresia?.empresa?.nombre ?? 'tu campo'} nombre={nombreDe(user?.user_metadata)} />
     </div>
   )
 }

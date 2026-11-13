@@ -71,3 +71,16 @@ test('el dueño invita con lo que va a ver, el invitado ve sólo eso y después 
   await page.getByRole('button', { name: 'Sí, sacarle el acceso' }).click()
   await expect(page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })).toHaveCount(0)
 })
+
+test('Plan: el dueño se da de baja, ve el trámite y la deshace', async ({ page }) => {
+  await entrar(page)
+  await page.goto('/configuracion?tab=plan')
+  await page.getByRole('button', { name: 'Dar de baja' }).click()
+  await expect(page.getByText('Esto va a pasar')).toBeVisible()
+  await page.getByRole('button', { name: 'Sí, dar de baja' }).click()
+  await expect(page.getByRole('heading', { name: /Pediste la baja el/ })).toBeVisible()
+  await expect(page.getByText(/Número de trámite: \d+/)).toBeVisible()
+  // Deshacerla deja todo como estaba.
+  await page.getByRole('button', { name: 'Deshacer la baja' }).click()
+  await expect(page.getByRole('button', { name: 'Dar de baja' })).toBeVisible()
+})

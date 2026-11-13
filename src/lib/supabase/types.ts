@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      baja: {
+        Row: { borrar_desde: string; deshecha_at: string | null; empresa_id: string; id: number; pedida_at: string; pedida_por: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       aceptacion_legal: {
         Row: { aceptado_at: string; dispositivo: string | null; id: number; ip: string | null; user_id: string; version: string; via: string }
         Insert: never
@@ -1568,6 +1574,8 @@ export type Database = {
       celular_tiene_cuenta: { Args: { p_celular: string }; Returns: boolean }
       terminar_onboarding: { Args: never; Returns: string }
       terminar_mapa: { Args: never; Returns: string }
+      pedir_baja: { Args: never; Returns: { borrar_desde: string; deshecha_at: string | null; empresa_id: string; id: number; pedida_at: string; pedida_por: string } }
+      deshacer_baja: { Args: never; Returns: undefined }
       aceptar_legales: { Args: { p_version: string; p_via: string }; Returns: undefined }
       crear_invitacion: {
         Args: { p_celular: string; p_nombre: string; p_rol: string; p_secciones: string[] }

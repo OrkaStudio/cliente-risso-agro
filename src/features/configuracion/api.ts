@@ -98,3 +98,42 @@ export function whatsappInvitacion(p: { celular: string; nombre: string; empresa
 export function celularLindo(c: string) {
   return formatearCelularAR(`+${c.replace(/\D/g, '')}`)
 }
+
+// ---------------------------------------------------------------- Baja (Lau, 13/11)
+
+export type Baja = { id: number; pedidaAt: string; borrarDesde: string }
+
+/** La baja en curso de la empresa, si hay (la ve sólo el dueño). */
+export function useBaja(empresaId: string | undefined) {
+  return useQuery({
+    queryKey: ['baja', empresaId],
+    enabled: !!empresaId,
+    queryFn: async (): Promise<Baja | null> => {
+      const { data, error } = await supabase.from('baja').select('id, pedida_at, borrar_desde').eq('empresa_id', empresaId!).is('deshecha_at', null).maybeSingle()
+      if (error) throw error
+      return data ? { id: data.id, pedidaAt: data.pedida_at, borrarDesde: data.borrar_desde } : null
+    },
+  })
+}
+
+export function usePedirBaja(empresaId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('pedir_baja')
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['baja', empresaId] }),
+  })
+}
+
+export function useDeshacerBaja(empresaId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('deshacer_baja')
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['baja', empresaId] }),
+  })
+}
