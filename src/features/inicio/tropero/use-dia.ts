@@ -7,6 +7,8 @@ import { useTiempo } from '@/features/cotizaciones/hooks'
 import { usePanoramaInicio } from '../hooks'
 import { useParaAtender } from '../para-atender-api'
 import { cosasParaHoy, delCampo, inicioDeCampania, lluviaDelMes } from './dia'
+import { useEmpresa } from '@/features/empresa/use-empresa'
+import { puedeVer, veePlata } from '@/features/empresa/secciones'
 
 /**
  * La lluvia del último mes (30 días que terminan ayer) en la ubicación del campo,
@@ -38,9 +40,11 @@ export function useCuantasHoy(): number {
   const campoId = useCampoElegido().elegido?.id ?? null
   // Mientras falta el mapa, el Inicio pide una sola cosa: terminarlo (lo demás es adelanto).
   const pendiente = useMapaPendiente()
+  const { data: membresia } = useEmpresa()
   if (pendiente) return 1
   if (!panorama.data || !atender.data) return 0
   const v = delCampo(campoId, panorama.data, atender.data)
-  return cosasParaHoy(v.potreros, v.vencimientos, v.sinRecorrer).length
+  const campos = puedeVer(membresia, 'campos')
+  return cosasParaHoy(campos ? v.potreros : [], veePlata(membresia) ? v.vencimientos : [], campos ? v.sinRecorrer : []).length
 }
 

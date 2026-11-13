@@ -1,3 +1,4 @@
+import type { Niveles } from './secciones'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { primeraMayuscula } from '@/lib/texto'
@@ -12,8 +13,8 @@ import { primeraMayuscula } from '@/lib/texto'
 export type Membresia = {
   empresa_id: string
   rol: string
-  /** Lo que ve (null = todo: el dueño). Ver `secciones.ts`. */
-  secciones?: string[] | null
+  /** El nivel en cada sección (null = todo: el dueño). Ver `secciones.ts`. */
+  niveles?: Niveles | null
   empresa: {
     id: string
     nombre: string
@@ -64,12 +65,12 @@ export function useEmpresa() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('miembro_empresa')
-        .select('empresa_id, rol, secciones, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
+        .select('empresa_id, rol, niveles, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
         .limit(1)
         .maybeSingle()
       if (error) throw error
       // El nombre como se lee: primera letra en mayúscula aunque se haya cargado «risso Agro».
-      const m = data?.empresa ? { ...data, empresa: { ...data.empresa, nombre: primeraMayuscula(data.empresa.nombre) } } : data
+      const m: Membresia | null = data?.empresa ? { ...data, niveles: data.niveles as Niveles | null, empresa: { ...data.empresa, nombre: primeraMayuscula(data.empresa.nombre) } } : null
       guardarMembresiaPersistida(m)
       return m
     },

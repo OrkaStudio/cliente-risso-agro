@@ -1,6 +1,8 @@
 import type { NombreIcono } from '@/components/tropero/icono'
 import { plural, type Resumen } from '@/features/guia/estado'
 import type { CampoMapa } from '@/features/mapa/reglas'
+import { esDueno, puedeCargar } from '@/features/empresa/secciones'
+import type { Membresia } from '@/features/empresa/use-empresa'
 
 // Lo que el asistente notó en los campos del productor (Lau, 28/10: «que venga
 // con lo que ya sabe»). Sale de datos que la app ya tiene: nada se inventa ni se
@@ -92,4 +94,13 @@ export function progresoDe(r: Resumen, campos: CampoMapa[], mapaPendiente: boole
     ...(r.alquilados > 0 ? [{ id: 'alquiler', texto: 'El alquiler cargado', hecho: r.alquilerPendiente.length === 0 }] : []),
     { id: 'recorrida', texto: 'La primera recorrida', hecho: r.recorridas > 0 },
   ]
+}
+
+/** Un aviso de puesta a punto es para quien puede resolverlo (permisos, 13/11): el mapa es del dueño. */
+export function avisoPermitido(id: string, m: Membresia | null | undefined): boolean {
+  if (id === 'mapa') return esDueno(m) || !m
+  if (id === 'sin-hacienda' || id === 'sin-potrero') return puedeCargar(m, 'hacienda')
+  if (id.startsWith('alquiler-')) return puedeCargar(m, 'plata')
+  if (id === 'recorrida') return puedeCargar(m, 'campos')
+  return true
 }

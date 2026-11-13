@@ -6,7 +6,7 @@ import { Icono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
 import type { NombreIcono } from '@/components/tropero/iconos-svg'
 import { useAuth } from '@/features/auth/auth-context'
-import { ROLES, SECCIONES, esDueno, nombreRol, seccionesSugeridas, type Rol } from '@/features/empresa/secciones'
+import { ROLES, SECCIONES, SECCIONES_CON_PERMISO, esDueno, nombreNivel, nombreRol, resumenNiveles, type Rol } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
@@ -118,11 +118,11 @@ function Personas({ empresa }: { empresa: string }) {
         </button>
       </div>
 
-      {/* La tabla: una fila por persona, una columna por sección. Se lee quién ve qué sin abrir nada. */}
+      {/* La tabla: una fila por persona, una columna por sección con su nivel. Se lee quién hace qué sin abrir nada. */}
       <section aria-label="Quién ve qué" className="overflow-hidden rounded-[24px] border border-borde bg-superficie">
-        <div className="grid grid-cols-[minmax(0,2.2fr)_repeat(5,minmax(0,0.8fr))_150px] items-center border-b border-borde bg-superficie-hundida/60 px-5 py-3 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">
+        <div className="grid grid-cols-[minmax(0,2.2fr)_repeat(3,minmax(0,1fr))_150px] items-center border-b border-borde bg-superficie-hundida/60 px-5 py-3 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">
           <span>Persona</span>
-          {SECCIONES.map((s) => (
+          {SECCIONES_CON_PERMISO.map((s) => (
             <span key={s.id} className="text-center">
               {s.texto}
             </span>
@@ -131,7 +131,7 @@ function Personas({ empresa }: { empresa: string }) {
         </div>
         <ul className="divide-y divide-borde/70">
           {adentro.map((p) => (
-            <li key={p.userId} className="grid grid-cols-[minmax(0,2.2fr)_repeat(5,minmax(0,0.8fr))_150px] items-center px-5 py-4">
+            <li key={p.userId} className="grid grid-cols-[minmax(0,2.2fr)_repeat(3,minmax(0,1fr))_150px] items-center px-5 py-4">
               <div className="flex min-w-0 items-center gap-3">
                 <span className={cn('grid size-10 shrink-0 place-items-center rounded-full font-heading text-[15px] font-extrabold', p.rol === 'dueno' ? 'bg-principal text-principal-texto' : 'bg-acento text-acento-texto')}>{p.nombre.charAt(0).toUpperCase()}</span>
                 <div className="min-w-0">
@@ -142,16 +142,16 @@ function Personas({ empresa }: { empresa: string }) {
                   <p className="truncate text-[14px] text-texto-suave">{[nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}</p>
                 </div>
               </div>
-              {SECCIONES.map((s) => {
-                const ve = p.secciones === null || p.secciones.includes(s.id)
+              {SECCIONES_CON_PERMISO.map((s) => {
+                const nivel = p.niveles === null ? 'carga' : (p.niveles[s.id] ?? 'no')
                 return (
-                  <span key={s.id} className="flex justify-center" aria-label={`${s.texto}: ${ve ? 'lo ve' : 'no lo ve'}`}>
-                    {ve ? (
-                      <span className="grid size-8 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
-                        <Icono nombre="Guardar" tamano={16} />
-                      </span>
-                    ) : (
+                  <span key={s.id} className="flex justify-center" aria-label={`${s.texto}: ${nombreNivel(nivel)}`}>
+                    {nivel === 'no' ? (
                       <span className="h-[2px] w-4 rounded-full bg-neutro-200" />
+                    ) : (
+                      <span className={cn('rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap', nivel === 'carga' ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-superficie-hundida text-texto')}>
+                        {nombreNivel(nivel)}
+                      </span>
                     )}
                   </span>
                 )
@@ -181,7 +181,7 @@ function Personas({ empresa }: { empresa: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[16px] font-semibold text-texto">{p.nombre}</p>
                     <p className="truncate text-[14px] text-texto-suave">
-                      {nombreRol(p.rol)} · va a ver {SECCIONES.filter((s) => (p.secciones ?? []).includes(s.id)).map((s) => s.texto).join(', ')}
+                      {nombreRol(p.rol)} · {resumenNiveles(p.niveles ?? {})}
                     </p>
                     <p className={cn('text-[14px] font-semibold', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
                       {vencida ? 'El link venció: cancelala e invitalo de nuevo' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}
@@ -212,7 +212,7 @@ function Personas({ empresa }: { empresa: string }) {
             {ROLES.map((r) => (
               <button key={r.valor} type="button" onClick={() => abrir(r.valor)} className="group flex flex-col items-start gap-2 rounded-[20px] border-[1.5px] border-borde bg-superficie p-5 text-left transition-colors hover:border-principal">
                 <span className="text-[17px] font-bold text-texto group-hover:text-principal">Al {r.texto.toLowerCase()}</span>
-                <span className="text-[14px] text-texto-suave">Vería {SECCIONES.filter((s) => seccionesSugeridas(r.valor).includes(s.id)).map((s) => s.texto).join(', ')}. Lo cambiás antes de invitarlo.</span>
+                <span className="text-[14px] text-texto-suave">Elegís vos qué ve y qué carga en cada sección.</span>
               </button>
             ))}
           </div>

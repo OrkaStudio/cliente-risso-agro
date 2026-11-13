@@ -57,7 +57,7 @@ export async function invitarComoDueno(celular: string, nombre: string, rol: 've
       Authorization: `Bearer ${sesion.access_token as string}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ p_celular: celular, p_nombre: nombre, p_rol: rol, p_secciones: rol === 'vet' ? ['hacienda'] : ['inicio', 'hacienda', 'campos'] }),
+    body: JSON.stringify({ p_celular: celular, p_nombre: nombre, p_rol: rol, p_niveles: rol === 'vet' ? { hacienda: 'carga', campos: 'no', plata: 'no' } : { hacienda: 'carga', campos: 'carga', plata: 'no' } }),
   })
   if (!r.ok) throw new Error(`no se pudo invitar: ${await r.text()}`)
   return (await r.json()) as string

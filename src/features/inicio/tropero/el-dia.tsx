@@ -14,7 +14,7 @@ import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
-import { veePlata } from '@/features/empresa/secciones'
+import { puedeVer, veePlata } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
@@ -62,6 +62,10 @@ export function ElDia() {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const plata = veePlata(membresia)
+  // Cada bloque, sólo si la persona ve esa sección (permisos, 13/11). Lo que no ve
+  // no se muestra: un «Nunca se recorrió» sobre datos que no puede leer sería falso.
+  const veCampos = puedeVer(membresia, 'campos')
+  const veHacienda = puedeVer(membresia, 'hacienda')
   const panorama = usePanoramaInicio()
   const atender = useParaAtender()
   const inicio = useCampoElegido()
@@ -78,7 +82,7 @@ export function ElDia() {
   if (panorama.error || !panorama.data) return <p className="text-texto-suave">No pudimos cargar el Inicio. Revisá la conexión y probá de nuevo.</p>
 
   const v = delCampo(campoId, panorama.data, atender.data)
-  const cosas = cosasParaHoy(v.potreros, v.vencimientos, v.sinRecorrer)
+  const cosas = cosasParaHoy(veCampos ? v.potreros : [], plata ? v.vencimientos : [], veCampos ? v.sinRecorrer : [])
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const manana = pronostico.data?.[1]
@@ -95,26 +99,28 @@ export function ElDia() {
       {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
       <motion.div
         {...entra(1)}
-        className={cn('grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l', plata ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}
+        className={cn('grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l', ['', 'lg:grid-cols-1', 'lg:grid-cols-2', 'lg:grid-cols-3', 'lg:grid-cols-4'][1 + Number(veHacienda) + Number(plata) + Number(veCampos)])}
       >
-        <PulsoHacienda total={v.totalCabezas} campos={campoId ? 1 : inicio.campos.length} cats={v.porCategoria} nacimientos={v.nacimientos} />
+        {veHacienda && <PulsoHacienda total={v.totalCabezas} campos={campoId ? 1 : inicio.campos.length} cats={v.porCategoria} nacimientos={v.nacimientos} />}
         {/* La plata sólo para quien el dueño se la habilitó (Configuración → Personas). */}
         {plata && <PulsoPlata vencimientos={v.vencimientos} ganado={ganado.data ?? null} />}
         <PulsoLluvia lugar={lugar?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
-        <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} />
+        {veCampos && <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} />}
       </motion.div>
 
-      <motion.div {...entra(2)}>
-        <ParaAtenderHoy cosas={cosas} empresaId={membresia?.empresa_id ?? ''} />
-      </motion.div>
+      {(veCampos || plata) && (
+        <motion.div {...entra(2)}>
+          <ParaAtenderHoy cosas={cosas} empresaId={membresia?.empresa_id ?? ''} />
+        </motion.div>
+      )}
 
       {/* El campo hoy: el rodeo y el clima en un solo panel, divididos por una línea. */}
       <motion.div
         {...entra(3)}
-        className="grid overflow-hidden rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,1fr)_360px]"
+        className={cn('grid overflow-hidden rounded-[20px] border border-borde bg-superficie', veHacienda && 'lg:grid-cols-[minmax(0,1fr)_360px]')}
       >
-        <EstructuraDelRodeo cats={v.porCategoria} total={v.totalCabezas} campo={inicio.elegido?.nombre ?? null} />
-        <div className="border-borde max-lg:border-t lg:border-l">
+        {veHacienda && <EstructuraDelRodeo cats={v.porCategoria} total={v.totalCabezas} campo={inicio.elegido?.nombre ?? null} />}
+        <div className={cn('border-borde', veHacienda && 'max-lg:border-t lg:border-l')}>
           <Clima lugar={lugar} />
         </div>
       </motion.div>

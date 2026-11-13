@@ -1,3 +1,4 @@
+import type { Niveles } from '@/features/empresa/secciones'
 import { VERSION_LEGALES } from '@/features/legales/textos'
 import { supabase } from '@/lib/supabase/client'
 import { errorAlPedir, REENVIO_MS, type ErrorAlPedir } from './reglas'
@@ -149,8 +150,8 @@ export type Invitacion = {
   celular: string
   vencida: boolean
   usada: boolean
-  /** Lo que le habilitó el dueño: inicio, hacienda, campos, plata, agenda. */
-  secciones: string[]
+  /** Lo que le habilitó el dueño, sección por sección. */
+  niveles: Niveles
 }
 
 /** A4: lo que muestra el link de invitación (sin sesión). null si no existe. */
@@ -159,7 +160,7 @@ export async function leerInvitacion(token: string): Promise<Invitacion | null |
   if (error) return errorAlPedir(error).tipo === 'sin-senal' ? 'sin-senal' : null
   const fila = data?.[0]
   if (!fila) return null
-  return { ...fila, celular: `+${fila.celular}` }
+  return { ...fila, niveles: fila.niveles as Niveles, celular: `+${fila.celular}` }
 }
 
 /** Ya con la sesión del celular invitado: queda en la empresa con su rol. */

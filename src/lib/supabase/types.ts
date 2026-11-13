@@ -844,21 +844,21 @@ export type Database = {
           created_at: string
           empresa_id: string
           rol: string
-          secciones: string[] | null
+          niveles: Json | null
           user_id: string
         }
         Insert: {
           created_at?: string
           empresa_id: string
           rol?: string
-          secciones?: string[] | null
+          niveles?: Json | null
           user_id: string
         }
         Update: {
           created_at?: string
           empresa_id?: string
           rol?: string
-          secciones?: string[] | null
+          niveles?: Json | null
           user_id?: string
         }
         Relationships: [
@@ -1578,7 +1578,7 @@ export type Database = {
       deshacer_baja: { Args: never; Returns: undefined }
       aceptar_legales: { Args: { p_version: string; p_via: string }; Returns: undefined }
       crear_invitacion: {
-        Args: { p_celular: string; p_nombre: string; p_rol: string; p_secciones: string[] }
+        Args: { p_celular: string; p_nombre: string; p_rol: string; p_niveles: Json }
         Returns: string
       }
       personas_de_empresa: {
@@ -1589,14 +1589,14 @@ export type Database = {
           invitacion_id: string | null
           nombre: string | null
           rol: string
-          secciones: string[] | null
+          niveles: Json | null
           soy_yo: boolean
           token: string | null
           user_id: string | null
           vence_at: string | null
         }[]
       }
-      cambiar_secciones: { Args: { p_secciones: string[]; p_user: string }; Returns: undefined }
+      cambiar_niveles: { Args: { p_niveles: Json; p_user: string }; Returns: undefined }
       quitar_persona: { Args: { p_invitacion: string | null; p_user: string | null }; Returns: undefined }
       auth_empresa_ids_plata: { Args: never; Returns: string[] }
       invitacion_por_token: {
@@ -1609,7 +1609,7 @@ export type Database = {
           celular: string
           vencida: boolean
           usada: boolean
-          secciones: string[]
+          niveles: Json
         }[]
       }
       aceptar_invitacion: { Args: { p_token: string }; Returns: string }

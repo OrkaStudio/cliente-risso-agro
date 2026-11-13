@@ -6,7 +6,7 @@ import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
 import { Mascota, type Animo } from '@/features/campos/tropero/mascota'
 import { useEmpresa } from '@/features/empresa/use-empresa'
-import { avisosDe, progresoDe, type Aviso } from '@/features/guia/avisos'
+import { avisoPermitido, avisosDe, progresoDe, type Aviso } from '@/features/guia/avisos'
 import { responderLocal, sugerenciasDe, type Mensaje } from '@/features/guia/conversacion'
 import { useEstadoPuestaAPunto } from '@/features/guia/checklist'
 import { nombreDe } from '@/features/guia/nombre-usuario'
@@ -85,8 +85,12 @@ export function AsistentePanel() {
   const nombre = nombreDe(user?.user_metadata)
 
   const resumen = estado.data?.resumen
-  const avisos = React.useMemo(() => (resumen ? avisosDe(resumen, campos ?? [], mapaPendiente) : []), [resumen, campos, mapaPendiente])
-  const progreso = React.useMemo(() => (resumen ? progresoDe(resumen, campos ?? [], mapaPendiente) : []), [resumen, campos, mapaPendiente])
+  // Los avisos son tareas de puesta a punto: a un invitado, sólo los de lo que puede cargar (permisos, 13/11).
+  const avisos = React.useMemo(
+    () => (resumen ? avisosDe(resumen, campos ?? [], mapaPendiente).filter((a) => avisoPermitido(a.id, empresa.data)) : []),
+    [resumen, campos, mapaPendiente, empresa.data],
+  )
+  const progreso = React.useMemo(() => (resumen && quien.dueno ? progresoDe(resumen, campos ?? [], mapaPendiente) : []), [resumen, campos, mapaPendiente, quien.dueno])
   const hechos = progreso.filter((p) => p.hecho).length
 
   // ===== La conversación =====

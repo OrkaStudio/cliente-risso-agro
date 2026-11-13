@@ -5,41 +5,72 @@ import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoCelular } from '@/features/acceso/campo-celular'
-import { ROLES, SECCIONES, nombreRol, seccionesSugeridas, type Rol, type RolConocido, type Seccion } from '@/features/empresa/secciones'
+import { NIVELES, ROLES, SECCIONES_CON_PERMISO, nombreRol, resumenNiveles, type Niveles, type Rol, type RolConocido } from '@/features/empresa/secciones'
 import { normalizarCelularAR } from '@/lib/telefono'
 import { nombrePropio, primeraMayuscula } from '@/lib/texto'
 import { cn } from '@/lib/utils'
-import { celularLindo, linkInvitacion, useCambiarSecciones, useInvitar, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
+import { celularLindo, linkInvitacion, useCambiarNiveles, useInvitar, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
 
-/** Qué secciones ve: cada una con lo que hay adentro, para decidir sabiendo. */
-function ElegirSecciones({ elegidas, onCambiar }: { elegidas: Seccion[]; onCambiar: (s: Seccion[]) => void }) {
+/**
+ * Qué puede hacer en cada sección (permisos, 13/11): una fila por sección, con
+ * lo que hay adentro, y los cuatro niveles. Nada viene elegido: decide el dueño.
+ * Debajo, en palabras simples, qué significa lo elegido.
+ */
+function ElegirNiveles({ niveles, onCambiar }: { niveles: Niveles; onCambiar: (n: Niveles) => void }) {
   return (
-    <div role="group" aria-label="Qué ve" className="flex flex-col gap-2">
-      {SECCIONES.map((s) => {
-        const si = elegidas.includes(s.id)
+    <div className="flex flex-col gap-3">
+      {SECCIONES_CON_PERMISO.map((s) => {
+        const elegido = niveles[s.id]
         return (
-          <button
-            key={s.id}
-            type="button"
-            role="checkbox"
-            aria-checked={si}
-            onClick={() => onCambiar(si ? elegidas.filter((x) => x !== s.id) : [...elegidas, s.id])}
-            className={cn('flex items-center gap-4 rounded-[16px] border-[1.5px] px-4 py-3 text-left transition-colors', si ? 'border-principal bg-principal-suave/60' : 'border-borde bg-superficie hover:border-neutro-300')}
-          >
-            <span className={cn('grid size-7 shrink-0 place-items-center rounded-[8px] border-2', si ? 'border-principal bg-principal text-principal-texto' : 'border-texto/40 bg-superficie')}>{si && <Icono nombre="Guardar" tamano={16} />}</span>
-            <Icono nombre={s.icono} />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[16px] font-semibold text-texto">{s.texto}</span>
-              <span className="block text-[14px] text-texto-suave">{s.queVe}</span>
-            </span>
-          </button>
+          <div key={s.id} className="rounded-[18px] border border-borde bg-superficie px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto">
+                <Icono nombre={s.icono} tamano={16} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] font-semibold text-texto">{s.texto}</span>
+                <span className="block text-[13.5px] text-texto-suave">{s.queHay}</span>
+              </span>
+            </div>
+            <div role="radiogroup" aria-label={`Qué puede hacer en ${s.texto}`} className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {NIVELES.map((n) => {
+                const si = elegido === n.id
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={si}
+                    onClick={() => onCambiar({ ...niveles, [s.id]: n.id })}
+                    className={cn(
+                      'h-10 rounded-full border-[1.5px] px-3 text-[14px] font-semibold transition-colors',
+                      si ? 'border-acento bg-acento text-acento-texto' : 'border-borde bg-superficie text-texto hover:border-neutro-300',
+                    )}
+                  >
+                    {n.texto}
+                  </button>
+                )
+              })}
+            </div>
+            {elegido && <p className="mt-2 text-[13.5px] text-texto-suave">{NIVELES.find((n) => n.id === elegido)!.explica}</p>}
+          </div>
         )
       })}
     </div>
   )
 }
 
-/** Invitar: quién es, qué hace y qué va a ver (el rol propone, el dueño decide). */
+const SIN_ELEGIR = 'Elegí qué puede hacer en cada sección.'
+const SIN_NADA = 'Tiene que poder ver o cargar al menos una sección.'
+
+/** Falta elegir alguna sección, o todo quedó en «No ve». */
+function faltaElegir(n: Niveles): string | null {
+  if (SECCIONES_CON_PERMISO.some((s) => !n[s.id])) return SIN_ELEGIR
+  if (SECCIONES_CON_PERMISO.every((s) => n[s.id] === 'no')) return SIN_NADA
+  return null
+}
+
+/** Invitar: quién es, qué hace (sólo lo nombra) y qué puede hacer en cada sección (lo elige el dueño). */
 export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abierto: boolean; empresa: string; rolInicial?: Rol; onCerrar: () => void }) {
   const invitar = useInvitar()
   const [nombre, setNombre] = useState('')
@@ -48,7 +79,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   const [tipoRol, setTipoRol] = useState<RolConocido | 'otro' | ''>((rolInicial as RolConocido | undefined) ?? '')
   const [otroRol, setOtroRol] = useState('')
   const rol: Rol | '' = tipoRol === 'otro' ? otroRol.trim() : tipoRol
-  const [secciones, setSecciones] = useState<Seccion[]>(rolInicial ? seccionesSugeridas(rolInicial) : [])
+  const [niveles, setNiveles] = useState<Niveles>({})
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,9 +89,10 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
     if (!cel) return setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.')
     if (!tipoRol) return setError('Tocá qué hace en el campo.')
     if (tipoRol === 'otro' && otroRol.trim().length < 2) return setError('Escribí qué hace en el campo.')
-    if (!secciones.length) return setError('Elegí al menos una sección que va a ver.')
+    const falta = faltaElegir(niveles)
+    if (falta) return setError(falta)
     try {
-      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, secciones }))
+      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo invitar. Probá de nuevo.')
     }
@@ -89,7 +121,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
           </div>
         }
       >
-        <TarjetaPersona nombre={nombre.trim()} rol={rol} celular={cel} secciones={secciones} />
+        <TarjetaPersona nombre={nombre.trim()} rol={rol} celular={cel} niveles={niveles} />
       </PanelLateral>
     )
 
@@ -98,7 +130,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
       abierto={abierto}
       onCerrar={onCerrar}
       titulo="Invitar a alguien"
-      bajada="Le llega un link por WhatsApp y entra con su celular. Vos elegís qué ve; lo podés cambiar cuando quieras."
+      bajada="Le llega un link por WhatsApp y entra con su celular. Vos elegís qué ve y qué carga; lo cambiás cuando quieras."
       ancho
       pie={
         <>
@@ -118,20 +150,17 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
           etiqueta="Qué hace"
           opciones={[...ROLES, { valor: 'otro' as const, texto: 'Otro' }]}
           elegidas={tipoRol ? [tipoRol] : []}
-          onTocar={(r) => {
-            setTipoRol(r)
-            // Un punto de partida según lo que hace; lo cambiás abajo. Para «Otro», elegís vos.
-            if (r !== 'otro') setSecciones(seccionesSugeridas(r))
-          }}
+          // El rol sólo lo nombra: no trae permisos armados (Lau, 13/11).
+          onTocar={setTipoRol}
         />
         {tipoRol === 'otro' && (
           <CampoTexto className="mt-3" etiqueta="Qué hace" placeholder="Contador, ingeniero agrónomo…" value={otroRol} onChange={(e) => setOtroRol(primeraMayuscula(e.target.value))} autoFocus maxLength={40} />
         )}
       </Grupo>
-      <Grupo titulo={tipoRol && tipoRol !== 'otro' ? 'Qué va a ver · te propusimos esto, cambialo como quieras' : 'Qué va a ver'}>
-        <ElegirSecciones elegidas={secciones} onCambiar={setSecciones} />
+      <Grupo titulo="Qué puede hacer en cada sección">
+        <ElegirNiveles niveles={niveles} onCambiar={setNiveles} />
       </Grupo>
-      <p className="mt-4 text-[14px] text-texto-suave">Configuración (las personas y el plan) sólo la ves vos.</p>
+      <Resumen niveles={niveles} nombre={nombre} />
     </PanelLateral>
   )
 }
@@ -146,9 +175,9 @@ export function EditarPanel({ persona, empresa, onCerrar }: { persona: Persona |
 }
 
 function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string; abierto: boolean; onCerrar: () => void }) {
-  const cambiar = useCambiarSecciones()
+  const cambiar = useCambiarNiveles()
   const quitar = useQuitarPersona()
-  const [secciones, setSecciones] = useState<Seccion[]>(p.secciones ?? [])
+  const [niveles, setNiveles] = useState<Niveles>(p.niveles ?? {})
   const [seguro, setSeguro] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pendiente = !!p.invitacionId
@@ -158,11 +187,12 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
 
   async function guardar() {
     setError(null)
-    if (!secciones.length) return setError('Tiene que ver al menos una sección. Para que no entre más, sacale el acceso.')
+    const falta = faltaElegir(niveles)
+    if (falta) return setError(falta === SIN_NADA ? `${falta} Para que no entre más, sacale el acceso.` : falta)
     try {
-      await cambiar.mutateAsync({ userId: p.userId!, secciones })
+      await cambiar.mutateAsync({ userId: p.userId!, niveles })
       onCerrar()
-      toast.success(`Listo: ${nombre} ahora ve ${SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => s.texto).join(', ')}`, { description: 'Lo ve la próxima vez que abra Troppero.' })
+      toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Rige la próxima vez que abra Troppero.` })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar.')
     }
@@ -181,7 +211,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
     <PanelLateral
       abierto={abierto}
       onCerrar={onCerrar}
-      titulo={pendiente ? `La invitación de ${nombre}` : `Qué ve ${nombre}`}
+      titulo={pendiente ? `La invitación de ${nombre}` : `Qué puede hacer ${nombre}`}
       bajada={pendiente ? (vencida ? 'El link venció. Cancelala e invitalo de nuevo.' : `Todavía no entró. El link vence el ${venceEl}.`) : [nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
       ancho={!pendiente}
       chico={pendiente}
@@ -198,7 +228,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
           )}
           {!pendiente && (
             <BotonPrincipal icono="Guardar" cargando={cambiar.isPending} disabled={cambiar.isPending} onClick={() => void guardar()}>
-              Guardar lo que ve
+              Guardar
             </BotonPrincipal>
           )}
           {seguro ? (
@@ -223,18 +253,21 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
     >
       {pendiente ? (
         <>
-          <TarjetaPersona nombre={p.nombre} rol={p.rol} celular={p.celular} secciones={p.secciones ?? []} pendiente />
-          <p className="mt-3 text-[14px] text-texto-suave">Cuando entre, le cambiás lo que ve desde la tabla.</p>
+          <TarjetaPersona nombre={p.nombre} rol={p.rol} celular={p.celular} niveles={p.niveles ?? {}} pendiente />
+          <p className="mt-3 text-[14px] text-texto-suave">Cuando entre, le cambiás lo que puede hacer desde la tabla.</p>
         </>
       ) : (
-        <ElegirSecciones elegidas={secciones} onCambiar={setSecciones} />
+        <>
+          <ElegirNiveles niveles={niveles} onCambiar={setNiveles} />
+          <Resumen niveles={niveles} nombre={p.nombre} />
+        </>
       )}
     </PanelLateral>
   )
 }
 
 /** Quién es y qué va a ver, de un vistazo: para confirmar una invitación o revisarla. */
-function TarjetaPersona({ nombre, rol, celular, secciones, pendiente = false }: { nombre: string; rol: string; celular: string; secciones: Seccion[]; pendiente?: boolean }) {
+function TarjetaPersona({ nombre, rol, celular, niveles, pendiente = false }: { nombre: string; rol: string; celular: string; niveles: Niveles; pendiente?: boolean }) {
   return (
     <div className="overflow-hidden rounded-[22px] border border-principal/25 bg-gradient-to-br from-terracota-50 to-trigo-100">
       <div className="flex items-center gap-4 px-5 pt-5">
@@ -248,16 +281,19 @@ function TarjetaPersona({ nombre, rol, celular, secciones, pendiente = false }: 
         </div>
       </div>
       <div className="mt-4 border-t border-principal/15 bg-superficie/70 px-5 py-4">
-        <p className="text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">Va a ver</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {SECCIONES.filter((s) => secciones.includes(s.id)).map((s) => (
-            <span key={s.id} className="inline-flex items-center gap-1.5 rounded-full bg-principal-suave px-3 py-1 text-[14px] font-semibold text-acento-texto">
-              <Icono nombre={s.icono} tamano={16} />
-              {s.texto}
-            </span>
-          ))}
-        </div>
+        <p className="text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">Va a poder</p>
+        <p className="mt-1.5 text-[15px] text-texto">{resumenNiveles(niveles)}</p>
       </div>
     </div>
+  )
+}
+
+/** En una frase, lo que va a poder hacer, para confirmar antes de invitar o guardar. */
+function Resumen({ niveles, nombre }: { niveles: Niveles; nombre: string }) {
+  if (faltaElegir(niveles)) return <p className="mt-4 text-[14px] text-texto-suave">Configuración (las personas, el plan y la baja) sólo la ves vos.</p>
+  return (
+    <p className="mt-4 rounded-[16px] bg-principal-suave/60 px-4 py-3 text-[15px] text-texto">
+      <b>{nombre.trim().split(' ')[0] || 'Esta persona'}:</b> {resumenNiveles(niveles)}
+    </p>
   )
 }

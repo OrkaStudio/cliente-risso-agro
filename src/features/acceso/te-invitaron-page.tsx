@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
-import { SECCIONES, nombreRol } from '@/features/empresa/secciones'
+import { SECCIONES_CON_PERMISO, nombreNivel, nombreRol } from '@/features/empresa/secciones'
 import { recordarQueAcepto } from '@/features/legales/aceptacion'
 import { AccesoLayout, Legales, TarjetaWhatsApp } from './acceso-layout'
 import { leerInvitacion, marcarEnviado, pedirCodigo, type Invitacion } from './envio'
@@ -66,8 +66,8 @@ export function TeInvitaronPage() {
   }
 
   const inv = carga.inv
-  // Lo que le habilitó el dueño, sección por sección (desde el 05/11 lo elige él).
-  const ve = SECCIONES.filter((x) => inv.secciones.includes(x.id)).map((x) => x.texto)
+  // Lo que le habilitó el dueño, sección por sección, con su nivel (permisos, 13/11).
+  const habilitado = SECCIONES_CON_PERMISO.map((x) => ({ ...x, nivel: inv.niveles[x.id] ?? 'no' })).filter((x) => x.nivel !== 'no')
 
   async function entrar() {
     setMandando(true)
@@ -114,8 +114,17 @@ export function TeInvitaronPage() {
           </dd>
         </div>
         <div className="flex flex-col gap-2">
-          <dt className="text-[14px] font-semibold text-texto">Vas a ver</dt>
-          <dd className="text-[18px] font-bold text-texto">{ve.length ? ve.join(', ') : 'Lo que te habilite el dueño'}</dd>
+          <dt className="text-[14px] font-semibold text-texto">Vas a poder</dt>
+          <dd>
+            <ul className="flex flex-col gap-1.5">
+              {habilitado.map((x) => (
+                <li key={x.id} className="flex items-baseline justify-between gap-3 text-[16px]">
+                  <span className="font-bold text-texto">{x.texto}</span>
+                  <span className="text-texto-suave">{x.nivel === 'solo_manda' ? 'Mandar por WhatsApp' : nombreNivel(x.nivel)}</span>
+                </li>
+              ))}
+            </ul>
+          </dd>
         </div>
       </dl>
       {fallo && <TarjetaWhatsApp tipo="error" pie={fallo} />}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Rol, Seccion } from '@/features/empresa/secciones'
+import type { Niveles, Rol } from '@/features/empresa/secciones'
 import { supabase } from '@/lib/supabase/client'
 import { formatearCelularAR } from '@/lib/telefono'
 
@@ -11,7 +11,8 @@ export type Persona = {
   /** E.164 sin «+» (549…). */
   celular: string
   rol: string
-  secciones: Seccion[] | null
+  /** El nivel en cada sección (null = el dueño, todo). */
+  niveles: Niveles | null
   desde: string
   venceAt: string | null
   token: string | null
@@ -31,7 +32,7 @@ export function usePersonas(activo: boolean) {
         nombre: p.nombre ?? 'Sin nombre',
         celular: p.celular.replace(/\D/g, ''),
         rol: p.rol,
-        secciones: (p.secciones as Seccion[] | null) ?? null,
+        niveles: (p.niveles as Niveles | null) ?? null,
         desde: p.desde,
         venceAt: p.vence_at,
         token: p.token,
@@ -44,8 +45,8 @@ export function usePersonas(activo: boolean) {
 export function useInvitar() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (x: { nombre: string; celular: string; rol: Rol; secciones: Seccion[] }) => {
-      const { data, error } = await supabase.rpc('crear_invitacion', { p_celular: x.celular, p_nombre: x.nombre, p_rol: x.rol, p_secciones: x.secciones })
+    mutationFn: async (x: { nombre: string; celular: string; rol: Rol; niveles: Niveles }) => {
+      const { data, error } = await supabase.rpc('crear_invitacion', { p_celular: x.celular, p_nombre: x.nombre, p_rol: x.rol, p_niveles: x.niveles })
       if (error) throw error
       return data
     },
@@ -53,11 +54,11 @@ export function useInvitar() {
   })
 }
 
-export function useCambiarSecciones() {
+export function useCambiarNiveles() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (x: { userId: string; secciones: Seccion[] }) => {
-      const { error } = await supabase.rpc('cambiar_secciones', { p_user: x.userId, p_secciones: x.secciones })
+    mutationFn: async (x: { userId: string; niveles: Niveles }) => {
+      const { error } = await supabase.rpc('cambiar_niveles', { p_user: x.userId, p_niveles: x.niveles })
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['personas'] }),
