@@ -24,7 +24,7 @@ export function CambieDeNumeroPage() {
   const navigate = useNavigate()
   return (
     <AccesoLayout
-      tituloCompu="Tu campo no se pierde."
+      tituloCompu="Cambió el número, no tu campo."
       tituloCelu="¿Cambiaste de número?"
       encabezado={{
         titulo: '¿Cambiaste de número?',

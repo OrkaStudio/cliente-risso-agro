@@ -72,7 +72,7 @@ export function CambiarNumeroPage() {
 
   if (paso === 'listo' && e164) {
     return (
-      <AccesoLayout tituloCompu="Tu campo no se pierde." tituloCelu="Número cambiado.">
+      <AccesoLayout tituloCompu="Cambió el número, no tu campo." tituloCelu="Número cambiado.">
         <div className="flex flex-col gap-2 rounded-[18px] bg-estado-bien-suave px-[18px] py-4" role="status">
           <p className="text-[14.5px] font-semibold text-estado-bien-texto">Listo, ya entrás con el número nuevo</p>
           <p className="text-[13.5px] text-estado-bien-texto">
@@ -89,7 +89,7 @@ export function CambiarNumeroPage() {
 
   return (
     <AccesoLayout
-      tituloCompu="Tu campo no se pierde."
+      tituloCompu="Cambió el número, no tu campo."
       tituloCelu="Cambiar mi número."
       encabezado={{
         titulo: 'Cambiar mi número',

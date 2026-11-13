@@ -60,24 +60,25 @@ export function AccesoLayout({
     }
   }, [])
   return (
-    <div ref={raiz} className={cn('relative isolate flex h-full flex-col overflow-y-auto md:flex-row md:overflow-hidden', !enFondo && 'bg-terracota-800')}>
+    <div ref={raiz} className={cn('sin-barra relative isolate flex h-full flex-col overflow-y-auto md:flex-row md:overflow-hidden', !enFondo && 'bg-terracota-800')}>
       {/* Fuera de <FondoAcceso> (cambiar el número, ya adentro) la pantalla pone su propia foto. */}
       {!enFondo && <FotoDeFondo src={src} />}
 
       {/* Arriba el sello de la marca, solo. La frase va lejos de él (Lau 13/11: pegados competían):
           en el celular, justo sobre la tarjeta; en la compu, abajo a la izquierda. */}
-      <div className="flex shrink-0 flex-col items-start px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:flex-1 md:justify-between md:px-14 md:pt-12 md:pb-16">
-        {/* Dentro del fondo el sello real es el de <FondoAcceso>, que no se mueve al navegar: acá sólo guarda su lugar. */}
-        {enFondo ? <span aria-hidden className="invisible"><Sello /></span> : <Sello />}
-        <h1 className="titulo-display hidden max-w-[640px] text-[clamp(56px,5.4vw,76px)] leading-[0.96] tracking-[-0.04em] text-superficie md:block">{tituloCompu}</h1>
+      <div className={cn('flex shrink-0 flex-col items-start px-6 md:flex-1 md:justify-between md:px-14 md:pt-12 md:pb-16', !enFondo && 'pt-[max(24px,calc(env(safe-area-inset-top)+16px))]')}>
+        {/* Dentro del fondo el sello real es el de <FondoAcceso>, que no se mueve al navegar: acá sólo guarda su lugar (en la compu). */}
+        {enFondo ? <span aria-hidden className="invisible hidden md:inline-flex"><Sello /></span> : <Sello />}
+        {/* En dos renglones anchos, no tres apretados (Lau 13/11). */}
+        <h1 className="titulo-display hidden max-w-[min(820px,100%)] text-[clamp(48px,4.4vw,64px)] leading-[1] tracking-[-0.035em] text-pretty text-superficie md:block">{tituloCompu}</h1>
       </div>
 
       {/* El formulario: una tarjeta sobre la foto; abajo en el celular, un panel a la derecha en la compu. */}
-      <div className="mt-auto flex w-full flex-col px-3 pt-16 pb-[max(12px,env(safe-area-inset-bottom))] md:mt-0 md:w-[min(560px,46%)] md:flex-none md:justify-center md:py-6 md:pr-6 md:pl-0">
+      <div className="mt-auto flex w-full flex-col px-3 pt-10 pb-[max(12px,env(safe-area-inset-bottom))] md:mt-0 md:w-[min(560px,46%)] md:flex-none md:justify-center md:py-6 md:pr-6 md:pl-0 bajo:py-4">
         <h1 className="titulo-display mx-auto mb-5 w-full max-w-[444px] px-3 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:hidden">{tituloCompu}</h1>
         {/* La tarjeta tiene el alto de lo que lleva: nunca vacía ni apretada. */}
-        <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] md:flex md:max-h-full md:max-w-none md:flex-col md:overflow-y-auto md:rounded-[32px] md:px-10 md:py-11">
-          <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:my-auto md:gap-[22px]">
+        <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] sin-barra md:flex md:max-h-full md:max-w-none md:flex-col md:overflow-y-auto md:rounded-[32px] md:px-10 md:py-8 bajo:py-5">
+          <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:my-auto bajo:gap-3">
             {/* En el celular, el título y la bajada arriba del formulario (B1, M2). */}
             {(tituloHoja || encabezado?.bajada) && (
               <div className="flex flex-col gap-1 md:hidden">
@@ -86,12 +87,12 @@ export function AccesoLayout({
               </div>
             )}
             {encabezado && (
-              <div className="hidden flex-col gap-2.5 pb-1.5 md:flex">
-                <h2 className="t-pagina text-texto">
+              <div className="hidden flex-col gap-1.5 md:flex">
+                <h2 className="t-pagina text-texto bajo:!text-[34px]">
                   {encabezado.titulo}
                 </h2>
                 {encabezado.bajada && (
-                  <p className="text-[16.5px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>
+                  <p className="text-[16px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>
                 )}
               </div>
             )}

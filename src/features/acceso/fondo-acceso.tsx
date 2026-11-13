@@ -13,16 +13,17 @@ export function FondoAcceso() {
   const outlet = useOutlet()
   return (
     <DentroDelFondo.Provider value>
-      <div className="relative isolate h-full bg-terracota-800">
+      <div className="relative isolate flex h-full flex-col bg-terracota-800">
         <FotoDeFondo />
-        {/* El sello, quieto en su lugar; el contenido pasa por encima al deslizar. */}
-        <div className="pointer-events-none absolute top-[max(24px,calc(env(safe-area-inset-top)+16px))] left-6 md:top-12 md:left-14">
+        {/* El sello acompaña todo el recorrido y manda sobre el título (Lau 13/11): en el celular es el
+            encabezado y el contenido se desliza debajo de él; en la compu, arriba a la izquierda. */}
+        <header className="relative z-20 shrink-0 px-6 pt-[max(20px,calc(env(safe-area-inset-top)+12px))] pb-3 md:pointer-events-none md:absolute md:top-12 md:left-14 md:p-0">
           <Sello />
-        </div>
+        </header>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={pathname}
-            className="relative z-10 h-full"
+            className="relative z-10 min-h-0 flex-1 [mask-image:linear-gradient(180deg,transparent,#000_20px)] md:h-full md:[mask-image:none]"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0, transition: { duration: 0.26, ease: [0.16, 1, 0.3, 1] } }}
             exit={{ opacity: 0, transition: { duration: 0.14, ease: 'easeOut' } }}

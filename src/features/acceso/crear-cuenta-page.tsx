@@ -77,7 +77,7 @@ export function CrearCuentaPage() {
       tituloCelu="En un minuto arrancás."
       encabezado={{
         titulo: 'Creá tu cuenta',
-        bajada: 'Sin contraseñas: entrás con un código que te llega por WhatsApp.',
+        bajada: 'Sin contraseñas: te llega un código por WhatsApp.',
       }}
     >
       <form

@@ -68,6 +68,8 @@
 }
 
 @custom-variant dark (&:is(.dark *));
+/* Compu con poca altura (notebooks de 720–840 px): el acceso se compacta para no tener que deslizar. */
+@custom-variant bajo (@media (min-width: 48rem) and (max-height: 840px));
 
 @theme inline {
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -1021,3 +1023,7 @@
 @keyframes foto-llega { from { transform: scale(1.09); } to { transform: scale(1); } }
 .foto-llega { animation: foto-llega 14s cubic-bezier(.16, 1, .3, 1) both; }
 @media (prefers-reduced-motion: reduce) { .foto-llega { animation: none; } }
+
+/* Se puede deslizar, pero sin barra a la vista (Lau 13/11, acceso). */
+.sin-barra { scrollbar-width: none; }
+.sin-barra::-webkit-scrollbar { display: none; }
