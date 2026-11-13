@@ -149,8 +149,8 @@ function Codigo({ envio, onEnvio }: { envio: Envio; onEnvio: (e: Envio) => void 
       >
         <div className="flex flex-col gap-[7px] md:gap-2">
           <label htmlFor="codigo" className="text-[14px] font-semibold text-texto md:text-[14.5px]">
-            <span className="md:hidden">El código que te mandamos al {numero}</span>
-            <span className="hidden md:inline">El código</span>
+            {/* El número ya está en la bajada: acá no se repite (Lau 13/11). */}
+            El código
           </label>
           <CampoCodigo
             ref={campo}
