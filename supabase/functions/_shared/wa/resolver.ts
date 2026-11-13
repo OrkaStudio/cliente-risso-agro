@@ -64,6 +64,7 @@ export function resolverPotrero(
   mencion: string | null | undefined,
   campos: Campo[],
   campoId?: string | null,
+  soloExacto = false,
 ): Resultado<PotreroDe> {
   const m = compacto(mencion ?? '')
   if (!m) return { ninguno: true }
@@ -75,7 +76,7 @@ export function resolverPotrero(
   if (exactos.length === 1) return { ok: exactos[0] }
   if (exactos.length > 1) return { varios: exactos }
 
-  if (/^\d+$/.test(m)) {
+  if (!soloExacto && /^\d+$/.test(m)) {
     const porNumero = todos.filter((x) => (compacto(x.potrero.nombre).match(/^\d+/)?.[0] ?? '') === m)
     if (porNumero.length === 1) return { ok: porNumero[0] }
     if (porNumero.length > 1) return { varios: porNumero }

@@ -99,8 +99,8 @@ describe('conversación', () => {
     const p = siguientePaso('c1', { tipo: 'lluvia', mm: 22 }, ctxUnCampo)
     expect(p.k).toBe('proponer')
     if (p.k !== 'proponer') return
-    expect(p.mensaje.texto).toBe('Anoto *22 mm en Toimil*, hoy.')
-    expect(p.mensaje.botones?.map((b) => b.titulo)).toEqual(['Sí', 'Corregir', 'Cancelar'])
+    expect(p.mensaje.texto).toBe('Tengo *22 mm en Toimil*, hoy. ¿Los guardo?')
+    expect(p.mensaje.botones?.map((b) => b.titulo)).toEqual(['Guardar lluvia', 'Corregir', 'Cancelar'])
   })
   it('potrero ambiguo: pregunta entre los candidatos', () => {
     const p = siguientePaso('c2', { tipo: 'consulta_dias_potrero', potreroMencion: '5' }, ctx)
@@ -116,7 +116,7 @@ describe('conversación', () => {
   it('gasto completo: propone con los datos resueltos', () => {
     const p = siguientePaso('c3', { tipo: 'gasto', monto: 184500, campoId: 'to', categoriaId: 'comb', contraparte: 'Estación Ruta 3' }, ctx)
     expect(p.k === 'proponer' && p.mensaje.texto).toBe(
-      'Anoto un *gasto de $184.500* a Estación Ruta 3\nCombustible · Toimil · pagado hoy',
+      '¿Guardo este *gasto de $184.500* a Estación Ruta 3?\nCombustible · Toimil · pagado hoy',
     )
   })
   it('una fecha futura requiere corrección y conserva el dato original', () => {

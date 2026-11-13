@@ -36,7 +36,8 @@ create table observacion_potrero (
 );
 
 create type estado_animal as enum ('activo','vendido','muerto','baja');
-create table animal (id uuid primary key default gen_random_uuid(), empresa_id uuid not null references empresa(id), potrero_id uuid references potrero(id), estado estado_animal not null default 'activo');
+create type categoria_animal as enum ('vaca','vaquillona','novillo','ternero','ternera','toro','capon','oveja');
+create table animal (id uuid primary key default gen_random_uuid(), empresa_id uuid not null references empresa(id), potrero_id uuid references potrero(id), estado estado_animal not null default 'activo', categoria categoria_animal not null default 'vaca');
 create view v_stock_potrero with (security_invoker = true) as
   select empresa_id, potrero_id, count(*)::integer as cabezas from animal a where estado = 'activo' and potrero_id is not null group by empresa_id, potrero_id;
 

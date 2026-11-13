@@ -3,12 +3,13 @@
 
 import { esFecha, sumarDias } from './texto.ts'
 import {
-  AGUA, ELECTRICO, INTENTS, PASTO,
-  type Borrador, type Contexto, type Interpretacion, type ObsInterpretada,
+  AGUA, CATEGORIAS_MORTANDAD, ELECTRICO, INTENTS, PASTO,
+  type Borrador, type Contexto, type GrupoMortandad, type Interpretacion, type ObsInterpretada, type PedidoInterpretado, type ReporteMortandad,
 } from './tipos.ts'
 
 export const MAX_TEXTO = 12000
 export const MAX_OBSERVACIONES = 60
+export const MAX_PEDIDOS = 8
 export class EntradaIncompleta extends Error {}
 
 export const HERRAMIENTA = {
@@ -19,12 +20,34 @@ export const HERRAMIENTA = {
     properties: {
       intent: { type: 'string', enum: [...INTENTS] },
       otros_registros: { type: 'array', items: { type: 'string' }, description: 'Otros tipos de REGISTRO presentes además del intent elegido: lluvia, gasto, novedad, hacienda. Vacío si hay uno solo; no omitir operaciones mezcladas.' },
+      mortandad: {
+        type: ['object', 'null'],
+        description: 'Animales muertos mencionados como hechos. Completar también si el intent principal es lluvia. Null si no los menciona.',
+        properties: {
+          campo: { type: ['string', 'null'], description: 'Campo que mencionó para este hecho.' },
+          potrero: { type: ['string', 'null'], description: 'Potrero donde dice que murieron. Copiá el nombre textual, incluso si no figura. Null si no lo vinculó claramente con la muerte.' },
+          detalle: { type: ['string', 'null'], description: 'Otra novedad vinculada, como una inundación, sin repetir el conteo ni atribuir una causa que no dijo.' },
+          grupos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                categoria: { type: 'string', enum: [...CATEGORIAS_MORTANDAD] },
+                cantidad: { type: 'integer', minimum: 1 },
+              },
+              required: ['categoria', 'cantidad'],
+            },
+          },
+        },
+        required: ['campo', 'potrero', 'detalle', 'grupos'],
+      },
       campo: { type: ['string', 'null'], description: 'El campo tal como lo nombró, o null.' },
       potrero: { type: ['string', 'null'], description: 'El potrero tal como lo nombró ("5", "5B"), o null.' },
       mm: { type: ['number', 'null'] },
       fecha: { type: ['string', 'null'], description: 'YYYY-MM-DD, sólo si dijo cuándo.' },
       monto: { type: ['number', 'null'], description: 'En pesos. "80 mil" = 80000.' },
-      categoria: { type: ['string', 'null'], description: 'Una de las categorías de la lista, o null.' },
+      categoria: { type: ['string', 'null'], description: 'Una de las categorías de gastos de la lista, o null.' },
+      categoria_animal: { type: ['string', 'null'], enum: [...CATEGORIAS_MORTANDAD, null], description: 'Categoría animal que pregunta en consulta_hacienda. Ejemplo: oveja si pide cuántas ovejas. Null para todo el rodeo.' },
       contraparte: { type: ['string', 'null'], description: 'A quién le pagó, si lo dijo.' },
       descripcion: { type: ['string', 'null'], description: 'Qué fue, en pocas palabras.' },
       periodo: { type: ['string', 'null'], enum: ['semana', 'mes', 'anio', null] },
@@ -60,6 +83,44 @@ export const HERRAMIENTA = {
   },
 } as const
 
+export const HERRAMIENTA_TURNO = {
+  name: HERRAMIENTA.name,
+  description: 'Identificá todos los pedidos del mensaje, aunque sean distintos o repitan un tipo.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      pedidos: {
+        type: 'array', minItems: 1, maxItems: MAX_PEDIDOS,
+        items: {
+          ...HERRAMIENTA.input_schema,
+          properties: {
+            ...HERRAMIENTA.input_schema.properties,
+            fragmento: { type: 'string', description: 'Parte textual del mensaje que respalda este pedido, copiada literalmente.' },
+          },
+          required: ['intent', 'fragmento'],
+        },
+      },
+    },
+    required: ['pedidos'],
+  },
+}
+
+export function limpiarPedidos(raw: unknown, textoOriginal: string): PedidoInterpretado[] {
+  const o = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+  // Acepta el contrato anterior durante la transición y para respuestas simples.
+  if (!('pedidos' in o)) return [{ fragmento: textoOriginal, interpretacion: limpiarInterpretacion(raw) }]
+  if (!Array.isArray(o.pedidos) || !o.pedidos.length || o.pedidos.length > MAX_PEDIDOS) {
+    throw new EntradaIncompleta('No pude separar todos los pedidos. Mandame el mensaje en partes más cortas.')
+  }
+  return o.pedidos.map((pedido) => {
+    const fragmento = typeof pedido?.fragmento === 'string' ? pedido.fragmento.trim() : ''
+    if (!fragmento || !textoOriginal.includes(fragmento)) {
+      throw new EntradaIncompleta('No pude relacionar todos los pedidos con tu mensaje. ¿Me lo repetís en partes más cortas?')
+    }
+    return { fragmento, interpretacion: limpiarInterpretacion(pedido) }
+  })
+}
+
 export function promptInterpretar(texto: string, ctx: Contexto, anterior?: Borrador): string {
   if (texto.length > MAX_TEXTO) throw new EntradaIncompleta('El mensaje es demasiado largo para revisarlo completo. Mandalo en dos partes; no guardé una carga parcial. Tu pendiente anterior se conserva.')
   const campos = ctx.campos
@@ -67,8 +128,8 @@ export function promptInterpretar(texto: string, ctx: Contexto, anterior?: Borra
     .join('\n')
   const cats = ctx.categoriasGasto.map((c) => c.nombre).join(' · ')
   const correccion = anterior
-    ? `\nEste mensaje CORRIGE una carga que el bot le propuso: ${JSON.stringify(anterior)}\n` +
-      'Devolvé el mismo intent y sólo los datos que el productor cambia; el resto en null.\n'
+    ? `\nEl bot le propuso esta carga: ${JSON.stringify(anterior)}\n` +
+      'Si el productor la corrige, devolvé el mismo intent y sólo los datos que cambia; el resto en null. Si hace una consulta, devolvé el intent de la consulta y sus propios datos.\n'
     : ''
   return `Sos el intérprete de un bot de WhatsApp para productores ganaderos argentinos. Leés UN mensaje del productor y llamás a la herramienta con lo que quiso decir. No le respondés al productor.
 
@@ -84,7 +145,7 @@ intent:
 - "novedad": cuenta lo que vio recorriendo uno o más potreros: agua, pasto, eléctrico, animales contados, faltantes, muertos o enfermos, roturas (molino, aguada, bebedero, alambrado, tranquera). Una vaca muerta encontrada es novedad.
 - "gasto": informa un gasto con monto.
 - "consulta_hacienda": pregunta cuántos animales hay.
-- "consulta_lluvia": pregunta cuánto llovió.
+- "consulta_lluvia": pregunta cuánto llovió. Conservá el potrero si lo nombra. Para semana pasada o esta semana, poné periodo "semana" y fecha null. Si pide dos períodos, devolvé dos pedidos de lluvia con fragmentos distintos y conservá el alcance explícito que comparten.
 - "consulta_vencimientos": pregunta qué vence o qué tiene que pagar o cobrar.
 - "consulta_dias_potrero": pregunta hace cuánto o desde cuándo están los animales en un potrero.
 - "consulta_recorrida": pide el resumen de la recorrida de hoy o qué potreros faltan recorrer.
@@ -100,6 +161,7 @@ intent:
 
 Reglas: null para todo lo que el mensaje no dice. No completes el campo ni el potrero si no los nombró. No conviertas un número de potrero en mm ni en monto.
 Si combina tipos de registro (por ejemplo lluvia y gasto), completá otros_registros con los tipos adicionales. No omitas la segunda operación ni confundas una pregunta con un registro.
+Si combina lluvia y animales muertos, elegí intent "lluvia", incluí "novedad" en otros_registros y detallá cada categoría y cantidad explícita en mortandad. Si hubo muertes en distintos potreros o faltan datos para agruparlas, devolvé mortandad como null. No supongas que una inundación causó las muertes.
 Si nombra uno de los campos de la lista, va en campo aunque venga con "para", "de" o "del campo" ("gasoil para Don Gilberto", "para el campo Toimil"); no lo pongas como contraparte.
 En novedad, una observación por potrero; si dice el campo una vez, ponelo en cada una.
 Una observación con un potrero que no figura en la lista sigue siendo "novedad": devolvé el nombre que dijo. El código comprueba si existe; no la conviertas en "otro" por ese motivo.
@@ -146,16 +208,36 @@ export function limpiarInterpretacion(raw: unknown): Interpretacion {
     ...(o.fecha != null && !esFecha(o.fecha) ? { fechaInvalida: true } : {}),
     monto: numero(o.monto),
     categoria: texto(o.categoria),
+    categoriaAnimal: deLista(CATEGORIAS_MORTANDAD, o.categoria_animal),
     contraparte: texto(o.contraparte),
     descripcion: texto(o.descripcion),
     periodo,
     observaciones: intent === 'novedad' ? limpiarObservaciones(o.observaciones) : [],
+    mortandad: limpiarMortandad(o.mortandad),
     otrosRegistros: Array.isArray(o.otros_registros) ? [...new Set(o.otros_registros.filter((v): v is string => typeof v === 'string' && ['lluvia', 'gasto', 'novedad', 'hacienda'].includes(v) && v !== intent))] : [],
   }
 }
 
 const deLista = <T extends string>(lista: readonly T[], v: unknown): T | null =>
   lista.includes(v as T) ? (v as T) : null
+
+function limpiarMortandad(raw: unknown): ReporteMortandad | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  if (!Array.isArray(o.grupos) || !o.grupos.length || o.grupos.length > CATEGORIAS_MORTANDAD.length) return null
+  const grupos = new Map<GrupoMortandad['categoria'], number>()
+  for (const item of o.grupos) {
+    if (!item || typeof item !== 'object') return null
+    const categoria = deLista(CATEGORIAS_MORTANDAD, item.categoria)
+    const cantidad = numero(item.cantidad)
+    if (!categoria || cantidad === null || !Number.isSafeInteger(cantidad) || cantidad < 1 || grupos.has(categoria)) return null
+    grupos.set(categoria, cantidad)
+  }
+  return {
+    campo: texto(o.campo), potrero: texto(o.potrero), detalle: texto(o.detalle),
+    grupos: [...grupos].map(([categoria, cantidad]) => ({ categoria, cantidad })),
+  }
+}
 
 /** Un límite debe ser explícito: nunca devolver sólo un prefijo de la recorrida. */
 function limpiarObservaciones(raw: unknown): ObsInterpretada[] {
