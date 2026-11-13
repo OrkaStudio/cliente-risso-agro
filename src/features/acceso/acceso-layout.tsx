@@ -6,10 +6,10 @@ import fotoCampo from '@/assets/tropero/campo-aereo.webp'
 // Marco de las pantallas de Acceso (página 35, sección Acceso).
 // Compu (≥ md): foto a la izquierda (760 de 1440) con el título grande abajo y
 // el formulario de 420 centrado a la derecha.
-// Celular (Lau 13/11): la foto del campo cubre toda la pantalla, quieta detrás, y
-// la frase con el formulario van juntos, centrados, en una tarjeta. En cualquier
-// alto lo que sobra es campo alrededor del bloque, nunca un hueco en blanco; si
-// el formulario es largo, el bloque se desliza sobre la foto.
+// Celular (Lau 13/11): un afiche sobre la foto del campo, que cubre toda la
+// pantalla: arriba la cabeza (logo y frase), en el medio la foto y abajo la
+// tarjeta del formulario. Si el formulario es largo, se desliza sobre la foto.
+// Compu: la foto se funde con el crema del formulario en vez de cortarse.
 
 const FOTOS = { campo: fotoCampo } as const
 
@@ -58,25 +58,26 @@ export function AccesoLayout({
       {/* Celular: la foto cubre toda la pantalla y queda quieta detrás; lo que sobra es campo, no blanco. */}
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden md:hidden">
         <img src={src} alt="" className="foto-llega size-full object-cover" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.55)_0%,rgba(19,27,22,0.2)_35%,rgba(19,27,22,0.35)_65%,rgba(19,27,22,0.75)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.72)_0%,rgba(19,27,22,0.15)_38%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.6)_100%)]" />
       </div>
 
       {/* Compu: la foto a la izquierda, con el título grande abajo. Mientras carga, terracota oscuro (M5). */}
-      <div className="relative hidden h-full w-[52.8%] flex-none flex-col overflow-hidden bg-terracota-800 md:flex">
+      <div className="relative hidden h-full w-[52.8%] flex-none flex-col overflow-hidden bg-terracota-800 [mask-image:linear-gradient(90deg,#000_76%,transparent)] md:flex">
         <img src={src} alt="" className="foto-llega absolute inset-0 size-full object-cover" />
-        <div aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.5)_0%,rgba(19,27,22,0)_30%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.9)_100%)]" />
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_70%_30%_at_0%_0%,rgba(19,27,22,0.55),transparent),radial-gradient(ellipse_90%_55%_at_0%_100%,rgba(19,27,22,0.85),transparent)]" />
         <div className="relative px-14 pt-[52px]">
           <Logo tono="hueso" alto={34} />
         </div>
-        <h1 className="titulo-display relative mt-auto w-full max-w-[724px] px-[52px] pb-[110px] text-[76px] leading-[0.96] tracking-[-0.04em] text-superficie">{tituloCompu}</h1>
+        <h1 className="titulo-display relative mt-auto w-full max-w-[640px] px-[52px] pb-[110px] text-[76px] leading-[0.96] tracking-[-0.04em] text-superficie">{tituloCompu}</h1>
       </div>
 
-      {/* Celular: el logo arriba y, centrados como un solo bloque, la frase y el formulario. */}
-      <div className="shrink-0 px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:hidden">
-        <Logo tono="hueso" alto={26} />
+      {/* Celular, como un afiche (Lau 13/11): arriba la cabeza (el logo y la frase), en el medio el
+          campo de la foto y abajo, donde llega el pulgar, la tarjeta del formulario. */}
+      <div className="flex shrink-0 flex-col items-start gap-6 px-6 pt-[max(28px,calc(env(safe-area-inset-top)+20px))] md:hidden">
+        <Logo tono="hueso" alto={32} />
+        <h1 className="titulo-display max-w-[400px] text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie">{tituloCompu}</h1>
       </div>
-      <div className="my-auto flex w-full flex-col gap-5 px-3 pt-8 pb-[max(12px,env(safe-area-inset-bottom))] md:contents">
-        <h1 className="titulo-display mx-auto w-full max-w-[444px] px-3 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:hidden">{tituloCompu}</h1>
+      <div className="mt-auto flex w-full flex-col px-3 pt-10 pb-[max(12px,env(safe-area-inset-bottom))] md:contents">
 
         {/* Formulario: una tarjeta sobre la foto en el celular, columna a la derecha en la compu */}
         <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] md:m-0 md:flex md:max-w-none md:flex-1 md:items-center md:justify-center md:overflow-y-auto md:rounded-none md:px-10 md:py-12 md:shadow-none">
