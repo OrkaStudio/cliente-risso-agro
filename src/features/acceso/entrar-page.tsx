@@ -60,6 +60,7 @@ export function EntrarPage() {
     <AccesoLayout
       tituloCompu="Tu campo, donde lo dejaste."
       tituloCelu="Entrá con tu celular."
+      pie={<Legales sobreFoto />}
       encabezado={{ titulo: 'Entrá a tu campo', bajada: 'Tus animales, tus potreros y tu plata.' }}
     >
       <form
@@ -120,7 +121,6 @@ export function EntrarPage() {
           },
         ]}
       />
-      <Legales />
       {estado === 'sin-cuenta' && e164 && (
         <p className="sr-only" role="status">
           {formatearCelularAR(e164)} no tiene cuenta.

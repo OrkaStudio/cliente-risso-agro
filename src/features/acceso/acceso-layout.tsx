@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Logo } from '@/components/tropero/logo'
+import { cn } from '@/lib/utils'
 // Foto aérea del Figma (nodo 217:40587): caminos de tierra, la aguada y la hacienda.
 import fotoCampo from '@/assets/tropero/campo-aereo.webp'
 
@@ -18,6 +19,7 @@ export function AccesoLayout({
   tituloCompu,
   tituloCelu,
   encabezado,
+  pie,
   children,
 }: {
   foto?: keyof typeof FOTOS
@@ -27,6 +29,8 @@ export function AccesoLayout({
   tituloCelu: string
   /** Título y bajada del formulario (sólo en la compu, como en la 35). */
   encabezado?: { titulo: string; bajada?: React.ReactNode }
+  /** Lo que va debajo de la tarjeta, sobre la foto (los links legales del login). */
+  pie?: React.ReactNode
   children: React.ReactNode
 }) {
   const src = FOTOS[foto]
@@ -57,22 +61,22 @@ export function AccesoLayout({
     <div ref={raiz} className="relative isolate flex h-full flex-col overflow-y-auto bg-terracota-800 md:flex-row md:overflow-hidden">
       {/* La foto del campo cubre toda la pantalla y queda quieta detrás. Mientras carga, terracota oscuro (M5). */}
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <img src={src} alt="" className="foto-llega size-full object-cover" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.72)_0%,rgba(19,27,22,0.15)_38%,rgba(19,27,22,0.1)_60%,rgba(19,27,22,0.6)_100%)] md:bg-[radial-gradient(ellipse_60%_30%_at_0%_0%,rgba(19,27,22,0.45),transparent),radial-gradient(ellipse_75%_60%_at_0%_100%,rgba(19,27,22,0.8),transparent)]" />
+        <img src={src} alt="" className="foto-llega absolute -top-[20%] h-[120%] w-full object-cover md:top-0 md:left-[-20%] md:h-full md:w-[120%] md:max-w-none" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.3)_0%,rgba(19,27,22,0.05)_28%,rgba(19,27,22,0.5)_62%,rgba(19,27,22,0.72)_100%)] md:bg-[radial-gradient(ellipse_75%_60%_at_0%_100%,rgba(19,27,22,0.9),transparent)]" />
       </div>
 
-      {/* La cabeza: el sello de la marca y la frase. En el celular arriba; en la compu, el sello
-          arriba y la frase abajo, a la izquierda del formulario. */}
-      <div className="flex shrink-0 flex-col items-start gap-6 px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:flex-1 md:justify-between md:px-14 md:pt-12 md:pb-16">
+      {/* Arriba el sello de la marca, solo. La frase va lejos de él (Lau 13/11: pegados competían):
+          en el celular, justo sobre la tarjeta; en la compu, abajo a la izquierda. */}
+      <div className="flex shrink-0 flex-col items-start px-6 pt-[max(24px,calc(env(safe-area-inset-top)+16px))] md:flex-1 md:justify-between md:px-14 md:pt-12 md:pb-16">
         <Sello />
-        <h1 className="titulo-display max-w-[400px] text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:max-w-[640px] md:text-[clamp(56px,5.4vw,76px)] md:leading-[0.96] md:tracking-[-0.04em]">
-          {tituloCompu}
-        </h1>
+        <h1 className="titulo-display hidden max-w-[640px] text-[clamp(56px,5.4vw,76px)] leading-[0.96] tracking-[-0.04em] text-superficie md:block">{tituloCompu}</h1>
       </div>
 
       {/* El formulario: una tarjeta sobre la foto; abajo en el celular, un panel a la derecha en la compu. */}
-      <div className="mt-auto flex w-full flex-col px-3 pt-10 pb-[max(12px,env(safe-area-inset-bottom))] md:mt-0 md:w-[min(560px,46%)] md:flex-none md:p-4">
-        <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] md:flex md:h-full md:max-w-none md:flex-col md:overflow-y-auto md:rounded-[32px] md:px-10 md:py-12">
+      <div className="mt-auto flex w-full flex-col px-3 pt-16 pb-[max(12px,env(safe-area-inset-bottom))] md:mt-0 md:w-[min(560px,46%)] md:flex-none md:justify-center md:py-6 md:pr-6 md:pl-0">
+        <h1 className="titulo-display mx-auto mb-5 w-full max-w-[444px] px-3 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:hidden">{tituloCompu}</h1>
+        {/* La tarjeta tiene el alto de lo que lleva: nunca vacía ni apretada. */}
+        <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] md:flex md:max-h-full md:max-w-none md:flex-col md:overflow-y-auto md:rounded-[32px] md:px-10 md:py-11">
           <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:my-auto md:gap-[22px]">
             {/* En el celular, el título y la bajada arriba del formulario (B1, M2). */}
             {(tituloHoja || encabezado?.bajada) && (
@@ -92,8 +96,10 @@ export function AccesoLayout({
               </div>
             )}
             {children}
+          {pie && <div className="hidden md:block">{pie}</div>}
           </div>
         </main>
+        {pie && <div className="mx-auto mt-3 w-full max-w-[444px] md:hidden">{pie}</div>}
       </div>
     </div>
   )
@@ -163,14 +169,17 @@ export function TarjetaWhatsApp({
     )
   }
   // Una sola línea, en celu y en compu (Lau 12/11: el ejemplo del mensaje era mucho texto).
-  return <p className="text-[14px] text-texto-suave">Te llega un código por WhatsApp. Sin contraseñas.</p>
+  return <p className="text-[14px] text-texto-suave">Te llega un código por WhatsApp.</p>
 }
 
 /** Términos y privacidad en letra chica (QA 10/11, A6). En registro e invitación, con «Al seguir aceptás…». */
-export function Legales({ aceptas = false }: { aceptas?: boolean }) {
-  const link = 'underline decoration-borde underline-offset-2 hover:text-principal'
+export function Legales({ aceptas = false, sobreFoto = false }: { aceptas?: boolean; sobreFoto?: boolean }) {
+  // Sobre la foto sólo en el celular; en la compu el pie va adentro del panel, con los colores de siempre.
+  const link = sobreFoto
+    ? 'underline decoration-superficie/40 underline-offset-2 hover:text-superficie md:decoration-borde md:hover:text-principal'
+    : 'underline decoration-borde underline-offset-2 hover:text-principal'
   return (
-    <p className="-mt-2 text-center text-[12px] leading-snug text-texto-suave">
+    <p className={cn('text-center text-[12px] leading-snug', sobreFoto ? 'text-superficie/80 md:text-texto-suave' : '-mt-2 text-texto-suave')}>
       {aceptas && 'Al seguir aceptás los '}
       <a href="/terminos" target="_blank" rel="noreferrer" className={link}>
         Términos

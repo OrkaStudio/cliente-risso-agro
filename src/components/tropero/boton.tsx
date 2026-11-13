@@ -62,7 +62,7 @@ export function BotonPrincipal({
         BASE,
         "group/principal w-full justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-left text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600",
         // Apagado (no cargando): gris de la marca, que se distingue hasta en blanco y negro (QA 10/11, B3).
-        "disabled:opacity-100 [&:disabled:not([aria-busy])]:opacity-45",
+        "disabled:opacity-100 [&:disabled:not([aria-busy])]:opacity-60",
         className,
       )}
       aria-busy={cargando || undefined}
