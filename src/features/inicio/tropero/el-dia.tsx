@@ -14,7 +14,8 @@ import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
-import { puedeCargar, puedeVer, veePlata } from '@/features/empresa/secciones'
+import { nivelDe, puedeCargar, puedeVer, veePlata } from '@/features/empresa/secciones'
+import { LoQueMandaste } from './lo-que-mandaste'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
@@ -67,6 +68,8 @@ export function ElDia() {
   // no se muestra: un «Nunca se recorrió» sobre datos que no puede leer sería falso.
   const veCampos = puedeVer(membresia, 'campos')
   const veHacienda = puedeVer(membresia, 'hacienda')
+  const mandaPlata = !!membresia && nivelDe(membresia, 'plata') === 'solo_manda'
+  const mandaCampos = !!membresia && nivelDe(membresia, 'campos') === 'solo_manda'
   const panorama = usePanoramaInicio()
   const atender = useParaAtender()
   const inicio = useCampoElegido()
@@ -98,7 +101,7 @@ export function ElDia() {
   return (
     <div className="mx-auto flex w-full ancho-pagina flex-col gap-5">
       <motion.div {...entra(0)}>
-        <Cabecera titulo={saludo(new Date().getHours(), nombre)} cosas={cosas} lluvia={chips.find((c) => c.key === 'lluvia') ?? null} campos={inicio.campos} elegido={inicio.elegido} />
+        <Cabecera veAlgo={veCampos || plata} titulo={saludo(new Date().getHours(), nombre)} cosas={cosas} lluvia={chips.find((c) => c.key === 'lluvia') ?? null} campos={inicio.campos} elegido={inicio.elegido} />
       </motion.div>
 
       {/* Una sola franja, cuatro celdas: se lee como un tablero, no como cuatro cajas. */}
@@ -112,6 +115,13 @@ export function ElDia() {
         <PulsoLluvia lugar={lugar?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
         {veCampos && <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} />}
       </motion.div>
+
+      {/* Quien sólo manda: cómo mandar y lo último que mandó (permisos, 14/11). */}
+      {(mandaPlata || mandaCampos) && (
+        <motion.div {...entra(2)}>
+          <LoQueMandaste plata={mandaPlata} campos={mandaCampos} />
+        </motion.div>
+      )}
 
       {(veCampos || plata) && (
         <motion.div {...entra(2)}>
@@ -155,6 +165,7 @@ function useIr() {
 
 
 function Cabecera({
+  veAlgo = true,
   titulo,
   cosas,
   lluvia,
@@ -166,6 +177,7 @@ function Cabecera({
   lluvia: Chip | null
   campos: CampoElegible[]
   elegido: CampoElegible | null
+  veAlgo?: boolean
 }) {
   const ir = useIr()
   return (
@@ -173,7 +185,8 @@ function Cabecera({
     <CabeceraSeccion imagen={tranquera} posicion="50% 42%" encima={<CampoVisto campos={campos} elegido={elegido} />}>
         <h1 className="t-pagina text-texto">{titulo}</h1>
         {/* Los avisos del día, en un botón con su número: se abren en un panelito, cada uno con su acción (Lau, 07/11). */}
-        <Avisos cosas={cosas} lluvia={lluvia} onIr={ir} />
+        {/* «Todo en orden» sólo lo puede decir quien ve el campo o la plata (permisos, 14/11). */}
+        {(veAlgo || lluvia) && <Avisos cosas={cosas} lluvia={lluvia} onIr={ir} />}
     </CabeceraSeccion>
   )
 }
