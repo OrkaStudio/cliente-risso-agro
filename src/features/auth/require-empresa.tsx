@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { WifiOff } from 'lucide-react'
+import { AccesoPorWhatsapp } from './acceso-por-whatsapp'
 import { leerMembresiaPersistida, useEmpresa, type Membresia } from '@/features/empresa/use-empresa'
 
 /**
@@ -27,6 +28,8 @@ export function RequireEmpresa() {
     // El dueño que dejó el onboarding por la mitad vuelve al paso donde quedó,
     // no a una app a medio cargar (regla de destino de Acceso).
     if (onboardingPendiente(membresia)) return <Navigate to="/onboarding" replace />
+    // Invitado «Sólo por WhatsApp»: lo suyo no está en la app (permisos, 14/11).
+    if (membresia.acceso === 'whatsapp') return <AccesoPorWhatsapp empresa={membresia.empresa?.nombre ?? null} />
     return <Outlet />
   }
 

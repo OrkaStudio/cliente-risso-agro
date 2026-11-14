@@ -139,7 +139,7 @@ function Personas({ empresa }: { empresa: string }) {
                     {p.nombre}
                     {p.soyYo && <span className="font-normal text-texto-suave"> (vos)</span>}
                   </p>
-                  <p className="truncate text-[14px] text-texto-suave">{[nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}</p>
+                  <p className="truncate text-[14px] text-texto-suave">{[nombreRol(p.rol), p.acceso === 'whatsapp' ? 'Por WhatsApp' : null, celularLindo(p.celular)].filter(Boolean).join(' · ')}</p>
                 </div>
               </div>
               {SECCIONES_CON_PERMISO.map((s) => {
@@ -181,7 +181,7 @@ function Personas({ empresa }: { empresa: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[16px] font-semibold text-texto">{p.nombre}</p>
                     <p className="truncate text-[14px] text-texto-suave">
-                      {nombreRol(p.rol)} · {resumenNiveles(p.niveles ?? {})}
+                      {nombreRol(p.rol)}{p.acceso === 'whatsapp' ? ' · por WhatsApp' : ''} · {resumenNiveles(p.niveles ?? {})}
                     </p>
                     <p className={cn('text-[14px] font-semibold', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
                       {vencida ? 'El link venció: cancelala e invitalo de nuevo' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}

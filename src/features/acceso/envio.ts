@@ -152,6 +152,8 @@ export type Invitacion = {
   usada: boolean
   /** Lo que le habilitó el dueño, sección por sección. */
   niveles: Niveles
+  /** «whatsapp»: la invitación es para usar Troppero sólo por WhatsApp. */
+  acceso: string
 }
 
 /** A4: lo que muestra el link de invitación (sin sesión). null si no existe. */
