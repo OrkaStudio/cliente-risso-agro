@@ -19,7 +19,7 @@ import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
 import { registrar } from '@/lib/telemetria'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
-import { puedeVer, veePlata } from '@/features/empresa/secciones'
+import { puedeCargar, puedeVer, seccionDeRuta as seccionDeRutaApp, veePlata } from '@/features/empresa/secciones'
 
 /**
  * El asistente de Troppero en toda la Oficina (Lau, 28–29/10). Cerrado es una
@@ -80,6 +80,15 @@ export function AsistentePanel() {
   const quien = useQuienMira()
   // Lo que ve quien pregunta: el asistente no sugiere ni contesta lo que no tiene habilitado.
   const ve = React.useMemo(() => ({ plata: veePlata(empresa.data), hacienda: puedeVer(empresa.data, 'hacienda'), campos: puedeVer(empresa.data, 'campos') }), [empresa.data])
+  // Las fichas de ayuda: sólo de lo que ve, y el botón sólo si lleva a algo que puede hacer.
+  const fichas = React.useMemo(
+    () =>
+      FICHAS.filter((f) => f.categoria === 'celular' || ve[f.categoria]).map((f) => {
+        const s = f.accion ? seccionDeRutaApp(f.accion.ruta) : null
+        return f.accion && s && !puedeCargar(empresa.data, s) ? { ...f, accion: undefined } : f
+      }),
+    [ve, empresa.data],
+  )
   const estado = useEstadoPuestaAPunto()
   const { data: campos } = useMapa(empresa.data?.empresa_id)
   const nombre = nombreDe(user?.user_metadata)
@@ -96,7 +105,7 @@ export function AsistentePanel() {
   // ===== La conversación =====
   // Se le escribe lo que sea. Arranca con lo que notó y ejemplos hechos con sus campos.
   const categoria = mapaPendiente ? 'campos' : seccion ? CATEGORIA_DE_SECCION[seccion] : 'hacienda'
-  const sugerencias = sugerenciasDe(campos ?? [], categoria, FICHAS, ve)
+  const sugerencias = sugerenciasDe(campos ?? [], categoria, fichas, ve)
   const [mensajes, setMensajes] = React.useState<Mensaje[]>([])
   const [borrador, setBorrador] = React.useState('')
   const [pensando, setPensando] = React.useState(false)
@@ -117,7 +126,7 @@ export function AsistentePanel() {
     setPensando(true)
     // Un instante pensando: la respuesta no aparece de golpe.
     setTimeout(() => {
-      const r = responderLocal(t, FICHAS, ve)
+      const r = responderLocal(t, fichas, ve)
       setMensajes((m) => [...m, { id: ++idMensaje.current, de: 'tropero', ...r }])
       setPensando(false)
     }, quieto ? 0 : 700)

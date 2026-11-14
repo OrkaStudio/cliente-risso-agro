@@ -183,6 +183,41 @@ begin
 end $$;
 reset role;
 
+-- ---- Comprobantes (fotos): siguen el permiso de la Plata ----
+insert into storage.objects (bucket_id, name, owner_id) values
+  ('comprobantes', 'e0000000-0000-0000-0000-000000000001/del-dueno.jpg', 'd0000000-0000-0000-0000-000000000001'),
+  ('comprobantes', 'e0000000-0000-0000-0000-000000000001/del-que-manda.jpg', 'a0000000-0000-0000-0000-000000000004');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-000000000002"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from storage.objects where bucket_id = 'comprobantes';
+  assert n = 0, format('FUGA: sin Plata vio %s comprobantes', n);
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-000000000004"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from storage.objects where bucket_id = 'comprobantes';
+  assert n = 1, format('«solo manda»: debería ver sólo su comprobante, vio %s', n);
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"d0000000-0000-0000-0000-000000000001"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from storage.objects where bucket_id = 'comprobantes' and name like 'e0000000-0000-0000-0000-000000000001/%';
+  assert n = 2, format('dueño: debería ver los 2 comprobantes, vio %s', n);
+end $$;
+reset role;
+
 do $$ begin raise notice 'Permisos OK: no / ve / carga / solo manda, lo del dueño y la otra empresa.'; end $$;
 
 rollback;
