@@ -20,6 +20,9 @@ const v = (x: Partial<Vencimiento>): Vencimiento => ({
   campo: null,
   serieId: null,
   conComprobante: false,
+  createdBy: null,
+  canal: 'app',
+  nuevo: false,
   ...x,
 })
 const HOY = '2026-11-05' // jueves

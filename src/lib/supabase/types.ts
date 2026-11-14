@@ -34,6 +34,8 @@ export type Database = {
       }
       salida_pendiente: {
         Row: {
+          canal: string
+          created_by: string | null
           categoria: Database["public"]["Enums"]["categoria_animal"]
           created_at: string
           empresa_id: string
@@ -48,6 +50,8 @@ export type Database = {
           salida_id: string
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           categoria: Database["public"]["Enums"]["categoria_animal"]
           empresa_id: string
           fecha: string
@@ -55,11 +59,13 @@ export type Database = {
           potrero_id: string
           salida_id: string
         }
-        Update: { resuelta_como?: string | null; resuelta_en?: string | null }
+        Update: { canal?: string; created_by?: string | null; resuelta_como?: string | null; resuelta_en?: string | null }
         Relationships: []
       }
       animal: {
         Row: {
+          canal: string
+          created_by: string | null
           categoria: Database["public"]["Enums"]["categoria_animal"]
           created_at: string
           empresa_id: string
@@ -76,6 +82,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           categoria: Database["public"]["Enums"]["categoria_animal"]
           created_at?: string
           empresa_id: string
@@ -92,6 +100,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           categoria?: Database["public"]["Enums"]["categoria_animal"]
           created_at?: string
           empresa_id?: string
@@ -189,6 +199,8 @@ export type Database = {
       }
       caravana: {
         Row: {
+          canal: string
+          created_by: string | null
           animal_id: string
           created_at: string
           empresa_id: string
@@ -201,6 +213,8 @@ export type Database = {
           vigente: boolean
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           animal_id: string
           created_at?: string
           empresa_id: string
@@ -213,6 +227,8 @@ export type Database = {
           vigente?: boolean
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           animal_id?: string
           created_at?: string
           empresa_id?: string
@@ -389,6 +405,7 @@ export type Database = {
       }
       evento: {
         Row: {
+          canal: string
           animal_id: string
           audio_url: string | null
           created_at: string
@@ -401,6 +418,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_evento"]
         }
         Insert: {
+          canal?: string
           animal_id: string
           audio_url?: string | null
           created_at?: string
@@ -413,6 +431,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_evento"]
         }
         Update: {
+          canal?: string
           animal_id?: string
           audio_url?: string | null
           created_at?: string
@@ -515,6 +534,8 @@ export type Database = {
       }
       infraestructura: {
         Row: {
+          canal: string
+          created_by: string | null
           angulo_deg: number | null
           campo_id: string
           created_at: string
@@ -527,6 +548,8 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_infraestructura"]
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           angulo_deg?: number | null
           campo_id: string
           created_at?: string
@@ -539,6 +562,8 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_infraestructura"]
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           angulo_deg?: number | null
           campo_id?: string
           created_at?: string
@@ -569,6 +594,7 @@ export type Database = {
       }
       labor_potrero: {
         Row: {
+          canal: string
           created_at: string
           created_by: string | null
           cultivo: string | null
@@ -582,6 +608,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_labor"]
         }
         Insert: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           cultivo?: string | null
@@ -595,6 +622,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_labor"]
         }
         Update: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           cultivo?: string | null
@@ -640,6 +668,8 @@ export type Database = {
       }
       lluvia: {
         Row: {
+          canal: string
+          created_by: string | null
           campo_id: string
           created_at: string
           empresa_id: string
@@ -649,6 +679,8 @@ export type Database = {
           mm: number
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           campo_id: string
           created_at?: string
           empresa_id: string
@@ -658,6 +690,8 @@ export type Database = {
           mm: number
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           campo_id?: string
           created_at?: string
           empresa_id?: string
@@ -685,6 +719,8 @@ export type Database = {
       }
       lote: {
         Row: {
+          canal: string
+          created_by: string | null
           campo_id: string | null
           created_at: string
           empresa_id: string
@@ -695,6 +731,8 @@ export type Database = {
           proposito: Database["public"]["Enums"]["proposito_lote"]
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           campo_id?: string | null
           created_at?: string
           empresa_id: string
@@ -705,6 +743,8 @@ export type Database = {
           proposito?: Database["public"]["Enums"]["proposito_lote"]
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           campo_id?: string | null
           created_at?: string
           empresa_id?: string
@@ -783,6 +823,7 @@ export type Database = {
       }
       marca_senal: {
         Row: {
+          canal: string
           created_at: string
           created_by: string | null
           empresa_id: string
@@ -794,6 +835,7 @@ export type Database = {
           tipo_senal: Database["public"]["Enums"]["tipo_senal"]
         }
         Insert: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           empresa_id: string
@@ -805,6 +847,7 @@ export type Database = {
           tipo_senal: Database["public"]["Enums"]["tipo_senal"]
         }
         Update: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           empresa_id?: string
@@ -886,6 +929,8 @@ export type Database = {
           comprobante_url: string | null
           contraparte: string | null
           created_at: string
+          canal: string
+          revisado_at: string | null
           created_by: string | null
           cuit_contraparte: string | null
           descripcion: string | null
@@ -908,6 +953,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          canal?: string
+          revisado_at?: string | null
           actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
           audio_url?: string | null
@@ -943,6 +990,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          canal?: string
+          revisado_at?: string | null
           actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
           audio_url?: string | null
@@ -1024,6 +1073,8 @@ export type Database = {
       }
       movimiento_iva_linea: {
         Row: {
+          canal: string
+          created_by: string | null
           alicuota: number
           concepto: string | null
           created_at: string
@@ -1035,6 +1086,8 @@ export type Database = {
           orden: number
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           alicuota?: number
           concepto?: string | null
           created_at?: string
@@ -1046,6 +1099,8 @@ export type Database = {
           orden?: number
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           alicuota?: number
           concepto?: string | null
           created_at?: string
@@ -1082,6 +1137,8 @@ export type Database = {
       }
       observacion_potrero: {
         Row: {
+          canal: string
+          created_by: string | null
           agua: Database["public"]["Enums"]["agua_estado"] | null
           audio_url: string | null
           conteo: number | null
@@ -1097,6 +1154,8 @@ export type Database = {
           recorrida_id: string
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           agua?: Database["public"]["Enums"]["agua_estado"] | null
           audio_url?: string | null
           conteo?: number | null
@@ -1112,6 +1171,8 @@ export type Database = {
           recorrida_id: string
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           agua?: Database["public"]["Enums"]["agua_estado"] | null
           audio_url?: string | null
           conteo?: number | null
@@ -1269,6 +1330,7 @@ export type Database = {
       }
       recorrida: {
         Row: {
+          canal: string
           campo_id: string
           created_at: string
           created_by: string | null
@@ -1277,6 +1339,7 @@ export type Database = {
           id: string
         }
         Insert: {
+          canal?: string
           campo_id: string
           created_at?: string
           created_by?: string | null
@@ -1285,6 +1348,7 @@ export type Database = {
           id?: string
         }
         Update: {
+          canal?: string
           campo_id?: string
           created_at?: string
           created_by?: string | null
@@ -1576,6 +1640,7 @@ export type Database = {
       terminar_mapa: { Args: never; Returns: string }
       pedir_baja: { Args: never; Returns: { borrar_desde: string; deshecha_at: string | null; empresa_id: string; id: number; pedida_at: string; pedida_por: string } }
       deshacer_baja: { Args: never; Returns: undefined }
+      nombres_de_empresa: { Args: never; Returns: { user_id: string; nombre: string; rol: string }[] }
       aceptar_legales: { Args: { p_version: string; p_via: string }; Returns: undefined }
       crear_invitacion: {
         Args: { p_celular: string; p_nombre: string; p_rol: string; p_niveles: Json }

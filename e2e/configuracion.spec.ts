@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { execSync } from 'node:child_process'
 import { codigoDelLog, despejarGuia, entrar, invitarComoDueno } from './helpers'
+
+/** SQL directo en la base local (como servicio): para simular lo que carga el bot. */
+const sql = (q: string) => execSync('docker exec -i supabase_db_cliente-risso-agro psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q', { input: q })
 
 // Configuración (Lau, 05/11 y 13/11): el dueño invita y elige, sección por
 // sección, qué puede hacer (no ve, ve, ve y carga, solo manda); el invitado
@@ -126,4 +130,48 @@ test('con «Ve» se mira sin cargar, y sin Campos no se cuentan cabezas ni se re
   const nav = page.getByRole('navigation', { name: 'Modo Campo' })
   await expect(nav.getByRole('link', { name: 'Manga' })).toHaveCount(0)
   await expect(nav.getByRole('link', { name: 'Recorrida' })).toHaveCount(0)
+})
+
+test('lo que manda un invitado le llega al dueño como nuevo, con su nombre, y lo corrige (permisos, entrega 4)', async ({ page }) => {
+  const sufijo = String(Date.now()).slice(-5)
+  const detalle = `Gasoil ${sufijo}`
+  // Un invitado con la Plata en «Solo manda» manda un gasto por WhatsApp (como lo carga el bot).
+  sql(`
+    with u as (
+      insert into auth.users (id, instance_id, aud, role, phone, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
+      values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '54922415${sufijo}', '{"nombre":"Tito","apellido":"Manda"}', now(), now(), '', '', '', '')
+      returning id
+    ), m as (
+      insert into public.miembro_empresa (empresa_id, user_id, rol, niveles)
+      select me.empresa_id, u.id, 'encargado', '{"hacienda":"no","campos":"no","plata":"solo_manda"}'
+      from u, public.miembro_empresa me join auth.users d on d.id = me.user_id where d.phone = '5492240000001'
+      returning empresa_id, user_id
+    )
+    insert into public.movimiento_financiero (empresa_id, campo_id, tipo, categoria_id, monto, fecha_devengo, fecha_cobro_pago, estado, descripcion, created_by, canal)
+    select m.empresa_id, (select id from public.campo where empresa_id = m.empresa_id order by color_idx limit 1), 'gasto',
+      (select id from public.categoria_movimiento where empresa_id is null limit 1), 85000, current_date, current_date, 'liquidado', '${detalle}', m.user_id, 'whatsapp'
+    from m`)
+
+  await entrar(page)
+  // El número junto a Plata y el aviso en Plata.
+  const barra = page.getByRole('navigation', { name: 'Oficina' })
+  await expect(barra.getByRole('link', { name: 'Plata', exact: true }).locator('[data-nuevos]')).toBeVisible()
+  await page.goto('/analitica')
+  await page.getByRole('button', { name: 'Revisarlos' }).click()
+  await expect(page).toHaveURL(/movimientos\?nuevos=1/)
+  const fila = page.getByRole('listitem').filter({ hasText: detalle })
+  await expect(fila).toContainText('Nuevo')
+  await expect(fila).toContainText('Cargó Tito Manda (encargado) · por WhatsApp')
+
+  // Lo abre y lo corrige: deja de ser nuevo.
+  await fila.getByRole('button').click()
+  const panel = page.getByRole('dialog', { name: detalle })
+  await expect(panel).toContainText('Tito Manda (encargado) · por WhatsApp')
+  await panel.getByRole('button', { name: 'Corregir' }).click()
+  await page.getByLabel('Monto').fill('90000')
+  await page.getByRole('button', { name: 'Guardar' }).click()
+  await expect(page.getByText('Listo: el movimiento quedó corregido')).toBeVisible()
+  await page.goto(`/analitica/movimientos?q=${encodeURIComponent(detalle)}`)
+  await expect(page.getByRole('listitem').filter({ hasText: detalle })).not.toContainText('Nuevo')
+  await expect(page.getByRole('listitem').filter({ hasText: detalle })).toContainText('90.000')
 })

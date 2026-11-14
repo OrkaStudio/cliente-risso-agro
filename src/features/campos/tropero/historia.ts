@@ -4,8 +4,9 @@
 import type { Observacion } from './panorama'
 
 export type MovimientoPotrero = { animalId: string; fecha: string; origen: string | null; destino: string | null; origenNombre: string | null; destinoNombre: string | null }
-export type Labor = { potreroId: string; fecha: string; tipo: 'laboreo' | 'siembra' | 'fertilizacion' | 'fumigacion' | 'corte_forraje' | 'cosecha'; cultivo: string | null; nota: string | null; kg: number | null }
-export type Hecho = { fecha: string; tipo: 'recorrida' | 'hacienda' | 'labor'; titulo: string; detalle: string | null }
+export type Labor = { potreroId: string; fecha: string; tipo: 'laboreo' | 'siembra' | 'fertilizacion' | 'fumigacion' | 'corte_forraje' | 'cosecha'; cultivo: string | null; nota: string | null; kg: number | null; createdBy?: string | null; canal?: string }
+/** `createdBy`/`canal`: quién lo cargó y por dónde (permisos, entrega 4). */
+export type Hecho = { fecha: string; tipo: 'recorrida' | 'hacienda' | 'labor'; titulo: string; detalle: string | null; createdBy?: string | null; canal?: string }
 
 export const LABOR: Record<Labor['tipo'], string> = { laboreo: 'Laboreo', siembra: 'Siembra', fertilizacion: 'Fertilización', fumigacion: 'Fumigación', corte_forraje: 'Corte de forraje', cosecha: 'Cosecha' }
 const PASTO = { abundante: 'abundante', normal: 'normal', escaso: 'escaso', pelado: 'pelado' }
@@ -24,7 +25,7 @@ export function historiaDelPotrero(potreroId: string, obs: Observacion[], movs: 
   const r: Hecho[] = []
   for (const o of obs.filter((x) => x.potreroId === potreroId)) {
     const partes = [o.pasto && `pasto ${PASTO[o.pasto]}`, o.agua && `agua ${AGUA[o.agua]}`, o.electrico === 'cortado' && 'eléctrico cortado'].filter(Boolean) as string[]
-    r.push({ fecha: o.fecha, tipo: 'recorrida', titulo: 'Recorrida', detalle: [partes.join(', '), o.novedad && `«${o.novedad}»`].filter(Boolean).join('. ') || null })
+    r.push({ fecha: o.fecha, tipo: 'recorrida', titulo: 'Recorrida', detalle: [partes.join(', '), o.novedad && `«${o.novedad}»`].filter(Boolean).join('. ') || null, createdBy: o.createdBy, canal: o.canal })
   }
   const grupos = new Map<string, { n: number; otro: string | null; entra: boolean }>()
   for (const m of movs) {
@@ -45,7 +46,7 @@ export function historiaDelPotrero(potreroId: string, obs: Observacion[], movs: 
     })
   }
   for (const l of labores.filter((x) => x.potreroId === potreroId)) {
-    r.push({ fecha: l.fecha, tipo: 'labor', titulo: LABOR[l.tipo], detalle: [l.cultivo, l.kg != null && `${l.kg.toLocaleString('es-AR')} kg`, l.nota].filter(Boolean).join(' · ') || null })
+    r.push({ fecha: l.fecha, tipo: 'labor', titulo: LABOR[l.tipo], detalle: [l.cultivo, l.kg != null && `${l.kg.toLocaleString('es-AR')} kg`, l.nota].filter(Boolean).join(' · ') || null, createdBy: l.createdBy, canal: l.canal })
   }
   return r.sort((a, b) => b.fecha.localeCompare(a.fecha))
 }

@@ -19,6 +19,7 @@ import { AnotarPlata } from './anotar-plata'
 import { MesAMes } from './mes-a-mes'
 import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Periodo } from './plata'
 import { usePermiso } from '@/features/empresa/use-permiso'
+import { useNuevosPlata } from '@/features/analitica/hooks'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 
@@ -36,6 +37,7 @@ const diaYmes = (ymd: string) => {
  */
 export function PlataPage() {
   const cargaPlata = usePermiso('plata').carga
+  const nuevos = useNuevosPlata(cargaPlata)
   const empresaId = useEmpresa().data?.empresa_id ?? ''
   const movs = useMovimientos()
   const pend = usePendientes()
@@ -191,6 +193,20 @@ export function PlataPage() {
           </div>
         </Cabecera>
       </motion.div>
+
+      {/* Lo que cargaron otros y todavía no se miró (permisos, entrega 4). */}
+      {(nuevos.data ?? 0) > 0 && (
+        <motion.div {...entra(1)} className="flex flex-wrap items-center gap-4 rounded-[18px] border border-principal/30 bg-principal-suave/50 px-5 py-3.5">
+          <span className="rounded-full bg-principal px-2.5 py-0.5 text-[13px] font-bold text-principal-texto">Nuevo</span>
+          <p className="min-w-0 flex-1 text-[15px] font-semibold text-texto">
+            {nuevos.data === 1 ? 'Alguien de tu equipo cargó un movimiento' : `Tu equipo cargó ${nuevos.data} movimientos`}
+            <span className="block text-[13.5px] font-normal text-texto-suave">Ya cuentan en los números de abajo.</span>
+          </p>
+          <button type="button" onClick={() => navigate('/analitica/movimientos?nuevos=1')} className="inline-flex h-10 items-center rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600">
+            Revisarlos
+          </button>
+        </motion.div>
+      )}
 
       {/* Para mejorar: lo que conviene mirar, cada cosa con adónde ir a hacer algo. */}
       {!vacio && avisos.length > 0 && (

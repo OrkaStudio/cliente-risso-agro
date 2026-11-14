@@ -6,7 +6,7 @@ import type { Database } from '@/lib/supabase/types'
 import type { Dias } from './dias'
 
 type E = Database['public']['Enums']
-export type Observacion = { potreroId: string; fecha: string; pasto: E['pasto_estado'] | null; agua: E['agua_estado'] | null; electrico: E['electrico_estado'] | null; novedad: string | null }
+export type Observacion = { potreroId: string; fecha: string; pasto: E['pasto_estado'] | null; agua: E['agua_estado'] | null; electrico: E['electrico_estado'] | null; novedad: string | null; createdBy?: string | null; canal?: string }
 export type Lluvia = { fecha: string; mm: number }
 export type Aviso = { potreroId: string | null; texto: string; tono: 'problema' | 'atencion' }
 

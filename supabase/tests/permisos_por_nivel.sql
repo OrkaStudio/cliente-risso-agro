@@ -140,14 +140,34 @@ begin
 end $$;
 reset role;
 
--- El dueño ve lo que cargó el invitado, con su nombre.
+-- El dueño ve lo que cargó el invitado, con su nombre, como nuevo; lo suyo nace visto.
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0000000-0000-0000-0000-000000000001"}';
 do $$
 declare n int;
 begin
-  select count(*) into n from movimiento_financiero where created_by = 'a0000000-0000-0000-0000-000000000004';
-  assert n = 1, 'dueño: no ve el gasto que cargó el invitado';
+  select count(*) into n from movimiento_financiero where created_by = 'a0000000-0000-0000-0000-000000000004' and revisado_at is null;
+  assert n = 1, 'dueño: el gasto del invitado debería verse como nuevo';
+  insert into movimiento_financiero (empresa_id, campo_id, tipo, categoria_id, monto, fecha_devengo, fecha_vencimiento)
+  select 'e0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'gasto', id, 1000, current_date, current_date
+  from categoria_movimiento where empresa_id is null limit 1;
+  select count(*) into n from movimiento_financiero where created_by = 'd0000000-0000-0000-0000-000000000001' and monto = 1000 and revisado_at is null;
+  assert n = 0, 'dueño: lo que carga él no debería quedar como nuevo';
+  select count(*) into n from public.nombres_de_empresa() where nombre is not null;
+  assert n = 4, format('dueño: debería ver los nombres de las 4 personas, vio %s', n);
+  -- Lo revisa.
+  update movimiento_financiero set revisado_at = now() where created_by = 'a0000000-0000-0000-0000-000000000004';
+end $$;
+reset role;
+
+-- Ya revisado, «solo manda» no lo puede corregir.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-000000000004"}';
+do $$
+declare n int;
+begin
+  update movimiento_financiero set monto = 1 where created_by = 'a0000000-0000-0000-0000-000000000004';
+  get diagnostics n = row_count; assert n = 0, 'FUGA: «solo manda» corrigió algo ya revisado';
 end $$;
 reset role;
 

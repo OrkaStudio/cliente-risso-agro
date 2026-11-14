@@ -5,7 +5,11 @@ import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { AnotarPlata } from './anotar-plata'
 import { fmtCompact, formatARS } from '@/features/analitica/compute'
-import { useMovimientos } from '@/features/analitica/hooks'
+import { useMarcarRevisados, useMovimientos } from '@/features/analitica/hooks'
+import type { MovimientoConDetalle } from '@/features/analitica/api'
+import { useNombres } from '@/features/empresa/use-nombres'
+import { usePermiso } from '@/features/empresa/use-permiso'
+import { MovimientoPanel } from './movimiento-panel'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
@@ -25,13 +29,25 @@ export function MovimientosPage() {
   const [params] = useSearchParams()
   const [rango, setRango] = useState<Rango>(() => (['mes', 'anio', '12m', 'todo'].includes(params.get('rango') ?? '') ? (params.get('rango') as Rango) : 'mes'))
   const [q, setQ] = useState(() => params.get('q') ?? '')
+  // Quién cargó cada uno y lo nuevo que cargaron otros (permisos, entrega 4).
+  const { quienCargo, nombreDe } = useNombres()
+  const { carga } = usePermiso('plata')
+  const revisar = useMarcarRevisados()
+  const [quien, setQuien] = useState<string | null>(null)
+  const [soloNuevos, setSoloNuevos] = useState(() => params.get('nuevos') === '1')
+  const [abierto, setAbierto] = useState<MovimientoConDetalle | null>(null)
+  const nuevos = (movs.data ?? []).filter((m) => carga && !m.revisado_at)
+  // Los que cargaron algo (lo de antes del 13/11 no tiene autor: sólo entra en «Cargó cualquiera»).
+  const autores = [...new Set((movs.data ?? []).map((m) => m.created_by).filter((x): x is string => !!x))]
+  // Sin nuevos por ver, «sólo los nuevos» no tiene sentido: vuelve a todos.
+  if (soloNuevos && movs.data && nuevos.length === 0) setSoloNuevos(false)
 
   const lista = useMemo(
     () =>
       (movs.data ?? [])
-        .filter((m) => (!campoId || m.campo_id === campoId) && enRango(m, rango, hoy) && coincide(m, q))
+        .filter((m) => (soloNuevos ? !m.revisado_at : (!campoId || m.campo_id === campoId) && enRango(m, rango, hoy)) && coincide(m, q) && (quien === null || m.created_by === quien))
         .sort((a, b) => (b.fecha_cobro_pago ?? b.fecha_devengo).localeCompare(a.fecha_cobro_pago ?? a.fecha_devengo)),
-    [movs.data, campoId, rango, hoy, q],
+    [movs.data, campoId, rango, hoy, q, quien, soloNuevos],
   )
   const salio = lista.filter((m) => m.tipo === 'gasto').reduce((s, m) => s + Number(m.monto), 0)
   const entro = lista.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
@@ -92,6 +108,28 @@ export function MovimientosPage() {
         </div>
       </div>
 
+      {/* Lo que cargaron otros y todavía no se miró: cuenta desde que entró. */}
+      {nuevos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 rounded-[18px] border border-principal/30 bg-principal-suave/50 px-5 py-3.5">
+          <span className="rounded-full bg-principal px-2.5 py-0.5 text-[13px] font-bold text-principal-texto">Nuevo</span>
+          <p className="min-w-0 flex-1 text-[15px] text-texto">
+            <b>{nuevos.length === 1 ? 'Hay un movimiento que cargó otro' : `Hay ${nuevos.length} movimientos que cargaron otros`}</b>
+            <span className="block text-[13.5px] text-texto-suave">Ya cuentan en los totales. Revisalos y corregí lo que haga falta.</span>
+          </p>
+          <button type="button" onClick={() => setSoloNuevos((v) => !v)} className="inline-flex h-10 items-center rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave">
+            {soloNuevos ? 'Ver todos' : 'Ver sólo los nuevos'}
+          </button>
+          <button
+            type="button"
+            disabled={revisar.isPending}
+            onClick={() => revisar.mutate(nuevos.map((m) => m.id), { onSuccess: () => setSoloNuevos(false) })}
+            className="inline-flex h-10 items-center rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-50"
+          >
+            Ya los vi
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2.5">
         <div role="tablist" aria-label="Período" className="flex flex-wrap gap-2">
           {RANGOS.map((r) => (
@@ -100,6 +138,16 @@ export function MovimientosPage() {
             </button>
           ))}
         </div>
+        {/* Quién cargó: sólo si cargó más de una persona. */}
+        {autores.length > 1 && (
+          <div role="group" aria-label="Quién cargó" className="flex flex-wrap gap-2">
+            {[null, ...autores].map((a) => (
+              <button key={a ?? 'todos'} type="button" aria-pressed={quien === a} onClick={() => setQuien(a)} className={cn('h-11 rounded-full px-4 text-[15px] font-bold transition-colors', quien === a ? 'bg-principal-suave text-principal' : 'border-[1.5px] border-borde bg-superficie text-texto hover:border-neutro-300')}>
+                {a === null ? 'Cargó cualquiera' : nombreDe(a)}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="ml-auto flex h-11 min-w-[260px] items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 focus-within:border-principal/60">
           <Icono nombre="Buscar" tamano={16} className="text-texto-suave" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Proveedor, detalle o CUIT" aria-label="Buscar un movimiento" className="w-full bg-transparent text-[15px] text-texto outline-none placeholder:text-texto-suave" />
@@ -118,24 +166,40 @@ export function MovimientosPage() {
             const medio = medioTexto(m)
             // Como las filas de la Agenda: el título y, debajo, todo lo demás en una línea gris.
             const detalle = [m.categoria?.nombre, m.campo?.nombre, m.contraparte, medio, comprobanteTexto(m)].filter(Boolean).join(' · ')
+            const autor = quienCargo(m.created_by, m.canal)
+            const nuevo = carga && !m.revisado_at
             return (
-              <li key={m.id} className="flex items-center gap-5 border-b border-borde/70 py-4">
+              <li key={m.id} className="border-b border-borde/70">
+                <button type="button" onClick={() => setAbierto(m)} className="flex w-full items-center gap-5 py-4 text-left transition-colors hover:bg-superficie-hundida/50">
                 <span className="t-cifra w-14 shrink-0 text-texto-suave">{`${f.slice(8, 10)}/${f.slice(5, 7)}`}
                   {f.slice(0, 4) !== hoy.slice(0, 4) && <span className="block text-[13px] font-semibold">{f.slice(0, 4)}</span>}</span>
                 <span aria-hidden className={cn('h-10 w-1 shrink-0 rounded-full', ingreso ? 'bg-estado-bien' : 'bg-estado-problema/80')} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[16.5px] font-semibold text-texto">{m.descripcion || m.categoria?.nombre || (ingreso ? 'Ingreso' : 'Gasto')}</p>
+                  <p className="flex items-center gap-2 truncate text-[16.5px] font-semibold text-texto">
+                    {nuevo && <span className="shrink-0 rounded-full bg-principal px-2 py-0.5 text-[12px] font-bold text-principal-texto">Nuevo</span>}
+                    <span className="truncate">{m.descripcion || m.categoria?.nombre || (ingreso ? 'Ingreso' : 'Gasto')}</span>
+                  </p>
                   <p className="truncate text-[14.5px] text-texto-suave">{detalle}</p>
+                  {autor && <p className="truncate text-[13.5px] font-semibold text-acento-texto">{autor}</p>}
                 </div>
                 <span className={cn('t-cifra w-36 shrink-0 text-right', ingreso ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
                   {ingreso ? '+' : '−'}
                   {formatARS(Number(m.monto)).replace('-', '').replace(/\s/g, '')}
                 </span>
+                </button>
               </li>
             )
           })}
         </ul>
       )}
+      <MovimientoPanel
+        m={abierto}
+        onCerrar={() => {
+          // Abrirlo es mirarlo: deja de ser nuevo.
+          if (abierto && carga && !abierto.revisado_at) revisar.mutate([abierto.id])
+          setAbierto(null)
+        }}
+      />
     </div>
   )
 }

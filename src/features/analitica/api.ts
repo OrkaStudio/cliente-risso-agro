@@ -39,9 +39,40 @@ export async function listMovimientos(): Promise<MovimientoConDetalle[]> {
     .select(
       '*, categoria:categoria_movimiento(nombre, grupo), campo(nombre), potrero(nombre)',
     )
+    // Lo anulado no es un movimiento: no se lista ni suma.
+    .neq('estado', 'anulado')
     .order('fecha_devengo', { ascending: false })
   if (error) throw new Error(error.message)
   return data as unknown as MovimientoConDetalle[]
+}
+
+/** Lo que cargó otro deja de ser «Nuevo» (permisos, entrega 4). */
+export async function marcarRevisados(ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const { error } = await supabase.from('movimiento_financiero').update({ revisado_at: new Date().toISOString() }).in('id', ids)
+  if (error) throw new Error(error.message)
+}
+
+/** Corregir un movimiento: lo que se tipea mal (monto, detalle, fecha). Queda revisado. */
+export async function corregirMovimiento(x: { id: string; monto: number; descripcion: string; fecha: string }): Promise<void> {
+  const { error } = await supabase
+    .from('movimiento_financiero')
+    .update({ monto: x.monto, descripcion: x.descripcion, fecha_devengo: x.fecha, revisado_at: new Date().toISOString() })
+    .eq('id', x.id)
+  if (error) throw new Error(error.message)
+}
+
+/** Anular un movimiento: deja de contar, pero queda el rastro (no se borra). */
+export async function anularMovimiento(id: string): Promise<void> {
+  const { error } = await supabase.from('movimiento_financiero').update({ estado: 'anulado', revisado_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Cuántos movimientos cargados por otros todavía no se miraron (el número junto a Plata). */
+export async function contarNuevos(): Promise<number> {
+  const { count, error } = await supabase.from('movimiento_financiero').select('id', { count: 'exact', head: true }).is('revisado_at', null).neq('estado', 'anulado')
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export type Pendiente = {

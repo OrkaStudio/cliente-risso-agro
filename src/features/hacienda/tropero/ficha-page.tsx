@@ -17,6 +17,7 @@ import { CaravanaDibujo, SinCaravanaDibujo } from './caravana-dibujo'
 import { AnotarleAlgo, CorregirDatos, DarDeBaja } from './paneles'
 import { estadoDe } from './rodeo'
 import { usePermiso } from '@/features/empresa/use-permiso'
+import { useNombres } from '@/features/empresa/use-nombres'
 
 const AVISO: Record<Tono, string> = {
   principal: 'bg-principal-suave text-principal',
@@ -41,6 +42,7 @@ const SECUNDARIO =
  */
 export function FichaPage() {
   const { carga } = usePermiso('hacienda')
+  const { quienCargo } = useNombres()
   const { id = '' } = useParams()
   const animal = useAnimal(id)
   const eventos = useEventos(id)
@@ -93,6 +95,11 @@ export function FichaPage() {
   const campoMapa = mapa?.find((c) => c.potreros.some((p) => p.id === a.potrero_id))
   const identidad = campos.find((c) => c.id === potrero?.campo_id)
   const historia = historiaDelAnimal(evs)
+  // Quién cargó cada cosa de la historia, si no fue uno (permisos, entrega 4).
+  const autorDe = (id: string) => {
+    const e = (eventos.data ?? []).find((x) => x.id === id)
+    return e ? quienCargo(e.created_by, e.canal) : null
+  }
   const titulo = tituloDelAnimal(a.categoria, a.sexo)
   // Si ya no está: la fecha de su última baja (la del hecho, no la de la carga).
   const ultimaBaja = !activo ? (eventos.data ?? []).filter((e) => e.tipo === 'baja').sort((x, y) => y.created_at.localeCompare(x.created_at))[0] : undefined
@@ -326,6 +333,7 @@ export function FichaPage() {
                   <div className={cn('min-w-0 flex-1', i < historia.length - 1 && 'pb-5')}>
                     <p className="text-[15px] leading-tight font-bold text-texto">{h.titulo}</p>
                     {h.detalle && <p className="mt-0.5 text-[14px] text-texto-suave">{h.detalle}</p>}
+                    {autorDe(h.id) && <p className="mt-0.5 text-[13px] font-semibold text-acento-texto">{autorDe(h.id)}</p>}
                   </div>
                 </li>
               ))}

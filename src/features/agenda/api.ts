@@ -30,6 +30,10 @@ export type Vencimiento = {
   serieId: string | null
   /** Ya tiene foto del comprobante. */
   conComprobante: boolean
+  /** Quién lo cargó y por dónde, y si es nuevo para quien carga la plata (permisos, entrega 4). */
+  createdBy: string | null
+  canal: string
+  nuevo: boolean
 }
 
 const MEDIO_LABEL: Record<MedioPago, string> = {
@@ -53,7 +57,7 @@ export async function listVencimientos(): Promise<Vencimiento[]> {
   const { data, error } = await supabase
     .from('movimiento_financiero')
     .select(
-      'id, tipo, estado, monto, fecha_vencimiento, fecha_cobro_pago, medio_pago, es_echeq, cheque_numero, cheque_banco, contraparte, descripcion, serie_id, campo_id, comprobante_url, categoria:categoria_movimiento(nombre), campo(nombre)',
+      'id, tipo, estado, monto, fecha_vencimiento, fecha_cobro_pago, medio_pago, es_echeq, cheque_numero, cheque_banco, contraparte, descripcion, serie_id, campo_id, comprobante_url, created_by, canal, revisado_at, categoria:categoria_movimiento(nombre), campo(nombre)',
     )
     .neq('estado', 'anulado')
     .or('fecha_vencimiento.not.is.null,fecha_cobro_pago.not.is.null')
@@ -77,6 +81,9 @@ export async function listVencimientos(): Promise<Vencimiento[]> {
     campo: (m.campo as { nombre: string } | null)?.nombre ?? null,
     serieId: m.serie_id,
     conComprobante: !!m.comprobante_url,
+    createdBy: m.created_by,
+    canal: m.canal,
+    nuevo: !m.revisado_at,
   }))
 }
 

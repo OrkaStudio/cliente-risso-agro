@@ -34,6 +34,7 @@ import { MapaCampos } from './mapa-campos'
 import { ProgresoMapa } from './progreso-mapa'
 import { AGUA, avisosDelCampo, lluviaDesde, PASTO, textoDias, ultimaPorPotrero, type Aviso, type Lluvia, type Observacion } from './panorama'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
+import { useNombres } from '@/features/empresa/use-nombres'
 
 const EditorCampo = lazy(() => import('./editor-campo'))
 
@@ -67,9 +68,9 @@ function useDatosDelCampo(empresaId: string, campoId: string, potreroIds: string
       const desde = antes(hoyLocal(), 365)
       const [movs, obs, ll, lab] = await Promise.all([
         supabase.from('evento').select('animal_id, fecha, datos').eq('empresa_id', empresaId).eq('tipo', 'movimiento'),
-        potreroIds.length ? supabase.from('observacion_potrero').select('potrero_id, created_at, pasto, agua, electrico, novedad').in('potrero_id', potreroIds).order('created_at', { ascending: false }).limit(500) : Promise.resolve({ data: [], error: null }),
+        potreroIds.length ? supabase.from('observacion_potrero').select('potrero_id, created_at, pasto, agua, electrico, novedad, created_by, canal').in('potrero_id', potreroIds).order('created_at', { ascending: false }).limit(500) : Promise.resolve({ data: [], error: null }),
         supabase.from('lluvia').select('fecha, mm').eq('campo_id', campoId).gte('fecha', desde),
-        potreroIds.length ? supabase.from('labor_potrero').select('potrero_id, fecha, tipo, cultivo, nota, kg_cosechados').in('potrero_id', potreroIds).order('fecha', { ascending: false }).limit(300) : Promise.resolve({ data: [], error: null }),
+        potreroIds.length ? supabase.from('labor_potrero').select('potrero_id, fecha, tipo, cultivo, nota, kg_cosechados, created_by, canal').in('potrero_id', potreroIds).order('fecha', { ascending: false }).limit(300) : Promise.resolve({ data: [], error: null }),
       ])
       if (lab.error) throw lab.error
       if (movs.error) throw movs.error
@@ -87,8 +88,8 @@ function useDatosDelCampo(empresaId: string, campoId: string, potreroIds: string
             destinoNombre: (d.potrero_destino as string) ?? null,
           }
         }),
-        labores: (lab.data ?? []).map((l): Labor => ({ potreroId: l.potrero_id, fecha: l.fecha, tipo: l.tipo, cultivo: l.cultivo, nota: l.nota, kg: l.kg_cosechados })),
-        observaciones: (obs.data ?? []).map((o): Observacion => ({ potreroId: o.potrero_id, fecha: o.created_at.slice(0, 10), pasto: o.pasto, agua: o.agua, electrico: o.electrico, novedad: o.novedad })),
+        labores: (lab.data ?? []).map((l): Labor => ({ potreroId: l.potrero_id, fecha: l.fecha, tipo: l.tipo, cultivo: l.cultivo, nota: l.nota, kg: l.kg_cosechados, createdBy: l.created_by, canal: l.canal })),
+        observaciones: (obs.data ?? []).map((o): Observacion => ({ potreroId: o.potrero_id, fecha: o.created_at.slice(0, 10), pasto: o.pasto, agua: o.agua, electrico: o.electrico, novedad: o.novedad, createdBy: o.created_by, canal: o.canal })),
         lluvias: (ll.data ?? []) as Lluvia[],
       }
     },
@@ -439,6 +440,7 @@ function DetallePotrero({
 }) {
   const hacienda = usePermiso('hacienda')
   const campos = usePermiso('campos')
+  const { quienCargo } = useNombres()
   const navigate = useNavigate()
   const [verHistoria, setVerHistoria] = useState(false)
   const [labor, setLabor] = useState(false)
@@ -486,6 +488,7 @@ function DetallePotrero({
                 <div className="pb-4">
                   <p className="text-[15px] font-bold text-texto">{h.titulo}</p>
                   {h.detalle && <p className="text-[14px] text-texto-suave">{h.detalle}</p>}
+                  {quienCargo(h.createdBy, h.canal) && <p className="text-[13px] font-semibold text-acento-texto">{quienCargo(h.createdBy, h.canal)}</p>}
                 </div>
               </li>
             ))}

@@ -4,7 +4,7 @@ import { Logo } from '@/components/tropero/logo'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
-import { nombreRol, puedeVer, type Seccion } from '@/features/empresa/secciones'
+import { nombreRol, puedeCargar, puedeVer, type Seccion } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 import { abiertoSinMapa, primerPendiente, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
@@ -13,6 +13,7 @@ import { formatearCelularAR } from '@/lib/telefono'
 import { cn } from '@/lib/utils'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
 import { nombreDe } from '@/features/guia/nombre-usuario'
+import { useNuevosPlata } from '@/features/analitica/hooks'
 
 /** Las secciones de la Oficina (página 35, «Barra lateral · Oficina»). */
 const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; seccion: Seccion }[] = [
@@ -35,6 +36,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
   const quien = useQuienMira()
+  const nuevosPlata = useNuevosPlata(puedeCargar(membresia, 'plata'))
   // Sin Hacienda no se cuentan cabezas (permisos, 13/11).
   const veHacienda = puedeVer(membresia, 'hacienda')
   const pendiente = useMapaPendiente()
@@ -62,6 +64,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
             <NavLink
               key={s.to}
               to={bloqueada ? '/campos' : s.to}
+              aria-description={s.seccion === 'plata' && (nuevosPlata.data ?? 0) > 0 ? `${nuevosPlata.data} cargados por otros, sin mirar` : undefined}
               state={bloqueada ? { bloqueada: seccionBloqueada(s.to) } : undefined}
               end={s.end}
               onMouseEnter={() => {
@@ -90,6 +93,12 @@ export function BarraLateral({ hoy }: { hoy: number }) {
                   {bloqueada && (
                     <span className="ml-auto opacity-60" aria-label="Se abre al terminar el mapa">
                       <Icono nombre="Candado" tamano={16} />
+                    </span>
+                  )}
+                  {/* Lo que cargaron otros y el dueño todavía no miró (permisos, entrega 4). */}
+                  {s.seccion === 'plata' && !bloqueada && (nuevosPlata.data ?? 0) > 0 && (
+                    <span aria-hidden data-nuevos className="ml-auto grid h-[22px] min-w-[22px] place-items-center rounded-full bg-principal px-1.5 text-[12px] font-bold text-principal-texto">
+                      {nuevosPlata.data}
                     </span>
                   )}
                   {s.to === '/' && hoy > 0 && (
