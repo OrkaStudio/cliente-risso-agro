@@ -190,3 +190,6 @@ export function cargasRecientes(filas: { fecha: string; tipo: string; campo: str
     return `• ${ddmm(f.fecha)} · ${f.campo}: ${valor}.`
   }).join('\n')
 }
+
+/** «$85.000», para armar un mensaje fuera de este módulo. */
+export const pesosTexto = (n: number) => pesos(n)

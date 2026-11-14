@@ -139,6 +139,10 @@ export type Borrador = {
   observaciones?: ObsBorrador[]
   sesionId?: string
   cerrarSesion?: boolean
+  /** Gasto de un invitado (permisos, 14/11): lo pagó el campo, lo adelantó él (reintegro) o hay que pagarlo. */
+  pago?: 'campo' | 'yo' | 'a_pagar' | null
+  /** Hay que pagarlo: en cuántos días vence (0 = hoy). */
+  venceDias?: number | null
 }
 
 /** Qué le preguntó el bot al productor y todavía espera. */
@@ -161,6 +165,8 @@ export type Pendiente =
   /** Compartió la ubicación sin decir nada más: vale para el próximo mensaje. */
   | { tipo: 'ubicado'; capturaId: null; ubicado: Ubicado }
   | { tipo: 'categoria'; capturaId: string; borrador: Borrador }
+  | { tipo: 'pago'; capturaId: string; borrador: Borrador }
+  | { tipo: 'vence'; capturaId: string; borrador: Borrador }
   | { tipo: 'corregir'; capturaId: string; borrador: Borrador }
 
 /** Inventario: elegir qué es lo de la ubicación, confirmar el alta o la baja.

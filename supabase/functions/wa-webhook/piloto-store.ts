@@ -1,3 +1,4 @@
+import { EntradaIncompleta } from '../_shared/wa/interpretar.ts'
 import type postgres from 'npm:postgres@3.4.5'
 import { comoUsuario, sql, type Vinculo } from './db.ts'
 import type { Borrador } from '../_shared/wa/tipos.ts'
@@ -100,12 +101,22 @@ export async function aplicar(v: Vinculo, operacionId: string, a: Accion): Promi
         if (a.tabla === 'movimiento_financiero' && (current.estado === 'anulado' || current.comprobante_url || current.neto_total != null || current.iva_total != null)) throw new Error('Comprobante o gasto anulado: revisar en la app')
         antes = current; objetoId = a.id
         if (a.tabla === 'lluvia') {
-          if (a.anular) { await tx`delete from lluvia where id=${a.id} and empresa_id=${v.empresa_id}`; despues = null }
-          else { const [r] = await tx<Datos[]>`update lluvia set mm=${a.valor!} where id=${a.id} and empresa_id=${v.empresa_id} returning *`; despues = r }
+          // La base decide si puede (permisos, 14/11): si no cambió nada, se dice, no se festeja.
+          if (a.anular) {
+            const borradas = await tx`delete from lluvia where id=${a.id} and empresa_id=${v.empresa_id} returning id`
+            if (!borradas.length) throw new EntradaIncompleta('No tenés permiso para borrar esa lluvia. Si hay que sacarla, pedíselo al dueño del campo.')
+            despues = null
+          } else {
+            const [r] = await tx<Datos[]>`update lluvia set mm=${a.valor!} where id=${a.id} and empresa_id=${v.empresa_id} returning *`
+            if (!r) throw new EntradaIncompleta('No pude corregir esa lluvia. Si hay que cambiarla, pedíselo al dueño del campo.')
+            despues = r
+          }
         } else {
           const [r] = a.anular
             ? await tx<Datos[]>`update movimiento_financiero set estado='anulado' where id=${a.id} and empresa_id=${v.empresa_id} returning *`
             : await tx<Datos[]>`update movimiento_financiero set monto=${a.valor!} where id=${a.id} and empresa_id=${v.empresa_id} returning *`
+          // «Solo manda» corrige lo suyo sólo hasta que el dueño lo revisa.
+          if (!r) throw new EntradaIncompleta('Ese gasto ya lo revisó el dueño del campo: si hay que corregirlo, pedíselo a él.')
           despues = r
         }
         texto = a.anular ? 'Carga anulada. Conservé quién lo hizo y los datos anteriores en el historial.' : `Carga corregida a ${a.valor}${a.tabla === 'lluvia' ? ' mm' : ' pesos'}. Conservé el valor anterior en el historial.`; break

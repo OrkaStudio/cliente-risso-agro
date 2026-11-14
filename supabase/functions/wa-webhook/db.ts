@@ -272,7 +272,8 @@ export function escribirLluvia(v: Vinculo, b: Borrador, id: string): Promise<str
   })
 }
 
-export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | null, id: string): Promise<string> {
+/** `quien`: el nombre de quien lo adelantó, para el reintegro. */
+export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | null, id: string, quien: string | null = null): Promise<string> {
   const lineas = (b.ivaLineas ?? []).filter((l) => l.neto || l.iva)
   const neto = lineas.reduce((s, l) => s + (l.neto || 0), 0)
   const iva = lineas.reduce((s, l) => s + (l.iva || 0), 0)
@@ -281,17 +282,23 @@ export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | 
     const categoria = await tx`select 1 from categoria_movimiento where id=${b.categoriaId!} and (empresa_id is null or empresa_id=${v.empresa_id})`
     if(campo.length!==1 || categoria.length!==1)throw new Error('Campo o categoría ajenos a la empresa')
     // Pagado en el momento (un ticket): liquidado con su fecha de pago, como
-    // "Ya está pagado" en el formulario de la app.
+    // "Ya está pagado" en el formulario de la app. Un invitado puede decir que lo
+    // adelantó él (queda a pagarle, hoy) o que hay que pagarlo (con su vencimiento):
+    // en los dos casos va a la Agenda del dueño (permisos, 14/11).
+    const pendiente = b.pago === 'yo' || b.pago === 'a_pagar'
+    const vence = b.pago === 'a_pagar' ? sumarDias(b.fecha!, b.venceDias ?? 0) : b.pago === 'yo' ? b.fecha! : null
+    const contraparte = b.pago === 'yo' ? (quien ?? b.contraparte ?? null) : (b.contraparte ?? null)
+    const descripcion = b.pago === 'yo' ? `Reintegro${quien ? ` a ${quien}` : ''}${b.descripcion ? `: ${b.descripcion}` : ''}` : (b.descripcion ?? null)
     await tx`
       insert into movimiento_financiero (
         id, empresa_id, tipo, categoria_id, campo_id, monto, fecha_devengo, fecha_cobro_pago,
         estado, descripcion, contraparte, cuit_contraparte, comprobante_tipo, comprobante_url,
-        neto_total, iva_total, canal)
+        neto_total, iva_total, canal, fecha_vencimiento)
       values (
-        ${id}, ${v.empresa_id}, 'gasto', ${b.categoriaId!}, ${b.campoId!}, ${b.monto!}, ${b.fecha!}, ${b.fecha!},
-        'liquidado', ${b.descripcion ?? null}, ${b.contraparte ?? null}, ${b.cuit ?? null},
+        ${id}, ${v.empresa_id}, 'gasto', ${b.categoriaId!}, ${b.campoId!}, ${b.monto!}, ${b.fecha!}, ${pendiente ? null : b.fecha!},
+        ${pendiente ? 'pendiente' : 'liquidado'}, ${descripcion}, ${contraparte}, ${b.cuit ?? null},
         ${b.comprobanteTipo ?? null}, ${comprobanteUrl},
-        ${lineas.length ? neto : null}, ${lineas.length ? iva : null}, 'whatsapp')`
+        ${lineas.length ? neto : null}, ${lineas.length ? iva : null}, 'whatsapp', ${vence})`
     for (const [i, l] of lineas.entries()) {
       await tx`
         insert into movimiento_iva_linea (empresa_id, movimiento_id, concepto, neto, alicuota, iva, orden, canal)

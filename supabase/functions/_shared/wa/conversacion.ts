@@ -7,7 +7,7 @@
 
 import { cargaSeccion, veSeccion, type Niveles } from './permisos.ts'
 import { campoEnTexto, campoExacto, resolverCampo, resolverCategoria, resolverPotrero, campoPorId, potreroPorId, type PotreroDe } from './resolver.ts'
-import { cuandoTexto, esFecha, mmTexto, norm, numeroEn, pesos, sumarDias } from './texto.ts'
+import { cuandoTexto, ddmm, esFecha, mmTexto, norm, numeroEn, pesos, sumarDias } from './texto.ts'
 import type { Borrador, Boton, Campo, Contexto, Interpretacion, Mensaje, ObsBorrador, ObsInterpretada, Pendiente, Ubicado } from './tipos.ts'
 
 // ─── Botones ────────────────────────────────────────────────────────────────
@@ -291,6 +291,10 @@ export function leer(
           borrador: { ...p.borrador, potreroId: x.potrero.id, campoId: x.campo.id, potreroMencion: null, campoMencion: null },
         }
     }
+    if (accion === 'pg' && (valor === 'campo' || valor === 'yo' || valor === 'a_pagar') && p.tipo === 'pago')
+      return { k: 'seguir', capturaId: p.capturaId, borrador: { ...p.borrador, pago: valor } }
+    if (accion === 'vn' && valor && /^\d{1,3}$/.test(valor) && p.tipo === 'vence')
+      return { k: 'seguir', capturaId: p.capturaId, borrador: { ...p.borrador, venceDias: Number(valor) } }
     if (accion === 'k' && valor && ctx.categoriasGasto.some((c) => c.id === valor))
       return { k: 'seguir', capturaId: p.capturaId, borrador: { ...p.borrador, categoriaId: valor } }
     return { k: 'viejo', capturaId: p.capturaId }
@@ -356,6 +360,18 @@ export function leer(
     }
     case 'ubicado':
       return { k: 'nuevo', abandona: null }
+    case 'pago': {
+      const pago = /\b(yo|adelant|lo pague|lo puse)/.test(t) ? 'yo' : /\b(hay que|a pagar|debe|deber|todavia no|no esta pagad)/.test(t) ? 'a_pagar' : /\b(campo|ya esta|pagad|pago el)/.test(t) ? 'campo' : null
+      if (pago) return { k: 'seguir', capturaId: p.capturaId, borrador: { ...p.borrador, pago } }
+      if (NO.test(t) && t.length <= 12) return { k: 'cancelar', capturaId: p.capturaId }
+      return { k: 'nuevo', abandona: p.capturaId }
+    }
+    case 'vence': {
+      const n = /\bhoy\b/.test(t) ? 0 : numeroEn(texto)
+      if (n !== null && n >= 0 && n <= 365 && texto.length <= 40) return { k: 'seguir', capturaId: p.capturaId, borrador: { ...p.borrador, venceDias: Math.round(n) } }
+      if (NO.test(t) && t.length <= 12) return { k: 'cancelar', capturaId: p.capturaId }
+      return { k: 'nuevo', abandona: p.capturaId }
+    }
     case 'categoria': {
       const c = resolverCategoria(texto, ctx.categoriasGasto)
       if (c) return { k: 'seguir', capturaId: p.capturaId, borrador: { ...p.borrador, categoriaId: c.id } }
@@ -444,6 +460,13 @@ function preguntarPotrero(
   }
 }
 
+/** «pagado ayer», «para devolverte», «a pagar el 28/11». */
+export function comoSePaga(b: Borrador, ctx: Contexto): string {
+  if (b.pago === 'yo') return 'lo pusiste vos: queda para devolvértelo'
+  if (b.pago === 'a_pagar') return `a pagar ${b.venceDias ? `el ${ddmm(sumarDias(ctx.hoy, b.venceDias))}` : 'hoy'}`
+  return `pagado ${cuandoTexto(b.fecha ?? fechaBase(ctx), ctx.hoy)}`
+}
+
 export function textoPropuesta(b: Borrador, ctx: Contexto): string {
   const campo = campoPorId(ctx.campos, b.campoId)?.nombre ?? ''
   const cuando = cuandoTexto(b.fecha ?? fechaBase(ctx), ctx.hoy)
@@ -451,7 +474,7 @@ export function textoPropuesta(b: Borrador, ctx: Contexto): string {
   const cat = ctx.categoriasGasto.find((c) => c.id === b.categoriaId)?.nombre ?? ''
   const partes = [
     `Anoto un *gasto de ${pesos(b.monto ?? 0)}*${b.contraparte ? ` a ${b.contraparte}` : ''}`,
-    `${cat} · ${campo} · pagado ${cuando}`,
+    `${cat} · ${campo} · ${comoSePaga(b, ctx)}`,
   ]
   if (b.descripcion) partes.push(b.descripcion)
   const iva = (b.ivaLineas ?? []).reduce((s, l) => s + (l.iva || 0), 0)
@@ -671,7 +694,7 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
     if (b.tipo === 'gasto' && (b.monto === null || b.monto === undefined || b.monto <= 0)) {
       return {
         k: 'preguntar',
-        mensaje: { texto: '¿De cuánto fue el gasto?' },
+        mensaje: { texto: b.fotoMediaId ? 'No pude leer el monto en la foto. ¿De cuánto es? La foto la guardo con el gasto para que la revise el dueño.' : '¿De cuánto fue el gasto?' },
         pendiente: { tipo: 'dato', capturaId, borrador: b, dato: 'monto' },
         notas,
       }
@@ -686,6 +709,41 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
           'Elegir categoría',
         ),
         pendiente: { tipo: 'categoria', capturaId, borrador: b },
+        notas,
+      }
+    }
+    // Un gasto de un invitado: quién lo pagó (permisos, 14/11). Al dueño no se le pregunta: lo paga el campo, como siempre.
+    if (b.tipo === 'gasto' && ctx.niveles && !b.pago) {
+      return {
+        k: 'preguntar',
+        mensaje: opciones(
+          capturaId,
+          [
+            { id: 'pg=campo', titulo: 'Ya está pagado' },
+            { id: 'pg=yo', titulo: 'Lo pagué yo' },
+            { id: 'pg=a_pagar', titulo: 'Hay que pagarlo' },
+          ],
+          `¿Quién pagó${b.monto ? ` los *${pesos(b.monto)}*` : ''}? Si lo pusiste vos, queda para devolvértelo.`,
+          'Elegir',
+        ),
+        pendiente: { tipo: 'pago', capturaId, borrador: b },
+        notas,
+      }
+    }
+    if (b.tipo === 'gasto' && b.pago === 'a_pagar' && (b.venceDias === null || b.venceDias === undefined)) {
+      return {
+        k: 'preguntar',
+        mensaje: opciones(
+          capturaId,
+          [
+            { id: 'vn=0', titulo: 'Vence hoy' },
+            { id: 'vn=15', titulo: 'En 15 días' },
+            { id: 'vn=30', titulo: 'En 30 días' },
+          ],
+          '¿Para cuándo hay que pagarlo? También podés escribirme en cuántos días.',
+          'Elegir',
+        ),
+        pendiente: { tipo: 'vence', capturaId, borrador: b },
         notas,
       }
     }

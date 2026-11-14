@@ -9,7 +9,7 @@
 //
 // Secrets: WA_TOKEN, WA_PHONE_NUMBER_ID, WA_APP_SECRET, WA_VERIFY_TOKEN,
 // ANTHROPIC_API_KEY (+ los SUPABASE_* que da la plataforma).
-import { permiso } from '../_shared/wa/permisos.ts'
+import { permiso, soloManda } from '../_shared/wa/permisos.ts'
 import { comandoSemanal, periodoSemana } from '../_shared/wa/semanal.ts'
 import { enviarSolicitado } from '../wa-resumen-semanal/servicio.ts'
 import { configurar } from '../wa-resumen-semanal/store.ts'
@@ -18,6 +18,7 @@ import {
   arrancar,
   ayuda,
   ayudaConPendiente,
+  comoSePaga,
   AUDIO_PRONTO,
   conUbicacion,
   corregir,
@@ -584,11 +585,18 @@ async function confirmar(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Bor
     monto: b.monto ?? 0, campo, fecha, hoy: ctx.hoy,
     categoria: ctx.categoriasGasto.find((c) => c.id === b.categoriaId)?.nombre ?? 'esa categoría',
   }
+  // Lo que adelantó un invitado o hay que pagar: se dice a dónde fue (la Agenda del dueño).
+  const guardada = lluvia
+    ? R.lluviaAnotada(lluvia)
+    : `${b.pago && b.pago !== 'campo' ? `Listo, anoté *${R.pesosTexto(gasto.monto)}* de ${gasto.categoria} en ${campo}: ${comoSePaga(b, ctx)}. Lo ve el dueño en su Agenda.` : R.gastoAnotado(gasto)}${fotoFalto}`
   const resultado = await confirmarConVerificacion({
-    escribir: () => b.tipo === 'lluvia' ? db.escribirLluvia(v, b, id) : db.escribirGasto(v, b, url, id),
+    escribir: () => b.tipo === 'lluvia' ? db.escribirLluvia(v, b, id) : db.escribirGasto(v, b, url, id, ctx.nombre),
     verificar: () => db.verificarCarga(v, tabla, id),
-    mensajeGuardada: lluvia ? R.lluviaAnotada(lluvia) : `${R.gastoAnotado(gasto)}${fotoFalto}`,
+    mensajeGuardada: guardada,
     resumir: async () => {
+      // A quien sólo manda no se le muestran totales (permisos, 13/11): la confirmación de lo suyo y nada más.
+      if (soloManda(ctx.niveles ?? null, lluvia ? 'campos' : 'plata') || (b.pago && b.pago !== 'campo'))
+        return guardada
       if (lluvia) {
         // Un mes ya terminado se cuenta entero; el actual, hasta hoy.
         const hasta = fecha.slice(0, 7) < ctx.hoy.slice(0, 7) ? finDeMes(fecha) : ctx.hoy
@@ -623,6 +631,13 @@ async function foto(
   const f = await meta.descargarMedia(img.id)
   const c = await leerComprobante(f.bytes, f.mime, ctx.categoriasOcr)
   await db.actualizarCaptura(capturaId, { interpretacion: c, interpretadoPor: 'extraer-comprobante' })
+  // Un invitado con una foto que no se lee: no se adivina; se le pregunta el monto y la foto
+  // queda con el gasto, para que el dueño la revise (llega como «Nuevo») (permisos, 14/11).
+  if (!c.monto && ctx.niveles && permiso(ctx.niveles, 'gasto').ok) {
+    await db.actualizarCaptura(capturaId, { notas: ['La foto no se leyó: el monto lo dice quien la mandó.'] })
+    await avanzar(v, ctx, capturaId, { tipo: 'gasto', monto: null, fecha: null, campoMencion: img.caption ?? null, fotoMediaId: img.id, descripcion: 'Comprobante sin leer: revisar la foto' }, [])
+    return
+  }
   if (!c.monto) {
     await db.actualizarCaptura(capturaId, { estado: 'error', notas: ['La foto no se leyó como comprobante.'] })
     await db.guardarPendiente(v.id, null)
