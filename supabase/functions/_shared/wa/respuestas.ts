@@ -99,13 +99,36 @@ export function hacienda(filas: FilaHacienda[], filtro: { campo?: string; potrer
   return `Hay *${suma(filas)} ${plural('cabeza', suma(filas))}* en total.\n${lineas.join('\n')}`
 }
 
-export function lluviaConsulta(hoy: string, filas: { campo: string; mesMm: number; anteriorMm: number | null }[]): string {
+export function lluviaConsulta(hoy: string, filas: { campo: string; mesMm: number | null; anteriorMm: number | null }[], dia: string | null = null): string {
   if (!filas.length) return 'Todavía no tengo campos cargados.'
+  if (dia && filas.length === 1) {
+    const [fila] = filas
+    const cuando = cuandoTexto(dia, hoy)
+    return fila.mesMm === null
+      ? `No tengo una medición de lluvia en *${fila.campo}* ${cuando}.`
+      : `El pluviómetro de *${fila.campo}* marcó *${mmTexto(fila.mesMm)} mm* ${cuando}.`
+  }
   const lineas = filas.map(
     (f) =>
-      `• *${f.campo}*: ${mmTexto(f.mesMm)} mm${f.anteriorMm === null ? '' : ` (el año pasado a esta altura, ${mmTexto(f.anteriorMm)})`}`,
+      `• *${f.campo}*: ${f.mesMm === null ? 'sin mediciones registradas' : `${mmTexto(f.mesMm)} mm`}${f.anteriorMm === null ? '' : ` (el año pasado a esta altura, ${mmTexto(f.anteriorMm)} mm)`}`,
   )
-  return `Lluvia medida en ${nombreMes(hoy)}, hasta hoy:\n${lineas.join('\n')}\n\nCuento sólo lo que marcó el pluviómetro.`
+  const periodo = dia ? cuandoTexto(dia, hoy) : `en ${nombreMes(hoy)}, hasta hoy`
+  return `Lluvia medida ${periodo}:\n${lineas.join('\n')}\n\nCuento sólo lo que marcó el pluviómetro.`
+}
+
+type LluviaPorFuente = { campo: string; medida: number | null; estimada: number | null; dias_estimados: number }
+
+export function estimacionesLluvia(filas: LluviaPorFuente[]): string {
+  const estimadas = filas.filter(f => f.estimada !== null)
+  if (!estimadas.length) return ''
+  const detalle = estimadas.map(f => `• ${f.campo}: *${mmTexto(f.estimada!)} mm* en ${f.dias_estimados} ${plural('día', f.dias_estimados)} con datos`)
+  return `\n\nEstimación de Open-Meteo:\n${detalle.join('\n')}`
+}
+
+export function lluviaPorPeriodo(desde: string, hasta: string, filas: LluviaPorFuente[]): string {
+  if (!filas.length) return 'Todavía no tengo campos cargados.'
+  const detalle = filas.map(f => `• ${f.campo}: ${f.medida === null ? 'sin mediciones de pluviómetro' : `*${mmTexto(f.medida)} mm* medidos`}`)
+  return `Lluvia del ${ddmm(desde)} al ${ddmm(hasta)}:\n${detalle.join('\n')}` + estimacionesLluvia(filas)
 }
 
 export type FilaVencimiento = {
@@ -148,7 +171,7 @@ const potreros = (n: number) => `${n} ${n === 1 ? 'potrero' : 'potreros'}`
 
 /** Lo que se anotó y cuánto lleva recorrido hoy: así se ve si le falta algún potrero. */
 export function recorridaAnotada(anotados: number, fecha?: string, hoy?: string): string {
-  return `Listo, anoté ${potreros(anotados)} en la recorrida de ${fecha && hoy ? cuandoTexto(fecha, hoy) : 'hoy'}.`
+  return `Guardé la recorrida de ${fecha && hoy ? cuandoTexto(fecha, hoy) : 'hoy'} con ${potreros(anotados)}.`
 }
 
 export function trasRecorrida(anotados: number, avance: { campo: string; recorridos: number; total: number }[], fecha?: string, hoy?: string): string {
@@ -180,7 +203,10 @@ export function novedades(desde: string, hasta: string, filas: { fecha: string; 
 export function resumenGastos(desde: string, hasta: string, filas: { campo: string; categoria: string; cantidad: number; total: number }[]): string {
   if (!filas.length) return `No tengo gastos registrados del ${ddmm(desde)} al ${ddmm(hasta)} para esa consulta.`
   const total = filas.reduce((s, f) => s + Number(f.total), 0)
-  return `Gastos registrados del ${ddmm(desde)} al ${ddmm(hasta)}:\n` + filas.map((f) => `• ${f.campo} · ${f.categoria}: *${pesos(Number(f.total))}* (${f.cantidad} ${f.cantidad === 1 ? 'gasto' : 'gastos'}).`).join('\n') + `\nTotal: *${pesos(total)}*. Según fecha de devengo; excluyo anulados.`
+  const periodo = desde === hasta ? `El ${ddmm(hasta)}` : `Del ${ddmm(desde)} al ${ddmm(hasta)}`
+  const detalle = filas.map((f) => `• ${f.campo} · ${f.categoria}: *${pesos(Number(f.total))}* (${f.cantidad} ${f.cantidad === 1 ? 'gasto' : 'gastos'}).`)
+  return `${periodo} tenés *${pesos(total)}* en gastos registrados.\n${detalle.join('\n')}\n\n` +
+    'Sumé por fecha del gasto. Los pendientes de pago están incluidos y los anulados quedan afuera.'
 }
 
 export function cargasRecientes(filas: { fecha: string; tipo: string; campo: string; cantidad: number | null }[]): string {

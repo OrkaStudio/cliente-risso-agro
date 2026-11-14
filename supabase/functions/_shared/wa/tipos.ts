@@ -62,6 +62,19 @@ export type ObsInterpretada = {
   novedad: string | null
 }
 
+export const CATEGORIAS_MORTANDAD = [
+  'vaca', 'vaquillona', 'novillo', 'ternero', 'ternera', 'toro', 'capon',
+  'oveja', 'carnero', 'cordero', 'cordera', 'yegua', 'padrillo', 'potrillo', 'potranca',
+] as const
+export type GrupoMortandad = { categoria: typeof CATEGORIAS_MORTANDAD[number]; cantidad: number }
+export type ReporteMortandad = {
+  campo: string | null
+  potrero: string | null
+  detalle: string | null
+  grupos: GrupoMortandad[]
+}
+export type PendienteMortandad = { tipo: 'mortandad'; capturaId: null; reporte: ReporteMortandad }
+
 /** Lo que devuelve el modelo, ya limpio. Nunca se escribe tal cual: es una propuesta. */
 export type Interpretacion = {
   intent: Intent
@@ -72,13 +85,17 @@ export type Interpretacion = {
   fechaInvalida?: boolean
   monto: number | null
   categoria: string | null
+  categoriaAnimal?: GrupoMortandad['categoria'] | null
   contraparte: string | null
   descripcion: string | null
   periodo: 'semana' | 'mes' | 'anio' | null
   /** Sólo en "novedad": una por potrero. */
   observaciones: ObsInterpretada[]
   otrosRegistros?: string[]
+  mortandad?: ReporteMortandad | null
 }
+
+export type PedidoInterpretado = { fragmento: string; interpretacion: Interpretacion }
 
 export type TipoBorrador =
   | 'recorrida'
@@ -128,6 +145,7 @@ export type Borrador = {
   monto?: number | null
   categoriaId?: string | null
   categoriaMencion?: string | null
+  categoriaAnimal?: GrupoMortandad['categoria'] | null
   contraparte?: string | null
   descripcion?: string | null
   cuit?: string | null
@@ -136,7 +154,9 @@ export type Borrador = {
   /** id del medio en Meta, para subir la foto al bucket al confirmar. */
   fotoMediaId?: string | null
   periodo?: 'semana' | 'mes' | 'anio' | null
+  semanaPasada?: boolean
   observaciones?: ObsBorrador[]
+  mortandad?: ReporteMortandad
   sesionId?: string
   cerrarSesion?: boolean
   /** Gasto de un invitado (permisos, 14/11): lo pagó el campo, lo adelantó él (reintegro) o hay que pagarlo. */
@@ -147,7 +167,7 @@ export type Borrador = {
 
 /** Qué le preguntó el bot al productor y todavía espera. */
 export type Pendiente =
-  | { tipo: 'propuesta'; capturaId: string; borrador: Borrador }
+  | { tipo: 'propuesta'; capturaId: string; borrador: Borrador; revision?: string }
   | { tipo: 'dato'; capturaId: string; borrador: Borrador; dato: 'mm' | 'monto' }
   | {
       tipo: 'campo'; capturaId: string; borrador: Borrador
@@ -177,6 +197,18 @@ export type PendienteInfra =
   | { tipo: 'infra'; capturaId: string; paso: 'borrar'; id: string; nombre: string }
   /** Dijo qué es antes de mandar la ubicación (sin señal salen juntas y llegan en cualquier orden). */
   | { tipo: 'infra'; capturaId: null; paso: 'ubicacion'; elemento: { tipo: InfraNueva['tipo']; apodo: string | null }; origen: { texto: string; entrada: 'texto' | 'audio' } }
+
+export type PasoTurno = {
+  pendiente: Exclude<Pendiente, { tipo: 'ubicado' }>
+  mensaje: Mensaje
+}
+
+export type PendienteTurno = {
+  tipo: 'turno'
+  capturaId: null
+  pasos: PasoTurno[]
+  anterior: Pendiente | PendienteInfra | PendienteMortandad | null
+}
 
 export type InfraNueva = {
   campoId: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'

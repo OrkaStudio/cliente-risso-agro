@@ -8,10 +8,10 @@
 //   queda con su id. Nunca con la clave de servicio.
 
 import postgres from 'npm:postgres@3.4.5'
-import { sumarDias,hoyAR } from '../_shared/wa/texto.ts'
+import { finDeMes, sumarDias,hoyAR } from '../_shared/wa/texto.ts'
 import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
 import { veSeccion, type Niveles } from '../_shared/wa/permisos.ts'
-import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, InfraNueva, Pasto, Pendiente, PendienteInfra } from '../_shared/wa/tipos.ts'
+import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, InfraNueva, Pasto, Pendiente, PendienteInfra, PendienteMortandad, PendienteTurno } from '../_shared/wa/tipos.ts'
 import type { PotreroDibujado } from '../_shared/wa/resolver.ts'
 import type { FilaHacienda, FilaVencimiento } from '../_shared/wa/respuestas.ts'
 import type { PeriodoSemana, SemanaCampo } from '../_shared/wa/semanal.ts'
@@ -26,15 +26,19 @@ export type Vinculo = {
   telefono: string
   user_id: string
   empresa_id: string
-  /** Puede traer un PendienteInfra: el webhook lo separa antes de usarlo. */
-  pendiente: Pendiente | PendienteInfra | null
+  pendiente: Pendiente | PendienteInfra | PendienteMortandad | PendienteTurno | null
   pendiente_at: string | null
 }
 
 export async function vinculoDe(telefono: string): Promise<Vinculo | null> {
   const [v] = await sql<Vinculo[]>`
-    select id, telefono, user_id, empresa_id, pendiente, pendiente_at
-    from wa_vinculo where telefono = ${telefono} and activo`
+    select v.id, v.telefono, v.user_id, v.empresa_id, v.pendiente, v.pendiente_at
+    from wa_vinculo v
+    where v.telefono = ${telefono} and v.activo
+      and exists (
+        select 1 from miembro_empresa m
+        where m.user_id = v.user_id and m.empresa_id = v.empresa_id
+      )`
   return v ?? null
 }
 
@@ -80,7 +84,7 @@ export async function actualizarEstado(wamid: string, estado: string, error: unk
     where wamid = ${wamid}`
 }
 
-export async function guardarPendiente(vinculoId: string, p: Pendiente | PendienteInfra | null): Promise<void> {
+export async function guardarPendiente(vinculoId: string, p: Vinculo['pendiente']): Promise<void> {
   await sql`
     update wa_vinculo set pendiente = ${p ? sql.json(p as unknown as postgres.JSONValue) : null},
       pendiente_at = ${p ? sql`now()` : null}
@@ -92,6 +96,23 @@ export async function fechaDeEntrada(v:Vinculo,mensajeId:string):Promise<string>
   const [r]=await sql<{created_at:string}[]>`select created_at::text from wa_mensaje where id=${mensajeId} and vinculo_id=${v.id} and empresa_id=${v.empresa_id} and direccion='entrante'`
   if(!r)throw Error('Mensaje no disponible para este vínculo')
   return hoyAR(new Date(r.created_at))
+}
+
+/** Contexto de la consulta de lluvia más reciente de este número. */
+export async function ultimaConsultaLluvia(v: Vinculo): Promise<{ campoId: string | null } | null> {
+  const recientes = await sql<{ tipo: string; campoId: string | null }[]>`
+    select c.propuesta->>'tipo' as tipo, c.propuesta->>'campoId' as "campoId"
+    from captura c join wa_mensaje m on m.id = c.mensaje_id and m.empresa_id = c.empresa_id
+    where m.vinculo_id = ${v.id} and m.direccion = 'entrante'
+      and c.user_id = ${v.user_id} and c.empresa_id = ${v.empresa_id}
+      and c.estado = 'respondida' and left(c.propuesta->>'tipo', 9) = 'consulta_'
+      and c.updated_at > now() - interval '15 minutes'
+    order by c.updated_at desc fetch first 1 row with ties`
+  const [consulta] = recientes
+  return consulta?.tipo === 'consulta_lluvia'
+    && recientes.every(r => r.tipo === consulta.tipo && r.campoId === consulta.campoId)
+    ? { campoId: consulta.campoId }
+    : null
 }
 
 // ── Capturas ───────────────────────────────────────────────────────────
@@ -121,9 +142,11 @@ export type CambioCaptura = {
   tokensSalida?: number
 }
 
-export async function actualizarCaptura(id: string, c: CambioCaptura): Promise<void> {
-  const j = (v: unknown) => (v === undefined ? null : sql.json(v as postgres.JSONValue))
-  await sql`
+export async function actualizarCaptura(id: string, c: CambioCaptura, tx?: Tx, vinculo?: Vinculo): Promise<void> {
+  const conexion = tx ?? sql
+  const j = (v: unknown) => (v === undefined ? null : conexion.json(v as postgres.JSONValue))
+  const alcance = vinculo ? conexion`and user_id = ${vinculo.user_id} and empresa_id = ${vinculo.empresa_id}` : conexion``
+  const [r] = await conexion`
     update captura set
       estado = coalesce(${c.estado ?? null}::estado_captura, estado),
       interpretacion = coalesce(${j(c.interpretacion)}, interpretacion),
@@ -131,21 +154,51 @@ export async function actualizarCaptura(id: string, c: CambioCaptura): Promise<v
       propuesta = coalesce(${j(c.propuesta)}, propuesta),
       escrito_tabla = coalesce(${c.escritoTabla ?? null}, escrito_tabla),
       escrito_id = coalesce(${c.escritoId ?? null}::uuid, escrito_id),
-      notas = notas || ${sql.array(c.notas ?? [])}::text[],
+      notas = notas || ${conexion.array(c.notas ?? [])}::text[],
       tokens_entrada = coalesce(tokens_entrada, 0) + ${c.tokensEntrada ?? 0},
       tokens_salida = coalesce(tokens_salida, 0) + ${c.tokensSalida ?? 0},
       updated_at = now()
-    where id = ${id}`
+    where id = ${id} ${alcance} returning id`
+  if (vinculo && !r) throw new Error('Captura fuera del vínculo')
 }
 
-/**
- * Toma la propuesta para confirmarla. Si dos "Sí" llegan juntos, sólo uno la
- * toma: el otro recibe false y no escribe.
- */
-export async function tomarPropuesta(id: string): Promise<boolean> {
-  const r = await sql`update captura set estado = 'confirmada', updated_at = now()
-                      where id = ${id} and estado = 'propuesta' returning id`
-  return r.length === 1
+/** Mueve el turno y su captura activa en la misma transacción. */
+export async function reemplazarPendiente(
+  v: Vinculo, esperado: Vinculo['pendiente'], nuevo: Vinculo['pendiente'],
+  capturas: { id: string; cambio: CambioCaptura }[] = [],
+): Promise<boolean> {
+  return await sql.begin(async tx => {
+    const [r] = await tx`update wa_vinculo w set pendiente = ${nuevo ? tx.json(nuevo as unknown as postgres.JSONValue) : null},
+        pendiente_at = case when ${Boolean(nuevo)} then now() else null end
+      where w.id = ${v.id} and w.user_id = ${v.user_id} and w.empresa_id = ${v.empresa_id} and w.activo
+        and w.pendiente is not distinct from ${esperado ? tx.json(esperado as unknown as postgres.JSONValue) : null}::jsonb
+        and exists (select 1 from miembro_empresa m where m.user_id = w.user_id and m.empresa_id = w.empresa_id)
+      returning id`
+    if (!r) return false
+    for (const c of capturas) await actualizarCaptura(c.id, c.cambio, tx, v)
+    return true
+  }) as boolean
+}
+
+/** Toma la versión vigente una sola vez antes de confirmar. */
+export async function tomarPropuesta(v: Vinculo, id: string, pendiente: Pendiente | PendienteTurno, siguiente: Vinculo['pendiente'] = null): Promise<boolean> {
+  const actual = pendiente.tipo === 'turno' ? pendiente.pasos[0]?.pendiente : pendiente
+  if (actual?.capturaId !== id) return false
+  return await sql.begin(async tx => {
+    const [vigente] = await tx`select id from wa_vinculo w where w.id = ${v.id}
+      and w.user_id = ${v.user_id} and w.empresa_id = ${v.empresa_id} and w.activo
+      and w.pendiente = ${tx.json(pendiente as unknown as postgres.JSONValue)}
+      and exists (select 1 from miembro_empresa m where m.user_id = w.user_id and m.empresa_id = w.empresa_id)
+      for update`
+    if (!vigente) return false
+    const [captura] = await tx`update captura set estado = 'confirmada', updated_at = now()
+      where id = ${id} and empresa_id = ${v.empresa_id} and user_id = ${v.user_id}
+      and estado = 'propuesta' returning id`
+    if (!captura) return false
+    const nuevo = siguiente ? tx.json(siguiente as unknown as postgres.JSONValue) : null
+    await tx`update wa_vinculo set pendiente = ${nuevo}, pendiente_at = case when ${Boolean(siguiente)} then now() else null end where id = ${v.id}`
+    return true
+  }) as boolean
 }
 
 export async function estadoCaptura(id: string): Promise<string | null> {
@@ -332,21 +385,38 @@ export async function subirComprobante(empresaId: string, movimientoId: string, 
 // ── Lecturas para las respuestas ───────────────────────────────────────
 
 /** mm medidos (manual) en el mes de `hasta`, hasta ese día; y lo mismo un año antes. */
-export function lluviaMes(v: Vinculo, campoId: string | null, hasta: string) {
-  const desde = `${hasta.slice(0, 7)}-01`
-  const antHasta = `${Number(hasta.slice(0, 4)) - 1}${hasta.slice(4)}`
-  const antDesde = `${antHasta.slice(0, 7)}-01`
+export function lluviaMes(v: Vinculo, campoId: string | null, hasta: string, soloDia = false) {
+  const desde = soloDia ? hasta : `${hasta.slice(0, 7)}-01`
+  const antDesde = `${Number(hasta.slice(0, 4)) - 1}${hasta.slice(4, 7)}-01`
+  const antDia = Math.min(Number(hasta.slice(8)), Number(finDeMes(antDesde).slice(8)))
+  const antHasta = `${antDesde.slice(0, 8)}${String(antDia).padStart(2, '0')}`
   return comoUsuario(v.user_id, (tx) =>
-    tx<{ campo_id: string; campo: string; mes_mm: number; ant_mm: number | null }[]>`
+    tx<{ campo_id: string; campo: string; mes_mm: number; mes_mediciones: number; ant_mm: number | null }[]>`
       select c.id as campo_id, c.nombre as campo,
         coalesce(sum(l.mm) filter (where l.fecha between ${desde} and ${hasta}), 0)::float8 as mes_mm,
-        case when count(l.id) filter (where l.fecha < ${desde}) = 0 then null
-             else coalesce(sum(l.mm) filter (where l.fecha between ${antDesde} and ${antHasta}), 0)::float8 end as ant_mm
+        (count(l.id) filter (where l.fecha between ${desde} and ${hasta}))::int as mes_mediciones,
+        (sum(l.mm) filter (where l.fecha between ${antDesde} and ${antHasta}))::float8 as ant_mm
       from campo c
       left join lluvia l on l.campo_id = c.id and l.fuente = 'manual'
       where c.empresa_id = ${v.empresa_id} and (${campoId}::uuid is null or c.id = ${campoId})
       group by c.id, c.nombre
       order by c.nombre`,
+  )
+}
+
+/** Devuelve cada fuente por separado. Un cero registrado se conserva como tal. */
+export function lluviaPeriodo(v: Vinculo, campoId: string | null, desde: string, hasta: string) {
+  return comoUsuario(v.user_id, tx =>
+    tx<{ campo: string; medida: number | null; estimada: number | null; dias_estimados: number }[]>`
+      select c.nombre as campo,
+        sum(l.mm) filter (where l.fuente = 'manual')::float8 as medida,
+        sum(l.mm) filter (where l.fuente = 'open_meteo')::float8 as estimada,
+        count(distinct l.fecha) filter (where l.fuente = 'open_meteo')::int as dias_estimados
+      from campo c
+      left join lluvia l on l.campo_id = c.id and l.empresa_id = c.empresa_id
+        and l.fecha between ${desde} and ${hasta}
+      where c.empresa_id = ${v.empresa_id} and (${campoId}::uuid is null or c.id = ${campoId})
+      group by c.id, c.nombre order by c.nombre`
   )
 }
 

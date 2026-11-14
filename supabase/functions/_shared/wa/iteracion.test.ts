@@ -3,7 +3,7 @@ import { arrancar, corregir, leer, siguientePaso } from './conversacion.ts'
 import { limpiarInterpretacion, promptInterpretar } from './interpretar.ts'
 import { potreroEnPunto } from './resolver.ts'
 import { payload, prepararMensajes } from '../../wa-webhook/meta.ts'
-import { resumenGastos, resumenRecorrida, ultimaObservacion, novedades, cargasRecientes } from './respuestas.ts'
+import { resumenGastos, resumenRecorrida, ultimaObservacion, novedades, cargasRecientes, lluviaConsulta } from './respuestas.ts'
 import type { Contexto, Pendiente } from './tipos.ts'
 import { inicioSemana, numeroEn, pesos } from './texto.ts'
 
@@ -150,11 +150,22 @@ describe('propuestas y respuestas completas', () => {
     expect(resumenGastos(ctx.hoy, ctx.hoy, [])).toContain('No tengo gastos')
     expect(cargasRecientes([])).toContain('No encontré cargas')
   })
-  it('el gasto consultado declara período, total y criterio contable', () => {
-    const texto = resumenGastos('2026-10-01', ctx.hoy, [{ campo: 'La Porteña', categoria: 'Combustible', total: 45000, cantidad: 1 }])
-    expect(texto).toContain('$45.000')
-    expect(texto).toContain('fecha de devengo')
-    expect(texto).toContain('excluyo anulados')
+  it('el gasto consultado abre con el total y explica qué gastos incluye', () => {
+    const texto = resumenGastos('2026-10-01', ctx.hoy, [
+      { campo: 'La Porteña', categoria: 'Combustible', total: 45000, cantidad: 1 },
+      { campo: 'La Porteña', categoria: 'Sanidad', total: 1000.5, cantidad: 1 },
+    ])
+    expect(texto.split('\n')[0]).toBe('Del 01/10 al 12/10 tenés *$46.000,50* en gastos registrados.')
+    expect(texto).toContain('fecha del gasto')
+    expect(texto).toContain('pendientes de pago están incluidos')
+    expect(texto).toContain('anulados quedan afuera')
+  })
+  it('la respuesta de lluvia diaria distingue cero medido de una medición faltante', () => {
+    const fila = { campo: 'La Porteña', mesMm: 0, anteriorMm: null }
+    expect(lluviaConsulta('2026-10-12', [fila], '2026-10-11'))
+      .toBe('El pluviómetro de *La Porteña* marcó *0 mm* ayer.')
+    expect(lluviaConsulta('2026-10-12', [{ ...fila, mesMm: null }], '2026-10-12'))
+      .toBe('No tengo una medición de lluvia en *La Porteña* hoy.')
   })
   it('los potreros pendientes salen de observaciones guardadas', () => {
     const texto = resumenRecorrida(ctx.hoy, [{ campo: 'La Porteña', recorridos: 1, total: 3, pendientes: ['2B', '3B'] }])

@@ -121,8 +121,8 @@ const fechaBase = (ctx: Contexto): string => ctx.fechaMensaje ?? ctx.hoy
 
 /** Las fechas explícitas del productor prevalecen sobre las omisiones del modelo. */
 function fechaDelMensaje(it: Interpretacion, ctx: Contexto, texto?: string, tipo: string = it.intent): Interpretacion {
-  if (!texto || !['lluvia', 'gasto', 'novedad', 'recorrida'].includes(tipo)) return it
-  const t = norm(texto)
+  if (!texto || !['lluvia', 'gasto', 'novedad', 'recorrida', 'consulta_lluvia'].includes(tipo)) return it
+  const t = norm(texto).replace(/\bantes de ayer\b/g, 'anteayer')
   const relativos: Record<string, number> = { 'pasado manana': 2, manana: 1, hoy: 0, ayer: -1, anteayer: -2 }
   const fechas = [...t.matchAll(/\b(pasado manana|manana|anteayer|ayer|hoy)\b/g)].map((m) => sumarDias(fechaBase(ctx), relativos[m[1]]))
   fechas.push(...[...t.matchAll(/\b\d{4}-\d{2}-\d{2}\b/g)].map((m) => m[0]))
@@ -177,8 +177,12 @@ export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: 
           descripcion: it.descripcion,
         },
       }
-    case 'consulta_hacienda':
     case 'consulta_lluvia':
+      if (it.fechaInvalida) return { respuesta: '¿De qué día querés consultar la lluvia?', estado: 'respondida' }
+      return { borrador: { tipo: it.intent, campoMencion: it.campo, potreroMencion: it.potrero, fecha: it.fecha,
+        periodo: it.periodo, semanaPasada: /\bsemana pasada\b/.test(norm(texto)) } }
+    case 'consulta_hacienda':
+      return { borrador: { tipo: it.intent, campoMencion: it.campo, potreroMencion: it.potrero, categoriaAnimal: it.categoriaAnimal, periodo: it.periodo } }
     case 'consulta_vencimientos':
     case 'consulta_dias_potrero':
     case 'consulta_recorrida':
@@ -242,11 +246,12 @@ export type Lectura =
   /** Mensaje nuevo. Si había algo pendiente, queda incompleto. */
   | { k: 'nuevo'; abandona: string | null }
 
-export const SI = /^(si|sii+|dale|ok|okey|oka|confirmo|de una|correcto|joya|perfecto|listo|asi es|eso)\b/
+const INICIO_SI = /^(?:si|sii+|dale|ok|okey|oka|confirmo|de una|correcto|joya|perfecto|listo|asi es|eso)\b/
+export const SI = /^(?:(?:si|sii+|dale|ok|okey|oka|de una)(?:[, ]+(?:guardalo|anotalo|guarda eso))?|confirmo|correcto|joya|perfecto|listo|asi es|eso|guardalo|anotalo|guarda eso)[\s.!¡]*$/
 export const NO = /^(no|nop|cancela|cancelar|deja|dejalo|olvidate)\b/
 
 function lluviaLista(b: Borrador, ctx: Contexto): boolean {
-  return b.tipo === 'lluvia' && typeof b.mm === 'number' && Number.isFinite(b.mm) && b.mm >= 0 &&
+  return b.tipo === 'lluvia' && !b.mortandad && typeof b.mm === 'number' && Number.isFinite(b.mm) && b.mm >= 0 &&
     esFecha(b.fecha) && b.fecha <= ctx.hoy
 }
 
@@ -266,6 +271,10 @@ export function leer(
     const b = leerBoton(entrada.botonId)
     if (!b || !p || p.capturaId !== b.capturaId) return { k: 'viejo', capturaId: b?.capturaId ?? '' }
     const [accion, valor] = b.accion.split('=')
+    if (accion === 'si' || accion === 'cancelar' || accion === 'corregir') {
+      const revision = p.tipo === 'propuesta' ? p.revision : undefined
+      if (valor !== revision) return { k: 'viejo', capturaId: p.capturaId }
+    }
     if (accion === 'si' && p.tipo === 'propuesta') return { k: 'confirmar', capturaId: p.capturaId, borrador: p.borrador }
     if (accion === 'cancelar') return { k: 'cancelar', capturaId: p.capturaId }
     if (accion === 'corregir') return { k: 'pedir_correccion', capturaId: p.capturaId, borrador: p.borrador }
@@ -309,6 +318,7 @@ export function leer(
   switch (p.tipo) {
     case 'propuesta': {
       if (SI.test(t)) return { k: 'confirmar', capturaId: p.capturaId, borrador: p.borrador }
+      if (INICIO_SI.test(t)) return { k: 'reinterpretar', capturaId: p.capturaId, borrador: p.borrador, texto }
       if (NO.test(t)) {
         const resto = t.replace(NO, '').replace(/^[\s,.:;-]+/, '')
         if (!resto) return { k: 'cancelar', capturaId: p.capturaId }
@@ -319,6 +329,7 @@ export function leer(
       return { k: 'nuevo', abandona: p.capturaId }
     }
     case 'corregir':
+      if (NO.test(t) && !t.replace(NO, '').replace(/^[\s,.!?]+/, '')) return { k: 'cancelar', capturaId: p.capturaId }
       return { k: 'reinterpretar', capturaId: p.capturaId, borrador: p.borrador, texto }
     case 'dato': {
       const n = numeroEn(texto)
@@ -385,7 +396,7 @@ export function leer(
 
 export type Paso =
   | { k: 'preguntar'; mensaje: Mensaje; pendiente: Pendiente; notas: string[] }
-  | { k: 'proponer'; mensaje: Mensaje; pendiente: Pendiente; borrador: Borrador; notas: string[] }
+  | { k: 'proponer'; mensaje: Mensaje; pendiente: Extract<Pendiente, { tipo: 'propuesta' }>; borrador: Borrador; notas: string[] }
   | { k: 'consultar'; borrador: Borrador; notas: string[] }
   | { k: 'decir'; mensaje: Mensaje; notas: string[] }
 
@@ -400,10 +411,10 @@ function opciones(capturaId: string, items: Boton[], texto: string, boton: strin
 }
 
 function preguntarCampo(
-  capturaId: string, b: Borrador, campos: Campo[], texto: string, notas: string[], ctx: Contexto, aviso = '',
+  capturaId: string, b: Borrador, campos: Campo[], texto: string, notas: string[], ctx: Contexto, aviso = '', compuesto = false,
 ): Paso {
   const lluvia = { ...b, fecha: b.fecha ?? fechaBase(ctx) }
-  const confirma = lluviaLista(lluvia, ctx)
+  const confirma = !compuesto && lluviaLista(lluvia, ctx)
   const pendiente: Pendiente = confirma
     ? { tipo: 'campo', capturaId, borrador: lluvia, confirmaAlElegir: true, camposOfrecidos: campos.map((c) => c.id) }
     : { tipo: 'campo', capturaId, borrador: b }
@@ -470,16 +481,16 @@ export function comoSePaga(b: Borrador, ctx: Contexto): string {
 export function textoPropuesta(b: Borrador, ctx: Contexto): string {
   const campo = campoPorId(ctx.campos, b.campoId)?.nombre ?? ''
   const cuando = cuandoTexto(b.fecha ?? fechaBase(ctx), ctx.hoy)
-  if (b.tipo === 'lluvia') return `Anoto *${mmTexto(b.mm ?? 0)} mm en ${campo}*, ${cuando}.`
+  if (b.tipo === 'lluvia') return `Tengo *${mmTexto(b.mm ?? 0)} mm en ${campo}*, ${cuando}. ¿Los guardo?`
   const cat = ctx.categoriasGasto.find((c) => c.id === b.categoriaId)?.nombre ?? ''
   const partes = [
-    `Anoto un *gasto de ${pesos(b.monto ?? 0)}*${b.contraparte ? ` a ${b.contraparte}` : ''}`,
+    `¿Guardo este *gasto de ${pesos(b.monto ?? 0)}*${b.contraparte ? ` a ${b.contraparte}` : ''}?`,
     `${cat} · ${campo} · ${comoSePaga(b, ctx)}`,
   ]
   if (b.descripcion) partes.push(b.descripcion)
   const iva = (b.ivaLineas ?? []).reduce((s, l) => s + (l.iva || 0), 0)
   if (iva > 0) partes.push(`IVA ${pesos(iva)}`)
-  if (b.fotoMediaId) partes.push('Guardo la foto del comprobante.')
+  if (b.fotoMediaId) partes.push('También queda adjunta la foto del comprobante.')
   return partes.join('\n')
 }
 
@@ -521,9 +532,9 @@ function textoRecorrida(obs: ObsBorrador[], ctx: Contexto, aviso: string, fecha:
   }
   const cuerpo = [...grupos.entries()].map(([campo, lineas]) => `${campo}\n${lineas.join('\n')}`).join('\n\n')
   const baja = obs.some((o) => o.novedad && MUERTE.test(o.novedad))
-    ? '\n\nLa baja del animal no la hago por acá: queda como novedad y la das de baja en Hacienda.'
+    ? '\n\nEsto queda como novedad de la recorrida. La baja del animal se hace en Hacienda.'
     : ''
-  return `${aviso}Anoto en la recorrida de ${cuandoTexto(fecha, ctx.hoy)}:\n${cuerpo}${baja}`
+  return `${aviso}Esto entendí de la recorrida de ${cuandoTexto(fecha, ctx.hoy)}. ¿La guardo así?\n\n${cuerpo}${baja}`
 }
 
 export function preguntaRecorrida(p: Pendiente, ctx: Contexto): string {
@@ -600,7 +611,7 @@ function pasoRecorrida(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
     mensaje: {
       texto: textoRecorrida(quedan, ctx, aviso, b.fecha!),
       botones: [
-        { id: botonId(capturaId, 'si'), titulo: 'Sí' },
+        { id: botonId(capturaId, 'si'), titulo: 'Guardar recorrida' },
         { id: botonId(capturaId, 'corregir'), titulo: 'Corregir' },
         { id: botonId(capturaId, 'cancelar'), titulo: 'Cancelar' },
       ],
@@ -610,7 +621,7 @@ function pasoRecorrida(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
   }
 }
 
-export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): Paso {
+export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto, compuesto = false): Paso {
   if (b0.tipo === 'recorrida') return pasoRecorrida(capturaId, b0, ctx)
   const b: Borrador = { ...b0 }
   const notas: string[] = []
@@ -634,11 +645,15 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
     } else if ('varios' in r) {
       notas.push(`"${b.campoMencion}" coincide con ${r.varios.length} campos: se pregunta.`)
       b.campoMencion = null
-      return preguntarCampo(capturaId, b, r.varios, '¿Cuál de estos campos?', notas, ctx)
+      return preguntarCampo(capturaId, b, r.varios, '¿Cuál de estos campos?', notas, ctx, '', compuesto)
     } else {
       notas.push(`No hay un campo "${b.campoMencion}".`)
       aviso = `No encontré el campo «${b.campoMencion}». `
-      if (b.tipo.startsWith('consulta_')) return { k: 'decir', mensaje: { texto: `${aviso}Decime el nombre como figura en la app.` }, notas }
+      const mensaje = { texto: aviso + 'Decime el nombre como figura en la app.' }
+      if (compuesto && ctx.campos.length) {
+        return { k: 'preguntar', mensaje, pendiente: { tipo: 'campo', capturaId, borrador: { ...b, campoMencion: null } }, notas }
+      }
+      if (b.tipo.startsWith('consulta_')) return { k: 'decir', mensaje, notas }
       b.campoMencion = null
     }
   }
@@ -660,6 +675,12 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
       return preguntarPotrero(capturaId, b, r.varios, texto, notas)
     } else {
       notas.push(`No hay un potrero "${b.potreroMencion}".`)
+      if (b.tipo.startsWith('consulta_')) {
+        const mensaje = { texto: `No encontré el potrero «${b.potreroMencion}». Decime el nombre como figura en la app.` }
+        return compuesto
+          ? { k: 'preguntar', mensaje, pendiente: { tipo: 'potrero', capturaId, borrador: { ...b, potreroMencion: null } }, notas }
+          : { k: 'decir', mensaje, notas }
+      }
       b.potreroMencion = null
     }
   }
@@ -679,7 +700,7 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
               ? `¿En qué campo llovieron ${mmTexto(b.mm)} mm?`
               : '¿En qué campo llovió?'
             : `¿De qué campo es el gasto${b.monto ? ` de *${pesos(b.monto)}*` : ''}?`
-        return preguntarCampo(capturaId, b, ctx.campos, texto, notas, ctx, aviso)
+        return preguntarCampo(capturaId, b, ctx.campos, texto, notas, ctx, aviso, compuesto)
       }
     }
     if (b.tipo === 'lluvia' && (b.mm === null || b.mm === undefined)) {
@@ -754,7 +775,7 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto): P
       mensaje: {
         texto: textoPropuesta(b, ctx),
         botones: [
-          { id: botonId(capturaId, 'si'), titulo: 'Sí' },
+          { id: botonId(capturaId, 'si'), titulo: b.tipo === 'lluvia' ? 'Guardar lluvia' : 'Guardar gasto' },
           { id: botonId(capturaId, 'corregir'), titulo: 'Corregir' },
           { id: botonId(capturaId, 'cancelar'), titulo: 'Cancelar' },
         ],

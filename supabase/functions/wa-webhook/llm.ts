@@ -1,9 +1,9 @@
 // Interpretar un mensaje con Haiku (tool use forzado) y leer comprobantes
 // reusando la Edge Function extraer-comprobante.
 
-import { EntradaIncompleta, HERRAMIENTA, limpiarInterpretacion, promptInterpretar } from '../_shared/wa/interpretar.ts'
+import { EntradaIncompleta, HERRAMIENTA, HERRAMIENTA_TURNO, limpiarPedidos, MAX_PEDIDOS, promptInterpretar } from '../_shared/wa/interpretar.ts'
 import { leerServicio } from '../_shared/wa/servicios.ts'
-import type { Borrador, Contexto, Interpretacion } from '../_shared/wa/tipos.ts'
+import type { Borrador, Contexto, Interpretacion, PedidoInterpretado } from '../_shared/wa/tipos.ts'
 
 const MODELO = 'claude-haiku-4-5'
 
@@ -13,10 +13,14 @@ export async function interpretar(
   texto: string,
   ctx: Contexto,
   anterior?: Borrador,
-): Promise<{ interpretacion: Interpretacion; uso: Uso }> {
+  varios = false,
+): Promise<{ interpretacion: Interpretacion; pedidos: PedidoInterpretado[]; uso: Uso }> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) throw new Error('Falta ANTHROPIC_API_KEY')
-  const prompt = promptInterpretar(texto, ctx, anterior)
+  const herramienta = varios ? HERRAMIENTA_TURNO : HERRAMIENTA
+  const prompt = promptInterpretar(texto, ctx, anterior) + (varios
+    ? '\nDevolvé pedidos como lista, uno por cada consulta o carga independiente. Cada uno lleva sus propios datos, fecha y un fragmento literal del mensaje. Una parte desconocida debe aparecer como intent "otro". En cada pedido dejá otros_registros vacío. Si el mensaje sólo combina lluvia y un reporte de mortandad, conservá mortandad dentro del pedido de lluvia para su revisión.'
+    : '')
   const json = await leerServicio<{
     content?: { type: string; input?: unknown }[]
     usage?: { input_tokens: number; output_tokens: number }
@@ -32,17 +36,25 @@ export async function interpretar(
       model: MODELO,
       max_tokens: 4096,
       temperature: 0,
-      tools: [HERRAMIENTA],
-      tool_choice: { type: 'tool', name: HERRAMIENTA.name },
+      tools: [herramienta],
+      tool_choice: { type: 'tool', name: herramienta.name },
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(25_000),
   }) })
   if (json.stop_reason === 'max_tokens') throw new EntradaIncompleta('No pude revisar el mensaje completo. Mandalo en partes más cortas; no guardé una parte sin avisarte. Tu pendiente se conserva.')
-  const tool = json.content?.find((b) => b.type === 'tool_use')
-  if (!tool?.input) throw new EntradaIncompleta('No pude interpretar el mensaje completo. Tu pendiente se conserva; probá con un audio más corto o escribime lo que falta.')
+  const herramientas = json.content?.filter((b) => b.type === 'tool_use') ?? []
+  if (!herramientas.length || herramientas.some(b => !b.input)) {
+    throw new EntradaIncompleta('No pude interpretar el mensaje completo. Tu pendiente se conserva; probá con un audio más corto o escribime lo que falta.')
+  }
+  const pedidos = herramientas.flatMap(b => limpiarPedidos(b.input, texto))
+  if (pedidos.length > MAX_PEDIDOS) throw new EntradaIncompleta('Hay muchos pedidos en ese mensaje. Mandámelos en partes más cortas.')
+  if (!varios && pedidos.length > 1) {
+    throw new EntradaIncompleta('Hay más de un pedido en esa corrección. Decime qué dato querés cambiar en la propuesta actual.')
+  }
   return {
-    interpretacion: limpiarInterpretacion(tool?.input),
+    interpretacion: pedidos[0].interpretacion,
+    pedidos,
     uso: { entrada: json.usage?.input_tokens ?? 0, salida: json.usage?.output_tokens ?? 0 },
   }
 }

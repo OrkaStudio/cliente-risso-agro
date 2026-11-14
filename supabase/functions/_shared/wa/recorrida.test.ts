@@ -66,12 +66,12 @@ describe('la recorrida de Fran: tres potreros en un audio', () => {
     const paso = siguientePaso('c', borrador(audio), ctx)
     if (paso.k !== 'proponer') throw new Error(`Debe proponer, fue ${paso.k}`)
     expect(paso.mensaje.texto).toBe(
-      'Anoto en la recorrida de hoy:\nLa Porteña\n' +
+      'Esto entendí de la recorrida de hoy. ¿La guardo así?\n\nLa Porteña\n' +
         '• *2B*: aguada llena, mucha agua, la aguada rebalsa\n' +
         '• *5B*: 15 terneros\n' +
         '• *7B*: faltan 2 terneros',
     )
-    expect(paso.mensaje.botones?.map((b) => b.titulo)).toEqual(['Sí', 'Corregir', 'Cancelar'])
+    expect(paso.mensaje.botones?.map((b) => b.titulo)).toEqual(['Guardar recorrida', 'Corregir', 'Cancelar'])
     expect(paso.borrador.observaciones?.map((o) => o.potreroId)).toEqual(['lp-2B', 'lp-5B', 'lp-7B'])
   })
 
@@ -128,7 +128,7 @@ describe('qué potrero es', () => {
   it('un potrero que no existe no se anota, y se avisa', () => {
     const paso = siguientePaso('c', borrador([obs({ potrero: '40', novedad: 'x' }), obs({ potrero: '7', novedad: 'y' })]), ctx)
     if (paso.k !== 'proponer') throw new Error('Debe proponer')
-    expect(paso.mensaje.texto.startsWith('No encontré el potrero «40»: eso no lo anoto. Anoto en la recorrida de hoy:')).toBe(true)
+    expect(paso.mensaje.texto.startsWith('No encontré el potrero «40»: eso no lo anoto. Esto entendí de la recorrida de hoy.')).toBe(true)
     expect(paso.borrador.observaciones).toHaveLength(1)
   })
 
@@ -160,7 +160,7 @@ describe('«acá»: el potrero sale de la ubicación', () => {
   it('con la ubicación, propone en ese potrero', () => {
     const b = conUbicacion(borrador(aca), { potreroId: 'pa-3D', campoId: 'pa' })
     const paso = siguientePaso('c', b, ctx)
-    expect(paso.k === 'proponer' && paso.mensaje.texto).toBe('Anoto en la recorrida de hoy:\nLos Pampas\n• *3D*: el molino no anda')
+    expect(paso.k === 'proponer' && paso.mensaje.texto).toBe('Esto entendí de la recorrida de hoy. ¿La guardo así?\n\nLos Pampas\n• *3D*: el molino no anda')
   })
 
   it('la ubicación sólo completa lo que dijo «acá»', () => {
@@ -202,12 +202,12 @@ describe('lo que se dice', () => {
   })
   it('una muerte avisa que la baja se hace en la app', () => {
     const paso = siguientePaso('c', borrador([obs({ potrero: '3', campo: 'La Porteña', novedad: 'vaca muerta, caravana 4521' })]), ctx)
-    expect(paso.k === 'proponer' && paso.mensaje.texto).toContain('La baja del animal no la hago por acá')
+    expect(paso.k === 'proponer' && paso.mensaje.texto).toContain('La baja del animal se hace en Hacienda.')
   })
   it('después de guardar, cuánto va de la recorrida de hoy', () => {
     expect(trasRecorrida(3, [{ campo: 'La Porteña', recorridos: 4, total: 12 }]))
-      .toBe('Listo, anoté 3 potreros en la recorrida de hoy. Hoy van 4 de 12 en La Porteña.')
-    expect(trasRecorrida(1, [])).toBe('Listo, anoté 1 potrero en la recorrida de hoy.')
+      .toBe('Guardé la recorrida de hoy con 3 potreros. Hoy van 4 de 12 en La Porteña.')
+    expect(trasRecorrida(1, [])).toBe('Guardé la recorrida de hoy con 1 potrero.')
   })
   it('el pedido de ubicación va como el mensaje interactivo de Meta', () => {
     expect(payload('549', { texto: '¿Dónde estás?', pedirUbicacion: true })).toEqual({
