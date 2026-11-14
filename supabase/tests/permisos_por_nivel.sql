@@ -200,6 +200,13 @@ begin
   exception when raise_exception then null;
   end;
   perform public.crear_invitacion('2241000001', 'Pedro', 'peon', '{"hacienda": "no", "campos": "solo_manda", "plata": "no"}');
+  -- Sólo por WhatsApp: se manda, no se ve.
+  begin
+    perform public.crear_invitacion('2241000002', 'Vet', 'vet', '{"hacienda": "ve", "campos": "no", "plata": "no"}', 'whatsapp');
+    assert false, 'por WhatsApp no debería poder «ver»';
+  exception when raise_exception then null;
+  end;
+  perform public.crear_invitacion('2241000002', 'Vet', 'vet', '{"hacienda": "solo_manda", "campos": "no", "plata": "solo_manda"}', 'whatsapp');
 end $$;
 reset role;
 

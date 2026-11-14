@@ -9,14 +9,17 @@ import { NIVELES, ROLES, SECCIONES_CON_PERMISO, nombreRol, resumenNiveles, type 
 import { normalizarCelularAR } from '@/lib/telefono'
 import { nombrePropio, primeraMayuscula } from '@/lib/texto'
 import { cn } from '@/lib/utils'
-import { celularLindo, linkInvitacion, useCambiarNiveles, useInvitar, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
+import { celularLindo, linkInvitacion, useCambiarNiveles, useInvitar, whatsappInvitacionBot, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
+import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 
 /**
  * Qué puede hacer en cada sección (permisos, 13/11): una fila por sección, con
  * lo que hay adentro, y los cuatro niveles. Nada viene elegido: decide el dueño.
  * Debajo, en palabras simples, qué significa lo elegido.
  */
-function ElegirNiveles({ niveles, onCambiar }: { niveles: Niveles; onCambiar: (n: Niveles) => void }) {
+function ElegirNiveles({ niveles, onCambiar, soloWhatsapp = false }: { niveles: Niveles; onCambiar: (n: Niveles) => void; soloWhatsapp?: boolean }) {
+  // Por WhatsApp no se ve nada: se manda (Lau, 13/11).
+  const opciones = soloWhatsapp ? NIVELES.filter((n) => n.id === 'no' || n.id === 'solo_manda') : NIVELES
   return (
     <div className="flex flex-col gap-3">
       {SECCIONES_CON_PERMISO.map((s) => {
@@ -32,8 +35,8 @@ function ElegirNiveles({ niveles, onCambiar }: { niveles: Niveles; onCambiar: (n
                 <span className="block text-[13.5px] text-texto-suave">{s.queHay}</span>
               </span>
             </div>
-            <div role="radiogroup" aria-label={`Qué puede hacer en ${s.texto}`} className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {NIVELES.map((n) => {
+            <div role="radiogroup" aria-label={`Qué puede hacer en ${s.texto}`} className={cn('mt-3 grid grid-cols-2 gap-1.5', !soloWhatsapp && 'sm:grid-cols-4')}>
+              {opciones.map((n) => {
                 const si = elegido === n.id
                 return (
                   <button
@@ -80,6 +83,8 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   const [otroRol, setOtroRol] = useState('')
   const rol: Rol | '' = tipoRol === 'otro' ? otroRol.trim() : tipoRol
   const [niveles, setNiveles] = useState<Niveles>({})
+  // Cómo va a usar Troppero: en la app, o sólo mandando por WhatsApp (Lau, 13/11). Nada viene elegido.
+  const [acceso, setAcceso] = useState<'app' | 'whatsapp' | ''>('')
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -89,10 +94,11 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
     if (!cel) return setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.')
     if (!tipoRol) return setError('Tocá qué hace en el campo.')
     if (tipoRol === 'otro' && otroRol.trim().length < 2) return setError('Escribí qué hace en el campo.')
+    if (!acceso) return setError('Elegí cómo va a usar Troppero.')
     const falta = faltaElegir(niveles)
     if (falta) return setError(falta)
     try {
-      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles }))
+      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles, acceso }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo invitar. Probá de nuevo.')
     }
@@ -105,19 +111,23 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
         abierto={abierto}
         onCerrar={onCerrar}
         titulo={`Listo: invitaste a ${nombre.trim().split(' ')[0]}`}
-        bajada="Mandale el link por WhatsApp: entra con su celular, sin contraseña. Vence en 7 días."
+        bajada={
+          acceso === 'whatsapp'
+            ? 'Mandale el número de Troppero: con su primer mensaje queda adentro, sin bajarse nada. Vence en 7 días.'
+            : 'Mandale el link por WhatsApp: entra con su celular, sin contraseña. Vence en 7 días.'
+        }
         chico
         pie={
           <div className="flex flex-col gap-2.5">
-            <a href={whatsappInvitacion({ celular: cel, nombre, empresa, token })} target="_blank" rel="noreferrer" className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600">
+            <a href={acceso === 'whatsapp' ? whatsappInvitacionBot({ celular: cel, nombre, empresa, bot: WHATSAPP_TROPERO }) : whatsappInvitacion({ celular: cel, nombre, empresa, token })} target="_blank" rel="noreferrer" className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600">
               Mandárselo por WhatsApp
               <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto">
                 <Icono nombre="Celular" tamano={16} />
               </span>
             </a>
-            <button type="button" onClick={() => void navigator.clipboard.writeText(linkInvitacion(token)).then(() => toast.success('Listo: copiaste el link', { description: 'Pegalo donde quieras mandárselo.' }))} className="h-12 rounded-full border-[1.5px] border-borde bg-superficie text-[15.5px] font-bold text-texto hover:border-principal hover:text-principal">
+            {acceso !== 'whatsapp' && <button type="button" onClick={() => void navigator.clipboard.writeText(linkInvitacion(token)).then(() => toast.success('Listo: copiaste el link', { description: 'Pegalo donde quieras mandárselo.' }))} className="h-12 rounded-full border-[1.5px] border-borde bg-superficie text-[15.5px] font-bold text-texto hover:border-principal hover:text-principal">
               Copiar el link
-            </button>
+            </button>}
           </div>
         }
       >
@@ -130,7 +140,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
       abierto={abierto}
       onCerrar={onCerrar}
       titulo="Invitar a alguien"
-      bajada="Le llega un link por WhatsApp y entra con su celular. Vos elegís qué ve y qué carga; lo cambiás cuando quieras."
+      bajada="Vos elegís cómo lo usa, qué ve y qué carga; lo cambiás cuando quieras."
       ancho
       pie={
         <>
@@ -157,10 +167,40 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
           <CampoTexto className="mt-3" etiqueta="Qué hace" placeholder="Contador, ingeniero agrónomo…" value={otroRol} onChange={(e) => setOtroRol(primeraMayuscula(e.target.value))} autoFocus maxLength={40} />
         )}
       </Grupo>
-      <Grupo titulo="Qué puede hacer en cada sección">
-        <ElegirNiveles niveles={niveles} onCambiar={setNiveles} />
+      <Grupo titulo="Cómo va a usar Troppero">
+        <div role="radiogroup" aria-label="Cómo va a usar Troppero" className="grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              { id: 'app', titulo: 'En la app y por WhatsApp', texto: 'Entra con su celular, mira y carga lo que le habilites.' },
+              { id: 'whatsapp', titulo: 'Sólo por WhatsApp', texto: 'No se baja nada: te manda novedades, gastos o facturas por WhatsApp.' },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={acceso === o.id}
+              onClick={() => {
+                setAcceso(o.id)
+                // Por WhatsApp no se ve: lo elegido que no sea «No ve» o «Solo manda» se vuelve a elegir.
+                if (o.id === 'whatsapp') setNiveles((n) => Object.fromEntries(Object.entries(n).filter(([, v]) => v === 'no' || v === 'solo_manda')))
+              }}
+              className={cn('flex flex-col gap-0.5 rounded-[16px] border-[1.5px] px-4 py-3 text-left transition-colors', acceso === o.id ? 'border-acento bg-acento/30' : 'border-borde bg-superficie hover:border-neutro-300')}
+            >
+              <span className="text-[15.5px] font-bold text-texto">{o.titulo}</span>
+              <span className="text-[13.5px] text-texto-suave">{o.texto}</span>
+            </button>
+          ))}
+        </div>
       </Grupo>
-      <Resumen niveles={niveles} nombre={nombre} />
+      {acceso && (
+        <>
+          <Grupo titulo="Qué puede hacer en cada sección">
+            <ElegirNiveles niveles={niveles} onCambiar={setNiveles} soloWhatsapp={acceso === 'whatsapp'} />
+          </Grupo>
+          <Resumen niveles={niveles} nombre={nombre} />
+        </>
+      )}
     </PanelLateral>
   )
 }
@@ -258,7 +298,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
         </>
       ) : (
         <>
-          <ElegirNiveles niveles={niveles} onCambiar={setNiveles} />
+          <ElegirNiveles niveles={niveles} onCambiar={setNiveles} soloWhatsapp={p.acceso === 'whatsapp'} />
           <Resumen niveles={niveles} nombre={p.nombre} />
         </>
       )}

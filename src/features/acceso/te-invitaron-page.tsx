@@ -4,6 +4,7 @@ import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
 import { formatearCelularAR } from '@/lib/telefono'
 import { SECCIONES_CON_PERMISO, nombreNivel, nombreRol } from '@/features/empresa/secciones'
 import { recordarQueAcepto } from '@/features/legales/aceptacion'
+import { WHATSAPP_TROPERO } from './reglas'
 import { AccesoLayout, Legales, TarjetaWhatsApp } from './acceso-layout'
 import { leerInvitacion, marcarEnviado, pedirCodigo, type Invitacion } from './envio'
 
@@ -66,6 +67,16 @@ export function TeInvitaronPage() {
   }
 
   const inv = carga.inv
+  // Una invitación «Sólo por WhatsApp» no entra a la app: lleva al bot (permisos, 14/11).
+  if (inv.acceso === 'whatsapp')
+    return (
+      <AccesoLayout tituloCompu="Te esperan en el campo." tituloCelu="Te esperan en el campo." encabezado={{ titulo: `${inv.invita} te sumó a ${inv.empresa}`, bajada: 'Lo tuyo va por WhatsApp: no hace falta bajarse nada.' }}>
+        <BotonPrincipal icono="Celular" onClick={() => window.open(`https://wa.me/${WHATSAPP_TROPERO}?text=${encodeURIComponent('Hola, me sumaron a Troppero.')}`, '_blank', 'noopener')}>
+          Escribirle a Troppero
+        </BotonPrincipal>
+        <p className="text-center text-[14px] text-texto-suave">Con tu primer mensaje quedás adentro.</p>
+      </AccesoLayout>
+    )
   // Lo que le habilitó el dueño, sección por sección, con su nivel (permisos, 13/11).
   const habilitado = SECCIONES_CON_PERMISO.map((x) => ({ ...x, nivel: inv.niveles[x.id] ?? 'no' })).filter((x) => x.nivel !== 'no')
 

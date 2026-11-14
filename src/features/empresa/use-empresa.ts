@@ -15,6 +15,8 @@ export type Membresia = {
   rol: string
   /** El nivel en cada sección (null = todo: el dueño). Ver `secciones.ts`. */
   niveles?: Niveles | null
+  /** «whatsapp»: no usa la app, manda por WhatsApp (permisos, 14/11). */
+  acceso?: string
   empresa: {
     id: string
     nombre: string
@@ -65,7 +67,7 @@ export function useEmpresa() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('miembro_empresa')
-        .select('empresa_id, rol, niveles, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
+        .select('empresa_id, rol, niveles, acceso, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
         .limit(1)
         .maybeSingle()
       if (error) throw error

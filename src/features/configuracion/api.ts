@@ -13,6 +13,8 @@ export type Persona = {
   rol: string
   /** El nivel en cada sección (null = el dueño, todo). */
   niveles: Niveles | null
+  /** «app» o «whatsapp» (sólo manda por WhatsApp). */
+  acceso: string
   desde: string
   venceAt: string | null
   token: string | null
@@ -33,6 +35,7 @@ export function usePersonas(activo: boolean) {
         celular: p.celular.replace(/\D/g, ''),
         rol: p.rol,
         niveles: (p.niveles as Niveles | null) ?? null,
+        acceso: p.acceso,
         desde: p.desde,
         venceAt: p.vence_at,
         token: p.token,
@@ -45,8 +48,8 @@ export function usePersonas(activo: boolean) {
 export function useInvitar() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (x: { nombre: string; celular: string; rol: Rol; niveles: Niveles }) => {
-      const { data, error } = await supabase.rpc('crear_invitacion', { p_celular: x.celular, p_nombre: x.nombre, p_rol: x.rol, p_niveles: x.niveles })
+    mutationFn: async (x: { nombre: string; celular: string; rol: Rol; niveles: Niveles; acceso: 'app' | 'whatsapp' }) => {
+      const { data, error } = await supabase.rpc('crear_invitacion', { p_celular: x.celular, p_nombre: x.nombre, p_rol: x.rol, p_niveles: x.niveles, p_acceso: x.acceso })
       if (error) throw error
       return data
     },
@@ -92,6 +95,15 @@ export function linkInvitacion(token: string) {
 }
 export function whatsappInvitacion(p: { celular: string; nombre: string; empresa: string; token: string }) {
   const texto = `Hola ${p.nombre.split(' ')[0]}, te sumé a ${p.empresa} en Troppero. Entrá desde acá con tu celular: ${linkInvitacion(p.token)}`
+  return `https://wa.me/${p.celular}?text=${encodeURIComponent(texto)}`
+}
+
+/**
+ * Invitado «Solo por WhatsApp»: no hay link a la app. El dueño le manda el número
+ * de Troppero; con su primer mensaje el bot le arma la cuenta y lo vincula.
+ */
+export function whatsappInvitacionBot(p: { celular: string; nombre: string; empresa: string; bot: string }) {
+  const texto = `Hola ${p.nombre.split(' ')[0]}, te sumé a ${p.empresa} en Troppero. No necesitás bajarte nada: mandale cualquier mensaje a este número de WhatsApp y empezás: https://wa.me/${p.bot}`
   return `https://wa.me/${p.celular}?text=${encodeURIComponent(texto)}`
 }
 

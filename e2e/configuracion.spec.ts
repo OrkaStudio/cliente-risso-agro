@@ -33,6 +33,8 @@ test('el dueño invita eligiendo el nivel de cada sección, el invitado ve sólo
   await expect(cel).toHaveValue(`${numero.slice(0, 4)} ${numero.slice(4, 6)}-${numero.slice(6)}`)
   await panel.getByRole('group', { name: 'Qué hace' }).getByRole('button', { name: 'Peón' }).click()
   await expect(panel.getByRole('radio', { checked: true })).toHaveCount(0)
+  // Primero, cómo va a usar Troppero; recién ahí aparecen las secciones.
+  await panel.getByRole('radio', { name: /En la app y por WhatsApp/ }).click()
   // Sin elegir todas las secciones no deja invitar.
   await nivel(/Hacienda/).getByRole('radio', { name: 'Ve y carga' }).click()
   await panel.getByRole('button', { name: `Invitar a ${nombre.split(' ')[0]}` }).click()
@@ -174,4 +176,51 @@ test('lo que manda un invitado le llega al dueño como nuevo, con su nombre, y l
   await page.goto(`/analitica/movimientos?q=${encodeURIComponent(detalle)}`)
   await expect(page.getByRole('listitem').filter({ hasText: detalle })).not.toContainText('Nuevo')
   await expect(page.getByRole('listitem').filter({ hasText: detalle })).toContainText('90.000')
+})
+
+test('invitar «Sólo por WhatsApp»: sólo se manda, sin link a la app, y si entra le dice dónde está lo suyo (permisos, 14/11)', async ({ page, browser }) => {
+  const numero = `22414${String(Date.now()).slice(-5)}`
+  await entrar(page)
+  await page.goto('/configuracion?tab=personas')
+  await page.getByRole('button', { name: 'Invitar a alguien' }).click()
+  const panel = page.getByRole('dialog', { name: 'Invitar a alguien' })
+  await panel.getByLabel('Cómo se llama').fill('Vete Rinaria')
+  await panel.getByLabel('Su celular, el que tiene WhatsApp').fill(numero)
+  await panel.getByRole('group', { name: 'Qué hace' }).getByRole('button', { name: 'Veterinario' }).click()
+  await panel.getByRole('radio', { name: /Sólo por WhatsApp/ }).click()
+  // Por WhatsApp no se ve: cada sección ofrece «No ve» o «Solo manda».
+  const hacienda = panel.getByRole('radiogroup', { name: /Hacienda/ })
+  await expect(hacienda.getByRole('radio')).toHaveCount(2)
+  await hacienda.getByRole('radio', { name: 'Solo manda' }).click()
+  await panel.getByRole('radiogroup', { name: /Campos/ }).getByRole('radio', { name: 'No ve' }).click()
+  await panel.getByRole('radiogroup', { name: /Plata/ }).getByRole('radio', { name: 'Solo manda' }).click()
+  await panel.getByRole('button', { name: 'Invitar a Vete' }).click()
+  const listo = page.getByRole('dialog', { name: /Listo: invitaste a/ })
+  await expect(listo).toContainText('Mandale el número de Troppero')
+  await expect(listo.getByRole('button', { name: 'Copiar el link' })).toHaveCount(0)
+  const wa = decodeURIComponent((await listo.getByRole('link', { name: 'Mandárselo por WhatsApp' }).getAttribute('href'))!)
+  expect(wa).toContain('mandale cualquier mensaje a este número')
+  expect(wa).not.toContain('/invitacion/')
+
+  // Si igual entra a la app (la cuenta la arma el bot con su primer mensaje; acá, directo en la base).
+  sql(`
+    with u as (
+      insert into auth.users (id, instance_id, aud, role, phone, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
+      values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '549${numero}', '{"nombre":"Vete"}', now(), now(), '', '', '', '')
+      returning id
+    )
+    insert into public.miembro_empresa (empresa_id, user_id, rol, niveles, acceso)
+    select i.empresa_id, u.id, i.rol, i.niveles, i.acceso from u, public.invitacion i where i.celular = '549${numero}'`)
+  const otro = await browser.newContext()
+  const vet = await otro.newPage()
+  await despejarGuia(vet)
+  await vet.goto('/login')
+  await vet.getByLabel('Tu celular, el que tiene WhatsApp').fill(numero)
+  await vet.getByRole('button', { name: 'Mandame el código' }).click()
+  await vet.waitForURL('**/login/codigo')
+  await vet.waitForTimeout(800)
+  await vet.locator('#codigo').fill(codigoDelLog(`549${numero}`))
+  await expect(vet.getByRole('heading', { name: 'Tu acceso es por WhatsApp' })).toBeVisible()
+  await expect(vet.getByRole('button', { name: 'Abrir WhatsApp' })).toBeVisible()
+  await otro.close()
 })

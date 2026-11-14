@@ -884,6 +884,7 @@ export type Database = {
       }
       miembro_empresa: {
         Row: {
+          acceso: string
           created_at: string
           empresa_id: string
           rol: string
@@ -891,6 +892,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          acceso?: string
           created_at?: string
           empresa_id: string
           rol?: string
@@ -898,6 +900,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          acceso?: string
           created_at?: string
           empresa_id?: string
           rol?: string
@@ -1643,7 +1646,7 @@ export type Database = {
       nombres_de_empresa: { Args: never; Returns: { user_id: string; nombre: string; rol: string }[] }
       aceptar_legales: { Args: { p_version: string; p_via: string }; Returns: undefined }
       crear_invitacion: {
-        Args: { p_celular: string; p_nombre: string; p_rol: string; p_niveles: Json }
+        Args: { p_celular: string; p_nombre: string; p_rol: string; p_niveles: Json; p_acceso?: string }
         Returns: string
       }
       personas_de_empresa: {
@@ -1655,6 +1658,7 @@ export type Database = {
           nombre: string | null
           rol: string
           niveles: Json | null
+          acceso: string
           soy_yo: boolean
           token: string | null
           user_id: string | null
@@ -1675,6 +1679,7 @@ export type Database = {
           vencida: boolean
           usada: boolean
           niveles: Json
+          acceso: string
         }[]
       }
       aceptar_invitacion: { Args: { p_token: string }; Returns: string }
