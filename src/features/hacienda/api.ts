@@ -273,12 +273,13 @@ export async function listTropasCampo(campoId: string) {
 
 export type MoverAnimalesInput = {
   empresaId: string
-  potreroOrigenId: string
+  /** Requerido salvo cuando se mueven animales puntuales. */
+  potreroOrigenId?: string
   potreroDestinoId: string
   /** Tropa de origen (null = animales sueltos). */
   loteId: string | null
   /** Qué se mueve: la tropa entera del potrero, o cantidades por categoría. */
-  seleccion: { todo: true } | { items: ItemCargaMasiva[] }
+  seleccion: { todo: true } | { items: ItemCargaMasiva[] } | { animalIds: string[] }
   /** A qué tropa llegan. Omitido = conservan la de origen (cruzar de campo
    *  conservando tropa solo vale si se muda entera; lo valida Postgres). */
   destino?: { loteId: string } | { nuevoNombre: string }
@@ -302,11 +303,13 @@ export async function moverAnimales(
   const { data, error } = await supabase.rpc('mover_animales', {
     p_empresa_id: input.empresaId,
     p_potrero_destino: input.potreroDestinoId,
-    p_potrero_origen: input.potreroOrigenId,
+    p_potrero_origen: input.potreroOrigenId || undefined,
     p_lote_id: input.loteId ?? undefined,
     ...('todo' in input.seleccion
       ? { p_todo: true }
-      : { p_items: input.seleccion.items.filter((it) => it.cantidad > 0) }),
+      : 'animalIds' in input.seleccion
+        ? { p_animal_ids: input.seleccion.animalIds }
+        : { p_items: input.seleccion.items.filter((it) => it.cantidad > 0) }),
     ...(input.destino && 'loteId' in input.destino
       ? { p_lote_destino: input.destino.loteId }
       : {}),
@@ -325,22 +328,6 @@ export async function moverAnimales(
     loteDestinoId: res.lote_destino_id,
     tropaMudada: res.tropa_mudada,
   }
-}
-
-/** Cambiar la caravana conservando la identidad del animal (RPC transaccional). */
-export async function cambiarCaravana(input: {
-  animalId: string
-  nuevoRfid: string
-  nuevaVisual?: string
-  motivo?: string
-}): Promise<void> {
-  const { error } = await supabase.rpc('cambiar_caravana', {
-    p_animal_id: input.animalId,
-    p_nuevo_rfid: input.nuevoRfid.trim(),
-    p_nueva_visual: input.nuevaVisual?.trim() || undefined,
-    p_motivo: input.motivo?.trim() || undefined,
-  })
-  if (error) throw new Error(error.message)
 }
 
 /** Dar de baja (vendido/muerto) + dejar el evento en el historial (RPC). */
@@ -396,27 +383,6 @@ export async function registrarEvento(input: {
 }
 
 /**
- * Ubicar animales que están SIN potrero (cargados en el onboarding antes de
- * tener potreros, o desde Hacienda sin destino): misma RPC `mover_animales`,
- * por ids, sin potrero de origen. Conservan su tropa. Atómico.
- */
-export async function ubicarAnimales(input: {
-  empresaId: string
-  potreroDestinoId: string
-  animalIds: string[]
-}): Promise<number> {
-  if (input.animalIds.length === 0) throw new Error('No hay animales para ubicar')
-  const { data, error } = await supabase.rpc('mover_animales', {
-    p_empresa_id: input.empresaId,
-    p_potrero_destino: input.potreroDestinoId,
-    p_animal_ids: input.animalIds,
-    p_contexto: { tipo: 'ubicar' },
-  })
-  if (error) throw new Error(error.message)
-  return (data as { movidos: number }).movidos
-}
-
-/**
  * Deshace un alta del onboarding para volver a cargarla: borra los
  * animales activos de esos potreros que entraron con origen 'onboarding'.
  * Caravanas y eventos se van en cascada; no toca nada cargado por otro
@@ -441,4 +407,173 @@ export async function borrarAltaOnboardingSinPotrero(empresaId: string): Promise
     .is('potrero_id', null)
     .eq('origen', 'onboarding')
   if (error) throw new Error(error.message)
+}
+
+export type MotivoSalida = 'venta' | 'muerte' | 'correccion'
+
+/**
+ * Salieron, por cantidad (RPC `salida_por_cantidad`): «vendí 12 terneros del
+ * 11B» sin leer caravanas. Da de baja primero los sin caravana; los
+ * caravaneados que entran en la cuenta quedan «pendientes de identificar».
+ */
+export async function salidaPorCantidad(input: {
+  empresaId: string
+  potreroId: string
+  items: ItemCargaMasiva[]
+  motivo: MotivoSalida
+  fecha?: string
+  nota?: string
+  /** Las que se sabe que salieron (visible o electrónica). */
+  caravanas?: string[]
+}): Promise<{ salieron: number; sinIdentificar: number; salidaId: string }> {
+  const { data, error } = await supabase.rpc('salida_por_cantidad', {
+    p_empresa_id: input.empresaId,
+    p_potrero_id: input.potreroId,
+    p_items: input.items.filter((it) => it.cantidad > 0),
+    p_motivo: input.motivo,
+    p_fecha: input.fecha || undefined,
+    p_nota: input.nota?.trim() || undefined,
+    p_caravanas: input.caravanas?.length ? input.caravanas : undefined,
+  })
+  if (error) throw new Error(error.message)
+  const r = data as { salieron: number; sin_identificar: number; salida_id: string }
+  return { salieron: r.salieron, sinIdentificar: r.sin_identificar, salidaId: r.salida_id }
+}
+
+export type SalidaSinIdentificar = {
+  salidaId: string
+  potreroId: string
+  categoria: CategoriaAnimal
+  motivo: 'venta' | 'muerte'
+  fecha: string
+  pendientes: number
+  posibles: number
+  /** Los animales que pueden ser los que salieron (estaban ahí y siguen). */
+  posiblesIds: string[]
+}
+
+/**
+ * Las salidas que restaron el número sin decir qué animal fue: una por venta
+ * o muerte, con cuántas faltan identificar y sus posibles.
+ */
+export async function listSalidasSinIdentificar(): Promise<SalidaSinIdentificar[]> {
+  const [{ data: salidas, error: e1 }, { data: posibles, error: e2 }] = await Promise.all([
+    supabase.from('v_salidas_sin_identificar').select('salida_id, potrero_id, categoria, motivo, fecha, pendientes, posibles').order('created_at'),
+    supabase.from('v_posibles_salida').select('salida_id, animal_id'),
+  ])
+  if (e1) throw new Error(e1.message)
+  if (e2) throw new Error(e2.message)
+  return (salidas ?? []).map((s) => ({
+    salidaId: s.salida_id!,
+    potreroId: s.potrero_id!,
+    categoria: s.categoria!,
+    motivo: s.motivo === 'muerte' ? 'muerte' : 'venta',
+    fecha: s.fecha!,
+    pendientes: s.pendientes ?? 0,
+    posibles: s.posibles ?? 0,
+    posiblesIds: (posibles ?? []).filter((p) => p.salida_id === s.salida_id).map((p) => p.animal_id!),
+  }))
+}
+
+/** Por caravana (la planilla de la venta, o elegidas de la lista). */
+export async function identificarSalida(input: { empresaId: string; caravanas: string[]; salidaId?: string }): Promise<{ identificadas: number }> {
+  const { data, error } = await supabase.rpc('identificar_salida', { p_empresa_id: input.empresaId, p_caravanas: input.caravanas, p_salida_id: input.salidaId })
+  if (error) throw new Error(error.message)
+  return data as { identificadas: number }
+}
+
+/** «Fue ésta»: desde la ficha o la lista. */
+export async function identificarAnimal(input: { animalId: string; salidaId?: string }): Promise<void> {
+  const { error } = await supabase.rpc('identificar_animal', { p_animal_id: input.animalId, p_salida_id: input.salidaId })
+  if (error) throw new Error(error.message)
+}
+
+/** «No sé cuál fue»: sale una cualquiera de las posibles y su ficha lo dice. */
+export async function resolverSinSaber(input: { salidaId: string; animalIds: string[] }): Promise<number> {
+  const { data, error } = await supabase.rpc('resolver_sin_saber', { p_salida_id: input.salidaId, p_animal_ids: input.animalIds })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** «Sigue en el campo»: la que salió sin identificar vuelve y la salida se reabre sin ella. */
+export async function reabrirSinSaber(animalId: string): Promise<void> {
+  const { error } = await supabase.rpc('reabrir_sin_saber', { p_animal_id: animalId })
+  if (error) throw new Error(error.message)
+}
+
+/** «Me equivoqué al cargarla»: rehace esa categoría con el potrero y la cantidad correctos (0 = no salió). */
+export async function corregirSalida(input: { salidaId: string; categoria: CategoriaAnimal; potreroId: string; cantidad: number }): Promise<void> {
+  const { error } = await supabase.rpc('corregir_salida', { p_salida_id: input.salidaId, p_categoria: input.categoria, p_potrero_id: input.potreroId, p_cantidad: input.cantidad })
+  if (error) throw new Error(error.message)
+}
+
+/** «Fue un error»: la salida entera se deshace. */
+export async function anularSalida(salidaId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('anular_salida', { p_salida_id: salidaId })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** Cabezas por potrero y categoría, ya sin las salidas sin identificar: la fuente de todos los números. */
+export async function listComposicion() {
+  const { data, error } = await supabase.from('v_composicion_potrero').select('potrero_id, categoria, cabezas')
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/** La planilla: caravana para los que se cargaron por categoría. No crea animales. */
+/**
+ * Pone las caravanas de una planilla, todo o nada: cada número en el animal
+ * exacto que eligió el productor, el chip a los que ya tenían la visible y el
+ * alta de los que entraron sin cargarse.
+ */
+export async function asignarCaravanas(input: {
+  empresaId: string
+  lote: string
+  filas: { animalId: string; visual: string | null; rfid: string | null; nacimiento: string | null; raza: string | null }[]
+  chips: { animalId: string; rfid: string }[]
+  altas: { categoria: CategoriaAnimal; potreroId: string; visual: string | null; rfid: string | null; nacimiento: string | null; raza: string | null }[]
+}): Promise<{ asignadas: number; chips: number; altas: number }> {
+  const { data, error } = await supabase.rpc('asignar_caravanas', {
+    p_empresa_id: input.empresaId,
+    p_lote: input.lote,
+    p_filas: input.filas.map((f) => ({ animal_id: f.animalId, visual: f.visual, rfid: f.rfid, nacimiento: f.nacimiento, raza: f.raza })),
+    p_chips: input.chips.map((c) => ({ animal_id: c.animalId, rfid: c.rfid })),
+    p_altas: input.altas.map((a) => ({ categoria: a.categoria, potrero_id: a.potreroId, visual: a.visual, rfid: a.rfid, nacimiento: a.nacimiento, raza: a.raza })),
+  })
+  if (error) throw new Error(error.message)
+  return data as { asignadas: number; chips: number; altas: number }
+}
+
+/** Saca las caravanas de una carga (las que siguen puestas). */
+export async function deshacerCaravanas(lote: string): Promise<number> {
+  const { data, error } = await supabase.rpc('deshacer_caravanas', { p_lote: lote })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** Lo que se cambia desde «Corregir datos»: sólo van las claves que cambiaron. */
+export type Correccion = Partial<{ categoria: CategoriaAnimal; fecha_nacimiento: string | null; raza: string | null; pelaje: string | null; visual: string | null; rfid: string | null; potrero_id: string }>
+
+/** Corregir lo que estaba mal cargado, todo o nada; lo de antes queda en su historia (RPC). */
+export async function corregirAnimal(input: { animalId: string; cambios: Correccion }): Promise<void> {
+  const { error } = await supabase.rpc('corregir_animal', { p_animal_id: input.animalId, p_cambios: input.cambios })
+  if (error) throw new Error(error.message)
+}
+
+export type Baja = { animalId: string; fecha: string; estado: string; motivo: string | null; sinIdentificar: boolean }
+
+/** La última baja de cada animal que salió (para la pestaña «Salieron» de Hacienda). */
+export async function listBajas(): Promise<Baja[]> {
+  const { data, error } = await supabase.from('evento').select('animal_id, fecha, datos, created_at').eq('tipo', 'baja').order('created_at', { ascending: false }).limit(5000)
+  if (error) throw new Error(error.message)
+  const vistos = new Set<string>()
+  const out: Baja[] = []
+  for (const e of data ?? []) {
+    if (vistos.has(e.animal_id)) continue
+    vistos.add(e.animal_id)
+    const d = (e.datos ?? {}) as Record<string, unknown>
+    out.push({ animalId: e.animal_id, fecha: e.fecha, estado: String(d.estado ?? ''), motivo: typeof d.motivo === 'string' ? d.motivo : null, sinIdentificar: !!d.sin_identificar })
+  }
+  return out
 }

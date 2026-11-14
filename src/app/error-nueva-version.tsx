@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useRouteError } from 'react-router-dom'
-import { RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { PantallaAviso } from './pantalla-aviso'
 
 const RECARGA_KEY = 'risso.recarga-por-version'
 
@@ -45,21 +44,14 @@ export function ErrorNuevaVersion() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-4 p-6 text-center">
-      <RefreshCw className="size-8 text-muted-foreground" />
-      <div>
-        <p className="text-base font-semibold">
-          {deVersion ? 'Hay una versión nueva de la app' : 'Algo salió mal'}
-        </p>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          {deVersion
-            ? 'Se actualizó mientras la tenías abierta. Con recargar alcanza; no perdés nada.'
-            : 'Recargá la página. Si sigue pasando, avisanos.'}
-        </p>
-      </div>
-      <Button onClick={recargar}>
-        <RefreshCw className="size-4" /> Recargar
-      </Button>
-    </div>
+    <PantallaAviso
+      pantallaEntera
+      titulo={deVersion ? 'Hay una versión nueva' : 'Algo salió mal'}
+      texto={deVersion ? 'Troppero se actualizó mientras lo tenías abierto. Con recargar alcanza; no perdés nada.' : 'Recargá la página. Si sigue pasando, avisanos por WhatsApp y lo vemos.'}
+      accion="Recargar"
+      icono="Reintentar"
+      onAccion={recargar}
+      secundaria={{ texto: 'Ir al Inicio', onClick: () => window.location.assign('/') }}
+    />
   )
 }

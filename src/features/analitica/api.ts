@@ -39,9 +39,40 @@ export async function listMovimientos(): Promise<MovimientoConDetalle[]> {
     .select(
       '*, categoria:categoria_movimiento(nombre, grupo), campo(nombre), potrero(nombre)',
     )
+    // Lo anulado no es un movimiento: no se lista ni suma.
+    .neq('estado', 'anulado')
     .order('fecha_devengo', { ascending: false })
   if (error) throw new Error(error.message)
   return data as unknown as MovimientoConDetalle[]
+}
+
+/** Lo que cargó otro deja de ser «Nuevo» (permisos, entrega 4). */
+export async function marcarRevisados(ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const { error } = await supabase.from('movimiento_financiero').update({ revisado_at: new Date().toISOString() }).in('id', ids)
+  if (error) throw new Error(error.message)
+}
+
+/** Corregir un movimiento: lo que se tipea mal (monto, detalle, fecha). Queda revisado. */
+export async function corregirMovimiento(x: { id: string; monto: number; descripcion: string; fecha: string }): Promise<void> {
+  const { error } = await supabase
+    .from('movimiento_financiero')
+    .update({ monto: x.monto, descripcion: x.descripcion, fecha_devengo: x.fecha, revisado_at: new Date().toISOString() })
+    .eq('id', x.id)
+  if (error) throw new Error(error.message)
+}
+
+/** Anular un movimiento: deja de contar, pero queda el rastro (no se borra). */
+export async function anularMovimiento(id: string): Promise<void> {
+  const { error } = await supabase.from('movimiento_financiero').update({ estado: 'anulado', revisado_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Cuántos movimientos cargados por otros todavía no se miraron (el número junto a Plata). */
+export async function contarNuevos(): Promise<number> {
+  const { count, error } = await supabase.from('movimiento_financiero').select('id', { count: 'exact', head: true }).is('revisado_at', null).neq('estado', 'anulado')
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export type Pendiente = {
@@ -99,7 +130,7 @@ export type NuevoMovimiento = {
 }
 
 /** Sube la imagen del comprobante al bucket privado (RLS por empresa). */
-async function subirComprobante(
+export async function subirComprobante(
   empresaId: string,
   movimientoId: string,
   img: Blob,
@@ -158,14 +189,18 @@ export type NuevaSerie = {
   cantidad: number
   descripcion: string
   medioPago?: MedioPago | null
+  /** Un pago que se repite (un sueldo): sin «(cuota 2/12)» en la descripción. */
+  sinNumerar?: boolean
+  /** Las fechas exactas de cada pago (a 30, 60, 90 días): si están, mandan sobre frecuencia y cantidad. */
+  fechas?: string[]
 }
 
 /** Genera la serie completa de cuotas pendientes, unidas por serie_id. */
 export async function crearSerie(input: NuevaSerie): Promise<void> {
   const serieId = crypto.randomUUID()
   const off = MESES_FREQ[input.frecuencia]
-  const filas = Array.from({ length: input.cantidad }, (_, i) => {
-    const fecha = addMeses(input.primeraFecha, i * off)
+  const fechas = input.fechas ?? Array.from({ length: input.cantidad }, (_, i) => addMeses(input.primeraFecha, i * off))
+  const filas = fechas.map((fecha, i) => {
     return {
       empresa_id: input.empresaId,
       tipo: input.tipo,
@@ -179,7 +214,7 @@ export async function crearSerie(input: NuevaSerie): Promise<void> {
       fecha_cobro_pago: null,
       estado: 'pendiente' as const,
       medio_pago: input.medioPago || null,
-      descripcion: `${input.descripcion.trim()} (cuota ${i + 1}/${input.cantidad})`,
+      descripcion: input.sinNumerar ? input.descripcion.trim() : `${input.descripcion.trim()} (cuota ${i + 1}/${fechas.length})`,
       serie_id: serieId,
     }
   })

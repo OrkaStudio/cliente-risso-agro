@@ -1,48 +1,47 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { ChevronRight, Compass, MessageCircle, Sparkles, X } from 'lucide-react'
+import { AnimatePresence, MotionConfig, motion, useMotionValue, useReducedMotion, useSpring, useVelocity } from 'framer-motion'
+import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
+import { Mascota, type Animo } from '@/features/campos/tropero/mascota'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { avisoPermitido, avisosDe, progresoDe, type Aviso } from '@/features/guia/avisos'
+import { responderLocal, sugerenciasDe, type Mensaje } from '@/features/guia/conversacion'
 import { useEstadoPuestaAPunto } from '@/features/guia/checklist'
-import { proximaMision } from '@/features/guia/misiones'
-import { Orbe, TextoStream } from '@/features/guia/orbe'
 import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
-import {
-  abrirPanel,
-  cerrarPanel,
-  empezarMision,
-  usePanelAbierto,
-} from '@/features/guia/guia-store'
-import { ejecutarEnAncla } from '@/features/guia/ejecutar'
-import {
-  CATEGORIAS,
-  FICHAS,
-  type CategoriaFicha,
-  type Ficha,
-} from '@/features/guia/fichas'
-import {
-  NOMBRE_SECCION,
-  seccionDeRuta,
-  type SeccionGuia,
-} from '@/features/guia/secciones'
+import { abrirPanel, cerrarPanel, useHayAyudaLocal, usePanelAbierto } from '@/features/guia/guia-store'
+import { FICHAS, type CategoriaFicha } from '@/features/guia/fichas'
+import { NOMBRE_SECCION, seccionDeRuta, type SeccionGuia } from '@/features/guia/secciones'
+import { useMapa } from '@/features/mapa/api'
+import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
+import { registrar } from '@/lib/telemetria'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
+import { puedeCargar, puedeVer, seccionDeRuta as seccionDeRutaApp, veePlata } from '@/features/empresa/secciones'
 
 /**
- * Panel del Asistente — preguntas (fichas guionadas por chips; el chat con
- * modelo es la Fase 2 del spec) + la salida a una PERSONA: "Hablar con
- * alguien de Orka" abre WhatsApp con quién escribe y desde dónde (TASK-063).
- * La puesta a punto vive aparte, en su smart checklist flotante
- * (features/guia/puesta-a-punto) — decisión de Lau: el productor se centra
- * en la misión sin información alrededor.
+ * El asistente de Troppero en toda la Oficina (Lau, 28–29/10). Cerrado es una
+ * barra oscura abajo a la derecha con el orbe adentro y «Preguntale a Troppero»:
+ * que se entienda que es una IA. Abierto es una tarjeta angosta: lo que vio en
+ * los campos (avisos.ts), ejemplos de qué preguntarle y la charla, con la caja
+ * para escribir abajo. Lo que propone lo hace: el orbe sale de la barra, vuela
+ * hasta el botón, lo marca, lo toca y vuelve. Festeja cada paso que se completa.
+ * Mientras el del mapa está en pantalla, se corre: nunca hay dos (guia-store).
  * Spec: [[clientes/risso-agro/especificaciones/2026-07-16-asistente-conversacional-operativo]].
  */
 
-type Burbuja = { rol: 'user' | 'ia'; texto: string; accion?: Ficha['accion'] }
+/** El orbe dentro de la barra; al volar se agranda un poco. */
+const TAM = 40
+/** El viaje: el mismo resorte que en el mapa. */
+const VUELO = { stiffness: 34, damping: 12.5, mass: 1.15, restDelta: 0.2 }
+/** Cuánto muestra el botón antes de tocarlo, y cuánto se queda después. */
+const MARCA_MS = 1300
+const VUELTA_MS = 700
+const DORMIR_MS = 60_000
 
-/** Categoría inicial según dónde está parado el usuario. */
+/** Categoría de dudas según dónde está parado. */
 const CATEGORIA_DE_SECCION: Record<SeccionGuia, CategoriaFicha> = {
   inicio: 'hacienda',
   hacienda: 'hacienda',
@@ -51,261 +50,613 @@ const CATEGORIA_DE_SECCION: Record<SeccionGuia, CategoriaFicha> = {
   agenda: 'plata',
 }
 
+type Caja = { left: number; top: number; width: number; height: number }
+
+function leer(clave: string): string | null {
+  try {
+    return localStorage.getItem(clave)
+  } catch {
+    return null
+  }
+}
+function guardar(clave: string, valor: string) {
+  try {
+    localStorage.setItem(clave, valor)
+  } catch {
+    /* sin almacenamiento: sólo se pierde el recuerdo */
+  }
+}
+
 export function AsistentePanel() {
+  const quieto = !!useReducedMotion()
   const abierto = usePanelAbierto()
+  const hayAyudaLocal = useHayAyudaLocal()
   const navigate = useNavigate()
   const location = useLocation()
-  // "Recorrer esta sección" solo donde hay recorrido (las 5 secciones).
   const seccion = seccionDeRuta(location.pathname)
+  const mapaPendiente = useMapaPendiente()
   const { user } = useAuth()
   const empresa = useEmpresa()
-  const whatsapp = linkWhatsapp({
-    nombre: nombreDe(user?.user_metadata),
-    empresa: empresa.data?.empresa?.nombre ?? null,
-    seccion: seccion ? NOMBRE_SECCION[seccion] : null,
-  })
-  const estado = useEstadoPuestaAPunto()
-  const mision = estado.data ? proximaMision(estado.data.resumen) : null
-  const [hilo, setHilo] = React.useState<Burbuja[]>([])
-  // Categoría activa del menú de preguntas — arranca en la de la sección actual.
-  const [categoria, setCategoria] = React.useState<CategoriaFicha>(() =>
-    seccion ? CATEGORIA_DE_SECCION[seccion] : 'hacienda',
+  const quien = useQuienMira()
+  // Lo que ve quien pregunta: el asistente no sugiere ni contesta lo que no tiene habilitado.
+  const ve = React.useMemo(() => ({ plata: veePlata(empresa.data), hacienda: puedeVer(empresa.data, 'hacienda'), campos: puedeVer(empresa.data, 'campos') }), [empresa.data])
+  // Las fichas de ayuda: sólo de lo que ve, y el botón sólo si lleva a algo que puede hacer.
+  const fichas = React.useMemo(
+    () =>
+      FICHAS.filter((f) => f.categoria === 'celular' || ve[f.categoria]).map((f) => {
+        const s = f.accion ? seccionDeRutaApp(f.accion.ruta) : null
+        return f.accion && s && !puedeCargar(empresa.data, s) ? { ...f, accion: undefined } : f
+      }),
+    [ve, empresa.data],
   )
-  const hiloRef = React.useRef<HTMLDivElement>(null)
+  const estado = useEstadoPuestaAPunto()
+  const { data: campos } = useMapa(empresa.data?.empresa_id)
+  const nombre = nombreDe(user?.user_metadata)
 
-  // Autoscroll del hilo al agregar burbujas.
+  const resumen = estado.data?.resumen
+  // Los avisos son tareas de puesta a punto: a un invitado, sólo los de lo que puede cargar (permisos, 13/11).
+  const avisos = React.useMemo(
+    () => (resumen ? avisosDe(resumen, campos ?? [], mapaPendiente).filter((a) => avisoPermitido(a.id, empresa.data)) : []),
+    [resumen, campos, mapaPendiente, empresa.data],
+  )
+  const progreso = React.useMemo(() => (resumen && quien.dueno ? progresoDe(resumen, campos ?? [], mapaPendiente) : []), [resumen, campos, mapaPendiente, quien.dueno])
+  const hechos = progreso.filter((p) => p.hecho).length
+
+  // ===== La conversación =====
+  // Se le escribe lo que sea. Arranca con lo que notó y ejemplos hechos con sus campos.
+  const categoria = mapaPendiente ? 'campos' : seccion ? CATEGORIA_DE_SECCION[seccion] : 'hacienda'
+  const sugerencias = sugerenciasDe(campos ?? [], categoria, fichas, ve)
+  const [mensajes, setMensajes] = React.useState<Mensaje[]>([])
+  const [borrador, setBorrador] = React.useState('')
+  const [pensando, setPensando] = React.useState(false)
+  const [ultimaPregunta, setUltimaPregunta] = React.useState('')
+  const hilo = React.useRef<HTMLDivElement>(null)
+  const idMensaje = React.useRef(0)
   React.useEffect(() => {
-    const el = hiloRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [hilo])
-
-  const responder = (f: Ficha) => {
-    setHilo((h) => [
-      ...h,
-      { rol: 'user', texto: f.chip },
-      { rol: 'ia', texto: f.respuesta, accion: f.accion },
-    ])
+    const el = hilo.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: quieto ? 'auto' : 'smooth' })
+  }, [mensajes, pensando, quieto])
+  const preguntar = (texto: string) => {
+    const t = texto.trim()
+    if (!t || pensando) return
+    registrar('asistente_pregunta', { ficha: 'texto' })
+    setBorrador('')
+    setUltimaPregunta(t)
+    setMensajes((m) => [...m, { id: ++idMensaje.current, de: 'yo', texto: t }])
+    setPensando(true)
+    // Un instante pensando: la respuesta no aparece de golpe.
+    setTimeout(() => {
+      const r = responderLocal(t, fichas, ve)
+      setMensajes((m) => [...m, { id: ++idMensaje.current, de: 'tropero', ...r }])
+      setPensando(false)
+    }, quieto ? 0 : 700)
   }
+  const whatsappConsulta = linkWhatsapp({ nombre, empresa: empresa.data?.empresa?.nombre ?? null, seccion: seccion ? NOMBRE_SECCION[seccion] : null, consulta: ultimaPregunta })
 
-  const irALaMision = () => {
-    if (!mision) return
+  React.useEffect(() => {
+    if (!abierto) return
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && cerrarPanel()
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [abierto])
+
+  // ===== Dónde está y a dónde va =====
+  // Su casa es el hueco dentro de la barra: se mide en pantalla (la barra cambia de ancho con el texto).
+  const hueco = React.useRef<HTMLSpanElement>(null)
+  const [casa, setCasa] = React.useState({ x: window.innerWidth - 24 - 48, y: window.innerHeight - 24 - 48 })
+  React.useLayoutEffect(() => {
+    const el = hueco.current
+    if (!el) return
+    const medir = () => {
+      const b = el.getBoundingClientRect()
+      setCasa((c) => (c.x === b.left && c.y === b.top ? c : { x: b.left, y: b.top }))
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    if (el.parentElement) ro.observe(el.parentElement)
+    window.addEventListener('resize', medir)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', medir)
+    }
+  }, [hayAyudaLocal])
+  const [marca, setMarca] = React.useState<Caja | null>(null)
+  const destino = marca
+    ? {
+        // Al lado del botón, del lado que tenga lugar.
+        x: marca.left - TAM - 10 > 8 ? marca.left - TAM - 10 : Math.min(marca.left + marca.width + 10, window.innerWidth - TAM - 8),
+        y: Math.max(8, Math.min(marca.top + marca.height / 2 - TAM / 2, window.innerHeight - TAM - 8)),
+      }
+    : casa
+  const metaX = useMotionValue(destino.x)
+  const metaY = useMotionValue(destino.y)
+  const posX = useSpring(metaX, VUELO)
+  const posY = useSpring(metaY, VUELO)
+  // Vuela con resorte sólo al ir a un botón y al volver; si la barra cambia de
+  // ancho (texto, scroll), el orbe va derecho a su hueco, sin quedar corrido.
+  const volando = React.useRef(false)
+  React.useEffect(() => {
+    if (marca) volando.current = true
+    const viaja = !quieto && volando.current
+    if (viaja) {
+      metaX.set(destino.x)
+      metaY.set(destino.y)
+    } else {
+      for (const [v, n] of [[metaX, destino.x], [metaY, destino.y], [posX, destino.x], [posY, destino.y]] as const) v.jump(n)
+    }
+    if (marca || !volando.current) return
+    // Ya de vuelta en la barra: lo que siga es acomodarse, no volar.
+    const t = setTimeout(() => (volando.current = false), 2500)
+    return () => clearTimeout(t)
+  }, [marca, destino.x, destino.y, quieto, metaX, metaY, posX, posY])
+  // En reposo el orbe vive adentro de la barra (se mueve con ella, sin atraso: antes la
+  // perseguía un cuadro tarde y se trababa); sólo sale a volar para señalar algo y volver.
+  const [vuela, setVuela] = React.useState(false)
+  if (marca && !vuela) setVuela(true)
+  React.useEffect(() => {
+    if (marca || !vuela) return
+    const t = setTimeout(() => setVuela(false), 2500)
+    return () => clearTimeout(t)
+  }, [marca, vuela])
+  const velX = useVelocity(posX)
+  const velY = useVelocity(posY)
+
+  // Hacer lo que propone: ir a la pantalla, volar al botón, marcarlo y tocarlo.
+  const guia = React.useRef<ReturnType<typeof setTimeout>[]>([])
+  React.useEffect(() => () => guia.current.forEach(clearTimeout), [])
+  const hacer = (a: Pick<NonNullable<Aviso['accion']>, 'ruta' | 'ancla'>, id: string) => {
+    registrar('asistente_pregunta', { ficha: `aviso:${id}` })
     cerrarPanel()
-    setTimeout(() => empezarMision(mision.id), 150)
+    navigate(a.ruta)
+    const ancla = a.ancla
+    if (!ancla) return
+    guia.current.forEach(clearTimeout)
+    guia.current = []
+    let intentos = 0
+    const buscar = () => {
+      const el = document.querySelector<HTMLElement>(`[data-guia="${ancla}"]`)
+      if (!el) {
+        if (++intentos < 15) guia.current.push(setTimeout(buscar, 200))
+        return
+      }
+      el.scrollIntoView({ block: 'center', behavior: quieto ? 'auto' : 'smooth' })
+      guia.current.push(
+        setTimeout(() => {
+          const b = el.getBoundingClientRect()
+          setMarca({ left: b.left, top: b.top, width: b.width, height: b.height })
+          guia.current.push(
+            setTimeout(() => {
+              const boton = el.tagName === 'BUTTON' ? el : (el.querySelector<HTMLElement>('button, a') ?? el)
+              boton.click()
+              guia.current.push(setTimeout(() => setMarca(null), VUELTA_MS))
+            }, MARCA_MS),
+          )
+        }, 350),
+      )
+    }
+    guia.current.push(setTimeout(buscar, 150))
   }
+
+  // ===== Vida: parpadea, mira el mouse, se duerme si nadie hace nada =====
+  const [parpadea, setParpadea] = React.useState(false)
+  React.useEffect(() => {
+    if (quieto) return
+    let t: ReturnType<typeof setTimeout>
+    const siguiente = () => {
+      t = setTimeout(() => {
+        setParpadea(true)
+        setTimeout(() => setParpadea(false), 140)
+        siguiente()
+      }, 2400 + Math.random() * 2600)
+    }
+    siguiente()
+    return () => clearTimeout(t)
+  }, [quieto])
+  const [mouse, setMouse] = React.useState<{ x: number; y: number } | null>(null)
+  const [duerme, setDuerme] = React.useState(false)
+  React.useEffect(() => {
+    let t: ReturnType<typeof setTimeout>
+    const activo = () => {
+      setDuerme(false)
+      clearTimeout(t)
+      t = setTimeout(() => setDuerme(true), DORMIR_MS)
+    }
+    // Un cuadro por vez: antes cada pixel del mouse redibujaba todo el asistente (y trababa la animación).
+    let cuadro = 0
+    const mover = (e: MouseEvent) => {
+      const x = e.clientX
+      const y = e.clientY
+      if (!cuadro) cuadro = requestAnimationFrame(() => ((cuadro = 0), setMouse({ x, y })))
+      activo()
+    }
+    activo()
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('pointerdown', activo)
+    window.addEventListener('keydown', activo)
+    return () => {
+      clearTimeout(t)
+      cancelAnimationFrame(cuadro)
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('pointerdown', activo)
+      window.removeEventListener('keydown', activo)
+    }
+  }, [])
+  const centro = { x: destino.x + TAM / 2, y: destino.y + TAM / 2 }
+  const mira = marca
+    ? { x: (marca.left + marca.width / 2 - centro.x) / 120, y: (marca.top + marca.height / 2 - centro.y) / 120 }
+    : abierto
+      ? { x: -0.4, y: -0.6 }
+      : mouse && Math.hypot(mouse.x - centro.x, mouse.y - centro.y) < 520
+        ? { x: (mouse.x - centro.x) / 160, y: (mouse.y - centro.y) / 160 }
+        : { x: 0, y: 0 }
+
+  // ===== Lo que dice sin que lo abran =====
+  // Festeja cada paso nuevo; si no, una vez por sesión cuenta lo que notó.
+  const uid = user?.id ?? ''
+  const [globo, setGlobo] = React.useState<string | null>(null)
+  const [festeja, setFesteja] = React.useState(false)
+  const clave = `tropero:asistente:hechos:${uid}`
+  const [hechosVistos, setHechosVistos] = React.useState<number | null>(null)
+  // Recién con todo cargado: un cálculo a medias no es un paso cumplido.
+  if (uid && resumen && campos && empresa.data && hechosVistos !== hechos) {
+    const guardado = leer(clave)
+    const antes = hechosVistos ?? (guardado === null ? null : Number(guardado))
+    setHechosVistos(hechos)
+    if (antes !== null && hechos > antes) {
+      const nuevo = progreso.filter((p) => p.hecho).at(-1)
+      setFesteja(true)
+      setGlobo(nuevo ? `¡Bien! ${nuevo.texto}: listo.` : '¡Bien!')
+    }
+  }
+  React.useEffect(() => {
+    if (uid && hechosVistos !== null) guardar(clave, String(hechosVistos))
+  }, [uid, clave, hechosVistos])
+  React.useEffect(() => {
+    if (!festeja) return
+    const t = setTimeout(() => setFesteja(false), 2600)
+    return () => clearTimeout(t)
+  }, [festeja])
+  React.useEffect(() => {
+    if (!uid || avisos.length === 0) return
+    const clave = `tropero:asistente:saludo:${uid}`
+    try {
+      if (sessionStorage.getItem(clave) === '1') return
+    } catch {
+      /* sin almacenamiento: saluda igual */
+    }
+    // Se marca al saludar, no antes: si el efecto se repite, el saludo no se pierde.
+    const t = setTimeout(() => {
+      try {
+        sessionStorage.setItem(clave, '1')
+      } catch {
+        /* idem */
+      }
+      setGlobo((g) => g ?? `Noté ${avisos.length === 1 ? 'una cosa' : `${avisos.length} cosas`} en ${quien.enLosCampos}.`)
+    }, 1800)
+    return () => clearTimeout(t)
+  }, [uid, avisos.length, quien.enLosCampos])
+  React.useEffect(() => {
+    if (!globo) return
+    const t = setTimeout(() => setGlobo(null), 8000)
+    return () => clearTimeout(t)
+  }, [globo])
+  if (abierto && globo) setGlobo(null)
+
+  const [compacta, setCompacta] = React.useState(false)
+  const [sobre, setSobre] = React.useState(false)
+  React.useEffect(() => {
+    const alBajar = (e: Event) => {
+      const t = e.target
+      // Lo que se scrollea adentro del panel no cuenta.
+      if (t instanceof Element && t.closest('[role="dialog"]')) return
+      const y = t instanceof Element ? t.scrollTop : window.scrollY
+      setCompacta(y > 24)
+    }
+    document.addEventListener('scroll', alBajar, true)
+    return () => document.removeEventListener('scroll', alBajar, true)
+  }, [])
+  // Cada pantalla nueva arranca arriba, con la barra entera.
+  const [rutaVista, setRutaVista] = React.useState(location.pathname)
+  if (rutaVista !== location.pathname) {
+    setRutaVista(location.pathname)
+    setCompacta(false)
+  }
+
+  if (hayAyudaLocal) return null
+
+  const animo: Animo = festeja ? 'festeja' : duerme && !abierto && !marca ? 'duerme' : 'normal'
+
+  const nAvisos = avisos.length
+  // Al bajar por la página la barra se achica al orbe y el número: no tapa la tabla.
+  // Abierto, la barra se recoge al orbe (el panel ya tiene su ×): no queda «Cerrar» estirado (Lau, 07/11).
+  const verTexto = !abierto && (!compacta || sobre || !!globo)
+  const etiqueta = nAvisos > 0 ? `El asistente de Troppero: notó ${nAvisos === 1 ? 'una cosa' : `${nAvisos} cosas`}` : 'El asistente de Troppero'
+  // Debajo de los diálogos (z-50) mientras espera; arriba cuando está abierto o trabajando.
+  const arriba = abierto || !!marca
 
   return createPortal(
     <MotionConfig reducedMotion="user">
-      {/* ===== Burbuja flotante (launcher, abajo a la derecha) ===== */}
+      {/* La marca sobre el botón que va a tocar. */}
       <AnimatePresence>
-        {!abierto && (
-          <motion.button
-            key="burbuja"
-            type="button"
-            onClick={abrirPanel}
-            title="Abrí el asistente"
-            aria-label="Abrí el asistente"
-            initial={{ opacity: 0, scale: 0.6, y: 14 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.6, y: 14 }}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 24 }}
-            // Debajo de los diálogos (z-50): un modal abierto tapa la burbuja.
-            className="fixed bottom-4 right-4 z-[42] flex size-[54px] items-center justify-center rounded-full shadow-[0_12px_38px_rgba(10,20,14,0.35)]"
-          >
-            {/* Anillo degradé girando — la identidad del asistente, en grande */}
-            <motion.span
-              aria-hidden
-              className="absolute inset-0 rounded-full"
-              style={{
-                background:
-                  'conic-gradient(from 0deg, var(--field), var(--lima), var(--sky), var(--field))',
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 5, ease: 'linear', repeat: Infinity }}
-            />
-            {/* Ping suave que invita sin gritar. La opacidad ENTRA y SALE en
-                fade (0→0.3→0): al reiniciar el ciclo no hay salto de 0 a 0.35
-                — ese salto era el "parpadeo brusco" que marcó Lau. */}
-            <motion.span
-              aria-hidden
-              className="absolute inset-0 rounded-full bg-field"
-              animate={{ scale: [1, 1.12, 1.4], opacity: [0, 0.3, 0] }}
-              transition={{
-                duration: 2.6,
-                times: [0, 0.35, 1],
-                repeat: Infinity,
-                repeatDelay: 1.2,
-                ease: 'easeOut',
-              }}
-            />
-            <span className="absolute inset-[3px] rounded-full bg-field-deep" />
-            <Sparkles className="relative size-[22px] text-white" />
-          </motion.button>
+        {marca && (
+          <motion.span
+            key="marca"
+            aria-hidden
+            className="pointer-events-none fixed z-[80]"
+            style={{ left: marca.left - 5, top: marca.top - 5, width: marca.width + 10, height: marca.height + 10, borderRadius: Math.min((marca.height + 10) / 2, 20) }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, boxShadow: '0 0 0 2.5px rgba(236,196,106,0.9), 0 0 14px 4px rgba(169,85,44,0.2)' }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            transition={{ duration: 0.5 }}
+          />
         )}
       </AnimatePresence>
 
-      {/* ===== Panel de chat, anclado a la burbuja ===== */}
       <AnimatePresence>
         {abierto && (
           <>
             {/* Click afuera cierra (sin velo: el panel convive con la página). */}
             <div className="fixed inset-0 z-[70]" onClick={cerrarPanel} />
             <motion.aside
-              initial={{ opacity: 0, y: 40, scale: 0.92, transformOrigin: 'bottom right' }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 30, scale: 0.94 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-              className="fixed bottom-4 right-4 z-[75] flex h-[600px] max-h-[calc(100vh-32px)] w-[390px] max-w-[calc(100vw-28px)] flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-[0_24px_70px_rgba(10,20,14,0.4)]"
               role="dialog"
-              aria-label="Asistente"
+              aria-label="¿En qué te ayudo?"
+              className="fixed z-[75] flex flex-col overflow-hidden bg-superficie text-texto shadow-[0_24px_60px_rgba(40,22,10,0.28)] ring-1 ring-[#a9552c]/12 max-md:inset-x-2 max-md:bottom-2 max-md:h-[85dvh] max-md:rounded-[24px] md:right-6 md:bottom-[92px] md:h-[min(720px,calc(100dvh-116px))] md:w-[380px] md:rounded-[24px]"
+              style={{ transformOrigin: 'bottom right', willChange: 'transform, opacity' }}
+              // Nace de la barra y vuelve a ella: resorte sin rebote al abrir, salida suave al cerrar (Lau, 07/11).
+              // Sólo transform y opacidad (lo que la placa de video mueve sin esfuerzo): sin trabas.
+              initial={{ opacity: 0, y: 28, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.94, transition: { type: 'tween', duration: 0.26, ease: [0.4, 0, 0.2, 1] } }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.85, opacity: { type: 'tween', duration: 0.2, ease: 'easeOut' } }}
             >
-              <div className="h-[3px] w-full shrink-0 bg-gradient-to-r from-field via-lima to-sky" />
-
-              {/* Header */}
-              <div className="flex items-center gap-2.5 border-b border-border px-4 py-3.5">
-                <Orbe />
-                <div className="min-w-0 flex-1 leading-tight">
-                  <div className="text-[14px] font-bold text-ink">Asistente</div>
-                  <div className="truncate text-[10px] font-bold uppercase tracking-[0.11em] text-faint">
-                    Preguntame y te llevo
-                  </div>
+              {/* Cabecera: quién es y para qué sirve. */}
+              <header className="flex items-center gap-3 border-b border-borde/70 px-5 py-4">
+                <Mascota tam={40} parpadea={parpadea} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15.5px] leading-tight font-bold">Asistente de Troppero</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">Te respondo sobre {quien.enLosCampos} y cómo usar la app</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={cerrarPanel}
-                  aria-label="Cerrar el asistente"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-ink"
-                >
-                  <X className="size-4" />
+                <button type="button" aria-label="Cerrar el asistente" onClick={cerrarPanel} className="grid size-9 shrink-0 place-items-center rounded-full text-texto-suave hover:bg-fondo hover:text-texto">
+                  <Icono nombre="Cerrar" tamano={16} />
                 </button>
-              </div>
+              </header>
 
-              {/* ===== Hilo ===== */}
-              <div ref={hiloRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-                <div className="max-w-[88%] self-start rounded-2xl rounded-bl-md bg-secondary px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink">
-                  ¡Buenas! Tocá una pregunta y te la respondo al toque. 👇
-                </div>
+              <div ref={hilo} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+                <Burbuja>{nombre ? `Hola, ${nombre}. ¿Qué querés saber?` : '¡Hola! ¿Qué querés saber?'}</Burbuja>
 
-                {hilo.map((b, i) =>
-                  b.rol === 'user' ? (
-                    <div
-                      key={i}
-                      className="max-w-[88%] self-end rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-[13.5px] leading-relaxed text-primary-foreground"
-                    >
-                      {b.texto}
-                    </div>
+                {/* Lo que la app detectó en sus datos, cada cosa con el botón que la resuelve. */}
+                {nAvisos > 0 && (
+                  <section className="flex flex-col gap-2">
+                    <Titulo>Lo que vi en {quien.enLosCampos}</Titulo>
+                    {avisos.map((a) => (
+                      <div key={a.id} className="rounded-[18px] border border-borde bg-fondo/60 p-3.5">
+                        <div className="flex items-start gap-3">
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-principal-suave text-principal">
+                            <Icono nombre={a.icono} tamano={16} />
+                          </span>
+                          <div className="min-w-0 flex-1 pt-0.5">
+                            <p className="text-[14.5px] leading-snug font-bold">{a.titulo}</p>
+                            <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">{a.detalle}</p>
+                          </div>
+                        </div>
+                        {a.accion ? (
+                          <button
+                            type="button"
+                            onClick={() => hacer(a.accion!, a.id)}
+                            className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-principal text-[14px] font-bold text-principal-texto hover:bg-terracota-600"
+                          >
+                            {a.accion.texto}
+                            <Icono nombre="Siguiente" tamano={16} />
+                          </button>
+                        ) : (
+                          <p className="mt-3 flex h-10 items-center justify-center gap-2 rounded-full bg-superficie text-[13.5px] font-semibold text-texto-suave ring-1 ring-borde">
+                            <Icono nombre="Celular" tamano={16} />
+                            Se hace desde el celular
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </section>
+                )}
+
+                {/* Ejemplos de lo que se le puede preguntar; se van apenas pregunta algo. */}
+                {mensajes.length === 0 && (
+                  <section className="flex flex-col gap-2">
+                    <Titulo>Probá preguntarme</Titulo>
+                    <ul className="flex flex-col overflow-hidden rounded-[18px] border border-borde">
+                      {sugerencias.map((q) => (
+                        <li key={q.texto} className="border-b border-borde/70 last:border-b-0">
+                          <button type="button" onClick={() => preguntar(q.texto)} className="group flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-principal-suave/50">
+                            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-fondo text-principal">
+                              <Icono nombre={q.icono} tamano={16} />
+                            </span>
+                            <span className="flex-1 text-[14px] leading-snug font-semibold">{q.texto}</span>
+                            <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave transition-transform group-hover:translate-x-0.5 group-hover:text-principal" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {mensajes.map((m) =>
+                  m.de === 'yo' ? (
+                    <p key={m.id} className="max-w-[85%] self-end rounded-[18px] rounded-br-[6px] bg-principal px-3.5 py-2.5 text-[14.5px] leading-snug text-principal-texto">
+                      {m.texto}
+                    </p>
                   ) : (
-                    <div
-                      key={i}
-                      className="max-w-[88%] self-start rounded-2xl rounded-bl-md bg-secondary px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink"
-                    >
-                      <TextoStream texto={b.texto} />
-                      {b.accion && (
+                    <Burbuja key={m.id}>
+                      {m.texto}
+                      {m.accion && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const a = b.accion!
-                            cerrarPanel()
-                            navigate(a.ruta)
-                            ejecutarEnAncla(a.ancla)
-                          }}
-                          className="mt-2.5 w-full rounded-full bg-field-deep px-3.5 py-2 text-[13px] font-bold text-white shadow-[0_2px_10px_rgba(11,88,55,0.35)] transition-opacity hover:opacity-90"
+                          onClick={() => hacer(m.accion!, `respuesta:${m.accion!.ruta}`)}
+                          className="mt-2.5 flex h-9 w-fit items-center gap-1.5 rounded-full bg-principal px-3.5 text-[14px] font-bold text-principal-texto hover:bg-terracota-600"
                         >
-                          {b.accion.label}
+                          {m.accion.texto}
+                          <Icono nombre="Siguiente" tamano={16} />
                         </button>
                       )}
-                    </div>
+                      {m.persona && whatsappConsulta && (
+                        <a
+                          href={whatsappConsulta}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => registrar('soporte_whatsapp', { seccion })}
+                          className="mt-2.5 flex h-9 w-fit items-center gap-1.5 rounded-full bg-principal px-3.5 text-[14px] font-bold text-principal-texto hover:bg-terracota-600"
+                        >
+                          <Icono nombre="Celular" tamano={16} />
+                          Preguntar por WhatsApp
+                        </a>
+                      )}
+                    </Burbuja>
                   ),
                 )}
+                {pensando && (
+                  <p role="status" aria-label="Pensando" className="flex gap-1.5 self-start rounded-[18px] rounded-bl-[6px] bg-fondo px-4 py-3.5">
+                    {[0, 1, 2].map((i) => (
+                      <motion.span key={i} className="size-1.5 rounded-full bg-texto-suave" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.18 }} />
+                    ))}
+                  </p>
+                )}
               </div>
 
-              {/* ===== Menú de preguntas por categoría ===== */}
-              <div className="shrink-0 border-t border-border pb-3 pt-3">
-                <div className="mb-2 flex items-center gap-1.5 px-4">
-                  {CATEGORIAS.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setCategoria(c.id)}
-                      className={cn(
-                        'rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors',
-                        categoria === c.id
-                          ? 'bg-field-deep text-white shadow-[0_2px_8px_rgba(11,88,55,0.3)]'
-                          : 'bg-secondary text-muted-foreground hover:text-ink',
-                      )}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-
-                <motion.div
-                  key={categoria}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="px-4"
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  preguntar(borrador)
+                }}
+                className="flex items-center gap-2 border-t border-borde/70 bg-fondo/60 p-3"
+              >
+                <input
+                  autoFocus
+                  value={borrador}
+                  onChange={(e) => setBorrador(e.target.value)}
+                  placeholder="Escribí tu pregunta"
+                  aria-label="Escribí tu pregunta"
+                  className="h-11 min-w-0 flex-1 rounded-full bg-superficie px-4 text-[15px] text-texto ring-1 ring-borde outline-none placeholder:text-texto-suave focus:ring-principal/50"
+                />
+                <button
+                  type="submit"
+                  aria-label="Preguntar"
+                  disabled={!borrador.trim() || pensando}
+                  className="grid size-11 shrink-0 place-items-center rounded-full bg-principal text-principal-texto transition-opacity hover:bg-terracota-600 disabled:opacity-35"
                 >
-                  {FICHAS.filter((f) => f.categoria === categoria).map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => responder(f)}
-                      className="group flex w-full items-center gap-2 border-b border-border/60 py-2 text-left text-[13px] font-medium text-ink transition-colors last:border-0 hover:text-field-deep"
-                    >
-                      <span className="min-w-0 flex-1">{f.chip}</span>
-                      <ChevronRight className="size-3.5 shrink-0 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-field-deep" />
-                    </button>
-                  ))}
-                </motion.div>
-
-                {/* La misión que sigue, con lo suyo: "Traé La Porteña al
-                    mapa · 2 min". Enseñar haciendo, desde acá también. */}
-                {mision && estado.data && (
-                  <button
-                    type="button"
-                    onClick={irALaMision}
-                    className="mx-4 mt-2 flex w-[calc(100%-32px)] items-center gap-2.5 rounded-2xl border border-field/40 bg-field-soft px-3.5 py-2.5 text-left transition-colors hover:border-field"
-                  >
-                    <Compass className="size-4 shrink-0 text-field-deep" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-bold text-field-deep">
-                        {mision.titulo(estado.data.resumen)}
-                      </span>
-                      <span className="block text-[11.5px] text-muted-foreground">
-                        Te acompaño mientras lo hacés ·{' '}
-                        {mision.invitacion(estado.data.resumen).minutos} min
-                      </span>
-                    </span>
-                    <ChevronRight className="size-4 shrink-0 text-field-deep" />
-                  </button>
-                )}
-
-                {/* La salida a una persona: siempre a la vista, abajo de todo.
-                    WhatsApp abre en otra pestaña con el mensaje ya escrito. */}
-                {whatsapp && (
-                  <a
-                    href={whatsapp}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-guia="asistente-whatsapp"
-                    className="mx-4 mt-2 flex items-center justify-center gap-2 rounded-full bg-[#25D366] py-2 text-[13px] font-bold text-white shadow-[0_2px_10px_rgba(37,211,102,0.35)] transition-opacity hover:opacity-90"
-                  >
-                    <MessageCircle className="size-4" />
-                    Hablar con alguien de Orka
-                  </a>
-                )}
-
-                <p className="mt-2 px-4 text-center text-[10px] text-faint">
-                  El asistente nunca carga ni mueve nada sin tu confirmación.
-                </p>
-              </div>
+                  <Icono nombre="Siguiente" tamano={16} className="-rotate-90" />
+                </button>
+              </form>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
+
+      {/* Cerrado: la barra oscura con el orbe adentro. Se entiende que es una IA y a qué invita. */}
+      <button
+        type="button"
+        onClick={() => {
+          setGlobo(null)
+          if (abierto) cerrarPanel()
+          else abrirPanel()
+        }}
+        onMouseEnter={() => setSobre(true)}
+        onMouseLeave={() => setSobre(false)}
+        aria-label={etiqueta}
+        aria-expanded={abierto}
+        className={cn(
+          'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
+          verTexto ? 'md:pr-3' : '',
+          arriba ? 'z-[76]' : 'z-[45]',
+        )}
+      >
+        <span ref={hueco} aria-hidden className="relative size-10 shrink-0">
+          {!vuela && (
+            <motion.span className="absolute inset-0 grid place-items-center" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
+              <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+            </motion.span>
+          )}
+          {/* Tiene algo para contarte: un puntito en el orbe (antes un «1» que no se entendía). */}
+          <AnimatePresence>
+            {nAvisos > 0 && !abierto && (
+              <motion.span
+                className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-terracota-900"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+              />
+            )}
+          </AnimatePresence>
+        </span>
+        {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
+        <TextoDeLaBarra texto={globo ?? 'Preguntale a Troppero'} visible={verTexto} estado={!!globo} />
+      </button>
+
+      {/* El orbe: descansa en su hueco de la barra y sale a volar cuando hace algo. */}
+      {vuela && <motion.div
+        aria-hidden
+        className={cn('pointer-events-none fixed top-0 left-0', arriba ? 'z-[77]' : 'z-[46]')}
+        style={{ width: TAM, height: TAM, x: posX, y: posY }}
+        animate={{ scale: marca ? 1.35 : 1 }}
+        transition={{ type: 'spring', stiffness: 120, damping: 16 }}
+      >
+        <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+      </motion.div>}
     </MotionConfig>,
     document.body,
+  )
+}
+
+/** El título de cada bloque: dice para qué es. */
+function Titulo({ children }: { children: React.ReactNode }) {
+  return <p className="text-[12.5px] font-bold tracking-[0.03em] text-texto-suave uppercase">{children}</p>
+}
+
+/** Lo que dice el asistente en la charla. */
+function Burbuja({ children }: { children: React.ReactNode }) {
+  return <div className="max-w-[88%] self-start rounded-[18px] rounded-bl-[6px] bg-fondo px-4 py-3 text-[14.5px] leading-relaxed text-texto">{children}</div>
+}
+
+/**
+ * El texto de la barra, sin saltos (Lau, 07/11): se mide el texto nuevo
+ * antes de mostrarlo y el ancho viaja hasta esa medida; el viejo se va y el
+ * nuevo entra en el mismo lugar, cruzándose.
+ */
+function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: boolean; estado: boolean }) {
+  const regla = React.useRef<HTMLSpanElement>(null)
+  const base = React.useRef<HTMLSpanElement>(null)
+  const [ancho, setAncho] = React.useState(0)
+  // Nunca más angosta que «Preguntale a Troppero»: abrir y cerrar no cambia el ancho, sólo el texto.
+  React.useLayoutEffect(() => {
+    const w = Math.max(regla.current?.getBoundingClientRect().width ?? 0, base.current?.getBoundingClientRect().width ?? 0)
+    setAncho(Math.min(260, Math.ceil(w)))
+  }, [texto])
+  return (
+    <motion.span
+      className="relative grid h-10 items-center justify-items-start overflow-hidden whitespace-nowrap max-md:hidden"
+      initial={false}
+      animate={{ width: visible ? ancho : 0, opacity: visible ? 1 : 0 }}
+      transition={{ width: { type: 'spring', stiffness: 210, damping: 30, mass: 0.9 }, opacity: { duration: 0.2, ease: 'easeOut' } }}
+    >
+      {/* Las reglas: miden el texto que viene y el de siempre, sin verse. */}
+      <span ref={regla} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 text-[15px] font-bold">
+        {texto}
+      </span>
+      <span ref={base} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 text-[15px] font-bold">
+        Preguntale a Troppero
+      </span>
+      <AnimatePresence initial={false}>
+        <motion.span
+          key={texto}
+          role={estado ? 'status' : undefined}
+          className="max-w-[260px] truncate text-[15px] font-bold [grid-area:1/1]"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {texto}
+        </motion.span>
+      </AnimatePresence>
+    </motion.span>
   )
 }

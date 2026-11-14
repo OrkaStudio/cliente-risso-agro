@@ -78,10 +78,8 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
-    supabase
-      .from('v_animal_con_caravana')
-      .select('categoria, potrero_id, estado')
-      .eq('estado', 'activo'),
+    // Las cabezas por categoría ya sin las salidas sin identificar.
+    supabase.from('v_composicion_potrero').select('categoria, potrero_id, cabezas'),
   ])
   if (eC) throw new Error(eC.message)
   if (eP) throw new Error(eP.message)
@@ -93,7 +91,7 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
   for (const a of animales ?? []) {
     if (!a.categoria || !a.potrero_id) continue
     const m = catPorPotrero.get(a.potrero_id) ?? new Map<Categoria, number>()
-    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
     catPorPotrero.set(a.potrero_id, m)
   }
 
@@ -275,6 +273,13 @@ export async function listPotreros(campoId: string): Promise<Potrero[]> {
  * Alta de potrero. Se manda el NÚMERO; la LETRA la pone el trigger de la DB
  * (la del campo: 1A en el campo A, 1B en el B). Devuelve el nombre real.
  */
+/** El nombre del potrero es único por campo (uq_potrero_nombre_por_campo). */
+function errorDePotrero(error: { code?: string; message: string }): Error {
+  return new Error(
+    error.code === '23505' ? 'Ya hay un potrero con ese número en este campo. Elegí otro número.' : error.message,
+  )
+}
+
 export async function crearPotrero(input: {
   empresaId: string
   campoId: string
@@ -293,7 +298,7 @@ export async function crearPotrero(input: {
     })
     .select('id, nombre')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDePotrero(error)
   return { id: data.id, nombre: data.nombre }
 }
 
@@ -302,6 +307,12 @@ export async function crearPotrero(input: {
  * para potreros sin historia: los animales quedan sin potrero (SET NULL),
  * las observaciones se van en cascada.
  */
+/** Saca un campo sumado por error, con sus potreros (la base los borra en cascada). */
+export async function eliminarCampo(id: string): Promise<void> {
+  const { error } = await supabase.from('campo').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function eliminarPotrero(id: string): Promise<void> {
   const { error } = await supabase.from('potrero').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -323,7 +334,7 @@ export async function actualizarPotrero(input: {
       hectareas: input.hectareas ?? null,
     })
     .eq('id', input.id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDePotrero(error)
 }
 
 // ===== Datos del mapa de un campo (geometría + uso + stock) =====

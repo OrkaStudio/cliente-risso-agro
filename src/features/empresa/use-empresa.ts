@@ -1,5 +1,7 @@
+import type { Niveles } from './secciones'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
+import { primeraMayuscula } from '@/lib/texto'
 
 /**
  * Empresa del usuario actual (multi-tenant). Por ahora un usuario pertenece a
@@ -11,7 +13,19 @@ import { supabase } from '@/lib/supabase/client'
 export type Membresia = {
   empresa_id: string
   rol: string
-  empresa: { id: string; nombre: string } | null
+  /** El nivel en cada sección (null = todo: el dueño). Ver `secciones.ts`. */
+  niveles?: Niveles | null
+  empresa: {
+    id: string
+    nombre: string
+    /** null = el dueño todavía no terminó el onboarding. Una membresía
+     *  guardada de antes de este campo no lo trae: cuenta como terminado. */
+    onboarding_completo_at?: string | null
+    /** null = todavía no ubicó sus campos en el mapa (la app queda cerrada). */
+    mapa_completo_at?: string | null
+    /** Desde cuándo usa Troppero (la pantalla Plan). */
+    created_at?: string
+  } | null
 }
 
 // Última membresía conocida, cacheada en localStorage. Sin red no podemos
@@ -51,12 +65,14 @@ export function useEmpresa() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('miembro_empresa')
-        .select('empresa_id, rol, empresa:empresa(id, nombre)')
+        .select('empresa_id, rol, niveles, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
         .limit(1)
         .maybeSingle()
       if (error) throw error
-      guardarMembresiaPersistida(data)
-      return data
+      // El nombre como se lee: primera letra en mayúscula aunque se haya cargado «risso Agro».
+      const m: Membresia | null = data?.empresa ? { ...data, niveles: data.niveles as Niveles | null, empresa: { ...data.empresa, nombre: primeraMayuscula(data.empresa.nombre) } } : null
+      guardarMembresiaPersistida(m)
+      return m
     },
   })
 }

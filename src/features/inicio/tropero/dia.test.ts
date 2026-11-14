@@ -1,0 +1,214 @@
+import { describe, expect, it } from 'vitest'
+import type { PotreroAtencion } from '../para-atender-api'
+import type { Vencimiento } from '../api'
+import { delCampo, enCarriles, lluviaDelMes, escenaDelClima, lineaDePlata, chipsDelDia, porDondeVaElMapa, cosasParaHoy, fraseDelDia, inicioDeCampania, plataCorta, proximos30, saludo } from './dia'
+
+const potrero = (nombre: string, nivel: 'atender' | 'prevenir', extra: Partial<PotreroAtencion> = {}): PotreroAtencion => ({
+  key: nombre,
+  observacionId: `o-${nombre}`,
+  potrero: nombre,
+  campo: 'La Porteña',
+  campoId: 'c1',
+  cabezas: 60,
+  avisos: [{ key: 'a', tipo: 'electrico', nivel, urgencia: 1, icon: (() => null) as never, titulo: 'El eléctrico está cortado' }],
+  nivel,
+  urgencia: 1,
+  hace: 3,
+  to: `/potrero/${nombre}`,
+  ...extra,
+})
+const venc = (id: string, dias: number, tipo: 'gasto' | 'ingreso' = 'gasto', monto = 350000): Vencimiento => ({
+  id,
+  descripcion: `Cosa ${id}`,
+  tipo,
+  monto,
+  fechaVencimiento: null,
+  diasParaVencer: dias,
+  campoId: 'c1',
+})
+
+describe('para atender hoy', () => {
+  it('ordena de lo urgente a lo que puede esperar y corta en cuatro', () => {
+    const cs = cosasParaHoy(
+      [potrero('4B', 'prevenir'), potrero('11B', 'atender')],
+      [venc('a', 10), venc('b', -2), venc('c', 1, 'ingreso')],
+      [{ key: 'x', campo: 'Los Pampas', campoId: 'c2', cabezas: 46, hace: 15, to: '/campo/recorrida' }],
+    )
+    expect(cs.map((c) => c.key)).toEqual(['p-11B', 'v-b', 'p-4B', 'v-c'])
+    expect(cs[0]).toMatchObject({ tono: 'problema', titulo: 'El eléctrico está cortado en el 11B', detalle: 'Desde hace 3 días. Hay 60 animales adentro.' })
+    expect(cs[1]).toMatchObject({ detalle: 'Venció hace dos días. $350.000.', accion: { texto: 'Ya lo pagué' } })
+    expect(cs[3]!.accion.texto).toBe('Ya lo cobré')
+  })
+  it('sin nada, lista vacía', () => {
+    expect(cosasParaHoy([], [venc('a', 20)], [])).toEqual([])
+  })
+})
+
+describe('lo que dice arriba', () => {
+  it('saluda según la hora', () => {
+    expect(saludo(8, 'Daniel')).toBe('Buen día, Daniel.')
+    expect(saludo(15, 'Daniel')).toBe('Buenas tardes, Daniel.')
+    expect(saludo(21, '')).toBe('Buenas noches.')
+  })
+  it('arma la frase con lo que hay', () => {
+    expect(fraseDelDia({ temp: 17, lugar: 'La Porteña', lluviaMes: 42, cosas: 4 })).toBe(
+      '17 grados en La Porteña. Llovieron unos 42 mm en el último mes y hay cuatro cosas para atender.',
+    )
+    expect(fraseDelDia({ temp: null, lugar: null, lluviaMes: null, cosas: 0 })).toBe('No hay nada urgente.')
+    expect(fraseDelDia({ temp: 9, lugar: 'Los Pampas', lluviaMes: 0, cosas: 1 })).toBe('9 grados en Los Pampas. Hay una cosa para atender.')
+  })
+})
+
+describe('la plata', () => {
+  it('la campaña arranca en julio', () => {
+    expect(inicioDeCampania(new Date(2026, 9, 9))).toBe('2026-07-01')
+    expect(inicioDeCampania(new Date(2026, 2, 1))).toBe('2025-07-01')
+  })
+  it('los próximos 30 días: cobros menos pagos, sin lo vencido', () => {
+    expect(proximos30([venc('a', 4), venc('b', 9, 'ingreso', 18_900_000), venc('c', -1), venc('d', 45)])).toBe(18_550_000)
+  })
+  it('en corto', () => {
+    expect(plataCorta(36_900_000)).toBe('$36,9M')
+    expect(plataCorta(7_750_000, true)).toBe('+$7,75M')
+    expect(plataCorta(-350_000, true)).toBe('−$350.000')
+  })
+})
+
+describe('por dónde va el mapa', () => {
+  const c = (nombre: string, contorno: boolean, potreros: boolean[]) => ({
+    id: nombre,
+    nombre,
+    provincia: 'Buenos Aires',
+    lat: null,
+    lon: null,
+    hectareas: 100,
+    contorno: contorno ? ([[0, 0], [0, 1], [1, 1]] as [number, number][]) : null,
+    potreros: potreros.map((d, i) => ({ id: `${i}`, nombre: `${i}A`, hectareas: 10, poligono: d ? ([[0, 0], [0, 1], [1, 1]] as [number, number][]) : null, cabezas: 0, que: '' })),
+  })
+  it('dice el campo, el paso y los minutos', () => {
+    expect(porDondeVaElMapa([c('La Porteña', false, [false, false, false]), c('Los Pampas', false, [false, false])])).toBe(
+      'La Porteña: vas por el borde. Después, Los Pampas. Unos 11 minutos',
+    )
+    expect(porDondeVaElMapa([c('La Porteña', true, [true, false])])).toBe('La Porteña: falta un potrero. Unos 2 minutos')
+  })
+})
+
+describe('los chips de la cabecera', () => {
+  const cosa = (key: string): import('./dia').Cosa => ({ key, tono: 'problema', titulo: '', detalle: '', accion: { texto: '', to: '' }, icono: 'Plata', lugar: '', que: '', datos: [] })
+  it('lo del campo, lo vencido y la lluvia, en ese orden', () => {
+    const cs = chipsDelDia({ cosas: [cosa('p-1'), cosa('p-2'), cosa('v-1')], vencimientos: [venc('a', -2)], lluviaManana: 82 })
+    expect(cs.map((c) => c.texto)).toEqual(['2 avisos de la recorrida', 'Un pago vencido · $350.000', '82 % de lluvia mañana'])
+    expect(cs.map((c) => c.accion)).toEqual(['Ver', 'Marcar', 'Pronóstico'])
+    expect(cs[1]!.destino).toBe('/agenda?revisar=1')
+  })
+  it('sin vencidos lleva a lo de la semana; sin nada, no hay chips', () => {
+    expect(chipsDelDia({ cosas: [], vencimientos: [venc('a', 4)], lluviaManana: 10 }).map((c) => c.texto)).toEqual(['1 pago vence esta semana'])
+    expect(chipsDelDia({ cosas: [], vencimientos: [], lluviaManana: null })).toEqual([])
+  })
+})
+
+describe('la línea de la plata', () => {
+  it('suma lo que entra y sale en 30 días y aparta lo vencido', () => {
+    const l = lineaDePlata([venc('a', -2), venc('b', 4, 'gasto', 5_400_000), venc('c', 9, 'ingreso', 18_900_000), venc('d', 45)])
+    expect(l).toMatchObject({ entra: 18_900_000, sale: 5_400_000, queda: 13_500_000, vencido: 350_000, maximo: 18_900_000 })
+    expect(l.vencidos.map((p) => p.id)).toEqual(['a'])
+    expect(l.futuros.map((p) => p.id)).toEqual(['b', 'c'])
+  })
+  it('la tarjeta de un potrero dice dónde, qué y cuánto, y cómo marcarla', () => {
+    const [c] = cosasParaHoy([potrero('11B', 'atender')], [], [])
+    expect(c).toMatchObject({ icono: 'Eléctrico', lugar: '11B', que: 'El eléctrico está cortado', datos: ['hace 3 días', '60 animales'], senal: { potreroId: '11B', tipo: 'electrico' } })
+  })
+})
+
+describe('la escena del clima', () => {
+  it('elige el cielo por el código y suma el viento', () => {
+    expect(escenaDelClima(0, 10, true)).toEqual({ cielo: 'sol', ventoso: false })
+    expect(escenaDelClima(2, 35, true)).toEqual({ cielo: 'nubes', ventoso: true })
+    expect(escenaDelClima(3, 0, true).cielo).toBe('nublado')
+    expect(escenaDelClima(53, 0, true).cielo).toBe('lluvia')
+    expect(escenaDelClima(61, 0, false).cielo).toBe('lluvia')
+    expect(escenaDelClima(95, 0, true).cielo).toBe('tormenta')
+    expect(escenaDelClima(0, 0, false).cielo).toBe('noche')
+  })
+})
+
+describe('la lluvia del último mes', () => {
+  it('suma los 30 días que terminan ayer; hoy y lo anterior no cuentan', () => {
+    const hoy = '2026-10-10'
+    const est = Array.from({ length: 32 }, (_, i) => {
+      const f = new Date(2026, 9, 10 - 31 + i)
+      const ymd = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+      return { fecha: ymd, mm: ymd === hoy ? 50 : 2 }
+    })
+    // 32 días: el más viejo queda afuera, hoy no cuenta → 30 días × 2 mm.
+    expect(lluviaDelMes(est, hoy)).toBe(60)
+    expect(lluviaDelMes([], hoy)).toBe(0)
+  })
+})
+
+describe('el Inicio de un campo', () => {
+  const pot = (id: string, campoId: string, cats: [string, number][]) => ({
+    id, nombre: id, campoId, campoNombre: campoId, campoTipo: 'propio' as const, estadoCiclo: 'pastoreo' as never, hectareas: 10,
+    cabezas: cats.reduce((s, c) => s + c[1], 0), porCategoria: cats.map(([categoria, cabezas]) => ({ categoria: categoria as never, cabezas })),
+    cultivo: null, fechaSiembra: null, fechaCosechaEstimada: null, destino: null,
+  })
+  const panorama = {
+    totalCabezas: 30,
+    porCategoria: [{ categoria: 'vaca' as const, cabezas: 22 }, { categoria: 'ternero' as const, cabezas: 8 }],
+    potreros: [pot('1A', 'c1', [['vaca', 12], ['ternero', 5]]), pot('2A', 'c1', [['vaca', 4]]), pot('1B', 'c2', [['vaca', 6], ['ternero', 3]])],
+    vencimientos: [venc('a', 3), { ...venc('b', -1), campoId: 'c2' }],
+  }
+  const atender = {
+    potreros: [potrero('1A', 'atender'), potrero('1B', 'prevenir', { campoId: 'c2' })],
+    sinRecorrer: [{ key: 'x', campo: 'B', campoId: 'c2', cabezas: 9, hace: 20, to: '/campos' }],
+    nacimientos: [{ key: 'n', potrero: '1A', campo: 'A', campoId: 'c1', total: 2, detalle: '', fecha: '', orden: '' }],
+    ultimaRecorridaHace: 2,
+    ultimaPorCampo: { c1: 2, c2: 20 },
+  }
+  it('con un campo, cuenta sólo su hacienda, sus avisos, su plata y su recorrida', () => {
+    const v = delCampo('c1', panorama, atender)
+    expect(v.totalCabezas).toBe(21)
+    expect(v.porCategoria).toEqual([{ categoria: 'vaca', cabezas: 16 }, { categoria: 'ternero', cabezas: 5 }])
+    expect(v.potreros.map((p) => p.potrero)).toEqual(['1A'])
+    expect(v.sinRecorrer).toEqual([])
+    expect(v.vencimientos.map((x) => x.id)).toEqual(['a'])
+    expect(v.nacimientos).toBe(2)
+    expect(v.ultimaRecorridaHace).toBe(2)
+  })
+  it('un campo que nunca se recorrió no toma la recorrida de otro', () => {
+    expect(delCampo('c3', panorama, atender).ultimaRecorridaHace).toBeNull()
+  })
+  it('todos los campos es la empresa entera', () => {
+    const v = delCampo(null, panorama, atender)
+    expect(v.totalCabezas).toBe(30)
+    expect(v.potreros).toHaveLength(2)
+    expect(v.vencimientos).toHaveLength(2)
+  })
+})
+
+describe('la línea de la plata: nada se pisa', () => {
+  // Ninguna etiqueta pisa otra del mismo carril, y ningún tallo cruza una etiqueta de un carril de adentro.
+  const limpio = (u: { xb: number; carril: number }[], ancho: number) =>
+    u.every((a, i) => u.every((b, j) => i === j || (a.carril === b.carril ? Math.abs(a.xb - b.xb) >= ancho : a.carril < b.carril ? Math.abs(b.xb - a.xb) >= ancho / 2 : true)))
+  it('las que caen el mismo día o cerca no se pisan', () => {
+    const { ubicadas } = enCarriles([
+      { id: 'a', x: 500, ancho: 120 },
+      { id: 'b', x: 500, ancho: 120 },
+      { id: 'c', x: 540, ancho: 120 },
+      { id: 'd', x: 900, ancho: 120 },
+    ])
+    expect(ubicadas.find((u) => u.id === 'd')!.carril).toBe(0)
+    expect(limpio(ubicadas, 120)).toBe(true)
+  })
+  it('con muchas en pocos días, ninguna se pisa y termina', () => {
+    const muchas = Array.from({ length: 15 }, (_, i) => ({ id: String(i), x: 100 + (i % 5) * 30, ancho: 120 }))
+    const { ubicadas } = enCarriles(muchas)
+    expect(ubicadas).toHaveLength(15)
+    expect(limpio(ubicadas, 120)).toBe(true)
+  })
+  it('separadas, todas en el primer carril y en su día', () => {
+    const r = enCarriles([{ id: 'a', x: 100, ancho: 100 }, { id: 'b', x: 400, ancho: 100 }])
+    expect(r.carriles).toBe(1)
+    expect(r.ubicadas.every((u) => u.xb === u.x)).toBe(true)
+  })
+})

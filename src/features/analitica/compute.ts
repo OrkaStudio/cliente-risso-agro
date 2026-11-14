@@ -241,7 +241,7 @@ export function serieMensualNeto(
   const cursor = new Date(`${minMes}-01T00:00:00`)
   // Tope de seguridad: 10 años de meses.
   for (let i = 0; i < 120; i++) {
-    const mes = cursor.toISOString().slice(0, 7)
+    const mes = ymd(cursor).slice(0, 7)
     if (mes > fin) break
     out.push({ mes, valor: porMes.get(mes) ?? 0 })
     cursor.setMonth(cursor.getMonth() + 1)

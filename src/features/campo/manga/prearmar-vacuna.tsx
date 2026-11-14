@@ -4,6 +4,7 @@ import { Check, Syringe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CChip, CLabel } from '../ui'
 import { Encabezado, Seguir } from './ui-manga'
+import { enDiasLocal } from '@/lib/fecha'
 
 /**
  * Prearmado de la vacunación: se define UNA vez y vale para todos los animales
@@ -68,7 +69,9 @@ export function PrearmarVacuna({
   onListo: (d: DatosVacuna) => void
   onVolver: () => void
 }) {
-  const [vacunas, setVacunas] = useState<string[]>([VACUNAS[0]])
+  // Nada marcado de entrada: una vacuna premarcada que no se destilda queda
+  // registrada como aplicada, y para SENASA eso es un dato falso.
+  const [vacunas, setVacunas] = useState<string[]>([])
   const [producto, setProducto] = useState('')
   const [vete, setVete] = useState('')
   const [retiro, setRetiro] = useState<number>(0)
@@ -78,7 +81,7 @@ export function PrearmarVacuna({
     recordar(vete)
     const hasta =
       retiro > 0
-        ? new Date(Date.now() + retiro * 86_400_000).toISOString().slice(0, 10)
+        ? enDiasLocal(retiro)
         : null
     onListo({
       vacunas,

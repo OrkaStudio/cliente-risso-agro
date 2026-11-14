@@ -32,6 +32,8 @@ export type Vencimiento = {
   monto: number | null
   fechaVencimiento: string | null
   diasParaVencer: number | null
+  /** El campo al que se cargó; null si es de toda la empresa. */
+  campoId: string | null
 }
 
 export type IvaPanorama = {
@@ -70,10 +72,8 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     { data: pendientes, error: ePend },
     { data: movsIva, error: eIva },
   ] = await Promise.all([
-    supabase
-      .from('v_animal_con_caravana')
-      .select('categoria, estado, potrero_id')
-      .eq('estado', 'activo'),
+    // Las cabezas ya sin las salidas sin identificar (la misma cuenta en toda la app).
+    supabase.from('v_composicion_potrero').select('categoria, potrero_id, cabezas'),
     supabase
       .from('potrero')
       .select(
@@ -81,10 +81,16 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       )
       .order('nombre'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
-    supabase.from('v_flujo_caja').select('neto'),
+    // Sólo el año en curso: sin este filtro la tarjeta "Resultado del año"
+    // sumaba todo el histórico de caja.
+    supabase
+      .from('v_flujo_caja')
+      .select('neto')
+      .gte('mes', `${new Date().getFullYear()}-01-01`)
+      .lt('mes', `${new Date().getFullYear() + 1}-01-01`),
     supabase
       .from('v_pendientes')
-      .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
+      .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer, campo_id')
       .order('dias_para_vencer', { ascending: true }),
     supabase
       .from('movimiento_financiero')
@@ -103,7 +109,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
   const catMap = new Map<Categoria, number>()
   for (const a of animales ?? []) {
     if (!a.categoria) continue
-    catMap.set(a.categoria, (catMap.get(a.categoria) ?? 0) + 1)
+    catMap.set(a.categoria, (catMap.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
   }
   const porCategoria: CategoriaConteo[] = [...catMap.entries()]
     .map(([categoria, cabezas]) => ({ categoria, cabezas }))
@@ -115,7 +121,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
   for (const a of animales ?? []) {
     if (!a.categoria || !a.potrero_id) continue
     const m = catPorPotrero.get(a.potrero_id) ?? new Map<Categoria, number>()
-    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
     catPorPotrero.set(a.potrero_id, m)
   }
 
@@ -160,6 +166,7 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     monto: v.monto,
     fechaVencimiento: v.fecha_vencimiento,
     diasParaVencer: v.dias_para_vencer,
+    campoId: v.campo_id,
   }))
   const porPagarTotal = vencimientos
     .filter((v) => v.tipo === 'gasto')

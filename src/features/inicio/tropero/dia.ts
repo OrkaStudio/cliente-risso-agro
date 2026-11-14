@@ -1,0 +1,373 @@
+import type { NombreIcono } from '@/components/tropero/icono'
+import type { CampoSinRecorrer, ParaAtenderData, PotreroAtencion, TipoSenal } from '../para-atender-api'
+import type { CategoriaConteo, PanoramaInicio, Vencimiento } from '../api'
+import { estadoDe, type CampoMapa } from '@/features/mapa/reglas'
+
+// El Inicio de Troppero (página 35, «Inicio · El día»): qué se dice arriba, qué
+// hay para atender hoy y los números del rodeo. Puro, para probarlo sin base.
+
+export type Tono = 'problema' | 'atencion' | 'aviso'
+
+/** Una cosa para atender hoy: qué pasa, por qué importa y el botón que la resuelve. */
+export type Cosa = {
+  key: string
+  tono: Tono
+  titulo: string
+  detalle: string
+  accion: { texto: string; to: string }
+  /** Para la tarjeta, que se entiende sin leer: el ícono del problema, dónde
+   *  (en grande), qué pasa en dos o tres palabras y los datos cortos. */
+  icono: NombreIcono
+  lugar: string
+  que: string
+  datos: string[]
+  /** Si es una señal de la recorrida, lo que hace falta para marcarla resuelta. */
+  senal?: { potreroId: string; observacionId: string; tipo: TipoSenal }
+}
+
+const ICONO_SENAL: Record<TipoSenal, NombreIcono> = {
+  agua: 'Agua',
+  pasto: 'Campos',
+  electrico: 'Eléctrico',
+  cultivo: 'Campos',
+  conteo: 'Vaca',
+  tratamiento: 'Vacuna',
+  novedad: 'Ayuda',
+}
+
+const plata = (n: number) => `$${Math.round(Math.abs(n)).toLocaleString('es-AR')}`
+const dias = (n: number) => (n === 1 ? 'un día' : n === 2 ? 'dos días' : `${n} días`)
+
+/**
+ * Lo de hoy, de lo más urgente a lo menos: los potreros que piden ir, lo que
+ * venció, lo que vence en tres días y los campos que hace rato no se recorren.
+ * Como mucho `max`: más que eso ya no es «hoy».
+ */
+export function cosasParaHoy(
+  potreros: PotreroAtencion[],
+  vencimientos: Vencimiento[],
+  sinRecorrer: CampoSinRecorrer[],
+  max = 4,
+): Cosa[] {
+  const dePotrero = (p: PotreroAtencion): Cosa => {
+    const a = p.avisos[0]!
+    const cuando = p.hace <= 0 ? 'Desde hoy' : p.hace === 1 ? 'Desde ayer' : `Desde hace ${dias(p.hace)}`
+    const adentro = p.cabezas > 0 ? ` Hay ${p.cabezas} ${p.cabezas === 1 ? 'animal' : 'animales'} adentro.` : ''
+    return {
+      key: `p-${p.key}`,
+      tono: p.nivel === 'atender' ? 'problema' : 'atencion',
+      titulo: `${a.titulo} en el ${p.potrero}`,
+      detalle: `${cuando}.${adentro}`,
+      accion: { texto: 'Ver el potrero', to: p.to },
+      icono: ICONO_SENAL[a.tipo],
+      lugar: p.potrero,
+      que: a.titulo,
+      datos: [p.hace <= 0 ? 'hoy' : p.hace === 1 ? 'ayer' : `hace ${p.hace} días`, ...(p.cabezas > 0 ? [`${p.cabezas} animales`] : []), ...(p.avisos.length > 1 ? [`+${p.avisos.length - 1} más`] : [])],
+      senal: { potreroId: p.key, observacionId: p.observacionId, tipo: a.tipo },
+    }
+  }
+  const deVencimiento = (v: Vencimiento): Cosa => {
+    const d = v.diasParaVencer ?? 0
+    const cobro = v.tipo === 'ingreso'
+    const cuando = d < 0 ? `Venció hace ${dias(-d)}` : d === 0 ? 'Vence hoy' : d === 1 ? 'Vence mañana' : `Vence en ${dias(d)}`
+    return {
+      key: `v-${v.id}`,
+      tono: d < 0 ? 'problema' : 'atencion',
+      titulo: v.descripcion,
+      detalle: v.monto ? `${cuando}. ${plata(v.monto)}.` : `${cuando}.`,
+      accion: { texto: cobro ? 'Ya lo cobré' : 'Ya lo pagué', to: `/agenda?mov=${v.id}` },
+      icono: 'Plata',
+      lugar: v.monto ? plataCorta(cobro ? v.monto : -v.monto, true) : v.descripcion,
+      que: v.descripcion,
+      datos: [d < 0 ? `venció hace ${dias(-d)}` : d === 0 ? 'vence hoy' : d === 1 ? 'vence mañana' : `vence en ${dias(d)}`],
+    }
+  }
+  const atender = potreros.filter((p) => p.nivel === 'atender').map(dePotrero)
+  const vencidos = vencimientos.filter((v) => (v.diasParaVencer ?? 0) < 0).map(deVencimiento)
+  const prevenir = potreros.filter((p) => p.nivel === 'prevenir').map(dePotrero)
+  const proximos = vencimientos
+    .filter((v) => v.diasParaVencer !== null && v.diasParaVencer >= 0 && v.diasParaVencer <= 3)
+    .map(deVencimiento)
+  const recorrer = sinRecorrer.map<Cosa>((c) => ({
+    key: `r-${c.key}`,
+    tono: 'aviso',
+    titulo: c.hace === null ? `${c.campo} todavía no se recorrió` : `${c.campo} no se recorre hace ${dias(c.hace)}`,
+    detalle: 'Recorrelo y mandá por WhatsApp lo que viste: un audio alcanza.',
+    // Lo que lo resuelve no es abrir el mapa: es contar lo que se vio (Lau, 08/11).
+    accion: { texto: 'Mandar la recorrida', to: `whatsapp:Recorrí ${c.campo}. ` },
+    icono: 'Recorrida',
+    lugar: c.campo,
+    que: c.hace === null ? 'Nunca se recorrió' : 'Sin recorrer',
+    datos: [...(c.hace === null ? [] : [`hace ${c.hace} días`]), ...(c.cabezas > 0 ? [`${c.cabezas} cabezas adentro`] : [])],
+  }))
+  return [...atender, ...vencidos, ...prevenir, ...proximos, ...recorrer].slice(0, max)
+}
+
+const NUMEROS = ['ninguna', 'una', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez']
+const enLetras = (n: number) => NUMEROS[n] ?? String(n)
+
+export function saludo(hora: number, nombre: string): string {
+  const s = hora < 13 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches'
+  return nombre ? `${s}, ${nombre}.` : `${s}.`
+}
+
+/** «17 grados en La Porteña. Llovieron unos 42 mm en el último mes y hay cuatro cosas para atender.» */
+export function fraseDelDia({
+  temp,
+  lugar,
+  lluviaMes,
+  cosas,
+}: {
+  temp: number | null
+  lugar: string | null
+  /** mm del último mes según el pronóstico («unos»: es una estimación). */
+  lluviaMes: number | null
+  cosas: number
+}): string {
+  const partes: string[] = []
+  if (temp !== null && lugar) partes.push(`${temp} ${Math.abs(temp) === 1 ? 'grado' : 'grados'} en ${lugar}.`)
+  const atender = cosas === 0 ? 'no hay nada urgente' : `hay ${enLetras(cosas)} ${cosas === 1 ? 'cosa' : 'cosas'} para atender`
+  if (lluviaMes !== null && lluviaMes > 0) partes.push(`Llovieron unos ${lluviaMes} mm en el último mes y ${atender}.`)
+  else partes.push(`${atender.charAt(0).toUpperCase()}${atender.slice(1)}.`)
+  return partes.join(' ')
+}
+
+/** El 1 de julio de la campaña en curso (julio a junio), 'YYYY-MM-DD'. */
+export function inicioDeCampania(hoy: Date): string {
+  const y = hoy.getMonth() >= 6 ? hoy.getFullYear() : hoy.getFullYear() - 1
+  return `${y}-07-01`
+}
+
+/** Lo que entra menos lo que sale en los próximos 30 días (sin lo ya vencido). */
+export function proximos30(vencimientos: Vencimiento[]): number {
+  return vencimientos
+    .filter((v) => v.diasParaVencer !== null && v.diasParaVencer >= 0 && v.diasParaVencer <= 30)
+    .reduce((s, v) => s + (v.tipo === 'ingreso' ? 1 : -1) * (v.monto ?? 0), 0)
+}
+
+/** $36.900.000 → «$36,9M»; $350.000 → «$350.000». */
+export function plataCorta(n: number, signo = false): string {
+  const s = signo ? (n > 0 ? '+' : n < 0 ? '−' : '') : n < 0 ? '−' : ''
+  const a = Math.abs(n)
+  if (a >= 1_000_000) return `${s}$${(a / 1_000_000).toLocaleString('es-AR', { maximumFractionDigits: a >= 10_000_000 ? 1 : 2 })}M`
+  return `${s}$${Math.round(a).toLocaleString('es-AR')}`
+}
+
+/** El rodeo en las cuatro franjas de la barra: vientres, cría, recría y machos adultos. */
+export function franjasDelRodeo(cats: CategoriaConteo[]): { nombre: string; cabezas: number; clase: string }[] {
+  const n = (c: CategoriaConteo['categoria']) => cats.find((x) => x.categoria === c)?.cabezas ?? 0
+  return [
+    { nombre: 'Vacas', cabezas: n('vaca'), clase: 'bg-principal' },
+    { nombre: 'Terneros', cabezas: n('ternero') + n('ternera'), clase: 'bg-[#cf7b4f]' },
+    { nombre: 'Recría', cabezas: n('vaquillona') + n('novillo') + n('capon'), clase: 'bg-acento' },
+    { nombre: 'Toros', cabezas: n('toro'), clase: 'bg-[#7c8b69]' },
+  ].filter((f) => f.cabezas > 0)
+}
+
+/**
+ * «La Porteña: vas por el borde. Después, Los Pampas. Unos 12 minutos»: por
+ * dónde sigue el mapa. Los minutos: 3 por el borde y 1 por potrero sin dibujar.
+ */
+export function porDondeVaElMapa(campos: CampoMapa[]): string {
+  const pendientes = campos.filter((c) => estadoDe(c).tipo !== 'listo')
+  if (!pendientes.length) return 'Ya está todo en el mapa.'
+  const [actual, ...resto] = pendientes
+  const e = estadoDe(actual!)
+  const donde =
+    e.tipo === 'sin-borde'
+      ? 'vas por el borde'
+      : e.tipo === 'sin-potreros'
+        ? 'falta dibujar los potreros'
+        : e.tipo === 'faltan'
+          ? `${e.faltan.length === 1 ? 'falta un potrero' : `faltan ${e.faltan.length} potreros`}`
+          : ''
+  const minutos = pendientes.reduce((s, c) => {
+    const x = estadoDe(c)
+    return s + (x.tipo === 'sin-borde' ? 3 + c.potreros.length : x.tipo === 'faltan' ? x.faltan.length : 0)
+  }, 0)
+  const despues = resto.length ? ` Después, ${resto.map((c) => c.nombre).join(' y ')}.` : ''
+  return `${actual!.nombre}: ${donde}.${despues} Unos ${Math.max(2, minutos)} minutos`
+}
+
+/** Un dato del día en la cabecera: lo más importante, de un vistazo, y adónde lleva. */
+/** Un aviso del día: qué pasa (corto), el botón que lo resuelve y adónde lleva. */
+export type Chip = { key: string; texto: string; accion: string; tono: Tono | 'bien' | 'info'; destino: string }
+
+/**
+ * Lo que dice la cabecera, en orden de importancia (como mucho tres): lo que
+ * hay que atender, lo vencido, y la lluvia de mañana si es probable. Sin nada
+ * urgente, lo dice: también es información que el productor quiere.
+ */
+export function chipsDelDia({
+  cosas,
+  vencimientos,
+  lluviaManana,
+}: {
+  cosas: Cosa[]
+  vencimientos: Vencimiento[]
+  /** Probabilidad de lluvia de mañana (%), si hay pronóstico. */
+  lluviaManana: number | null
+}): Chip[] {
+  // Qué pasa, corto, y el verbo del botón que lo resuelve (Lau, 07/11: en un panel de avisos, no chips sueltos).
+  const chips: Chip[] = []
+  const delCampo = cosas.filter((c) => !c.key.startsWith('v-'))
+  if (delCampo.length === 1) {
+    const c = delCampo[0]!
+    chips.push({ key: 'atender', texto: c.lugar && c.que ? `${c.lugar}: ${c.que.charAt(0).toLowerCase()}${c.que.slice(1)}` : 'Un aviso de la recorrida', accion: 'Ver', tono: 'problema', destino: '#para-atender' })
+  } else if (delCampo.length > 1) chips.push({ key: 'atender', texto: `${delCampo.length} avisos de la recorrida`, accion: 'Ver', tono: 'problema', destino: '#para-atender' })
+  const vencidos = vencimientos.filter((v) => (v.diasParaVencer ?? 0) < 0)
+  if (vencidos.length > 0) {
+    const monto = vencidos.reduce((t, v) => t + (v.monto ?? 0), 0)
+    // Lleva directo a «¿Ya pagaste esto?», donde se marcan de una vez.
+    chips.push({ key: 'vencidos', texto: `${vencidos.length === 1 ? 'Un pago vencido' : `${vencidos.length} pagos vencidos`}${monto ? ` · ${plataCorta(monto)}` : ''}`, accion: 'Marcar', tono: 'problema', destino: '/agenda?revisar=1' })
+  } else {
+    const semana = vencimientos.filter((v) => v.diasParaVencer !== null && v.diasParaVencer >= 0 && v.diasParaVencer <= 7).length
+    if (semana > 0) chips.push({ key: 'semana', texto: `${semana} ${semana === 1 ? 'pago vence' : 'pagos vencen'} esta semana`, accion: 'Ver', tono: 'atencion', destino: '/agenda' })
+  }
+  if (lluviaManana !== null && lluviaManana >= 40)
+    chips.push({ key: 'lluvia', texto: `${lluviaManana} % de lluvia mañana`, accion: 'Pronóstico', tono: 'info', destino: '#clima' })
+  // Sin nada urgente no se muestra un botón vacío: el saludo ya dice que está todo bien.
+  return chips.slice(0, 3)
+}
+
+export type PuntoPlata = { id: string; dia: number; monto: number; cobro: boolean; descripcion: string; fecha: string | null; /** Varios del mismo día, juntos en una burbuja. */ grupo?: PuntoPlata[] }
+
+/**
+ * La plata de los próximos días como línea de tiempo: lo que entra (arriba),
+ * lo que sale (abajo), lo vencido (antes de hoy) y los tres números que la
+ * resumen. Se entiende sin leer la lista.
+ */
+export function lineaDePlata(vencimientos: Vencimiento[], horizonte = 30) {
+  const puntos: PuntoPlata[] = vencimientos
+    .filter((v) => v.diasParaVencer !== null && v.diasParaVencer <= horizonte && (v.monto ?? 0) > 0)
+    .map((v) => ({ id: v.id, dia: v.diasParaVencer!, monto: v.monto!, cobro: v.tipo === 'ingreso', descripcion: v.descripcion, fecha: v.fechaVencimiento }))
+  const futuros = puntos.filter((p) => p.dia >= 0)
+  const entra = futuros.filter((p) => p.cobro).reduce((s, p) => s + p.monto, 0)
+  const sale = futuros.filter((p) => !p.cobro).reduce((s, p) => s + p.monto, 0)
+  const vencidos = puntos.filter((p) => p.dia < 0)
+  return {
+    entra,
+    sale,
+    queda: entra - sale,
+    vencido: vencidos.reduce((s, p) => s + (p.cobro ? -p.monto : p.monto), 0),
+    vencidos,
+    futuros,
+    maximo: Math.max(1, ...puntos.map((p) => p.monto)),
+  }
+}
+
+export type Cielo = 'sol' | 'nubes' | 'nublado' | 'lluvia' | 'tormenta' | 'noche'
+
+/**
+ * Cómo pintar la escena del molino con el clima de ahora (códigos WMO de
+ * Open-Meteo). El viento va aparte: se suma a cualquier cielo (la rueda gira
+ * rápido y las nubes corren). Ventoso desde 30 km/h.
+ */
+export function escenaDelClima(code: number, viento: number, dia: boolean): { cielo: Cielo; ventoso: boolean } {
+  const ventoso = viento >= 30
+  if (code >= 95) return { cielo: 'tormenta', ventoso }
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 71 && code <= 77) || code === 85 || code === 86)
+    return { cielo: 'lluvia', ventoso }
+  if (!dia) return { cielo: 'noche', ventoso }
+  if (code === 3 || code === 45 || code === 48) return { cielo: 'nublado', ventoso }
+  if (code === 2) return { cielo: 'nubes', ventoso }
+  return { cielo: 'sol', ventoso }
+}
+
+// ===== La lluvia del último mes =====
+
+export type DiaLluvia = { fecha: string; mm: number }
+
+/**
+ * Lo que llovió en el campo en los 30 días que terminan ayer, según Open-Meteo
+ * (sus días pasados). Hoy no cuenta: el pronóstico de hoy incluye horas que
+ * todavía no pasaron. Es una estimación del modelo para la ubicación del campo:
+ * así se dice en pantalla.
+ */
+export const DIAS_DE_LLUVIA = 30
+
+export function lluviaDelMes(estimado: DiaLluvia[], hoy: string): number {
+  const desde = sumarDias(hoy, -DIAS_DE_LLUVIA)
+  const total = estimado.filter((x) => x.fecha >= desde && x.fecha < hoy).reduce((s, x) => s + x.mm, 0)
+  return Math.round(total)
+}
+
+const sumarDias = (ymd: string, n: number) => {
+  const [a, m, d] = ymd.split('-').map(Number)
+  const f = new Date(a!, m! - 1, d! + n)
+  return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+}
+
+/** Lo que el Inicio muestra de UN campo o de todos (`campoId` null). */
+export type VistaDelInicio = {
+  totalCabezas: number
+  porCategoria: CategoriaConteo[]
+  vencimientos: Vencimiento[]
+  potreros: PotreroAtencion[]
+  sinRecorrer: CampoSinRecorrer[]
+  nacimientos: number
+  ultimaRecorridaHace: number | null
+}
+
+/**
+ * Recorta el Inicio al campo elegido: la hacienda (por los potreros del campo),
+ * lo que hay que atender, la plata que se cargó a ese campo y su última
+ * recorrida. Con `null` es la empresa entera, tal cual llega.
+ */
+export function delCampo(campoId: string | null, p: Pick<PanoramaInicio, 'totalCabezas' | 'porCategoria' | 'potreros' | 'vencimientos'>, a: ParaAtenderData | undefined): VistaDelInicio {
+  const nac = (a?.nacimientos ?? []).filter((n) => campoId === null || n.campoId === campoId)
+  const base = {
+    potreros: (a?.potreros ?? []).filter((x) => campoId === null || x.campoId === campoId),
+    sinRecorrer: (a?.sinRecorrer ?? []).filter((x) => campoId === null || x.campoId === campoId),
+    nacimientos: nac.reduce((s, n) => s + n.total, 0),
+  }
+  if (campoId === null)
+    return { ...base, totalCabezas: p.totalCabezas, porCategoria: p.porCategoria, vencimientos: p.vencimientos, ultimaRecorridaHace: a?.ultimaRecorridaHace ?? null }
+  const cats = new Map<CategoriaConteo['categoria'], number>()
+  for (const pot of p.potreros) if (pot.campoId === campoId) for (const c of pot.porCategoria) cats.set(c.categoria, (cats.get(c.categoria) ?? 0) + c.cabezas)
+  const porCategoria = [...cats].map(([categoria, cabezas]) => ({ categoria, cabezas })).sort((x, y) => y.cabezas - x.cabezas)
+  return {
+    ...base,
+    totalCabezas: porCategoria.reduce((s, c) => s + c.cabezas, 0),
+    porCategoria,
+    vencimientos: p.vencimientos.filter((v) => v.campoId === campoId),
+    ultimaRecorridaHace: a?.ultimaPorCampo[campoId] ?? null,
+  }
+}
+
+// ===== La línea de la plata, sin que nada se pise =====
+
+/** Dónde va cada burbuja: su x y en qué carril (0 = pegado a la línea). */
+/** x: el día en la línea; xb: dónde queda la burbuja (corrida si el día ya estaba ocupado). */
+export type Ubicada = { id: string; x: number; xb: number; carril: number }
+
+/**
+ * Reparte las burbujas en carriles para que ninguna (ni su etiqueta) pise a
+ * otra (Lau, 07/11: «no debería suceder en ningún caso»). Cada una ocupa
+ * `ancho(id)` px centrados en su x; va al primer carril donde entra con
+ * `separacion` px de aire, o abre uno nuevo.
+ */
+export function enCarriles(puntos: { id: string; x: number; ancho: number }[], separacion = 10): { ubicadas: Ubicada[]; carriles: number } {
+  // Lo ocupado en cada carril: cada burbuja con su etiqueta, y los tallos de las de más afuera que lo cruzan.
+  const ocupado: [number, number][][] = []
+  const libre = (c: number, a: number, b: number) => (ocupado[c] ?? []).every(([x, y]) => b + separacion <= x || a >= y + separacion)
+  const TALLO = 3
+  const entra = (c: number, xb: number, ancho: number) =>
+    libre(c, xb - ancho / 2, xb + ancho / 2) && Array.from({ length: c }, (_, k) => libre(k, xb - TALLO, xb + TALLO)).every(Boolean)
+  const ubicadas = [...puntos]
+    .sort((a, b) => a.x - b.x)
+    .map((p) => {
+      // Primero en su día, de adentro hacia afuera; si no entra, corrida a un costado (cada vez un poco más).
+      const corrimientos = [0, ...Array.from({ length: 36 }, (_, i) => (i % 2 ? -1 : 1) * Math.ceil((i + 1) / 2) * (p.ancho / 6))]
+      let lugar: { c: number; xb: number } | null = null
+      for (const d of corrimientos) {
+        for (let c = 0; c < 6 && !lugar; c++) if (entra(c, p.x + d, p.ancho)) lugar = { c, xb: p.x + d }
+        if (lugar) break
+      }
+      // Sin lugar cerca (muchísimas en pocos días): a la derecha de todo, en el primer carril; ahí siempre entra.
+      lugar ??= { c: 0, xb: Math.max(...ocupado.flat().map(([, b]) => b)) + separacion + p.ancho / 2 }
+      for (let k = 0; k <= lugar.c; k++) (ocupado[k] ??= []).push(k === lugar.c ? [lugar.xb - p.ancho / 2, lugar.xb + p.ancho / 2] : [lugar.xb - TALLO, lugar.xb + TALLO])
+      return { id: p.id, x: p.x, xb: lugar.xb, carril: lugar.c }
+    })
+  return { ubicadas, carriles: ocupado.length }
+}

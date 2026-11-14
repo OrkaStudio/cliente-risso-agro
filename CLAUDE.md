@@ -8,6 +8,8 @@
 - **Vertical:** agropecuaria.
 - **Producto:** app **única** agnóstica de dispositivo — web de escritorio (Modo Oficina) + iOS/Android nativo vía **Capacitor** (Modo Campo, offline-first). Hacienda por caravana RFID, recorridas por potrero, contable, planificación. Multi-cliente desde el día 1 (`empresa_id`). ~500 cabezas.
 - **Cerebro:** `orka-brain/clientes/risso-agro/`.
+- **Marca: Troppero, con doble p** (Lau, 05/11). Así en todo texto que lea alguien: pantallas, WhatsApp, mails, títulos, legales. El logo sale de `troppero-web/assets/troppero-logo.svg` (`src/components/tropero/logo.tsx`). Las carpetas y nombres internos `tropero/` quedan como están.
+- **Tipografía: una sola escala** (Lau, 05/11), en `src/index.css`. Títulos y números con estas clases, sin `text-[Npx]` sueltos: `t-pagina` (título de página, Archivo Black 40), `t-seccion` (sección, Archivo Black 26), `t-tarjeta` (título de tarjeta o fila, Archivo ExtraBold 19), `t-numero-hero` (el número protagonista, 64), `t-numero` (número de tarjeta, 34), `t-cifra` (monto en una lista, Barlow Condensed 18), `t-cifra-chica` (15) y `t-cifra-mini` (12,5). El texto va en Inter. Si hace falta otro tamaño, se suma a la escala, no se inventa en la pantalla.
 
 ## Stack — NO es el boilerplate Next.js de Orka
 
@@ -49,9 +51,24 @@ Al no haber servidor (Server Actions), el cliente habla directo con Postgres:
 - **Code-splitting:** el bundle inicial supera 500 kB (warning de Vite). Dividir con `import()` dinámico cuando crezca.
 - **Build iOS:** requiere macOS/Xcode o CI con runner Mac (Lau desarrolla en Windows). Las plataformas `ios/` y `android/` no están agregadas todavía (gitignoreadas).
 - **Operaciones de Hacienda = RPCs transaccionales** (`SECURITY INVOKER`, RLS del usuario): `crear_animal`, `cambiar_caravana`, `dar_baja_animal`. Las multi-tabla (alta, cambio de caravana, baja) son atómicas. `registrar_evento` es un insert directo (append-only). Migración `hacienda_rpcs`.
-- **Verificación E2E:** golden path verificado a nivel datos (RLS + vistas) **y** en navegador real (`pnpm test:e2e`, Playwright — login → alta → ficha → stock). Credenciales: `orka.arg@gmail.com` / `SanMartin364` → empresa **"Orka Pruebas"** (4 campos, 24 potreros con polígonos reales, 186 cabezas; Don Gilberto con 3 potreros). El test toma las credenciales de `E2E_EMAIL`/`E2E_PASSWORD`.
-  > ⚠️ **Los tests NO corren contra "Risso Agro"**: desde el 06/08 esa empresa es del productor (`rissodaniel23@gmail.com`) y quedó vacía a propósito para que cargue él. Escribirle desde un test sería ensuciarle los datos. Ver [[TASK-056]].
+- **Verificación E2E:** `pnpm test:e2e:todo` (Playwright) corre contra el **Supabase local**, nunca contra prod. La cuenta de prueba sale de `supabase/seed.sql` (empresa «E2E Pruebas», campo «E2E Campo base» con el 1A) y entra con el celular `+54 9 2240 00-0001` y el código fijo de `[auth.sms.test_otp]`, que sólo existe en local. Manga y sin señal corren contra `pnpm build:local` (build apuntado a la base local).
+  > ⚠️ **Los tests NO corren contra "Risso Agro"** ni contra prod: desde el 06/08 esa empresa es del productor (`rissodaniel23@gmail.com`). Ver [[TASK-056]].
+- **Acceso sin contraseñas (rediseño Troppero):** se entra con el celular y un código de 6 números. Supabase Auth genera el código (login por teléfono) y el hook «Send SMS» llama a `supabase/functions/enviar-codigo`, que lo manda por WhatsApp con la plantilla de autenticación de Meta. Cambiar el número se hace desde adentro (`/mi-cuenta/numero`: sesión abierta + código al número nuevo); afuera, `/cambie-de-numero` sólo explica los caminos (sin CUIT). Para activarlo en prod hace falta: la plantilla aprobada en Meta (`code_login`, Copiar código, `es`), **«Confirm phone» prendido** (si no, el cambio de número se aplica sin verificar el nuevo), los secrets `SEND_SMS_HOOK_SECRETS`, `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_PLANTILLA_CODIGO`, el hook en Auth → Hooks, el proveedor de teléfono prendido con «SMS OTP Expiry» en 600 s, y pasarle el celular a los usuarios que hoy entran con mail.
 - **Auth — leaked password protection:** desactivado (advisor de Supabase). Activar en el dashboard (Auth → Password security, HaveIBeenPwned). Toggle de consola, no código.
+
+## Desarrollo local (sin tocar prod)
+
+Hace falta OrbStack (o Docker) y la CLI de Supabase (`brew install supabase/tap/supabase`).
+
+```
+supabase start          # base, login y funciones en la Mac; aplica las migraciones y seed.sql
+pnpm dev                # la app apunta a la base local por .env.development.local
+supabase db reset       # vuelve la base local a cero (migraciones + seed)
+```
+
+- `.env.development.local` y `.env.localdb.local` (ignorados) tienen `VITE_SUPABASE_URL=http://127.0.0.1:54321` y la clave pública local que imprime `supabase status`. `.env.local` sigue apuntando a prod para `pnpm build`.
+- `supabase/.env` y `supabase/functions/.env` (ignorados) llevan `SEND_SMS_HOOK_SECRETS=v1,whsec_…` (cualquier secreto de 32 bytes en base64). Sin `WA_*`, el código para entrar se ve con `pnpm codigo`.
+- `/estilo` (sólo en dev) muestra los componentes de Troppero para compararlos con la página 34 del Figma.
 
 ## Flujo de trabajo
 

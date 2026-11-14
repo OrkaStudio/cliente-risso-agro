@@ -80,8 +80,6 @@ export type Observacion = {
   audio_url: string | null
 }
 
-const hoyISO = () => new Date().toISOString().slice(0, 10)
-
 /** Días desde la última observación de un potrero. null = nunca se recorrió. */
 export function diasDesde(fecha: string | undefined | null): number | null {
   if (!fecha) return null
@@ -108,7 +106,7 @@ export async function fetchRefs(): Promise<{
   campos: CampoRec[]
   potreros: (PotreroRec & { campo_id: string })[]
 }> {
-  const [camposRes, potrerosRes, stockRes, obsRes, animalesRes, lotesRes] =
+  const [camposRes, potrerosRes, stockRes, obsRes, animalesRes, lotesRes, composRes] =
     await Promise.all([
     // Orden por color_idx = orden de la letra (A, B, C…): la lista de campos
     // queda coherente con las letras de sus potreros en toda la app.
@@ -135,6 +133,8 @@ export async function fetchRefs(): Promise<{
       .eq('estado', 'activo'),
     // Nombres de tropas (lote) → etiquetar la selección de tropa del nacimiento.
     supabase.from('lote').select('id, nombre'),
+    // Las cabezas por categoría ya sin las salidas sin identificar.
+    supabase.from('v_composicion_potrero').select('potrero_id, categoria, cabezas'),
   ])
   if (camposRes.error) throw camposRes.error
   if (potrerosRes.error) throw potrerosRes.error
@@ -146,12 +146,14 @@ export async function fetchRefs(): Promise<{
   const cab = new Map(
     (stockRes.data ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]),
   )
-  // Composición por potrero: categoría → cabezas, ordenada de mayor a menor.
+  if (composRes.error) throw composRes.error
+  // Composición por potrero: categoría → cabezas (sin las salidas sin
+  // identificar), ordenada de mayor a menor.
   const composPorPotrero = new Map<string, Map<CategoriaAnimal, number>>()
-  for (const a of animalesRes.data ?? []) {
+  for (const a of composRes.data ?? []) {
     if (!a.potrero_id || !a.categoria) continue
     const m = composPorPotrero.get(a.potrero_id) ?? new Map<CategoriaAnimal, number>()
-    m.set(a.categoria, (m.get(a.categoria) ?? 0) + 1)
+    m.set(a.categoria, (m.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
     composPorPotrero.set(a.potrero_id, m)
   }
   const composDe = (potreroId: string): CompoItem[] =>
@@ -334,32 +336,3 @@ export async function guardarObservacion(input: {
   }
 }
 
-/** Lluvia del campo (mm) del día — única por campo+fecha (upsert manual). */
-export async function guardarLluvia(input: {
-  campoId: string
-  empresaId: string
-  mm: number
-}): Promise<void> {
-  const fecha = hoyISO()
-  const { data: ex } = await supabase
-    .from('lluvia')
-    .select('id')
-    .eq('campo_id', input.campoId)
-    .eq('fecha', fecha)
-    .maybeSingle()
-  if (ex) {
-    const { error } = await supabase
-      .from('lluvia')
-      .update({ mm: input.mm })
-      .eq('id', ex.id)
-    if (error) throw new Error(error.message)
-  } else {
-    const { error } = await supabase.from('lluvia').insert({
-      campo_id: input.campoId,
-      empresa_id: input.empresaId,
-      fecha,
-      mm: input.mm,
-    })
-    if (error) throw new Error(error.message)
-  }
-}

@@ -14,8 +14,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      baja: {
+        Row: { borrar_desde: string; deshecha_at: string | null; empresa_id: string; id: number; pedida_at: string; pedida_por: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      aceptacion_legal: {
+        Row: { aceptado_at: string; dispositivo: string | null; id: number; ip: string | null; user_id: string; version: string; via: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      salida_candidato: {
+        Row: { animal_id: string; descartado: boolean; empresa_id: string; salida_id: string }
+        Insert: { animal_id: string; descartado?: boolean; empresa_id: string; salida_id: string }
+        Update: { animal_id?: string; descartado?: boolean; empresa_id?: string; salida_id?: string }
+        Relationships: []
+      }
+      salida_pendiente: {
+        Row: {
+          canal: string
+          created_by: string | null
+          categoria: Database["public"]["Enums"]["categoria_animal"]
+          created_at: string
+          empresa_id: string
+          fecha: string
+          id: string
+          motivo: string
+          nota: string | null
+          potrero_id: string
+          resuelta_animal_id: string | null
+          resuelta_como: string | null
+          resuelta_en: string | null
+          salida_id: string
+        }
+        Insert: {
+          canal?: string
+          created_by?: string | null
+          categoria: Database["public"]["Enums"]["categoria_animal"]
+          empresa_id: string
+          fecha: string
+          motivo: string
+          potrero_id: string
+          salida_id: string
+        }
+        Update: { canal?: string; created_by?: string | null; resuelta_como?: string | null; resuelta_en?: string | null }
+        Relationships: []
+      }
       animal: {
         Row: {
+          canal: string
+          created_by: string | null
           categoria: Database["public"]["Enums"]["categoria_animal"]
           created_at: string
           empresa_id: string
@@ -32,6 +82,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           categoria: Database["public"]["Enums"]["categoria_animal"]
           created_at?: string
           empresa_id: string
@@ -48,6 +100,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           categoria?: Database["public"]["Enums"]["categoria_animal"]
           created_at?: string
           empresa_id?: string
@@ -223,6 +277,8 @@ export type Database = {
       }
       caravana: {
         Row: {
+          canal: string
+          created_by: string | null
           animal_id: string
           created_at: string
           empresa_id: string
@@ -230,11 +286,13 @@ export type Database = {
           fecha_baja: string | null
           id: string
           motivo_baja: string | null
-          numero_rfid: string
+          numero_rfid: string | null
           numero_visual: string | null
           vigente: boolean
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           animal_id: string
           created_at?: string
           empresa_id: string
@@ -242,11 +300,13 @@ export type Database = {
           fecha_baja?: string | null
           id?: string
           motivo_baja?: string | null
-          numero_rfid: string
+          numero_rfid?: string | null
           numero_visual?: string | null
           vigente?: boolean
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           animal_id?: string
           created_at?: string
           empresa_id?: string
@@ -254,7 +314,7 @@ export type Database = {
           fecha_baja?: string | null
           id?: string
           motivo_baja?: string | null
-          numero_rfid?: string
+          numero_rfid?: string | null
           numero_visual?: string | null
           vigente?: boolean
         }
@@ -357,16 +417,22 @@ export type Database = {
       }
       empresa: {
         Row: {
+          mapa_completo_at: string | null
+          onboarding_completo_at: string | null
           created_at: string
           id: string
           nombre: string
         }
         Insert: {
+          mapa_completo_at?: string | null
+          onboarding_completo_at?: string | null
           created_at?: string
           id?: string
           nombre: string
         }
         Update: {
+          mapa_completo_at?: string | null
+          onboarding_completo_at?: string | null
           created_at?: string
           id?: string
           nombre?: string
@@ -417,6 +483,7 @@ export type Database = {
       }
       evento: {
         Row: {
+          canal: string
           animal_id: string
           audio_url: string | null
           created_at: string
@@ -429,6 +496,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_evento"]
         }
         Insert: {
+          canal?: string
           animal_id: string
           audio_url?: string | null
           created_at?: string
@@ -441,6 +509,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_evento"]
         }
         Update: {
+          canal?: string
           animal_id?: string
           audio_url?: string | null
           created_at?: string
@@ -543,11 +612,12 @@ export type Database = {
       }
       infraestructura: {
         Row: {
+          canal: string
+          created_by: string | null
           angulo_deg: number | null
           apodo: string | null
           campo_id: string
           created_at: string
-          created_by: string | null
           empresa_id: string
           escala: number | null
           id: string
@@ -558,11 +628,12 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_infraestructura"]
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           angulo_deg?: number | null
           apodo?: string | null
           campo_id: string
           created_at?: string
-          created_by?: string | null
           empresa_id: string
           escala?: number | null
           id?: string
@@ -573,11 +644,11 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_infraestructura"]
         }
         Update: {
+          canal?: string
           angulo_deg?: number | null
           apodo?: string | null
           campo_id?: string
           created_at?: string
-          created_by?: string | null
           empresa_id?: string
           escala?: number | null
           id?: string
@@ -606,6 +677,7 @@ export type Database = {
       }
       labor_potrero: {
         Row: {
+          canal: string
           created_at: string
           created_by: string | null
           cultivo: string | null
@@ -619,6 +691,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_labor"]
         }
         Insert: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           cultivo?: string | null
@@ -632,6 +705,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_labor"]
         }
         Update: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           cultivo?: string | null
@@ -677,6 +751,8 @@ export type Database = {
       }
       lluvia: {
         Row: {
+          canal: string
+          created_by: string | null
           campo_id: string
           created_at: string
           empresa_id: string
@@ -686,6 +762,8 @@ export type Database = {
           mm: number
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           campo_id: string
           created_at?: string
           empresa_id: string
@@ -695,6 +773,8 @@ export type Database = {
           mm: number
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           campo_id?: string
           created_at?: string
           empresa_id?: string
@@ -722,6 +802,8 @@ export type Database = {
       }
       lote: {
         Row: {
+          canal: string
+          created_by: string | null
           campo_id: string | null
           created_at: string
           empresa_id: string
@@ -732,6 +814,8 @@ export type Database = {
           proposito: Database["public"]["Enums"]["proposito_lote"]
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           campo_id?: string | null
           created_at?: string
           empresa_id: string
@@ -742,6 +826,8 @@ export type Database = {
           proposito?: Database["public"]["Enums"]["proposito_lote"]
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           campo_id?: string | null
           created_at?: string
           empresa_id?: string
@@ -820,6 +906,7 @@ export type Database = {
       }
       marca_senal: {
         Row: {
+          canal: string
           created_at: string
           created_by: string | null
           empresa_id: string
@@ -831,6 +918,7 @@ export type Database = {
           tipo_senal: Database["public"]["Enums"]["tipo_senal"]
         }
         Insert: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           empresa_id: string
@@ -842,6 +930,7 @@ export type Database = {
           tipo_senal: Database["public"]["Enums"]["tipo_senal"]
         }
         Update: {
+          canal?: string
           created_at?: string
           created_by?: string | null
           empresa_id?: string
@@ -881,18 +970,21 @@ export type Database = {
           created_at: string
           empresa_id: string
           rol: string
+          niveles: Json | null
           user_id: string
         }
         Insert: {
           created_at?: string
           empresa_id: string
           rol?: string
+          niveles?: Json | null
           user_id: string
         }
         Update: {
           created_at?: string
           empresa_id?: string
           rol?: string
+          niveles?: Json | null
           user_id?: string
         }
         Relationships: [
@@ -920,6 +1012,8 @@ export type Database = {
           comprobante_url: string | null
           contraparte: string | null
           created_at: string
+          canal: string
+          revisado_at: string | null
           created_by: string | null
           cuit_contraparte: string | null
           descripcion: string | null
@@ -942,6 +1036,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          canal?: string
+          revisado_at?: string | null
           actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
           audio_url?: string | null
@@ -977,6 +1073,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          canal?: string
+          revisado_at?: string | null
           actividad?: Database["public"]["Enums"]["actividad_movimiento"] | null
           animal_id?: string | null
           audio_url?: string | null
@@ -1058,6 +1156,8 @@ export type Database = {
       }
       movimiento_iva_linea: {
         Row: {
+          canal: string
+          created_by: string | null
           alicuota: number
           concepto: string | null
           created_at: string
@@ -1069,6 +1169,8 @@ export type Database = {
           orden: number
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           alicuota?: number
           concepto?: string | null
           created_at?: string
@@ -1080,6 +1182,8 @@ export type Database = {
           orden?: number
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           alicuota?: number
           concepto?: string | null
           created_at?: string
@@ -1116,6 +1220,8 @@ export type Database = {
       }
       observacion_potrero: {
         Row: {
+          canal: string
+          created_by: string | null
           agua: Database["public"]["Enums"]["agua_estado"] | null
           audio_url: string | null
           conteo: number | null
@@ -1131,6 +1237,8 @@ export type Database = {
           recorrida_id: string
         }
         Insert: {
+          canal?: string
+          created_by?: string | null
           agua?: Database["public"]["Enums"]["agua_estado"] | null
           audio_url?: string | null
           conteo?: number | null
@@ -1146,6 +1254,8 @@ export type Database = {
           recorrida_id: string
         }
         Update: {
+          canal?: string
+          created_by?: string | null
           agua?: Database["public"]["Enums"]["agua_estado"] | null
           audio_url?: string | null
           conteo?: number | null
@@ -1218,6 +1328,7 @@ export type Database = {
       }
       potrero: {
         Row: {
+          descanso_desde: string | null
           aprovechamiento:
             | Database["public"]["Enums"]["aprovechamiento_forraje"]
             | null
@@ -1237,6 +1348,7 @@ export type Database = {
           variedad: string | null
         }
         Insert: {
+          descanso_desde?: string | null
           aprovechamiento?:
             | Database["public"]["Enums"]["aprovechamiento_forraje"]
             | null
@@ -1256,6 +1368,7 @@ export type Database = {
           variedad?: string | null
         }
         Update: {
+          descanso_desde?: string | null
           aprovechamiento?:
             | Database["public"]["Enums"]["aprovechamiento_forraje"]
             | null
@@ -1300,6 +1413,7 @@ export type Database = {
       }
       recorrida: {
         Row: {
+          canal: string
           campo_id: string
           created_at: string
           created_by: string | null
@@ -1308,6 +1422,7 @@ export type Database = {
           id: string
         }
         Insert: {
+          canal?: string
           campo_id: string
           created_at?: string
           created_by?: string | null
@@ -1316,6 +1431,7 @@ export type Database = {
           id?: string
         }
         Update: {
+          canal?: string
           campo_id?: string
           created_at?: string
           created_by?: string | null
@@ -1446,6 +1562,33 @@ export type Database = {
       }
     }
     Views: {
+      v_composicion_potrero: {
+        Row: {
+          cabezas: number | null
+          categoria: Database["public"]["Enums"]["categoria_animal"] | null
+          empresa_id: string | null
+          potrero_id: string | null
+        }
+        Relationships: []
+      }
+      v_posibles_salida: {
+        Row: { animal_id: string | null; empresa_id: string | null; salida_id: string | null }
+        Relationships: []
+      }
+      v_salidas_sin_identificar: {
+        Row: {
+          categoria: Database["public"]["Enums"]["categoria_animal"] | null
+          created_at: string | null
+          empresa_id: string | null
+          fecha: string | null
+          motivo: string | null
+          pendientes: number | null
+          posibles: number | null
+          potrero_id: string | null
+          salida_id: string | null
+        }
+        Relationships: []
+      }
       v_animal_con_caravana: {
         Row: {
           caravana_rfid: string | null
@@ -1679,6 +1822,49 @@ export type Database = {
         }
         Returns: number
       }
+      celular_tiene_cuenta: { Args: { p_celular: string }; Returns: boolean }
+      terminar_onboarding: { Args: never; Returns: string }
+      terminar_mapa: { Args: never; Returns: string }
+      pedir_baja: { Args: never; Returns: { borrar_desde: string; deshecha_at: string | null; empresa_id: string; id: number; pedida_at: string; pedida_por: string } }
+      deshacer_baja: { Args: never; Returns: undefined }
+      nombres_de_empresa: { Args: never; Returns: { user_id: string; nombre: string; rol: string }[] }
+      aceptar_legales: { Args: { p_version: string; p_via: string }; Returns: undefined }
+      crear_invitacion: {
+        Args: { p_celular: string; p_nombre: string; p_rol: string; p_niveles: Json }
+        Returns: string
+      }
+      personas_de_empresa: {
+        Args: never
+        Returns: {
+          celular: string
+          desde: string
+          invitacion_id: string | null
+          nombre: string | null
+          rol: string
+          niveles: Json | null
+          soy_yo: boolean
+          token: string | null
+          user_id: string | null
+          vence_at: string | null
+        }[]
+      }
+      cambiar_niveles: { Args: { p_niveles: Json; p_user: string }; Returns: undefined }
+      quitar_persona: { Args: { p_invitacion: string | null; p_user: string | null }; Returns: undefined }
+      auth_empresa_ids_plata: { Args: never; Returns: string[] }
+      invitacion_por_token: {
+        Args: { p_token: string }
+        Returns: {
+          empresa: string
+          invita: string
+          nombre: string
+          rol: string
+          celular: string
+          vencida: boolean
+          usada: boolean
+          niveles: Json
+        }[]
+      }
+      aceptar_invitacion: { Args: { p_token: string }; Returns: string }
       crear_empresa_con_dueno: { Args: { p_nombre: string }; Returns: string }
       crear_lote_repartido: {
         Args: {
@@ -1702,6 +1888,49 @@ export type Database = {
         Returns: undefined
       }
       infraestructura_linea_valida: { Args: { l: Json }; Returns: boolean }
+      salida_por_cantidad: {
+        Args: {
+          p_caravanas?: string[]
+          p_empresa_id: string
+          p_fecha?: string
+          p_items: Json
+          p_motivo: string
+          p_nota?: string
+          p_potrero_id: string
+        }
+        Returns: Json
+      }
+      identificar_salida: {
+        Args: { p_caravanas: string[]; p_empresa_id: string; p_salida_id?: string }
+        Returns: Json
+      }
+      identificar_animal: {
+        Args: { p_animal_id: string; p_salida_id?: string }
+        Returns: undefined
+      }
+      resolver_sin_saber: { Args: { p_salida_id: string; p_animal_ids?: string[] }; Returns: number }
+      reabrir_sin_saber: { Args: { p_animal_id: string }; Returns: string }
+      anular_salida: { Args: { p_salida_id: string }; Returns: number }
+      corregir_salida: {
+        Args: { p_cantidad: number; p_categoria: Database["public"]["Enums"]["categoria_animal"]; p_potrero_id: string; p_salida_id: string }
+        Returns: Json
+      }
+      asignar_caravanas: {
+        Args: { p_altas?: Json; p_chips?: Json; p_empresa_id: string; p_filas: Json; p_lote: string }
+        Returns: Json
+      }
+      deshacer_caravanas: {
+        Args: { p_lote: string }
+        Returns: number
+      }
+      corregir_animal: {
+        Args: { p_animal_id: string; p_cambios: Json }
+        Returns: undefined
+      }
+      animal_por_caravana: {
+        Args: { p_caravana: string; p_empresa_id: string }
+        Returns: string
+      }
       marcar_senal: {
         Args: {
           p_empresa_id: string
@@ -1776,7 +2005,7 @@ export type Database = {
       cultivo_obs_estado: "bien" | "regular" | "mal"
       destino_campania: "venta" | "consumo"
       electrico_estado: "ok" | "cortado"
-      estado_animal: "activo" | "vendido" | "muerto"
+      estado_animal: "activo" | "vendido" | "muerto" | "corregido"
       estado_captura:
         | "recibida"
         | "propuesta"
@@ -2009,7 +2238,7 @@ export const Constants = {
       cultivo_obs_estado: ["bien", "regular", "mal"],
       destino_campania: ["venta", "consumo"],
       electrico_estado: ["ok", "cortado"],
-      estado_animal: ["activo", "vendido", "muerto"],
+      estado_animal: ["activo", "vendido", "muerto", "corregido"],
       estado_captura: [
         "recibida",
         "propuesta",

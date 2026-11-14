@@ -1,32 +1,35 @@
-import { Suspense, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import { Suspense, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { prefetch, prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
+import { prefetchEnReposo, CHUNKS_OFICINA } from '@/lib/prefetch'
 import {
   BarChart3,
   Beef,
   CalendarClock,
-  ChevronLeft,
+  CalendarDays,
   CircleDollarSign,
   LayoutDashboard,
-  Leaf,
+  Lock,
   LogOut,
+  Menu,
   Map as MapIcon,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
-import { Invitacion } from '@/features/guia/invitacion'
-import { Mision } from '@/features/guia/mision'
-import { PuestaAPunto } from '@/features/guia/puesta-a-punto'
-import { Spots } from '@/features/guia/spots'
+import { useMedirPuestaAPunto } from '@/features/guia/medir'
 import { ClimaSlot } from '@/features/cotizaciones/clima-slot'
 import { GordoSlot } from '@/features/cotizaciones/gordo-slot'
 import { useDolarBlue } from '@/features/cotizaciones/hooks'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { abiertoSinMapa, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
 import { MARCA } from '@/lib/marca'
+import { useIsMobile } from '@/lib/use-is-mobile'
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { contarHoy, useParaAtender } from '@/features/inicio/para-atender-api'
+import { ICONO_PILDORA, PILDORA } from '@/features/cotizaciones/pildora'
+import { BarraLateral } from './barra-lateral'
+import { useCuantasHoy } from '@/features/inicio/tropero/use-dia'
 
 function fechaHoy(): string {
   const s = new Date().toLocaleDateString('es-AR', {
@@ -36,8 +39,6 @@ function fechaHoy(): string {
   })
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
-
-const TickerDivider = () => <span className="h-6 w-px bg-sidebar-border" />
 
 /** Strip de mercado: gordo (manual), dólar blue (dolarapi) y clima
  *  (open-meteo). Si una fuente falla, no muestra ese dato (nunca un valor
@@ -52,16 +53,12 @@ function Ticker() {
     blue.data ? (
       <div
         key="blue"
-        className="flex shrink-0 items-center gap-2"
-        title={`Dólar Blue — compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
+        className={PILDORA}
+        title={`Dólar blue: compra $${blue.data.compra.toLocaleString('es-AR')} · venta $${blue.data.venta.toLocaleString('es-AR')}`}
       >
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-          <CircleDollarSign className="size-[15px] text-[#2fd58b]" />
-          Blue
-        </span>
-        <b className="tnum text-sm font-semibold text-white">
-          ${blue.data.venta.toLocaleString('es-AR')}
-        </b>
+        <span className={cn(ICONO_PILDORA, 'bg-estado-bien-suave text-estado-bien-texto')}><CircleDollarSign /></span>
+        <span className="text-[13px] text-texto-suave">Blue</span>
+        <b className="t-cifra-chica font-bold text-texto">${blue.data.venta.toLocaleString('es-AR')}</b>
       </div>
     ) : null,
     // El slot del clima decide solo si tiene algo que mostrar (campo elegido
@@ -69,16 +66,7 @@ function Ticker() {
     <ClimaSlot key="clima" />,
   ].filter(Boolean)
 
-  return (
-    <div className="ml-auto flex min-w-0 items-center gap-3 overflow-hidden text-sidebar-foreground">
-      {slots.map((slot, i) => (
-        <div key={i} className="flex items-center gap-3">
-          {i > 0 && <TickerDivider />}
-          {slot}
-        </div>
-      ))}
-    </div>
-  )
+  return <div className="ml-auto flex min-w-0 items-center gap-4 [&>*+*]:border-l [&>*+*]:border-borde [&>*+*]:pl-4">{slots}</div>
 }
 
 /**
@@ -92,24 +80,19 @@ const NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/hacienda', label: 'Hacienda', icon: Beef, end: false },
   { to: '/campos', label: 'Campos', icon: MapIcon, end: false },
-  { to: '/analitica', label: 'Analítica', icon: BarChart3, end: false },
+  { to: '/analitica', label: 'Plata', icon: BarChart3, end: false },
   { to: '/agenda', label: 'Agenda', icon: CalendarClock, end: false },
 ]
 
-function initials(email?: string) {
-  return email ? email.slice(0, 1).toUpperCase() : 'R'
-}
-
 export function AppShell() {
-  const { user, signOut } = useAuth()
+  useMedirPuestaAPunto()
+  const isMobile = useIsMobile()
+  const { signOut } = useAuth()
   const { data: membresia } = useEmpresa()
 
   /* Una sola consulta compartida con el Inicio (misma queryKey): el contador y la
    * cabecera "Hoy" no pueden decir números distintos. */
-  const hoy = contarHoy(useParaAtender().data)
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('side-collapsed') === '1',
-  )
+  const hoy = useCuantasHoy()
   // Recién llegó del onboarding: la barra ya se formó en su lugar (ver
   // `HaciaLaBarra`), así que aparece al instante; lo de adentro, el
   // encabezado y el contenido entran con un fundido escalonado.
@@ -130,167 +113,64 @@ export function AppShell() {
         }
       : {}
 
+  // El scroll de la columna (Lau, 05/11): al ir a otra pantalla, arranca arriba;
+  // con «atrás» del navegador, vuelve a donde estaba. Sólo cambia con la ruta,
+  // no con los filtros de la misma pantalla (?tab=, ?q=).
+  const principal = useRef<HTMLElement>(null)
+  const tipoNav = useNavigationType()
+  const posiciones = useRef(new Map<string, number>())
+  useLayoutEffect(() => {
+    const el = principal.current
+    if (!el) return
+    const destino = tipoNav === 'POP' ? (posiciones.current.get(location.key) ?? 0) : 0
+    el.scrollTop = destino
+    // Volviendo atrás la pantalla puede tardar un instante en tener su alto: se reintenta.
+    const r = destino ? requestAnimationFrame(() => requestAnimationFrame(() => (el.scrollTop = destino))) : 0
+    const guardar = () => posiciones.current.set(location.key, el.scrollTop)
+    el.addEventListener('scroll', guardar, { passive: true })
+    return () => (cancelAnimationFrame(r), el.removeEventListener('scroll', guardar))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo con la ruta: los filtros de la misma pantalla no suben el scroll
+  }, [location.pathname])
+
   // Precarga los chunks de las secciones en reposo → navegar entre Hacienda/
   // Campos/Analítica/Agenda es instantáneo (sin flash de "Cargando…").
   useEffect(() => prefetchEnReposo(Object.values(CHUNKS_OFICINA)), [])
-  const toggle = () =>
-    setCollapsed((c) => {
-      localStorage.setItem('side-collapsed', c ? '0' : '1')
-      return !c
-    })
-
   return (
-    <div className="flex h-full overflow-hidden bg-background">
-      {/* ===== Sidebar ===== */}
-      <aside
-        className={cn(
-          'm-4 flex h-[calc(100%-2rem)] shrink-0 flex-col rounded-[20px] bg-sidebar text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)] transition-[width] duration-200 ease-out',
-          collapsed ? 'w-[76px]' : 'w-[248px]',
-        )}
-      >
-        <motion.div className="flex min-h-0 flex-1 flex-col" {...entra(0.05)}>
-        {/* Marca + toggle */}
-        <div className="flex items-center gap-3 px-4 pb-4 pt-4">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]">
-            <Leaf className="size-5 text-white" strokeWidth={1.75} />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate font-heading text-[17px] font-bold text-white">
-                {MARCA}
-              </div>
-              <div className="truncate text-[11px] font-medium text-sidebar-foreground/55">
-                Gestión de campo
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={toggle}
-            title={collapsed ? 'Expandir' : 'Colapsar'}
-            className={cn(
-              'flex size-7 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white',
-              collapsed && 'mx-auto',
-            )}
-          >
-            <ChevronLeft
-              className={cn('size-4 transition-transform', collapsed && 'rotate-180')}
-            />
-          </button>
-        </div>
-
-        {/* Navegación (scrollea si no entra) */}
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1">
-          {!collapsed && (
-            <div className="px-2 pb-1 pt-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-sidebar-foreground/45">
-              Oficina
-            </div>
-          )}
-          {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              title={collapsed ? label : undefined}
-              onMouseEnter={() => {
-                const t = CHUNKS_OFICINA[to]
-                if (t) prefetch(t)
-              }}
-              className={({ isActive }) =>
-                cn(
-                  'relative flex items-center gap-3 rounded-[10px] py-2.5 text-sm font-medium transition-colors',
-                  collapsed ? 'justify-center px-0' : 'px-3',
-                  isActive
-                    ? 'bg-white/[0.07] text-white'
-                    : 'text-sidebar-foreground/65 hover:bg-white/[0.05] hover:text-white',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && !collapsed && (
-                    <span className="absolute inset-y-[14%] left-0 w-[3px] rounded-full bg-lima" />
-                  )}
-                  <Icon
-                    className={cn(
-                      'size-5 shrink-0',
-                      isActive ? 'text-lima' : 'text-sidebar-foreground/55',
-                    )}
-                    strokeWidth={1.75}
-                  />
-                  {!collapsed && <span>{label}</span>}
-                  {/* Señala dónde mirar, no repite el contenido: descartamos una
-                      campanita con panel propio porque duplicaba la verdad en dos
-                      lugares (mismo problema que los cheques antes de la Agenda). */}
-                  {to === '/' && hoy > 0 && (
-                    <span
-                      aria-label={`${hoy} para hoy`}
-                      className={cn(
-                        'tnum ml-auto shrink-0 rounded-full bg-lima px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-ink',
-                        collapsed && 'absolute right-1 top-1 ml-0 px-1',
-                      )}
-                    >
-                      {hoy}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Usuario */}
-        <div
-          className={cn(
-            'flex items-center border-t border-sidebar-border px-3 py-3',
-            collapsed ? 'flex-col gap-2' : 'gap-2.5',
-          )}
-        >
-          <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-[13px] font-bold text-white"
-            title={collapsed ? user?.email : undefined}
-          >
-            {initials(user?.email)}
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-[13px] font-semibold text-sidebar-foreground">
-                {membresia?.empresa?.nombre ?? '—'}
-              </div>
-              <div className="truncate text-[11px] text-sidebar-foreground/55">
-                {user?.email}
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            title="Salir"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-white/[0.07] hover:text-white"
-          >
-            <LogOut className="size-[17px]" />
-          </button>
-        </div>
-        </motion.div>
-      </aside>
+    <div className="flex h-full overflow-hidden bg-fondo">
+      {/* ===== Barra lateral (página 35, «Barra lateral · Oficina») ===== */}
+      <motion.div className="flex h-full" {...entra(0.05)}>
+        <BarraLateral hoy={hoy} />
+      </motion.div>
 
       {/* ===== Columna principal ===== */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <motion.header {...entra(0.15)} className="m-4 mb-0 flex shrink-0 items-center gap-4 rounded-[20px] bg-sidebar px-6 py-3.5 text-sidebar-foreground shadow-[0_12px_40px_rgba(16,30,20,0.12)]">
-          <div className="hidden shrink-0 font-heading text-sm font-semibold text-white sm:block">
-            {fechaHoy()}
+        <motion.header {...entra(0.15)} className="flex h-16 shrink-0 items-center gap-4 border-b border-borde bg-fondo/95 px-4 text-texto backdrop-blur-sm sm:px-10">
+          <div className="hidden shrink-0 items-center gap-2.5 sm:flex">
+            <span className={cn(ICONO_PILDORA, 'bg-principal-suave text-principal')}>
+              <CalendarDays />
+            </span>
+            <span className="leading-tight">
+              <span className="block text-[14.5px] font-bold text-texto">{fechaHoy().split(',')[0]}</span>
+              <span className="block text-[13px] text-texto-suave">{fechaHoy().split(', ')[1]}</span>
+            </span>
           </div>
 
+          {isMobile && (
+            <OficinaMobileMenu
+              empresaNombre={membresia?.empresa?.nombre ?? MARCA}
+              onSignOut={signOut}
+            />
+          )}
           <Ticker />
         </motion.header>
 
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
             burbuja flotante del Asistente (no tapa la última card). */}
-        <main className="flex-1 overflow-y-auto">
+        <main ref={principal} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
-            className="w-full px-4 pb-12 pt-7 sm:px-6"
+            className="w-full px-4 pb-14 pt-7 sm:px-10 sm:pt-8"
             style={bienvenida && !contenidoListo ? { opacity: 0 } : undefined}
           >
             <Suspense
@@ -304,17 +184,67 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* El asistente enseña haciendo (TASK-063): la invitación una sola
-          vez, la misión en curso pegada al botón real, y un puntito por
-          panel la primera vez. Nada tapa la página. */}
-      <Invitacion />
-      <Mision />
-      <Spots />
+      {/* El asistente enseña haciendo (TASK-063): la misión en curso pegada al
+          botón real y un puntito por panel la primera vez. La invitación y la
+          lista «Tu campo, en marcha» se reemplazaron por el Inicio «Antes del
+          mapa» de Troppero, que muestra los mismos pasos en un solo lugar. */}
 
-      {/* Panel del Asistente (preguntas + WhatsApp) + smart checklist */}
+      {/* El asistente, siempre a la vista abajo a la derecha: lo que notó, el progreso y las dudas. */}
       <AsistentePanel />
-      <PuestaAPunto />
     </div>
+  )
+}
+
+/** La Oficina es una opción explícita en teléfono; su menú no ocupa el ancho del contenido. */
+function OficinaMobileMenu({ empresaNombre, onSignOut }: {
+  empresaNombre: string
+  onSignOut: () => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const mapaPendiente = useMapaPendiente()
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        aria-label="Abrir menú de Oficina"
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground hover:bg-sidebar-accent"
+      >
+        <Menu className="size-5" aria-hidden="true" />
+      </DialogTrigger>
+      <DialogContent>
+        <DialogTitle>Modo Oficina</DialogTitle>
+        <DialogDescription>{empresaNombre}</DialogDescription>
+        <nav aria-label="Secciones de Oficina" className="flex flex-col gap-1">
+          {NAV.map(({ to, label, icon: Icon, end }) => {
+            const bloqueada = mapaPendiente && !abiertoSinMapa(to)
+            return (
+            <NavLink
+              key={to}
+              to={bloqueada ? '/campos' : to}
+              state={bloqueada ? { bloqueada: seccionBloqueada(to) } : undefined}
+              end={end}
+              onClick={() => setOpen(false)}
+              className={({ isActive }) => cn(
+                'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold',
+                isActive ? 'bg-secondary text-principal' : 'text-ink hover:bg-secondary',
+              )}
+            >
+              <Icon className="size-5" aria-hidden="true" />
+              {label}
+              {bloqueada && <Lock aria-label="Se abre al terminar el mapa" className="ml-auto size-4 text-texto-suave" />}
+            </NavLink>
+            )
+          })}
+        </nav>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); void onSignOut() }}
+          className="flex items-center gap-3 border-t border-border px-3 pt-3 text-sm text-texto-suave"
+        >
+          <LogOut className="size-5" aria-hidden="true" />
+          Cerrar sesión
+        </button>
+      </DialogContent>
+    </Dialog>
   )
 }
 

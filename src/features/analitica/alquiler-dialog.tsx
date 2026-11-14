@@ -1,21 +1,22 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight, Check, Receipt } from 'lucide-react'
+import { BotonPrincipal } from '@/components/tropero/boton'
+import { Icono, type NombreIcono } from '@/components/tropero/icono'
+import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
+import { CampoFecha } from '@/components/ui/campo-fecha'
 import { crearAlquilerDeCampo, frecuenciaLabel, type Frecuencia } from '@/features/analitica/api'
 import { useInvalidarMovimientos } from '@/features/agenda/hooks'
 import { useCampos } from '@/features/campos/hooks'
 import { cargarGordo } from '@/features/cotizaciones/api'
 import { useDolarBlue, useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
 import { formatearNumero, numeroDeFormateado } from '@/features/onboarding/numeros'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useCampoElegido } from '@/features/campos/campo-elegido'
+import { MarcaCampo } from '@/features/campos/opciones-campo'
 import { cn } from '@/lib/utils'
 
 /**
- * El alquiler de un campo como está pactado, en un diálogo de una pregunta
- * por pantalla. Vive en Analítica (es un gasto) y la guía lo empuja para
+ * El alquiler de un campo como está pactado, en el panel lateral, una pregunta
+ * por pantalla (Figma página 35, «Alquiler» en 4 pasos; Lau, 03/11). Vive en Analítica (es un gasto) y la guía lo empuja para
  * los campos alquilados una vez terminado el onboarding — cuando tiene el
  * contrato a mano, no mientras arma su campo.
  *
@@ -46,73 +47,11 @@ const MESES: Record<Frecuencia, number> = { mensual: 1, bimestral: 2, trimestral
 type Sub = 'campo' | 'unidad' | 'cantidad' | 'pago' | 'precio' | 'resumen'
 
 function pesos(n: number): string {
-  return `$ ${Math.round(n).toLocaleString('es-AR')}`
+  return `$${Math.round(n).toLocaleString('es-AR')}`
 }
 function hoyISO(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function fechaLarga(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y!, m! - 1, d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
-}
-
-/** Una opción grande: se toca y avanza. */
-function Opcion({ activa, onClick, titulo, detalle }: { activa: boolean; onClick: () => void; titulo: string; detalle?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors',
-        activa ? 'border-primary bg-primary/10' : 'border-input hover:border-ring hover:bg-secondary/40',
-      )}
-    >
-      <span>
-        <span className={cn('block text-sm font-semibold', activa ? 'text-primary' : 'text-foreground')}>{titulo}</span>
-        {detalle ? <span className="block text-xs text-muted-foreground">{detalle}</span> : null}
-      </span>
-      {activa ? <Check className="size-4 shrink-0 text-primary" strokeWidth={2.5} /> : <ArrowRight className="size-4 shrink-0 text-muted-foreground/50" />}
-    </button>
-  )
-}
-
-/** Dos opciones en un segmento: botones, no links. */
-function Segmento<T extends string>({ valor, opciones, onChange, ariaLabel }: { valor: T; opciones: { valor: T; etiqueta: string }[]; onChange: (v: T) => void; ariaLabel: string }) {
-  return (
-    <div className="inline-flex rounded-lg bg-secondary p-0.5" role="radiogroup" aria-label={ariaLabel}>
-      {opciones.map((o) => (
-        <button
-          key={o.valor}
-          type="button"
-          role="radio"
-          aria-checked={valor === o.valor}
-          onClick={() => onChange(o.valor)}
-          className={cn(
-            'h-8 rounded-md px-3 text-xs font-semibold transition-colors',
-            valor === o.valor ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {o.etiqueta}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function Pregunta({ clave, children }: { clave: string; children: ReactNode }) {
-  return (
-    <motion.div
-      key={clave}
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -24 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="grid gap-3"
-    >
-      {children}
-    </motion.div>
-  )
 }
 
 export function AlquilerDialog({
@@ -127,13 +66,17 @@ export function AlquilerDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { campos: identidadCampos } = useCampoElegido()
   const campos = useCampos()
   const dolar = useDolarBlue()
   const gordo = useGordoActual(empresaId)
   const canuelas = useNovilloCanuelas()
   const invalidar = useInvalidarMovimientos()
 
-  const alquilados = (campos.data ?? []).filter((c) => c.tipo === 'alquilado')
+  // Los alquilados primero; si no hay ninguno marcado así, cualquiera de sus campos
+  // (antes no preguntaba y «Guardar» no hacía nada).
+  const marcados = (campos.data ?? []).filter((c) => c.tipo === 'alquilado')
+  const alquilados = marcados.length ? marcados : (campos.data ?? [])
   const [campoId, setCampoId] = useState<string | null>(campoInicial ?? null)
   const campo = (campos.data ?? []).find((c) => c.id === (campoId ?? campoInicial)) ?? (alquilados.length === 1 ? alquilados[0] : null)
 
@@ -160,7 +103,8 @@ export function AlquilerDialog({
         ? (canuelas.data?.valor ?? gordo.data?.valor ?? null)
         : null
   const precioNum = precioAuto ?? numeroDeFormateado(precio)
-  const pidePrecio = unidad !== 'pesos' && precioAuto === null
+  // Sólo cuando ya eligió en qué está pactado: si no, el total de pasos cambia al elegir.
+  const pidePrecio = unidad !== null && unidad !== 'pesos' && precioAuto === null
 
   const unidadesAnio = cant !== null ? cant * (base === 'ha' ? (hectareas ?? 0) : 1) * (periodo === 'mes' ? 12 : 1) : null
   const cuotasAnio = 12 / MESES[frecuencia]
@@ -204,8 +148,8 @@ export function AlquilerDialog({
     setSub('resumen')
   }
 
-  async function guardar(e: FormEvent) {
-    e.preventDefault()
+  async function guardar(e?: { preventDefault: () => void }) {
+    e?.preventDefault()
     if (!campo || !u || montoCuota === null || cant === null) return
     setOcupado(true)
     try {
@@ -229,7 +173,7 @@ export function AlquilerDialog({
         }
       }
       invalidar()
-      toast.success(`Alquiler de ${campo.nombre}: ${pesos(montoCuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}, en la Agenda`)
+      toast.success(`Listo: anotamos el alquiler de ${campo.nombre}`, { description: `${pesos(montoCuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}; cada pago lo ves en la Agenda.` })
       onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el alquiler.')
@@ -238,13 +182,6 @@ export function AlquilerDialog({
     }
   }
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (sub === 'cantidad') confirmarCantidad()
-    else if (sub === 'pago') confirmarPago()
-    else if (sub === 'precio') confirmarPrecio()
-    else if (sub === 'resumen') void guardar(e)
-  }
 
   const labelCantidad = !u
     ? ''
@@ -252,249 +189,186 @@ export function AlquilerDialog({
       ? `¿Cuánto por ${periodo === 'mes' ? 'mes' : 'año'}${base === 'ha' ? ', por hectárea' : ''}?`
       : `¿Cuántos ${u.nombre} por ${base === 'ha' ? 'hectárea por ' : ''}${periodo === 'mes' ? 'mes' : 'año'}?`
 
+  const TITULO: Record<Sub, string> = {
+    campo: '¿De qué campo?',
+    unidad: '¿En qué está pactado?',
+    cantidad: esMoneda ? '¿Cuánto?' : u ? `¿Cuántos ${u.nombre.split(' ')[0]}?` : '¿Cuánto?',
+    pago: '¿Cuándo se paga?',
+    precio: u ? `¿A cuánto está hoy ${u.precioDe}?` : '¿A cuánto está hoy?',
+    resumen: 'Así queda',
+  }
+  const confirmar = sub === 'cantidad' ? confirmarCantidad : sub === 'pago' ? confirmarPago : sub === 'precio' ? confirmarPrecio : null
+  // Los próximos pagos, para ver cómo queda en la Agenda.
+  const proximos = Array.from({ length: Math.min(3, cuotasAnio) }, (_, i) => {
+    const [y, m, d] = primerPago.split('-').map(Number) as [number, number, number]
+    const f = new Date(y, m - 1 + i * MESES[frecuencia], d)
+    return { dia: f.getDate(), mes: f.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '') }
+  })
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-[440px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary">
-              <Receipt className="size-[18px]" strokeWidth={1.75} />
-            </span>
-            <DialogTitle className="text-left font-heading text-[19px] leading-snug">
-              {campo ? `El alquiler de ${campo.nombre}` : 'El alquiler'}
-            </DialogTitle>
+    <PanelLateral
+      abierto={open}
+      onCerrar={() => onOpenChange(false)}
+      onVolver={anterior ? () => (setError(null), setSub(anterior)) : undefined}
+      titulo={TITULO[sub]}
+      bajada={
+        <span className="flex items-center gap-3">
+          {campo ? `El alquiler de ${campo.nombre}` : 'El alquiler'}, paso {indice + 1} de {ORDEN.length}
+          <span aria-hidden className="flex gap-1">
+            {ORDEN.map((x, i) => (
+              <span key={x} className={cn('h-1.5 w-6 rounded-full', i <= indice ? 'bg-principal' : 'bg-borde')} />
+            ))}
+          </span>
+        </span>
+      }
+      pie={
+        sub === 'resumen' ? (
+          <>
+            {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
+            <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado || montoCuota === null} onClick={() => void guardar()}>
+              {ocupado ? 'Guardando…' : 'Guardar el alquiler'}
+            </BotonPrincipal>
+          </>
+        ) : confirmar ? (
+          <>
+            {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
+            <BotonPrincipal icono="Siguiente" onClick={confirmar}>
+              Seguir
+            </BotonPrincipal>
+          </>
+        ) : undefined
+      }
+    >
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (confirmar) confirmar()
+          else if (sub === 'resumen') void guardar(e)
+        }}
+      >
+        {sub === 'campo' && (
+          <div className="flex flex-col gap-3">
+            {alquilados.map((c) => (
+              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" marca={(() => { const id = identidadCampos.find((x) => x.id === c.id); return id ? <MarcaCampo letra={id.letra} color={id.color} className="size-12 text-[18px] ring-2 ring-superficie" /> : undefined })()} titulo={c.nombre} detalle={c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : ''} onClick={() => (setCampoId(c.id), setSub('unidad'))} />
+            ))}
           </div>
-        </DialogHeader>
+        )}
 
-        {/* Dónde vamos */}
-        <div className="flex items-center gap-1.5">
-          {ORDEN.map((s, i) => (
-            <span key={s} className={cn('h-1.5 rounded-full transition-all', i < indice ? 'w-4 bg-primary' : i === indice ? 'w-6 bg-primary' : 'w-4 bg-border')} />
-          ))}
-          <span className="ml-1 text-[11px] text-muted-foreground">{indice + 1} de {ORDEN.length}</span>
-        </div>
+        {sub === 'unidad' && (
+          <div className="flex flex-col gap-3">
+            <p className="mb-1 text-[15px] text-texto-suave">Como dice el contrato. Si es en kilos o en quintales, la app lo pasa a pesos cada vez que se paga.</p>
+            {UNIDADES.map((x) => (
+              <OpcionGrande key={x.valor} activa={unidad === x.valor} icono={x.valor === 'kg_novillo' ? 'Vaca' : x.valor === 'pesos' || x.valor === 'dolares' ? 'Plata' : 'Campos'} titulo={x.titulo} detalle={x.detalle} onClick={() => elegirUnidad(x.valor)} />
+            ))}
+          </div>
+        )}
 
-        <form onSubmit={onSubmit} noValidate>
-          <AnimatePresence mode="wait" initial={false}>
-            {sub === 'campo' && (
-              <Pregunta clave="campo">
-                <p className="text-[15px] font-semibold">¿De qué campo?</p>
-                <div className="grid gap-1.5">
-                  {alquilados.map((c) => (
-                    <Opcion
-                      key={c.id}
-                      activa={campoId === c.id}
-                      onClick={() => {
-                        setCampoId(c.id)
-                        setSub('unidad')
-                      }}
-                      titulo={c.nombre}
-                      detalle={c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : ''}
-                    />
-                  ))}
-                </div>
-              </Pregunta>
+        {sub === 'cantidad' && u && (
+          <>
+            <label className="flex items-baseline gap-2">
+              {esMoneda && <span className="titulo-display shrink-0 text-[40px] text-texto-suave">{u.nombre}</span>}
+              <input
+                inputMode="decimal"
+                aria-label={labelCantidad}
+                value={cantidad}
+                placeholder={esMoneda ? '5.000.000' : '120'}
+                onChange={(e) => (setCantidad(formatearNumero(e.target.value)), setError(null))}
+                autoFocus
+                className="titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[64px] [field-sizing:content] leading-tight tracking-[-0.03em] text-texto outline-none placeholder:text-texto/25"
+              />
+              {!esMoneda && <span className="shrink-0 text-[22px] font-bold text-texto">{u.nombre.split(' ')[0]}</span>}
+            </label>
+            {!esMoneda && <p className="text-[16px] font-semibold text-texto-suave">{u.nombre.split(' ').slice(1).join(' ')}</p>}
+            <Grupo titulo="Por" className="mt-6">
+              <Opciones etiqueta="Por" opciones={[{ valor: 'mes', texto: 'Mes' }, { valor: 'anio', texto: 'Año' }]} elegidas={[periodo]} onTocar={(v) => setPeriodo(v as 'mes' | 'anio')} />
+            </Grupo>
+            <Grupo titulo="Para">
+              <Opciones etiqueta="Para" opciones={[{ valor: 'total', texto: 'Todo el campo' }, { valor: 'ha', texto: hectareas ? `Cada hectárea (${hectareas.toLocaleString('es-AR')} ha)` : 'Cada hectárea' }]} elegidas={[base]} onTocar={(v) => setBase(v as 'ha' | 'total')} />
+            </Grupo>
+            {unidadesAnio !== null && unidadesAnio > 0 && unidad !== 'pesos' && precioAuto !== null && (
+              <div className="mt-6 rounded-[18px] bg-acento px-5 py-4 text-acento-texto">
+                <p className="text-[14px]">Con {unidad === 'dolares' ? 'el blue' : 'el gordo'} de hoy son</p>
+                <p className="titulo-display cifra text-[24px]">{pesos((unidadesAnio / (periodo === 'mes' ? 12 : 1)) * precioAuto)} por {periodo === 'mes' ? 'mes' : 'año'}</p>
+              </div>
             )}
+          </>
+        )}
 
-            {sub === 'unidad' && (
-              <Pregunta clave="unidad">
-                <p className="text-[15px] font-semibold">¿En qué está pactado?</p>
-                <div className="grid gap-1.5">
-                  {UNIDADES.map((x) => (
-                    <Opcion key={x.valor} activa={unidad === x.valor} onClick={() => elegirUnidad(x.valor)} titulo={x.titulo} detalle={x.detalle} />
-                  ))}
-                </div>
-              </Pregunta>
+        {sub === 'pago' && (
+          <>
+            <Grupo titulo="Cada cuánto">
+              <Opciones etiqueta="Cada cuánto" opciones={FRECUENCIAS.map((f) => ({ valor: f.valor, texto: frecuenciaLabel[f.valor] }))} elegidas={[frecuencia]} onTocar={setFrecuencia} />
+            </Grupo>
+            <Grupo titulo="El próximo pago">
+              <CampoFecha value={primerPago} onChange={(v) => (setPrimerPago(v), setError(null))} ariaLabel="El próximo pago" />
+            </Grupo>
+            <p className="mt-4 text-[14px] text-texto-suave">Desde ahí armamos un año de pagos en la Agenda. Después los renovás o cancelás desde ahí.</p>
+          </>
+        )}
+
+        {sub === 'precio' && u && (
+          <>
+            <label className="flex items-baseline gap-2">
+              <span className="titulo-display shrink-0 text-[40px] text-texto-suave">$</span>
+              <input inputMode="decimal" aria-label={`Precio de hoy de ${u.precioDe}`} value={precio} placeholder={unidad === 'kg_novillo' ? '3.900' : '30.000'} onChange={(e) => (setPrecio(formatearNumero(e.target.value)), setError(null))} autoFocus className="titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight text-texto outline-none placeholder:text-texto/25" />
+            </label>
+            <p className="mt-3 text-[14px] text-texto-suave">
+              Con esto estimamos cada cuota; al pagar, la ajustás al precio de ese día.
+              {unidad === 'kg_novillo' ? ' Queda como tu cotización del gordo.' : ''}
+            </p>
+          </>
+        )}
+
+        {sub === 'resumen' && u && (
+          <>
+            <p className="text-[16px] text-texto">
+              {esMoneda ? `${u.nombre} ${cantidad}` : `${cantidad} ${u.nombre}`}
+              {base === 'ha' ? ` por hectárea (${(hectareas ?? 0).toLocaleString('es-AR')} ha)` : ' en total'} por {periodo === 'mes' ? 'mes' : 'año'}; {cuotasAnio} {cuotasAnio === 1 ? 'pago' : 'pagos'} por año.
+            </p>
+            {montoCuota !== null ? (
+              <ul className="mt-5 border-t border-borde">
+                {proximos.map((p, i) => (
+                  <li key={i} className="flex items-center gap-4 border-b border-borde py-3.5">
+                    <span className="w-10 text-center">
+                      <b className="t-cifra block text-texto">{p.dia}</b>
+                      <span className="text-[12.5px] font-semibold text-texto-suave">{p.mes}</span>
+                    </span>
+                    <span>
+                      <b className="t-cifra text-texto">
+                        {i > 0 && unidad !== 'pesos' ? '≈ ' : ''}
+                        {pesos(montoCuota)}
+                      </b>
+                      <span className="block text-[13.5px] text-texto-suave">{unidad === 'pesos' ? 'monto fijo' : i === 0 ? `con ${u.precioDe} a ${pesos(precioNum!)}` : 'se recalcula ese día'}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-[14px] text-texto-suave">{unidad === 'dolares' ? 'No pudimos traer el dólar de hoy. Probá de nuevo en un rato.' : 'Falta un dato para calcular.'}</p>
             )}
+            <p className="mt-4 text-[14px] text-texto-suave">Van a la Agenda. Plata los cuenta en lo que viene.</p>
+          </>
+        )}
+        <button type="submit" hidden />
+      </form>
+    </PanelLateral>
+  )
+}
 
-            {sub === 'cantidad' && u && (
-              <Pregunta clave="cantidad">
-                <p className="text-[15px] font-semibold">{labelCantidad}</p>
-                <div className="relative">
-                  {esMoneda && (
-                    <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-lg text-muted-foreground">{u.nombre}</span>
-                  )}
-                  <Input
-                    inputMode="decimal"
-                    className={cn('h-12 text-xl font-semibold tabular-nums', esMoneda ? (unidad === 'dolares' ? 'pl-14' : 'pl-8') : 'pr-28')}
-                    value={cantidad}
-                    onChange={(e) => {
-                      setCantidad(formatearNumero(e.target.value))
-                      setError(null)
-                    }}
-                    placeholder={esMoneda ? '5.000.000' : '120'}
-                    aria-label={labelCantidad}
-                    aria-invalid={!!error}
-                    autoFocus
-                  />
-                  {!esMoneda && (
-                    <span className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-sm text-muted-foreground">{u.nombre}</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Segmento
-                    ariaLabel="Base"
-                    valor={base}
-                    onChange={setBase}
-                    opciones={[
-                      { valor: 'ha', etiqueta: 'Por hectárea' },
-                      { valor: 'total', etiqueta: 'En total' },
-                    ]}
-                  />
-                  <Segmento
-                    ariaLabel="Período"
-                    valor={periodo}
-                    onChange={setPeriodo}
-                    opciones={[
-                      { valor: 'anio', etiqueta: 'Por año' },
-                      { valor: 'mes', etiqueta: 'Por mes' },
-                    ]}
-                  />
-                </div>
-                {error && <p className="text-xs text-destructive">{error}</p>}
-                <Button type="button" onClick={confirmarCantidad} className="h-11 w-full">
-                  Siguiente <ArrowRight className="size-4" />
-                </Button>
-              </Pregunta>
-            )}
-
-            {sub === 'pago' && (
-              <Pregunta clave="pago">
-                <p className="text-[15px] font-semibold">¿Cómo se paga?</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {FRECUENCIAS.map((f) => (
-                    <button
-                      key={f.valor}
-                      type="button"
-                      role="radio"
-                      aria-checked={frecuencia === f.valor}
-                      onClick={() => setFrecuencia(f.valor)}
-                      className={cn(
-                        'rounded-lg border px-3 py-2 text-left transition-colors',
-                        frecuencia === f.valor ? 'border-primary bg-primary/10' : 'border-input hover:border-ring',
-                      )}
-                    >
-                      <span className={cn('block text-sm font-semibold', frecuencia === f.valor ? 'text-primary' : 'text-foreground')}>{frecuenciaLabel[f.valor]}</span>
-                      <span className="block text-xs text-muted-foreground">{f.detalle}</span>
-                    </button>
-                  ))}
-                </div>
-                <label className="grid gap-1.5">
-                  <span className="text-sm font-medium">Próximo pago</span>
-                  <Input
-                    type="date"
-                    className="h-11 tabular-nums"
-                    value={primerPago}
-                    onChange={(e) => {
-                      setPrimerPago(e.target.value)
-                      setError(null)
-                    }}
-                    aria-invalid={!!error}
-                  />
-                </label>
-                <p className="text-xs text-muted-foreground">Desde ahí armamos un año de pagos en la Agenda. Después los renovás o cancelás desde ahí.</p>
-                {error && <p className="text-xs text-destructive">{error}</p>}
-                <Button type="button" onClick={confirmarPago} className="h-11 w-full">
-                  {pidePrecio ? 'Siguiente' : 'Ver la cuenta'} <ArrowRight className="size-4" />
-                </Button>
-              </Pregunta>
-            )}
-
-            {sub === 'precio' && u && (
-              <Pregunta clave="precio">
-                <p className="text-[15px] font-semibold">¿A cuánto está hoy {u.precioDe}?</p>
-                <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-lg text-muted-foreground">$</span>
-                  <Input
-                    inputMode="decimal"
-                    className="h-12 pl-8 text-xl font-semibold tabular-nums"
-                    value={precio}
-                    onChange={(e) => {
-                      setPrecio(formatearNumero(e.target.value))
-                      setError(null)
-                    }}
-                    placeholder={unidad === 'kg_novillo' ? '3.900' : '30.000'}
-                    aria-label={`Precio de hoy de ${u.precioDe}`}
-                    aria-invalid={!!error}
-                    autoFocus
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Con esto estimamos cada cuota; al pagar, la ajustás al precio de ese día.
-                  {unidad === 'kg_novillo' ? ' Queda como tu cotización del gordo.' : ''}
-                </p>
-                {error && <p className="text-xs text-destructive">{error}</p>}
-                <Button type="button" onClick={confirmarPrecio} className="h-11 w-full">
-                  Ver la cuenta <ArrowRight className="size-4" />
-                </Button>
-              </Pregunta>
-            )}
-
-            {sub === 'resumen' && u && (
-              <Pregunta clave="resumen">
-                <p className="text-[15px] font-semibold">Así queda</p>
-                <div className="rounded-lg border border-primary/50 bg-primary/5 px-3.5 py-3">
-                  {montoCuota !== null ? (
-                    <>
-                      <p className="text-[22px] font-bold leading-tight tabular-nums">
-                        {pesos(montoCuota)}{' '}
-                        <span className="text-sm font-normal text-muted-foreground">
-                          {frecuenciaLabel[frecuencia].toLowerCase()}
-                          {unidad !== 'pesos' ? ' · estimado' : ''}
-                        </span>
-                      </p>
-                      <ul className="mt-2 grid gap-0.5 text-xs text-muted-foreground">
-                        <li>
-                          {esMoneda ? `${u.nombre} ${cantidad}` : `${cantidad} ${u.nombre}`}
-                          {base === 'ha' ? ` por hectárea (${(hectareas ?? 0).toLocaleString('es-AR')} ha)` : ' en total'} por {periodo === 'mes' ? 'mes' : 'año'}
-                        </li>
-                        <li>
-                          {cuotasAnio} {cuotasAnio === 1 ? 'pago' : 'pagos'} por año, el primero el {fechaLarga(primerPago)}
-                        </li>
-                        {unidad !== 'pesos' && precioNum !== null && (
-                          <li>
-                            {u.precioDe![0]!.toUpperCase() + u.precioDe!.slice(1)} a {pesos(precioNum)}
-                            {unidad === 'dolares'
-                              ? ' (blue de hoy)'
-                              : unidad === 'kg_novillo' && canuelas.data
-                                ? ` (Cañuelas, ${fechaLarga(canuelas.data.fecha)})`
-                                : unidad === 'kg_novillo' && precioAuto !== null
-                                  ? ' (tu cotización del gordo)'
-                                  : ' hoy'}
-                          </li>
-                        )}
-                      </ul>
-                    </>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {unidad === 'dolares' ? 'No pudimos traer el dólar de hoy. Probá de nuevo en un rato.' : 'Falta un dato para calcular.'}
-                    </p>
-                  )}
-                </div>
-                {error && <p className="text-xs text-destructive">{error}</p>}
-                <Button type="submit" disabled={ocupado || montoCuota === null} className="h-11 w-full">
-                  {ocupado ? 'Guardando…' : 'Guardar el alquiler'}
-                </Button>
-              </Pregunta>
-            )}
-          </AnimatePresence>
-
-          {anterior && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="mt-2 text-muted-foreground"
-              onClick={() => {
-                setError(null)
-                setSub(anterior)
-              }}
-            >
-              <ArrowLeft className="size-3.5" /> Volver
-            </Button>
-          )}
-        </form>
-      </DialogContent>
-    </Dialog>
+/** Una opción grande del panel: se toca y avanza. */
+function OpcionGrande({ activa, onClick, titulo, detalle, icono, marca }: { activa: boolean; onClick: () => void; titulo: string; detalle?: string; icono: NombreIcono; marca?: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className={cn('flex w-full items-center gap-4 rounded-[20px] px-5 py-4 text-left transition-colors', activa ? 'bg-principal text-principal-texto' : 'bg-superficie text-texto hover:bg-superficie-hundida')}>
+      {marca ?? (
+        <span className={cn('grid size-12 shrink-0 place-items-center rounded-full', activa ? 'bg-acento text-acento-texto' : 'bg-superficie-hundida text-texto')}>
+          <Icono nombre={icono} />
+        </span>
+      )}
+      <span className="min-w-0">
+        <span className="block font-heading text-[18px] font-extrabold">{titulo}</span>
+        {detalle ? <span className={cn('block text-[14px]', activa ? 'text-principal-texto/85' : 'text-texto-suave')}>{detalle}</span> : null}
+      </span>
+    </button>
   )
 }

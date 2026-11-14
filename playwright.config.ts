@@ -1,11 +1,19 @@
+import { existsSync } from 'node:fs'
 import { defineConfig } from '@playwright/test'
 
-// E2E contra Supabase real, con el dev server de Vite.
-// Credenciales seed por env (no hardcodear): E2E_EMAIL / E2E_PASSWORD.
+// E2E contra el Supabase LOCAL (supabase start), con el dev server de Vite.
+// La cuenta de prueba sale de supabase/seed.sql: entra con un celular y un
+// código fijo que sólo existen en local. Producción no se toca.
+if (existsSync('.env.e2e.local')) process.loadEnvFile('.env.e2e.local')
 export default defineConfig({
+  // La empresa de pruebas es una sola: un campo a medias de un test trabaría a
+  // otro que corra a la vez (primero el mapa). De a uno, y arrancando completa.
+  workers: 1,
+  globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
-  // offline.spec.ts corre contra el build de prod (playwright.offline.config.ts).
-  testIgnore: 'offline.spec.ts',
+  // offline y manga corren contra el build de prod (playwright.offline.config.ts):
+  // el service worker no existe en dev.
+  testIgnore: /(offline|manga)\.spec\.ts/,
   timeout: 45_000,
   expect: { timeout: 10_000 },
   use: {

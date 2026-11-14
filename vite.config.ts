@@ -36,8 +36,8 @@ export default defineConfig({
         'apple-touch-icon.png',
       ],
       manifest: {
-        name: 'Risso Agro — Gestión de campo',
-        short_name: 'Risso Agro',
+        name: 'Troppero — Gestión de campo',
+        short_name: 'Troppero',
         description:
           'Hacienda, recorridas y plata del campo. Funciona sin señal.',
         lang: 'es',

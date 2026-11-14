@@ -15,9 +15,12 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:offline": "playwright test -c playwright.offline.config.ts",
+    "test:e2e:todo": "playwright test && pnpm build:local && playwright test -c playwright.offline.config.ts",
     "cap": "cap",
     "test": "TZ=America/Argentina/Buenos_Aires vitest run",
-    "test:watch": "TZ=America/Argentina/Buenos_Aires vitest"
+    "test:watch": "TZ=America/Argentina/Buenos_Aires vitest",
+    "build:local": "tsc -b && vite build --mode localdb",
+    "codigo": "docker logs --tail 200 supabase_edge_runtime_cliente-risso-agro 2>&1 | grep 'enviar-codigo] sin WhatsApp' | tail -3"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -28,6 +31,7 @@
     "@turf/area": "^7.3.5",
     "@turf/helpers": "^7.3.5",
     "@turf/intersect": "^7.3.5",
+    "@turf/union": "^7.4.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dexie": "^4.4.4",
@@ -39,10 +43,12 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.17.0",
+    "read-excel-file": "^9.3.12",
     "shadcn": "^4.10.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

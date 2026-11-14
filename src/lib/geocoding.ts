@@ -21,22 +21,46 @@ export async function buscarLocalidades(texto: string): Promise<Localidad[]> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`geocoding ${res.status}`)
   const j = (await res.json()) as {
-    results?: { name: string; admin1?: string; latitude: number; longitude: number }[]
+    results?: {
+      name: string
+      admin1?: string
+      latitude: number
+      longitude: number
+      feature_code?: string
+    }[]
   }
+  return depurarResultados(j.results ?? [])
+}
+
+/**
+ * Sólo pueblos y ciudades: Open-Meteo mezcla aeródromos ("Aeropuerto de Río
+ * Cuarto", "Chascomus North") que el productor no busca y que dejan el clima
+ * en una pista. Los lugares poblados son los de código PPL* de GeoNames.
+ */
+export function depurarResultados(
+  results: { name: string; admin1?: string; latitude: number; longitude: number; feature_code?: string }[],
+): Localidad[] {
   const vistos = new Set<string>()
-  return (j.results ?? []).flatMap((r) => {
+  return results.flatMap((r) => {
+    if (r.feature_code && !r.feature_code.startsWith('PPL')) return []
+    const nombre = normalizarNombre(r.name)
     const provincia = normalizarProvincia(r.admin1 ?? '')
-    const clave = `${r.name}|${provincia}`
+    const clave = `${nombre}|${provincia}`
     // Open-Meteo repite la misma localidad como ciudad y como partido.
     if (vistos.has(clave)) return []
     vistos.add(clave)
-    return [{ nombre: r.name, provincia, lat: r.latitude, lon: r.longitude }]
+    return [{ nombre, provincia, lat: r.latitude, lon: r.longitude }]
   })
 }
 
-/** Open-Meteo trae "Buenos Aires" también para la Ciudad; "Provincia de …" a veces. */
+/** "Ciudad de Río Cuarto" → "Río Cuarto": el productor escribe el nombre, no el título. */
+function normalizarNombre(nombre: string): string {
+  return nombre.replace(/^Ciudad de /i, '')
+}
+
+/** Open-Meteo trae "Buenos Aires" también para la Ciudad; "Provincia de …" o "Provincia del …" a veces. */
 function normalizarProvincia(admin1: string): string {
-  return admin1.replace(/^Provincia de /i, '').replace(/^Ciudad Autónoma de Buenos Aires$/i, 'CABA')
+  return admin1.replace(/^Provincia del? /i, '').replace(/^Ciudad Autónoma de Buenos Aires$/i, 'CABA')
 }
 
 export function etiquetaLocalidad(l: Pick<Localidad, 'nombre' | 'provincia'>): string {

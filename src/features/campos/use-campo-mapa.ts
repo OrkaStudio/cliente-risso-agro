@@ -55,8 +55,8 @@ const PALETA: { hex: string; nombre: string }[] = [
   { hex: '#ff8c42', nombre: 'Coral' },
   { hex: '#38bdf8', nombre: 'Celeste' },
 ]
-/** Letra del campo por su índice: 0→A, 1→B, … Wrappea a AA, AB… por si acaso. */
-function letraDeIndice(i: number): string {
+/** Letra del campo por su índice: 0→A, 1→B, … Z, AA, AB… Igual que la base (`letra_de_campo`). */
+export function letraDeIndice(i: number): string {
   let n = i
   let s = ''
   do {
@@ -91,3 +91,15 @@ export const useCampoMapa = (campoId: string) =>
     queryFn: () => api.getCampoMapa(campoId),
     enabled: !!campoId,
   })
+
+/** Construye el CampoVM (identidad real + color) para los componentes del mapa. */
+export function vmDe(c: api.CampoConPotreros): CampoVM {
+  return {
+    id: c.id,
+    nombre: c.nombre,
+    tipo: c.tipo,
+    hectareas: c.hectareas,
+    color: colorDeCampo(c.color_idx),
+    centro: c.ubicacion.lat != null && c.ubicacion.lon != null ? { lat: c.ubicacion.lat, lon: c.ubicacion.lon } : null,
+  }
+}

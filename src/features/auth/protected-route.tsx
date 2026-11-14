@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '@/features/auth/auth-context'
+import { AceptacionLegal } from '@/features/legales/aceptacion-legal'
 
 /**
  * Guard de rutas. Mientras resuelve la sesión muestra un placeholder
@@ -18,5 +19,10 @@ export function ProtectedRoute() {
 
   if (!session) return <Navigate to="/login" replace />
 
-  return <Outlet />
+  return (
+    <>
+      <Outlet />
+      <AceptacionLegal />
+    </>
+  )
 }

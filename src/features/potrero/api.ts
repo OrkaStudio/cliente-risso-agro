@@ -45,7 +45,7 @@ export type PotreroDetalle = {
 export async function getPotreroDetalle(
   id: string,
 ): Promise<PotreroDetalle | null> {
-  const [{ data: potrero, error: ePot }, { data: animales, error: eAni }, { data: rent, error: eRent }] =
+  const [{ data: potrero, error: ePot }, { data: animales, error: eAni }, { data: rent, error: eRent }, { data: compos, error: eComp }] =
     await Promise.all([
       supabase
         .from('potrero')
@@ -63,6 +63,9 @@ export async function getPotreroDetalle(
         .from('v_rentabilidad_devengada')
         .select('ingresos, gastos, resultado')
         .eq('potrero_id', id),
+      // Las cabezas ya sin las salidas sin identificar (la lista de animales
+      // sigue mostrando a todos: no se sabe cuál salió).
+      supabase.from('v_composicion_potrero').select('categoria, cabezas').eq('potrero_id', id),
     ])
   if (ePot) throw new Error(ePot.message)
   if (eAni) throw new Error(eAni.message)
@@ -75,11 +78,12 @@ export async function getPotreroDetalle(
     tipo: TipoCampo
   } | null
 
+  if (eComp) throw new Error(eComp.message)
   // Stock por categoría
   const catMap = new Map<Categoria, number>()
-  for (const a of animales ?? []) {
+  for (const a of compos ?? []) {
     if (!a.categoria) continue
-    catMap.set(a.categoria, (catMap.get(a.categoria) ?? 0) + 1)
+    catMap.set(a.categoria, (catMap.get(a.categoria) ?? 0) + (a.cabezas ?? 0))
   }
   const porCategoria = [...catMap.entries()]
     .map(([categoria, cabezas]) => ({ categoria, cabezas }))
@@ -104,7 +108,7 @@ export async function getPotreroDetalle(
     campoId: campo?.id ?? '—',
     campoNombre: campo?.nombre ?? '—',
     campoTipo: campo?.tipo ?? 'propio',
-    totalCabezas: lista.length,
+    totalCabezas: porCategoria.reduce((t, c) => t + c.cabezas, 0),
     porCategoria,
     animales: lista,
     cultivo: potrero.cultivo,

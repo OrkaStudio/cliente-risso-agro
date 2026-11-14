@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   cargarGordo,
-  getClima,
   getDolarBlue,
   getGordoActual,
   getNovilloCanuelas,
-  getPronostico,
+  getTiempoDelCampo,
+  type Clima,
+  type TiempoDelCampo,
   type UbicacionClima,
 } from '@/features/cotizaciones/api'
 
@@ -24,15 +25,17 @@ export const useDolarBlue = () =>
   })
 
 /**
- * Clima del campo elegido (Open-Meteo). Cambia lento → cache 15 min. Sin
- * ubicación (ningún campo con centro) no consulta: `data` queda undefined y
- * la UI pide cargar la ubicación en vez de mostrar un clima ajeno.
+ * El tiempo del campo (Open-Meteo): UNA consulta por ubicación que comparten el
+ * clima de ahora, el pronóstico y la lluvia del mes. Cache 15 min. Sin ubicación
+ * (ningún campo con centro) no consulta: `data` queda undefined y la UI pide
+ * cargar la ubicación en vez de mostrar un clima ajeno.
  */
-export const useClima = (u: UbicacionClima | null) =>
+export const useTiempo = <T,>(u: { lat: number; lon: number } | null, select: (t: TiempoDelCampo) => T) =>
   useQuery({
-    queryKey: ['clima', u?.lat, u?.lon],
-    queryFn: () => getClima(u!),
+    queryKey: ['tiempo', u?.lat, u?.lon],
+    queryFn: () => getTiempoDelCampo(u!),
     enabled: u !== null,
+    select,
     staleTime: 15 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000,
     // Un corte de red de un segundo (cambio de wifi, el 4G en el campo) no
@@ -41,15 +44,11 @@ export const useClima = (u: UbicacionClima | null) =>
     retryDelay: (n) => Math.min(1000 * 2 ** n, 8000),
   })
 
-/** Pronóstico 7 días del campo elegido (Open-Meteo). Cambia poco → cache 1 h. */
-export const usePronostico = (u: UbicacionClima | null) =>
-  useQuery({
-    queryKey: ['pronostico', u?.lat, u?.lon],
-    queryFn: () => getPronostico(u!),
-    enabled: u !== null,
-    staleTime: 60 * 60 * 1000,
-    retry: 1,
-  })
+/** El clima de ahora y del día del campo elegido. */
+export const useClima = (u: UbicacionClima | null) => useTiempo(u, (t): Clima => ({ ...t.ahora, lugar: u?.nombre ?? '' }))
+
+/** El pronóstico de 7 días (desde hoy) del campo elegido. */
+export const usePronostico = (u: UbicacionClima | null) => useTiempo(u, (t) => t.dias)
 
 /** Último precio del gordo (carga manual). enabled hasta tener empresa. */
 /** Novillo de Cañuelas, automático. Se refresca cada 12 h; si falla, el ticker cae al manual. */

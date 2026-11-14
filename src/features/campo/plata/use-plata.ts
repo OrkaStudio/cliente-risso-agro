@@ -10,6 +10,7 @@ import {
   type MedioPago,
   type TipoMov,
 } from './api'
+import { hoyLocal } from '@/lib/fecha'
 
 // Campo por defecto (el último usado): sobrevive entre sesiones.
 const CAMPO_KEY = 'plata-campo-default'
@@ -170,7 +171,7 @@ export function usePlata() {
         monto: n.monto,
         categoria_id: n.categoriaId,
         categoria_nombre: n.categoriaNombre,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: hoyLocal(),
         descripcion: n.descripcion?.trim() || null,
         medio_pago: n.medioPago ?? null,
         audio: n.audio ?? null,
@@ -213,7 +214,7 @@ export function usePlata() {
 
   // Resumen del día (lo cargado HOY desde este teléfono, sin errores):
   // gasto suma negativo, ingreso positivo — el productor ve cuánto lleva.
-  const hoyISO = new Date().toISOString().slice(0, 10)
+  const hoyISO = hoyLocal()
   const deHoy = lista.filter((o) => o.fecha === hoyISO && o.estado !== 'error')
   const hoyCantidad = deHoy.length
   const hoyGastos = deHoy

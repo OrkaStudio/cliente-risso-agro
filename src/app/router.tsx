@@ -2,15 +2,21 @@
 // No es un módulo de componentes para Fast Refresh → desactivamos la regla acá.
 /* eslint-disable react-refresh/only-export-components */
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { ErrorNuevaVersion } from '@/app/error-nueva-version'
-import { LoginPage } from '@/features/auth/login-page'
-import { SignupPage } from '@/features/auth/signup-page'
+import { NoEncontrada } from '@/app/pantalla-aviso'
+import { SeccionPermitida } from '@/app/seccion-permitida'
+import { CodigoPage } from '@/features/acceso/codigo-page'
+import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
+import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
+import { CambieDeNumeroPage } from '@/features/acceso/cambie-de-numero-page'
+import { EntrarPage } from '@/features/acceso/entrar-page'
+import { FondoAcceso } from '@/features/acceso/fondo-acceso'
+import { TeInvitaronPage } from '@/features/acceso/te-invitaron-page'
 import { componenteOnboarding, onboardingListo, precargarOnboarding } from '@/features/onboarding/precarga'
-import { RecuperarPage } from '@/features/auth/recuperar-page'
-import { RestablecerPage } from '@/features/auth/restablecer-page'
 import { ProtectedRoute } from '@/features/auth/protected-route'
 import { RequireEmpresa } from '@/features/auth/require-empresa'
+import { RequireMapa } from '@/features/mapa/require-mapa'
 import { ResponsiveShell } from '@/app/responsive-shell'
 
 // Los shells también se cargan al entrar: el login, el registro y el
@@ -28,35 +34,34 @@ const InicioPage = lazy(() =>
   })),
 )
 const AnimalesPage = lazy(() =>
-  import('@/features/hacienda/animales-page').then((m) => ({
-    default: m.AnimalesPage,
+  import('@/features/hacienda/tropero/rodeo-page').then((m) => ({
+    default: m.RodeoPage,
   })),
 )
 const FichaAnimalPage = lazy(() =>
-  import('@/features/hacienda/ficha-animal-page').then((m) => ({
-    default: m.FichaAnimalPage,
+  import('@/features/hacienda/tropero/ficha-page').then((m) => ({
+    default: m.FichaPage,
   })),
 )
-const LotesPage = lazy(() =>
-  import('@/features/lotes/lotes-page').then((m) => ({ default: m.LotesPage })),
+const CamposPage = lazy(() =>
+  import('@/features/campos/tropero/campos-page').then((m) => ({ default: m.CamposPage })),
 )
-const CampoDetailPage = lazy(() =>
-  import('@/features/campos/campo-detail-page').then((m) => ({
-    default: m.CampoDetailPage,
-  })),
-)
-const PotreroDetailPage = lazy(() =>
-  import('@/features/potrero/potrero-detail-page').then((m) => ({
-    default: m.PotreroDetailPage,
-  })),
-)
-const AnaliticaPage = lazy(() =>
-  import('@/features/analitica/analitica-page').then((m) => ({
-    default: m.AnaliticaPage,
-  })),
-)
+// Las páginas viejas del campo y del potrero se borraron (03/11): sus direcciones
+// llevan a Campos, con ese campo elegido o la tarjeta de ese potrero abierta.
+function CampoViejo() {
+  const { id } = useParams()
+  return <Navigate to={`/campos?campo=${id}`} replace />
+}
+function PotreroViejo() {
+  const { id } = useParams()
+  return <Navigate to={`/campos?potrero=${id}`} replace />
+}
+// Plata (rediseño, Figma página 35): la plata y los movimientos.
+const AnaliticaPage = lazy(() => import('@/features/analitica/tropero/plata-page').then((m) => ({ default: m.PlataPage })))
+const MovimientosPage = lazy(() => import('@/features/analitica/tropero/movimientos-page').then((m) => ({ default: m.MovimientosPage })))
+const ConfiguracionPage = lazy(() => import('@/features/configuracion/configuracion-page').then((m) => ({ default: m.ConfiguracionPage })))
 const AgendaPage = lazy(() =>
-  import('@/features/agenda/agenda-page').then((m) => ({
+  import('@/features/agenda/tropero/agenda-page').then((m) => ({
     default: m.AgendaPage,
   })),
 )
@@ -109,30 +114,57 @@ function OnboardingRuta() {
   )
 }
 
+const TutorialMapaPage = lazy(() =>
+  import('@/features/mapa/tutorial-page').then((m) => ({ default: m.TutorialMapaPage })),
+)
+const AsistenteMuestra = lazy(() =>
+  import('@/features/campos/tropero/asistente-muestra').then((m) => ({ default: m.AsistenteMuestra })),
+)
+const LegalesPage = lazy(() =>
+  import('@/features/legales/legales-page').then((m) => ({ default: m.LegalesPage })),
+)
+const MuestraPage = lazy(() =>
+  import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
+)
+
 export const router = createBrowserRouter([
+  // Sólo en desarrollo: los componentes de Troppero juntos (/estilo).
+  ...(import.meta.env.DEV
+    ? [
+        { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
+        { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
+      ]
+    : []),
+  // Acceso (A1–A5): se entra con un código por WhatsApp, sin contraseñas. Comparten la foto
+  // y el sello (FondoAcceso), que no se recargan al pasar de una pantalla a otra.
   {
-    path: '/login',
+    element: <FondoAcceso />,
     errorElement: <ErrorNuevaVersion />,
-    element: <LoginPage />,
+    children: [
+      { path: '/login', element: <EntrarPage /> },
+      { path: '/login/codigo', element: <CodigoPage /> },
+      { path: '/registro', element: <CrearCuentaPage /> },
+      // A4: el link que manda el dueño desde Personas.
+      { path: '/invitacion/:token', element: <TeInvitaronPage /> },
+      // A5 (afuera): qué hacer si cambiaste de número.
+      { path: '/cambie-de-numero', element: <CambieDeNumeroPage /> },
+    ],
   },
-  {
-    path: '/registro',
-    errorElement: <ErrorNuevaVersion />,
-    element: <SignupPage />,
-  },
-  {
-    path: '/recuperar',
-    errorElement: <ErrorNuevaVersion />,
-    element: <RecuperarPage />,
-  },
+  // Términos, privacidad y su resumen: abiertos, sin sesión.
+  { path: '/legales', element: <Suspense fallback={null}><LegalesPage doc="resumen" /></Suspense> },
+  { path: '/terminos', element: <Suspense fallback={null}><LegalesPage doc="terminos" /></Suspense> },
+  { path: '/privacidad', element: <Suspense fallback={null}><LegalesPage doc="privacidad" /></Suspense> },
+  // Sin contraseñas no hay nada que recuperar: los links viejos van a entrar.
+  { path: '/recuperar', element: <Navigate to="/login" replace /> },
+  { path: '/restablecer', element: <Navigate to="/login" replace /> },
   {
     element: <ProtectedRoute />,
     errorElement: <ErrorNuevaVersion />,
     children: [
       {
-        // Llega con la sesión del link de recuperación; elige contraseña nueva.
-        path: '/restablecer',
-        element: <RestablecerPage />,
+        // A5 (adentro): cambiar el número con la sesión abierta y un código al nuevo.
+        path: '/mi-cuenta/numero',
+        element: <CambiarNumeroPage />,
       },
       {
         // Recién registrado, sin empresa todavía: arma la suya acá.
@@ -146,6 +178,27 @@ export const router = createBrowserRouter([
         element: <RequireEmpresa />,
         children: [
           {
+            // Módulo 3 · el tutorial para ubicar los campos y potreros en el mapa.
+            path: 'mapa',
+            element: (
+              <Suspense fallback={null}>
+                <TutorialMapaPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'mapa/:campoId',
+            element: (
+              <Suspense fallback={null}>
+                <TutorialMapaPage />
+              </Suspense>
+            ),
+          },
+          {
+            // Primero el campo: sin el mapa sólo andan el Inicio y Campos.
+            element: <RequireMapa />,
+            children: [
+          {
             // Gate por dispositivo: misma web, distinta navegación según el equipo.
             // Un móvil cae al Modo Campo; escritorio ve el Modo Oficina completo.
             element: <ResponsiveShell />,
@@ -158,18 +211,28 @@ export const router = createBrowserRouter([
               </Suspense>
             ),
             children: [
+              {
+              // Cada uno ve lo que el dueño le habilitó (Configuración → Personas).
+              element: <SeccionPermitida />,
+              children: [
               { index: true, element: <InicioPage /> },
               { path: 'hacienda', element: <AnimalesPage /> },
               { path: 'hacienda/:id', element: <FichaAnimalPage /> },
-              { path: 'campos', element: <LotesPage /> },
-              { path: 'campos/:id', element: <CampoDetailPage /> },
+              { path: 'campos', element: <CamposPage /> },
+              { path: 'campos/:id', element: <CampoViejo /> },
               // Compat: la sección Potreros se unificó dentro de Campos.
               { path: 'potreros', element: <Navigate to="/campos" replace /> },
-              { path: 'potrero/:id', element: <PotreroDetailPage /> },
+              { path: 'potrero/:id', element: <PotreroViejo /> },
               { path: 'analitica', element: <AnaliticaPage /> },
+              { path: 'analitica/movimientos', element: <MovimientosPage /> },
               { path: 'agenda', element: <AgendaPage /> },
               // Compat: la sección Cheques se unificó en Agenda (cheque = filtro).
               { path: 'cheques', element: <Navigate to="/agenda" replace /> },
+              { path: 'configuracion', element: <ConfiguracionPage /> },
+              // Una dirección que no existe: se dice, dentro de la app, con el camino al Inicio.
+              { path: '*', element: <NoEncontrada /> },
+              ],
+              },
             ],
           },
               {
@@ -180,6 +243,9 @@ export const router = createBrowserRouter([
                   </Suspense>
                 ),
                 children: [
+                  {
+                  element: <SeccionPermitida />,
+                  children: [
                   { path: 'campo', element: <CampoInicioPage /> },
                   { path: 'campo/manga', element: <MangaPage /> },
                   // Laboratorio: probar un bastón RFID antes de comprarlo.
@@ -188,8 +254,12 @@ export const router = createBrowserRouter([
                   { path: 'campo/recorrida', element: <RecorridaPage /> },
                   { path: 'campo/plata', element: <PlataPage /> },
                   { path: 'campo/historial', element: <HistorialPage /> },
+                  ],
+                  },
                 ],
               },
+            ],
+          },
             ],
           },
         ],

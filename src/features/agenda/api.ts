@@ -1,3 +1,4 @@
+import { subirComprobante } from '@/features/analitica/api'
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
@@ -27,13 +28,19 @@ export type Vencimiento = {
   campoId: string | null
   campo: string | null
   serieId: string | null
+  /** Ya tiene foto del comprobante. */
+  conComprobante: boolean
+  /** Quién lo cargó y por dónde, y si es nuevo para quien carga la plata (permisos, entrega 4). */
+  createdBy: string | null
+  canal: string
+  nuevo: boolean
 }
 
 const MEDIO_LABEL: Record<MedioPago, string> = {
   efectivo: 'Efectivo',
   transferencia: 'Transferencia',
   cheque: 'Cheque',
-  mercadopago: 'MercadoPago',
+  mercadopago: 'Mercado Pago',
   otro: 'Otro',
 }
 export function medioLabel(m: MedioPago | null, esEcheq = false): string {
@@ -50,7 +57,7 @@ export async function listVencimientos(): Promise<Vencimiento[]> {
   const { data, error } = await supabase
     .from('movimiento_financiero')
     .select(
-      'id, tipo, estado, monto, fecha_vencimiento, fecha_cobro_pago, medio_pago, es_echeq, cheque_numero, cheque_banco, contraparte, descripcion, serie_id, campo_id, categoria:categoria_movimiento(nombre), campo(nombre)',
+      'id, tipo, estado, monto, fecha_vencimiento, fecha_cobro_pago, medio_pago, es_echeq, cheque_numero, cheque_banco, contraparte, descripcion, serie_id, campo_id, comprobante_url, created_by, canal, revisado_at, categoria:categoria_movimiento(nombre), campo(nombre)',
     )
     .neq('estado', 'anulado')
     .or('fecha_vencimiento.not.is.null,fecha_cobro_pago.not.is.null')
@@ -73,6 +80,10 @@ export async function listVencimientos(): Promise<Vencimiento[]> {
     campoId: m.campo_id,
     campo: (m.campo as { nombre: string } | null)?.nombre ?? null,
     serieId: m.serie_id,
+    conComprobante: !!m.comprobante_url,
+    createdBy: m.created_by,
+    canal: m.canal,
+    nuevo: !m.revisado_at,
   }))
 }
 
@@ -82,13 +93,22 @@ export async function listVencimientos(): Promise<Vencimiento[]> {
  * alquiler en kilos de novillo, en dólares) recién sabe cuánto fue el día
  * que se paga. Lo que entra a la Analítica es lo que se pagó, no la estimación.
  */
-export async function liquidarMovimiento(id: string, fecha: string, monto?: number): Promise<void> {
+export async function liquidarMovimiento(
+  id: string,
+  fecha: string,
+  monto?: number,
+  extra?: { medio?: MedioPago; empresaId?: string; comprobanteImg?: Blob | null },
+): Promise<void> {
+  // La foto (opcional) sube primero, así el movimiento queda con su comprobante de una.
+  const comprobanteUrl = extra?.comprobanteImg && extra.empresaId ? await subirComprobante(extra.empresaId, id, extra.comprobanteImg) : null
   const { error } = await supabase
     .from('movimiento_financiero')
     .update({
       fecha_cobro_pago: fecha,
       estado: 'liquidado',
       ...(monto !== undefined ? { monto } : {}),
+      ...(extra?.medio ? { medio_pago: extra.medio } : {}),
+      ...(comprobanteUrl ? { comprobante_url: comprobanteUrl } : {}),
     })
     .eq('id', id)
   if (error) throw new Error(error.message)

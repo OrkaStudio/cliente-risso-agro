@@ -32,6 +32,7 @@ import type { AnimalSinCaravana, CategoriaAnimal } from './manga/api'
 import { normalizarRfid } from './manga/rfid'
 import { useScanner } from './manga/use-scanner'
 import { CChip, CLabel, CSheet, NotaVoz } from './ui'
+import { hoyLocal } from '@/lib/fecha'
 
 // Preferencia por lector, no por sesión: una vez que se sabe si el bastón manda
 // Enter, la elección vale para siempre. Se guarda local (no es dato de negocio).
@@ -273,7 +274,7 @@ function sesionDe(
   return {
     eventos,
     soloCategorias: [...soloCategorias],
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyLocal(),
     // El tacto no se puede prearmar: el resultado sale del animal que tenés
     // adelante, así que el registro espera al toque.
     diferido: elegidas.has('tacto'),

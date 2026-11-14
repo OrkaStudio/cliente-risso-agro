@@ -10,7 +10,6 @@ import {
   Loader2,
   Paperclip,
   RefreshCw,
-  CloudRain,
   Search,
   Syringe,
   TriangleAlert,
@@ -32,6 +31,7 @@ import {
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { categoriaLabel } from '@/features/hacienda/labels'
 import { CSheet } from './ui'
+import { hoyLocal, ymd } from '@/lib/fecha'
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
 /** Monto compacto para la fila (siempre entra): $30M · $45k. */
@@ -65,11 +65,17 @@ const fechaDelHecho = (e: Entrada): string =>
   e.kind === 'manga' ? e.cargadoEn : aLocal(e.fecha)
 
 /** Un movimiento con fecha posterior a hoy no pasó: está programado. */
-const esFuturo = (e: Entrada): boolean =>
-  fechaDelHecho(e).slice(0, 10) > new Date().toISOString().slice(0, 10)
+const esFuturo = (e: Entrada): boolean => diaLocal(fechaDelHecho(e)) > hoyLocal()
+
+/** El día del calendario local de una fecha o un instante: la manga trae
+ *  `cargadoEn` en UTC, y a las 22:00 su día UTC ya es mañana. */
+const diaLocal = (iso: string): string => {
+  const d = new Date(aLocal(iso))
+  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : ymd(d)
+}
 
 const fmtFecha = (iso: string) => {
-  const s = iso.slice(0, 10).split('-')
+  const s = diaLocal(iso).split('-')
   return s.length === 3 ? `${s[2]}/${s[1]}/${s[0]}` : iso
 }
 
@@ -700,12 +706,6 @@ function FilaRecorrida({ e, onAbrir }: { e: EntRec; onAbrir: () => void }) {
             <Footprints className="size-3" />
             {plural(e.potreros, 'potrero', 'potreros')}
           </span>
-          {e.lluviaMm != null && (
-            <span className="inline-flex items-center gap-0.5">
-              <CloudRain className="size-3" />
-              {e.lluviaMm} mm
-            </span>
-          )}
           {e.alertas > 0 && (
             <span className="inline-flex items-center gap-0.5 font-semibold text-[var(--c-warn-deep)]">
               <TriangleAlert className="size-3" />

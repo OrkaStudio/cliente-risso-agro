@@ -3,14 +3,13 @@
 @import "shadcn/tailwind.css";
 
 /* ============================================================
-   Identidad Risso Agro — "Precisión agro-tech"
-   Porcelana fría + verde campo profundo + semánticos de campo
-   (sol/cielo/tierra) + lima como realce. Números en JetBrains
-   Mono (instrumento de precisión). Paleta de gráficos g1–g5
-   armonizada, separada de los colores de alerta.
-   Tipografía: Inter (cuerpo) + Archivo (títulos) + JetBrains
-   Mono (cifras), todas self-hosted (offline-first del vertical).
-   Guía visual: design/dashboard-agro-ai.html
+   Troppero — sistema visual (Figma iwikybSRHYJMtHuSCpGLyE, página 34)
+   Colores: colección «Troppero · App» (modos Día y Noche) sobre la
+   paleta «Terracota tostada». Los nombres de las variables son los
+   mismos que en Figma: --fondo, --superficie, --principal, --estado-bien…
+   Tipografía (medida en las pantallas de la 35): Inter para el texto,
+   Archivo ExtraBold para títulos, Archivo Black para el título grande
+   y Barlow Condensed para las cifras. Todas self-hosted (offline-first).
    ============================================================ */
 
 /* WOFF2 recortadas al español (latín + signos que usa la app): 245 KB en vez
@@ -39,13 +38,114 @@
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "Archivo Black";
+  src: url("./assets/fonts/ArchivoBlack-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("./assets/fonts/BarlowCondensed-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("./assets/fonts/BarlowCondensed-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("./assets/fonts/BarlowCondensed-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 @custom-variant dark (&:is(.dark *));
+/* Compu con poca altura (notebooks de 720–840 px): el acceso se compacta para no tener que deslizar. */
+@custom-variant bajo (@media (min-width: 48rem) and (max-height: 840px));
 
 @theme inline {
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
     --font-heading: 'Archivo', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-display: 'Archivo Black', 'Archivo', system-ui, sans-serif;
+    --font-cifra: 'Barlow Condensed', 'Inter', system-ui, sans-serif;
+
+    /* Roles de Troppero como utilidades (bg-fondo, text-texto-suave, bg-estado-bien-suave…) */
+    --color-fondo: var(--fondo);
+    --color-superficie: var(--superficie);
+    --color-superficie-hundida: var(--superficie-hundida);
+    --color-borde: var(--borde);
+    --color-texto: var(--texto);
+    --color-texto-suave: var(--texto-suave);
+    --color-titulares: var(--titulares);
+    --color-principal: var(--principal);
+    --color-principal-texto: var(--principal-texto);
+    --color-principal-suave: var(--principal-suave);
+    --color-destacado: var(--destacado);
+    --color-destacado-texto: var(--destacado-texto);
+    --color-acento: var(--acento);
+    --color-acento-texto: var(--acento-texto);
+    --color-estado-bien: var(--estado-bien);
+    --color-plata-entra: var(--plata-entra);
+    --color-plata-sale: var(--plata-sale);
+    --color-estado-bien-suave: var(--estado-bien-suave);
+    --color-estado-bien-texto: var(--estado-bien-texto);
+    --color-estado-atencion: var(--estado-atencion);
+    --color-estado-atencion-suave: var(--estado-atencion-suave);
+    --color-estado-atencion-texto: var(--estado-atencion-texto);
+    --color-estado-problema: var(--estado-problema);
+    --color-estado-problema-suave: var(--estado-problema-suave);
+    --color-estado-problema-texto: var(--estado-problema-texto);
+    --color-estado-aviso: var(--estado-aviso);
+    --color-estado-aviso-suave: var(--estado-aviso-suave);
+    --color-estado-aviso-texto: var(--estado-aviso-texto);
+    --color-barra-fondo: var(--barra-fondo);
+    --color-barra-activo: var(--barra-activo);
+    --color-barra-texto: var(--barra-texto);
+    --color-terracota-50: #fbf3ed;
+    --color-terracota-100: #f5e2d8;
+    --color-terracota-200: #e8c0ae;
+    --color-terracota-300: #d99f84;
+    --color-terracota-400: #c97e5b;
+    --color-terracota-500: #b85c2e;
+    --color-terracota-600: #984b25;
+    --color-terracota-700: #7a3a1c;
+    --color-terracota-800: #592a14;
+    --color-terracota-900: #3a1a0d;
+    --color-trigo-50: #fef9eb;
+    --color-trigo-100: #fcf2da;
+    --color-trigo-200: #f7e3b6;
+    --color-trigo-300: #f1d392;
+    --color-trigo-400: #ecc46a;
+    --color-trigo-500: #daaa4d;
+    --color-trigo-600: #c8912c;
+    --color-trigo-700: #9d7024;
+    --color-trigo-800: #74511c;
+    --color-trigo-900: #4e3413;
+    --color-neutro-50: #fbfaf6;
+    --color-neutro-100: #f4f1e9;
+    --color-neutro-200: #d9d4cb;
+    --color-neutro-300: #bfb8ad;
+    --color-neutro-400: #a59d91;
+    --color-neutro-500: #8c8375;
+    --color-neutro-600: #6e675c;
+    --color-neutro-700: #524c44;
+    --color-neutro-800: #37322d;
+    --color-neutro-900: #1e1b18;
+    --color-tinta: #131b16;
+    --color-salvia: #7c8b69;
+    --color-pasto: #c9d2b4;
+    --color-pasto-oscuro: #aab78d;
+    --color-hueso: #e6e1d6;
+    --color-carbon: #2b2724;
 
     /* Acentos de marca expuestos como utilidades (bg-field, text-sol, …) */
     --color-field: var(--field);
@@ -119,70 +219,138 @@
 }
 
 :root {
-    /* Acentos de marca */
-    --field: #178a55;        /* verde campo (primary) */
-    --field-deep: #0b5837;   /* verde profundo (sidebar, énfasis) */
-    --field-soft: #e2f2e9;   /* tint */
-    --sol: #d98a18;          /* sol / atención cálida */
-    --sol-soft: #fbf1de;
-    --sol-deep: #9c620c;
-    --sky: #2779c4;          /* cielo / info / clima */
+    /* ---- Troppero · App, modo Día (Figma: colección «Troppero · App») ---- */
+    --fondo: #f4f1e9;                 /* neutro/100 */
+    --superficie: #fbfaf6;            /* neutro/50 */
+    --superficie-hundida: #ece7de;
+    --borde: #d9d4cb;                 /* neutro/200 */
+    --texto: #131b16;                 /* tinta */
+    --texto-suave: #6e675c;           /* neutro/600 */
+    --titulares: #b85c2e;             /* terracota/500 */
+    --principal: #b85c2e;
+    --principal-texto: #fbfaf6;
+    --principal-suave: #f5e2d8;       /* terracota/100 */
+    --destacado: #b85c2e;
+    --destacado-texto: #fbfaf6;
+    --acento: #ecc46a;                /* trigo/400 */
+    --acento-texto: #7a3a1c;          /* terracota/700 */
+    --estado-bien: #4e7a4a;
+    --estado-bien-suave: #e3ecdf;
+    --estado-bien-texto: #3e6339;
+    --estado-atencion: #c98a1c;
+    --estado-atencion-suave: #fcf2da;
+    --estado-atencion-texto: #74511c;
+    --estado-problema: #b23a2a;
+    --estado-problema-suave: #f6deda;
+    --estado-problema-texto: #8f2e21;
+    /* Plata mes a mes: lo que entra (arriba) y lo que sale (abajo). Validados con el
+       chequeo de daltonismo; la dirección respecto del cero es la segunda señal. */
+    --plata-entra: #3b7a4f;
+    --plata-sale: #c97e5b;
+    --estado-aviso: #524c44;
+    --estado-aviso-suave: #f4f1e9;
+    --estado-aviso-texto: #524c44;
+    --barra-fondo: #f4f1e9;
+    --barra-activo: #d9d4cb;
+    --barra-texto: #131b16;
+
+    /* ---- Nombres heredados de Risso Agro, apuntados a Troppero ----
+       Las pantallas viejas los usan; se van retirando a medida que cada
+       módulo se rehace con los roles de arriba. */
+    --field: var(--principal);
+    --field-deep: #7a3a1c;            /* terracota/700 */
+    --field-soft: var(--principal-suave);
+    --sol: var(--estado-atencion);
+    --sol-soft: var(--estado-atencion-suave);
+    --sol-deep: var(--estado-atencion-texto);
+    --sky: #2779c4;
     --sky-soft: #e7f1f9;
-    --tierra: #b85c2e;       /* tierra / terracota */
-    --tierra-soft: #f7e9e0;
-    --lima: #79ad28;         /* realce (brote) */
-    --lima-soft: #eff6de;
-    --ganado: #b5392f;       /* rojo ganado (hacienda) */
-    --ganado-soft: #f7e2de;
-    --lila: #7c5cc4;         /* violeta forraje */
+    --tierra: var(--principal);
+    --tierra-soft: var(--principal-suave);
+    --lima: #7c8b69;                  /* salvia */
+    --lima-soft: #e3ecdf;
+    --ganado: var(--estado-problema);
+    --ganado-soft: var(--estado-problema-suave);
+    --lila: #7c5cc4;
     --lila-soft: #ece7f8;
-    --ink: #131b16;          /* texto carbón verdoso */
-    --ink-soft: #4b5750;
-    --faint: #828e85;
+    --ink: var(--texto);
+    --ink-soft: var(--texto-suave);
+    --faint: #8c8375;                 /* neutro/500 */
 
-    /* Serie de datos — paleta de gráficos armonizada (tonos campo) */
-    --g1: #3d8b66;           /* verde pradera */
-    --g2: #cda44b;           /* miel */
-    --g3: #5189a8;           /* agua / acero */
-    --g4: #b97950;           /* arcilla */
-    --g5: #8fa08f;           /* salvia */
-    --g6: #9a6b96;           /* malva */
-    --g7: #7a5a40;           /* cuero */
-    --g-mute: #c6cfc3;       /* base apagada (contexto) */
+    /* Serie de datos para gráficos (tonos de la paleta) */
+    --g1: #b85c2e;
+    --g2: #daaa4d;
+    --g3: #7c8b69;
+    --g4: #5189a8;
+    --g5: #a59d91;
+    --g6: #7a3a1c;
+    --g7: #524c44;
+    --g-mute: #d9d4cb;
 
-    /* Semánticos (shadcn) */
-    --background: #eef0eb;          /* porcelana fría */
-    --foreground: #131b16;
-    --card: #ffffff;
-    --card-foreground: #131b16;
-    --popover: #ffffff;
-    --popover-foreground: #131b16;
-    --primary: #178a55;             /* verde campo */
-    --primary-foreground: #ffffff;
-    --secondary: #f2f4ef;           /* superficie hundida */
-    --secondary-foreground: #131b16;
-    --muted: #f2f4ef;
-    --muted-foreground: #4b5750;
-    --accent: #d98a18;              /* sol / atención */
-    --accent-foreground: #2a1c06;
-    --destructive: #cd3a2c;
-    --border: #e4e7e1;              /* hairline */
-    --input: #dadeD6;
-    --ring: #178a55;
-    --chart-1: #3d8b66;
-    --chart-2: #cda44b;
-    --chart-3: #5189a8;
-    --chart-4: #b97950;
-    --chart-5: #8fa08f;
-    --radius: 0.875rem;             /* cards ≈ 14px; botones/inputs ≈ 9–10px */
-    --sidebar: #182c1e;             /* verde profundo */
-    --sidebar-foreground: #f7f5ec;
-    --sidebar-primary: #178a55;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: rgba(247, 245, 236, 0.07);
-    --sidebar-accent-foreground: #ffffff;
-    --sidebar-border: rgba(247, 245, 236, 0.10);
-    --sidebar-ring: #2fd58b;
+    /* Semánticos (shadcn) → roles de Troppero */
+    --background: var(--fondo);
+    --foreground: var(--texto);
+    --card: var(--superficie);
+    --card-foreground: var(--texto);
+    --popover: var(--superficie);
+    --popover-foreground: var(--texto);
+    --primary: var(--principal);
+    --primary-foreground: var(--principal-texto);
+    --secondary: var(--superficie-hundida);
+    --secondary-foreground: var(--texto);
+    --muted: var(--superficie-hundida);
+    --muted-foreground: var(--texto-suave);
+    --accent: var(--acento);
+    --accent-foreground: var(--acento-texto);
+    --destructive: var(--estado-problema);
+    --border: var(--borde);
+    --input: var(--borde);
+    --ring: var(--principal);
+    --chart-1: var(--g1);
+    --chart-2: var(--g2);
+    --chart-3: var(--g3);
+    --chart-4: var(--g4);
+    --chart-5: var(--g5);
+    --radius: 0.625rem;               /* 10 px: botones, avisos (Figma) */
+    --sidebar: var(--barra-fondo);
+    --sidebar-foreground: var(--barra-texto);
+    --sidebar-primary: var(--principal);
+    --sidebar-primary-foreground: var(--principal-texto);
+    --sidebar-accent: var(--barra-activo);
+    --sidebar-accent-foreground: var(--barra-texto);
+    --sidebar-border: var(--borde);
+    --sidebar-ring: var(--principal);
+}
+
+/* ---- Troppero · App, modo Noche ---- */
+.dark {
+    --fondo: #131b16;
+    --superficie: #1e1b18;
+    --superficie-hundida: #2b2724;
+    --borde: #37322d;
+    --texto: #fbfaf6;
+    --texto-suave: #a59d91;
+    --principal-suave: #592a14;
+    --acento-texto: #131b16;
+    --estado-bien: #8db58a;
+    --estado-bien-suave: #2f3f2c;
+    --estado-bien-texto: #8db58a;
+    --estado-atencion: #ecc46a;
+    --estado-atencion-suave: #4e3413;
+    --estado-atencion-texto: #f1d392;
+    --estado-problema: #f08a7a;
+    --estado-problema-suave: #4a1812;
+    --estado-problema-texto: #f08a7a;
+    --plata-entra: #6fae84;
+    --plata-sale: #e0956c;
+    --estado-aviso: #a59d91;
+    --estado-aviso-suave: #37322d;
+    --estado-aviso-texto: #bfb8ad;
+    --barra-fondo: #1e1b18;
+    --barra-activo: #2b2724;
+    --barra-texto: #bfb8ad;
+    --field-deep: #d99f84;
+    --faint: #8c8375;
 }
 
 @layer base {
@@ -192,9 +360,6 @@
   html {
     @apply font-sans;
     font-size: 16px;
-    /* Bump global sutil de toda la UI (texto + números) para mejor legibilidad
-       del público 40+. Escala proporcional → no aprieta el layout. */
-    zoom: 1.06;
   }
   /* La cadena de altura va por porcentaje (no `svh`): los % se adaptan al zoom,
      las unidades de viewport NO → con zoom desbordaban y aparecía una segunda
@@ -210,33 +375,121 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Grilla cartográfica fina sobre porcelana — atmósfera técnica, no ruido */
-    background-image:
-      linear-gradient(rgba(16, 24, 19, 0.022) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(16, 24, 19, 0.022) 1px, transparent 1px);
-    background-size: 28px 28px;
   }
-  /* Títulos en Archivo, levemente condensado */
+  /* Títulos en Archivo ExtraBold, ancho normal (como en la 35) */
   h1, h2, h3, h4, h5,
   [data-slot="card-title"] {
     font-family: var(--font-heading);
-    font-stretch: 87%;
+    font-weight: 800;
     letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
-  /* Cifras: JetBrains Mono tabular, el sello "instrumento de precisión".
-     Usar en métricas, montos, caravanas, fechas. */
+  /* Cifras: Barlow Condensed con dígitos de ancho fijo, como en la 35
+     (hectáreas, cabezas, montos, caravanas). */
   .tnum {
-    font-family: var(--font-mono);
+    font-family: var(--font-cifra);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.03em;
   }
-  /* Igual que .tnum pero SIN imponer la mono: alinea las cifras y deja la
-     tipografía que ya tenga el elemento. En mono cada glifo ocupa el mismo
-     ancho —también la coma—, y en un número titular eso abre un hueco que se
-     lee "$118 , 3M". En columnas de tabla la mono sigue siendo lo correcto. */
+  .cifra {
+    font-family: var(--font-cifra);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Título grande de las pantallas de entrada (Archivo Black). */
+  .titulo-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: 0.98;
+    letter-spacing: -0.025em;
+  }
+  /* ===== Escala tipográfica de Troppero (Lau, 05/11): una sola para toda la web =====
+     Títulos y números grandes en Archivo Black; títulos de tarjeta en Archivo
+     ExtraBold; montos dentro de listas en Barlow Condensed; el texto en Inter.
+     No usar otros tamaños para estas piezas: si hace falta uno nuevo, se suma acá. */
+  /* Título de página (Agenda, Configuración, el nombre del campo). */
+  .t-pagina {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+  }
+  /* Título de sección dentro de la página (Para mejorar, Mes a mes, Noviembre). */
+  .t-seccion {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  /* Título de una tarjeta, bloque o fila (Tu nombre, Lo que usás, una semana). */
+  .t-tarjeta {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 19px;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+  /* El número protagonista de una pantalla (17 cabezas, $81,1M). */
+  .t-numero-hero {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 64px;
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+  /* El número de una tarjeta de datos (+$14,4M, 985 ha, $6.100.000). */
+  .t-numero {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Un monto o número dentro de una lista o fila (−$300k, 17 cab). */
+  .t-cifra {
+    font-family: var(--font-cifra);
+    font-size: 18px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Número mini: al lado de un nombre en la barra o un eje («17 cab»). */
+  .t-cifra-mini {
+    font-family: var(--font-cifra);
+    font-size: 12.5px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Número chico: chips, etiquetas, ejes. */
+  .t-cifra-chica {
+    font-family: var(--font-cifra);
+    font-size: 15px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Los popups chicos (detalle al pasar el mouse, avisos): entran subiendo y salen bajando,
+     con una curva suave y un cierre un poco más lento que la apertura (Lau, 07/11). */
+  .popup-suave {
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      filter 220ms ease-out;
+  }
+  .popup-suave[data-starting-style] {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  .popup-suave[data-ending-style] {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    transition:
+      opacity 240ms cubic-bezier(0.4, 0, 0.6, 1),
+      transform 280ms cubic-bezier(0.4, 0, 0.6, 1);
+  }
   .tnum-prop {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
@@ -524,3 +777,253 @@
   box-shadow: none;
   border-color: transparent;
 }
+
+/* ===== Tutorial del mapa (Troppero): etiqueta de cada potrero ===== */
+.tropero-etiqueta.leaflet-tooltip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  /* Pastilla propia: se lee aunque el potrero sea chico y el texto se salga. */
+  padding: 4px 9px 5px;
+  border: none;
+  border-radius: 10px;
+  background: rgb(251 250 246 / 0.94);
+  box-shadow: 0 2px 8px rgb(19 27 22 / 0.22);
+  color: #7a3a1c;
+  text-align: center;
+  white-space: nowrap;
+}
+.tropero-etiqueta.leaflet-tooltip::before {
+  display: none;
+}
+.tropero-etiqueta b {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+}
+.tropero-etiqueta span {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+/* Cada potrero con el color de lo que tiene, como en el ejemplo. */
+.tropero-etiqueta--hacienda.leaflet-tooltip { background: #b85c2e; color: #fbfaf6; }
+.tropero-etiqueta--sembrado.leaflet-tooltip { background: #ecc46a; color: #7a3a1c; }
+.tropero-etiqueta--descanso.leaflet-tooltip { color: #3e6339; }
+/* El que se acaba de ubicar: oscuro, para que se distinga del resto. */
+.tropero-etiqueta--activa.leaflet-tooltip {
+  padding: 6px 12px 7px;
+  background: #7a3a1c;
+  color: #fbfaf6;
+}
+.tropero-etiqueta--activa b {
+  font-size: 16px;
+}
+/* El pueblo donde arranca el mapa: un punto y su nombre. */
+.tropero-pueblo { pointer-events: none; }
+.tropero-pueblo-punto {
+  position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 9999px;
+  background: #b85c2e; border: 3px solid #fbfaf6; box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.tropero-pueblo-texto {
+  position: absolute; left: 14px; top: -14px; white-space: nowrap;
+  background: #fbfaf6; color: #131b16; font: 700 13px/1 Inter, sans-serif;
+  padding: 7px 10px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+}
+/* «Cerrá acá»: el primer punto late cuando ya se puede cerrar el dibujo. */
+.tropero-cerrar { pointer-events: none; }
+.tropero-cerrar-onda {
+  position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; border-radius: 9999px;
+  border: 3px solid #ecc46a; animation: cerrar-onda 1.3s ease-out infinite;
+}
+.tropero-cerrar-texto {
+  position: absolute; left: 0; top: -46px; transform: translateX(-50%); white-space: nowrap;
+  background: #ecc46a; color: #7a3a1c; font: 700 13px/1 Inter, sans-serif;
+  padding: 7px 11px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+@keyframes cerrar-onda { 0% { opacity: 1; transform: scale(.55); } 100% { opacity: 0; transform: scale(1.7); } }
+/* El punto donde se toca cada esquina del dibujo. */
+.leaflet-container .marker-icon.leaflet-pm-draggable,
+.leaflet-container .leaflet-marker-icon.marker-icon {
+  border: 2.5px solid #b85c2e;
+  background: #fbfaf6;
+}
+
+/* ===== Guía sobre el mapa (tutorial del mapa) =====
+   Un gesto animado sobre el mapa real: dónde tocar y cómo arrastrar. Se repite solo; con «menos movimiento» queda quieto. */
+.tropero-guia-ancla { pointer-events: none; }
+.guia { position: relative; transform: translate(-22px, -6px); pointer-events: none; overflow: visible; }
+.guia-mano { position: relative; z-index: 2; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); }
+.guia-onda {
+  position: absolute; left: 6px; top: -2px; width: 22px; height: 22px; border-radius: 9999px;
+  border: 3px solid #ecc46a; opacity: 0; animation: guia-onda 1.6s ease-out infinite;
+}
+.guia--tocar .guia-mano { animation: guia-tocar 1.6s ease-in-out infinite; }
+.guia--arrastrar .guia-mano { animation: guia-arrastrar 2.4s ease-in-out infinite; }
+.guia--arrastrar .guia-onda { display: none; }
+.guia-texto {
+  position: absolute; left: 50%; top: 52px; transform: translateX(-30%); white-space: nowrap;
+  background: rgba(19,27,22,.88); color: #fbfaf6; font: 600 14px/1 Inter, sans-serif;
+  padding: 9px 14px; border-radius: 9999px; box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+@keyframes guia-onda { 0%,40% { opacity: 0; transform: scale(.6); } 50% { opacity: 1; transform: scale(.8); } 100% { opacity: 0; transform: scale(2.4); } }
+@keyframes guia-tocar { 0%,100% { transform: translateY(0) scale(1); } 45% { transform: translateY(-10px) scale(1.05); } 55% { transform: translateY(2px) scale(.92); } }
+@keyframes guia-arrastrar { 0%,100% { transform: translate(0,0); } 20% { transform: translate(0,0) scale(.92); } 70% { transform: translate(90px,-30px) scale(.92); } 85% { transform: translate(90px,-30px) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .guia-mano, .guia-onda, .tropero-cerrar-onda { animation: none !important; }
+}
+
+/* El ancho de las páginas: 1104 en una compu común y más en monitores anchos,
+   para que en 2000 px y más no quede una columna angosta en el medio (03/11). */
+@utility ancho-pagina {
+  max-width: 1104px;
+  @media (min-width: 1700px) { max-width: 1320px; }
+  @media (min-width: 2100px) { max-width: 1520px; }
+}
+
+/* Una columna que scrollea no se corta en seco: arriba y abajo se difumina. */
+@utility scroll-difuminado {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+}
+
+
+/* ===== Inicio: la escena del clima ===== */
+.escena-gota { animation: escena-gota 0.9s linear infinite; opacity: 0; }
+@keyframes escena-gota { 0% { transform: translateY(-20px); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(260px); opacity: 0.8; } }
+.escena-rayo { opacity: 0; animation: escena-rayo 6s infinite; }
+@keyframes escena-rayo { 0%, 88%, 92%, 100% { opacity: 0; } 89% { opacity: 0.55; } 90% { opacity: 0.1; } 91% { opacity: 0.4; } }
+.escena-viento { left: -100px; animation: escena-viento 2.2s linear infinite; }
+@keyframes escena-viento { from { transform: translateX(0); opacity: 0; } 20% { opacity: 1; } to { transform: translateX(560px); opacity: 0; } }
+
+/* «Todos tus campos»: cada campo con su letra y su nombre en una pastilla clara, que se toca para elegirlo. */
+.tropero-campo.leaflet-tooltip,
+.tropero-campo--pin {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.tropero-campo.leaflet-tooltip::before {
+  display: none;
+}
+.tropero-campo b {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  background: rgb(251 250 246 / 0.95);
+  box-shadow: 0 4px 14px rgb(19 27 22 / 0.3);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-texto, #131b16);
+  cursor: pointer;
+}
+.tropero-campo i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-style: normal;
+  font-size: 11px;
+  color: #fff;
+}
+.tropero-campo--pin {
+  transform: translate(-50%, -50%);
+}
+
+/* Campos (Figma 1050:2): el nombre del potrero sobre el satélite, grande y blanco, sin pastilla. */
+.tropero-nombre.leaflet-tooltip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #fbfaf6;
+  text-align: center;
+  text-shadow: 0 1px 3px rgb(19 27 22 / 0.75), 0 0 10px rgb(19 27 22 / 0.35);
+  pointer-events: none;
+}
+.tropero-nombre.leaflet-tooltip::before {
+  display: none;
+}
+.tropero-nombre b {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1;
+}
+.tropero-nombre span {
+  font-family: var(--font-cifra);
+  font-size: 15px;
+  font-weight: 700;
+}
+.tropero-nombre span {
+  margin-top: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(19 27 22 / 0.55);
+  font-family: var(--font-sans, inherit);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-shadow: none;
+  white-space: nowrap;
+}
+.tropero-nombre--si b { font-size: 24px; }
+.tropero-marca span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fbfaf6;
+  color: #131b16;
+  box-shadow: 0 2px 6px rgb(19 27 22 / 0.35);
+}
+.tropero-nombre--si b { font-size: 30px; }
+.tropero-nombre--otro { opacity: 0.6; }
+
+/* Lo que el asistente pide tocar (acompanante.tsx): el propio botón, con un anillo sobrio que respira. */
+[data-resaltado] {
+  position: relative;
+  box-shadow: 0 0 0 3px var(--color-fondo, #f5f1ea), 0 0 0 5px rgb(169 85 44 / 0.45);
+  animation: tropero-resaltado 2.4s ease-in-out infinite;
+}
+@keyframes tropero-resaltado {
+  0%, 100% { box-shadow: 0 0 0 3px var(--color-fondo, #f5f1ea), 0 0 0 5px rgb(169 85 44 / 0.45); }
+  50% { box-shadow: 0 0 0 3px var(--color-fondo, #f5f1ea), 0 0 0 7px rgb(169 85 44 / 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-resaltado] { animation: none; }
+}
+
+/* Plata · «Leyendo el comprobante»: la raya que baja por la foto. */
+@keyframes escaneo { 0% { transform: translateY(24px); } 50% { transform: translateY(316px); } 100% { transform: translateY(24px); } }
+
+/* La etiqueta de cada campo, centrada en su lugar (el lugar lo calcula el mapa para que no se pisen). */
+.tropero-campo--pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Lo que el satélite todavía no cargó, en un tono de campo (no el gris de Leaflet): durante el zoom no se ven cuadros grises. */
+.leaflet-container.leaflet-container {
+  background: #3d4630 !important;
+}
+
+/* Acceso: la foto del campo se asienta despacio al entrar, como una cámara que llega (Lau 12/11). Una vez, sin loop. */
+@keyframes foto-llega { from { transform: scale(1.09); } to { transform: scale(1); } }
+.foto-llega { animation: foto-llega 14s cubic-bezier(.16, 1, .3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .foto-llega { animation: none; } }
+
+/* Se puede deslizar, pero sin barra a la vista (Lau 13/11, acceso). */
+.sin-barra { scrollbar-width: none; }
+.sin-barra::-webkit-scrollbar { display: none; }

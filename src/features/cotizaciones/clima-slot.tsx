@@ -1,72 +1,46 @@
-import { ChevronDown, MapPin, Snowflake } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { MapPin, Snowflake } from 'lucide-react'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { useClima } from '@/features/cotizaciones/hooks'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
-import { Link } from 'react-router-dom'
+import { cn } from '@/lib/utils'
+import { ICONO_PILDORA, PILDORA } from './pildora'
 
 /**
- * Slot del clima en el ticker (Open-Meteo): temperatura actual, máx/mín del
- * día y aviso de helada (clave para el productor). Lluvia en el tooltip.
- *
- * El clima es DEL CAMPO ELEGIDO: con varios campos, el nombre es un selector
- * (la elección se comparte con el panel del Inicio). Sin ningún campo con
- * ubicación, en vez de un clima ajeno muestra "Ubicá tu campo" → Campos.
- * Si la fuente falla, no muestra nada (nunca un valor de muestra).
+ * El clima en la barra superior (Open-Meteo): temperatura, máx/mín y aviso de
+ * helada, del campo elegido en la barra izquierda (con «Todos tus campos», el
+ * primero con ubicación, con su nombre a la vista). Acá no se elige. Sin campo ubicado, lleva a
+ * Campos. Si la fuente falla, no muestra nada (nunca un valor de muestra).
  */
 export function ClimaSlot() {
-  const { opciones, actual, elegir, cargando } = useCampoClima()
+  const { actual, cargando } = useCampoClima()
   const clima = useClima(actual?.ubicacion ?? null)
+  const navigate = useNavigate()
 
   if (cargando) return null
   if (!actual) {
     return (
-      <Link
-        to="/campos"
-        className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55 hover:text-sidebar-foreground"
-        title="Cargá la localidad del campo para ver su clima"
-      >
-        <MapPin className="size-[15px] text-[#e8b75c]" />
-        Ubicá tu campo
-      </Link>
+      <button type="button" onClick={() => navigate('/campos')} className={cn(PILDORA, 'text-[13px] font-semibold text-principal')}>
+        <span className={cn(ICONO_PILDORA, 'bg-principal-suave')}><MapPin /></span>
+        Ubicá tu campo para ver el clima
+      </button>
     )
   }
   if (!clima.data) return null
   const d = clima.data
   return (
     <div
-      className="flex shrink-0 items-center gap-2.5"
-      title={`${d.descripcion} · ${d.lugar} · lluvia ${d.lluviaProb}%${d.lluviaMm > 0 ? ` (${d.lluviaMm} mm)` : ''}`}
+      title={`${d.descripcion} · lluvia ${d.lluviaProb} %${d.lluviaMm > 0 ? ` (${d.lluviaMm} mm)` : ''}`}
+      className={cn(PILDORA, 'cursor-default hover:border-borde')}
     >
-      <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
-        <WmoIcon code={d.code} className="size-[15px] text-[#e8b75c]" />
-        {opciones.length > 1 ? (
-          // Selector nativo, sin estilo propio: en la barra oscura basta con el
-          // nombre y la flechita; el menú lo pinta el sistema.
-          <span className="relative inline-flex items-center gap-0.5">
-            <select
-              aria-label="Campo del clima"
-              value={actual.id}
-              onChange={(e) => elegir(e.target.value)}
-              className="cursor-pointer appearance-none bg-transparent pr-3.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/70 outline-none hover:text-sidebar-foreground"
-            >
-              {opciones.map((o) => (
-                <option key={o.id} value={o.id} className="text-ink">
-                  {o.nombre}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-0 size-3" />
-          </span>
-        ) : (
-          d.lugar
-        )}
-      </span>
-      <b className="tnum text-sm font-semibold text-white">{d.temp}°</b>
-      <span className="tnum hidden text-[11px] font-medium text-sidebar-foreground/45 md:inline">
+      <span className={cn(ICONO_PILDORA, 'bg-trigo-100 text-trigo-700')}><WmoIcon code={d.code} className="size-4" /></span>
+      <span className="text-[13px] text-texto-suave">{actual.nombre}</span>
+      <b className="t-cifra-chica font-bold text-texto">{d.temp}°</b>
+      <span className="t-cifra-mini hidden text-texto-suave lg:inline">
         {d.max}° / {d.min}°
       </span>
       {d.helada && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#2779c4]/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-[#8cc2f0]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#e1ebf2] px-2 py-0.5 text-[11.5px] font-bold text-[#215a7e]">
           <Snowflake className="size-3" />
           Helada
         </span>

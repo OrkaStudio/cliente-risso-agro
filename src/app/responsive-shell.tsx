@@ -4,22 +4,26 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Tractor } from 'lucide-react'
 import { useIsMobile } from '@/lib/use-is-mobile'
 import { setForceOficina, useForceOficina } from '@/lib/campo-mode'
+import { useMedirUso } from '@/features/guia/medir'
 
 /**
  * Gate de navegación por dispositivo. La app es UNA sola web; lo que cambia
  * según el equipo es QUÉ se ve:
  *   · En un teléfono se entra al **Modo Campo** (la oficina es ruido en el campo).
- *   · En escritorio se ve todo (Modo Oficina completo).
+ *   · En escritorio se ve el Modo Oficina, y el Modo Campo no se puede abrir.
  * No hay app aparte: este componente solo redirige y elige el shell por ruta.
  *
  * Las rutas de Oficina cuelgan de `AppShell`; las de Campo, de `CampoShell`
  * (ver router). Acá solo decidimos a cuál mandar a un móvil parado en Oficina.
  */
 export function ResponsiveShell() {
+  useMedirUso()
   const isMobile = useIsMobile()
   const forceOficina = useForceOficina()
   const location = useLocation()
   const enCampo = location.pathname.startsWith('/campo')
+  const rutaOficina = `${location.pathname}${location.search}${location.hash}`
+  const regresoResponsive = (location.state as { regresoResponsive?: string } | null)?.regresoResponsive
   // Recién terminó el onboarding: la app entra con un fundido, no de golpe.
   // Se decide una vez al montar (navegar dentro de la app no lo repite).
   const quieto = useReducedMotion()
@@ -28,9 +32,18 @@ export function ResponsiveShell() {
     () => !quieto && isMobile && !!(location.state as { bienvenida?: boolean } | null)?.bienvenida,
   )
 
+  // El Modo Campo no se abre desde la compu: es para el celular, en el potrero.
+  // Una ruta /campo en escritorio (link viejo, URL escrita, ventana achicada y
+  // vuelta a agrandar) vuelve a la Oficina. Ojo: `enCampo` también cubre
+  // /campos (el editor del mapa en el celular), que en la compu es Oficina.
+  const modoCampo = location.pathname === '/campo' || location.pathname.startsWith('/campo/')
+  if (!isMobile && modoCampo) {
+    return <Navigate to={regresoResponsive ?? '/'} replace state={null} />
+  }
+
   // Teléfono, sin override y parado en una ruta de Oficina → al Modo Campo.
   if (isMobile && !forceOficina && !enCampo) {
-    return <Navigate to="/campo" replace />
+    return <Navigate to="/campo" replace state={{ regresoResponsive: rutaOficina }} />
   }
 
   return (

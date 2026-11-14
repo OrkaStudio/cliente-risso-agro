@@ -49,6 +49,7 @@ export type RecSesion = {
   campo_nombre: string
   empresa_id: string
   fecha: string
+  /** Ya no se carga (la lluvia sale del pronóstico); queda por los registros guardados de antes. */
   lluvia_mm: number | null
   lluvia_ok: 0 | 1
   /** 1 = la fila `recorrida` ya existe en el servidor. 0 = se arrancó offline

@@ -90,7 +90,7 @@ export function itemsDe(r: Resumen): ItemChecklist[] {
         ? 'Con los tres números de la boleta de ARBA, el mapa se arma solo.'
         : 'Ubicalo en el satélite y marcá las esquinas del campo.',
       cta: auto ? 'Traer el contorno' : 'Marcar el contorno',
-      ruta: primero ? `/campos?campo=${primero.id}` : '/campos',
+      ruta: '/campos',
       accion: 'campos-catastro',
       hecho: r.campos >= 1 && r.sinContorno.length === 0,
     },

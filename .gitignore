@@ -58,3 +58,4 @@ auditoria-shots/
 /output/playwright/
 /supabase/.temp/
 /supabase/tests/wa/piloto/resultado.json
+.vitest/

@@ -20,6 +20,8 @@ function circ2(v: string): string {
 
 export type ParcelaCatastro = {
   cca: string
+  /** Partido y partida, como en la boleta: «058-000146». Vacío si ARBA no la tiene. */
+  partida: string
   areaHa: number
   anillo: LatLng[] // anillo exterior [lat, lng]
 }
@@ -56,7 +58,7 @@ export async function buscarParcelaRural(input: {
   const json = (await res.json()) as {
     features?: {
       geometry: { type: string; coordinates: number[][][] | number[][][][] }
-      properties?: { cca?: string; ara1?: number }
+      properties?: { cca?: string; ara1?: number; pda?: string }
     }[]
   }
 
@@ -72,10 +74,100 @@ export async function buscarParcelaRural(input: {
     if (!ring || ring.length < 3) continue
     out.push({
       cca: f.properties?.cca ?? '',
+      partida: partidaTexto(f.properties?.pda),
       areaHa: Math.round(((f.properties?.ara1 ?? 0) / 10000) * 100) / 100,
       anillo: ring.map((p) => [p[1], p[0]] as LatLng),
     })
   }
   // las parcelas más grandes primero (suelen ser la rural buscada)
   return out.sort((a, b) => b.areaHa - a.areaHa)
+}
+
+/**
+ * La parcela rural que está debajo de un punto del mapa (el productor toca su
+ * campo). En WFS 2.0 con SRID 4326 el punto va como (lng lat): verificado
+ * contra geo.arba.gov.ar el 09/10. null si ahí no hay parcela (lagunas, rutas,
+ * otra provincia).
+ */
+export async function parcelaEnPunto(lat: number, lng: number): Promise<ParcelaCatastro | null> {
+  const cql = `INTERSECTS(geom, SRID=4326;POINT(${lng} ${lat}))`
+  const url =
+    `${WFS}?service=WFS&version=2.0.0&request=GetFeature` +
+    `&typeNames=idera:Parcela&outputFormat=application/json` +
+    `&srsName=EPSG:4326&count=1&CQL_FILTER=${encodeURIComponent(cql)}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('El catastro no respondió. Probá de nuevo o marcalo a mano.')
+  const json = (await res.json()) as {
+    features?: {
+      geometry: { type: string; coordinates: number[][][] | number[][][][] }
+      properties?: { cca?: string; ara1?: number; pda?: string }
+    }[]
+  }
+  const f = json.features?.[0]
+  if (!f?.geometry) return null
+  const g = f.geometry
+  const ring = (
+    g.type === 'MultiPolygon' ? (g.coordinates as number[][][][])[0]?.[0] : (g.coordinates as number[][][])[0]
+  ) as number[][] | undefined
+  if (!ring || ring.length < 3) return null
+  return {
+    cca: f.properties?.cca ?? '',
+    partida: partidaTexto(f.properties?.pda),
+    areaHa: Math.round(((f.properties?.ara1 ?? 0) / 10000) * 100) / 100,
+    anillo: ring.map((p) => [p[1], p[0]] as LatLng),
+  }
+}
+
+/** «058000146» → «058-000146». */
+function partidaTexto(pda: string | undefined): string {
+  const d = (pda ?? '').replace(/\D/g, '')
+  return d.length === 9 ? `${d.slice(0, 3)}-${d.slice(3)}` : ''
+}
+
+/**
+ * Lo que escribió el productor → los 9 dígitos de ARBA (partido 3 + partida 6).
+ * La boleta puede traer un dígito verificador al final: se descarta.
+ * null si no alcanza para buscar.
+ */
+export function normalizarPartida(partido: string, partida: string): string | null {
+  const p = partido.replace(/\D/g, '')
+  let n = partida.replace(/\D/g, '')
+  if (!p || !n || p.length > 3) return null
+  if (n.length === 7) n = n.slice(0, 6)
+  if (n.length > 6) return null
+  return p.padStart(3, '0') + n.padStart(6, '0')
+}
+
+/**
+ * La parcela de una partida (partido + número, como en la boleta del
+ * Inmobiliario Rural). Exacto: una partida es una parcela. Verificado contra
+ * geo.arba.gov.ar el 02/11 (Toimil: 058-000146, 70 ha).
+ */
+export async function parcelaPorPartida(partido: string, partida: string): Promise<ParcelaCatastro | null> {
+  const pda = normalizarPartida(partido, partida)
+  if (!pda) throw new Error('Revisá los números: el partido tiene hasta 3 cifras y la partida hasta 6.')
+  const cql = `pda='${pda}'`
+  const url =
+    `${WFS}?service=WFS&version=2.0.0&request=GetFeature` +
+    `&typeNames=idera:Parcela&outputFormat=application/json` +
+    `&srsName=EPSG:4326&count=1&CQL_FILTER=${encodeURIComponent(cql)}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('El catastro no respondió. Probá de nuevo en un rato.')
+  const json = (await res.json()) as {
+    features?: {
+      geometry: { type: string; coordinates: number[][][] | number[][][][] }
+      properties?: { cca?: string; ara1?: number; pda?: string }
+    }[]
+  }
+  const f = json.features?.[0]
+  if (!f?.geometry) return null
+  const g = f.geometry
+  const ring = (g.type === 'MultiPolygon' ? (g.coordinates as number[][][][])[0]?.[0] : (g.coordinates as number[][][])[0]) as number[][] | undefined
+  if (!ring || ring.length < 3) return null
+  return {
+    cca: f.properties?.cca ?? '',
+    partida: partidaTexto(f.properties?.pda),
+    areaHa: Math.round(((f.properties?.ara1 ?? 0) / 10000) * 100) / 100,
+    anillo: ring.map((p) => [p[1], p[0]] as LatLng),
+  }
 }
