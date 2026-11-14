@@ -10,6 +10,7 @@ import { LABORES, laborPorTipo, type TipoLabor } from '@/features/potrero/labore
 import { useRegistrarLabor } from '@/features/potrero/hooks'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import { hoyLocal } from '@/lib/fecha'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 /**
  * Cargar una labor agrícola.
@@ -48,6 +49,7 @@ export function CargarLaborDialog({
   const [kg, setKg] = useState('')
   const [nota, setNota] = useState('')
   const [monto, setMonto] = useState('')
+  const cargaPlata = usePermiso('plata').carga
   const [error, setError] = useState<string | null>(null)
   // Cada vez que se abre arranca de cero.
   const [abiertoAntes, setAbiertoAntes] = useState(open)
@@ -153,6 +155,8 @@ export function CargarLaborDialog({
 
       <CampoTexto className="mt-6" etiqueta="Nota · opcional" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Variedad, producto, dosis, quién lo hizo…" autoComplete="off" />
 
+      {/* El costo crea un gasto: sólo para quien carga la Plata (permisos, 13/11). */}
+      {cargaPlata && (
       <CampoTexto
         className="mt-6"
         etiqueta="¿Cuánto costó? · opcional"
@@ -165,6 +169,7 @@ export function CargarLaborDialog({
         placeholder="Dejalo vacío si todavía no sabés"
         ayuda={monto.trim() ? `Se carga como gasto en "${labor.categoria}", imputado a este potrero.` : 'Si lo cargás, el gasto queda imputado a este potrero sin volver a tipearlo.'}
       />
+      )}
 
       {error && (
         <div className="mt-6">

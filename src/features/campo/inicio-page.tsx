@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import { useRecorrida } from './recorrida/use-recorrida'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
+import { puedeCargar, puedeVer } from '@/features/empresa/secciones'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const BARRA: Record<Cosa['tono'], string> = { problema: 'bg-[#b3372a]', atencion: 'bg-[#d38f1d]', aviso: 'bg-acento' }
@@ -55,14 +56,20 @@ function Hoy() {
 
   const potreros = (atender.data?.potreros ?? []).filter((p) => !campo || p.campo === campo.nombre)
   // En el celular, cada cosa va a su pantalla del Modo Campo.
-  const cosas = cosasParaHoy(potreros, panorama.data?.vencimientos ?? [], (atender.data?.sinRecorrer ?? []).filter((c) => c.campo === campo?.nombre), 3).map(
-    (c): Cosa => ({
-      ...c,
-      accion: c.key.startsWith('v-')
-        ? { texto: 'Anotar', to: '/campo/plata' }
-        : { texto: c.key.startsWith('r-') ? 'Recorrer' : 'Ver', to: '/campo/recorrida' },
-    }),
-  )
+  // Sólo lo que la persona ve, y cada acción sólo si la puede hacer (permisos, 13/11).
+  const ve = { campos: puedeVer(membresia, 'campos'), plata: puedeVer(membresia, 'plata'), hacienda: puedeVer(membresia, 'hacienda') }
+  const carga = { campos: puedeCargar(membresia, 'campos'), plata: puedeCargar(membresia, 'plata'), hacienda: puedeCargar(membresia, 'hacienda') }
+  const cosas = cosasParaHoy(ve.campos ? potreros : [], ve.plata ? (panorama.data?.vencimientos ?? []) : [], ve.campos ? (atender.data?.sinRecorrer ?? []).filter((c) => c.campo === campo?.nombre) : [], 3)
+    .map(
+      (c): Cosa => ({
+        ...c,
+        accion: c.key.startsWith('v-')
+          ? { texto: 'Anotar', to: '/campo/plata' }
+          : { texto: c.key.startsWith('r-') ? 'Recorrer' : 'Ver', to: '/campo/recorrida' },
+      }),
+    )
+    // Ver una cosa en el celular es ir a cargar: sin ese permiso, se muestra sin botón.
+    .map((c) => (c.accion.to === '/campo/plata' ? carga.plata : carga.campos) ? c : { ...c, accion: { texto: '', to: '' } })
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluviaMes: lluvia.data ?? null, cosas: cosas.length })
@@ -176,19 +183,22 @@ function Hoy() {
                     <p className="text-[16px] leading-snug font-semibold text-texto">{c.titulo}</p>
                     <p className="text-[13.5px] leading-snug text-texto-suave">{c.detalle}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(c.accion.to)}
-                    className="h-10 shrink-0 rounded-full bg-superficie-hundida px-4 text-[15px] font-bold text-principal"
-                  >
-                    {c.accion.texto}
-                  </button>
+                  {c.accion.to && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(c.accion.to)}
+                      className="h-10 shrink-0 rounded-full bg-superficie-hundida px-4 text-[15px] font-bold text-principal"
+                    >
+                      {c.accion.texto}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </motion.section>
 
+        {ve.hacienda && (
         <motion.section {...entra(3)} aria-label="Las cabezas" className="pt-2">
           <div className="flex items-end gap-3">
             <p className="titulo-display text-[110px] leading-[0.9] tracking-[-0.04em] text-texto">{cabezas}</p>
@@ -206,7 +216,9 @@ function Hoy() {
             </div>
           )}
         </motion.section>
+        )}
 
+        {carga.hacienda && (
         <button
           type="button"
           onClick={() => navigate('/campo/lector')}
@@ -215,6 +227,7 @@ function Hoy() {
           <Icono nombre="Bastón lector" tamano={16} />
           Probar un lector de caravana
         </button>
+        )}
       </div>
     </div>
   )

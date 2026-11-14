@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { usePermiso } from '@/features/empresa/use-permiso'
 import { supabase } from '@/lib/supabase/client'
 import { crearPotrero, setCampoContorno, setPotreroPoligono } from '@/features/campos/api'
 import type { CampoMapa, LatLng, PotreroMapa } from './reglas'
@@ -18,8 +19,12 @@ function tipoDe(estado: string, cultivo: string | null, cabezas: number): Potrer
   return 'vacio'
 }
 
-/** Los campos de la empresa con su borde y sus potreros, desde la base. */
-export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
+/**
+ * Los campos de la empresa con su borde y sus potreros, desde la base.
+ * Sin `veHacienda` (permisos, 13/11) la base no deja contar animales: cada
+ * potrero se describe por su uso, nunca como «Vacío» sin saberlo.
+ */
+export async function leerMapa(empresaId: string, veHacienda = true): Promise<CampoMapa[]> {
   const [{ data: campos, error }, { data: stock, error: e2 }] = await Promise.all([
     supabase
       .from('campo')
@@ -45,6 +50,16 @@ export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((p) => {
         const cabezas = cab.get(p.id) ?? 0
+        if (!veHacienda)
+          return {
+            id: p.id,
+            nombre: p.nombre,
+            hectareas: p.hectareas === null ? null : Number(p.hectareas),
+            poligono: (p.poligono as LatLng[] | null) ?? null,
+            cabezas: 0,
+            que: p.cultivo ? queTiene(p.estado_ciclo, p.cultivo, 0) : p.estado_ciclo === 'descanso' ? 'En descanso' : 'Ganadero',
+            tipo: p.cultivo || p.estado_ciclo === 'cultivo' ? ('sembrado' as const) : p.estado_ciclo === 'descanso' ? ('descanso' as const) : undefined,
+          }
         return {
           id: p.id,
           nombre: p.nombre,
@@ -58,12 +73,14 @@ export async function leerMapa(empresaId: string): Promise<CampoMapa[]> {
   }))
 }
 
-export const useMapa = (empresaId: string | undefined) =>
-  useQuery({
-    queryKey: ['mapa', empresaId],
-    queryFn: () => leerMapa(empresaId!),
+export function useMapa(empresaId: string | undefined) {
+  const { ve } = usePermiso('hacienda')
+  return useQuery({
+    queryKey: ['mapa', empresaId, ve],
+    queryFn: () => leerMapa(empresaId!, ve),
     enabled: !!empresaId,
   })
+}
 
 export const guardarBorde = setCampoContorno
 

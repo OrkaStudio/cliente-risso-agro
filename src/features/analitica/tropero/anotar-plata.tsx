@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import { cn } from '@/lib/utils'
 import { nombreMes } from './plata'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 type Tipo = Database['public']['Enums']['tipo_movimiento']
 type Medio = Database['public']['Enums']['medio_pago']
@@ -106,6 +107,8 @@ export function AnotarPlata({
   const [abierto, setAbierto] = useState(false)
   const [vez, setVez] = useState(0)
   const [escanear, setEscanear] = useState(false)
+  // Anotar plata es cargar en Plata: con «Ve» no aparece (permisos, 13/11).
+  if (!usePermiso('plata').carga) return null
   return (
     <>
       {renderTrigger((e = false) => {

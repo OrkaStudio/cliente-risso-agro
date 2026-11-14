@@ -10,6 +10,8 @@ import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
+import { cargaDeRuta, puedeCargar } from '@/features/empresa/secciones'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 
 /**
  * Shell del Modo Campo (móvil). Layout sobrio, pensado para el teléfono en la
@@ -65,6 +67,7 @@ function SalirDeLaCuenta() {
 }
 
 export function CampoShell() {
+  const { data: membresia } = useEmpresa()
   // Precarga los chunks de las secciones en reposo → el salto a Recorrida/
   // Manga/Plata/Historial es instantáneo (sin flash de "Cargando…").
   useEffect(() => prefetchEnReposo(Object.values(CHUNKS_CAMPO)), [])
@@ -150,7 +153,8 @@ export function CampoShell() {
       {/* En flujo (no flotando encima): así no tapa los pies fijos de la recorrida y la manga. */}
       <nav aria-label="Modo Campo" className="shrink-0 bg-fondo px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between rounded-full bg-superficie p-1.5 shadow-[0_8px_28px_rgba(19,27,22,0.18)]">
-          {NAV.map(({ to, label, icono, end }) => {
+          {/* Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos. */}
+          {NAV.filter(({ to }) => { const s = cargaDeRuta(to); return !s || puedeCargar(membresia, s) }).map(({ to, label, icono, end }) => {
             const cerrada = mapaPendiente && to !== '/campo'
             return (
               <NavLink

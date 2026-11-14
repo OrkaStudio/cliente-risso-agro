@@ -10,12 +10,15 @@ const ha = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: 1 }
  * las formas de cargarla. Nada de un 0 grande ni una tabla vacía.
  */
 export function SinHacienda({
+  carga = true,
   cara,
   campo,
   onEntraron,
   onPlanilla,
   onVerCampo,
 }: {
+  /** Con Hacienda en «Ve» no se ofrece cargar (permisos, 13/11). */
+  carga?: boolean
   cara: CaraSinHacienda
   /** El campo elegido; null con «Todos tus campos». */
   campo: string | null
@@ -49,13 +52,22 @@ export function SinHacienda({
             Ver {campo} en Campos
             <Icono nombre="Siguiente" tamano={16} />
           </button>
-          <button type="button" onClick={onEntraron} className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
-            ¿Entraron animales? Cargalos
-          </button>
+          {carga && (
+            <button type="button" onClick={onEntraron} className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-3.5 text-[14px] font-bold text-texto transition-colors hover:border-principal hover:text-principal">
+              ¿Entraron animales? Cargalos
+            </button>
+          )}
         </div>
       </div>
     )
 
+  if (!carga)
+    return (
+      <div className="flex flex-col gap-1 px-7 py-7 lg:col-span-2">
+        <h2 className="t-seccion text-texto">Todavía no hay hacienda cargada {campo ? `en ${campo}` : `en ${quien.enLosCampos}`}</h2>
+        <p className="text-[15px] text-texto-suave">Cuando el dueño la cargue, la vas a ver acá.</p>
+      </div>
+    )
   const formas: { icono: NombreIcono; titulo: string; detalle: string; onClick: () => void }[] = [
     { icono: 'Agregar', titulo: 'Entraron', detalle: 'Los compraste, nacieron o vinieron de otro campo tuyo.', onClick: onEntraron },
     { icono: 'Comprobante', titulo: 'Desde una planilla', detalle: 'La del veterinario o la tuya: la leemos y la revisás antes de guardar.', onClick: onPlanilla },

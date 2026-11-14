@@ -14,7 +14,7 @@ import { useAuth } from '@/features/auth/auth-context'
 import { useCampoClima, type OpcionClima } from '@/features/cotizaciones/campo-clima'
 import { useClima, usePronostico } from '@/features/cotizaciones/hooks'
 import type { DiaPronostico } from '@/features/cotizaciones/api'
-import { puedeVer, veePlata } from '@/features/empresa/secciones'
+import { puedeCargar, puedeVer, veePlata } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
@@ -29,6 +29,7 @@ import { CampoVisto } from '@/features/campos/campo-visto'
 import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluviaDelMes } from './use-dia'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 const TARJETA = 'rounded-[20px] border border-borde bg-superficie px-6 py-5'
@@ -82,7 +83,11 @@ export function ElDia() {
   if (panorama.error || !panorama.data) return <p className="text-texto-suave">No pudimos cargar el Inicio. Revisá la conexión y probá de nuevo.</p>
 
   const v = delCampo(campoId, panorama.data, atender.data)
-  const cosas = cosasParaHoy(veCampos ? v.potreros : [], plata ? v.vencimientos : [], veCampos ? v.sinRecorrer : [])
+  // Con Campos en «Ve» se ve lo que hay que atender, pero «Mandar la recorrida» es cargar: lleva a mirar el campo.
+  const cargaCampos = puedeCargar(membresia, 'campos')
+  const cosas = cosasParaHoy(veCampos ? v.potreros : [], plata ? v.vencimientos : [], veCampos ? v.sinRecorrer : []).map((c) =>
+    !cargaCampos && c.accion.to.startsWith('whatsapp:') ? { ...c, accion: { texto: 'Ver el campo', to: '/campos' } } : c,
+  )
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const manana = pronostico.data?.[1]
@@ -556,6 +561,9 @@ export function SeSoluciono({ senal, empresaId, compacto = false }: { senal: Non
   const marcar = useMarcarSenal()
   const deshacer = useDeshacerMarca()
   const [marca, setMarca] = useState<string | null>(null)
+  // Marcarlo solucionado es cargar en Campos (permisos, 13/11).
+  const { carga } = usePermiso('campos')
+  if (!carga) return null
   if (marca)
     return (
       <span className="flex shrink-0 items-center justify-center gap-1 text-[13.5px] font-bold text-estado-bien-texto">

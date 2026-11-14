@@ -21,6 +21,7 @@ import { CargarCaravanas } from './caravanas-carga'
 import { EntradasSalidas } from './entradas-salidas-panel'
 import { AnimalNuevo } from './paneles'
 import { ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type FilaSalida } from './rodeo'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 /** Cuántas filas se ven antes de «Ver los N». */
@@ -92,6 +93,7 @@ const PUNTO: Record<Estado, string> = {
  * mismo campo que el Inicio («Estás viendo»).
  */
 export function RodeoPage() {
+  const { carga } = usePermiso('hacienda')
   const navigate = useNavigate()
   const reducir = useReducedMotion()
   const [params, setParams] = useSearchParams()
@@ -119,7 +121,7 @@ export function RodeoPage() {
     setVez((v) => v + 1)
     setPanelCaravanas('excel')
   }
-  const [panelCaravanas, setPanelCaravanas] = useState<'excel' | 'identificar' | null>(params.get('salida') ? 'identificar' : null)
+  const [panelCaravanas, setPanelCaravanas] = useState<'excel' | 'identificar' | null>(params.get('salida') && carga ? 'identificar' : null)
   const salidasQ = useSalidasSinIdentificar()
   const [salidaFoco, setSalidaFoco] = useState<string | null>(params.get('salida'))
   const { data: membresia } = useEmpresa()
@@ -258,6 +260,7 @@ export function RodeoPage() {
       <motion.section {...entra(1)} className="grid rounded-[20px] border border-borde bg-superficie lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         {vacio ? (
           <SinHacienda
+            carga={carga}
             cara={cara}
             campo={elegido.elegido?.nombre ?? null}
             onEntraron={() => abrirES('entraron')}
@@ -289,6 +292,8 @@ export function RodeoPage() {
           )}
         </div>
 
+        {/* Con Hacienda en «Ve» no se carga nada (permisos, 13/11). */}
+        {carga && (
         <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
@@ -309,6 +314,7 @@ export function RodeoPage() {
             Salieron
           </button>
         </div>
+        )}
         </div>
         <div className="flex items-center border-borde px-6 py-5 max-lg:border-t lg:border-l">
           <StockPorCategoria cats={r.porCategoria} total={r.total} />
@@ -360,11 +366,13 @@ export function RodeoPage() {
             <b>
               {sinIdentificar} {sinIdentificar === 1 ? 'animal salió' : 'animales salieron'} sin decir cuál
             </b>
-            <span className="block text-[13.5px] text-texto-suave">Ya se restaron del número. Cuando sepas cuál fue, decilo acá o en su ficha.</span>
+            <span className="block text-[13.5px] text-texto-suave">{carga ? 'Ya se restaron del número. Cuando sepas cuál fue, decilo acá o en su ficha.' : 'Ya se restaron del número.'}</span>
           </p>
-          <BotonChico type="button" onClick={() => setPanelCaravanas('identificar')}>
-            {sinIdentificar === 1 ? 'Decir cuál' : 'Decir cuáles'}
-          </BotonChico>
+          {carga && (
+            <BotonChico type="button" onClick={() => setPanelCaravanas('identificar')}>
+              {sinIdentificar === 1 ? 'Decir cuál' : 'Decir cuáles'}
+            </BotonChico>
+          )}
         </motion.div>
       )}
 
@@ -443,6 +451,7 @@ export function RodeoPage() {
               <Icono nombre="Siguiente" tamano={16} />
             </span>
           </label>
+          {carga && (
           <button
             type="button"
             onClick={() => abrirPlanilla()}
@@ -450,6 +459,7 @@ export function RodeoPage() {
           >
             <Icono nombre="Comprobante" tamano={16} /> Caravanas desde una planilla
           </button>
+          )}
         </div>
 
         {lista.length === 0 && salidos.length === 0 && (verSalieron || q || !(verSinIdentificar || (!estado && salidas.length > 0))) ? (
@@ -476,6 +486,7 @@ export function RodeoPage() {
                     key={x.salidaId}
                     x={x}
                     onClick={() => {
+                      if (!carga) return
                       setSalidaFoco(x.salidaId)
                       setPanelCaravanas('identificar')
                     }}

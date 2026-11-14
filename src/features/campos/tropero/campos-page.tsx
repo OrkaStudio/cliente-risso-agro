@@ -17,6 +17,7 @@ import { useActualizarCampo, useActualizarPotreroMapa, useCamposConPotreros, use
 import { tipoCampoLabel } from '@/features/campos/labels'
 import { usoDeEstado, usoToEstadoCiclo, type Uso } from '@/features/campos/use-campo-mapa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
+import { usePermiso } from '@/features/empresa/use-permiso'
 import { useAnimales } from '@/features/hacienda/hooks'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
 import { useMapa } from '@/features/mapa/api'
@@ -354,6 +355,7 @@ function ResumenCampo({
   onAviso: (potreroId: string | null) => void
   onCorregir: () => void
 }) {
+  const hacienda = usePermiso('hacienda')
   const quien = useQuienMira()
   const usos = (['ganadero', 'agricola', 'vacio'] as Uso[])
     .map((u) => [u, campo.potreros.filter((p) => usoDeEstado(p.estadoCiclo) === u)] as const)
@@ -367,7 +369,8 @@ function ResumenCampo({
       </div>
       <dl className="flex gap-6">
         <Numero n={ha(campo.totalHa)} texto="hectáreas" />
-        <Numero n={campo.totalCabezas.toLocaleString('es-AR')} texto="cabezas" />
+        {/* Sin Hacienda, las cabezas no se muestran: la base no deja contarlas y un 0 sería falso. */}
+        {hacienda.ve && <Numero n={campo.totalCabezas.toLocaleString('es-AR')} texto="cabezas" />}
         {lluvia != null && <Numero n={`${lluvia} mm`} texto="lluvia, 30 días" />}
       </dl>
       {usos.length > 0 && (
@@ -434,6 +437,8 @@ function DetallePotrero({
   onCerrar: () => void
   onCorregir: () => void
 }) {
+  const hacienda = usePermiso('hacienda')
+  const campos = usePermiso('campos')
   const navigate = useNavigate()
   const [verHistoria, setVerHistoria] = useState(false)
   const [labor, setLabor] = useState(false)
@@ -464,7 +469,7 @@ function DetallePotrero({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="t-seccion text-texto">Lo que pasó en el {p.nombre}</h2>
-            <p className="mt-1 text-[14px] text-texto-suave">{[p.hectareas ? `${ha(p.hectareas)} ha` : null, p.cabezas ? `${p.cabezas} cabezas` : null].filter(Boolean).join(', ')}</p>
+            <p className="mt-1 text-[14px] text-texto-suave">{[p.hectareas ? `${ha(p.hectareas)} ha` : null, hacienda.ve && p.cabezas ? `${p.cabezas} cabezas` : null].filter(Boolean).join(', ')}</p>
           </div>
           </div>
         {historia.length === 0 ? (
@@ -508,7 +513,7 @@ function DetallePotrero({
         </div>
       </div>
 
-      {uso === 'ganadero' && (
+      {uso === 'ganadero' && hacienda.ve && (
         <>
           <dl className="flex gap-6">
             <Numero n={String(p.cabezas)} texto="cabezas" />
@@ -587,7 +592,7 @@ function DetallePotrero({
       )}
 
       <div className="mt-auto flex flex-col items-start gap-2">
-        {uso === 'ganadero' && p.cabezas > 0 && (
+        {uso === 'ganadero' && hacienda.ve && p.cabezas > 0 && (
           <button type="button" onClick={() => navigate(`/hacienda?potrero=${p.id}`)} className="inline-flex h-11 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[15px] font-bold text-principal-texto hover:bg-terracota-600">
             Ver {p.cabezas === 1 ? 'el animal' : `las ${p.cabezas}`}
             <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
@@ -595,7 +600,7 @@ function DetallePotrero({
             </span>
           </button>
         )}
-        {uso === 'agricola' && (
+        {uso === 'agricola' && campos.carga && (
           <button type="button" onClick={() => setLabor(true)} className="inline-flex h-11 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[15px] font-bold text-principal-texto hover:bg-terracota-600">
             Anotar una labor
             <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
@@ -607,9 +612,12 @@ function DetallePotrero({
           <button type="button" onClick={() => setVerHistoria(true)} className={BOTON_CHICO}>
             Ver la historia del {p.nombre}
           </button>
-          <button type="button" onClick={onCorregir} className={BOTON_CHICO}>
-            Corregir
-          </button>
+          {/* Corregir el estado del potrero: quien carga Campos (el dibujo y el nombre, sólo el dueño). */}
+          {campos.carga && (
+            <button type="button" onClick={onCorregir} className={BOTON_CHICO}>
+              Corregir
+            </button>
+          )}
         </div>
       </div>
       <CargarLaborDialog potreroId={p.id} potreroNombre={p.nombre} open={labor} onOpenChange={setLabor} />
@@ -773,6 +781,7 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
  * lo que suman y cada campo con lo suyo. Tocar uno lo elige, como en la barra.
  */
 function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMapa[]; identidad: CampoElegible[]; onElegir: (id: string) => void; desde: string | null }) {
+  const hacienda = usePermiso('hacienda')
   const quien = useQuienMira()
   const marca = (id: string) => identidad.find((c) => c.id === id)
   const cabezas = (c: CampoMapa) => c.potreros.reduce((n, p) => n + p.cabezas, 0)
@@ -806,10 +815,12 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
             <span className="t-numero">{ha(totalHa)}</span>
             <span className="mt-1 text-[13.5px] text-texto-suave">hectáreas</span>
           </p>
-          <p className="flex flex-col">
-            <span className="t-numero">{totalCab.toLocaleString('es-AR')}</span>
-            <span className="mt-1 text-[13.5px] text-texto-suave">cabezas</span>
-          </p>
+          {hacienda.ve && (
+            <p className="flex flex-col">
+              <span className="t-numero">{totalCab.toLocaleString('es-AR')}</span>
+              <span className="mt-1 text-[13.5px] text-texto-suave">cabezas</span>
+            </p>
+          )}
         </div>
         <ul className="flex flex-col overflow-hidden rounded-[16px] border border-borde">
           {campos.map((c) => {
@@ -824,7 +835,7 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-bold text-texto">{c.nombre}</span>
                     <span className="t-cifra-mini block text-texto-suave">
-                      {ha(hectareas(c))} ha · {cabezas(c)} cab
+                      {ha(hectareas(c))} ha{hacienda.ve && ` · ${cabezas(c)} cab`}
                     </span>
                   </span>
                   {!listo && <span className="shrink-0 rounded-full bg-principal-suave px-2.5 py-1 text-[12px] font-bold text-principal">Falta el mapa</span>}

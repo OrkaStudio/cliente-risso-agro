@@ -12,6 +12,7 @@ import { hoyLocal } from '@/lib/fecha'
 import type { Database } from '@/lib/supabase/types'
 import { cn } from '@/lib/utils'
 import { PILDORA, datosDe, estadoTexto, mesCorto, tituloDe } from './agenda'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 type Medio = Database['public']['Enums']['medio_pago']
 const MEDIOS: { valor: Medio; texto: string }[] = [
@@ -42,6 +43,7 @@ export function PagarPanel({ item, empresaId, onCerrar, onVolver }: { item: Venc
 
 function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimiento; abierto: boolean; empresaId: string; onCerrar: () => void; onVolver?: () => void }) {
   const liquidar = useLiquidar()
+  const { carga } = usePermiso('plata')
   const revertir = useRevertirLiquidacion()
   const archivo = useRef<HTMLInputElement>(null)
   const cobro = v.tipo === 'ingreso'
@@ -100,7 +102,9 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
       titulo={titulo}
       bajada={<span className={cn('inline-block rounded-full px-2.5 py-0.5 text-[13px] font-bold', PILDORA[estado.clase])}>{estado.texto}</span>}
       pie={
-        ya ? (
+        !carga ? (
+          <p className="text-center text-[14px] text-texto-suave">Lo marca como {cobro ? 'cobrado' : 'pagado'} quien carga la plata.</p>
+        ) : ya ? (
           <>
             {aviso}
             <button type="button" onClick={() => void volverAPendiente()} disabled={revertir.isPending} className="h-14 w-full rounded-full border-[1.5px] border-borde bg-superficie text-[16px] font-bold text-texto hover:border-principal hover:text-principal disabled:opacity-50">
@@ -128,7 +132,7 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
             {cobro ? '+' : '−'}
             {pesos(ya ? v.monto : montoReal)}
           </p>
-          {!ya && !otroMonto && (
+          {!ya && !otroMonto && carga && (
             <button type="button" onClick={() => setOtroMonto(true)} className="mb-1 h-10 shrink-0 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14px] font-bold text-texto hover:border-principal hover:text-principal">
               Fue otro monto
             </button>
@@ -150,7 +154,7 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
         )}
       </div>
 
-      {!ya && (
+      {!ya && carga && (
         <>
           <Grupo titulo={cobro ? '¿Cuándo lo cobraste?' : '¿Cuándo lo pagaste?'} className="mt-6">
             <Opciones etiqueta="Cuándo" opciones={[{ valor: 'hoy', texto: 'Hoy' }, { valor: 'ayer', texto: 'Ayer' }, { valor: 'otra', texto: 'Otro día' }]} elegidas={[cuando]} onTocar={setCuando} />

@@ -35,6 +35,8 @@ export function BarraLateral({ hoy }: { hoy: number }) {
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
   const quien = useQuienMira()
+  // Sin Hacienda no se cuentan cabezas (permisos, 13/11).
+  const veHacienda = puedeVer(membresia, 'hacienda')
   const pendiente = useMapaPendiente()
   const { data: campos } = useMapa(membresia?.empresa_id)
   const { elegido, elegir } = useCampoElegido()
@@ -118,7 +120,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
                     </span>
                   }
                   nombre={quien.todosLosCampos}
-                  cabezas={campos.reduce((n, c) => n + c.potreros.reduce((s, p) => s + p.cabezas, 0), 0)}
+                  cabezas={veHacienda ? campos.reduce((n, c) => n + c.potreros.reduce((s, p) => s + p.cabezas, 0), 0) : null}
                 />
               )}
               {campos.map((c) => {
@@ -138,7 +140,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
                       </span>
                     }
                     nombre={c.nombre}
-                    cabezas={c.potreros.reduce((s, p) => s + p.cabezas, 0)}
+                    cabezas={veHacienda ? c.potreros.reduce((s, p) => s + p.cabezas, 0) : null}
                     falta={primerPendiente([c]) !== null}
                   />
                 )
@@ -186,7 +188,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 }
 
 /** Una fila de «Tus campos»: el elegido se ve claro, con fondo oscuro. */
-function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }: { activo: boolean; onClick: () => void; marca: React.ReactNode; nombre: string; cabezas: number; falta?: boolean }) {
+function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }: { activo: boolean; onClick: () => void; marca: React.ReactNode; nombre: string; cabezas: number | null; falta?: boolean }) {
   return (
     <button
       type="button"
@@ -203,7 +205,7 @@ function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }:
         <span className="block truncate">{nombre}</span>
         {falta && <span className={cn('block text-[12px] font-bold', activo ? 'text-white/75' : 'text-principal')}>Falta el mapa</span>}
       </span>
-      <span className={cn('t-cifra-mini shrink-0', activo ? 'text-white/70' : 'text-texto-suave')}>{cabezas} cab</span>
+      {cabezas !== null && <span className={cn('t-cifra-mini shrink-0', activo ? 'text-white/70' : 'text-texto-suave')}>{cabezas} cab</span>}
     </button>
   )
 }

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { codigoDelLog, despejarGuia, entrar } from './helpers'
+import { codigoDelLog, despejarGuia, entrar, invitarComoDueno } from './helpers'
 
 // Configuración (Lau, 05/11 y 13/11): el dueño invita y elige, sección por
 // sección, qué puede hacer (no ve, ve, ve y carga, solo manda); el invitado
@@ -90,4 +90,40 @@ test('Plan: el dueño se da de baja, ve el trámite y la deshace', async ({ page
   // Deshacerla deja todo como estaba.
   await page.getByRole('button', { name: 'Deshacer la baja' }).click()
   await expect(page.getByRole('button', { name: 'Dar de baja' })).toBeVisible()
+})
+
+test('con «Ve» se mira sin cargar, y sin Campos no se cuentan cabezas ni se recorre (permisos, 13/11)', async ({ page }) => {
+  const numero = `22416${String(Date.now()).slice(-5)}`
+  const token = await invitarComoDueno(numero, 'Vera Mirada', 'encargado', { hacienda: 've', campos: 'no', plata: 'no' })
+  await despejarGuia(page)
+  await page.goto(`/invitacion/${token}`)
+  await expect(page.getByText('Hacienda', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Entrar con mi celular' }).click()
+  await page.waitForURL('**/login/codigo')
+  await page.waitForTimeout(800)
+  await page.locator('#codigo').fill(codigoDelLog(`549${numero}`))
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'))
+
+  // Hacienda: el rodeo se ve, los botones de cargar no.
+  await page.goto('/hacienda')
+  await expect(page.getByRole('table')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Entraron' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Salieron' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Caravanas desde una planilla/ })).toHaveCount(0)
+
+  // Sin Campos: la barra no cuenta cabezas, el Inicio no habla de recorridas y Campos no se abre.
+  const barra = page.getByRole('navigation', { name: 'Oficina' })
+  await expect(barra.getByRole('link', { name: 'Campos' })).toHaveCount(0)
+  await page.goto('/')
+  await expect(page.getByText('Última recorrida')).toHaveCount(0)
+  await expect(page.getByText(/se recorrió|sin recorrer/i)).toHaveCount(0)
+  await page.goto('/campos')
+  await expect(page).toHaveURL(/\/$/)
+  // El Modo Campo (celular): la recorrida y la manga son cargar.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/campo/manga')
+  await expect(page).toHaveURL(/\/campo$/)
+  const nav = page.getByRole('navigation', { name: 'Modo Campo' })
+  await expect(nav.getByRole('link', { name: 'Manga' })).toHaveCount(0)
+  await expect(nav.getByRole('link', { name: 'Recorrida' })).toHaveCount(0)
 })

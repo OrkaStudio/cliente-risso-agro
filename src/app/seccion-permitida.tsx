@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { primeraRuta, puedeVer, seccionDeRuta } from '@/features/empresa/secciones'
+import { cargaDeRuta, primeraRuta, puedeCargar, puedeVer, seccionDeRuta } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 
 /**
@@ -12,6 +12,9 @@ export function SeccionPermitida() {
   const { data: membresia } = useEmpresa()
   const seccion = seccionDeRuta(pathname)
   const destino = primeraRuta(membresia)
-  if (membresia && seccion && !puedeVer(membresia, seccion) && destino !== pathname) return <Navigate to={destino} replace />
+  // En el Modo Campo cada pantalla es para cargar: sin ese permiso, vuelve a Hoy.
+  const carga = cargaDeRuta(pathname)
+  if (membresia && carga && !puedeCargar(membresia, carga)) return <Navigate to="/campo" replace />
+  if (membresia && seccion && !carga && !puedeVer(membresia, seccion) && destino !== pathname) return <Navigate to={destino} replace />
   return <Outlet />
 }

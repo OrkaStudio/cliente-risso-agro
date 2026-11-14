@@ -16,6 +16,7 @@ import { avisoDelAnimal, desdeCuando, fraseDelAnimal, historiaDelAnimal, loQueHa
 import { CaravanaDibujo, SinCaravanaDibujo } from './caravana-dibujo'
 import { AnotarleAlgo, CorregirDatos, DarDeBaja } from './paneles'
 import { estadoDe } from './rodeo'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 const AVISO: Record<Tono, string> = {
   principal: 'bg-principal-suave text-principal',
@@ -39,6 +40,7 @@ const SECUNDARIO =
  * quién es en una frase, qué hay que hacer con él y su historia.
  */
 export function FichaPage() {
+  const { carga } = usePermiso('hacienda')
   const { id = '' } = useParams()
   const animal = useAnimal(id)
   const eventos = useEventos(id)
@@ -96,7 +98,8 @@ export function FichaPage() {
   const ultimaBaja = !activo ? (eventos.data ?? []).filter((e) => e.tipo === 'baja').sort((x, y) => y.created_at.localeCompare(x.created_at))[0] : undefined
   const salio = ultimaBaja ? { fecha: ultimaBaja.fecha, murio: a.estado === 'muerto', corregido: a.estado === 'corregido' } : null
   const panelAnimal = { id, empresaId: a.empresa_id ?? '', visual: a.caravana_visual, rfid: a.caravana_rfid, potreroId: a.potrero_id }
-  const editable = activo && !!a.empresa_id
+  // Con Hacienda en «Ve» la ficha se mira, no se corrige (permisos, 13/11).
+  const editable = activo && !!a.empresa_id && carga
   const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : a.estado === 'corregido' ? 'Corregido: estaba cargado de más' : 'De baja'
 
   return (

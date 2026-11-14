@@ -18,6 +18,7 @@ import { useDolarHistorico } from './dolar'
 import { AnotarPlata } from './anotar-plata'
 import { MesAMes } from './mes-a-mes'
 import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Periodo } from './plata'
+import { usePermiso } from '@/features/empresa/use-permiso'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
 
@@ -34,6 +35,7 @@ const diaYmes = (ymd: string) => {
  * va y qué rinde. El campo es el de la barra izquierda.
  */
 export function PlataPage() {
+  const cargaPlata = usePermiso('plata').carga
   const empresaId = useEmpresa().data?.empresa_id ?? ''
   const movs = useMovimientos()
   const pend = usePendientes()
@@ -180,10 +182,12 @@ export function PlataPage() {
                 )}
               />
             )}
-            <button type="button" data-guia="analitica-alquiler" onClick={() => (setVezAlquiler((v) => v + 1), setAlquiler(true))} className={BOTON_SEC}>
-              <Icono nombre="Comprobante" tamano={16} />
-              Cargar un alquiler
-            </button>
+            {cargaPlata && (
+              <button type="button" data-guia="analitica-alquiler" onClick={() => (setVezAlquiler((v) => v + 1), setAlquiler(true))} className={BOTON_SEC}>
+                <Icono nombre="Comprobante" tamano={16} />
+                Cargar un alquiler
+              </button>
+            )}
           </div>
         </Cabecera>
       </motion.div>

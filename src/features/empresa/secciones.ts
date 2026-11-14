@@ -102,6 +102,17 @@ export function seccionDeRuta(path: string): Seccion | null {
   return s?.id ?? null
 }
 
+/**
+ * Lo que se hace en el Modo Campo del celular es cargar: la recorrida es de
+ * Campos, la manga y el lector de Hacienda, y anotar plata de la Plata.
+ */
+export function cargaDeRuta(path: string): Seccion | null {
+  if (path.startsWith('/campo/recorrida')) return 'campos'
+  if (path.startsWith('/campo/manga') || path.startsWith('/campo/lector')) return 'hacienda'
+  if (path.startsWith('/campo/plata')) return 'plata'
+  return null
+}
+
 /** A dónde va alguien que entra a algo que no ve: su primera sección (el Inicio, que lo tienen todos). */
 export function primeraRuta(m: Membresia | null | undefined): string {
   return SECCIONES.find((s) => puedeVer(m, s.id))?.ruta ?? '/'

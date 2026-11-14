@@ -48,7 +48,7 @@ export async function sesionDePrueba(): Promise<Record<string, unknown>> {
 }
 
 /** El dueño de prueba invita a alguien (lo que hará Configuración → Personas). */
-export async function invitarComoDueno(celular: string, nombre: string, rol: 'vet' | 'encargado' | 'peon') {
+export async function invitarComoDueno(celular: string, nombre: string, rol: 'vet' | 'encargado' | 'peon', niveles?: Record<string, string>) {
   const sesion = await sesionDePrueba()
   const r = await fetch(`${SUPABASE_LOCAL}/rest/v1/rpc/crear_invitacion`, {
     method: 'POST',
@@ -57,7 +57,7 @@ export async function invitarComoDueno(celular: string, nombre: string, rol: 've
       Authorization: `Bearer ${sesion.access_token as string}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ p_celular: celular, p_nombre: nombre, p_rol: rol, p_niveles: rol === 'vet' ? { hacienda: 'carga', campos: 'no', plata: 'no' } : { hacienda: 'carga', campos: 'carga', plata: 'no' } }),
+    body: JSON.stringify({ p_celular: celular, p_nombre: nombre, p_rol: rol, p_niveles: niveles ?? (rol === 'vet' ? { hacienda: 'carga', campos: 'no', plata: 'no' } : { hacienda: 'carga', campos: 'carga', plata: 'no' }) }),
   })
   if (!r.ok) throw new Error(`no se pudo invitar: ${await r.text()}`)
   return (await r.json()) as string
