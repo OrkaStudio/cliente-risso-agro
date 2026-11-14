@@ -12,7 +12,7 @@ begin
   foreach t in array array['animal', 'caravana', 'evento', 'lote', 'salida_pendiente', 'lluvia', 'recorrida',
     'observacion_potrero', 'labor_potrero', 'marca_senal', 'infraestructura', 'movimiento_financiero', 'movimiento_iva_linea']
   loop
-    execute format('alter table public.%I add column canal text not null default ''app'' check (canal in (''app'', ''whatsapp''))', t);
+    execute format('alter table public.%I add column if not exists canal text not null default ''app'' check (canal in (''app'', ''whatsapp''))', t);
   end loop;
 end
 $$;

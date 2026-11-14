@@ -36,6 +36,8 @@ import { AGUA, avisosDelCampo, lluviaDesde, PASTO, textoDias, ultimaPorPotrero, 
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
 import { useNombres } from '@/features/empresa/use-nombres'
 
+const TIPOS_MARCA: Marca['tipo'][] = ['molino', 'laguna', 'tranquera', 'manga']
+
 const EditorCampo = lazy(() => import('./editor-campo'))
 
 // Campos (rediseño, Figma «Mapa y potreros», nodo 1050:2). Arriba, el campo:
@@ -162,7 +164,9 @@ export function CamposPage() {
     hoy,
   )
   const ultima = ultimaPorPotrero(datosQ.data?.observaciones ?? [])
-  const marcas: Marca[] = (infraQ.data ?? []).map((m) => ({ id: m.id, tipo: m.tipo, lat: m.lat, lng: m.lng }))
+  // Sólo los tipos que el mapa sabe dibujar: el bot carga más (tanques, bebederos, eléctricos) y quedan
+  // apagados en la app hasta que los muestre.
+  const marcas: Marca[] = (infraQ.data ?? []).flatMap((m) => (TIPOS_MARCA.includes(m.tipo as Marca['tipo']) ? [{ id: m.id, tipo: m.tipo as Marca['tipo'], lat: m.lat, lng: m.lng }] : []))
 
   // El último campo abierto: al volver a «Todos», el mapa se aleja desde ahí.
   if (!todos && campoId && ultimoVisto !== campoId) setUltimoVisto(campoId)
