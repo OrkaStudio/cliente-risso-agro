@@ -105,14 +105,14 @@ $$;
 
 -- Quién cargó cada cosa (el dueño lo ve: «Cargó Juan · por WhatsApp»), y la
 -- base de «Solo manda», que ve sólo lo suyo. Lo cargado antes queda sin autor.
-alter table public.animal add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.caravana add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.lote add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.salida_pendiente add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.lluvia add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.observacion_potrero add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.infraestructura add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
-alter table public.movimiento_iva_linea add column created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.animal add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.caravana add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.lote add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.salida_pendiente add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.lluvia add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.observacion_potrero add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.infraestructura add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
+alter table public.movimiento_iva_linea add column if not exists created_by uuid default auth.uid() references auth.users (id) on delete set null;
 
 -- ---------------------------------------------------------------- Políticas por sección
 
