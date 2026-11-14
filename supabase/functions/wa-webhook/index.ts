@@ -16,6 +16,7 @@ import { configurar } from '../wa-resumen-semanal/store.ts'
 
 import {
   arrancar,
+  ayuda,
   ayudaConPendiente,
   AUDIO_PRONTO,
   conUbicacion,
@@ -161,7 +162,15 @@ async function responder(v: db.Vinculo | null, to: string, m: Mensaje): Promise<
 
 async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null): Promise<void> {
   if (!v) {
-    await responder(null, m.from, { texto: NO_VINCULADO })
+    // Una cuenta de la empresa o una invitación «Sólo por WhatsApp»: queda vinculado con este mensaje (permisos, 14/11).
+    const auto = await db.autovincular(m.from).catch((e) => (console.error('autovincular', e), null))
+    if (!auto) {
+      await responder(null, m.from, { texto: NO_VINCULADO })
+      return
+    }
+    const ctx = await db.contexto(auto.vinculo, hoyAR())
+    const hola = auto.nuevo ? `Listo${auto.nombre ? `, ${auto.nombre}` : ''}: ya estás en Troppero, en ${auto.empresa}.` : `Listo: tu WhatsApp quedó conectado a Troppero, en ${auto.empresa}.`
+    await responder(auto.vinculo, m.from, { texto: `${hola}\n\n${ayuda(ctx.nombre, ctx)}` })
     return
   }
   await meta.leidoYEscribiendo(m.id)

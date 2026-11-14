@@ -720,3 +720,61 @@ async function operarInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'b
   }) as ResultadoInfra
 }
 
+
+// ── Vincular solo (permisos, 14/11) ────────────────────────────────────────
+//
+// Antes cada número se vinculaba a mano. Ahora, si escribe un número que:
+//  · ya tiene cuenta verificada (entró con el código de WhatsApp) y es de una
+//    empresa: se vincula a esa cuenta;
+//  · tiene una invitación «Sólo por WhatsApp» vigente: se le crea la cuenta,
+//    acepta la invitación y se vincula.
+// Meta firma el mensaje: que escriba desde ese número prueba que es suyo.
+// Detrás de WA_AUTOVINCULO (apagado hasta que Lau lo active).
+
+export type Autovinculo = { vinculo: Vinculo; nuevo: boolean; empresa: string; nombre: string | null }
+
+export async function autovincular(telefono: string): Promise<Autovinculo | null> {
+  if (Deno.env.get('WA_AUTOVINCULO') !== 'true') return null
+  const tel = telefono.replace(/\D/g, '')
+  // 1) Una cuenta verificada con ese número, en una sola empresa.
+  const cuentas = await sql<{ user_id: string; empresa_id: string; empresa: string; nombre: string | null }[]>`
+    select u.id as user_id, m.empresa_id, e.nombre as empresa, nullif(trim(u.raw_user_meta_data->>'nombre'), '') as nombre
+    from auth.users u join miembro_empresa m on m.user_id = u.id join empresa e on e.id = m.empresa_id
+    where u.phone = ${tel} and u.phone_confirmed_at is not null`
+  if (cuentas.length === 1) {
+    const c = cuentas[0]!
+    return { vinculo: await crearVinculo(tel, c.user_id, c.empresa_id), nuevo: false, empresa: c.empresa, nombre: c.nombre }
+  }
+  if (cuentas.length > 1) return null
+  // 2) Una invitación «Sólo por WhatsApp» vigente para ese número.
+  const [inv] = await sql<{ token: string; nombre: string; empresa: string }[]>`
+    select i.token, i.nombre, e.nombre as empresa from invitacion i join empresa e on e.id = i.empresa_id
+    where i.celular = ${tel} and i.acceso = 'whatsapp' and i.aceptada_at is null and i.vence_at > now()
+    order by i.creada_at desc limit 1`
+  if (!inv) return null
+  const partes = inv.nombre.trim().split(/\s+/)
+  const userId = await crearCuenta(tel, { nombre: partes.slice(0, -1).join(' ') || inv.nombre, apellido: partes.length > 1 ? partes.at(-1)! : '' })
+  const empresaId = await comoUsuario(userId, async (tx) => (await tx<{ id: string }[]>`select public.aceptar_invitacion(${inv.token}) as id`)[0]!.id)
+  return { vinculo: await crearVinculo(tel, userId, empresaId), nuevo: true, empresa: inv.empresa, nombre: partes[0] ?? null }
+}
+
+async function crearVinculo(telefono: string, userId: string, empresaId: string): Promise<Vinculo> {
+  const [v] = await sql<Vinculo[]>`
+    insert into wa_vinculo (telefono, user_id, empresa_id, activo, vinculado_at)
+    values (${telefono}, ${userId}, ${empresaId}, true, now())
+    returning id, telefono, user_id, empresa_id, pendiente, pendiente_at`
+  return v!
+}
+
+/** La cuenta del invitado: sólo identidad (Auth admin); sus datos los escribe siempre como él. */
+async function crearCuenta(telefono: string, meta: { nombre: string; apellido: string }): Promise<string> {
+  const clave = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: { apikey: clave, Authorization: `Bearer ${clave}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: telefono, phone_confirm: true, user_metadata: { ...meta, celular: `+${telefono}` } }),
+  })
+  if (!res.ok) throw new Error(`No se pudo crear la cuenta (${res.status})`)
+  const u = (await res.json()) as { id: string }
+  return u.id
+}
