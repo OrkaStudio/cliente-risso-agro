@@ -9,6 +9,7 @@
 //
 // Secrets: WA_TOKEN, WA_PHONE_NUMBER_ID, WA_APP_SECRET, WA_VERIFY_TOKEN,
 // ANTHROPIC_API_KEY (+ los SUPABASE_* que da la plataforma).
+import { permiso } from '../_shared/wa/permisos.ts'
 import { comandoSemanal, periodoSemana } from '../_shared/wa/semanal.ts'
 import { enviarSolicitado } from '../wa-resumen-semanal/servicio.ts'
 import { configurar } from '../wa-resumen-semanal/store.ts'
@@ -344,6 +345,13 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
         if ('respuesta' in a) {
           await db.actualizarCaptura(capturaId, { estado: a.estado })
           await responder(v, m.from, { texto: a.respuesta })
+          return
+        }
+        // Lo que el dueño no le habilitó, se dice (permisos, 13/11): ni se consulta ni se propone cargar.
+        const habilitado = permiso(ctx.niveles ?? null, a.borrador.tipo)
+        if (!habilitado.ok) {
+          await db.actualizarCaptura(capturaId, { estado: 'respondida' })
+          await responder(v, m.from, { texto: habilitado.texto })
           return
         }
         if (a.borrador.tipo.startsWith('consulta_')) {

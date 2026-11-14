@@ -1,5 +1,6 @@
 // Inventario por WhatsApp: ubicación + qué es → foto de dónde queda → Guardar.
 // Eléctricos por borde («entre el 8 y el 9») y bajas con confirmación. Nada se escribe sin el «Guardar».
+import { permisoInfra } from '../_shared/wa/permisos.ts'
 import * as db from './db.ts'
 import { imagenMapa } from './mapa-imagen.ts'
 import { NO, SI } from '../_shared/wa/conversacion.ts'
@@ -97,6 +98,9 @@ function lugarPendiente(p: Pendiente | PendienteInfra | null): { punto: LatLng; 
 }
 
 async function proponerPunto(e: EntradaInfra, io: IOInfra, tipo: TipoInfra, apodo: string | null, punto0: LatLng, campoId: string) {
+  // Antes de preguntar qué es, si no puede cargar, se lo dice (permisos, 13/11).
+  const permitido = permisoInfra(e.ctx.niveles ?? null, 'cargar')
+  if (!permitido.ok) { await io.responder({ texto: permitido.texto }); return }
   if (!tiposCargables().includes(tipo)) { await io.responder({ texto: TODAVIA_NO }); return }
   const dibujados = (await db.potrerosDibujados(e.v)).filter(x => x.campoId === campoId)
   const punto = tipo === 'tranquera' ? pegarAlBorde(punto0, dibujados) : punto0
@@ -126,6 +130,9 @@ async function proponer(e: EntradaInfra, io: IOInfra, elemento: InfraNueva, preg
 }
 
 async function guardar(e: EntradaInfra, io: IOInfra, capturaId: string, elemento: InfraNueva) {
+  // Cargar infraestructura es de Campos (permisos, 13/11).
+  const p = permisoInfra(e.ctx.niveles ?? null, 'cargar')
+  if (!p.ok) { await db.guardarPendiente(e.v.id, null); await io.responder({ texto: p.texto }); return }
   const resultado = await db.confirmarInfra(e.v, capturaId, 'guardar')
   await io.responder({ texto: resultado === 'guardada'
     ? `Listo, guardé ${articulo(elemento.tipo)} *${elemento.nombre}*. Ya aparece en el mapa. Para cargar otra cosa, mandá su ubicación.`
@@ -133,6 +140,8 @@ async function guardar(e: EntradaInfra, io: IOInfra, capturaId: string, elemento
 }
 
 async function borrar(e: EntradaInfra, io: IOInfra, capturaId: string, nombre: string) {
+  const p = permisoInfra(e.ctx.niveles ?? null, 'borrar')
+  if (!p.ok) { await db.guardarPendiente(e.v.id, null); await io.responder({ texto: p.texto }); return }
   const resultado = await db.confirmarInfra(e.v, capturaId, 'borrar')
   const art = /^tranquera/.test(nombre) ? 'la' : 'el'
   await io.responder({ texto: resultado === 'borrada' ? `Listo, borré ${art} *${nombre}*.` : resultado === 'no_existe'
@@ -159,6 +168,8 @@ function buscar(mencion: string, ctx: Contexto, dibujados: PotreroDibujado[], ca
 }
 
 async function comando(e: EntradaInfra, io: IOInfra, c: ComandoInfra) {
+  const p = permisoInfra(e.ctx.niveles ?? null, c.k === 'borrar' ? 'borrar' : 'cargar')
+  if (!p.ok) { await io.responder({ texto: p.texto }); return }
   if (c.k !== 'borrar' && !nuevosHabilitados()) { await io.responder({ texto: TODAVIA_NO }); return }
   const dibujados = await db.potrerosDibujados(e.v)
   if (c.k === 'electrico_entre') {

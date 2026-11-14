@@ -31,6 +31,8 @@ export type SemanaCampo = {
   gastos: { campo: string; categoria: string; cantidad: number; total: number }[]
   hacienda: { campo: string; categoria: string; cabezas: number }[]
   vencimientos: { fecha: string; tipo: string; monto: number; descripcion: string | null; contraparte: string | null; categoria: string | null }[]
+  /** Qué secciones ve quien lo recibe (permisos, 13/11). Sin dato, todas (el dueño). Lo que no ve no aparece: un «sin gastos» sería falso. */
+  ve?: { campos: boolean; hacienda: boolean; plata: boolean }
 }
 
 export type LineaInforme = { tipo: 'titulo' | 'texto'; texto: string }
@@ -42,6 +44,8 @@ export function lineasSemana(s: SemanaCampo): LineaInforme[] {
   const text = (texto: string) => lines.push({ tipo: 'texto', texto })
   text(`${s.empresa} | ${fecha(s.periodo.desde)} al ${fecha(s.periodo.hasta)}`)
   text('Resumen de registros de Tropero, ingresados desde la app o WhatsApp. Los datos ausentes no significan que no haya ocurrido actividad.')
+  const ve = s.ve ?? { campos: true, hacienda: true, plata: true }
+  if (ve.campos) {
   title('Lluvia medida')
   if (!s.lluvia.length) text('Sin mediciones manuales registradas en el período.')
   for (const f of s.lluvia) text(`${f.campo}: ${f.mm.toLocaleString('es-AR')} mm en ${f.mediciones} mediciones. No incluye lluvia estimada.`)
@@ -55,18 +59,25 @@ export function lineasSemana(s: SemanaCampo): LineaInforme[] {
     text(`${fecha(f.fecha)} | ${f.campo}, potrero ${f.potrero}: ${[...states, f.novedad].filter(Boolean).join('; ') || 'sin detalle adicional'}`)
   }
   text('Las novedades son históricas: el informe no supone que un incidente sigue abierto. Una muerte anotada no realiza la baja en Hacienda.')
+  }
+  if (ve.plata) {
   title('Gastos por devengo')
   if (!s.gastos.length) text('Sin gastos registrados en el período según fecha de devengo.')
   for (const f of s.gastos) text(`${f.campo} | ${f.categoria}: ${plata(f.total)} (${f.cantidad} movimiento${f.cantidad===1?'':'s'}).`)
   text(`Total: ${plata(s.gastos.reduce((t, f) => t + f.total, 0))}. Excluye ingresos y movimientos anulados; no equivale al flujo de caja pagado.`)
+  }
+  if (ve.hacienda) {
   title('Hacienda al corte')
   if (!s.hacienda.length) text('Sin animales activos visibles al generar el informe.')
   for (const f of s.hacienda) text(`${f.campo}: ${f.cabezas} ${f.categoria}.`)
   text('Estado actual al generar el informe. No representa altas, bajas ni movimientos netos de la semana.')
+  }
+  if (ve.plata) {
   title('Vencidos y próximos vencimientos')
   text(`Pendientes hasta ${fecha(s.periodo.vencimientosHasta)}, incluyendo vencidos anteriores.`)
   if (!s.vencimientos.length) text('Sin vencimientos pendientes registrados hasta esa fecha.')
   for (const f of s.vencimientos) text(`${fecha(f.fecha)}${f.fecha < s.periodo.corte ? ' (vencido)' : ''}: ${f.descripcion || f.contraparte || f.categoria || 'Movimiento'} | ${plata(f.monto)} ${f.tipo === 'ingreso' ? 'a cobrar' : 'a pagar'}.`)
+  }
   title('Tu resumen semanal')
   text('Envío los sábados a las 09:00, hora de Argentina, cuando está activado. Para dejar de recibirlo: desactivar resumen semanal. Para pedirlo: resumen semanal.')
   return lines

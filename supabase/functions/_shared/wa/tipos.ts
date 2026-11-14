@@ -6,6 +6,8 @@ export type Campo = { id: string; nombre: string; potreros: Potrero[] }
 export type Categoria = { id: string; nombre: string }
 
 /** Lo que el bot sabe de la empresa del número vinculado. */
+import type { Niveles } from './permisos.ts'
+
 export type Contexto = {
   hoy: string
   fechaMensaje?: string
@@ -14,6 +16,8 @@ export type Contexto = {
   categoriasGasto: Categoria[]
   semanalHabilitado?: boolean
   pilotoHabilitado?: boolean
+  /** Lo que el dueño le habilitó a quien escribe; null = el dueño (todo). Sin dato, como dueño. */
+  niveles?: Niveles
 }
 
 export const INTENTS = [

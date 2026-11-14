@@ -5,6 +5,7 @@
 // Reglas de la spec: nada se escribe sin confirmar; los nombres los resuelve
 // el código; si hay más de un candidato se pregunta.
 
+import { cargaSeccion, veSeccion, type Niveles } from './permisos.ts'
 import { campoEnTexto, campoExacto, resolverCampo, resolverCategoria, resolverPotrero, campoPorId, potreroPorId, type PotreroDe } from './resolver.ts'
 import { cuandoTexto, esFecha, mmTexto, norm, numeroEn, pesos, sumarDias } from './texto.ts'
 import type { Borrador, Boton, Campo, Contexto, Interpretacion, Mensaje, ObsBorrador, ObsInterpretada, Pendiente, Ubicado } from './tipos.ts'
@@ -27,7 +28,21 @@ export function leerBoton(id: string): { capturaId: string; accion: string } | n
 export const QUE_PUEDO =
   'Puedo anotar *lluvias* y *gastos*, y consultar *hacienda*, *lluvia medida*, *vencimientos* y *días en un potrero*. Para cargar movimientos de hacienda, usá la app.'
 
-export function ayuda(nombre: string | null, opciones: { semanalHabilitado?: boolean; pilotoHabilitado?: boolean } = {}): string {
+export function ayuda(nombre: string | null, opciones: { semanalHabilitado?: boolean; pilotoHabilitado?: boolean; niveles?: Niveles } = {}): string {
+  // A un invitado, sólo lo que el dueño le habilitó (permisos, 13/11). El dueño ve la ayuda de siempre.
+  const n = opciones.niveles
+  if (n) {
+    const manda = [cargaSeccion(n, 'campos') && 'la recorrida o la lluvia', cargaSeccion(n, 'plata') && 'un gasto o la foto de un ticket'].filter(Boolean)
+    const consulta = [veSeccion(n, 'hacienda') && 'la hacienda', veSeccion(n, 'campos') && 'la lluvia y las recorridas', veSeccion(n, 'plata') && 'los gastos y vencimientos'].filter(Boolean)
+    const y = (xs: (string | false)[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : String(xs[0]))
+    return [
+      `Hola${nombre ? `, ${nombre}` : ''}.`,
+      manda.length ? `Mandame ${y(manda)}.` : '',
+      consulta.length ? `Podés consultar ${y(consulta)}.` : '',
+      'También tus últimas cargas por WhatsApp.',
+      manda.length || consulta.length ? '' : 'Por ahora el dueño del campo no te habilitó nada para hacer por acá.',
+    ].filter(Boolean).join(' ')
+  }
   return `Hola${nombre ? `, ${nombre}` : ''}. Mandame un audio con la recorrida, lluvia o un gasto; también puedo leer la foto de un ticket. Para ver los potreros, escribí «mapa» o «acercá» y el nombre del potrero. Podés consultar lo registrado y tus últimas cargas.${opciones.semanalHabilitado ? ' Para el documento de la semana, pedime «resumen semanal».' : ''}${opciones.pilotoHabilitado ? ' También: «empezar recorrida», «tareas», «problemas», «comparar recorridas» y «corregir última carga».' : ''}`
 }
 

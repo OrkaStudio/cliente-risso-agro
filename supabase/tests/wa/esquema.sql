@@ -86,3 +86,17 @@ create table infraestructura(id uuid primary key default gen_random_uuid(),empre
 alter table infraestructura enable row level security;
 create policy infraestructura_mod on infraestructura for all using(empresa_id in(select auth_empresa_ids())) with check(empresa_id in(select auth_empresa_ids()));
 grant all on infraestructura to authenticated;
+
+-- Permisos por persona (13/11): el nivel de cada uno y por dónde entró cada carga.
+alter table miembro_empresa add column if not exists rol text not null default 'dueno';
+alter table miembro_empresa add column if not exists niveles jsonb;
+alter table lluvia add column if not exists canal text not null default 'app';
+alter table movimiento_financiero add column if not exists canal text not null default 'app';
+alter table recorrida add column if not exists canal text not null default 'app';
+alter table observacion_potrero add column if not exists canal text not null default 'app';
+alter table infraestructura add column if not exists canal text not null default 'app';
+do $$ begin
+  if to_regclass('movimiento_iva_linea') is not null then
+    alter table movimiento_iva_linea add column if not exists canal text not null default 'app';
+  end if;
+end $$;

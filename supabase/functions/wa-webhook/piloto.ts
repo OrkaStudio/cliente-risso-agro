@@ -1,3 +1,4 @@
+import { permisoPiloto } from '../_shared/wa/permisos.ts'
 import { comandoPiloto, textoComparacion } from '../_shared/wa/piloto.ts'
 import { esFecha, norm, numeroEn, pesos } from '../_shared/wa/texto.ts'
 import { resolverCampo, resolverReferenciaPotrero, potreroPorId } from '../_shared/wa/resolver.ts'
@@ -42,6 +43,9 @@ export async function atenderPiloto(d: { v: Vinculo; ctx: Contexto; mensajeId: s
     }
   }
   if (!comando) return false
+  // Lo que el dueño no le habilitó, se dice (permisos, 13/11).
+  const habilitado = permisoPiloto(ctx.niveles ?? null, comando.k)
+  if (!habilitado.ok) { await io.responder({ texto: habilitado.texto }); return true }
   switch(comando.k) {
     case 'ajustar': {
       const carga = await store.ultimaCarga(v)

@@ -10,6 +10,7 @@
 import postgres from 'npm:postgres@3.4.5'
 import { sumarDias,hoyAR } from '../_shared/wa/texto.ts'
 import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
+import { veSeccion, type Niveles } from '../_shared/wa/permisos.ts'
 import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, InfraNueva, Pasto, Pendiente, PendienteInfra } from '../_shared/wa/tipos.ts'
 import type { PotreroDibujado } from '../_shared/wa/resolver.ts'
 import type { FilaHacienda, FilaVencimiento } from '../_shared/wa/respuestas.ts'
@@ -196,7 +197,10 @@ export async function datosSemana(v: Vinculo, periodo: PeriodoSemana): Promise<S
       m.descripcion,m.contraparte,cat.nombre as categoria from movimiento_financiero m
       left join categoria_movimiento cat on cat.id=m.categoria_id where m.empresa_id=${v.empresa_id} and m.estado='pendiente'
       and m.fecha_vencimiento is not null and m.fecha_vencimiento<=${periodo.vencimientosHasta} order by m.fecha_vencimiento,m.id`
-    return { empresa: empresa.nombre, periodo, lluvia, recorridas, observaciones, gastos, hacienda, vencimientos }
+    const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select rol, niveles from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
+    const niveles: Niveles = !m || m.rol === 'dueno' ? null : (m.niveles ?? {})
+    const ve = { campos: veSeccion(niveles, 'campos'), hacienda: veSeccion(niveles, 'hacienda'), plata: veSeccion(niveles, 'plata') }
+    return { empresa: empresa.nombre, periodo, lluvia, recorridas, observaciones, gastos, hacienda, vencimientos, ve }
   }) as SemanaCampo
 }
 
@@ -223,7 +227,9 @@ export async function contexto(v: Vinculo, hoy: string): Promise<Contexto & { ca
     const categoriasGasto: Categoria[] = cats
       .filter((c) => c.aplica_a === null || c.aplica_a === 'gasto')
       .map((c) => ({ id: c.id, nombre: c.nombre }))
-    return { hoy, nombre: u?.nombre ?? null, campos, categoriasGasto, categoriasOcr: cats }
+    const [m] = await tx<{ rol: string; niveles: Niveles }[]>`
+      select rol, niveles from miembro_empresa where user_id = ${v.user_id} and empresa_id = ${v.empresa_id}`
+    return { hoy, nombre: u?.nombre ?? null, campos, categoriasGasto, categoriasOcr: cats, niveles: !m || m.rol === 'dueno' ? null : (m.niveles ?? {}) }
   })
 }
 
@@ -259,8 +265,8 @@ export function escribirLluvia(v: Vinculo, b: Borrador, id: string): Promise<str
     const campo = await tx`select 1 from campo where id=${b.campoId!} and empresa_id=${v.empresa_id}`
     if(campo.length!==1)throw new Error('Campo ajeno a la empresa')
     const [r] = await tx<{ id: string }[]>`
-      insert into lluvia (id, empresa_id, campo_id, fecha, mm, fuente)
-      values (${id}, ${v.empresa_id}, ${b.campoId!}, ${b.fecha!}, ${b.mm!}, 'manual')
+      insert into lluvia (id, empresa_id, campo_id, fecha, mm, fuente, canal)
+      values (${id}, ${v.empresa_id}, ${b.campoId!}, ${b.fecha!}, ${b.mm!}, 'manual', 'whatsapp')
       returning id`
     return r.id
   })
@@ -280,16 +286,16 @@ export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | 
       insert into movimiento_financiero (
         id, empresa_id, tipo, categoria_id, campo_id, monto, fecha_devengo, fecha_cobro_pago,
         estado, descripcion, contraparte, cuit_contraparte, comprobante_tipo, comprobante_url,
-        neto_total, iva_total)
+        neto_total, iva_total, canal)
       values (
         ${id}, ${v.empresa_id}, 'gasto', ${b.categoriaId!}, ${b.campoId!}, ${b.monto!}, ${b.fecha!}, ${b.fecha!},
         'liquidado', ${b.descripcion ?? null}, ${b.contraparte ?? null}, ${b.cuit ?? null},
         ${b.comprobanteTipo ?? null}, ${comprobanteUrl},
-        ${lineas.length ? neto : null}, ${lineas.length ? iva : null})`
+        ${lineas.length ? neto : null}, ${lineas.length ? iva : null}, 'whatsapp')`
     for (const [i, l] of lineas.entries()) {
       await tx`
-        insert into movimiento_iva_linea (empresa_id, movimiento_id, concepto, neto, alicuota, iva, orden)
-        values (${v.empresa_id}, ${id}, ${l.concepto ?? null}, ${l.neto || 0}, ${l.alicuota}, ${l.iva || 0}, ${i})`
+        insert into movimiento_iva_linea (empresa_id, movimiento_id, concepto, neto, alicuota, iva, orden, canal)
+        values (${v.empresa_id}, ${id}, ${l.concepto ?? null}, ${l.neto || 0}, ${l.alicuota}, ${l.iva || 0}, ${i}, 'whatsapp')`
     }
     return id
   })
@@ -433,7 +439,7 @@ export function escribirRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): P
           where empresa_id = ${v.empresa_id} and campo_id = ${o.campoId} and fecha = ${hoy}
           order by created_at limit 1`
         rec = r?.id ?? (await tx<{ id: string }[]>`
-          insert into recorrida (empresa_id, campo_id, fecha) values (${v.empresa_id}, ${o.campoId}, ${hoy})
+          insert into recorrida (empresa_id, campo_id, fecha, canal) values (${v.empresa_id}, ${o.campoId}, ${hoy}, 'whatsapp')
           returning id`)[0].id
         recorridas.set(o.campoId, rec)
       }
@@ -458,9 +464,9 @@ export function escribirRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): P
         ids.push(prev.id)
       } else {
         await tx`
-          insert into observacion_potrero (id, empresa_id, recorrida_id, potrero_id, agua, pasto, electrico, conteo, novedad)
+          insert into observacion_potrero (id, empresa_id, recorrida_id, potrero_id, agua, pasto, electrico, conteo, novedad, canal)
           values (${o.id}, ${v.empresa_id}, ${rec}, ${o.potreroId}, ${o.agua}::agua_estado, ${o.pasto}::pasto_estado,
-            ${o.electrico}::electrico_estado, ${o.conteo}::int, ${o.novedad})`
+            ${o.electrico}::electrico_estado, ${o.conteo}::int, ${o.novedad}, 'whatsapp')`
         ids.push(o.id)
       }
     }
@@ -646,9 +652,9 @@ export function infraDeEmpresa(v: Vinculo): Promise<InfraGuardada[]> {
 export function guardarInfra(v: Vinculo, e: InfraNueva): Promise<string> {
   return comoUsuario(v.user_id, async (tx) => {
     const [r] = await tx<{ id: string }[]>`
-      insert into infraestructura (empresa_id, campo_id, tipo, apodo, lat, lng, linea)
+      insert into infraestructura (empresa_id, campo_id, tipo, apodo, lat, lng, linea, canal)
       values (${v.empresa_id}, ${e.campoId}, ${e.tipo}::public.tipo_infraestructura, ${e.apodo}, ${e.lat}, ${e.lng},
-        ${e.linea ? sql.json(e.linea as postgres.JSONValue) : null})
+        ${e.linea ? sql.json(e.linea as postgres.JSONValue) : null}, 'whatsapp')
       returning id`
     return r.id
   })
@@ -695,9 +701,9 @@ async function operarInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'b
     let escritoId: string, resultado: ResultadoInfra
     if (c.propuesta.carga === 'infraestructura') {
       const e = c.propuesta
-      const [r] = await tx<{ id: string }[]>`insert into infraestructura (empresa_id,campo_id,tipo,apodo,lat,lng,linea)
+      const [r] = await tx<{ id: string }[]>`insert into infraestructura (empresa_id,campo_id,tipo,apodo,lat,lng,linea,canal)
         values (${v.empresa_id},${e.campoId},${e.tipo}::public.tipo_infraestructura,${e.apodo},${e.lat},${e.lng},
-          ${e.linea ? sql.json(e.linea as postgres.JSONValue) : null}) returning id`
+          ${e.linea ? sql.json(e.linea as postgres.JSONValue) : null},'whatsapp') returning id`
       escritoId = r.id; resultado = 'guardada'
     } else {
       escritoId = c.propuesta.id
