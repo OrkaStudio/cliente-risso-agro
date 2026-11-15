@@ -76,7 +76,7 @@ function VolverACampo() {
         setForceOficina(false)
         navigate('/campo')
       }}
-      className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_8px_24px_rgba(16,30,20,0.28)]"
+      className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-principal px-4 py-2.5 text-[15px] font-bold text-principal-texto shadow-[0_8px_24px_rgba(58,26,13,0.3)]"
     >
       <Tractor className="size-4" />
       Volver a Modo Campo

@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { Boton } from '@/components/tropero/boton'
 
 type Props = { children: ReactNode }
 type State = { failed: boolean }
@@ -22,19 +23,12 @@ export class MapErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.failed) {
       return (
-        <div className="flex min-h-[360px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-secondary/40 p-6 text-center">
-          <p className="text-sm font-semibold text-ink">No se pudo cargar el mapa</p>
-          <p className="max-w-xs text-[12.5px] text-muted-foreground">
-            El resto de la app sigue funcionando normalmente. Probá recargar la
-            página.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-secondary"
-          >
+        <div className="flex min-h-[360px] w-full flex-col items-center justify-center gap-3 rounded-[24px] border border-borde bg-superficie-hundida p-6 text-center">
+          <p className="text-[17px] font-bold text-texto">No se pudo cargar el mapa</p>
+          <p className="max-w-xs text-[15px] leading-snug text-texto-suave">El resto de la app sigue andando. Probá recargar la página.</p>
+          <Boton tipo="secundario" icono="Reintentar" onClick={() => window.location.reload()}>
             Recargar
-          </button>
+          </Boton>
         </div>
       )
     }

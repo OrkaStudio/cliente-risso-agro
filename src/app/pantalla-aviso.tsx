@@ -19,6 +19,7 @@ export function PantallaAviso({
   onAccion,
   secundaria,
   pantallaEntera = false,
+  conImagen = true,
 }: {
   titulo: string
   texto: string
@@ -27,16 +28,20 @@ export function PantallaAviso({
   onAccion: () => void
   secundaria?: { texto: string; onClick: () => void }
   pantallaEntera?: boolean
+  /** Sin la tranquera: para avisos sin señal (la imagen no está guardada en el equipo). */
+  conImagen?: boolean
 }) {
   return (
     <div className={cn('flex flex-col bg-fondo', pantallaEntera ? 'min-h-[100dvh] px-6 py-8 sm:px-10' : 'min-h-[70vh] py-10')}>
       {pantallaEntera && <Logo alto={28} />}
       {/* En la compu, a dos columnas: la tranquera a la izquierda y qué pasó con qué hacer a la derecha. */}
-      <div className="m-auto grid w-full max-w-[1040px] items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-14">
-        <div className="relative hidden aspect-[4/3] overflow-hidden rounded-[32px] border border-borde md:block">
-          <img src={tranquera} alt="" className="absolute inset-0 size-full object-cover object-[50%_40%]" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,color-mix(in_srgb,var(--fondo)_55%,transparent))]" />
-        </div>
+      <div className={cn('m-auto grid w-full items-center gap-10', conImagen ? 'max-w-[1040px] md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-14' : 'max-w-[560px]')}>
+        {conImagen && (
+          <div className="relative hidden aspect-[4/3] overflow-hidden rounded-[32px] border border-borde md:block">
+            <img src={tranquera} alt="" className="absolute inset-0 size-full object-cover object-[50%_40%]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,color-mix(in_srgb,var(--fondo)_55%,transparent))]" />
+          </div>
+        )}
         <div className="flex flex-col items-start">
           <span className="grid size-14 place-items-center rounded-[18px] bg-principal-suave md:hidden">
             <Logo soloIsotipo alto={26} />

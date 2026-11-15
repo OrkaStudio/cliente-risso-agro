@@ -9,7 +9,8 @@ export type Persona = {
   invitacionId: string | null
   nombre: string
   /** E.164 sin «+» (549…). */
-  celular: string
+  /** Null si su cuenta no tiene celular (una cuenta vieja que entraba por mail). */
+  celular: string | null
   rol: string
   /** El nivel en cada sección (null = el dueño, todo). */
   niveles: Niveles | null
@@ -34,7 +35,7 @@ export function usePersonas(activo: boolean) {
         userId: p.user_id,
         invitacionId: p.invitacion_id,
         nombre: p.nombre ?? 'Sin nombre',
-        celular: p.celular.replace(/\D/g, ''),
+        celular: p.celular?.replace(/\D/g, '') || null,
         rol: p.rol,
         niveles: (p.niveles as Niveles | null) ?? null,
         acceso: p.acceso,
@@ -96,9 +97,10 @@ export function useCambiarNombre() {
 export function linkInvitacion(token: string) {
   return `${window.location.origin}/invitacion/${token}`
 }
-export function whatsappInvitacion(p: { celular: string; nombre: string; empresa: string; token: string }) {
+export function whatsappInvitacion(p: { celular: string | null; nombre: string; empresa: string; token: string }) {
   const texto = `Hola ${p.nombre.split(' ')[0]}, te sumé a ${p.empresa} en Troppero. Entrá desde acá con tu celular: ${linkInvitacion(p.token)}`
-  return `https://wa.me/${p.celular}?text=${encodeURIComponent(texto)}`
+  // Sin número, WhatsApp abre para elegir a quién mandárselo.
+  return `https://wa.me/${p.celular ?? ''}?text=${encodeURIComponent(texto)}`
 }
 
 /**
@@ -111,8 +113,8 @@ export function whatsappInvitacionBot(p: { celular: string; nombre: string; empr
 }
 
 /** «+54 9 2244 42-9015» para mostrar un número guardado como 549…, con la característica bien cortada. */
-export function celularLindo(c: string) {
-  return formatearCelularAR(`+${c.replace(/\D/g, '')}`)
+export function celularLindo(c: string | null) {
+  return c ? formatearCelularAR(`+${c.replace(/\D/g, '')}`) : null
 }
 
 // ---------------------------------------------------------------- Baja (Lau, 13/11)

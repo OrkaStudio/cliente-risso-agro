@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
+import { PantallaCargando } from '@/components/tropero/cargando'
 import { useAuth } from '@/features/auth/auth-context'
 import { AceptacionLegal } from '@/features/legales/aceptacion-legal'
 
@@ -9,13 +10,7 @@ import { AceptacionLegal } from '@/features/legales/aceptacion-legal'
 export function ProtectedRoute() {
   const { session, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div className="flex min-h-full items-center justify-center text-muted-foreground">
-        Cargando…
-      </div>
-    )
-  }
+  if (loading) return <PantallaCargando />
 
   if (!session) return <Navigate to="/login" replace />
 

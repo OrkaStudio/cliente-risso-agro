@@ -627,8 +627,17 @@ function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: bo
   const [ancho, setAncho] = React.useState(0)
   // Nunca más angosta que «Preguntale a Troppero»: abrir y cerrar no cambia el ancho, sólo el texto.
   React.useLayoutEffect(() => {
-    const w = Math.max(regla.current?.getBoundingClientRect().width ?? 0, base.current?.getBoundingClientRect().width ?? 0)
-    setAncho(Math.min(260, Math.ceil(w)))
+    const medir = () => {
+      const w = Math.max(regla.current?.getBoundingClientRect().width ?? 0, base.current?.getBoundingClientRect().width ?? 0)
+      setAncho(Math.min(260, Math.ceil(w)))
+    }
+    medir()
+    // Medido antes de que cargue la letra, queda corto y el texto se corta: se vuelve a medir con la letra puesta.
+    let vivo = true
+    void document.fonts?.ready.then(() => vivo && medir())
+    return () => {
+      vivo = false
+    }
   }, [texto])
   return (
     <motion.span
