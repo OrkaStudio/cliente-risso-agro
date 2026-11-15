@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
 import { AccesoLayout } from '@/features/acceso/acceso-layout'
@@ -82,6 +83,42 @@ export function ElegirCuentaPage() {
           <Icono nombre="Salir" tamano={16} /> Salir
         </button>
       </div>
+    </AccesoLayout>
+  )
+}
+
+/**
+ * Se entra a una cuenta (aceptando una invitación, sumando el campo propio) con
+ * cargas hechas sin señal en otra que todavía no subieron: hasta que suban, se
+ * vuelve a ésa. Así no se mezclan ni se pierden.
+ */
+export function CargasDeOtraCuenta({ cuantas, de, a }: { cuantas: number; de: Membresia | null; a: string }) {
+  const { user, signOut } = useAuth()
+  const [volviendo, setVolviendo] = useState(false)
+  const nombre = de?.empresa?.nombre ?? 'la otra cuenta'
+  const unaCarga = cuantas === 1
+  const volver = () => {
+    if (!user || !de || volviendo) return
+    setVolviendo(true)
+    guardarCuentaElegida(user.id, de.empresa_id)
+    window.setTimeout(() => window.location.assign('/'), 420)
+  }
+  return (
+    <AccesoLayout
+      tituloCompu="Lo que cargaste sin señal no se pierde ni se mezcla."
+      tituloCelu={`Antes de entrar a ${a}`}
+      encabezado={{
+        titulo: `Antes de entrar a ${a}`,
+        bajada: `Tenés ${unaCarga ? 'una carga hecha' : `${cuantas} cargas hechas`} sin señal en ${nombre} que todavía no ${unaCarga ? 'subió' : 'subieron'}. Volvé a ${nombre} y abrí la app con señal: cuando ${unaCarga ? 'suba' : 'suban'}, vas a poder entrar a ${a}.`,
+      }}
+    >
+      <BotonPrincipal type="button" icono="Siguiente" onClick={volver} cargando={volviendo} disabled={!de}>
+        Volver a {nombre}
+      </BotonPrincipal>
+      <button type="button" onClick={() => void signOut()} className="inline-flex h-11 items-center gap-2 self-center rounded-full px-1 text-[15px] font-semibold text-texto-suave">
+        <Icono nombre="Salir" tamano={16} /> Salir
+      </button>
+      <EntrandoACuenta nombre={volviendo ? nombre : null} />
     </AccesoLayout>
   )
 }

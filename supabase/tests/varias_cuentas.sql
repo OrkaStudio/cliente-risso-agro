@@ -156,14 +156,43 @@ begin
 end $$;
 reset role;
 
--- ---- Un encabezado que no es un uuid no rompe nada (rige lo de antes: sus cuentas) ----
+-- ---- Sin decir la cuenta, quien está en varias no ve nada (nada se elige solo) ----
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"f1000000-0000-0000-0000-000000000001"}';
 set local request.headers = '{"x-troppero-cuenta":"no-es-un-uuid"}';
 do $$
 declare n int;
 begin
-  select count(*) into n from campo; assert n = 3, format('sin cuenta válida: sus 3 campos, vio %s', n);
+  select count(*) into n from campo; assert n = 0, format('FUGA: con una cuenta inválida vio %s campos', n);
+  select count(*) into n from lluvia; assert n = 0, format('FUGA: con una cuenta inválida vio %s lluvias', n);
+  begin
+    insert into lluvia (empresa_id, campo_id, fecha, mm) values ('e1000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000002', current_date - 3, 2);
+    assert false, 'FUGA: sin cuenta válida cargó una lluvia';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"f1000000-0000-0000-0000-000000000001"}';
+set local request.headers = '{}';
+do $$
+declare n int;
+begin
+  select count(*) into n from campo; assert n = 0, format('FUGA: sin cuenta pedida vio %s campos', n);
+  select count(*) into n from animal; assert n = 0, format('FUGA: sin cuenta pedida vio %s animales', n);
+  assert public.empresa_propia() is null, 'FUGA: sin cuenta pedida actuó como dueño';
+  select count(*) into n from public.mis_cuentas(); assert n = 3, format('mis_cuentas sin pedir: 3, vio %s', n);
+end $$;
+reset role;
+-- Quien está en una sola cuenta, sin pedirla, ve la suya (como siempre).
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"d1000000-0000-0000-0000-000000000002"}';
+set local request.headers = '{}';
+do $$
+declare n int;
+begin
+  select count(*) into n from campo; assert n = 1, format('una sola cuenta sin pedir: su campo, vio %s', n);
+  assert public.empresa_propia() = 'e1000000-0000-0000-0000-000000000002', 'una sola cuenta: es dueño sin pedirla';
 end $$;
 reset role;
 
