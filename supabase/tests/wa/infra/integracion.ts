@@ -660,12 +660,14 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
           'Una entrega incompleta cambió el borrador anterior.')
         const reenvio = await enviarFirmado(lote)
         const lluvias = await admin`select mm::float8 from lluvia where empresa_id=${E1} and mm in (17,27)`
-        assert(reenvio.status === 200 && lluvias.length === 1 && lluvias[0].mm === 27,
-          'El reintento debía guardar una sola medición de 27 mm.')
+        // La de 17 no se pierde por la de 27 (15/11): quedan las dos, de a una, y un «sí» suelto no guarda ninguna.
+        const turno = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(reenvio.status === 200 && lluvias.length === 0 && turno?.tipo === 'turno' && turno.pasos.length === 2,
+          'El reintento debía dejar las dos mediciones para confirmar con el botón.')
         assert(!reenvio.mensajes.some(m => m.to === v2.telefono), 'El reintento volvió a responder al otro número.')
       } finally {
         interpretarComo = null
-        await texto(v1, 'cancelar')
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${v1.id}`
         await admin`delete from lluvia where empresa_id=${E1} and mm in (17,27)`
       }
     })
@@ -812,6 +814,37 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
       await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
       await admin`update wa_vinculo set empresa_id=${E1}, pendiente=null, pendiente_at=null where id=${v1.id}`
     }
+
+    await test('Dos cargas en mensajes separados: la primera sin confirmar no se pierde', async () => {
+      const hoy = hoyAR()
+      try {
+        interpretarComo = { intent: 'lluvia', mm: 31, fecha: hoy, campo: 'La Porteña' }
+        let out = await texto(v1, 'llovieron 31')
+        const viejo = botones(out).find(x => x.includes('|si='))
+        assert(viejo && textos(out).includes('31 mm'), textos(out))
+        // Sin tocar Guardar, manda otra carga.
+        interpretarComo = { intent: 'lluvia', mm: 32, fecha: hoy, campo: 'La Porteña' }
+        out = await texto(v1, 'y llovieron 32 en otro pluviómetro')
+        interpretarComo = null
+        const g1 = botones(out).find(x => x.includes('|si='))
+        assert(g1 && textos(out).includes('te queda sin guardar lo anterior') && textos(out).includes('31 mm') && textos(out).includes('Queda otro pedido'), 'No retomó la primera: ' + textos(out))
+        assert(!(await admin`select 1 from lluvia where mm in (31,32)`).length, 'Guardó sin confirmar')
+        out = await boton(v1, g1!)
+        const g2 = botones(out).find(x => x.includes('|si='))
+        assert(g2 && textos(out).includes('32 mm'), 'No siguió con la segunda: ' + textos(out))
+        await boton(v1, g2!)
+        const filas = await admin`select mm::int as mm from lluvia where empresa_id=${E1} and mm in (31,32) order by mm`
+        assert(filas.length === 2, 'No guardó las dos: ' + JSON.stringify(filas))
+        // El botón de la primera propuesta (antes de juntarlas) ya no guarda otra vez.
+        await boton(v1, viejo!)
+        assert((await admin`select 1 from lluvia where mm=31`).length === 1, 'El botón viejo duplicó')
+        assert(!(await db.vinculoDe(v1.telefono))?.pendiente, 'Quedó algo pendiente')
+      } finally {
+        interpretarComo = null
+        await admin`delete from lluvia where mm in (31,32)`
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${v1.id}`
+      }
+    })
 
     await test('Varias cuentas: pregunta siempre de cuál es, no la arrastra, y carga sólo en la elegida', async () => {
       // El mismo usuario en «QA Uno» y «QA Dos» (las dos tienen un potrero 9B).

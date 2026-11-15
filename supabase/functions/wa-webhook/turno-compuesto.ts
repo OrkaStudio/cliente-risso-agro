@@ -91,6 +91,8 @@ function avisoAnterior(turno: PendienteTurno): string[] {
 export async function incorporarTurno(
   v: db.Vinculo, ctx: Contexto, estado: db.Vinculo['pendiente'],
   borradores: BorradorTurno[], avisos: string[], io: IOCompuesto,
+  /** El pendiente de antes va como primer paso (no queda abajo, como «anterior»). */
+  absorbe = false,
 ): Promise<void> {
   const nuevos: PasoTurno[] = []
   const capturas: { id: string; cambio: db.CambioCaptura }[] = []
@@ -108,7 +110,7 @@ export async function incorporarTurno(
   const nuevo: PendienteTurno = estado?.tipo === 'turno'
     ? { ...estado, pasos: [...estado.pasos, ...nuevos] }
     // Una pregunta de cuenta nunca queda abajo de un turno: se resuelve antes de llegar acá (varias cuentas, 14/11).
-    : { tipo: 'turno', capturaId: null, pasos: nuevos, anterior: estado?.tipo === 'cuenta' ? null : estado }
+    : { tipo: 'turno', capturaId: null, pasos: nuevos, anterior: absorbe || estado?.tipo === 'cuenta' ? null : estado }
   if (await reemplazar(v, estado, nuevo, io, capturas)) await mostrar(nuevo, avisos, io)
 }
 

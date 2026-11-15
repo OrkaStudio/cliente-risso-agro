@@ -560,11 +560,16 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
         const entrada = porAudio ? 'audio' : botonId ? 'boton' : 'texto'
         capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada, texto })
         const { interpretacion, pedidos, uso } = await interpretar(texto, ctx, undefined, true)
-        if (pedidos.length > 1 || turno) {
+        // Lo que quedó sin confirmar no se pierde por mandar otra carga (Lau, 15/11):
+        // se muestra primero y lo nuevo sigue después, de a uno.
+        const retomable = !turno && l.abandona && pendiente && 'borrador' in pendiente && pendiente.tipo !== 'corregir'
+          && pendiente.capturaId === l.abandona && !interpretacion.intent.startsWith('consulta_')
+          ? { capturaId: pendiente.capturaId, borrador: pendiente.borrador } : null
+        if (pedidos.length > 1 || turno || retomable) {
           const primera = capturaId
           capturaId = null
           const avisos: string[] = []
-          const borradores: BorradorTurno[] = []
+          const borradores: BorradorTurno[] = retomable ? [retomable] : []
           const ubicado = pendiente?.tipo === 'ubicado' ? pendiente.ubicado : null
           const tieneNovedad = pedidos.some(p => p.interpretacion.intent === 'novedad')
           const campoHoy = tieneNovedad
@@ -592,7 +597,8 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
             if (it.mortandad) avisos.push('Conservé el aviso de mortandad en el mensaje. Revisá los animales en Hacienda para una baja.')
             borradores.push({ capturaId: id, borrador: a.borrador })
           }
-          await incorporarTurno(v, ctx, crudo, borradores, avisos, ioCompuesto)
+          if (retomable && borradores.length > 1) avisos.unshift('Antes de lo nuevo, te queda sin guardar lo anterior:')
+          await incorporarTurno(v, ctx, crudo, borradores, avisos, ioCompuesto, Boolean(retomable))
           return
         }
         await db.actualizarCaptura(capturaId, {
