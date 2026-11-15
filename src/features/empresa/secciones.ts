@@ -90,7 +90,9 @@ export function resumenNiveles(n: Niveles): string {
   ].filter(Boolean)
   const no = grupo('no')
   const frase = partes.length ? `${y(partes).charAt(0).toUpperCase()}${y(partes).slice(1)}.` : ''
-  return [frase, no.length ? `No ve ${y(no)}.` : ''].filter(Boolean).join(' ')
+  // «No ve la Hacienda ni la Plata y la Agenda», no «… y la Plata y la Agenda».
+  const ni = no.length > 1 ? `${no.slice(0, -1).join(', ')} ni ${no.at(-1)}` : (no[0] ?? '')
+  return [frase, no.length ? `No ve ${ni}.` : ''].filter(Boolean).join(' ')
 }
 
 /** La sección de una ruta de la Oficina (null si no es de ninguna, como Configuración). */

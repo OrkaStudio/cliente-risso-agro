@@ -8,7 +8,8 @@ import { useAuth } from '@/features/auth/auth-context'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
 import { useClima } from '@/features/cotizaciones/hooks'
-import { useEmpresa } from '@/features/empresa/use-empresa'
+import { ListaCambiarCuenta } from '@/features/empresa/elegir-cuenta'
+import { useCuentas, useEmpresa } from '@/features/empresa/use-empresa'
 import { usePanoramaInicio } from '@/features/inicio/hooks'
 import { useParaAtender } from '@/features/inicio/para-atender-api'
 import { cosasParaHoy, fraseDelDia, franjasDelRodeo, saludo, type Cosa } from '@/features/inicio/tropero/dia'
@@ -39,6 +40,7 @@ function Hoy() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
+  const variasCuentas = (useCuentas().data?.cuentas.length ?? 0) > 1
   const quien = useQuienMira()
   const r = useRecorrida()
   const panorama = usePanoramaInicio()
@@ -132,6 +134,7 @@ function Hoy() {
           <MenuCuenta inicial={(nombre || membresia?.empresa?.nombre || 'T').charAt(0)} />
         </div>
         <motion.div {...entra(0)} className="mt-auto pt-16">
+          {variasCuentas && <p className="mb-1.5 text-[14px] font-semibold text-superficie/85">En {membresia?.empresa?.nombre}</p>}
           <h1 className="font-heading text-[42px] leading-[1.02] font-extrabold tracking-[-0.02em]">{saludo(new Date().getHours(), nombre)}</h1>
           <p className="mt-2 text-[15px] leading-snug text-superficie/90">
             {tempTexto}
@@ -284,6 +287,9 @@ function MenuCuenta({ inicial }: { inicial: string }) {
   const { signOut } = useAuth()
   const [abierto, setAbierto] = useState(false)
   const [salir, setSalir] = useState(false)
+  // Con varias cuentas (un veterinario que atiende varios campos), el cambio vive acá.
+  const varias = (useCuentas().data?.cuentas.length ?? 0) > 1
+  const [cuentas, setCuentas] = useState(false)
   return (
     <div className="relative ml-auto">
       <button
@@ -296,7 +302,18 @@ function MenuCuenta({ inicial }: { inicial: string }) {
         {inicial.toUpperCase()}
       </button>
       {abierto && (
-        <ul className="absolute top-12 right-0 z-20 min-w-[210px] overflow-hidden rounded-[14px] bg-superficie py-1.5 text-texto shadow-lg">
+        <ul className="absolute top-12 right-0 z-20 min-w-[230px] overflow-hidden rounded-[14px] bg-superficie py-1.5 text-texto shadow-lg">
+          {varias && (
+            <li className="border-b border-borde">
+              {cuentas ? (
+                <ListaCambiarCuenta onElegido={() => setCuentas(false)} />
+              ) : (
+                <button type="button" onClick={() => setCuentas(true)} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px] font-semibold">
+                  <Icono nombre="Usuario" tamano={16} /> Cambiar de cuenta
+                </button>
+              )}
+            </li>
+          )}
           <li>
             <button type="button" onClick={() => navigate('/campo/historial')} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]">
               <Icono nombre="Agenda" tamano={16} /> Historial

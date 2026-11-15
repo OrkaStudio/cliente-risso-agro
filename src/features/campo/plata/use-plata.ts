@@ -224,8 +224,10 @@ export function usePlata() {
     .filter((o) => o.tipo === 'ingreso')
     .reduce((s, o) => s + o.monto, 0)
 
+  // El último campo usado, si es de esta cuenta (un veterinario puede estar en varias, 14/11).
+  const ultimoCampo = localStorage.getItem(CAMPO_KEY)
   const campoDefault =
-    localStorage.getItem(CAMPO_KEY) ?? refs?.campos[0]?.id ?? ''
+    (refs?.campos.some((c) => c.id === ultimoCampo) ? ultimoCampo : null) ?? refs?.campos[0]?.id ?? ''
 
   // Montos frecuentes: los que más se repiten en el historial local; hasta
   // completar 4 con redondos típicos. Un toque carga el monto.

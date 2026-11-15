@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/auth-context'
-import { useEmpresa } from '@/features/empresa/use-empresa'
+import { useCuentas } from '@/features/empresa/use-empresa'
 import { setEmpresaTelemetria } from '@/lib/telemetria'
 import {
   onboardingCompletado,
@@ -56,12 +56,19 @@ const TELEMETRIA: Record<Exclude<Paso['etapa'], 'cierre'>, PasoOnboarding> = {
 
 export function OnboardingPage() {
   const { user } = useAuth()
-  const { data: membresia, isLoading } = useEmpresa()
+  const { data, isLoading } = useCuentas()
+  // Quien está invitado en otras cuentas y suma la de su propio campo (varias cuentas, 14/11).
+  const [params] = useSearchParams()
+  const cuentas = data?.cuentas ?? []
+  const sumaSuCampo = params.get('propio') === '1' && !cuentas.some((c) => c.rol === 'dueno')
+  const membresia = sumaSuCampo ? null : (data?.activa ?? null)
   // Cuando ya terminó, se queda en el cierre hasta que elija adónde ir.
   const [enCierre, setEnCierre] = useState(false)
 
   if (isLoading || !user) return <div className="h-full bg-fondo" aria-busy />
   const terminado = !!membresia?.empresa?.onboarding_completo_at
+  // Con cuentas y sin una propia que armar (o con varias y sin elegir), el onboarding no es para él.
+  if (!sumaSuCampo && cuentas.length > 0 && !membresia) return <Navigate to="/" replace />
   if ((membresia && membresia.rol !== 'dueno') || (terminado && !enCierre)) return <Navigate to="/" replace />
 
   // Desde dónde arranca: el progreso de este equipo, una empresa nueva, o (null)

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { cuentaDelPedido, ENCABEZADO_CUENTA } from '@/features/empresa/cuenta-activa'
 import { env } from '@/lib/env'
 import type { Database } from '@/lib/supabase/types'
 
@@ -22,8 +23,22 @@ import type { Database } from '@/lib/supabase/types'
  */
 export const fetchConKeepalive: typeof fetch = (input, init) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-  if (url.includes('/rest/v1/evento_producto')) return fetch(input, { ...init, keepalive: true })
-  return fetch(input, init)
+  // Sólo a la base (PostgREST): las funciones y el storage no lo usan y sus CORS no lo aceptan.
+  const conCuenta = url.includes('/rest/v1/') ? conLaCuenta(init) : init
+  if (url.includes('/rest/v1/evento_producto')) return fetch(input, { ...conCuenta, keepalive: true })
+  return fetch(input, conCuenta)
+}
+
+/**
+ * Cada pedido a la base lleva la cuenta con la que se trabaja (varias cuentas,
+ * 14/11): ve y carga sólo en ésa. Ver `features/empresa/cuenta-activa.ts`.
+ */
+function conLaCuenta(init: RequestInit | undefined): RequestInit | undefined {
+  const cuenta = cuentaDelPedido()
+  if (!cuenta) return init
+  const headers = new Headers(init?.headers)
+  headers.set(ENCABEZADO_CUENTA, cuenta)
+  return { ...init, headers }
 }
 
 export const supabase = createClient<Database>(

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
+import { claveDeCuenta } from '@/features/empresa/cuenta-activa'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 
@@ -14,9 +15,10 @@ const CLAVE = 'inicio-campo-id' // el nombre viejo se conserva: no se pierde lo 
 const TODOS = 'todos'
 const oyentes = new Set<() => void>()
 
+// Cada cuenta recuerda su campo (varias cuentas, 14/11); lo elegido antes queda para la primera.
 function leer(): string | null {
   try {
-    return localStorage.getItem(CLAVE)
+    return localStorage.getItem(claveDeCuenta(CLAVE)) ?? localStorage.getItem(CLAVE)
   } catch {
     return null
   }
@@ -34,7 +36,7 @@ export function elegirCampo(id: string | null) {
 
 function guardar(v: string) {
   try {
-    localStorage.setItem(CLAVE, v)
+    localStorage.setItem(claveDeCuenta(CLAVE), v)
   } catch {
     /* sin storage: queda sólo en esta sesión */
   }
