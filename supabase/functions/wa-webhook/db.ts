@@ -47,30 +47,50 @@ export type Vinculo = {
  */
 export async function vinculoDe(telefono: string): Promise<Vinculo | null> {
   return await sql.begin(async (tx) => {
-    const [v] = await tx<(Vinculo & { vigente: boolean; cuentas: number; primera: string })[]>`
-      select v.id, v.telefono, v.user_id, v.empresa_id, v.pendiente, v.pendiente_at,
-        exists (select 1 from miembro_empresa m where m.user_id = v.user_id and m.empresa_id = v.empresa_id) as vigente,
-        (select count(*)::int from miembro_empresa m where m.user_id = v.user_id) as cuentas,
-        (select m.empresa_id from miembro_empresa m join empresa e on e.id = m.empresa_id
-          where m.user_id = v.user_id order by lower(e.nombre), m.empresa_id limit 1) as primera
+    const [v] = await tx<Omit<Vinculo, 'varias'>[]>`
+      select v.id, v.telefono, v.user_id, v.empresa_id, v.pendiente, v.pendiente_at
       from wa_vinculo v
       where v.telefono = ${telefono} and v.activo
       for update`
-    if (!v || v.cuentas === 0) return null
-    let vinculo: Vinculo = { id: v.id, telefono: v.telefono, user_id: v.user_id, empresa_id: v.empresa_id, pendiente: v.pendiente, pendiente_at: v.pendiente_at, varias: v.cuentas > 1 }
-    if (!v.vigente) {
-      await tx`update wa_vinculo set empresa_id = ${v.primera}, pendiente = null, pendiente_at = null where id = ${v.id}`
-      vinculo = { ...vinculo, empresa_id: v.primera, pendiente: null, pendiente_at: null }
+    if (!v) return null
+    const cuentas = cuentasDelBot(await consultaCuentas(tx, v.user_id) as unknown as CuentaConUso[])
+    if (!cuentas.length) return null
+    let vinculo: Vinculo = { ...v, varias: cuentas.length > 1 }
+    if (!cuentas.some((c) => c.id === v.empresa_id)) {
+      // Lo abierto era de esa cuenta y se va con ella. Lo que espera que diga la
+      // cuenta no es de ninguna: queda (sin lo de la cuenta perdida) para avisarle.
+      const pendiente = v.pendiente?.tipo === 'cuenta' ? { ...v.pendiente, anterior: null } : null
+      await tx`update wa_vinculo set empresa_id = ${cuentas[0]!.id},
+        pendiente = ${pendiente ? tx.json(pendiente as unknown as postgres.JSONValue) : null},
+        pendiente_at = case when ${Boolean(pendiente)} then pendiente_at else null end where id = ${v.id}`
+      vinculo = { ...vinculo, empresa_id: cuentas[0]!.id, pendiente, pendiente_at: pendiente ? v.pendiente_at : null }
     }
     return vinculo
   }) as Vinculo | null
 }
 
-/** Sus cuentas, por nombre. */
+type CuentaConUso = Cuenta & { usa: boolean }
+
+// Sus membresías, por nombre, y si en cada una puede hacer algo por WhatsApp.
+const consultaCuentas = (q: Tx | typeof sql, userId: string) => q`
+  select e.id, e.nombre,
+    (m.rol = 'dueno' or exists (select 1 from jsonb_each_text(coalesce(m.niveles, '{}'::jsonb)) j where j.value <> 'no')) as usa
+  from miembro_empresa m join empresa e on e.id = m.empresa_id
+  where m.user_id = ${userId} order by lower(e.nombre), e.id`
+
+/**
+ * Las cuentas del bot: aquellas donde puede hacer algo por WhatsApp. Una donde
+ * el dueño le puso «No ve» en todo no se ofrece (no podría cargar ni consultar
+ * nada); si es la única, queda (el bot le dice qué no tiene habilitado).
+ */
+function cuentasDelBot(todas: CuentaConUso[]): Cuenta[] {
+  const usa = todas.filter((c) => c.usa)
+  return (usa.length ? usa : todas).map(({ id, nombre }) => ({ id, nombre }))
+}
+
+/** Sus cuentas en el bot, por nombre. */
 export async function cuentasDe(userId: string): Promise<Cuenta[]> {
-  return await sql<Cuenta[]>`
-    select e.id, e.nombre from miembro_empresa m join empresa e on e.id = m.empresa_id
-    where m.user_id = ${userId} order by lower(e.nombre), e.id`
+  return cuentasDelBot(await consultaCuentas(sql, userId) as unknown as CuentaConUso[])
 }
 
 /**
@@ -78,7 +98,7 @@ export async function cuentasDe(userId: string): Promise<Cuenta[]> {
  * queda abierto (lo de antes si es la misma, nada si es otra), y el mensaje
  * queda registrado en ella. Sólo si sigue siendo suya.
  */
-export async function pasarALaCuenta(v: Vinculo, empresaId: string, mensajeId: string | null, pendiente: Vinculo['pendiente']): Promise<boolean> {
+export async function pasarALaCuenta(v: Vinculo, empresaId: string, mensajeIds: string[], pendiente: Vinculo['pendiente']): Promise<boolean> {
   return await sql.begin(async (tx) => {
     const [r] = await tx`update wa_vinculo w set empresa_id = ${empresaId},
         pendiente = ${pendiente ? tx.json(pendiente as unknown as postgres.JSONValue) : null},
@@ -87,7 +107,7 @@ export async function pasarALaCuenta(v: Vinculo, empresaId: string, mensajeId: s
         and exists (select 1 from miembro_empresa m where m.user_id = w.user_id and m.empresa_id = ${empresaId})
       returning id`
     if (!r) return false
-    if (mensajeId) await tx`update wa_mensaje set empresa_id = ${empresaId} where id = ${mensajeId} and vinculo_id = ${v.id}`
+    if (mensajeIds.length) await tx`update wa_mensaje set empresa_id = ${empresaId} where id = any(${mensajeIds}::uuid[]) and vinculo_id = ${v.id}`
     return true
   }) as boolean
 }
@@ -370,14 +390,17 @@ export async function contexto(v: Vinculo, hoy: string): Promise<Contexto & { ca
  * esto se usa para cargar ni para contestar.
  */
 export async function camposDeTodas(userId: string): Promise<Campo[]> {
-  const filas = await comoUsuario(userId, (tx) => tx<{ campo_id: string; campo: string; potrero_id: string | null; potrero: string | null }[]>`
-    select c.id as campo_id, c.nombre as campo, p.id as potrero_id, p.nombre as potrero
-    from campo c left join potrero p on p.campo_id = c.id order by c.nombre, p.nombre`)
+  // De a una cuenta (la base no deja ver varias en un mismo pedido).
   const campos: Campo[] = []
-  for (const f of filas) {
-    let c = campos.find((x) => x.id === f.campo_id)
-    if (!c) campos.push((c = { id: f.campo_id, nombre: f.campo, potreros: [] }))
-    if (f.potrero_id) c.potreros.push({ id: f.potrero_id, nombre: f.potrero! })
+  for (const c of await cuentasDe(userId)) {
+    const filas = await comoUsuario({ user_id: userId, empresa_id: c.id }, (tx) => tx<{ campo_id: string; campo: string; potrero_id: string | null; potrero: string | null }[]>`
+      select c.id as campo_id, c.nombre as campo, p.id as potrero_id, p.nombre as potrero
+      from campo c left join potrero p on p.campo_id = c.id order by c.nombre, p.nombre`)
+    for (const f of filas) {
+      let campo = campos.find((x) => x.id === f.campo_id)
+      if (!campo) campos.push((campo = { id: f.campo_id, nombre: f.campo, potreros: [] }))
+      if (f.potrero_id) campo.potreros.push({ id: f.potrero_id, nombre: f.potrero! })
+    }
   }
   return campos
 }

@@ -857,22 +857,75 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
         out = await boton(v1, viejo)
         assert(textos(out).includes('anterior') && !(await admin`select 1 from lluvia where mm=20 and empresa_id=${E1}`).length, 'Un botón viejo eligió cuenta')
 
-        // Manda otra cosa en vez de contestar: lo anterior no se carga, se le dice, y se pregunta lo nuevo.
+        // Manda más cosas antes de contestar: se suman a la pregunta, nada se pierde.
+        interpretarComo = null
         out = await texto(v1, 'llovieron 7')
         assert(cuentasDe(out).length === 2)
         out = await texto(v1, 'llovieron 8')
-        assert(textos(out).includes('No cargué «llovieron 7»') && textos(out).includes('¿De qué cuenta es «llovieron 8»?'), 'No avisó lo que quedó sin cargar: ' + textos(out))
-        // Cancelar: no carga nada.
-        out = await texto(v1, 'cancelar')
-        assert(textos(out).includes('no cargué «llovieron 8»'), 'No canceló: ' + textos(out))
+        assert(!textos(out).includes('No cargué') && textos(out).includes('¿De qué cuenta son estos 2 mensajes?')
+          && textos(out).includes('1. «llovieron 7»\n2. «llovieron 8»'), 'No sumó lo nuevo a la pregunta: ' + textos(out))
+        const aDos = cuentasDe(out)
+        // La ayuda o un «sí» suelto no eligen ni descartan: vuelve a preguntar por los dos.
+        out = await texto(v1, 'ayuda')
+        assert(textos(out).includes('· QA Dos') && textos(out).includes('estos 2 mensajes') && cuentasDe(out).length === 2, 'La ayuda perdió la pregunta: ' + textos(out))
+        assert(cuentasDe(out)[0] === aDos[0], 'La ayuda cambió la pregunta')
+        out = await texto(v1, 'dale')
+        assert(textos(out).includes('Primero decime de qué cuenta') && textos(out).includes('estos 2 mensajes'), 'Un «dale» suelto no repreguntó: ' + textos(out))
         assert(!(await admin`select 1 from lluvia where mm in (7,8)`).length, 'Cargó algo sin cuenta')
+        // Elige QA Uno: los dos van juntos, como un mensaje con dos pedidos, y se proponen de a uno.
+        interpretarComo = { pedidos: [
+          { intent: 'lluvia', fragmento: 'llovieron 7', fecha: hoy, campo: 'La Porteña', mm: 7 },
+          { intent: 'lluvia', fragmento: 'llovieron 8', fecha: hoy, campo: 'La Porteña', mm: 8 },
+        ] }
+        out = await boton(v1, aDos[1]!)
+        interpretarComo = null
+        const g1 = botones(out).find(x => x.includes('|si='))
+        assert(g1 && textos(out).startsWith('*QA Uno*') && textos(out).includes('7 mm'), 'No siguió con los dos en QA Uno: ' + textos(out))
+        out = await boton(v1, g1!)
+        const g2 = botones(out).find(x => x.includes('|si='))
+        assert(g2 && g2 !== g1 && textos(out).includes('8 mm'), 'No propuso el segundo: ' + textos(out))
+        await boton(v1, g2!)
+        filas = await admin`select empresa_id from lluvia where mm in (7,8)`
+        assert(filas.length === 2 && filas.every((f) => f.empresa_id === E1), 'No guardó los dos en QA Uno')
+        const entradas = await admin`select empresa_id from wa_mensaje where direccion='entrante' and cuerpo->'text'->>'body' in ('llovieron 7','llovieron 8')`
+        assert(entradas.length === 2 && entradas.every((f) => f.empresa_id === E1), 'Los mensajes no quedaron en la cuenta elegida')
+
+        // Cancelar: no carga nada.
+        out = await texto(v1, 'llovieron 9')
+        out = await texto(v1, 'cancelar')
+        assert(textos(out).includes('no cargué «llovieron 9»'), 'No canceló: ' + textos(out))
+
+        // Más de 12 horas sin contestar: se le dice que no se cargó, y lo de ahora se pregunta solo.
+        out = await texto(v1, 'llovieron 6')
+        await admin`update wa_vinculo set pendiente_at = now() - interval '13 hours' where id=${v1.id}`
+        out = await texto(v1, 'llovieron 4')
+        assert(textos(out).includes('No cargué «llovieron 6»: pasaron más de 12 horas') && textos(out).includes('¿De qué cuenta es «llovieron 4»?'), 'No avisó lo vencido: ' + textos(out))
+        await texto(v1, 'cancelar')
+        assert(!(await admin`select 1 from lluvia where mm in (4,6,9)`).length, 'Cargó algo sin cuenta')
 
         // La ayuda, sin cuenta elegida, nombra las dos y no carga nada.
         out = await texto(v1, 'ayuda')
         assert(textos(out).includes('2 cuentas') && textos(out).includes('· QA Dos'), 'Ayuda sin las cuentas: ' + textos(out))
+
+        // Lo sacan de la otra cuenta mientras se le pregunta: aquello no va solo a la que le queda; se le dice.
+        // (y la conversación estaba en la cuenta que pierde).
+        await admin`update wa_vinculo set empresa_id=${E2} where id=${v1.id}`
+        out = await texto(v1, 'llovieron 3')
+        assert(cuentasDe(out).length === 2)
+        await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
+        out = await texto(v1, 'hola')
+        assert(textos(out).includes('No cargué «llovieron 3»') && textos(out).includes('sólo en QA Uno'), 'No avisó al quedar en una cuenta: ' + textos(out))
+        assert(!cuentasDe(out).length && !(await admin`select 1 from lluvia where mm=3`).length, 'Cargó o preguntó sin motivo')
+
+        // Una cuenta donde el dueño le puso «No ve» en todo no se ofrece: no podría hacer nada ahí.
+        await admin`insert into miembro_empresa (user_id, empresa_id, rol, niveles) values (${U1}, ${E2}, 'vet', ${admin.json({ hacienda: 'no', campos: 'no', plata: 'no' })})`
+        interpretarComo = { intent: 'lluvia', mm: 2, fecha: hoy, campo: 'La Porteña' }
+        out = await texto(v1, 'llovieron 2')
+        assert(!cuentasDe(out).length && botones(out).some(x => x.includes('|si=')), 'Preguntó por una cuenta sin nada habilitado: ' + textos(out))
+        await texto(v1, 'cancelar')
       } finally {
         interpretarComo = null
-        await admin`delete from lluvia where mm in (5,7,8,20)`
+        await admin`delete from lluvia where mm in (2,3,4,5,6,7,8,9,20)`
         await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
         await admin`update wa_vinculo set empresa_id=${E1}, pendiente=null, pendiente_at=null where id=${v1.id}`
       }

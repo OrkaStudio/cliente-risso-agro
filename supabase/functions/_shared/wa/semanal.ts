@@ -43,7 +43,7 @@ export function lineasSemana(s: SemanaCampo): LineaInforme[] {
   const title = (texto: string) => lines.push({ tipo: 'titulo', texto })
   const text = (texto: string) => lines.push({ tipo: 'texto', texto })
   text(`${s.empresa} | ${fecha(s.periodo.desde)} al ${fecha(s.periodo.hasta)}`)
-  text('Resumen de registros de Tropero, ingresados desde la app o WhatsApp. Los datos ausentes no significan que no haya ocurrido actividad.')
+  text('Resumen de registros de Troppero, ingresados desde la app o WhatsApp. Los datos ausentes no significan que no haya ocurrido actividad.')
   const ve = s.ve ?? { campos: true, hacienda: true, plata: true }
   if (ve.campos) {
   title('Lluvia medida')

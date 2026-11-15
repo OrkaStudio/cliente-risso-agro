@@ -108,7 +108,9 @@ create or replace function cuenta_pedida() returns uuid language sql stable as $
   select case when h ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then h::uuid end
   from (select nullif(current_setting('request.headers', true), '')::json ->> 'x-troppero-cuenta' as h) s $$;
 create or replace function auth_empresa_ids() returns setof uuid language sql stable set search_path to 'public' as $$
-  select empresa_id from miembro_empresa where user_id = auth.uid() and (cuenta_pedida() is null or empresa_id = cuenta_pedida()) $$;
+  select empresa_id from miembro_empresa where user_id = auth.uid()
+    and case when cuenta_pedida() is not null then empresa_id = cuenta_pedida()
+      else (select count(*) from miembro_empresa x where x.user_id = auth.uid()) = 1 end $$;
 create table if not exists invitacion (
   id uuid primary key default gen_random_uuid(), empresa_id uuid references empresa(id), celular text, nombre text,
   acceso text not null default 'app', niveles jsonb, token text unique default md5(random()::text), invitado_por uuid,

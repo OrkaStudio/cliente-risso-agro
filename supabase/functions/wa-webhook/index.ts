@@ -49,8 +49,8 @@ import { atenderInfra, cargarEnUbicacion, ofrecerCarga, type IOInfra } from './i
 import { potreroCercano } from '../_shared/wa/infraestructura.ts'
 import * as pilotoStore from './piloto-store.ts'
 import { fusionarRecorrida } from '../_shared/wa/piloto.ts'
-import { ahoraEnVarias, ayudaVariasCuentas, cuentaPorTexto, deQueSeTrata, enLaCuenta, leerBotonCuenta, leerBotonInvitacion, preguntaCuenta, preguntaInvitacion } from '../_shared/wa/cuentas.ts'
-import type { Cuenta, PendienteCuenta } from '../_shared/wa/tipos.ts'
+import { ahoraEnVarias, ayudaVariasCuentas, cuentaPorTexto, deQueSeTrata, enLaCuenta, leerBotonCuenta, leerBotonInvitacion, loQueMando, preguntaCuenta, preguntaInvitacion } from '../_shared/wa/cuentas.ts'
+import type { Cuenta, MensajeSinCuenta, PendienteCuenta } from '../_shared/wa/tipos.ts'
 
 const NO_VINCULADO =
   'Hola. Tu número no está vinculado a una cuenta de Troppero. Para pedir acceso, escribí a francisco@troppero.com.'
@@ -228,22 +228,31 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
   // de eso. Todo lo que se le contesta lleva el nombre de la cuenta arriba.
   const cuentas: Cuenta[] = v.varias ? await db.cuentasDe(v.user_id) : []
   const varias = cuentas.length > 1
-  // Le preguntaron la cuenta y después quedó en una sola (lo sacaron de la otra): ya no hay qué elegir.
-  if (!varias && v.pendiente?.tipo === 'cuenta') {
-    await db.guardarPendiente(v.id, null)
-    v = { ...v, pendiente: null }
-  }
   let aviso = ''
+  // Lo que mandó sin decir la cuenta y sigue esperando (lo nuevo se suma).
+  let sinCuenta: PendienteCuenta | null = null
+  if (!varias && v.pendiente?.tipo === 'cuenta') {
+    // Le preguntaron la cuenta y después quedó en una sola (lo sacaron de la otra):
+    // aquello no se carga en la que quedó sin que lo diga.
+    const pc = v.pendiente
+    await db.guardarPendiente(v.id, pc.anterior)
+    v = { ...v, pendiente: pc.anterior }
+    aviso = `No cargué ${loQueMando(dichosDe(pc))}: no me dijiste de qué cuenta era y ahora estás sólo en ${(await db.cuentasDe(v.user_id))[0]?.nombre ?? 'una cuenta'}. Si era para ésa, mandámelo de nuevo.\n\n`
+  }
   if (varias && v.pendiente?.tipo === 'cuenta') {
-    const r = await atenderPreguntaDeCuenta(m, mensajeId, v, cuentas)
+    const r = await atenderPreguntaDeCuenta(m, v, cuentas)
     if (r === 'listo') return
     v = r.v
     aviso = r.aviso
+    sinCuenta = r.sumar
     if (r.previo) previo = r.previo
   }
+  // Lo que no se cargó se dice en su propio mensaje, antes de seguir con lo de ahora.
+  if (aviso) await responder({ ...v, cuenta: null }, m.from, { texto: aviso.trim() })
   const confirmada = !varias || previo?.elegida === true
   const pilotoHabilitado = Deno.env.get('WA_PILOT_ENABLED') === 'true' && colaHabilitada(v.empresa_id)
-  const hilo = v.pendiente !== null || (varias && pilotoHabilitado && (await pilotoStore.pendiente(v).catch(() => null)) !== null)
+  // Mientras espera la cuenta de lo anterior, nada sigue un hilo: todo se suma a la pregunta.
+  const hilo = !sinCuenta && (v.pendiente !== null || (varias && pilotoHabilitado && (await pilotoStore.pendiente(v).catch(() => null)) !== null))
   if (varias && (confirmada || hilo)) {
     v = { ...v, cuenta: cuentas.find((c) => c.id === v!.empresa_id)?.nombre ?? null }
     await db.mensajeEnLaCuenta(v, mensajeId)
@@ -257,10 +266,12 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
   const pedirCuenta = async (textoDicho: string | null, porAudioDicho: boolean): Promise<boolean> => {
     if (confirmada) return false
     const revision = crypto.randomUUID()
-    const pc: PendienteCuenta = { tipo: 'cuenta', capturaId: null, revision, mensajeId, mensaje: m, texto: textoDicho, porAudio: porAudioDicho, anterior: crudo, cuentas }
+    const este = { mensajeId, mensaje: m, texto: textoDicho, porAudio: porAudioDicho }
+    const pc: PendienteCuenta = sinCuenta
+      ? { ...sinCuenta, revision, mensajes: [...sinCuenta.mensajes, este], cuentas }
+      : { tipo: 'cuenta', capturaId: null, revision, mensajes: [este], anterior: crudo, cuentas }
     await db.guardarPendiente(v!.id, pc)
-    const deQue = deQueSeTrata({ tipo: m.type, texto: m.type === 'image' ? (m.image?.caption ?? null) : textoDicho })
-    await responder(vSinCuenta, m.from, preguntaCuenta(cuentas, deQue, revision, aviso))
+    await responder(vSinCuenta, m.from, preguntaCuenta(cuentas, dichosDe(pc), revision))
     return true
   }
 
@@ -377,7 +388,7 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
 
     // Comandos explícitos: funcionan también por audio y conservan cualquier carga pendiente.
     if(!botonId && norm(texto)==='soporte'){
-      await responder(v,m.from,{texto:'Para hablar con el equipo, escribí a francisco@troppero.com. Contanos qué intentaste cargar y cuándo. Tu carga pendiente se conserva. También podés pedir una copia de tus datos o la desvinculación del número.'})
+      await responder(v,m.from,{texto:SOPORTE})
       return
     }
     const mapa = comandoMapa(texto, botonId)
@@ -505,6 +516,8 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
           })
           const a = arrancar(interpretacion, ctx, l.texto, { campoHoy: l.borrador.campoId ?? null })
           if (!('respuesta' in a) && a.borrador.tipo.startsWith('consulta_')) {
+            // Una consulta es algo nuevo: con varias cuentas, de cuál.
+            if (await pedirCuenta(l.texto, porAudio)) return
             const pausa = await pausarRecorridaNegada(v, pendiente, l.texto)
             if (porAudio && a.borrador.tipo === 'consulta_hacienda' && !nombraHacienda(l.texto)) {
               await responder(v, m.from, { texto: ACLARAR_CONSULTA_AUDIO + pausa })
@@ -524,6 +537,7 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
         }
         const { interpretacion, uso } = await interpretar(l.texto, ctx, l.borrador)
         if (interpretacion.intent.startsWith('consulta_')) {
+          if (await pedirCuenta(l.texto, porAudio)) return
           capturaId = null
           const tipo = l.borrador.tipo === 'gasto' ? 'el gasto' : 'la lluvia'
           const pausa = `\n\nDejé ${tipo} pendiente. Escribí «retomar ${l.borrador.tipo}» para volver a verlo.`
@@ -1079,27 +1093,41 @@ async function ubicacion(
   await responder(v, to, ofrecerCarga(`Estás en el *${p.nombre}* de ${p.campo}. Contame qué ves. Si querés cargar algo que está acá, elegí qué es o escribilo («tanque australiano»).`))
 }
 
+/** Cómo se nombra cada cosa que mandó sin decir la cuenta. */
+function dichosDe(pc: PendienteCuenta): string[] {
+  return pc.mensajes.map((x) => {
+    const m = x.mensaje as MensajeMeta
+    return deQueSeTrata({ tipo: m.type, texto: m.type === 'image' ? (m.image?.caption ?? null) : x.texto })
+  })
+}
+
+const SOPORTE = 'Para hablar con el equipo, escribí a francisco@troppero.com. Contanos qué intentaste cargar y cuándo. Tu carga pendiente se conserva. También podés pedir una copia de tus datos o la desvinculación del número.'
+
 /**
  * Le preguntamos de qué cuenta era lo que mandó (varias cuentas, 14/11). Si
- * contesta con el botón o con el nombre, se sigue con aquel mensaje en esa
- * cuenta. Si manda otra cosa, aquello no se carga (se le dice) y lo nuevo sigue
- * su camino: si es nuevo, se vuelve a preguntar.
+ * contesta con el botón o con el nombre, sigue con todo lo que mandó en esa
+ * cuenta. Si manda algo nuevo, se suma a la pregunta (nada se pierde ni se
+ * carga sin cuenta). La ayuda, el soporte o un botón viejo no la cambian.
  */
 async function atenderPreguntaDeCuenta(
-  m: MensajeMeta, mensajeId: string, v: db.Vinculo, cuentas: Cuenta[],
-): Promise<'listo' | { v: db.Vinculo; aviso: string; previo?: Previo }> {
+  m: MensajeMeta, v: db.Vinculo, cuentas: Cuenta[],
+): Promise<'listo' | { v: db.Vinculo; aviso: string; sumar: PendienteCuenta | null; previo?: Previo }> {
   const pc = v.pendiente as PendienteCuenta
   const sinCuenta = { ...v, cuenta: null }
-  const deQue = deQueSeTrata({ tipo: (pc.mensaje as MensajeMeta).type, texto: (pc.mensaje as MensajeMeta).type === 'image' ? ((pc.mensaje as MensajeMeta).image?.caption ?? null) : pc.texto })
-  // Lo de hace más de 12 horas ya no se espera.
+  const dichos = dichosDe(pc)
+  const repreguntar = (aviso: string) => responder(sinCuenta, m.from, preguntaCuenta(cuentas, dichos, pc.revision, aviso))
+  // Lo de hace más de 12 horas ya no se espera (se avisa) y lo de ahora sigue su camino.
   if (v.pendiente_at && Date.now() - new Date(v.pendiente_at).getTime() > PENDIENTE_VENCE_MS) {
+    const ids = !pc.anterior ? [] : pc.anterior.tipo === 'turno' ? [...pc.anterior.pasos.map((x) => x.pendiente.capturaId), pc.anterior.anterior?.capturaId] : [pc.anterior.capturaId]
+    for (const id of ids) if (id) await db.actualizarCaptura(id, { estado: 'incompleta', notas: ['Quedó sin respuesta más de 12 horas.'] })
     await db.guardarPendiente(v.id, null)
-    return { v: { ...v, pendiente: null }, aviso: '' }
+    return { v: { ...v, pendiente: null }, aviso: `No cargué ${loQueMando(dichos)}: pasaron más de 12 horas sin que me dijeras de qué cuenta era. Si sigue haciendo falta, mandámelo de nuevo.`, sumar: null }
   }
   let elegida: Cuenta | null = null
   let texto: string | null = null
   let porAudio = false
-  const boton = leerBotonCuenta(m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id)
+  const botonId = m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? m.button?.payload
+  const boton = leerBotonCuenta(botonId)
   if (boton) {
     if (boton.revision !== pc.revision) {
       await responder(sinCuenta, m.from, { texto: 'Ese botón es de una pregunta anterior. Elegí la cuenta en la última que te mandé.' })
@@ -1107,49 +1135,115 @@ async function atenderPreguntaDeCuenta(
     }
     elegida = cuentas.find((c) => c.id === boton.empresaId) ?? null
     if (!elegida) {
-      await responder(sinCuenta, m.from, preguntaCuenta(cuentas, deQue, pc.revision, 'Esa cuenta ya no está entre las tuyas. '))
+      await repreguntar('Esa cuenta ya no está entre las tuyas. ')
       return 'listo'
     }
+  } else if (botonId) {
+    await repreguntar('Ese botón es de una conversación anterior. ')
+    return 'listo'
   } else if (m.type === 'text' || m.type === 'audio') {
     texto = m.text?.body ?? ''
     if (m.type === 'audio' && m.audio && Deno.env.get('OPENAI_API_KEY')) {
       const a = await meta.descargarMedia(m.audio.id)
-      texto = await transcribir(a.bytes, a.mime, cuentas.map((c) => c.nombre).join(', '))
+      // Puede ser el nombre de la cuenta o algo más para cargar: se escucha con los nombres de todo.
+      const campos = await db.camposDeTodas(v.user_id).catch(() => [])
+      texto = await transcribir(a.bytes, a.mime, `Cuentas: ${cuentas.map((c) => c.nombre).join(', ')}. ${pistaTranscripcion({ campos } as unknown as Contexto)}`)
       porAudio = true
     }
-    const t = norm(texto).replace(/[¿?¡!.,]+/g, '').trim()
-    if (/^(cancelar|cancela|no|nada|ninguna|dejalo|deja)$/.test(t)) {
+    const t = norm(texto).replace(/^[¿¡]+/, '').replace(/[¿?¡!.,]+/g, '').trim()
+    if (/^(cancelar|cancela|cancelá|no|nada|ninguna|dejalo|deja|dejá)$/.test(t)) {
       await db.guardarPendiente(v.id, pc.anterior)
-      await responder(sinCuenta, m.from, { texto: `Listo, no cargué ${deQue}.` })
+      await responder(sinCuenta, m.from, { texto: `Listo, no cargué ${loQueMando(dichos)}.` })
+      return 'listo'
+    }
+    if (/^(hola|buenas|ayuda|que (podes|puedes) hacer)$/.test(t)) {
+      await repreguntar(`${ayudaVariasCuentas(null, cuentas)}\n\n`)
+      return 'listo'
+    }
+    if (t === 'soporte') {
+      await responder(sinCuenta, m.from, { texto: SOPORTE })
+      await repreguntar('')
+      return 'listo'
+    }
+    // Un «sí» suelto no dice la cuenta.
+    if (/^(si|sí|dale|ok|okey|listo|bueno|de una)$/.test(t)) {
+      await repreguntar('Primero decime de qué cuenta. ')
       return 'listo'
     }
     elegida = cuentaPorTexto(texto, cuentas)
   }
   if (!elegida) {
-    // Otra cosa: aquello no se carga, se le dice, y esto sigue (lo abierto de antes vuelve a estar).
-    await db.guardarPendiente(v.id, pc.anterior)
+    // Algo más para cargar: se suma a lo que espera la cuenta (el audio ya se escuchó).
     return {
-      v: { ...v, pendiente: pc.anterior },
-      aviso: `No cargué ${deQue}: no me dijiste de qué cuenta era. Si era para cargar, mandámelo de nuevo.\n\n`,
-      // El audio ya se escuchó: no se vuelve a transcribir.
+      v: { ...v, pendiente: null }, aviso: '', sumar: pc,
       previo: porAudio && texto ? { texto, porAudio: true, elegida: false } : undefined,
     }
   }
+  await seguirEnLaCuenta(v, pc, elegida, cuentas)
+  return 'listo'
+}
+
+/**
+ * Eligió la cuenta: todo lo que mandó sin decirla sigue en ésa, en orden. Los
+ * textos y audios seguidos van juntos como un solo mensaje (el bot ya parte
+ * varios pedidos de un mensaje y los propone de a uno); fotos y ubicaciones, de
+ * a una. Lo que estaba abierto vuelve si es la misma cuenta; si es otra, queda
+ * sin terminar y se le dice.
+ */
+async function seguirEnLaCuenta(v: db.Vinculo, pc: PendienteCuenta, elegida: Cuenta, cuentas: Cuenta[]): Promise<void> {
+  const sinCuenta = { ...v, cuenta: null }
   const misma = elegida.id === v.empresa_id
   const antes = cuentas.find((c) => c.id === v.empresa_id)?.nombre ?? 'la otra cuenta'
+  if (!(await db.pasarALaCuenta(v, elegida.id, pc.mensajes.map((x) => x.mensajeId), misma ? pc.anterior : null))) {
+    await responder(sinCuenta, v.telefono, { texto: 'No pude pasar a esa cuenta: ya no está entre las tuyas. No cargué nada.' })
+    return
+  }
   if (!misma && pc.anterior) {
-    // Lo que estaba abierto era de otra cuenta: queda sin terminar, y se le dice.
     const ids = pc.anterior.tipo === 'turno' ? [...pc.anterior.pasos.map((x) => x.pendiente.capturaId), pc.anterior.anterior?.capturaId] : [pc.anterior.capturaId]
     for (const id of ids) if (id) await abandonar(id)
+    await responder(sinCuenta, v.telefono, { texto: `Dejé sin terminar lo que tenías abierto en ${antes}.` })
   }
-  if (!(await db.pasarALaCuenta(v, elegida.id, pc.mensajeId, misma ? pc.anterior : null))) {
-    await responder(sinCuenta, m.from, { texto: 'No pude pasar a esa cuenta: ya no está entre las tuyas. No cargué nada.' })
-    return 'listo'
+  let actual: db.Vinculo = { ...v, empresa_id: elegida.id, pendiente: misma ? pc.anterior : null, cuenta: elegida.nombre }
+  for (const [i, t] of tandas(pc.mensajes).entries()) {
+    if (i > 0) {
+      const fresco = await db.vinculoDe(v.telefono)
+      if (!fresco || fresco.empresa_id !== elegida.id) {
+        await responder(sinCuenta, v.telefono, { texto: 'No pude seguir con el resto de lo que mandaste: cambió tu cuenta. Mandámelo de nuevo.' })
+        return
+      }
+      actual = { ...fresco, cuenta: elegida.nombre }
+    }
+    await procesar(t.m, t.mensajeId, actual, t.previo)
   }
-  const enLaElegida: db.Vinculo = { ...v, empresa_id: elegida.id, pendiente: misma ? pc.anterior : null, cuenta: elegida.nombre }
-  if (!misma && pc.anterior) await responder(sinCuenta, m.from, { texto: `Dejé sin terminar lo que tenías abierto en ${antes}.` })
-  await procesar(pc.mensaje as MensajeMeta, pc.mensajeId, enLaElegida, { texto: pc.texto, porAudio: pc.porAudio, elegida: true })
-  return 'listo'
+}
+
+type Tanda = { m: MensajeMeta; mensajeId: string; previo: Previo }
+
+function tandas(mensajes: MensajeSinCuenta[]): Tanda[] {
+  const lista: Tanda[] = []
+  let textos: MensajeSinCuenta[] = []
+  const cerrar = () => {
+    if (textos.length === 1) {
+      const x = textos[0]!
+      lista.push({ m: x.mensaje as MensajeMeta, mensajeId: x.mensajeId, previo: { texto: x.texto, porAudio: x.porAudio, elegida: true } })
+    } else if (textos.length > 1) {
+      const texto = textos.map((x) => x.texto!.trim()).join('\n')
+      const base = textos[0]!.mensaje as MensajeMeta
+      lista.push({ m: { ...base, type: 'text', text: { body: texto }, audio: undefined }, mensajeId: textos[0]!.mensajeId, previo: { texto, porAudio: textos.some((x) => x.porAudio), elegida: true } })
+    }
+    textos = []
+  }
+  for (const x of mensajes) {
+    const tipo = (x.mensaje as MensajeMeta).type
+    if ((tipo === 'text' || tipo === 'audio') && x.texto?.trim()) {
+      textos.push(x)
+      continue
+    }
+    cerrar()
+    lista.push({ m: x.mensaje as MensajeMeta, mensajeId: x.mensajeId, previo: { texto: x.texto, porAudio: x.porAudio, elegida: true } })
+  }
+  cerrar()
+  return lista
 }
 
 const QUE_MANDA: Record<string, string> = { hacienda: 'la hacienda', campos: 'los campos', plata: 'la plata' }

@@ -240,11 +240,11 @@ export type PendienteCuenta = {
   capturaId: null
   /** La pregunta: un botón de otra pregunta no elige. */
   revision: string
-  mensajeId: string
-  mensaje: unknown
-  texto: string | null
-  porAudio: boolean
+  /** Lo que mandó sin decir la cuenta, en orden: la que elija vale para todo. */
+  mensajes: MensajeSinCuenta[]
   /** Lo que estaba abierto (en la cuenta del vínculo) cuando llegó lo nuevo. */
   anterior: Pendiente | PendienteInfra | PendienteMortandad | PendienteTurno | null
   cuentas: Cuenta[]
 }
+
+export type MensajeSinCuenta = { mensajeId: string; mensaje: unknown; texto: string | null; porAudio: boolean }

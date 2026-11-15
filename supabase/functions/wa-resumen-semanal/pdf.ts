@@ -14,11 +14,11 @@ export async function pdfSemana(datos: SemanaCampo): Promise<Uint8Array> {
   let page = pdf.addPage([W, H]), y = H - 145
   function addPage() {
     page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: bone })
-    page.drawText('TROPERO', { x: margin, y: H - 54, font: bold, size: 24, color: terracota })
+    page.drawText('TROPPERO', { x: margin, y: H - 54, font: bold, size: 24, color: terracota })
     page.drawText('Tu campo, a mano.', { x: margin, y: H - 75, font: normal, size: 10, color: ink })
     page.drawText('RESUMEN SEMANAL', { x: margin, y: H - 111, font: bold, size: 16, color: ink })
     page.drawLine({ start: { x: margin, y: 38 }, end: { x: W - margin, y: 38 }, color: terracota, thickness: 0.6 })
-    page.drawText(`Tropero | ${datos.periodo.desde} al ${datos.periodo.hasta} | Página ${pdf.getPageCount()}`, { x: margin, y: 24, font: normal, size: 8, color: ink })
+    page.drawText(`Troppero | ${datos.periodo.desde} al ${datos.periodo.hasta} | Página ${pdf.getPageCount()}`, { x: margin, y: 24, font: normal, size: 8, color: ink })
   }
   addPage()
   function draw(text: string, title: boolean) {
@@ -49,8 +49,8 @@ export async function pdfSemana(datos: SemanaCampo): Promise<Uint8Array> {
     y -= 3
   }
   for (const line of lineasSemana(datos)) draw(line.texto, line.tipo === 'titulo')
-  pdf.setTitle(`Tropero - Resumen semanal - ${datos.periodo.hasta}`)
-  pdf.setAuthor('Tropero')
+  pdf.setTitle(`Troppero - Resumen semanal - ${datos.periodo.hasta}`)
+  pdf.setAuthor('Troppero')
   pdf.setSubject('Registros del campo: lluvia, recorridas, novedades, gastos, hacienda y vencimientos')
   return await pdf.save()
 }

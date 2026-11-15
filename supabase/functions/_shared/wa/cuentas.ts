@@ -56,13 +56,29 @@ function corto(s: string, max = 110): string {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t
 }
 
+/** Lo que mandó, para nombrarlo en un aviso: «vacuné 12» o «esos 3 mensajes». */
+export function loQueMando(dichos: string[]): string {
+  return dichos.length > 1 ? `esos ${dichos.length} mensajes` : (dichos[0] ?? 'lo que mandaste')
+}
+
 /**
  * La pregunta. Las cuentas en orden alfabético y ninguna marcada: no hay una
- * sugerida. Con hasta 3 y nombres que entran, botones; si no, una lista.
+ * sugerida. Con hasta 3 y nombres que entran, botones; si no, una lista. Si
+ * mandó varias cosas sin decir la cuenta, se nombran todas: la que elija vale
+ * para todas (si son de cuentas distintas, cancela y las manda de a una).
  */
-export function preguntaCuenta(cuentas: Cuenta[], deQue: string, revision: string, aviso = ''): Mensaje {
+export function preguntaCuenta(cuentas: Cuenta[], dichos: string[], revision: string, aviso = ''): Mensaje {
   const orden = [...cuentas].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-  const texto = `${aviso}¿De qué cuenta es ${deQue}?\n\nTocá la cuenta o escribime su nombre. Hasta que me digas, no cargo nada.`
+  let pregunta: string
+  if (dichos.length > 1) {
+    // Cortos: con los botones, la pregunta entera tiene que entrar en un mensaje (1024).
+    const vistos = dichos.slice(0, 6).map((d, i) => `${i + 1}. ${d.length > 64 ? `${d.slice(0, 62).trimEnd()}…»` : d}`)
+    if (dichos.length > 6) vistos.push(`y ${dichos.length - 6} más`)
+    pregunta = `¿De qué cuenta son estos ${dichos.length} mensajes?\n${vistos.join('\n')}\n\nTocá la cuenta o escribime su nombre: vale para todos. Si no son todos de la misma cuenta, escribime «cancelar» y mandámelos de a uno. Hasta que me digas, no cargo nada.`
+  } else {
+    pregunta = `¿De qué cuenta es ${loQueMando(dichos)}?\n\nTocá la cuenta o escribime su nombre. Hasta que me digas, no cargo nada.`
+  }
+  const texto = `${aviso}${pregunta}`
   const opciones = orden.map((c) => ({ id: botonCuenta(c.id, revision), titulo: c.nombre }))
   if (orden.length <= 3 && orden.every((c) => c.nombre.length <= 20)) return { texto, botones: opciones }
   return {
