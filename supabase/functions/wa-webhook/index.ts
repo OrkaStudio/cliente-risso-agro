@@ -49,6 +49,8 @@ import { atenderInfra, cargarEnUbicacion, ofrecerCarga, type IOInfra } from './i
 import { potreroCercano } from '../_shared/wa/infraestructura.ts'
 import * as pilotoStore from './piloto-store.ts'
 import { fusionarRecorrida } from '../_shared/wa/piloto.ts'
+import { ahoraEnVarias, ayudaVariasCuentas, cuentaPorTexto, deQueSeTrata, enLaCuenta, leerBotonCuenta, leerBotonInvitacion, preguntaCuenta, preguntaInvitacion } from '../_shared/wa/cuentas.ts'
+import type { Cuenta, PendienteCuenta } from '../_shared/wa/tipos.ts'
 
 const NO_VINCULADO =
   'Hola. Tu número no está vinculado a una cuenta de Troppero. Para pedir acceso, escribí a francisco@troppero.com.'
@@ -159,7 +161,8 @@ async function drenarCola(vinculo:db.Vinculo,avisar=false):Promise<void>{
       }
       try {
         const actual = await db.vinculoDe(vinculo.telefono)
-        if (!actual || actual.id !== vinculo.id || actual.empresa_id !== vinculo.empresa_id) throw new Error('El vínculo cambió; revisar antes de procesar')
+        // La cuenta de la conversación puede cambiar entre mensajes (varias cuentas, 14/11): la persona no.
+        if (!actual || actual.id !== vinculo.id || actual.user_id !== vinculo.user_id) throw new Error('El vínculo cambió; revisar antes de procesar')
         if ((job.cuerpo as MensajeMeta).from !== vinculo.telefono) throw new Error('Mensaje de otro vínculo')
         await procesar(job.cuerpo as MensajeMeta, job.mensajeId, actual)
         await terminarTrabajo(job.mensajeId, job.token)
@@ -168,13 +171,23 @@ async function drenarCola(vinculo:db.Vinculo,avisar=false):Promise<void>{
 }
 
 async function responder(v: db.Vinculo | null, to: string, m: Mensaje): Promise<void> {
-  for (const parte of meta.prepararMensajes(m)) {
+  // Con varias cuentas, todo lo que se contesta en una lleva su nombre arriba.
+  for (const parte of meta.prepararMensajes(enLaCuenta(m, v?.cuenta))) {
     const r = await meta.enviar(to, parte)
     await db.guardarSaliente({ wamid: r.wamid, telefono: to, vinculo: v, cuerpo: r.cuerpo })
   }
 }
 
-async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null): Promise<void> {
+/** Lo que ya se sabe de un mensaje que se retoma al elegir la cuenta (varias cuentas, 14/11). */
+type Previo = { texto: string | null; porAudio: boolean; elegida: boolean }
+
+async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null, previo?: Previo): Promise<void> {
+  await procesarMensaje(m, mensajeId, v, previo)
+  // Con todo resuelto, si otro campo lo invitó, se le ofrece (como mucho una vez por día).
+  if (v && !previo) await ofrecerInvitacion(m.from).catch((e) => console.error('ofrecer invitación', e))
+}
+
+async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null, previo?: Previo): Promise<void> {
   if (!v) {
     // Una cuenta de la empresa o una invitación «Sólo por WhatsApp»: queda vinculado con este mensaje (permisos, 14/11).
     const auto = await db.autovincular(m.from).catch((e) => (console.error('autovincular', e), null))
@@ -182,17 +195,77 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       await responder(null, m.from, { texto: NO_VINCULADO })
       return
     }
+    // Con varias cuentas no se nombra una: se dicen todas y que se va a preguntar (varias cuentas, 14/11).
+    if (auto.cuentas.length > 1) {
+      await responder(auto.vinculo, m.from, { texto: `Listo: tu WhatsApp quedó conectado a Troppero.\n\n${ayudaVariasCuentas(auto.nombre, auto.cuentas)}` })
+      return
+    }
     const ctx = await db.contexto(auto.vinculo, hoyAR())
     const hola = auto.nuevo ? `Listo${auto.nombre ? `, ${auto.nombre}` : ''}: ya estás en Troppero, en ${auto.empresa}.` : `Listo: tu WhatsApp quedó conectado a Troppero, en ${auto.empresa}.`
     await responder(auto.vinculo, m.from, { texto: `${hola}\n\n${ayuda(ctx.nombre, ctx)}` })
     return
   }
-  await meta.leidoYEscribiendo(m.id)
+  if (!previo) await meta.leidoYEscribiendo(m.id)
+
+  // Aceptar o no la invitación de otro campo: con el botón, en cualquier momento.
+  const invitacion = leerBotonInvitacion(m.interactive?.button_reply?.id)
+  if (invitacion) {
+    const r = await db.responderInvitacion(v, invitacion.token, invitacion.acepta)
+    if (!r) { await responder(null, m.from, { texto: 'Esa invitación ya no está disponible. Si la necesitás, pedí que te inviten de nuevo.' }); return }
+    if (invitacion.acepta) {
+      // Ahora está en varias: lo abierto queda, y lo nuevo se pregunta.
+      await responder(null, m.from, { texto: ahoraEnVarias(r.empresa, await db.cuentasDe(v.user_id)) })
+    } else {
+      await responder(null, m.from, { texto: `Listo, no te sumé a ${r.empresa}. Si cambiás de idea, pedile que te invite de nuevo.` })
+    }
+    return
+  }
+
+  // ── Varias cuentas (Lau, 14/11) ──────────────────────────────────────────
+  // Quien está en varias cuentas nunca carga sin decir de cuál: lo nuevo se
+  // pregunta, con botones y sin ninguna sugerida. Lo que contesta a algo abierto
+  // (el potrero que se le preguntó, el «sí» de una propuesta) sigue en la cuenta
+  // de eso. Todo lo que se le contesta lleva el nombre de la cuenta arriba.
+  const cuentas: Cuenta[] = v.varias ? await db.cuentasDe(v.user_id) : []
+  const varias = cuentas.length > 1
+  // Le preguntaron la cuenta y después quedó en una sola (lo sacaron de la otra): ya no hay qué elegir.
+  if (!varias && v.pendiente?.tipo === 'cuenta') {
+    await db.guardarPendiente(v.id, null)
+    v = { ...v, pendiente: null }
+  }
+  let aviso = ''
+  if (varias && v.pendiente?.tipo === 'cuenta') {
+    const r = await atenderPreguntaDeCuenta(m, mensajeId, v, cuentas)
+    if (r === 'listo') return
+    v = r.v
+    aviso = r.aviso
+    if (r.previo) previo = r.previo
+  }
+  const confirmada = !varias || previo?.elegida === true
+  const pilotoHabilitado = Deno.env.get('WA_PILOT_ENABLED') === 'true' && colaHabilitada(v.empresa_id)
+  const hilo = v.pendiente !== null || (varias && pilotoHabilitado && (await pilotoStore.pendiente(v).catch(() => null)) !== null)
+  if (varias && (confirmada || hilo)) {
+    v = { ...v, cuenta: cuentas.find((c) => c.id === v!.empresa_id)?.nombre ?? null }
+    await db.mensajeEnLaCuenta(v, mensajeId)
+  }
+  const vSinCuenta: db.Vinculo = { ...v, cuenta: null }
+
   const hoy = hoyAR()
-  const ctx = { ...await db.contexto(v, hoy),fechaMensaje:await db.fechaDeEntrada(v,mensajeId), semanalHabilitado: Deno.env.get('WA_WEEKLY_ENABLED') === 'true', pilotoHabilitado: Deno.env.get('WA_PILOT_ENABLED') === 'true' && colaHabilitada(v.empresa_id) }
+  const ctx = { ...await db.contexto(v, hoy),fechaMensaje:await db.fechaDeEntrada(v,mensajeId), semanalHabilitado: Deno.env.get('WA_WEEKLY_ENABLED') === 'true', pilotoHabilitado }
+
+  /** Antes de algo nuevo sin la cuenta dicha: la pregunta (true = preguntó, cortar acá). */
+  const pedirCuenta = async (textoDicho: string | null, porAudioDicho: boolean): Promise<boolean> => {
+    if (confirmada) return false
+    const revision = crypto.randomUUID()
+    const pc: PendienteCuenta = { tipo: 'cuenta', capturaId: null, revision, mensajeId, mensaje: m, texto: textoDicho, porAudio: porAudioDicho, anterior: crudo, cuentas }
+    await db.guardarPendiente(v!.id, pc)
+    const deQue = deQueSeTrata({ tipo: m.type, texto: m.type === 'image' ? (m.image?.caption ?? null) : textoDicho })
+    await responder(vSinCuenta, m.from, preguntaCuenta(cuentas, deQue, revision, aviso))
+    return true
+  }
 
   // Lo que el bot preguntó hace mucho ya no se espera.
-  let crudo = v.pendiente
+  let crudo = v.pendiente as Exclude<db.Vinculo['pendiente'], PendienteCuenta>
   const edad = v.pendiente_at ? Date.now() - new Date(v.pendiente_at).getTime() : 0
   if (crudo && edad > (crudo.tipo === 'ubicado' ? UBICADO_VENCE_MS : PENDIENTE_VENCE_MS)) {
     const ids = crudo.tipo === 'turno'
@@ -217,12 +290,18 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
   const compuesto = turno ? { turno, io: ioCompuesto } : undefined
 
   let capturaId: string | null = null
+  let texto = ''
+  let porAudio = false
   const ioInfra: IOInfra = {
     responder: msg => responder(v, v.telefono, msg),
     enviarImagen: (bytes, caption, campoId) => enviarImagenMapa(v, bytes, caption, campoId, null),
+    nuevo: async () => !(await pedirCuenta(texto, porAudio)),
   }
   try {
     if (m.type === 'location' && m.location) {
+      // La ubicación que el bot pidió sigue en esa cuenta; cualquier otra es algo nuevo.
+      const pedida = pendienteInfra?.paso === 'ubicacion' || (turno?.pasos[0]?.pendiente ?? pendiente)?.tipo === 'ubicacion'
+      if (!pedida && await pedirCuenta(null, false)) return
       if (pendienteInfra?.paso === 'ubicacion') {
         await cargarEnUbicacion({ v, ctx, mensajeId, texto: '', pendiente: pendienteInfra, entrada: 'texto' }, ioInfra, pendienteInfra, [m.location.latitude, m.location.longitude])
         return
@@ -232,23 +311,29 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       return
     }
     if (m.type === 'image' && m.image) {
+      if (await pedirCuenta(m.image.caption ?? null, false)) return
       capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada: 'foto', texto: m.image.caption ?? null })
       await foto(v, ctx, capturaId, m.image, crudo?.capturaId, compuesto)
       return
     }
     const botonId = m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? m.button?.payload
-    let texto = m.text?.body ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title ?? m.button?.text ?? ''
-    let porAudio = false
+    texto = m.text?.body ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title ?? m.button?.text ?? ''
 
     // Nota de voz: se transcribe y sigue el mismo camino que un texto
     // (también sirve para contestar lo que el bot preguntó: "veinticinco").
-    if (m.type === 'audio' && m.audio) {
+    if (m.type === 'audio' && m.audio && previo?.texto) {
+      // Ya se transcribió al preguntar la cuenta: no se vuelve a escuchar.
+      texto = previo.texto
+      porAudio = true
+    } else if (m.type === 'audio' && m.audio) {
       if (!Deno.env.get('OPENAI_API_KEY')) {
         await responder(v, m.from, { texto: AUDIO_PRONTO })
         return
       }
       const a = await meta.descargarMedia(m.audio.id)
-      texto = await transcribir(a.bytes, a.mime, pistaTranscripcion(ctx))
+      // Sin la cuenta dicha, los nombres de todas sus cuentas ayudan a entender el audio.
+      const pista = varias && !confirmada ? pistaTranscripcion({ ...ctx, campos: await db.camposDeTodas(v.user_id) }) : pistaTranscripcion(ctx)
+      texto = await transcribir(a.bytes, a.mime, pista)
       porAudio = true
       if (!texto) {
         await responder(v, m.from, { texto: 'No pude entender el audio. ¿Me lo escribís? No se cargó nada.' })
@@ -259,6 +344,19 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     if (!botonId && !texto) {
       await responder(v, m.from, { texto: 'No puedo leer ese mensaje. Mandame texto, un audio o una foto del ticket o la factura.' })
       return
+    }
+
+    // Varias cuentas y nada abierto: antes de entender nada en una cuenta, de cuál es.
+    if (varias && !confirmada && !hilo && norm(texto) !== 'soporte') {
+      if (botonId) {
+        await responder(vSinCuenta, m.from, { texto: 'Ese botón es de una conversación anterior. Mandame de nuevo lo que necesitás.' })
+        return
+      }
+      if (leer({ texto }, null, ctx).k === 'ayuda') {
+        await responder(vSinCuenta, m.from, { texto: ayudaVariasCuentas(ctx.nombre, cuentas) })
+        return
+      }
+      if (await pedirCuenta(texto, porAudio)) return
     }
 
     if (!botonId && pendienteMortandad) {
@@ -307,6 +405,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
           : { texto: '¿Qué querés consultar para ese día? Decime también el campo si corresponde.' }
       }
       if (lluvia && !(turno && niegaRecorrida(texto))) {
+        if (await pedirCuenta(texto, porAudio)) return
         const pausa = await pausarRecorridaNegada(v, pendiente, texto)
         if ('texto' in lluvia) {
           await responder(v, m.from, { texto: lluvia.texto + pausa })
@@ -327,6 +426,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     }
     const weekly = !botonId ? comandoSemanal(texto ?? '') : null
     if (weekly) {
+      if (await pedirCuenta(texto, porAudio)) return
       if (Deno.env.get('WA_WEEKLY_ENABLED') !== 'true') {
         // El paquete puede incluir código preparado, pero no consulta las tablas
         // del resumen ni ofrece documentos hasta activar su piloto completo.
@@ -345,6 +445,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     if (!turno && await atenderPiloto({v,ctx,mensajeId,texto,botonId,pendiente}, {
       responder: msg => responder(v,v.telefono,msg),
       limpiarPendiente: () => db.guardarPendiente(v.id,null),
+      nuevo: async () => !(await pedirCuenta(texto, porAudio)),
       avanzar: async b => {
         capturaId = await db.crearCaptura({vinculo:v,mensajeId,entrada:porAudio?'audio':'texto',texto})
         await avanzar(v,ctx,capturaId,b,[],mensajeId)
@@ -441,6 +542,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
         return
       }
       case 'nuevo': {
+        if (await pedirCuenta(texto, porAudio)) return
         const entrada = porAudio ? 'audio' : botonId ? 'boton' : 'texto'
         capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada, texto })
         const { interpretacion, pedidos, uso } = await interpretar(texto, ctx, undefined, true)
@@ -933,7 +1035,7 @@ async function confirmarRecorrida(v: db.Vinculo, ctx: Contexto, capturaId: strin
  */
 async function enviarImagenMapa(v: db.Vinculo, bytes: Uint8Array, caption: string, campoId: string, capturaId: string | null): Promise<void> {
   const mediaId = await meta.subirImagen(bytes, bytes[0] === 255 ? 'troppero-mapa.jpg' : 'troppero-mapa.png')
-  const r = await meta.enviarImagen(v.telefono, mediaId, caption)
+  const r = await meta.enviarImagen(v.telefono, mediaId, enLaCuenta({ texto: caption }, v.cuenta).texto)
   await db.guardarSaliente({ wamid: r.wamid, telefono: v.telefono, vinculo: v, cuerpo: { ...r.cuerpo, tropero_mapa: { campo_id: campoId, captura_id: capturaId } } })
 }
 
@@ -975,4 +1077,92 @@ async function ubicacion(
   }
   await db.guardarPendiente(v.id, { tipo: 'ubicado', capturaId: null, ubicado: { potreroId: p.id, campoId: p.campoId, punto } })
   await responder(v, to, ofrecerCarga(`Estás en el *${p.nombre}* de ${p.campo}. Contame qué ves. Si querés cargar algo que está acá, elegí qué es o escribilo («tanque australiano»).`))
+}
+
+/**
+ * Le preguntamos de qué cuenta era lo que mandó (varias cuentas, 14/11). Si
+ * contesta con el botón o con el nombre, se sigue con aquel mensaje en esa
+ * cuenta. Si manda otra cosa, aquello no se carga (se le dice) y lo nuevo sigue
+ * su camino: si es nuevo, se vuelve a preguntar.
+ */
+async function atenderPreguntaDeCuenta(
+  m: MensajeMeta, mensajeId: string, v: db.Vinculo, cuentas: Cuenta[],
+): Promise<'listo' | { v: db.Vinculo; aviso: string; previo?: Previo }> {
+  const pc = v.pendiente as PendienteCuenta
+  const sinCuenta = { ...v, cuenta: null }
+  const deQue = deQueSeTrata({ tipo: (pc.mensaje as MensajeMeta).type, texto: (pc.mensaje as MensajeMeta).type === 'image' ? ((pc.mensaje as MensajeMeta).image?.caption ?? null) : pc.texto })
+  // Lo de hace más de 12 horas ya no se espera.
+  if (v.pendiente_at && Date.now() - new Date(v.pendiente_at).getTime() > PENDIENTE_VENCE_MS) {
+    await db.guardarPendiente(v.id, null)
+    return { v: { ...v, pendiente: null }, aviso: '' }
+  }
+  let elegida: Cuenta | null = null
+  let texto: string | null = null
+  let porAudio = false
+  const boton = leerBotonCuenta(m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id)
+  if (boton) {
+    if (boton.revision !== pc.revision) {
+      await responder(sinCuenta, m.from, { texto: 'Ese botón es de una pregunta anterior. Elegí la cuenta en la última que te mandé.' })
+      return 'listo'
+    }
+    elegida = cuentas.find((c) => c.id === boton.empresaId) ?? null
+    if (!elegida) {
+      await responder(sinCuenta, m.from, preguntaCuenta(cuentas, deQue, pc.revision, 'Esa cuenta ya no está entre las tuyas. '))
+      return 'listo'
+    }
+  } else if (m.type === 'text' || m.type === 'audio') {
+    texto = m.text?.body ?? ''
+    if (m.type === 'audio' && m.audio && Deno.env.get('OPENAI_API_KEY')) {
+      const a = await meta.descargarMedia(m.audio.id)
+      texto = await transcribir(a.bytes, a.mime, cuentas.map((c) => c.nombre).join(', '))
+      porAudio = true
+    }
+    const t = norm(texto).replace(/[¿?¡!.,]+/g, '').trim()
+    if (/^(cancelar|cancela|no|nada|ninguna|dejalo|deja)$/.test(t)) {
+      await db.guardarPendiente(v.id, pc.anterior)
+      await responder(sinCuenta, m.from, { texto: `Listo, no cargué ${deQue}.` })
+      return 'listo'
+    }
+    elegida = cuentaPorTexto(texto, cuentas)
+  }
+  if (!elegida) {
+    // Otra cosa: aquello no se carga, se le dice, y esto sigue (lo abierto de antes vuelve a estar).
+    await db.guardarPendiente(v.id, pc.anterior)
+    return {
+      v: { ...v, pendiente: pc.anterior },
+      aviso: `No cargué ${deQue}: no me dijiste de qué cuenta era. Si era para cargar, mandámelo de nuevo.\n\n`,
+      // El audio ya se escuchó: no se vuelve a transcribir.
+      previo: porAudio && texto ? { texto, porAudio: true, elegida: false } : undefined,
+    }
+  }
+  const misma = elegida.id === v.empresa_id
+  const antes = cuentas.find((c) => c.id === v.empresa_id)?.nombre ?? 'la otra cuenta'
+  if (!misma && pc.anterior) {
+    // Lo que estaba abierto era de otra cuenta: queda sin terminar, y se le dice.
+    const ids = pc.anterior.tipo === 'turno' ? [...pc.anterior.pasos.map((x) => x.pendiente.capturaId), pc.anterior.anterior?.capturaId] : [pc.anterior.capturaId]
+    for (const id of ids) if (id) await abandonar(id)
+  }
+  if (!(await db.pasarALaCuenta(v, elegida.id, pc.mensajeId, misma ? pc.anterior : null))) {
+    await responder(sinCuenta, m.from, { texto: 'No pude pasar a esa cuenta: ya no está entre las tuyas. No cargué nada.' })
+    return 'listo'
+  }
+  const enLaElegida: db.Vinculo = { ...v, empresa_id: elegida.id, pendiente: misma ? pc.anterior : null, cuenta: elegida.nombre }
+  if (!misma && pc.anterior) await responder(sinCuenta, m.from, { texto: `Dejé sin terminar lo que tenías abierto en ${antes}.` })
+  await procesar(pc.mensaje as MensajeMeta, pc.mensajeId, enLaElegida, { texto: pc.texto, porAudio: pc.porAudio, elegida: true })
+  return 'listo'
+}
+
+const QUE_MANDA: Record<string, string> = { hacienda: 'la hacienda', campos: 'los campos', plata: 'la plata' }
+
+/** Otro campo lo invitó «Sólo por WhatsApp» y ya usa el bot: se le ofrece, sin cortar lo que está haciendo. */
+async function ofrecerInvitacion(telefono: string): Promise<void> {
+  const v = await db.vinculoDe(telefono)
+  if (!v || v.pendiente) return
+  const inv = await db.invitacionParaOfrecer(v)
+  if (!inv) return
+  const secciones = Object.entries(inv.niveles ?? {}).filter(([, n]) => n === 'solo_manda').map(([s]) => QUE_MANDA[s]).filter(Boolean)
+  const y = secciones.length > 1 ? `${secciones.slice(0, -1).join(', ')} y ${secciones.at(-1)}` : (secciones[0] ?? '')
+  const queHace = y ? `Ahí vas a poder mandarme lo de ${y}.` : ''
+  await db.invitacionOfrecida(inv.id)
+  await responder(null, telefono, preguntaInvitacion(inv.empresa, inv.invita, inv.token, queHace))
 }

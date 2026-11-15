@@ -31,6 +31,19 @@ await test('activar es individual y desactivar deja de seleccionar el vínculo',
 await test('no se puede activar con empresa/usuario ajenos al vínculo',async()=>{
   let denied=false;try{await store.configurar({...v,empresa_id:X,user_id:UX},true)}catch{denied=true}equal(denied,true)
 })
+await test('con varias cuentas (14/11): un resumen por cuenta, cada envío de una sola',async()=>{
+  await sql`insert into miembro_empresa values(${U},${X})`
+  const enX={...v,empresa_id:X}
+  await store.configurar(v,true);await store.configurar(enX,true)
+  equal((await store.destinatarios(period)).map(r=>`${r.id}@${r.empresa_id}`).sort(),[`${V}@${E}`,`${V}@${X}`].sort())
+  // Apagar una no apaga la otra.
+  await store.configurar(enX,false);equal((await store.destinatarios(period)).map(r=>r.empresa_id),[E])
+  // Cada cuenta reclama su envío, independiente de la otra.
+  await store.configurar(enX,true);equal(Boolean(await store.reclamar(v,period))&&Boolean(await store.reclamar(enX,period)),true)
+  // Si lo sacan de una, ésa deja de mandarse y no se puede volver a activar.
+  await sql`delete from miembro_empresa where user_id=${U} and empresa_id=${X}`
+  let denied=false;try{await store.configurar(enX,true)}catch{denied=true}equal(denied,true)
+})
 await test('cuatro jobs simultáneos reclaman una sola entrega de la semana',async()=>{
   await store.configurar(v,true);const claims=await Promise.all(Array.from({length:4},()=>store.reclamar(v,period)));equal(claims.filter(Boolean).length,1)
 })
@@ -87,7 +100,7 @@ await test('gastos por devengo excluyen ingreso/anulado/otros períodos y conser
   equal((await db.datosSemana(v,period)).gastos,[{campo:'Don Gilberto',categoria:'Combustible',cantidad:1,total:1200.5}]);equal((await db.datosSemana(vx,period)).gastos,[])
 })
 await test('hacienda incluye animales sin potrero y excluye bajas/empresa ajena',async()=>{
-  await sql`insert into animal values(${id('d3',1)},${E},${P},'vaca','activo'),(${id('d3',2)},${E},null,'vaca','activo'),(${id('d3',3)},${E},${P},'vaca','muerto'),(${id('d3',4)},${X},${PX},'ternero','activo')`
+  await sql`insert into animal(id,empresa_id,potrero_id,categoria,estado) values(${id('d3',1)},${E},${P},'vaca','activo'),(${id('d3',2)},${E},null,'vaca','activo'),(${id('d3',3)},${E},${P},'vaca','muerto'),(${id('d3',4)},${X},${PX},'ternero','activo')`
   equal((await db.datosSemana(v,period)).hacienda.map(r=>[r.campo,r.cabezas]),[['Don Gilberto',1],['Sin potrero asignado',1]])
 })
 await test('vencimientos incluye vencidos y próximos siete días sin truncar',async()=>{

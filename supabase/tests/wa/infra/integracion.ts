@@ -786,21 +786,114 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
       }
     })
 
+    // Lo sacan de una cuenta pero sigue en otra (varias cuentas, 14/11): el número
+    // sigue vinculado, en la que le queda, y nada nuevo va a la que perdió.
     await admin`insert into miembro_empresa values (${U1},${E2})`
     await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E1}`
     try {
       const wamid = 'qa-revocado-' + crypto.randomUUID()
-      const revocado = await firmar(v1, { id: wamid, type: 'text', text: { body: 'Mensaje privado tras retirar el acceso' } })
-      assert(textos(revocado).includes('Tu número no está vinculado'), 'Reconoció un número sin acceso a la empresa')
-      const [entrada] = await admin`select cuerpo, empresa_id, vinculo_id from wa_mensaje
-        where wamid=${wamid} and telefono=${v1.telefono} and direccion='entrante'`
-      assert(entrada?.cuerpo.sin_vincular === true && !entrada.cuerpo.text
-        && entrada.empresa_id === null && entrada.vinculo_id === null,
-        'Guardó el contenido privado o lo asoció a la empresa revocada')
-    } finally {
-      await admin`insert into miembro_empresa values (${U1},${E1})`
+      await firmar(v1, { id: wamid, type: 'text', text: { body: 'Mensaje privado tras retirar el acceso' } })
+      const [entrada] = await admin`select empresa_id from wa_mensaje where wamid=${wamid} and direccion='entrante'`
+      assert(entrada && entrada.empresa_id !== E1, 'Asoció el mensaje a la empresa de la que lo sacaron')
+      const [vin] = await admin`select empresa_id from wa_vinculo where id=${v1.id}`
+      assert(vin?.empresa_id === E2, 'El vínculo siguió en la empresa de la que lo sacaron')
+      // Sin ninguna cuenta: el número ya no está vinculado y no se guarda lo que dice.
       await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
+      const wamid2 = 'qa-revocado-' + crypto.randomUUID()
+      const revocado = await firmar(v1, { id: wamid2, type: 'text', text: { body: 'Otro mensaje privado sin ninguna cuenta' } })
+      assert(textos(revocado).includes('Tu número no está vinculado'), 'Reconoció un número sin acceso a ninguna empresa')
+      const [sin] = await admin`select cuerpo, empresa_id, vinculo_id from wa_mensaje
+        where wamid=${wamid2} and telefono=${v1.telefono} and direccion='entrante'`
+      assert(sin?.cuerpo.sin_vincular === true && !sin.cuerpo.text
+        && sin.empresa_id === null && sin.vinculo_id === null,
+        'Guardó el contenido privado o lo asoció a una empresa revocada')
+    } finally {
+      await admin`insert into miembro_empresa values (${U1},${E1}) on conflict do nothing`
+      await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
+      await admin`update wa_vinculo set empresa_id=${E1}, pendiente=null, pendiente_at=null where id=${v1.id}`
     }
+
+    await test('Varias cuentas: pregunta siempre de cuál es, no la arrastra, y carga sólo en la elegida', async () => {
+      // El mismo usuario en «QA Uno» y «QA Dos» (las dos tienen un potrero 9B).
+      await admin`insert into miembro_empresa values (${U1},${E2})`
+      const hoy = hoyAR()
+      const cuentasDe = (out: typeof salida) => botones(out).filter(b => b.startsWith('cta:'))
+      try {
+        // Algo nuevo: antes de entenderlo en una cuenta, la pregunta; ninguna marcada, en orden.
+        interpretarComo = { intent: 'lluvia', mm: 20, fecha: hoy, campo: 'Campo Ajeno' }
+        let out = await texto(v1, 'llovieron 20')
+        let opciones = cuentasDe(out)
+        assert(textos(out).includes('¿De qué cuenta es «llovieron 20»?') && opciones.length === 2, 'No preguntó la cuenta: ' + textos(out))
+        assert(opciones[0]!.startsWith(`cta:${E2}`) && opciones[1]!.startsWith(`cta:${E1}`), 'Las cuentas no van en orden alfabético')
+        assert(!(await admin`select 1 from lluvia where mm=20`).length, 'Cargó antes de saber la cuenta')
+        const [sinCuenta] = await admin`select empresa_id from wa_mensaje where direccion='entrante' and cuerpo->'text'->>'body'='llovieron 20'`
+        assert(sinCuenta && sinCuenta.empresa_id === null, 'Registró el mensaje en una cuenta antes de que la dijera')
+        const viejo = opciones[0]!
+
+        // Elige QA Dos: sigue con aquel mensaje, en QA Dos, con su nombre arriba.
+        out = await boton(v1, opciones[0]!)
+        assert(textos(out).startsWith('*QA Dos*'), 'La propuesta no dice la cuenta: ' + textos(out))
+        const si = botones(out).find(x => x.includes('|si='))
+        assert(si, 'No propuso la lluvia en QA Dos: ' + textos(out))
+        out = await boton(v1, si!)
+        assert(textos(out).includes('*QA Dos*'), 'La confirmación no dice la cuenta')
+        let filas = await admin`select empresa_id from lluvia where mm=20`
+        assert(filas.length === 1 && filas[0].empresa_id === E2, 'No guardó sólo en la cuenta elegida')
+
+        // Lo siguiente se vuelve a preguntar: la cuenta no queda «activa».
+        interpretarComo = { intent: 'lluvia', mm: 5, fecha: hoy, campo: 'La Porteña' }
+        out = await texto(v1, 'llovieron 5')
+        assert(cuentasDe(out).length === 2, 'Arrastró la cuenta del mensaje anterior')
+        // Contesta con el nombre, por texto.
+        out = await texto(v1, 'la de uno')
+        assert(textos(out).startsWith('*QA Uno*') && botones(out).some(x => x.includes('|si=')), 'No siguió en QA Uno: ' + textos(out))
+        // Lo que contesta a la propuesta sigue en esa cuenta, sin volver a preguntar.
+        out = await texto(v1, 'Sí')
+        assert(!cuentasDe(out).length && textos(out).includes('*QA Uno*'), 'Volvió a preguntar para un «sí»: ' + textos(out))
+        filas = await admin`select empresa_id from lluvia where mm=5`
+        assert(filas.length === 1 && filas[0].empresa_id === E1, 'El «sí» no guardó en QA Uno')
+
+        // Un botón de una pregunta vieja no elige nada.
+        out = await boton(v1, viejo)
+        assert(textos(out).includes('anterior') && !(await admin`select 1 from lluvia where mm=20 and empresa_id=${E1}`).length, 'Un botón viejo eligió cuenta')
+
+        // Manda otra cosa en vez de contestar: lo anterior no se carga, se le dice, y se pregunta lo nuevo.
+        out = await texto(v1, 'llovieron 7')
+        assert(cuentasDe(out).length === 2)
+        out = await texto(v1, 'llovieron 8')
+        assert(textos(out).includes('No cargué «llovieron 7»') && textos(out).includes('¿De qué cuenta es «llovieron 8»?'), 'No avisó lo que quedó sin cargar: ' + textos(out))
+        // Cancelar: no carga nada.
+        out = await texto(v1, 'cancelar')
+        assert(textos(out).includes('no cargué «llovieron 8»'), 'No canceló: ' + textos(out))
+        assert(!(await admin`select 1 from lluvia where mm in (7,8)`).length, 'Cargó algo sin cuenta')
+
+        // La ayuda, sin cuenta elegida, nombra las dos y no carga nada.
+        out = await texto(v1, 'ayuda')
+        assert(textos(out).includes('2 cuentas') && textos(out).includes('· QA Dos'), 'Ayuda sin las cuentas: ' + textos(out))
+      } finally {
+        interpretarComo = null
+        await admin`delete from lluvia where mm in (5,7,8,20)`
+        await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
+        await admin`update wa_vinculo set empresa_id=${E1}, pendiente=null, pendiente_at=null where id=${v1.id}`
+      }
+    })
+
+    await test('Invitación de otro campo a quien ya usa el bot: se ofrece una vez y se acepta con el botón', async () => {
+      const token = 'qatoken' + crypto.randomUUID().replaceAll('-', '')
+      await admin`insert into invitacion (empresa_id, celular, nombre, acceso, niveles, token) values (${E2}, ${v1.telefono}, 'Vete', 'whatsapp', ${admin.json({ hacienda: 'no', campos: 'solo_manda', plata: 'no' })}, ${token})`
+      try {
+        interpretarComo = null
+        let out = await texto(v1, 'hola')
+        assert(botones(out).includes(`inv:si@${token}`) && textos(out).includes('QA Dos'), 'No ofreció la invitación: ' + textos(out))
+        assert(textos(out).includes('los campos'), 'No dijo qué haría ahí')
+        // Una vez por día: el siguiente mensaje no la repite.
+        out = await texto(v1, 'hola')
+        assert(!botones(out).some(b => b.startsWith('inv:')), 'Repitió la invitación')
+      } finally {
+        await admin`delete from invitacion where token=${token}`
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${v1.id}`
+      }
+    })
 
     // Apagado (como en producción hasta que la app muestre los tipos nuevos): sólo molino y tranquera.
     Deno.env.delete('WA_INFRA_TIPOS_NUEVOS')

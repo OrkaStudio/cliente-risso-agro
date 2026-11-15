@@ -225,3 +225,26 @@ export type Mensaje = {
   botones?: Boton[]
   lista?: { boton: string; filas: Boton[] }
 }
+
+/** Una cuenta de quien escribe (varias cuentas, 14/11). */
+export type Cuenta = { id: string; nombre: string }
+
+/**
+ * Quien está en varias cuentas (un veterinario que atiende varios campos) mandó
+ * algo nuevo: antes de entenderlo en una cuenta, se le pregunta de cuál es. Se
+ * guarda el mensaje (y lo que dijo el audio) para seguir con él al elegir, y lo
+ * que estaba abierto antes, que vuelve si elige la misma cuenta.
+ */
+export type PendienteCuenta = {
+  tipo: 'cuenta'
+  capturaId: null
+  /** La pregunta: un botón de otra pregunta no elige. */
+  revision: string
+  mensajeId: string
+  mensaje: unknown
+  texto: string | null
+  porAudio: boolean
+  /** Lo que estaba abierto (en la cuenta del vínculo) cuando llegó lo nuevo. */
+  anterior: Pendiente | PendienteInfra | PendienteMortandad | PendienteTurno | null
+  cuentas: Cuenta[]
+}

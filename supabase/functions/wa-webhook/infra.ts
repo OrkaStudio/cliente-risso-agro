@@ -13,6 +13,8 @@ export type EntradaInfra = { v: db.Vinculo; ctx: Contexto; mensajeId: string; te
 export type IOInfra = {
   responder: (m: Mensaje) => Promise<void>
   enviarImagen: (bytes: Uint8Array, caption: string, campoId: string) => Promise<void>
+  /** Antes de algo nuevo: con varias cuentas, pregunta de cuál es (false = preguntó, no seguir). */
+  nuevo?: () => Promise<boolean>
 }
 
 const articulo = (t: TipoInfra) => t === 'tranquera' ? 'la' : 'el'
@@ -70,6 +72,7 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
     const el = elementoDeTexto(e.texto)
     if (el && !tiposCargables().includes(el.tipo)) { await io.responder({ texto: TODAVIA_NO }); return true }
     if (el) {
+      if (!p && io.nuevo && !(await io.nuevo())) return true
       await db.guardarPendiente(e.v.id, { tipo: 'infra', capturaId: null, paso: 'ubicacion', elemento: el, origen: { texto: e.texto, entrada: e.entrada } })
       const que = `${articulo(el.tipo) === 'la' ? 'de la' : 'del'} ${NOMBRE_TIPO[el.tipo].toLowerCase()}${el.apodo ? ` ${el.apodo}` : ''}`
       await io.responder({ texto: `Mandame la ubicación ${que}: clip → Ubicación. Si no estás ahí, mové el pin sobre el mapa. Si ya la mandaste sin señal, llega sola cuando vuelva.` })
@@ -79,7 +82,11 @@ export async function atenderInfra(e: EntradaInfra, io: IOInfra): Promise<boolea
   // Un comando no pisa una carga en curso de otro tipo (una lluvia o una recorrida sin terminar).
   if (!p || p.tipo === 'ubicado' || p.tipo === 'infra') {
     const c = comandoInfra(e.texto)
-    if (c) { await comando(e, io, c); return true }
+    if (c) {
+      if (io.nuevo && !(await io.nuevo())) return true
+      await comando(e, io, c)
+      return true
+    }
   }
   return false
 }

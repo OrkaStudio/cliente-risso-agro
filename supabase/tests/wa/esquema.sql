@@ -101,3 +101,16 @@ do $$ begin
     alter table movimiento_iva_linea add column if not exists canal text not null default 'app';
   end if;
 end $$;
+
+-- Varias cuentas (14/11): la cuenta pedida (x-troppero-cuenta) recorta los
+-- permisos como en producción, y las invitaciones que el bot ofrece a quien ya lo usa.
+create or replace function cuenta_pedida() returns uuid language sql stable as $$
+  select case when h ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then h::uuid end
+  from (select nullif(current_setting('request.headers', true), '')::json ->> 'x-troppero-cuenta' as h) s $$;
+create or replace function auth_empresa_ids() returns setof uuid language sql stable set search_path to 'public' as $$
+  select empresa_id from miembro_empresa where user_id = auth.uid() and (cuenta_pedida() is null or empresa_id = cuenta_pedida()) $$;
+create table if not exists invitacion (
+  id uuid primary key default gen_random_uuid(), empresa_id uuid references empresa(id), celular text, nombre text,
+  acceso text not null default 'app', niveles jsonb, token text unique default md5(random()::text), invitado_por uuid,
+  creada_at timestamptz not null default now(), vence_at timestamptz not null default now() + interval '7 days',
+  aceptada_at timestamptz, rechazada_at timestamptz, preguntada_at timestamptz);

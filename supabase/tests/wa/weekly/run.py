@@ -16,14 +16,18 @@ try:
     project=root.parents[3]
     schema=(root.parent/'esquema.sql').read_text()+'''\n
 create role anon nologin; create role service_role nologin;
-create schema interno; create table auth.users(id uuid primary key);
-create table wa_vinculo(id uuid primary key,telefono text,user_id uuid,empresa_id uuid,activo boolean default true,pendiente jsonb,pendiente_at timestamptz);
-alter table movimiento_financiero add column fecha_vencimiento date,add column descripcion text,add column contraparte text;
-create table animal(id uuid primary key,empresa_id uuid,potrero_id uuid,categoria text,estado text);
-alter table animal enable row level security;
-create policy animal_qa on animal using (empresa_id in (select auth_empresa_ids()));
-grant select on animal to authenticated;
-'''+(project/'supabase/migrations/20261013010000_whatsapp_resumen_semanal.sql').read_text()
+create schema interno; create table if not exists auth.users(id uuid primary key);
+create table if not exists wa_vinculo(id uuid primary key,telefono text,user_id uuid,empresa_id uuid,activo boolean default true,pendiente jsonb,pendiente_at timestamptz);
+alter table movimiento_financiero add column if not exists fecha_vencimiento date,add column if not exists descripcion text,add column if not exists contraparte text;
+-- animal ya viene en esquema.sql (con su RLS).
+'''+(project/'supabase/migrations/20261013010000_whatsapp_resumen_semanal.sql').read_text()+'''
+-- Un resumen por cuenta (20261114150000_varias_cuentas_bot, sólo la parte del resumen).
+alter table interno.wa_resumen_config add column empresa_id uuid;
+alter table interno.wa_resumen_config drop constraint wa_resumen_config_pkey;
+alter table interno.wa_resumen_config add primary key (vinculo_id, empresa_id);
+alter table interno.wa_resumen_envio drop constraint wa_resumen_envio_vinculo_id_desde_hasta_key;
+alter table interno.wa_resumen_envio add constraint wa_resumen_envio_un_envio_por_cuenta unique (vinculo_id, empresa_id, desde, hasta);
+'''
     subprocess.run(['docker','exec','-i',name,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],input=schema,text=True,check=True,stdout=subprocess.DEVNULL)
     env=dict(os.environ,SUPABASE_DB_URL='postgres://postgres:qa_local_only@127.0.0.1:'+port+'/postgres',WA_QA_WEEKLY_LOCAL_DB='1')
     subprocess.run([deno,'run','--no-config','--no-lock','--node-modules-dir=none','--allow-env','--allow-net=127.0.0.1:'+port,'--allow-read',str(root/'db.test.ts')],env=env,check=True)

@@ -107,7 +107,8 @@ export async function incorporarTurno(
   }
   const nuevo: PendienteTurno = estado?.tipo === 'turno'
     ? { ...estado, pasos: [...estado.pasos, ...nuevos] }
-    : { tipo: 'turno', capturaId: null, pasos: nuevos, anterior: estado }
+    // Una pregunta de cuenta nunca queda abajo de un turno: se resuelve antes de llegar acá (varias cuentas, 14/11).
+    : { tipo: 'turno', capturaId: null, pasos: nuevos, anterior: estado?.tipo === 'cuenta' ? null : estado }
   if (await reemplazar(v, estado, nuevo, io, capturas)) await mostrar(nuevo, avisos, io)
 }
 

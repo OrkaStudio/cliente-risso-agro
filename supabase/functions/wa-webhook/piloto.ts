@@ -6,7 +6,11 @@ import type { Borrador, Contexto, Mensaje, Pendiente } from '../_shared/wa/tipos
 import type { Vinculo } from './db.ts'
 import * as store from './piloto-store.ts'
 
-type IO = { responder: (m: Mensaje) => Promise<void>; avanzar: (b: Borrador) => Promise<void>; limpiarPendiente: () => Promise<void> }
+type IO = {
+  responder: (m: Mensaje) => Promise<void>; avanzar: (b: Borrador) => Promise<void>; limpiarPendiente: () => Promise<void>
+  /** Antes de un comando nuevo: con varias cuentas, pregunta de cuál es (false = preguntó, no seguir). */
+  nuevo?: () => Promise<boolean>
+}
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 export async function atenderPiloto(d: { v: Vinculo; ctx: Contexto; mensajeId: string; texto: string; botonId?: string; pendiente: Pendiente | null }, io: IO): Promise<boolean> {
   const { v,ctx,mensajeId,texto,botonId,pendiente } = d
@@ -43,6 +47,7 @@ export async function atenderPiloto(d: { v: Vinculo; ctx: Contexto; mensajeId: s
     }
   }
   if (!comando) return false
+  if (io.nuevo && !(await io.nuevo())) return true
   // Lo que el dueño no le habilitó, se dice (permisos, 13/11).
   const habilitado = permisoPiloto(ctx.niveles ?? null, comando.k)
   if (!habilitado.ok) { await io.responder({ texto: habilitado.texto }); return true }
