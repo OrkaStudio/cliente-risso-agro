@@ -1,5 +1,6 @@
 import type { Niveles } from '@/features/empresa/secciones'
 import { VERSION_LEGALES } from '@/features/legales/textos'
+import { guardarCuentaElegida } from '@/features/empresa/cuenta-activa'
 import { supabase } from '@/lib/supabase/client'
 import { errorAlPedir, REENVIO_MS, type ErrorAlPedir } from './reglas'
 
@@ -165,9 +166,15 @@ export async function leerInvitacion(token: string): Promise<Invitacion | null |
   return { ...fila, niveles: fila.niveles as Niveles, celular: `+${fila.celular}` }
 }
 
-/** Ya con la sesión del celular invitado: queda en la empresa con su rol. */
+/**
+ * Ya con la sesión del celular invitado: queda en la empresa con su rol. Si ya
+ * estaba en otras cuentas (varias cuentas, 14/11), entra a la que acaba de
+ * aceptar: es la que eligió al tocar el link.
+ */
 export async function aceptarInvitacion(token: string): Promise<{ ok: true } | { ok: false; mensaje: string }> {
-  const { error } = await supabase.rpc('aceptar_invitacion', { p_token: token })
+  const { data, error } = await supabase.rpc('aceptar_invitacion', { p_token: token })
   if (error) return { ok: false, mensaje: error.message }
+  const { data: sesion } = await supabase.auth.getSession()
+  if (data && sesion.session) guardarCuentaElegida(sesion.session.user.id, data)
   return { ok: true }
 }

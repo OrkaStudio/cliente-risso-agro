@@ -43,7 +43,7 @@ test('el dueño invita eligiendo el nivel de cada sección, el invitado ve sólo
   await nivel(/Plata/).getByRole('radio', { name: 'No ve' }).click()
   // Cada nivel se explica, y antes de invitar se resume en una frase.
   await expect(panel).toContainText('Mira y anota. Lo que carga queda con su nombre.')
-  await expect(panel).toContainText('Ve y carga la Hacienda. No ve los Campos y la Plata y la Agenda.')
+  await expect(panel).toContainText('Ve y carga la Hacienda. No ve los Campos ni la Plata y la Agenda.')
   await panel.getByRole('button', { name: `Invitar a ${nombre.split(' ')[0]}` }).click()
   const listo = page.getByRole('dialog', { name: /Listo: invitaste a/ })
   await expect(listo).toContainText('Va a poder')
