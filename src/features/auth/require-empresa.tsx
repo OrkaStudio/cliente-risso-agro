@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Preparado } from '@/features/campo/cuenta-del-equipo'
 import { Navigate, Outlet } from 'react-router-dom'
-import { WifiOff } from 'lucide-react'
+import { PantallaCargando } from '@/components/tropero/cargando'
+import { PantallaAviso } from '@/app/pantalla-aviso'
 import { AccesoPorWhatsapp } from './acceso-por-whatsapp'
 import { useAuth } from './auth-context'
 import { fijarCuentaDelPedido } from '@/features/empresa/cuenta-activa'
@@ -64,13 +65,7 @@ export function RequireEmpresa() {
   }
 
   // Buscando activamente con red: esperar.
-  if (fetchStatus === 'fetching') {
-    return (
-      <div className="flex min-h-full items-center justify-center text-muted-foreground">
-        Cargando…
-      </div>
-    )
-  }
+  if (fetchStatus === 'fetching') return <PantallaCargando />
 
   // Sin red y sin membresía conocida (nunca cargó con señal en este equipo).
   return <SinConexionEmpresa />
@@ -106,19 +101,14 @@ function useCachesDeLaCuenta(empresaId: string | null, cuentas: Membresia[] | un
  */
 function SinConexionEmpresa() {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <WifiOff className="size-8 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">
-        Necesitás conexión la primera vez para cargar tu campo. Conectate un
-        momento y volvé a abrir la app.
-      </p>
-      <button
-        type="button"
-        onClick={() => window.location.reload()}
-        className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-      >
-        Reintentar
-      </button>
-    </div>
+    <PantallaAviso
+      pantallaEntera
+      conImagen={false}
+      titulo="Necesitás señal una vez"
+      texto="La primera vez en este equipo hay que bajar tu campo. Conectate un momento y volvé a intentar; después anda sin señal."
+      accion="Reintentar"
+      icono="Reintentar"
+      onAccion={() => window.location.reload()}
+    />
   )
 }

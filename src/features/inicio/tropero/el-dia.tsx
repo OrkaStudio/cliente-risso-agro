@@ -88,8 +88,12 @@ export function ElDia() {
   const v = delCampo(campoId, panorama.data, atender.data)
   // Con Campos en «Ve» se ve lo que hay que atender, pero «Mandar la recorrida» es cargar: lleva a mirar el campo.
   const cargaCampos = puedeCargar(membresia, 'campos')
+  // Con la Plata en «Ve», marcar «Ya lo pagué» es cargar: abre el pago para mirarlo (ahí dice quién lo marca).
+  const cargaPlata = puedeCargar(membresia, 'plata')
   const cosas = cosasParaHoy(veCampos ? v.potreros : [], plata ? v.vencimientos : [], veCampos ? v.sinRecorrer : []).map((c) =>
-    !cargaCampos && c.accion.to.startsWith('whatsapp:') ? { ...c, accion: { texto: 'Ver el campo', to: '/campos' } } : c,
+    !cargaCampos && c.accion.to.startsWith('whatsapp:') ? { ...c, accion: { texto: 'Ver el campo', to: '/campos' } }
+    : !cargaPlata && c.accion.to.startsWith('/agenda?mov=') ? { ...c, accion: { ...c.accion, texto: 'Ver' } }
+    : c,
   )
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)

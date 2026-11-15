@@ -28,6 +28,7 @@ import { useIsMobile } from '@/lib/use-is-mobile'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { ICONO_PILDORA, PILDORA } from '@/features/cotizaciones/pildora'
+import { SeccionCargando } from '@/components/tropero/cargando'
 import { BarraLateral } from './barra-lateral'
 import { useCuantasHoy } from '@/features/inicio/tropero/use-dia'
 
@@ -166,18 +167,15 @@ export function AppShell() {
         </motion.header>
 
         {/* Sólo el contenido scrollea. El padding inferior deja aire para la
-            burbuja flotante del Asistente (no tapa la última card). */}
+            burbuja flotante del Asistente (no tapa la última card): su alto
+            (56px) más su margen (24px) y un respiro. */}
         <main ref={principal} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div
             ref={contenido}
-            className="w-full px-4 pb-14 pt-7 sm:px-10 sm:pt-8"
+            className="w-full px-4 pb-28 pt-7 sm:px-10 sm:pt-8"
             style={bienvenida && !contenidoListo ? { opacity: 0 } : undefined}
           >
-            <Suspense
-              fallback={
-                <div className="text-sm text-muted-foreground">Cargando…</div>
-              }
-            >
+            <Suspense fallback={<SeccionCargando />}>
               <Outlet />
             </Suspense>
           </div>

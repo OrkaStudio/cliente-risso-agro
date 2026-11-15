@@ -252,7 +252,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={pendiente ? `La invitación de ${nombre}` : `Qué puede hacer ${nombre}`}
-      bajada={pendiente ? (p.rechazada ? 'No aceptó la invitación. Si fue un error, cancelala e invitalo de nuevo.' : vencida ? 'El link venció. Cancelala e invitalo de nuevo.' : `Todavía no entró. El link vence el ${venceEl}.`) : [nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
+      bajada={pendiente ? (p.rechazada ? 'No aceptó la invitación. Si fue un error, cancelala e invitalo de nuevo.' : vencida ? 'El link venció. Cancelala e invitalo de nuevo.' : `Todavía no entró. El link vence el ${venceEl}.`) : [nombreRol(p.rol), celularLindo(p.celular)].filter(Boolean).join(' · ')}
       ancho={!pendiente}
       chico={pendiente}
       pie={
@@ -307,7 +307,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
 }
 
 /** Quién es y qué va a ver, de un vistazo: para confirmar una invitación o revisarla. */
-function TarjetaPersona({ nombre, rol, celular, niveles, pendiente = false }: { nombre: string; rol: string; celular: string; niveles: Niveles; pendiente?: boolean }) {
+function TarjetaPersona({ nombre, rol, celular, niveles, pendiente = false }: { nombre: string; rol: string; celular: string | null; niveles: Niveles; pendiente?: boolean }) {
   return (
     <div className="overflow-hidden rounded-[22px] border border-principal/25 bg-gradient-to-br from-terracota-50 to-trigo-100">
       <div className="flex items-center gap-4 px-5 pt-5">
@@ -317,7 +317,7 @@ function TarjetaPersona({ nombre, rol, celular, niveles, pendiente = false }: { 
         <div className="min-w-0">
           <p className="truncate text-[19px] font-bold text-texto">{nombre}</p>
           <p className="truncate text-[14.5px] text-texto-suave">{nombreRol(rol)}</p>
-          <p className="t-cifra text-texto">{celularLindo(celular)}</p>
+          {celular && <p className="t-cifra text-texto">{celularLindo(celular)}</p>}
         </div>
       </div>
       <div className="mt-4 border-t border-principal/15 bg-superficie/70 px-5 py-4">

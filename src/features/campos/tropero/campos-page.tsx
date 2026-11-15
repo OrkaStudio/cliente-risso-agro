@@ -173,9 +173,11 @@ export function CamposPage() {
   const volviendo = todos ? ultimoVisto : null
   if (camposQ.isLoading || mapaQ.isLoading) return <div className="mx-auto h-[560px] w-full max-w-[1280px] animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (camposQ.error) return <p className="text-texto-suave">No pudimos cargar los campos. Revisá la conexión y probá de nuevo.</p>
+  // El mapa entra justo en la pantalla: `lg:-mb-14` le saca el aire que el shell
+  // deja abajo para la burbuja del Asistente (acá flota sobre el mapa, no tapa nada).
   if (todos)
     return (
-      <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
+      <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)] lg:-mb-14">
         {/* El encabezado, con la misma letra que el resto: «Estás viendo» chico y el título grande (Lau, 09/11). */}
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -219,7 +221,7 @@ export function CamposPage() {
   const lugar = [tipoCampoLabel[campo.tipo], campo.ubicacion.localidad].filter(Boolean).join(' · ')
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)]">
+    <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)] lg:-mb-14">
       {/* Arriba: qué campo se está viendo (se elige en la barra izquierda) y sumar otro. */}
       <div className="flex items-end justify-between gap-3">
         <div>
