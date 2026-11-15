@@ -99,3 +99,38 @@ test('si la cuenta elegida ya no es suya (lo sacaron), vuelve a preguntar', asyn
   await page.reload()
   await expect(page.getByRole('list', { name: 'Tus cuentas' }).getByRole('button')).toHaveCount(2)
 })
+
+test('con cargas sin subir de una cuenta no entra a otra hasta que suban: vuelve a la suya', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await entrarComoVete(page)
+  await page.getByRole('list', { name: 'Tus cuentas' }).getByRole('button', { name: /E2E Otra Estancia/ }).click()
+  await expect(page.getByRole('button', { name: /Estás en E2E Otra Estancia/ })).toBeVisible()
+
+  // Un gasto cargado sin señal en la Otra que no subió (quedó con error: no se reintenta solo).
+  // (con el módulo de la app, así la base del teléfono queda con su forma).
+  const cola = (accion: 'agregar' | 'sacar') => page.evaluate(async (accion) => {
+    const ruta = '/src/features/campo/plata/db.ts'
+    const { platadb } = (await import(/* @vite-ignore */ ruta)) as { platadb: { outbox: { put: (x: object) => Promise<unknown>; delete: (id: string) => Promise<void> } } }
+    if (accion === 'agregar') await platadb.outbox.put({ id: 'e2e-sin-subir', estado: 'error', created_at: new Date().toISOString() })
+    else await platadb.outbox.delete('e2e-sin-subir')
+  }, accion)
+  await page.waitForLoadState('networkidle')
+  await cola('agregar')
+
+  // Entra a la otra cuenta por fuera del selector (como al aceptar una invitación).
+  await page.evaluate((e2e) => {
+    const todas = JSON.parse(localStorage.getItem('troppero.cuenta.v1') ?? '{}') as Record<string, string>
+    for (const k of Object.keys(todas)) todas[k] = e2e
+    localStorage.setItem('troppero.cuenta.v1', JSON.stringify(todas))
+  }, E2E)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Antes de entrar a E2E Pruebas' }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText(/una carga hecha sin señal en E2E Otra Estancia/).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByRole('radio', { name: /E2E Campo base/ })).toHaveCount(0)
+
+  // Vuelve a la suya, con lo suyo.
+  await page.getByRole('button', { name: 'Volver a E2E Otra Estancia' }).click()
+  await expect(page.getByRole('button', { name: /Estás en E2E Otra Estancia/ })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('radio', { name: /La de la Otra/ })).toBeVisible()
+  await cola('sacar')
+})

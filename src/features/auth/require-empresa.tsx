@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import type { Preparado } from '@/features/campo/cuenta-del-equipo'
 import { Navigate, Outlet } from 'react-router-dom'
 import { WifiOff } from 'lucide-react'
 import { AccesoPorWhatsapp } from './acceso-por-whatsapp'
 import { useAuth } from './auth-context'
 import { fijarCuentaDelPedido } from '@/features/empresa/cuenta-activa'
-import { ElegirCuentaPage } from '@/features/empresa/elegir-cuenta'
+import { CargasDeOtraCuenta, ElegirCuentaPage } from '@/features/empresa/elegir-cuenta'
 import { leerMembresiaPersistida, useCuentas, type Membresia } from '@/features/empresa/use-empresa'
 
 /**
@@ -28,7 +29,7 @@ export function RequireEmpresa() {
   const { data, isSuccess, isError, fetchStatus } = useCuentas()
   const membresia = data?.activa ?? null
   // Lo guardado en el teléfono para andar sin señal tiene que ser de esta cuenta (varias cuentas, 14/11).
-  const listo = useCachesDeLaCuenta(isSuccess ? (membresia?.empresa_id ?? null) : null)
+  const caches = useCachesDeLaCuenta(isSuccess ? (membresia?.empresa_id ?? null) : null, data?.cuentas)
 
   // Consulta exitosa: la verdad del servidor manda.
   if (isSuccess) {
@@ -40,7 +41,11 @@ export function RequireEmpresa() {
     if (onboardingPendiente(membresia)) return <Navigate to="/onboarding" replace />
     // Invitado «Sólo por WhatsApp»: lo suyo no está en la app (permisos, 14/11).
     if (membresia.acceso === 'whatsapp') return <AccesoPorWhatsapp empresa={membresia.empresa?.nombre ?? null} otrasCuentas={data.cuentas.length > 1} />
-    if (!listo) return <div className="h-full bg-fondo" aria-busy />
+    if (!caches) return <div className="h-full bg-fondo" aria-busy />
+    if (!caches.listo) {
+      const duena = data.cuentas.find((c) => c.empresa_id === caches.duena)
+      return <CargasDeOtraCuenta cuantas={caches.cuantas} de={duena ?? null} a={membresia.empresa?.nombre ?? 'esta cuenta'} />
+    }
     return <Outlet />
   }
 
@@ -74,23 +79,25 @@ export function RequireEmpresa() {
 /**
  * Lo guardado en el teléfono para el Modo Campo es de una cuenta: al entrar con
  * otra se vacía (ver `cuenta-del-equipo.ts`). Hasta que termina, no se muestra
- * nada, así no aparece un instante lo de la cuenta anterior.
+ * nada, así no aparece un instante lo de la cuenta anterior. Si quedan cargas
+ * sin subir de otra cuenta suya, no se entra (null = revisando).
  */
-function useCachesDeLaCuenta(empresaId: string | null): boolean {
-  const [lista, setLista] = useState<string | null>(null)
+function useCachesDeLaCuenta(empresaId: string | null, cuentas: Membresia[] | undefined): Preparado | null {
+  const [hecho, setHecho] = useState<{ empresaId: string; r: Preparado } | null>(null)
+  const suyas = (cuentas ?? []).map((c) => c.empresa_id).join(',')
   useEffect(() => {
     if (!empresaId) return
     let vivo = true
     import('@/features/campo/cuenta-del-equipo')
-      .then((m) => m.prepararParaLaCuenta(empresaId))
+      .then((m) => m.prepararParaLaCuenta(empresaId, suyas.split(',')))
       // Si el teléfono no deja revisar lo guardado, se entra igual: la base sólo deja ver esta cuenta.
-      .catch(() => {})
-      .finally(() => vivo && setLista(empresaId))
+      .catch((): Preparado => ({ listo: true }))
+      .then((r) => vivo && setHecho({ empresaId, r }))
     return () => {
       vivo = false
     }
-  }, [empresaId])
-  return empresaId !== null && lista === empresaId
+  }, [empresaId, suyas])
+  return empresaId !== null && hecho?.empresaId === empresaId ? hecho.r : null
 }
 
 /**
