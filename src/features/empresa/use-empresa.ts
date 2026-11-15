@@ -1,12 +1,14 @@
 import type { Niveles } from './secciones'
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { primeraMayuscula } from '@/lib/texto'
+import { fijarCuentaDelPedido, leerCuentaElegida, olvidarCuentaElegida } from './cuenta-activa'
 
 /**
- * Empresa del usuario actual (multi-tenant). Por ahora un usuario pertenece a
- * una sola empresa; tomamos la primera membresía. La RLS ya garantiza que sólo
- * ve la(s) suya(s).
+ * La cuenta con la que trabaja el usuario (multi-tenant). Puede estar en varias
+ * (un veterinario que atiende varios campos, 14/11): con una sola, es ésa; con
+ * varias, la que eligió en este equipo, y si no eligió ninguna se le pregunta
+ * (nunca se elige sola). Ver `cuenta-activa.ts`.
  */
 
 /** Forma de la membresía tal como la devuelve la query (y la que persistimos). */
@@ -17,6 +19,8 @@ export type Membresia = {
   niveles?: Niveles | null
   /** «whatsapp»: no usa la app, manda por WhatsApp (permisos, 14/11). */
   acceso?: string
+  /** De quién es (sólo en la guardada): otro usuario del mismo equipo no entra con ella. */
+  user_id?: string
   empresa: {
     id: string
     nombre: string
@@ -57,24 +61,75 @@ function guardarMembresiaPersistida(m: Membresia | null): void {
   }
 }
 
-export function useEmpresa() {
-  return useQuery({
-    queryKey: ['empresa'],
-    // offlineFirst: la query CORRE aunque no haya red (no se queda `paused`).
-    // Sin señal el fetch falla → isError, y el guard cae a la membresía
-    // persistida en vez de colgarse en "Cargando…" para siempre.
-    networkMode: 'offlineFirst',
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('miembro_empresa')
-        .select('empresa_id, rol, niveles, acceso, empresa:empresa(id, nombre, onboarding_completo_at, mapa_completo_at, created_at)')
-        .limit(1)
-        .maybeSingle()
-      if (error) throw error
-      // El nombre como se lee: primera letra en mayúscula aunque se haya cargado «risso Agro».
-      const m: Membresia | null = data?.empresa ? { ...data, niveles: data.niveles as Niveles | null, empresa: { ...data.empresa, nombre: primeraMayuscula(data.empresa.nombre) } } : null
-      guardarMembresiaPersistida(m)
-      return m
+/** Lo que hace falta para entrar: todas sus cuentas y la elegida (null = hay que elegir). */
+export type Cuentas = { cuentas: Membresia[]; activa: Membresia | null }
+
+type FilaCuenta = {
+  empresa_id: string
+  nombre: string
+  rol: string
+  niveles: unknown
+  acceso: string
+  onboarding_completo_at: string | null
+  mapa_completo_at: string | null
+  created_at: string
+}
+
+function aMembresia(f: FilaCuenta): Membresia {
+  return {
+    empresa_id: f.empresa_id,
+    rol: f.rol,
+    niveles: f.niveles as Niveles | null,
+    acceso: f.acceso,
+    // El nombre como se lee: primera letra en mayúscula aunque se haya cargado «risso Agro».
+    empresa: {
+      id: f.empresa_id,
+      nombre: primeraMayuscula(f.nombre),
+      onboarding_completo_at: f.onboarding_completo_at,
+      mapa_completo_at: f.mapa_completo_at,
+      created_at: f.created_at,
     },
-  })
+  }
+}
+
+/** La cuenta elegida entre las suyas: la única, o la que eligió en este equipo y sigue siendo suya. */
+export function cuentaActiva(cuentas: Membresia[], elegida: string | null): Membresia | null {
+  if (cuentas.length === 1) return cuentas[0]!
+  return cuentas.find((c) => c.empresa_id === elegida) ?? null
+}
+
+const opcionesCuentas = queryOptions({
+  queryKey: ['empresa'],
+  // offlineFirst: la query CORRE aunque no haya red (no se queda `paused`).
+  // Sin señal el fetch falla → isError, y el guard cae a la membresía
+  // persistida en vez de colgarse en "Cargando…" para siempre.
+  networkMode: 'offlineFirst',
+  queryFn: async (): Promise<Cuentas> => {
+    const [{ data, error }, { data: sesion }] = await Promise.all([
+      supabase.rpc('mis_cuentas'),
+      supabase.auth.getSession(),
+    ])
+    if (error) throw error
+    const cuentas = ((data ?? []) as FilaCuenta[]).map(aMembresia)
+    const userId = sesion.session?.user.id ?? null
+    const elegida = userId ? leerCuentaElegida(userId) : null
+    // Una elegida que ya no es suya (lo sacaron) se olvida: si vuelve a tener varias, se pregunta.
+    if (userId && elegida && !cuentas.some((c) => c.empresa_id === elegida)) olvidarCuentaElegida(userId)
+    const activa = cuentaActiva(cuentas, elegida)
+    // Desde acá cada pedido a la base va con esta cuenta (o con ninguna, si hay que elegir).
+    fijarCuentaDelPedido(activa?.empresa_id ?? null)
+    // Sin cuenta elegida no queda ninguna guardada: sin señal no se entra a una al azar.
+    guardarMembresiaPersistida(activa && userId ? { ...activa, user_id: userId } : null)
+    return { cuentas, activa }
+  },
+})
+
+/** Todas sus cuentas y la elegida. */
+export function useCuentas() {
+  return useQuery(opcionesCuentas)
+}
+
+/** La cuenta con la que se trabaja (null = ninguna: sin cuentas, o con varias y sin elegir). */
+export function useEmpresa() {
+  return useQuery({ ...opcionesCuentas, select: (d: Cuentas) => d.activa })
 }

@@ -252,13 +252,13 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={pendiente ? `La invitación de ${nombre}` : `Qué puede hacer ${nombre}`}
-      bajada={pendiente ? (vencida ? 'El link venció. Cancelala e invitalo de nuevo.' : `Todavía no entró. El link vence el ${venceEl}.`) : [nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
+      bajada={pendiente ? (p.rechazada ? 'No aceptó la invitación. Si fue un error, cancelala e invitalo de nuevo.' : vencida ? 'El link venció. Cancelala e invitalo de nuevo.' : `Todavía no entró. El link vence el ${venceEl}.`) : [nombreRol(p.rol), celularLindo(p.celular)].join(' · ')}
       ancho={!pendiente}
       chico={pendiente}
       pie={
         <>
           {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-          {pendiente && p.token && !vencida && !seguro && (
+          {pendiente && p.token && !vencida && !p.rechazada && !seguro && (
             <a href={whatsappInvitacion({ celular: p.celular, nombre: p.nombre, empresa, token: p.token })} target="_blank" rel="noreferrer" className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto hover:bg-terracota-600">
               Mandárselo de nuevo por WhatsApp
               <span className="grid size-12 place-items-center rounded-full bg-acento text-acento-texto">

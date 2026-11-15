@@ -19,6 +19,8 @@ export type Persona = {
   venceAt: string | null
   token: string | null
   soyYo: boolean
+  /** La invitación la rechazó (desde el bot, si ya usaba Troppero en otra cuenta). */
+  rechazada: boolean
 }
 
 export function usePersonas(activo: boolean) {
@@ -40,6 +42,7 @@ export function usePersonas(activo: boolean) {
         venceAt: p.vence_at,
         token: p.token,
         soyYo: p.soy_yo,
+        rechazada: p.rechazada ?? false,
       }))
     },
   })

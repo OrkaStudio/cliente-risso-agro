@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
@@ -5,7 +6,9 @@ import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { nombreRol, puedeCargar, puedeVer, type Seccion } from '@/features/empresa/secciones'
-import { useEmpresa } from '@/features/empresa/use-empresa'
+import { queEsEnLaCuenta } from '@/features/empresa/cuentas'
+import { ListaCambiarCuenta } from '@/features/empresa/elegir-cuenta'
+import { useCuentas, useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
 import { abiertoSinMapa, primerPendiente, seccionBloqueada, useMapaPendiente } from '@/features/mapa/bloqueo'
 import { prefetch, CHUNKS_OFICINA } from '@/lib/prefetch'
@@ -35,6 +38,7 @@ const SECCIONES: { to: string; texto: string; icono: NombreIcono; end: boolean; 
 export function BarraLateral({ hoy }: { hoy: number }) {
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
+  const varias = (useCuentas().data?.cuentas.length ?? 0) > 1
   const quien = useQuienMira()
   const nuevosPlata = useNuevosPlata(puedeCargar(membresia, 'plata'))
   // Sin Hacienda no se cuentan cabezas (permisos, 13/11).
@@ -52,9 +56,11 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 
   return (
     <aside className="hidden h-full w-[256px] shrink-0 flex-col border-r border-borde bg-fondo md:flex">
-      <div className="px-6 pt-6 pb-7">
+      <div className={cn('px-6 pt-6', varias ? 'pb-4' : 'pb-7')}>
         <Logo alto={30} />
       </div>
+      {/* Con varias cuentas (un veterinario que atiende varios campos), siempre a la vista en cuál está. */}
+      {varias && <SelectorDeCuenta nombre={membresia?.empresa?.nombre ?? ''} detalle={membresia ? queEsEnLaCuenta(membresia) : ''} />}
 
       <nav aria-label="Oficina" className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
         <p className="shrink-0 px-3 pb-2 text-[12px] font-semibold tracking-[0.04em] text-texto-suave">Oficina</p>
@@ -216,5 +222,58 @@ function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }:
       </span>
       {cabezas !== null && <span className={cn('t-cifra-mini shrink-0', activo ? 'text-white/70' : 'text-texto-suave')}>{cabezas} cab</span>}
     </button>
+  )
+}
+
+/**
+ * La cuenta en la que estás, arriba de todo, y el cambio a otra (varias
+ * cuentas, 14/11). Lo que muestra la Oficina es siempre de ésta.
+ */
+function SelectorDeCuenta({ nombre, detalle }: { nombre: string; detalle: string }) {
+  const [abierto, setAbierto] = useState(false)
+  const caja = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: PointerEvent) => {
+      if (caja.current && !caja.current.contains(e.target as Node)) setAbierto(false)
+    }
+    const escape = (e: KeyboardEvent) => e.key === 'Escape' && setAbierto(false)
+    document.addEventListener('pointerdown', fuera)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', fuera)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [abierto])
+  return (
+    <div ref={caja} className="relative mx-3 mb-5">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-label={`Estás en ${nombre}. Cambiar de cuenta`}
+        className={cn(
+          'flex w-full items-center gap-2.5 rounded-[14px] border-[1.5px] bg-superficie px-3 py-2 text-left transition-colors',
+          abierto ? 'border-principal' : 'border-borde hover:border-principal/60',
+        )}
+      >
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-principal-suave font-heading text-[13px] font-extrabold text-acento-texto">
+          {nombre.charAt(0).toUpperCase()}
+        </span>
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block text-[11.5px] font-semibold tracking-[0.03em] text-texto-suave">Estás en</span>
+          <span className="block truncate text-[15px] font-bold text-texto">{nombre}</span>
+          <span className="sr-only">{detalle}</span>
+        </span>
+        <span className={cn('text-texto-suave transition-transform duration-200', abierto && 'rotate-180')}>
+          <Icono nombre="Desplegar" tamano={16} />
+        </span>
+      </button>
+      {abierto && (
+        <div className="absolute inset-x-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-[16px] border border-borde bg-superficie shadow-[0_16px_40px_rgba(19,27,22,0.16)]">
+          <ListaCambiarCuenta onElegido={() => setAbierto(false)} />
+        </div>
+      )}
+    </div>
   )
 }

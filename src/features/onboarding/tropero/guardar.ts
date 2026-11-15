@@ -1,6 +1,7 @@
 // Onboarding de Troppero: lo que va a la base en cada paso. Cada paso guarda al
 // tocar su botón principal (spec 2), y todo es idempotente: volver atrás y
 // guardar de nuevo reescribe, no duplica.
+import { fijarCuentaDelPedido, guardarCuentaElegida } from '@/features/empresa/cuenta-activa'
 import { supabase } from '@/lib/supabase/client'
 import {
   actualizarActividadCampo,
@@ -24,10 +25,17 @@ import {
   type TipoCampo,
 } from './modelo'
 
-/** B1: crea la empresa con el usuario como dueño. */
+/**
+ * B1: crea la empresa con el usuario como dueño. Desde acá se trabaja con ella:
+ * quien ya estaba en otras cuentas (un veterinario que suma su campo, 14/11)
+ * carga lo que sigue del onboarding en la suya, no en la que tenía abierta.
+ */
 export async function crearEmpresa(nombre: string): Promise<string> {
   const { data, error } = await supabase.rpc('crear_empresa_con_dueno', { p_nombre: nombre.trim() })
   if (error) throw new Error(error.message)
+  const { data: sesion } = await supabase.auth.getSession()
+  if (sesion.session) guardarCuentaElegida(sesion.session.user.id, data)
+  fijarCuentaDelPedido(data)
   return data
 }
 

@@ -1660,11 +1660,27 @@ export type Database = {
           niveles: Json | null
           acceso: string
           soy_yo: boolean
+          rechazada: boolean
           token: string | null
           user_id: string | null
           vence_at: string | null
         }[]
       }
+      mis_cuentas: {
+        Args: never
+        Returns: {
+          empresa_id: string
+          nombre: string
+          rol: string
+          niveles: Json | null
+          acceso: string
+          onboarding_completo_at: string | null
+          mapa_completo_at: string | null
+          created_at: string
+        }[]
+      }
+      empresa_propia: { Args: never; Returns: string | null }
+      rechazar_invitacion: { Args: { p_token: string }; Returns: undefined }
       cambiar_niveles: { Args: { p_niveles: Json; p_user: string }; Returns: undefined }
       quitar_persona: { Args: { p_invitacion: string | null; p_user: string | null }; Returns: undefined }
       auth_empresa_ids_plata: { Args: never; Returns: string[] }

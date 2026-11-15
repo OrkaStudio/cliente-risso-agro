@@ -184,7 +184,7 @@ function Personas({ empresa }: { empresa: string }) {
                       {nombreRol(p.rol)}{p.acceso === 'whatsapp' ? ' · por WhatsApp' : ''} · {resumenNiveles(p.niveles ?? {})}
                     </p>
                     <p className={cn('text-[14px] font-semibold', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
-                      {vencida ? 'El link venció: cancelala e invitalo de nuevo' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}
+                      {p.rechazada ? 'No aceptó la invitación' : vencida ? 'El link venció: cancelala e invitalo de nuevo' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
