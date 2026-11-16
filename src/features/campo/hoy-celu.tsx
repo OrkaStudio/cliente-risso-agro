@@ -41,6 +41,13 @@ import { useGenteParaRevisar, useLluviasRegistradas, type CargaDeOtro } from './
  */
 
 const CURVA = [0.22, 1, 0.36, 1] as const
+// Un solo sistema para todo Hoy (Lau, 16/11: «simplificá y estandarizá»): una
+// tarjeta, un título de sección con su bajada, un número grande y dos tamaños
+// de texto. Archivo para títulos y números grandes; Inter para todo lo demás.
+const TARJETA = 'rounded-[20px] border border-borde bg-superficie'
+const TITULO = 'titulo-display text-[20px] leading-tight text-texto'
+const BAJADA = 'text-[13.5px] text-texto-suave'
+const MONTO = 'text-[15px] font-bold tabular-nums'
 /** El cielo de la ilustración de la tranquera: arriba de la imagen sigue el mismo color. */
 const CIELO = '#de8c61'
 const ICONO_TONO: Record<Cosa['tono'], string> = {
@@ -124,7 +131,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
   const manana = t?.dias[1]
   const lluviaMes = t ? t.pasado.slice(-30).reduce((s, d) => s + d.mm, 0) : null
   // El gordo: el más reciente entre Cañuelas y el cargado a mano (como la barra de la compu).
-  const gordo = canuelas.data && (!manual.data || canuelas.data.fecha > manual.data.fecha) ? { valor: canuelas.data.valor, fecha: canuelas.data.fecha, fuente: 'Cañuelas, novillos' } : manual.data ? { valor: manual.data.valor, fecha: manual.data.fecha, fuente: 'Cargado por vos' } : null
+  const gordo = canuelas.data && (!manual.data || canuelas.data.fecha > manual.data.fecha) ? { valor: canuelas.data.valor, fecha: canuelas.data.fecha, fuente: 'Cañuelas' } : manual.data ? { valor: manual.data.valor, fecha: manual.data.fecha, fuente: 'Cargado por vos' } : null
   const fecha = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   // La frase del día: hasta dos cosas, la primera subrayada (es la que pide hacer algo).
@@ -142,7 +149,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
         <span className="absolute top-[760px] -left-24 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(232,150,110,0.22),transparent)]" />
       </div>
 
-      <div className="flex flex-col gap-7 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
+      <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
         {/* Arriba: la marca, el campo y la cuenta. */}
         <div className="flex items-center gap-2">
           <Logo alto={16} />
@@ -193,7 +200,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
         </div>
 
         {/* 1. La portada: la tranquera con el saludo en el cielo y el clima encima. */}
-        <motion.div {...entra(0)} className="relative h-[272px] overflow-hidden rounded-[26px] shadow-[0_16px_34px_-18px_rgba(90,40,15,0.5)]" style={{ background: CIELO }}>
+        <motion.div {...entra(0)} className="relative h-[272px] overflow-hidden rounded-[20px] shadow-[0_16px_34px_-18px_rgba(90,40,15,0.5)]" style={{ background: CIELO }}>
           <img src={tranquera} alt="" className="absolute bottom-0 left-0 w-full origin-bottom scale-[1.04] [mask-image:linear-gradient(180deg,transparent_0,transparent_6%,#000_14%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_62%,rgba(19,27,22,0.4))]" />
           <div className="absolute inset-x-[18px] top-4 flex flex-col gap-1">
@@ -242,23 +249,28 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
           </motion.p>
         )}
 
-        {/* 3. Tres números con su gráfico chico. */}
+        {/* 3. Los números del día: lo suyo (rodeo y plata) y el mercado (gordo y dólar). */}
         {v && (
-          <motion.div {...entra(2)} className={cn('grid gap-2', [ve.hacienda, ve.plata, !!t].filter(Boolean).length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
+          <motion.div {...entra(2)} className="grid grid-cols-2 gap-3">
             {ve.hacienda && (
-              <Numero icono="Vaca" clase="bg-principal-suave text-principal" titulo="Hacienda" valor={v.totalCabezas.toLocaleString('es-AR')} unidad="cab">
-                <Franja cats={v.porCategoria} alto="h-1.5" />
-              </Numero>
+              <Dato icono="Vaca" clase="bg-principal-suave text-principal" titulo="Hacienda" valor={v.totalCabezas.toLocaleString('es-AR')} unidad="cab">
+                <Franja cats={v.porCategoria} alto="h-2" />
+              </Dato>
             )}
             {ve.plata && (
-              <Numero icono="Plata" clase="bg-estado-problema-suave text-estado-problema-texto" titulo="30 días" valor={plataCorta(proximos30(v.vencimientos), true)} tono={proximos30(v.vencimientos) < 0 ? 'text-estado-problema-texto' : 'text-estado-bien-texto'}>
-                {vencidos.length > 0 && <span className="rounded-full bg-estado-problema-suave px-2 py-0.5 text-[11px] font-bold text-estado-problema-texto">{plural(vencidos.length, 'vencido', 'vencidos')}</span>}
-              </Numero>
+              <Dato icono="Plata" clase="bg-estado-problema-suave text-estado-problema-texto" titulo="30 días" valor={plataCorta(proximos30(v.vencimientos), true)} tono={proximos30(v.vencimientos) < 0 ? 'text-estado-problema-texto' : 'text-estado-bien-texto'}>
+                {vencidos.length > 0 ? <span className="rounded-full bg-estado-problema-suave px-2.5 py-1 text-[13px] font-bold text-estado-problema-texto">{plural(vencidos.length, 'vencido', 'vencidos')}</span> : <span className={BAJADA}>Nada vencido</span>}
+              </Dato>
             )}
-            {lluviaMes !== null && t && (
-              <Numero icono="Lluvia" clase="bg-sky-soft text-sky" titulo="Lluvia" valor={String(Math.round(lluviaMes))} unidad="mm">
-                <BarritasLluvia mm={t.pasado.slice(-30).map((d) => d.mm)} />
-              </Numero>
+            {gordo && (
+              <Dato icono="Vaca" clase="bg-acento/30 text-acento-texto" titulo="Gordo" valor={`$${Math.round(gordo.valor).toLocaleString('es-AR')}`} unidad="/kg">
+                <span className={cn(BAJADA, 'truncate')}>{gordo.fuente} · {fechaCorta(gordo.fecha)}</span>
+              </Dato>
+            )}
+            {dolar.data && (
+              <Dato icono="Plata" clase="bg-estado-bien-suave text-estado-bien-texto" titulo="Dólar blue" valor={`$${Math.round(dolar.data.venta).toLocaleString('es-AR')}`}>
+                <span className={cn(BAJADA, 'truncate')}>Venta · {fechaCorta(dolar.data.actualizado.slice(0, 10))}</span>
+              </Dato>
             )}
           </motion.div>
         )}
@@ -266,21 +278,16 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
         {/* 4. Para hacer hoy: lo urgente y lo que cargó su gente, cada uno con su botón. */}
         {v && (ve.campos || ve.plata) && (
           <motion.section {...entra(3)} aria-labelledby="hoy-hacer" className="flex flex-col gap-3">
-            <div>
-              <h2 id="hoy-hacer" className="titulo-display text-[21px] text-texto">
-                Para hacer hoy
-              </h2>
-              <p className="text-[13.5px] text-texto-suave">De lo más urgente a lo que puede esperar</p>
-            </div>
+            <Encabezado id="hoy-hacer" titulo="Para hacer hoy" bajada="De lo más urgente a lo que puede esperar" />
             {filas.length === 0 ? (
-              <p className="flex items-center gap-3 rounded-[18px] border border-borde bg-superficie px-4 py-3.5 text-[15px] text-texto">
+              <p className={cn(TARJETA, 'flex items-center gap-3 p-4 text-[15px] text-texto')}>
                 <span className="grid size-9 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
                   <Icono nombre="Guardar" tamano={16} />
                 </span>
                 Nada pendiente. Lo que cargue tu gente aparece acá.
               </p>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-3">
                 {visibles.map((f) =>
                   f.tipo === 'cosa' ? (
                     <FilaCosa key={f.cosa.key} c={f.cosa} vencimiento={vencimientos.find((x) => `v-${x.id}` === f.cosa.key)} cargaPlata={carga.plata} cargaCampos={carga.campos} empresaId={membresia?.empresa_id ?? ''} />
@@ -300,20 +307,15 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
 
         {/* 5. El contexto: la lluvia, el mercado y el rodeo. */}
         {t && (
-          <motion.section {...entra(4)} aria-labelledby="hoy-lluvia" className="rounded-[22px] border border-borde bg-superficie px-4 py-3.5">
-            <div className="flex items-baseline gap-2">
-              <h2 id="hoy-lluvia" className="titulo-display text-[20px] text-texto">
-                Lluvia
-              </h2>
-              <span className="text-[13px] text-texto-suave">30 días y los próximos 7</span>
-            </div>
+          <motion.section {...entra(4)} aria-labelledby="hoy-lluvia" className={cn(TARJETA, 'p-4')}>
+            <Encabezado id="hoy-lluvia" titulo="Lluvia" bajada="Los últimos 30 días y los próximos 7" />
             <GraficoLluvia pasado={t.pasado} dias={t.dias} registradas={registradas.data ?? new Map()} />
-            <p className="mt-2 text-[14px] text-texto-suave">
-              <b className="t-cifra-chica text-texto">{Math.round(lluviaMes ?? 0)} mm</b> en 30 días
+            <p className={cn(BAJADA, 'mt-2')}>
+              <b className={cn(MONTO, 'text-texto')}>{Math.round(lluviaMes ?? 0)} mm</b> en 30 días
               {registradas.data && registradas.data.size > 0 && (
                 <>
                   {' · '}
-                  <b className="t-cifra-chica text-texto">{Math.round([...registradas.data.values()].reduce((s, x) => s + x, 0))} mm</b> en tu pluviómetro
+                  <b className={cn(MONTO, 'text-texto')}>{Math.round([...registradas.data.values()].reduce((s, x) => s + x, 0))} mm</b> en tu pluviómetro
                 </>
               )}
               <ProximaLluvia dias={t.dias} />
@@ -321,38 +323,29 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
             <ul className="mt-3 grid grid-cols-5 border-t border-borde pt-3 text-center">
               {t.dias.slice(1, 6).map((d) => (
                 <li key={d.fecha} className="flex flex-col items-center gap-0.5">
-                  <span className="text-[12px] font-semibold text-texto-suave">{DIA_CORTO[new Date(`${d.fecha}T12:00:00`).getDay()]}</span>
+                  <span className="text-[13px] font-semibold text-texto-suave">{DIA_CORTO[new Date(`${d.fecha}T12:00:00`).getDay()]}</span>
                   <IconoDia d={d} />
-                  <span className="t-cifra-chica font-bold text-texto">{d.max}°</span>
-                  <span className={cn('text-[11.5px]', d.lluviaProb >= 40 ? 'font-bold text-sky' : 'text-texto-suave')}>{d.lluviaProb} %</span>
+                  <span className={cn(MONTO, 'text-texto')}>{d.max}°</span>
+                  <span className={cn('text-[13px]', d.lluviaProb >= 40 ? 'font-bold text-sky' : 'text-texto-suave')}>{d.lluviaProb} %</span>
                 </li>
               ))}
             </ul>
           </motion.section>
         )}
 
-        {(gordo || dolar.data) && (
-          <motion.section {...entra(5)} aria-label="El gordo y el dólar" className="grid grid-cols-2 gap-2">
-            <Mercado icono="Vaca" clase="bg-principal-suave text-principal" titulo="Gordo" valor={gordo ? `$${Math.round(gordo.valor).toLocaleString('es-AR')}` : '—'} unidad="/kg" pie={gordo ? `${gordo.fuente} · ${fechaCorta(gordo.fecha)}` : 'Sin precio'} />
-            <Mercado icono="Plata" clase="bg-estado-bien-suave text-estado-bien-texto" titulo="Dólar blue" valor={dolar.data ? `$${Math.round(dolar.data.venta).toLocaleString('es-AR')}` : '—'} pie={dolar.data ? `Venta · ${fechaCorta(dolar.data.actualizado.slice(0, 10))}` : 'Sin dato'} />
-          </motion.section>
-        )}
-
         {v && ve.hacienda && v.totalCabezas > 0 && (
-          <motion.section {...entra(6)} aria-labelledby="hoy-rodeo" className="rounded-[22px] border border-borde bg-superficie px-4 py-3.5">
-            <h2 id="hoy-rodeo" className="titulo-display text-[20px] text-texto">
-              Tu rodeo
-            </h2>
-            <p className="mt-1 flex items-baseline gap-1.5">
-              <b className="titulo-display text-[30px] font-normal text-texto">{v.totalCabezas.toLocaleString('es-AR')}</b>
-              <span className="text-[14px] text-texto-suave">{campo ? `cabezas en ${campo.nombre}` : inicio.campos.length > 1 ? `cabezas en tus ${inicio.campos.length} campos` : 'cabezas'}</span>
-            </p>
-            <Franja cats={v.porCategoria} alto="mt-2.5 h-3" />
-            <ul className="mt-3 flex flex-wrap gap-1.5">
+          <motion.section {...entra(5)} aria-labelledby="hoy-rodeo" className={cn(TARJETA, 'p-4')}>
+            <Encabezado
+              id="hoy-rodeo"
+              titulo="Tu rodeo"
+              bajada={`${v.totalCabezas.toLocaleString('es-AR')} cabezas${campo ? ` en ${campo.nombre}` : inicio.campos.length > 1 ? ` en tus ${inicio.campos.length} campos` : ''}, por categoría`}
+            />
+            <Franja cats={v.porCategoria} alto="mt-3 h-2.5" />
+            <ul className="mt-3 flex flex-wrap gap-2">
               {ordenadas(v.porCategoria).map((c) => (
-                <li key={c.categoria} className="inline-flex items-center gap-1.5 rounded-full bg-fondo py-1 pr-2.5 pl-2 text-[13px] text-texto">
+                <li key={c.categoria} className="inline-flex items-center gap-1.5 rounded-full bg-fondo py-1.5 pr-3 pl-2.5 text-[13.5px] text-texto">
                   <span className="size-2.5 rounded-[3px]" style={{ background: COLOR_CATEGORIA[c.categoria] ?? OTRO_COLOR }} />
-                  {categoriaNombre(c.categoria, c.cabezas)} <b className="t-cifra-chica">{c.cabezas.toLocaleString('es-AR')}</b>
+                  {categoriaNombre(c.categoria, c.cabezas)} <b className="font-bold tabular-nums">{c.cabezas.toLocaleString('es-AR')}</b>
                 </li>
               ))}
             </ul>
@@ -361,10 +354,8 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
 
         {/* Al invitado, lo que cargó él (al dueño, lo de su gente ya está en «Para hacer hoy»). */}
         {!dueno && (mio.data?.length ?? 0) > 0 && (
-          <motion.section {...entra(7)} aria-labelledby="hoy-mio" className="flex flex-col gap-1">
-            <h2 id="hoy-mio" className="titulo-display text-[20px] text-texto">
-              Lo que cargaste
-            </h2>
+          <motion.section {...entra(6)} aria-labelledby="hoy-mio" className="flex flex-col gap-1">
+            <Encabezado id="hoy-mio" titulo="Lo que cargaste" bajada="Lo último que mandaste" />
             <ul className="divide-y divide-borde">
               {mio.data!.map((x) => (
                 <li key={x.id} className="flex items-center gap-3 py-2.5">
@@ -373,9 +364,9 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold text-texto">{x.titulo}</span>
-                    <span className="block truncate text-[13px] text-texto-suave">{[x.detalle, cuando(x.cuando)].filter(Boolean).join(' · ')}</span>
+                    <span className={cn(BAJADA, 'block truncate')}>{[x.detalle, cuando(x.cuando)].filter(Boolean).join(' · ')}</span>
                   </span>
-                  {x.valor && <span className="t-cifra-chica shrink-0 font-bold text-texto">{x.valor}</span>}
+                  {x.valor && <span className={cn(MONTO, 'shrink-0 text-texto')}>{x.valor}</span>}
                 </li>
               ))}
             </ul>
@@ -401,38 +392,33 @@ function Subrayado({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Numero({ icono, clase, titulo, valor, unidad, tono, children }: { icono: NombreIcono; clase: string; titulo: string; valor: string; unidad?: string; tono?: string; children?: React.ReactNode }) {
+/** El título de cada sección y, debajo, para qué sirve. */
+function Encabezado({ id, titulo, bajada }: { id: string; titulo: string; bajada: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-[18px] border border-borde bg-superficie px-2.5 py-2.5">
-      <span className="flex items-center gap-1.5 text-[12px] font-semibold text-texto-suave">
-        <span className={cn('grid size-[22px] shrink-0 place-items-center rounded-full', clase)}>
-          <Icono nombre={icono} tamano={16} className="size-[13px]" />
-        </span>
-        <span className="truncate">{titulo}</span>
-      </span>
-      <span className={cn('titulo-display text-[19px] leading-tight tracking-[-0.01em] whitespace-nowrap', tono ?? 'text-texto')}>
-        {valor}
-        {unidad && <span className="ml-1 font-sans text-[11.5px] font-semibold text-texto-suave">{unidad}</span>}
-      </span>
-      <span className="flex min-h-[18px] items-end">{children}</span>
+    <div className="flex flex-col gap-0.5">
+      <h2 id={id} className={TITULO}>
+        {titulo}
+      </h2>
+      <p className={BAJADA}>{bajada}</p>
     </div>
   )
 }
 
-function Mercado({ icono, clase, titulo, valor, unidad, pie }: { icono: NombreIcono; clase: string; titulo: string; valor: string; unidad?: string; pie: string }) {
+/** Un número del día: qué es, cuánto y, abajo, su detalle. Todos iguales. */
+function Dato({ icono, clase, titulo, valor, unidad, tono, children }: { icono: NombreIcono; clase: string; titulo: string; valor: string; unidad?: string; tono?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-[20px] border border-borde bg-superficie px-3.5 py-3">
-      <span className="flex items-center gap-2 text-[12.5px] font-semibold text-texto-suave">
-        <span className={cn('grid size-6 place-items-center rounded-full', clase)}>
-          <Icono nombre={icono} tamano={16} className="size-[14px]" />
+    <div className={cn(TARJETA, 'flex min-h-[124px] min-w-0 flex-col gap-2 p-4')}>
+      <span className="flex items-center gap-2 text-[13.5px] font-semibold text-texto-suave">
+        <span className={cn('grid size-7 shrink-0 place-items-center rounded-full', clase)}>
+          <Icono nombre={icono} tamano={16} />
         </span>
-        {titulo}
+        <span className="truncate">{titulo}</span>
       </span>
-      <span className="titulo-display text-[22px] text-texto">
+      <span className={cn('titulo-display text-[26px] leading-none whitespace-nowrap', tono ?? 'text-texto')}>
         {valor}
-        {unidad && <span className="ml-1 font-sans text-[12px] text-texto-suave">{unidad}</span>}
+        {unidad && <span className="ml-1 font-sans text-[13.5px] font-semibold text-texto-suave">{unidad}</span>}
       </span>
-      <span className="truncate text-[11.5px] text-texto-suave">{pie}</span>
+      <span className="mt-auto flex min-w-0 items-center">{children}</span>
     </div>
   )
 }
@@ -470,15 +456,15 @@ function FilaCosa({ c, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: C
           : null
   const titulo = vencimiento ? `${cobro ? 'Cobrar' : 'Pagar'}: ${vencimiento.descripcion}` : `${c.lugar} · ${c.que}`
   return (
-    <li className="relative overflow-hidden rounded-[18px] border border-borde bg-superficie py-3 pr-3 pl-3.5">
-      <span aria-hidden className={cn('absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-r-full', RAYA_TONO[c.tono])} />
+    <li className={cn(TARJETA, 'relative overflow-hidden p-4')}>
+      <span aria-hidden className={cn('absolute top-4 bottom-4 left-0 w-[3px] rounded-r-full', RAYA_TONO[c.tono])} />
       <div className="flex items-start gap-3">
         <span className={cn('mt-0.5 grid size-10 shrink-0 place-items-center rounded-full', ICONO_TONO[c.tono])}>
           <Icono nombre={c.icono} tamano={16} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-snug font-semibold text-texto">{titulo}</p>
-          <p className={cn('text-[12.5px]', c.tono === 'problema' ? 'font-semibold text-estado-problema-texto' : 'text-texto-suave')}>{vencimiento ? c.datos.join(' · ').replace(/^./, (x) => x.toUpperCase()) : c.datos.join(' · ')}</p>
+          <p className={cn('text-[13.5px]', c.tono === 'problema' ? 'font-semibold text-estado-problema-texto' : 'text-texto-suave')}>{vencimiento ? c.datos.join(' · ').replace(/^./, (x) => x.toUpperCase()) : c.datos.join(' · ')}</p>
           {(accion || (c.senal && empresaId)) && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               {accion && (
@@ -505,7 +491,7 @@ function FilaCosa({ c, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: C
             </div>
           )}
         </div>
-        {vencimiento?.monto ? <span className="t-cifra-chica mt-0.5 shrink-0 font-bold text-texto">{plataCorta(vencimiento.monto)}</span> : null}
+        {vencimiento?.monto ? <span className={cn(MONTO, 'mt-0.5 shrink-0 text-texto')}>{plataCorta(vencimiento.monto)}</span> : null}
       </div>
     </li>
   )
@@ -519,8 +505,8 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
   const porWhatsapp = cargas.some((c) => c.canal === 'whatsapp')
   const que = cargas.length === 1 ? cargas[0]!.descripcion || 'Un gasto' : `${plural(cargas.length, 'carga', 'cargas')}: ${[...new Set(cargas.map((c) => c.descripcion.split(/[:·]/)[0]!.trim()).filter(Boolean))].slice(0, 2).join(', ')}`
   return (
-    <li className="relative overflow-hidden rounded-[18px] border border-borde bg-superficie py-3 pr-3 pl-3.5">
-      <span aria-hidden className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-r-full bg-acento" />
+    <li className={cn(TARJETA, 'relative overflow-hidden p-4')}>
+      <span aria-hidden className="absolute top-4 bottom-4 left-0 w-[3px] rounded-r-full bg-acento" />
       <div className="flex items-start gap-3">
         <span className="relative mt-0.5 grid size-10 shrink-0 place-items-center rounded-full bg-[#f7e7bd] text-[15px] font-extrabold text-acento-texto">
           {quien.charAt(0).toLocaleUpperCase('es-AR')}
@@ -534,7 +520,7 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-snug font-semibold text-texto">Revisar lo que cargó {quien}</p>
-          <p className="truncate text-[12.5px] text-texto-suave">
+          <p className={cn(BAJADA, 'line-clamp-2')}>
             {que} · {cuando(cargas[0]!.cuando)}
           </p>
           <button type="button" onClick={() => setAbierto((x) => !x)} aria-expanded={abierto} className="mt-2.5 h-9 rounded-full border-[1.5px] border-principal/55 px-4 text-[13.5px] font-bold text-principal">
@@ -547,9 +533,9 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
                   <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-[14px]">
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-texto">{c.descripcion || (c.tipo === 'ingreso' ? 'Cobro' : 'Gasto')}</span>
-                      <span className="text-[12px] text-texto-suave">{cuando(c.cuando)}</span>
+                      <span className={BAJADA}>{cuando(c.cuando)}</span>
                     </span>
-                    <span className="t-cifra-chica shrink-0 font-bold">{c.tipo === 'ingreso' ? '+' : '−'}{pesos(c.monto)}</span>
+                    <span className={cn(MONTO, 'shrink-0')}>{c.tipo === 'ingreso' ? '+' : '−'}{pesos(c.monto)}</span>
                   </li>
                 ))}
               </ul>
@@ -570,7 +556,7 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
             </div>
           )}
         </div>
-        <span className={cn('t-cifra-chica mt-0.5 shrink-0 font-bold', total < 0 ? 'text-texto' : 'text-estado-bien-texto')}>{plataCorta(total)}</span>
+        <span className={cn(MONTO, 'mt-0.5 shrink-0', total < 0 ? 'text-texto' : 'text-estado-bien-texto')}>{plataCorta(total)}</span>
       </div>
     </li>
   )
@@ -592,16 +578,6 @@ function Franja({ cats, alto }: { cats: CategoriaConteo[]; alto: string }) {
   )
 }
 
-/** Las barritas de la lluvia del mes, en chico. */
-function BarritasLluvia({ mm }: { mm: number[] }) {
-  const max = Math.max(1, ...mm)
-  return (
-    <svg viewBox={`0 0 ${mm.length * 2} 18`} preserveAspectRatio="none" className="h-[18px] w-full" aria-hidden>
-      {mm.map((x, i) => (x > 0.2 ? <rect key={i} x={i * 2} y={18 - Math.max(2, (x / max) * 18)} width="1.4" height={Math.max(2, (x / max) * 18)} fill="var(--sky)" /> : null))}
-    </svg>
-  )
-}
-
 /** «· el martes vienen 13,6 mm», si en la semana viene algo que valga decir. */
 function ProximaLluvia({ dias }: { dias: DiaPronostico[] }) {
   const d = dias.slice(1, 7).find((x) => x.lluviaMm >= 5)
@@ -610,7 +586,7 @@ function ProximaLluvia({ dias }: { dias: DiaPronostico[] }) {
   return (
     <>
       {' · '}
-      {dia} vienen <b className="t-cifra-chica text-sky">{d.lluviaMm.toLocaleString('es-AR', { maximumFractionDigits: 1 })} mm</b>
+      {dia} vienen <b className={cn(MONTO, 'text-sky')}>{d.lluviaMm.toLocaleString('es-AR', { maximumFractionDigits: 1 })} mm</b>
     </>
   )
 }
