@@ -8,9 +8,10 @@ import { AvisoEstadoCampo, ChipEstadoCampo } from '@/features/campo/estado-campo
 import { useSeedOffline } from '@/features/campo/use-seed-offline'
 import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
+import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
-import { cargaDeRuta, puedeCargar } from '@/features/empresa/secciones'
+import { cargaDeRuta, nivelDe, puedeCargar } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 
 /**
@@ -25,7 +26,7 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 const NAV: { to: string; label: string; icono: NombreIcono; end: boolean }[] = [
   { to: '/campo', label: 'Hoy', icono: 'Inicio', end: true },
   { to: '/campo/recorrida', label: 'Recorrida', icono: 'Recorrida', end: false },
-  { to: '/campo/manga', label: 'Manga', icono: 'Manga', end: false },
+  // La Manga vuelve después del lanzamiento (Lau, 16/11: sin bastón todavía).
   { to: '/campo/plata', label: 'Plata', icono: 'Plata', end: false },
 ]
 
@@ -81,6 +82,9 @@ export function CampoShell() {
   const enHoy = useLocation().pathname === '/campo'
   const mapaPendiente = useMapaPendiente()
   // Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos.
+  // Mandar un audio: quien carga algo de los campos o la plata (lo demás no se carga por WhatsApp).
+  const manda = (sec: 'campos' | 'plata') => ['carga', 'solo_manda'].includes(nivelDe(membresia, sec))
+  const puedeMandar = manda('campos') || manda('plata')
   const navegables = NAV.filter(({ to }) => { const s = cargaDeRuta(to); return !s || puedeCargar(membresia, s) })
 
   return (
@@ -139,13 +143,14 @@ export function CampoShell() {
           un círculo terracota. Sin el mapa, sólo Hoy: lo demás necesita el campo. */}
       {/* En flujo (no flotando encima): así no tapa los pies fijos de la recorrida y la manga. */}
       {/* Con una sola sección (el que sólo mira Hoy), la barra no tiene a dónde llevar: no va. */}
-      {navegables.length > 1 && (
+      {(navegables.length > 1 || puedeMandar) && (
       <nav aria-label="Modo Campo" className="shrink-0 bg-fondo px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between rounded-full bg-superficie p-1.5 shadow-[0_8px_28px_rgba(19,27,22,0.18)]">
           {/* Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos. */}
-          {navegables.map(({ to, label, icono, end }) => {
-            const cerrada = mapaPendiente && to !== '/campo'
-            return (
+          {(() => {
+            const links = navegables.map(({ to, label, icono, end }) => {
+              const cerrada = mapaPendiente && to !== '/campo'
+              return (
               <NavLink
                 key={to}
                 to={cerrada ? '/campo' : to}
@@ -165,8 +170,25 @@ export function CampoShell() {
                 <Icono nombre={icono} />
                 {label}
               </NavLink>
-            )
-          })}
+              )
+            })
+            // En el medio, el audio a Troppero: lo que se carga en el campo (Lau, 16/11). Con una sola sección, al lado.
+            if (puedeMandar) links.splice(links.length === 1 ? 1 : Math.ceil(links.length / 2), 0, (
+                <button
+                  key="audio"
+                  type="button"
+                  onClick={() => window.open(`https://wa.me/${WHATSAPP_TROPERO}`, '_blank', 'noopener')}
+                  aria-label="Mandale un audio a Troppero"
+                  className="flex h-[62px] flex-1 flex-col items-center justify-center gap-1 text-[12px] font-semibold text-texto"
+                >
+                  <span className="grid size-10 place-items-center rounded-full bg-texto text-superficie">
+                    <Icono nombre="Celular" tamano={16} />
+                  </span>
+                  Audio
+                </button>
+            ))
+            return links
+          })()}
         </div>
       </nav>
       )}
