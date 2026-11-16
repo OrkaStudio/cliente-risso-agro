@@ -11,6 +11,9 @@ test('agenda: algo que vence aparece en su semana, se marca pagado y se deshace'
 
   await page.getByRole('button', { name: 'Anotar un pago o un cobro' }).click()
   const panel = page.getByRole('dialog', { name: 'Algo que vence' })
+  // Nada viene elegido: «Anotar un pago o un cobro» no dice cuál (16/11).
+  await expect(panel.getByRole('radio', { checked: true })).toHaveCount(0)
+  await panel.getByRole('radio', { name: 'A pagar' }).click()
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('4200')
   const enQue = panel.getByRole('group', { name: 'En qué' })
   if (!(await enQue.getByRole('button', { name: 'Combustible', exact: true }).count())) await enQue.getByRole('button', { name: /^Ver las \d+$/ }).click()

@@ -27,6 +27,8 @@ import { useParaAtender } from '../para-atender-api'
 import { delCampo, enCarriles, escenaDelClima, chipsDelDia, cosasParaHoy, franjasDelRodeo, lineaDePlata, plataCorta, proximos30, saludo, type Chip, type Cosa, type PuntoPlata } from './dia'
 import { useCampoElegido, type CampoElegible } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
+import { useCamposConPotreros } from '@/features/campos/hooks'
+import { caraSinHacienda, type CaraSinHacienda } from '@/features/hacienda/tropero/sin-hacienda'
 import { EscenaClima } from './escena-clima'
 import { useGanadoCampania, useLluviaDelMes } from './use-dia'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
@@ -71,6 +73,7 @@ export function ElDia() {
   const mandaPlata = !!membresia && nivelDe(membresia, 'plata') === 'solo_manda'
   const mandaCampos = !!membresia && nivelDe(membresia, 'campos') === 'solo_manda'
   const panorama = usePanoramaInicio()
+  const camposQ = useCamposConPotreros()
   const atender = useParaAtender()
   const inicio = useCampoElegido()
   const campoId = inicio.elegido?.id ?? null
@@ -86,6 +89,11 @@ export function ElDia() {
   if (panorama.error || !panorama.data) return <p className="text-texto-suave">No pudimos cargar el Inicio. Revisá la conexión y probá de nuevo.</p>
 
   const v = delCampo(campoId, panorama.data, atender.data)
+  // Un campo agrícola sin hacienda (Lau, 16/11): lo sembrado en lugar de las cabezas
+  // y sin el rodeo vacío. Con «Todos», sólo si todos son agrícolas; uno ganadero sin
+  // animales sigue viendo la hacienda (le falta cargarla).
+  const camposDeLaVista = (camposQ.data ?? []).filter((c) => !campoId || c.id === campoId)
+  const agricola = v.totalCabezas === 0 && camposDeLaVista.length > 0 ? sembradoDe(camposDeLaVista.map(caraSinHacienda)) : null
   // Con Campos en «Ve» se ve lo que hay que atender, pero «Mandar la recorrida» es cargar: lleva a mirar el campo.
   const cargaCampos = puedeCargar(membresia, 'campos')
   // Con la Plata en «Ve», marcar «Ya lo pagué» es cargar: abre el pago para mirarlo (ahí dice quién lo marca).
@@ -113,11 +121,11 @@ export function ElDia() {
         {...entra(1)}
         className={cn('grid grid-cols-2 overflow-hidden rounded-[20px] border border-borde bg-superficie [&>*]:border-borde max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*+*]:border-l', ['', 'lg:grid-cols-1', 'lg:grid-cols-2', 'lg:grid-cols-3', 'lg:grid-cols-4'][1 + Number(veHacienda) + Number(plata) + Number(veCampos)])}
       >
-        {veHacienda && <PulsoHacienda total={v.totalCabezas} campos={campoId ? 1 : inicio.campos.length} cats={v.porCategoria} nacimientos={v.nacimientos} />}
+        {veHacienda && (agricola ? <PulsoSembrado {...agricola} /> : <PulsoHacienda total={v.totalCabezas} campos={campoId ? 1 : inicio.campos.length} cats={v.porCategoria} nacimientos={v.nacimientos} />)}
         {/* La plata sólo para quien el dueño se la habilitó (Configuración → Personas). */}
         {plata && <PulsoPlata vencimientos={v.vencimientos} ganado={ganado.data ?? null} />}
         <PulsoLluvia lugar={lugar?.nombre ?? null} mm={lluvia.data ?? null} manana={manana ?? null} />
-        {veCampos && <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} />}
+        {veCampos && <PulsoRecorrida ultima={v.ultimaRecorridaHace} potreros={v.potreros.length} sinRecorrer={v.sinRecorrer} carga={cargaCampos} />}
       </motion.div>
 
       {/* Quien sólo manda: cómo mandar y lo último que mandó (permisos, 14/11). */}
@@ -136,10 +144,10 @@ export function ElDia() {
       {/* El campo hoy: el rodeo y el clima en un solo panel, divididos por una línea. */}
       <motion.div
         {...entra(3)}
-        className={cn('grid overflow-hidden rounded-[20px] border border-borde bg-superficie', veHacienda && 'lg:grid-cols-[minmax(0,1fr)_360px]')}
+        className={cn('grid overflow-hidden rounded-[20px] border border-borde bg-superficie', veHacienda && !agricola && 'lg:grid-cols-[minmax(0,1fr)_360px]')}
       >
-        {veHacienda && <EstructuraDelRodeo cats={v.porCategoria} total={v.totalCabezas} campo={inicio.elegido?.nombre ?? null} />}
-        <div className={cn('border-borde', veHacienda && 'max-lg:border-t lg:border-l')}>
+        {veHacienda && !agricola && <EstructuraDelRodeo cats={v.porCategoria} total={v.totalCabezas} campo={inicio.elegido?.nombre ?? null} />}
+        <div className={cn('border-borde', veHacienda && !agricola && 'max-lg:border-t lg:border-l')}>
           <Clima lugar={lugar} />
         </div>
       </motion.div>
@@ -348,6 +356,40 @@ function PulsoHacienda({ total, campos, cats, nacimientos }: { total: number; ca
   )
 }
 
+/** Lo sembrado de los campos agrícolas de la vista (null si alguno no es agrícola). */
+function sembradoDe(caras: CaraSinHacienda[]): { hectareas: number; sembrado: { cultivo: string; hectareas: number }[] } | null {
+  if (!caras.every((c) => c.tipo === 'agricola')) return null
+  const porCultivo = new Map<string, number>()
+  let hectareas = 0
+  for (const c of caras) {
+    if (c.tipo !== 'agricola') continue
+    hectareas += c.hectareas
+    for (const x of c.sembrado) porCultivo.set(x.cultivo, (porCultivo.get(x.cultivo) ?? 0) + x.hectareas)
+  }
+  return { hectareas, sembrado: [...porCultivo].map(([cultivo, ha]) => ({ cultivo, hectareas: ha })).sort((a, b) => b.hectareas - a.hectareas) }
+}
+
+const ha = (n: number) => `${Math.round(n).toLocaleString('es-AR')} ha`
+
+function PulsoSembrado({ hectareas, sembrado }: { hectareas: number; sembrado: { cultivo: string; hectareas: number }[] }) {
+  const total = sembrado.reduce((s, x) => s + x.hectareas, 0)
+  return (
+    <Pulso
+      titulo="Sembrado"
+      icono="Campos"
+      tinte="bg-estado-bien-suave text-estado-bien-texto"
+      destino="/campos"
+      pieTono={null}
+      pie={sembrado.length ? sembrado.slice(0, 2).map((x) => `${x.cultivo} ${ha(x.hectareas)}`).join(' · ') : `${ha(hectareas)} de campo, nada sembrado`}
+    >
+      <span className="flex items-baseline gap-2">
+        <span className={NUMERO}>{Math.round(total).toLocaleString('es-AR')}</span>
+        <span className="text-[14px] font-semibold text-texto-suave">ha</span>
+      </span>
+    </Pulso>
+  )
+}
+
 function PulsoPlata({ vencimientos, ganado }: { vencimientos: Vencimiento[]; ganado: number | null }) {
   const p30 = proximos30(vencimientos)
   const vencidos = vencimientos.filter((v) => (v.diasParaVencer ?? 0) < 0)
@@ -403,9 +445,16 @@ function PulsoLluvia({ lugar, mm, manana }: { lugar: string | null; mm: number |
   )
 }
 
-function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | null; potreros: number; sinRecorrer: { campo: string }[] }) {
-  // Más de dos semanas sin recorrer (o nunca): el número en color de atención.
-  const vieja = ultima === null || ultima > 14
+function PulsoRecorrida({ ultima, potreros, sinRecorrer, carga }: { ultima: number | null; potreros: number; sinRecorrer: { campo: string }[]; carga: boolean }) {
+  // Todavía no hubo ninguna: no es una alarma (un campo recién empezado) ni «todo en orden».
+  if (ultima === null)
+    return (
+      <Pulso titulo="Última recorrida" icono="Recorrida" tinte="bg-superficie-hundida text-texto-suave" destino="#para-atender" pieTono={null} pie={carga ? 'La primera la mandás por WhatsApp' : 'Todavía no hay ninguna'}>
+        <span className={NUMERO}>Todavía no</span>
+      </Pulso>
+    )
+  // Más de dos semanas sin recorrer: el número en color de atención.
+  const vieja = ultima > 14
   return (
     <Pulso
       titulo="Última recorrida"
@@ -423,8 +472,8 @@ function PulsoRecorrida({ ultima, potreros, sinRecorrer }: { ultima: number | nu
         )
       }
     >
-      {ultima === null || ultima <= 1 ? (
-        <span className={cn(NUMERO, vieja && 'text-estado-atencion-texto')}>{ultima === null ? 'Nunca' : ultima === 0 ? 'Hoy' : 'Ayer'}</span>
+      {ultima <= 1 ? (
+        <span className={cn(NUMERO, vieja && 'text-estado-atencion-texto')}>{ultima === 0 ? 'Hoy' : 'Ayer'}</span>
       ) : (
         <span className="flex items-baseline gap-2">
           <span className="text-[14px] font-semibold text-texto-suave">hace</span>

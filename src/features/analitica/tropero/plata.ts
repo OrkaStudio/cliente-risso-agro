@@ -290,7 +290,12 @@ export function comparacionCorta(a: Anio): { sube: boolean; texto: string } | nu
 }
 
 /** El período de la lista de movimientos. */
-export type Rango = 'mes' | 'anio' | '12m' | 'todo'
+/** Los períodos de Movimientos: los mismos de Plata (12 meses y las campañas) y los del calendario. */
+export type Rango = 'mes' | 'anio' | '12m' | 'campana' | 'pasada' | 'todo'
+export const RANGOS_VALIDOS: Rango[] = ['mes', 'anio', '12m', 'campana', 'pasada', 'todo']
+
+/** El período de Plata, como período de Movimientos (para abrir el detalle de lo que se miraba). */
+export const rangoDePeriodo = (clave: Periodo['clave']): Rango => (clave === 'doce' ? '12m' : clave)
 
 /** Lo que ya entró o salió en el período (lo pendiente vive en «Lo que viene» y la Agenda). */
 export function enRango(m: MovimientoConDetalle, r: Rango, hoy: string): boolean {
@@ -299,6 +304,10 @@ export function enRango(m: MovimientoConDetalle, r: Rango, hoy: string): boolean
   if (r === 'todo') return true
   if (r === 'mes') return f.slice(0, 7) === hoy.slice(0, 7)
   if (r === 'anio') return f.slice(0, 4) === hoy.slice(0, 4)
+  if (r === 'campana' || r === 'pasada') {
+    const p = periodos(hoy).find((x) => x.clave === r)!
+    return f >= p.desde && f <= p.hasta
+  }
   return f > restarDias(hoy, 365) && f <= hoy
 }
 

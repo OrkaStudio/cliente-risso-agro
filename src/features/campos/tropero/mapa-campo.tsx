@@ -132,6 +132,10 @@ export function MapaCampo({
       L.polygon([mundo, campo.contorno], { pane: 'potreros', stroke: false, fillColor: '#131b16', fillOpacity: 0.5, interactive: false }).addTo(g)
       L.polygon(campo.contorno, { pane: 'potreros', color: '#fbfaf6', weight: 2.5, opacity: 0.9, fill: false, interactive: false }).addTo(g)
     }
+    // Los nombres de potreros chicos se pisan: el que no entra en su potrero o choca con
+    // uno ya puesto (de mayor a menor) se esconde hasta acercarse. El potrero sigue
+    // tocándose; el nombre del elegido se ve siempre.
+    const nombres: { el: () => HTMLElement | undefined; area: number; si: boolean; poligono: L.LatLng[] }[] = []
     for (const p of campo.potreros) {
       if (!p.poligono) continue
       const si = p.id === elegido
@@ -155,14 +159,45 @@ export function MapaCampo({
       pol
         .bindTooltip(`<b>${esc(p.nombre)}</b>${d ? `<span>${esc(d)}</span>` : ''}`, { pane: 'potreros', permanent: true, direction: 'center', className: si ? 'tropero-nombre tropero-nombre--si' : otro ? 'tropero-nombre tropero-nombre--otro' : 'tropero-nombre' })
         .openTooltip()
+      const b = pol.getBounds()
+      nombres.push({ el: () => pol.getTooltip()?.getElement(), area: (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest()), si, poligono: (pol.getLatLngs() as L.LatLng[][])[0] ?? [] })
       if (si) pol.bringToFront()
     }
+    const map = mapa.current
+    const acomodar = () => {
+      const puestos: DOMRect[] = []
+      for (const n of [...nombres].sort((a, b) => Number(b.si) - Number(a.si) || b.area - a.area)) {
+        const el = n.el()
+        if (!el) continue
+        el.classList.remove('tropero-nombre--oculto')
+        const r = el.getBoundingClientRect()
+        const choca = puestos.some((q) => r.left < q.right + 2 && r.right > q.left - 2 && r.top < q.bottom + 2 && r.bottom > q.top - 2)
+        // Lo que ocupa el potrero en pantalla: si el nombre no entra holgado, se sale sobre los vecinos.
+        const pts = map ? n.poligono.map((ll) => map.latLngToContainerPoint(ll)) : []
+        const areaPx = Math.abs(pts.reduce((t, p, i) => t + p.x * pts[(i + 1) % pts.length]!.y - pts[(i + 1) % pts.length]!.x * p.y, 0)) / 2
+        const noEntra = pts.length > 2 && areaPx < r.width * r.height * 2.5
+        if ((choca || noEntra) && !n.si) el.classList.add('tropero-nombre--oculto')
+        else puestos.push(r)
+      }
+    }
+    // Después de que el mapa ubica los nombres (al terminar de moverse o de acercarse).
+    let cuadro = 0
+    const programar = () => {
+      cancelAnimationFrame(cuadro)
+      cuadro = requestAnimationFrame(acomodar)
+    }
+    programar()
+    map?.on('zoomend moveend', programar)
     for (const m of marcas)
       L.marker([m.lat, m.lng], {
         pane: 'potreros',
         interactive: false,
         icon: L.divIcon({ className: 'tropero-marca', html: `<span title="${m.tipo}">${svg(ICONO[m.tipo])}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] }),
       }).addTo(g)
+    return () => {
+      cancelAnimationFrame(cuadro)
+      map?.off('zoomend moveend', programar)
+    }
   }, [campo, elegido, color, dato, marcas])
 
   return <div ref={host} className="size-full bg-tinta" role="group" aria-label={`Mapa de ${campo.nombre}`} />

@@ -99,12 +99,12 @@ test('A4: el invitado entra por el link con su código y queda en la empresa, si
 
   // El link ya no sirve otra vez.
   await page.goto(`/invitacion/${token}`)
-  await expect(page.getByText('Esta invitación ya se usó')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Esta invitación ya se usó' }).filter({ visible: true }).first()).toBeVisible()
 })
 
 test('A4: un link que no es de una invitación avisa', async ({ page }) => {
   await page.goto('/invitacion/no-existe')
-  await expect(page.getByText('Esta invitación ya no sirve')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Esta invitación ya no sirve' }).filter({ visible: true }).first()).toBeVisible()
 })
 
 test('A5 afuera: explica los tres caminos, sin pedir el CUIT', async ({ page }) => {

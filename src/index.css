@@ -954,6 +954,10 @@
 .tropero-nombre.leaflet-tooltip::before {
   display: none;
 }
+/* Un nombre que se pisaría con otro (potreros chicos): se esconde hasta acercarse. */
+.tropero-nombre.tropero-nombre--oculto {
+  opacity: 0;
+}
 .tropero-nombre b {
   font-family: var(--font-heading);
   font-weight: 800;

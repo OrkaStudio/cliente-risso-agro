@@ -17,7 +17,7 @@ import { Cabecera } from '@/components/tropero/cabecera'
 import { useDolarHistorico } from './dolar'
 import { AnotarPlata } from './anotar-plata'
 import { MesAMes } from './mes-a-mes'
-import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Periodo } from './plata'
+import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, rangoDePeriodo, resumenPeriodo, type Aviso, type Periodo } from './plata'
 import { usePermiso } from '@/features/empresa/use-permiso'
 import { useNuevosPlata } from '@/features/analitica/hooks'
 
@@ -27,7 +27,8 @@ const pesos = (n: number) => fmtCompact(n)
 const conSigno = (n: number) => (n >= 0 ? `+${fmtCompact(n)}` : fmtCompact(n))
 const diaYmes = (ymd: string) => {
   const d = new Date(`${ymd}T12:00:00`)
-  return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' }).replace(/^\w/, (c) => c.toUpperCase())
+  // Con el mes: «Sábado 19» solo no dice si es este mes o el que viene.
+  return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, (c) => c.toUpperCase())
 }
 
 /**
@@ -123,7 +124,7 @@ export function PlataPage() {
       <motion.div {...entra(0)}>
         <Cabecera imagen={trigal} posicion="50% 62%" encima={<CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />} derecha={
             <>
-              <Link to="/analitica/movimientos" className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
+              <Link to={`/analitica/movimientos?rango=${rangoDePeriodo(clave)}`} className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
                 Ver los movimientos
                 <Icono nombre="Siguiente" tamano={16} />
               </Link>
@@ -171,7 +172,7 @@ export function PlataPage() {
           )}
           {/* Lo que se hace con la plata, todo junto y a la vista. */}
           <div className="mt-5 flex flex-wrap gap-2.5">
-            {empresaId && <span data-guia="analitica-cargar" className="contents"><AnotarPlata empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(() => abrir(), 'Anotar un gasto')} /></span>}
+            {empresaId && <span data-guia="analitica-cargar" className="contents"><AnotarPlata empresaId={empresaId} campoInicial={campoId ?? undefined} tipo="gasto" renderTrigger={(abrir) => anotar(() => abrir(), 'Anotar un gasto')} /></span>}
             {empresaId && (
               <AnotarPlata
                 empresaId={empresaId}

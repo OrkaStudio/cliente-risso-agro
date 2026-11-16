@@ -96,6 +96,9 @@ test('plata: un sueldo que se repite queda con el mismo monto cada mes', async (
   await page.getByRole('link', { name: 'Agenda', exact: true }).click()
   await page.getByRole('button', { name: 'Anotar un pago o un cobro' }).click()
   const panel = page.getByRole('dialog', { name: 'Algo que vence' })
+  // Nada viene elegido: «Anotar un pago o un cobro» no dice cuál (16/11).
+  await expect(panel.getByRole('radio', { checked: true })).toHaveCount(0)
+  await panel.getByRole('radio', { name: 'A pagar' }).click()
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('2900000')
   await enQue(panel, 'Combustible')
   await panel.getByRole('button', { name: 'Seguir' }).click()

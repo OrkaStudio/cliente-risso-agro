@@ -51,8 +51,8 @@ export function TeInvitaronPage() {
           ? { titulo: 'Esta invitación ya se usó', texto: 'Si sos vos, entrá con tu celular.' }
           : { titulo: 'Esta invitación ya no sirve', texto: 'Pedile al dueño que te mande una nueva.' }
     return (
-      <AccesoLayout tituloCompu="Te esperan en el campo." tituloCelu="Te esperan en el campo.">
-        <TarjetaWhatsApp tipo="error" titulo={caso.titulo} pie={caso.texto} />
+      // Con título y bajada, como las otras pantallas de entrada (relevamiento 15/11).
+      <AccesoLayout tituloCompu="Te esperan en el campo." tituloCelu="Te esperan en el campo." encabezado={{ titulo: caso.titulo, bajada: caso.texto }}>
         {carga.tipo === 'sin-senal' ? (
           <BotonPrincipal icono="Reintentar" onClick={() => window.location.reload()}>
             Probar de nuevo
