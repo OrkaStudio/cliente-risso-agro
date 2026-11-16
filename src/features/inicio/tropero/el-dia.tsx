@@ -995,7 +995,7 @@ function DiaCorto({ d }: { d: DiaPronostico }) {
 }
 
 /** El ícono del día con su color: sol trigo, nube gris, lluvia celeste, tormenta violeta, helada azul. */
-function IconoDia({ d }: { d: DiaPronostico }) {
+export function IconoDia({ d }: { d: DiaPronostico }) {
   const c = d.code
   const tono =
     c >= 95

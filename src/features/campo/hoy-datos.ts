@@ -5,52 +5,29 @@ import { supabase } from '@/lib/supabase/client'
 /** Hace N días, en ISO (para filtrar por created_at o fecha). */
 const haceDias = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 
-export type Novedad = { id: string; cuando: string; quien: string; tipo: 'plata' | 'lluvia' | 'recorrida'; titulo: string; detalle: string | null }
-
-const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
-
-/** Lo de la observación que vale contar: lo que no está normal. */
-function queVio(o: { agua: string | null; pasto: string | null; electrico: string | null; novedad: string | null }): string {
-  const partes = [
-    o.novedad,
-    o.agua && o.agua !== 'normal' ? `agua ${o.agua}` : null,
-    o.pasto && o.pasto !== 'normal' ? `pasto ${o.pasto}` : null,
-    o.electrico && o.electrico !== 'ok' ? `eléctrico ${o.electrico}` : null,
-  ].filter(Boolean)
-  return partes.length ? partes.join(', ') : 'todo normal'
-}
+export type CargaDeOtro = { id: string; descripcion: string; monto: number; tipo: string; cuando: string; por: string; canal: string }
 
 /**
- * Lo que cargó la gente del campo en la última semana (Hoy del dueño, 16/11):
- * gastos, lluvias y lo que vio en la recorrida, con quién lo cargó. Lo de uno
- * mismo no (eso ya lo sabe). La base deja ver sólo lo de esta cuenta.
+ * Lo que cargó la gente del campo y todavía no se miró (la marca «Nuevo» de
+ * Plata): va a «Para hacer hoy» de quien carga la plata (Lau, 16/11).
  */
-export function useLoNuevoDeTuGente({ enabled, nombreDe }: { enabled: boolean; nombreDe: (id: string) => string }) {
+export function useGenteParaRevisar(enabled: boolean) {
   const { user } = useAuth()
   return useQuery({
-    queryKey: ['hoy-lo-nuevo', user?.id],
+    queryKey: ['movimientos', 'hoy-para-revisar', user?.id],
     enabled: enabled && !!user,
-    queryFn: async (): Promise<(Omit<Novedad, 'quien'> & { por: string })[]> => {
-      const desde = haceDias(7)
-      const [m, l, o] = await Promise.all([
-        supabase.from('movimiento_financiero').select('id, descripcion, monto, tipo, created_at, created_by').neq('created_by', user!.id).gte('created_at', desde).neq('estado', 'anulado').order('created_at', { ascending: false }).limit(10),
-        supabase.from('lluvia').select('id, mm, created_at, created_by, campo(nombre)').neq('created_by', user!.id).gte('created_at', desde).order('created_at', { ascending: false }).limit(10),
-        supabase.from('observacion_potrero').select('id, agua, pasto, electrico, novedad, created_at, created_by, potrero(nombre)').neq('created_by', user!.id).gte('created_at', desde).order('created_at', { ascending: false }).limit(10),
-      ])
-      if (m.error) throw m.error
-      if (l.error) throw l.error
-      if (o.error) throw o.error
-      const nombre = (x: { nombre: string } | { nombre: string }[] | null) => (Array.isArray(x) ? x[0]?.nombre : x?.nombre) ?? null
-      return [
-        ...(m.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, por: x.created_by!, tipo: 'plata' as const, titulo: `${x.descripcion || (x.tipo === 'ingreso' ? 'Cobro' : 'Gasto')} · ${pesos(Number(x.monto))}`, detalle: null })),
-        ...(l.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, por: x.created_by!, tipo: 'lluvia' as const, titulo: `${Number(x.mm)} mm${nombre(x.campo) ? ` en ${nombre(x.campo)}` : ''}`, detalle: null })),
-        ...(o.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, por: x.created_by!, tipo: 'recorrida' as const, titulo: `${nombre(x.potrero) ?? 'Potrero'} · ${queVio(x)}`, detalle: null })),
-      ]
-        .filter((x) => x.por)
-        .sort((a, b) => b.cuando.localeCompare(a.cuando))
-        .slice(0, 5)
+    queryFn: async (): Promise<CargaDeOtro[]> => {
+      const { data, error } = await supabase
+        .from('movimiento_financiero')
+        .select('id, descripcion, monto, tipo, created_at, created_by, canal')
+        .is('revisado_at', null)
+        .neq('estado', 'anulado')
+        .neq('created_by', user!.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (error) throw error
+      return (data ?? []).filter((x) => x.created_by).map((x) => ({ id: x.id, descripcion: x.descripcion ?? '', monto: Number(x.monto), tipo: x.tipo, cuando: x.created_at, por: x.created_by!, canal: x.canal }))
     },
-    select: (xs) => xs.map(({ por, ...x }) => ({ ...x, quien: nombreDe(por) }) as Novedad),
   })
 }
 
