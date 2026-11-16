@@ -719,6 +719,9 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const alto = Math.max(1, arriba.carriles) * CARRIL + 16
   const altoAbajo = 34 + Math.max(1, abajo.carriles) * CARRIL
   const lugarDe = new Map([...arriba.ubicadas, ...abajo.ubicadas].map((u) => [u.id, u]))
+  // Con muchos pagos, los que no entran cerca de su día quedan a la derecha de todo:
+  // el gráfico se estira y scrollea él solo, nunca la página (Lau, 16/11).
+  const anchoGrafico = Math.max(ancho, ...[...arriba.ubicadas, ...abajo.ubicadas].map((u) => u.xb + ANCHO_ETIQUETA / 2 + 16))
   const vacio = l.futuros.length === 0 && l.vencidos.length === 0
   // Lo vencido no es todo pérdida: lo que no se pagó y lo que no se cobró van separados.
   const sinPagar = l.vencidos.filter((p) => !p.cobro).reduce((t, p) => t + p.monto, 0)
@@ -752,7 +755,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
         <p className="mt-6 rounded-[14px] bg-superficie-hundida/60 px-5 py-4 text-[15px] text-texto-suave">Nada por cobrar ni por pagar en los próximos 30 días.</p>
       ) : (
         <Tooltip.Provider delay={150} closeDelay={60}>
-          <div ref={medir} className="relative mt-6" style={{ height: alto + altoAbajo }}>
+          <div ref={medir} className="mt-6 overflow-x-auto overflow-y-hidden">
+          <div className="relative" style={{ height: alto + altoAbajo, width: anchoGrafico }}>
             {/* Lo vencido: una lista de botones (cada uno abre «¿Lo pagaste?»), de lo más grande a lo más chico. */}
             <div className="absolute inset-y-0 left-0 flex flex-col gap-1.5 rounded-[12px] bg-superficie-hundida/70 px-2.5 py-3" style={{ width: VENCIDO - 12 }}>
               <p className="px-1.5 text-[14px] font-bold text-texto">Vencido</p>
@@ -802,6 +806,7 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
               const u = lugarDe.get(p.id)!
               return <Burbuja key={p.id} p={p} hoy={hoy} tam={tam(p.monto)} x={u.x} xb={u.xb} eje={alto} carril={u.carril} onClick={() => abrir(p)} />
             })}
+          </div>
           </div>
         </Tooltip.Provider>
       )}

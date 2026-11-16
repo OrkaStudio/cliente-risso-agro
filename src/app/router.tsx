@@ -90,11 +90,6 @@ const PlataPage = lazy(() =>
     default: m.PlataPage,
   })),
 )
-const HistorialPage = lazy(() =>
-  import('@/features/campo/historial-page').then((m) => ({
-    default: m.HistorialPage,
-  })),
-)
 const OnboardingPage = lazy(() =>
   precargarOnboarding().then(() => ({ default: componenteOnboarding() })),
 )
@@ -253,7 +248,8 @@ export const router = createBrowserRouter([
                   { path: 'campo/lector', element: <LectorPage /> },
                   { path: 'campo/recorrida', element: <RecorridaPage /> },
                   { path: 'campo/plata', element: <PlataPage /> },
-                  { path: 'campo/historial', element: <HistorialPage /> },
+                  // El Historial se reemplazó por «Lo que cargaste» en Hoy (Lau, 16/11).
+                  { path: 'campo/historial', element: <Navigate to="/campo" replace /> },
                   ],
                   },
                 ],

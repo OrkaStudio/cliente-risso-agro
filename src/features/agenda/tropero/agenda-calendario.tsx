@@ -106,23 +106,23 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
           {semanas.flat().map((f, i) => {
             const ultimaFila = i >= (semanas.length - 1) * 7
             const borde = cn(!ultimaFila && 'border-b', i % 7 !== 0 && 'border-l', 'border-borde/70')
-            if (f.slice(0, 7) !== mes) return <div key={f} aria-hidden className={cn('min-h-[128px]', borde)} />
+            if (f.slice(0, 7) !== mes) return <div key={f} aria-hidden className={cn('min-h-[104px]', borde)} />
             const vs = dias.get(f)?.items ?? []
             const esHoy = f === hoy
             return (
-              <div key={f} className={cn('flex min-h-[128px] min-w-0 flex-col gap-1.5 p-2', borde, esHoy && 'bg-trigo-50')}>
-                <button type="button" onClick={() => setDia(f)} aria-label={`Ver el ${diaLargo(f)}: ${vs.length ? `${vs.length} ${vs.length === 1 ? 'cosa' : 'cosas'}` : 'nada'}`} className="group/num flex flex-col items-center self-center rounded-[12px] px-2 pt-0.5 pb-1">
-                  <span className={cn('t-cifra grid size-9 place-items-center rounded-full font-bold transition-colors', esHoy ? 'bg-principal text-principal-texto' : f < hoy ? 'text-texto-suave group-hover/num:bg-superficie-hundida' : 'text-texto group-hover/num:bg-superficie-hundida')}>
+              <div key={f} className={cn('flex min-h-[104px] min-w-0 flex-col gap-1 p-1.5', borde, esHoy && 'bg-trigo-50')}>
+                <button type="button" onClick={() => setDia(f)} aria-label={`Ver el ${diaLargo(f)}: ${vs.length ? `${vs.length} ${vs.length === 1 ? 'cosa' : 'cosas'}` : 'nada'}`} className="group/num flex items-center gap-1.5 self-start rounded-[10px] px-0.5">
+                  <span className={cn('t-cifra-chica grid size-7 place-items-center rounded-full font-bold transition-colors', esHoy ? 'bg-principal text-principal-texto' : f < hoy ? 'text-texto-suave group-hover/num:bg-superficie-hundida' : 'text-texto group-hover/num:bg-superficie-hundida')}>
                     {Number(f.slice(8))}
                   </span>
-                  {esHoy && <span className="mt-0.5 text-[11.5px] font-bold tracking-[0.06em] text-principal uppercase">Hoy</span>}
+                  {esHoy && <span className="text-[11.5px] font-bold tracking-[0.06em] text-principal uppercase">Hoy</span>}
                 </button>
                 {vs.slice(0, vs.length > POR_DIA ? POR_DIA - 1 : POR_DIA).map((v) => (
                   <Chip key={v.id} v={v} hoy={hoy} onAbrir={onAbrir} />
                 ))}
                 {vs.length > POR_DIA && (
-                  <button type="button" onClick={() => setDia(f)} className="rounded-[10px] border-[1.5px] border-dashed border-borde py-1.5 text-[13.5px] font-bold text-texto hover:border-principal hover:text-principal">
-                    Ver las {vs.length}
+                  <button type="button" onClick={() => setDia(f)} aria-label={`Ver las ${vs.length} del ${diaLargo(f)}`} className="self-start rounded-[8px] px-1.5 text-[13px] font-bold text-principal hover:bg-principal-suave">
+                    +{vs.length - (POR_DIA - 1)} más
                   </button>
                 )}
               </div>
@@ -193,16 +193,17 @@ function Chip({ v, hoy, onAbrir }: { v: Vencimiento; hoy: string; onAbrir: (v: V
   const estado = estadoTexto(v, hoy)
   return (
     <Tooltip.Root>
-      <Tooltip.Trigger type="button" onClick={() => onAbrir(v)} aria-label={`${verbo} ${fmtCompact(v.monto)}: ${tituloDe(v)}`} className={cn('flex min-w-0 gap-1.5 rounded-[10px] py-1.5 pr-2 pl-1.5 text-left transition-colors', e.caja)}>
+      <Tooltip.Trigger type="button" onClick={() => onAbrir(v)} aria-label={`${verbo} ${fmtCompact(v.monto)}: ${tituloDe(v)}`} className={cn('flex min-w-0 gap-1.5 rounded-[8px] py-1 pr-2 pl-1.5 text-left transition-colors', e.caja)}>
         <span aria-hidden className={cn('w-[3px] shrink-0 rounded-full', e.barra)} />
         <span className="min-w-0">
-          <span className={cn('block truncate text-[13.5px] leading-tight font-bold', e.monto)}>
+          {/* En una línea: el monto y qué es (el detalle, al pasar el mouse). */}
+          <span className={cn('block truncate text-[13px] leading-tight font-bold', e.monto)}>
             {/* En pantallas angostas manda el monto: el color ya dice qué es. */}
             <span className="hidden 2xl:inline">{clase === 'hecho' ? '✓ ' : ''}{verbo} </span>
             <span className="2xl:hidden">{clase === 'hecho' ? '✓ ' : clase === 'vencido' ? '! ' : cobro ? '+' : '−'}</span>
             <span className="t-cifra-chica">{fmtCompact(v.monto)}</span>
+            <span className={cn('font-semibold', e.nombre)}> {tituloDe(v)}</span>
           </span>
-          <span className={cn('block truncate text-[13px] leading-tight font-semibold', e.nombre)}>{tituloDe(v)}</span>
         </span>
       </Tooltip.Trigger>
       <Tooltip.Portal>

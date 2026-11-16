@@ -19,6 +19,9 @@ import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
+import tranquera from '@/assets/tropero/tranquera.webp'
+import { Cabecera } from '@/components/tropero/cabecera'
+import { fechaCorta, useLoUltimoMio } from '@/features/inicio/tropero/lo-ultimo-mio'
 import { useRecorrida } from './recorrida/use-recorrida'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
 import { puedeCargar, puedeVer } from '@/features/empresa/secciones'
@@ -84,66 +87,63 @@ function Hoy() {
 
   return (
     <div className="h-full overflow-y-auto bg-fondo pb-8">
-      {/* La foto con el saludo */}
-      <section className="relative isolate flex min-h-[330px] flex-col px-[22px] pt-[max(16px,env(safe-area-inset-top))] pb-5 text-superficie">
-        <img src="/inicio-bienvenida.png" alt="" className="absolute inset-0 -z-20 size-full object-cover object-[30%_50%]" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/30 via-black/10 to-black/70" />
-        <div className="flex items-center gap-2.5">
-          <Logo alto={26} soloIsotipo tono="hueso" />
-          {campos && campos.length > 0 && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setEligiendo((v) => !v)}
-                aria-expanded={eligiendo}
-                className="flex h-9 items-center gap-2 rounded-full border border-white/40 bg-white/20 pr-3 pl-1.5 text-[14px] font-semibold backdrop-blur-sm"
-              >
-                {color && (
-                  <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: color.hex }}>
-                    {color.letra}
-                  </span>
-                )}
-                {campo?.nombre}
-                {campos.length > 1 && (
-                  <Icono nombre="Desplegar" tamano={16} />
-                )}
-              </button>
-              {eligiendo && campos.length > 1 && (
-                <ul className="absolute top-11 left-0 z-20 min-w-[200px] overflow-hidden rounded-[14px] bg-superficie py-1.5 text-texto shadow-lg">
-                  {campos.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clima.elegir(c.id)
-                          setEligiendo(false)
-                        }}
-                        className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', c.id === campo?.id && 'font-bold')}
-                      >
-                        <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: colorDeCampo(c.colorIdx ?? 0).hex }}>
-                          {colorDeCampo(c.colorIdx ?? 0).letra}
-                        </span>
-                        {c.nombre}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+      {/* Arriba, en una barra clara: la marca, el campo y la cuenta (antes iban sobre la foto). */}
+      <div className="flex items-center gap-2.5 px-[18px] pt-[max(12px,env(safe-area-inset-top))] pb-3">
+        <Logo alto={24} soloIsotipo />
+        {campos && campos.length > 0 && (
+          <div className="relative min-w-0">
+            <button
+              type="button"
+              onClick={() => setEligiendo((v) => !v)}
+              aria-expanded={eligiendo}
+              className="flex h-10 max-w-full items-center gap-2 rounded-full border border-borde bg-superficie pr-3 pl-1.5 text-[15px] font-semibold text-texto"
+            >
+              {color && (
+                <span className="grid size-7 shrink-0 place-items-center rounded-[7px] text-[12px] font-extrabold text-white" style={{ background: color.hex }}>
+                  {color.letra}
+                </span>
               )}
-            </div>
-          )}
-          <MenuCuenta inicial={(nombre || membresia?.empresa?.nombre || 'T').charAt(0)} />
-        </div>
-        <motion.div {...entra(0)} className="mt-auto pt-16">
-          {variasCuentas && <p className="mb-1.5 text-[14px] font-semibold text-superficie/85">En {membresia?.empresa?.nombre}</p>}
-          <h1 className="font-heading text-[42px] leading-[1.02] font-extrabold tracking-[-0.02em]">{saludo(new Date().getHours(), nombre)}</h1>
-          <p className="mt-2 text-[15px] leading-snug text-superficie/90">
+              <span className="truncate">{campo?.nombre}</span>
+              {campos.length > 1 && <Icono nombre="Desplegar" tamano={16} />}
+            </button>
+            {eligiendo && campos.length > 1 && (
+              <ul className="absolute top-12 left-0 z-20 min-w-[220px] overflow-hidden rounded-[14px] border border-borde bg-superficie py-1.5 text-texto shadow-lg">
+                {campos.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clima.elegir(c.id)
+                        setEligiendo(false)
+                      }}
+                      className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', c.id === campo?.id && 'font-bold')}
+                    >
+                      <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: colorDeCampo(c.colorIdx ?? 0).hex }}>
+                        {colorDeCampo(c.colorIdx ?? 0).letra}
+                      </span>
+                      {c.nombre}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <MenuCuenta inicial={(nombre || membresia?.empresa?.nombre || 'T').charAt(0)} />
+      </div>
+
+      {/* El saludo, con la misma tranquera que el Inicio de la compu (Lau, 16/11): chico, para que lo de hoy se vea sin bajar. */}
+      <motion.div {...entra(0)} className="px-[18px]">
+        <Cabecera imagen={tranquera} posicion="50% 42%" className="min-h-[128px] px-5 py-4" encima={variasCuentas ? <p className="text-[13.5px] font-semibold text-texto-suave">En {membresia?.empresa?.nombre}</p> : undefined}>
+          <h1 className="font-heading text-[28px] leading-[1.05] font-extrabold tracking-[-0.01em] text-texto">{saludo(new Date().getHours(), nombre)}</h1>
+          <p className="mt-1.5 max-w-[70%] text-[14.5px] leading-snug text-texto-suave">
             {tempTexto}
             {frase}
           </p>
-        </motion.div>
-      </section>
+        </Cabecera>
+      </motion.div>
 
-      <div className="flex flex-col gap-5 px-[22px] pt-6">
+      <div className="flex flex-col gap-5 px-[18px] pt-5">
         <Pendientes r={r} />
 
         {r.abiertas.map((a) => (
@@ -202,24 +202,30 @@ function Hoy() {
         </motion.section>
 
         {ve.hacienda && (
-        <motion.section {...entra(3)} aria-label="Las cabezas" className="pt-2">
-          <div className="flex items-end gap-3">
-            <p className="titulo-display text-[110px] leading-[0.9] tracking-[-0.04em] text-texto">{cabezas}</p>
-            <p className="pb-3 text-[16px] leading-tight font-semibold text-texto-suave">
-              cabezas en
-              <br />
-              {campo?.nombre ?? quien.enLosCampos}
-            </p>
-          </div>
-          {franjas.length > 0 && (
-            <div className="mt-3 flex h-2 gap-1">
-              {franjas.map((f) => (
-                <span key={f.nombre} className={cn('rounded-full', f.clase)} style={{ flexGrow: f.cabezas }} />
-              ))}
-            </div>
-          )}
-        </motion.section>
+          // Hacienda para mirar llega al celular más adelante (decisión 6, 16/11): hasta entonces, sin a dónde ir.
+          <motion.section {...entra(3)} aria-label="Las cabezas" className="flex flex-col gap-3 rounded-[20px] border border-borde bg-superficie p-5">
+            <span className="flex items-center gap-2 text-[14px] font-semibold text-texto-suave">
+              <span className="grid size-7 place-items-center rounded-full bg-principal-suave text-principal">
+                <Icono nombre="Vaca" tamano={16} />
+              </span>
+              Hacienda
+            </span>
+            <span className="flex items-baseline gap-2">
+              <span className="t-numero text-texto">{cabezas.toLocaleString('es-AR')}</span>
+              <span className="text-[14.5px] font-semibold text-texto-suave">cabezas en {campo?.nombre ?? quien.enLosCampos}</span>
+            </span>
+            {franjas.length > 0 && (
+              <span className="flex h-1.5 gap-1">
+                {franjas.map((f) => (
+                  <span key={f.nombre} className={cn('rounded-full', f.clase)} style={{ flexGrow: f.cabezas }} />
+                ))}
+              </span>
+            )}
+          </motion.section>
         )}
+
+        {/* Lo que cargó la persona (reemplaza al Historial, Lau 16/11): lo último, de ella. Lo que espera señal va arriba, en «Pendientes». */}
+        {(ve.campos || ve.plata || carga.campos || carga.plata) && <LoQueCargaste plata={carga.plata} campos={carga.campos} />}
 
         {carga.hacienda && (
         <button
@@ -233,6 +239,30 @@ function Hoy() {
         )}
       </div>
     </div>
+  )
+}
+
+/** Lo último que cargó, del más nuevo al más viejo (lo de ella sola). */
+function LoQueCargaste({ plata, campos }: { plata: boolean; campos: boolean }) {
+  const q = useLoUltimoMio({ plata, campos })
+  if (!q.data?.length) return null
+  return (
+    <section aria-labelledby="lo-que-cargaste" className="flex flex-col gap-1">
+      <h2 id="lo-que-cargaste" className="font-heading text-[19px] font-extrabold text-texto">
+        Lo que cargaste
+      </h2>
+      <ul className="flex flex-col divide-y divide-borde/70">
+        {q.data.map((x) => (
+          <li key={x.id} className="flex items-center gap-3 py-2.5 text-[15px] text-texto">
+            <span className="t-cifra-chica w-14 shrink-0 text-texto-suave">{fechaCorta(x.cuando)}</span>
+            <span className="min-w-0 flex-1 truncate">{x.texto}</span>
+            <span className="shrink-0 text-estado-bien-texto" aria-label="Subido">
+              <Icono nombre="Guardar" tamano={16} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -314,11 +344,6 @@ function MenuCuenta({ inicial }: { inicial: string }) {
               )}
             </li>
           )}
-          <li>
-            <button type="button" onClick={() => navigate('/campo/historial')} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]">
-              <Icono nombre="Agenda" tamano={16} /> Historial
-            </button>
-          </li>
           <li>
             <button
               type="button"
