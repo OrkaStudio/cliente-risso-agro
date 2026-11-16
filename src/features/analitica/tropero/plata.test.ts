@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MovimientoConDetalle, Pendiente } from '@/features/analitica/api'
-import { aCsv, avisosParaMejorar, campanas, coincide, comparacionCorta, mesAMes, periodos, dolarDel, enRango, mesMasApretado, proximos, ultimoAnio, type DolarDia } from './plata'
+import { aCsv, avisosParaMejorar, campanas, coincide, comparacionCorta, mesAMes, periodos, dolarDel, enRango, rangoDePeriodo, mesMasApretado, proximos, ultimoAnio, type DolarDia } from './plata'
 
 const mov = (x: Partial<MovimientoConDetalle>): MovimientoConDetalle =>
   ({
@@ -68,6 +68,12 @@ describe('Plata', () => {
     expect(enRango(mov({ fecha_cobro_pago: '2026-10-30' }), 'mes', '2026-11-03')).toBe(false)
     // Lo pendiente no «salió» todavía.
     expect(enRango(mov({ estado: 'pendiente', fecha_cobro_pago: null, fecha_devengo: '2026-11-20' }), 'mes', '2026-11-03')).toBe(false)
+    // Las campañas, como en Plata (julio a junio).
+    expect(enRango(mov({ fecha_cobro_pago: '2026-07-01' }), 'campana', '2026-11-03')).toBe(true)
+    expect(enRango(mov({ fecha_cobro_pago: '2026-06-30' }), 'campana', '2026-11-03')).toBe(false)
+    expect(enRango(mov({ fecha_cobro_pago: '2026-06-30' }), 'pasada', '2026-11-03')).toBe(true)
+    expect(enRango(mov({ fecha_cobro_pago: '2025-06-30' }), 'pasada', '2026-11-03')).toBe(false)
+    expect(rangoDePeriodo('doce')).toBe('12m')
     expect(coincide(m, 'shell')).toBe(true)
     expect(coincide(m, '50672834')).toBe(true)
     expect(coincide(m, 'ypf')).toBe(false)

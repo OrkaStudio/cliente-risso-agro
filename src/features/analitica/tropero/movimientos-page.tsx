@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Icono } from '@/components/tropero/icono'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
@@ -13,7 +13,7 @@ import { MovimientoPanel } from './movimiento-panel'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { aCsv, coincide, comprobanteTexto, enRango, medioTexto, nombreMes, type Rango } from './plata'
+import { aCsv, coincide, comprobanteTexto, enRango, medioTexto, nombreMes, periodos, RANGOS_VALIDOS, type Rango } from './plata'
 
 /**
  * Plata · Los movimientos (Figma página 35): cuánto salió en el período, los
@@ -27,7 +27,9 @@ export function MovimientosPage() {
   const campoId = identidad.elegido?.id ?? null
   const hoy = hoyLocal()
   const [params] = useSearchParams()
-  const [rango, setRango] = useState<Rango>(() => (['mes', 'anio', '12m', 'todo'].includes(params.get('rango') ?? '') ? (params.get('rango') as Rango) : 'mes'))
+  // El período: el que trae el link (desde Plata, el que se estaba mirando, Lau 16/11).
+  // Sin link, el mes; si el mes todavía no tiene nada, los 12 meses (no abrir en «$0»).
+  const [elegido, setRango] = useState<Rango | null>(() => (RANGOS_VALIDOS.includes(params.get('rango') as Rango) ? (params.get('rango') as Rango) : null))
   const [q, setQ] = useState(() => params.get('q') ?? '')
   // Quién cargó cada uno y lo nuevo que cargaron otros (permisos, entrega 4).
   const { quienCargo, nombreDe } = useNombres()
@@ -42,20 +44,22 @@ export function MovimientosPage() {
   // Sin nuevos por ver, «sólo los nuevos» no tiene sentido: vuelve a todos.
   if (soloNuevos && movs.data && nuevos.length === 0) setSoloNuevos(false)
 
-  const lista = useMemo(
-    () =>
-      (movs.data ?? [])
-        .filter((m) => (soloNuevos ? !m.revisado_at : (!campoId || m.campo_id === campoId) && enRango(m, rango, hoy)) && coincide(m, q) && (quien === null || m.created_by === quien))
-        .sort((a, b) => (b.fecha_cobro_pago ?? b.fecha_devengo).localeCompare(a.fecha_cobro_pago ?? a.fecha_devengo)),
-    [movs.data, campoId, rango, hoy, q, quien, soloNuevos],
-  )
+  const hayEsteMes = (movs.data ?? []).some((m) => (!campoId || m.campo_id === campoId) && enRango(m, 'mes', hoy))
+  const rango: Rango = elegido ?? (movs.data && !hayEsteMes ? '12m' : 'mes')
+  const [campana, pasada] = periodos(hoy).slice(1)
+
+  const lista = (movs.data ?? [])
+    .filter((m) => (soloNuevos ? !m.revisado_at : (!campoId || m.campo_id === campoId) && enRango(m, rango, hoy)) && coincide(m, q) && (quien === null || m.created_by === quien))
+    .sort((a, b) => (b.fecha_cobro_pago ?? b.fecha_devengo).localeCompare(a.fecha_cobro_pago ?? a.fecha_devengo))
   const salio = lista.filter((m) => m.tipo === 'gasto').reduce((s, m) => s + Number(m.monto), 0)
   const entro = lista.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
-  const cuando = { mes: `En ${nombreMes(hoy.slice(0, 7))}`, anio: `En ${hoy.slice(0, 4)}`, '12m': 'En los últimos 12 meses', todo: 'Desde el principio' }[rango]
+  const cuando = { mes: `En ${nombreMes(hoy.slice(0, 7))}`, anio: `En ${hoy.slice(0, 4)}`, '12m': 'En los últimos 12 meses', campana: `En la ${campana!.nombre.toLowerCase()}`, pasada: `En la ${pasada!.nombre.toLowerCase()}`, todo: 'Desde el principio' }[rango]
   const RANGOS: { v: Rango; t: string }[] = [
     { v: 'mes', t: nombreMes(hoy.slice(0, 7)).replace(/^\w/, (c) => c.toUpperCase()) },
     { v: 'anio', t: 'Este año' },
     { v: '12m', t: '12 meses' },
+    { v: 'campana', t: campana!.nombre },
+    { v: 'pasada', t: pasada!.nombre },
     { v: 'todo', t: 'Todo' },
   ]
 

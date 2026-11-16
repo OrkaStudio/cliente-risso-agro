@@ -238,3 +238,79 @@ export function bajadaDelRodeo(deEspecie: ResumenRodeo, todo: ResumenRodeo, espe
   }
   return partes.join(' ')
 }
+
+// ── La lista, agrupada (Lau, 16/11) ─────────────────────────────────────────
+// Sin caravana no hay cómo distinguir un animal de otro: 594 filas iguales no
+// sirven. Lo que se mira primero es cada potrero con lo que tiene; los que
+// tienen caravana van de a uno (se reconocen) y los que no, juntos por
+// categoría y por lo que hay que hacer con ellos (un ternero sin caravana
+// también puede estar para destetar).
+
+/** Los estados que piden hacer algo (no un dato que falta). */
+const ATENDER: Estado[] = ['retiro', 'destetar', 'vender', 'vacia']
+
+export type GrupoPotrero = {
+  /** null: los que no están en ningún potrero. */
+  potreroId: string | null
+  donde: string | null
+  total: number
+  conCaravana: number
+  porCategoria: { categoria: Categoria | null; n: number }[]
+  /** Cuántos piden hacer algo (retiro, destetar, vender, vacía). */
+  atender: number
+}
+
+export function potrerosDelRodeo(filas: FilaRodeo[]): GrupoPotrero[] {
+  const grupos = new Map<string, GrupoPotrero & { cats: Map<Categoria | null, number> }>()
+  for (const f of filas) {
+    const k = f.potreroId ?? ''
+    let g = grupos.get(k)
+    if (!g) grupos.set(k, (g = { potreroId: f.potreroId, donde: f.donde, total: 0, conCaravana: 0, porCategoria: [], atender: 0, cats: new Map() }))
+    g.total++
+    if (f.visual || f.rfid) g.conCaravana++
+    if (ATENDER.includes(f.estado)) g.atender++
+    g.cats.set(f.categoria, (g.cats.get(f.categoria) ?? 0) + 1)
+  }
+  return [...grupos.values()]
+    .map(({ cats, ...g }) => ({ ...g, porCategoria: [...cats].map(([categoria, n]) => ({ categoria, n })).sort((a, b) => b.n - a.n) }))
+    // Los que no están en un potrero, siempre al final.
+    .sort((a, b) => Number(!a.potreroId) - Number(!b.potreroId) || b.atender - a.atender || b.total - a.total || (a.donde ?? '').localeCompare(b.donde ?? '', 'es'))
+}
+
+export type GrupoSinCaravana = {
+  key: string
+  potreroId: string | null
+  donde: string | null
+  categoria: Categoria | null
+  estado: Estado
+  n: number
+  /** Los animales del grupo, para abrirlo y llegar a la ficha de cada uno. */
+  filas: FilaRodeo[]
+}
+export type ItemLista = { tipo: 'animal'; f: FilaRodeo } | { tipo: 'grupo'; g: GrupoSinCaravana }
+
+/**
+ * Los de caravana de a uno; los que no tienen, juntos por potrero, categoría y
+ * estado, en el lugar del primero (la lista ya viene ordenada por lo que hay que hacer).
+ */
+export function juntarSinCaravana(filas: FilaRodeo[]): ItemLista[] {
+  const items: ItemLista[] = []
+  const grupos = new Map<string, GrupoSinCaravana>()
+  for (const f of filas) {
+    if (f.visual || f.rfid) {
+      items.push({ tipo: 'animal', f })
+      continue
+    }
+    const key = `${f.potreroId ?? ''}|${f.categoria ?? ''}|${f.estado}`
+    const g = grupos.get(key)
+    if (g) {
+      g.n++
+      g.filas.push(f)
+      continue
+    }
+    const nuevo = { key, potreroId: f.potreroId, donde: f.donde, categoria: f.categoria, estado: f.estado, n: 1, filas: [f] }
+    grupos.set(key, nuevo)
+    items.push({ tipo: 'grupo', g: nuevo })
+  }
+  return items
+}

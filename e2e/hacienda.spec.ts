@@ -169,7 +169,8 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await expect(panel.getByRole('heading', { name: 'Sumamos 2 terneros nacidos' })).toBeVisible()
   await panel.getByRole('button', { name: 'Listo' }).click()
   await page.getByRole('tab', { name: /Sin caravana/ }).click()
-  await expect(page.getByRole('row', { name: /Ternero/ }).first()).toBeVisible()
+  // Sin caravana van juntos, por potrero y categoría (16/11).
+  await expect(page.getByRole('row', { name: /\d+ terneros/ }).first()).toBeVisible()
 })
 
 test('decir cuál salió: del potrero, de otro potrero o anularla', async ({ page }) => {
@@ -302,6 +303,8 @@ test('desde la ficha: a uno solo se le pone su primera caravana, y la planilla l
   await entrar(page)
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
   await page.getByRole('tab', { name: /Sin caravana/ }).click()
+  // Juntos por categoría: se abre el grupo para llegar a la ficha de uno (16/11).
+  await page.getByRole('button', { name: /^\d+ terneros?/ }).first().click()
   await page.getByRole('row', { name: /Ternero/ }).first().getByRole('link').click()
   const n = String(Date.now()).slice(-5)
   await page.getByRole('button', { name: 'Ponerle caravana' }).click()
@@ -393,6 +396,9 @@ test('en la ficha, elegir en la barra un campo donde el animal no está vuelve a
   const barra = page.getByRole('radiogroup', { name: 'Qué campo estás viendo' })
   await barra.getByRole('radio', { name: /E2E Campo base \d+ cab/ }).click()
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
+  // Por potrero: se entra al 1A y de ahí a un animal (16/11).
+  await page.getByRole('row').filter({ has: page.getByText('1A', { exact: true }) }).first().click()
+  await expect(page).toHaveURL(/potrero=/)
   await page.getByRole('row').filter({ hasText: '1A' }).getByRole('link').first().click()
   await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
 

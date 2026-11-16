@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resumirEventos } from '../senales'
-import { bajadaDelRodeo, edadTexto, filasDeSalidas, filasDelRodeo, resumirRodeo, type AnimalRodeo } from './rodeo'
+import { bajadaDelRodeo, edadTexto, filasDeSalidas, filasDelRodeo, juntarSinCaravana, potrerosDelRodeo, resumirRodeo, type AnimalRodeo } from './rodeo'
 
 const hoy = new Date('2026-10-12T12:00:00')
 const HOY = '2026-10-12'
@@ -66,5 +66,44 @@ describe('el rodeo', () => {
     expect(edadTexto('2026-09-01', hoy)).toBe('1 mes')
     expect(edadTexto('2023-01-01', hoy)).toBe('3 años')
     expect(edadTexto(null, hoy)).toBeNull()
+  })
+})
+
+describe('la lista agrupada (16/11)', () => {
+  const sin = { caravana_visual: null, caravana_rfid: null }
+  const filas = filasDelRodeo(
+    [
+      animal('a', sin), animal('b', sin), animal('c', sin),
+      animal('d', { ...sin, categoria: 'ternero', fecha_nacimiento: '2026-03-01' }),
+      animal('e', { ...sin, categoria: 'ternero', fecha_nacimiento: '2026-03-01' }),
+      animal('1040'),
+      animal('f', { ...sin, potrero_id: 'p2', categoria: 'novillo' }),
+      animal('g', { ...sin, potrero_id: null }),
+    ],
+    potreros, campos, resumirEventos([]), HOY, hoy,
+  )
+
+  it('cada potrero con lo que tiene, primero el que pide hacer algo', () => {
+    const g = potrerosDelRodeo(filas)
+    expect(g.map((x) => x.donde)).toEqual(['11B, La Porteña', '2D, Los Pampas', null])
+    expect(g[0]).toMatchObject({ total: 6, conCaravana: 1, atender: 2 })
+    expect(g[0]!.porCategoria).toEqual([{ categoria: 'vaca', n: 4 }, { categoria: 'ternero', n: 2 }])
+    expect(g[2]).toMatchObject({ potreroId: null, total: 1 })
+  })
+
+  it('con caravana de a uno; sin caravana juntos por potrero, categoría y estado', () => {
+    const items = juntarSinCaravana(filas)
+    const animales = items.filter((i) => i.tipo === 'animal')
+    const grupos = items.flatMap((i) => (i.tipo === 'grupo' ? [i.g] : []))
+    expect(animales).toHaveLength(1)
+    expect(grupos.map((g) => [g.donde, g.categoria, g.estado, g.n])).toEqual(
+      expect.arrayContaining([
+        ['11B, La Porteña', 'vaca', 'sinCaravana', 3],
+        ['11B, La Porteña', 'ternero', 'destetar', 2],
+        ['2D, Los Pampas', 'novillo', 'sinCaravana', 1],
+        [null, 'vaca', 'sinCaravana', 1],
+      ]),
+    )
+    expect(grupos.reduce((t, g) => t + g.n, 0) + animales.length).toBe(filas.length)
   })
 })

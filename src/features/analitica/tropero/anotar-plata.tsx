@@ -93,6 +93,7 @@ export function AnotarPlata({
   renderTrigger,
   vence = false,
   venceInicial,
+  tipo,
 }: {
   empresaId: string
   campoInicial?: string
@@ -101,6 +102,11 @@ export function AnotarPlata({
   vence?: boolean
   /** El día ya elegido (tocando un día del calendario de la Agenda). */
   venceInicial?: string
+  /**
+   * Sólo si el botón ya lo dijo («Anotar un gasto»). Si no, nada viene elegido:
+   * la persona toca si salió o entró (regla del rediseño, Lau 16/11).
+   */
+  tipo?: Tipo
   /** El botón que lo abre; `escanear` arranca pidiendo la foto. */
   renderTrigger: (abrir: (escanear?: boolean) => void) => ReactNode
 }) {
@@ -117,12 +123,13 @@ export function AnotarPlata({
         setAbierto(true)
       })}
       {/* La key cambia al abrir: arranca de cero y sale con su animación. */}
-      <Formulario key={vez} vence={vence} venceInicial={venceInicial} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
+      <Formulario key={vez} tipoInicial={tipo ?? null} vence={vence} venceInicial={venceInicial} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
     </>
   )
 }
 
 function Formulario({
+  tipoInicial,
   vence: modoVence,
   venceInicial,
   empresaId,
@@ -132,6 +139,7 @@ function Formulario({
   escanear,
   onCerrar,
 }: {
+  tipoInicial: Tipo | null
   vence: boolean
   venceInicial?: string
   empresaId: string
@@ -149,7 +157,7 @@ function Formulario({
   const archivo = useRef<HTMLInputElement>(null)
 
   const [modo, setModo] = useState<Modo>('mano')
-  const [tipo, setTipo] = useState<Tipo>('gasto')
+  const [tipo, setTipo] = useState<Tipo | null>(tipoInicial)
   const [monto, setMonto] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
   const [todasCategorias, setTodasCategorias] = useState(false)
@@ -220,7 +228,10 @@ function Formulario({
   const nombreCategoria = opcionesCategoria.find((c) => c.id === categoriaId)?.nombre
   const nombreCampo = campos.find((c) => c.id === campoId)?.nombre
 
+  const faltaTipo = modoVence ? 'Tocá si es a pagar o a cobrar.' : 'Tocá si salió o entró.'
+
   function faltante(paraCuotas = false): string | null {
+    if (!tipo) return faltaTipo
     if (total <= 0) return 'Escribí cuánto fue.'
     if (!categoriaId) return `Tocá en qué ${esGasto ? 'se fue' : 'entró'}.`
     if (!campoId) return 'Tocá de qué campo es.'
@@ -233,6 +244,7 @@ function Formulario({
 
   /** Lo que falta para pasar del paso 1 (cuánto y en qué) al 2. */
   function faltaPaso1(): string | null {
+    if (!tipo) return faltaTipo
     if (total <= 0) return 'Escribí cuánto fue.'
     if (!categoriaId) return `Tocá en qué ${esGasto ? 'se fue' : 'entró'}.`
     return null
@@ -306,7 +318,7 @@ function Formulario({
   async function guardar() {
     setError(null)
     const f = faltante()
-    if (f) return setError(f)
+    if (f || !tipo) return setError(f ?? faltaTipo)
     const dia = cuando === 'otro' ? fecha : hoyLocal()
     const medioFinal = pendiente ? previsto : cuenta
     try {
@@ -342,7 +354,7 @@ function Formulario({
   async function guardarCuotas() {
     setError(null)
     const f = faltante(true)
-    if (f) return setError(f)
+    if (f || !tipo) return setError(f ?? faltaTipo)
     if (!forma) return setError(`Tocá cómo ${esGasto ? 'se paga' : 'se cobra'}: a plazos o todos los meses.`)
     if (!veces) return setError(forma === 'plazos' ? 'Tocá a cuántos días es cada pago.' : 'Tocá cuántos meses.')
     try {
@@ -539,13 +551,14 @@ function Formulario({
     setPaso(3)
   }
 
-  const bloqueTipo = !leyo && <Segmentos etiqueta="Salió o entró" valor={tipo === 'gasto' ? 'salio' : 'entro'} onCambio={(v) => (setTipo(v === 'salio' ? 'gasto' : 'ingreso'), setCategoriaId(''))} opciones={modoVence ? [{ valor: 'salio', texto: 'A pagar' }, { valor: 'entro', texto: 'A cobrar' }] : [{ valor: 'salio', texto: 'Salió' }, { valor: 'entro', texto: 'Entró' }]} />
+  // Leído de un comprobante, sólo si no dijo si salió o entró (si no, la persona no podría seguir).
+  const bloqueTipo = (!leyo || !tipo) && <Segmentos etiqueta="Salió o entró" valor={tipo === null ? null : tipo === 'gasto' ? 'salio' : 'entro'} onCambio={(v) => (setTipo(v === 'salio' ? 'gasto' : 'ingreso'), setCategoriaId(''))} opciones={modoVence ? [{ valor: 'salio', texto: 'A pagar' }, { valor: 'entro', texto: 'A cobrar' }] : [{ valor: 'salio', texto: 'Salió' }, { valor: 'entro', texto: 'Entró' }]} />
   const bloqueMonto = (
     <>
       {/* El monto, grande: es lo primero que se mira. */}
       <label className={cn('mt-5 flex items-baseline gap-1 rounded-[18px] px-1', amarillo('monto') && 'bg-acento/35 px-3', leyo && !fotoUrl && 'mt-0')}>
-        <span className={cn('titulo-display shrink-0 text-[44px] whitespace-nowrap', esGasto ? 'text-estado-problema-texto/70' : 'text-estado-bien-texto/70')}>{esGasto ? '−$' : '+$'}</span>
-        <input aria-label="Cuánto" inputMode="numeric" placeholder="0" value={monto} onChange={(e) => (setMonto(formatearNumero(e.target.value)), setLeidos((s) => (s.delete('monto'), new Set(s))))} autoFocus={!leyo} className={cn('titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight tracking-[-0.03em] outline-none placeholder:text-texto/25', esGasto ? 'text-estado-problema-texto' : 'text-estado-bien-texto')} />
+        <span className={cn('titulo-display shrink-0 text-[44px] whitespace-nowrap', !tipo ? 'text-texto/40' : esGasto ? 'text-estado-problema-texto/70' : 'text-estado-bien-texto/70')}>{!tipo ? '$' : esGasto ? '−$' : '+$'}</span>
+        <input aria-label="Cuánto" inputMode="numeric" placeholder="0" value={monto} onChange={(e) => (setMonto(formatearNumero(e.target.value)), setLeidos((s) => (s.delete('monto'), new Set(s))))} autoFocus={!leyo} className={cn('titulo-display cifra min-w-[2ch] max-w-full bg-transparent text-[56px] [field-sizing:content] leading-tight tracking-[-0.03em] outline-none placeholder:text-texto/25', !tipo ? 'text-texto' : esGasto ? 'text-estado-problema-texto' : 'text-estado-bien-texto')} />
       </label>
       {!leyo && conIva && iva > 0 && (
         <p className="mt-1 text-[14px] text-texto-suave">
@@ -555,7 +568,7 @@ function Formulario({
       )}
     </>
   )
-  const bloqueEnQue = (
+  const bloqueEnQue = !tipo ? null : (
     <Grupo titulo={todasCategorias ? (esGasto ? 'En qué · todas' : 'De qué · todas') : esGasto ? 'En qué · las que más usás' : 'De qué · las que más usás'} className="mt-6">
       <Opciones etiqueta="En qué" opciones={[...visibles.map((c) => ({ valor: c.id, texto: c.nombre })), ...(!todasCategorias && opcionesCategoria.length > visibles.length ? [{ valor: '__otra', texto: `Ver las ${opcionesCategoria.length}` }] : [])]} elegidas={[categoriaId]} onTocar={(v) => (v === '__otra' ? setTodasCategorias(true) : (setCategoriaId(v), setTodasCategorias(false)))} />
       {leyo && categoriaId && <p className="mt-2 text-[13px] text-texto-suave">La sugiere la app por lo que dice el comprobante.</p>}
