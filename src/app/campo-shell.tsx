@@ -9,6 +9,7 @@ import { useSeedOffline } from '@/features/campo/use-seed-offline'
 import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
 import { MARCA } from '@/lib/marca'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
+import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
 import { cargaDeRuta, nivelDe, puedeCargar } from '@/features/empresa/secciones'
@@ -143,6 +144,8 @@ export function CampoShell() {
           un círculo terracota. Sin el mapa, sólo Hoy: lo demás necesita el campo. */}
       {/* En flujo (no flotando encima): así no tapa los pies fijos de la recorrida y la manga. */}
       {/* Con una sola sección (el que sólo mira Hoy), la barra no tiene a dónde llevar: no va. */}
+      {/* El asistente acompaña todo el celular (Lau, 16/11). */}
+      <AsistentePanel celular />
       {(navegables.length > 1 || puedeMandar) && (
       <nav aria-label="Modo Campo" className="shrink-0 bg-fondo px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between rounded-full bg-superficie p-1.5 shadow-[0_8px_28px_rgba(19,27,22,0.18)]">

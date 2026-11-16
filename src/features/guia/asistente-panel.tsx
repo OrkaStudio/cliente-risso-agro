@@ -67,13 +67,13 @@ function guardar(clave: string, valor: string) {
   }
 }
 
-export function AsistentePanel() {
+export function AsistentePanel({ celular = false }: { celular?: boolean }) {
   const quieto = !!useReducedMotion()
   const abierto = usePanelAbierto()
   const hayAyudaLocal = useHayAyudaLocal()
   const navigate = useNavigate()
   const location = useLocation()
-  const seccion = seccionDeRuta(location.pathname)
+  const seccion = seccionDeRuta(location.pathname) ?? (celular ? seccionDelCelular(location.pathname) : null)
   const mapaPendiente = useMapaPendiente()
   const { user } = useAuth()
   const empresa = useEmpresa()
@@ -96,8 +96,14 @@ export function AsistentePanel() {
   const resumen = estado.data?.resumen
   // Los avisos son tareas de puesta a punto: a un invitado, sólo los de lo que puede cargar (permisos, 13/11).
   const avisos = React.useMemo(
-    () => (resumen ? avisosDe(resumen, campos ?? [], mapaPendiente).filter((a) => avisoPermitido(a.id, empresa.data)) : []),
-    [resumen, campos, mapaPendiente, empresa.data],
+    () =>
+      resumen
+        ? avisosDe(resumen, campos ?? [], mapaPendiente)
+            .filter((a) => avisoPermitido(a.id, empresa.data))
+            // En el celular esas pantallas no están: el aviso queda, sin el botón que lleva a la compu.
+            .map((a) => (celular ? { ...a, accion: null } : a))
+        : [],
+    [resumen, campos, mapaPendiente, empresa.data, celular],
   )
   const progreso = React.useMemo(() => (resumen && quien.dueno ? progresoDe(resumen, campos ?? [], mapaPendiente) : []), [resumen, campos, mapaPendiente, quien.dueno])
   const hechos = progreso.filter((p) => p.hecho).length
@@ -563,8 +569,12 @@ export function AsistentePanel() {
         aria-label={etiqueta}
         aria-expanded={abierto}
         className={cn(
-          'fixed right-6 bottom-6 flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
-          verTexto ? 'md:pr-3' : '',
+          // En el celular, arriba de la barra de abajo y a mano del pulgar.
+          celular ? 'fixed right-4 bottom-[calc(100px+env(safe-area-inset-bottom))]' : 'fixed right-6 bottom-6',
+          'flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
+          verTexto ? (celular ? 'pr-4' : 'md:pr-3') : '',
+          // En el celular el panel ocupa el ancho: abierto, la barra se esconde (el panel tiene su ×).
+          celular && abierto && 'pointer-events-none opacity-0',
           arriba ? 'z-[76]' : 'z-[45]',
         )}
       >
@@ -588,7 +598,7 @@ export function AsistentePanel() {
           </AnimatePresence>
         </span>
         {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
-        <TextoDeLaBarra texto={globo ?? 'Preguntale a Troppero'} visible={verTexto} estado={!!globo} />
+        <TextoDeLaBarra texto={globo ?? 'Preguntale a Troppero'} visible={verTexto} estado={!!globo} celular={celular} />
       </button>
 
       {/* El orbe: descansa en su hueco de la barra y sale a volar cuando hace algo. */}
@@ -621,7 +631,7 @@ function Burbuja({ children }: { children: React.ReactNode }) {
  * antes de mostrarlo y el ancho viaja hasta esa medida; el viejo se va y el
  * nuevo entra en el mismo lugar, cruzándose.
  */
-function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: boolean; estado: boolean }) {
+function TextoDeLaBarra({ texto, visible, estado, celular }: { texto: string; visible: boolean; estado: boolean; celular: boolean }) {
   const regla = React.useRef<HTMLSpanElement>(null)
   const base = React.useRef<HTMLSpanElement>(null)
   const [ancho, setAncho] = React.useState(0)
@@ -641,7 +651,7 @@ function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: bo
   }, [texto])
   return (
     <motion.span
-      className="relative grid h-10 items-center justify-items-start overflow-hidden whitespace-nowrap max-md:hidden"
+      className={cn('relative grid h-10 items-center justify-items-start overflow-hidden whitespace-nowrap', !celular && 'max-md:hidden')}
       initial={false}
       animate={{ width: visible ? ancho : 0, opacity: visible ? 1 : 0 }}
       transition={{ width: { type: 'spring', stiffness: 210, damping: 30, mass: 0.9 }, opacity: { duration: 0.2, ease: 'easeOut' } }}
@@ -668,4 +678,12 @@ function TextoDeLaBarra({ texto, visible, estado }: { texto: string; visible: bo
       </AnimatePresence>
     </motion.span>
   )
+}
+
+/** La sección del celular, para las dudas que sugiere: Hoy, la recorrida y la plata. */
+function seccionDelCelular(pathname: string): SeccionGuia | null {
+  if (pathname === '/campo') return 'inicio'
+  if (pathname.startsWith('/campo/recorrida')) return 'campos'
+  if (pathname.startsWith('/campo/plata')) return 'agenda'
+  return null
 }
