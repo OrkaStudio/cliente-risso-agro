@@ -204,6 +204,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
 
 /** Una fila de «Tus campos»: el elegido se ve claro, con fondo oscuro. */
 function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }: { activo: boolean; onClick: () => void; marca: React.ReactNode; nombre: string; cabezas: number | null; falta?: boolean }) {
+  const dueno = useQuienMira().dueno
   return (
     <button
       type="button"
@@ -218,7 +219,8 @@ function OpcionCampo({ activo, onClick, marca, nombre, cabezas, falta = false }:
       {marca}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{nombre}</span>
-        {falta && <span className={cn('block text-[12px] font-bold', activo ? 'text-white/75' : 'text-principal')}>Falta el mapa</span>}
+        {/* Al dueño le dice qué le falta hacer; a un invitado, sólo cómo está (no lo arma él). */}
+        {falta && <span className={cn('block text-[12px] font-bold', activo ? 'text-white/75' : dueno ? 'text-principal' : 'text-texto-suave')}>{dueno ? 'Falta el mapa' : 'Sin mapa todavía'}</span>}
       </span>
       {cabezas !== null && <span className={cn('t-cifra-mini shrink-0', activo ? 'text-white/70' : 'text-texto-suave')}>{cabezas} cab</span>}
     </button>

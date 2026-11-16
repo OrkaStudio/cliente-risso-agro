@@ -46,6 +46,9 @@ insert into campo (id, empresa_id, nombre) values
 insert into potrero (id, empresa_id, campo_id, nombre) values
   ('b1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 'El Bajo'),
   ('b1000000-0000-0000-0000-000000000002', 'e1000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000002', 'El Bajo');
+-- Los campos con su mapa dibujado (sin el mapa no se invita, 16/11).
+update campo set contorno = '[[-36,-59],[-36.01,-59],[-36.01,-59.01]]'::jsonb where contorno is null;
+update potrero set poligono = '[[-36,-59],[-36.005,-59],[-36.005,-59.005]]'::jsonb where poligono is null;
 insert into animal (empresa_id, categoria, potrero_id) values
   ('e1000000-0000-0000-0000-000000000001', 'vaca', 'b1000000-0000-0000-0000-000000000001'),
   ('e1000000-0000-0000-0000-000000000002', 'vaca', 'b1000000-0000-0000-0000-000000000002'),
@@ -215,6 +218,23 @@ begin
   end;
 end $$;
 reset role;
+
+-- Primero el mapa (16/11): sin campos dibujados no se invita.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"d1000000-0000-0000-0000-000000000003"}';
+set local request.headers = '{"x-troppero-cuenta":"e1000000-0000-0000-0000-000000000004"}';
+do $$
+begin
+  begin
+    perform public.crear_invitacion('5490000000077', 'Alguien', 'peon', '{"hacienda":"ve","campos":"no","plata":"no"}', 'app');
+    assert false, 'tenía que pedir el mapa antes de invitar';
+  exception when raise_exception then null;
+  end;
+end $$;
+reset role;
+-- Con el campo dibujado, sí.
+insert into campo (id, empresa_id, nombre, contorno) values ('c1000000-0000-0000-0000-000000000004', 'e1000000-0000-0000-0000-000000000004', 'La de Otro',
+  '[[-36,-59],[-36.01,-59],[-36.01,-59.01]]'::jsonb);
 
 -- El dueño de Otro invita al vete: el vete acepta (ya estaba en otras cuentas).
 set local role authenticated;

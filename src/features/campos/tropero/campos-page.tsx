@@ -200,7 +200,8 @@ export function CamposPage() {
   const estado = estadoDe(mapa)
   const listo = estado.tipo === 'listo'
   // Mientras el campo no esté armado, Campos es el mapa para armarlo (antes era otra pantalla, /mapa).
-  const editando = dibujar || !listo
+  // Armar el mapa es del dueño (Lau, 16/11): un invitado ve lo que haya, sin el editor.
+  const editando = quien.dueno && (dibujar || !listo)
   const potrero = campo.potreros.find((p) => p.id === potreroId) ?? null
   const usoDe = (id: string): Uso => {
     const p = campo.potreros.find((x) => x.id === id)
@@ -318,7 +319,7 @@ export function CamposPage() {
                 lugar={lugar}
                 lluvia={datosQ.data ? Math.round(lluvia30) : null}
                 avisos={avisos}
-                onAviso={(id) => (id ? setPotreroId(id) : setDibujar(true))}
+                onAviso={(id) => (id ? setPotreroId(id) : quien.dueno && setDibujar(true))}
                 onCorregir={() => setPanel('campo')}
               />
             )}
@@ -410,7 +411,7 @@ function ResumenCampo({
           ))}
         </ul>
       )}
-      <p className="text-[14px] text-texto-suave">{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.'}</p>
+      <p className="text-[14px] text-texto-suave">{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : quien.dueno ? 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.' : 'El dueño todavía está armando este campo en el mapa. Cuando lo termine, vas a ver cada potrero.'}</p>
       {/* El nombre, la tenencia y el dibujo del campo son del dueño (permisos, 13/11). */}
       {quien.dueno && (
         <button type="button" onClick={onCorregir} className={cn(BOTON, 'self-start')}>
@@ -847,7 +848,7 @@ function VistaGeneral({ campos, identidad, onElegir, desde }: { campos: CampoMap
                       {ha(hectareas(c))} ha{hacienda.ve && ` · ${cabezas(c)} cab`}
                     </span>
                   </span>
-                  {!listo && <span className="shrink-0 rounded-full bg-principal-suave px-2.5 py-1 text-[12px] font-bold text-principal">Falta el mapa</span>}
+                  {!listo && <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-[12px] font-bold', quien.dueno ? 'bg-principal-suave text-principal' : 'bg-superficie-hundida text-texto-suave')}>{quien.dueno ? 'Falta el mapa' : 'Sin mapa todavía'}</span>}
                   <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave transition-transform group-hover:translate-x-0.5" />
                 </button>
               </li>
