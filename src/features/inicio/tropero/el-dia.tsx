@@ -62,7 +62,12 @@ const T = {
  * recorrida); y a la vista, sin bajar, la lista para atender y los cobros y
  * pagos. El detalle (croquis, rodeo, clima) va abajo, para el que lo busca.
  */
-export function ElDia() {
+/**
+ * `celular`: el Hoy del celular usa lo mismo de arriba (el saludo, los cuatro
+ * números y lo que hay para atender) sin lo de abajo (Lau, 16/11: «mismo enfoque
+ * que la compu, más visual»).
+ */
+export function ElDia({ celular = false }: { celular?: boolean } = {}) {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const plata = veePlata(membresia)
@@ -111,7 +116,7 @@ export function ElDia() {
     reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } }
 
   return (
-    <div className="mx-auto flex w-full ancho-pagina flex-col gap-5">
+    <div className={cn('mx-auto flex w-full ancho-pagina flex-col', celular ? 'hoy-celu gap-4' : 'gap-5')}>
       <motion.div {...entra(0)}>
         <Cabecera veAlgo={veCampos || plata} titulo={saludo(new Date().getHours(), nombre)} cosas={cosas} lluvia={chips.find((c) => c.key === 'lluvia') ?? null} campos={inicio.campos} elegido={inicio.elegido} />
       </motion.div>
@@ -142,6 +147,7 @@ export function ElDia() {
       )}
 
       {/* El campo hoy: el rodeo y el clima en un solo panel, divididos por una línea. */}
+      {!celular && (
       <motion.div
         {...entra(3)}
         className={cn('grid overflow-hidden rounded-[20px] border border-borde bg-superficie', veHacienda && !agricola && 'lg:grid-cols-[minmax(0,1fr)_360px]')}
@@ -152,8 +158,10 @@ export function ElDia() {
         </div>
       </motion.div>
 
+      )}
+
       {/* Sólo para quien tiene la plata habilitada (permisos, 13/11): antes salía en $0. */}
-      {plata && (
+      {plata && !celular && (
         <motion.div {...entra(4)}>
           <LaPlata vencimientos={v.vencimientos} />
         </motion.div>
@@ -497,7 +505,7 @@ function ParaAtenderHoy({ cosas, empresaId }: { cosas: Cosa[]; empresaId: string
   const [primera, ...resto] = cosas
   return (
     <section id="para-atender" aria-labelledby="atender-hoy" className="scroll-mt-6 overflow-hidden rounded-[20px] border border-borde bg-superficie">
-      <div className="flex items-baseline gap-3 border-b border-borde px-6 py-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-borde px-6 py-4">
         <h2 id="atender-hoy" className={T.titulo}>
           Para atender hoy
         </h2>

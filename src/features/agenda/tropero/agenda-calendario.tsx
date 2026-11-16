@@ -112,7 +112,8 @@ export function AgendaCalendario({ items, hoy, empresaId, campoId, onAbrir, mesI
             return (
               <div key={f} className={cn('flex min-h-[104px] min-w-0 flex-col gap-1 p-1.5', borde, esHoy && 'bg-trigo-50')}>
                 <button type="button" onClick={() => setDia(f)} aria-label={`Ver el ${diaLargo(f)}: ${vs.length ? `${vs.length} ${vs.length === 1 ? 'cosa' : 'cosas'}` : 'nada'}`} className="group/num flex items-center gap-1.5 self-start rounded-[10px] px-0.5">
-                  <span className={cn('t-cifra-chica grid size-7 place-items-center rounded-full font-bold transition-colors', esHoy ? 'bg-principal text-principal-texto' : f < hoy ? 'text-texto-suave group-hover/num:bg-superficie-hundida' : 'text-texto group-hover/num:bg-superficie-hundida')}>
+                  {/* El número con presencia (Lau, 16/11) y con el color de lo que tiene ese día: rojo si quedó algo vencido, terracota si hay que pagar, verde si se cobra. */}
+                  <span className={cn('t-cifra grid size-9 place-items-center rounded-full text-[19px] font-bold transition-colors', esHoy ? 'bg-principal text-principal-texto' : cn(colorDelDia(vs, hoy), 'group-hover/num:bg-superficie-hundida'))}>
                     {Number(f.slice(8))}
                   </span>
                   {esHoy && <span className="text-[11.5px] font-bold tracking-[0.06em] text-principal uppercase">Hoy</span>}
@@ -185,6 +186,16 @@ function Numero({ titulo, monto, tono, detalle, alerta = false }: { titulo: stri
 }
 
 /** Una cosa del día: monto y nombre; al pasar el mouse, su detalle; al tocarla, «¿Lo pagaste?». */
+/** El color del número del día, por lo más urgente que tiene. Sin nada, tinta; lo ya pasado sin nada, apagado. */
+function colorDelDia(vs: Vencimiento[], hoy: string): string {
+  const clases = vs.map((v) => claseDe(v, hoy))
+  if (clases.includes('vencido')) return 'bg-estado-problema-suave text-estado-problema-texto'
+  if (clases.includes('paga')) return 'bg-principal-suave text-principal'
+  if (clases.includes('cobra')) return 'bg-estado-bien-suave text-estado-bien-texto'
+  if (clases.length) return 'text-texto'
+  return 'text-texto/70'
+}
+
 function Chip({ v, hoy, onAbrir }: { v: Vencimiento; hoy: string; onAbrir: (v: Vencimiento) => void }) {
   const clase = claseDe(v, hoy)
   const e = CHIP[clase]

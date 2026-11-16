@@ -5,29 +5,22 @@ import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
 import { useAuth } from '@/features/auth/auth-context'
-import { colorDeCampo } from '@/features/campos/use-campo-mapa'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
-import { useClima } from '@/features/cotizaciones/hooks'
+import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { ListaCambiarCuenta } from '@/features/empresa/elegir-cuenta'
 import { useCuentas, useEmpresa } from '@/features/empresa/use-empresa'
-import { usePanoramaInicio } from '@/features/inicio/hooks'
-import { useParaAtender } from '@/features/inicio/para-atender-api'
-import { cosasParaHoy, fraseDelDia, franjasDelRodeo, saludo, type Cosa } from '@/features/inicio/tropero/dia'
-import { useLluviaDelMes } from '@/features/inicio/tropero/use-dia'
+import { saludo } from '@/features/inicio/tropero/dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
-import tranquera from '@/assets/tropero/tranquera.webp'
-import { Cabecera } from '@/components/tropero/cabecera'
+import { ElDia } from '@/features/inicio/tropero/el-dia'
 import { fechaCorta, useLoUltimoMio } from '@/features/inicio/tropero/lo-ultimo-mio'
 import { useRecorrida } from './recorrida/use-recorrida'
-import { useQuienMira } from '@/features/empresa/use-quien-mira'
 import { puedeCargar, puedeVer } from '@/features/empresa/secciones'
 
 const CURVA = [0.22, 1, 0.36, 1] as const
-const BARRA: Record<Cosa['tono'], string> = { problema: 'bg-[#b3372a]', atencion: 'bg-[#d38f1d]', aviso: 'bg-acento' }
 
 /**
  * Hoy · El día en el celular (página 35): la foto con el campo elegido, lo
@@ -43,45 +36,23 @@ function Hoy() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
-  const variasCuentas = (useCuentas().data?.cuentas.length ?? 0) > 1
-  const quien = useQuienMira()
   const r = useRecorrida()
-  const panorama = usePanoramaInicio()
-  const atender = useParaAtender()
-  const { data: campos } = useMapa(membresia?.empresa_id)
+  // El campo que se mira: el mismo de la compu (la barra de campos); el clima lo sigue.
+  const inicio = useCampoElegido()
   const clima = useCampoClima()
-  // El campo de Hoy es el mismo que el del clima: se elige una vez para los dos.
-  const campo = campos?.find((c) => c.id === clima.actual?.id) ?? campos?.[0]
-  const tiempo = useClima(clima.actual?.ubicacion ?? null)
-  // La ubicación del campo de Hoy (el mismo que el del clima, o su centro).
-  const ubicacion = campo && clima.actual?.id === campo.id ? clima.actual.ubicacion : campo?.lat != null && campo.lon != null ? { lat: campo.lat, lon: campo.lon } : null
-  const lluvia = useLluviaDelMes(ubicacion)
+  const campos = inicio.campos
+  const campo = inicio.elegido
   const reducir = useReducedMotion()
   const [eligiendo, setEligiendo] = useState(false)
-
-  const potreros = (atender.data?.potreros ?? []).filter((p) => !campo || p.campo === campo.nombre)
-  // En el celular, cada cosa va a su pantalla del Modo Campo.
-  // Sólo lo que la persona ve, y cada acción sólo si la puede hacer (permisos, 13/11).
-  const ve = { campos: puedeVer(membresia, 'campos'), plata: puedeVer(membresia, 'plata'), hacienda: puedeVer(membresia, 'hacienda') }
   const carga = { campos: puedeCargar(membresia, 'campos'), plata: puedeCargar(membresia, 'plata'), hacienda: puedeCargar(membresia, 'hacienda') }
-  const cosas = cosasParaHoy(ve.campos ? potreros : [], ve.plata ? (panorama.data?.vencimientos ?? []) : [], ve.campos ? (atender.data?.sinRecorrer ?? []).filter((c) => c.campo === campo?.nombre) : [], 3)
-    .map(
-      (c): Cosa => ({
-        ...c,
-        accion: c.key.startsWith('v-')
-          ? { texto: 'Anotar', to: '/campo/plata' }
-          : { texto: c.key.startsWith('r-') ? 'Recorrer' : 'Ver', to: '/campo/recorrida' },
-      }),
-    )
-    // Ver una cosa en el celular es ir a cargar: sin ese permiso, se muestra sin botón.
-    .map((c) => (c.accion.to === '/campo/plata' ? carga.plata : carga.campos) ? c : { ...c, accion: { texto: '', to: '' } })
+  const ve = { campos: puedeVer(membresia, 'campos'), plata: puedeVer(membresia, 'plata') }
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
-  const frase = fraseDelDia({ temp: tiempo.data?.temp ?? null, lugar: null, lluviaMes: lluvia.data ?? null, cosas: cosas.length })
-  const tempTexto = tiempo.data ? `${tiempo.data.temp} grados. ` : ''
-  const cabezas = campo ? campo.potreros.reduce((s, p) => s + p.cabezas, 0) : (panorama.data?.totalCabezas ?? 0)
-  const color = campo ? colorDeCampo(campo.colorIdx ?? 0) : null
-  const franjas = franjasDelRodeo(panorama.data?.porCategoria ?? [])
+  const elegir = (id: string | null) => {
+    inicio.elegir(id)
+    if (id) clima.elegir(id)
+    setEligiendo(false)
+  }
   const entra = (i: number) =>
     reducir ? {} : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35, delay: i * 0.06, ease: CURVA } }
 
@@ -90,7 +61,7 @@ function Hoy() {
       {/* Arriba, en una barra clara: la marca, el campo y la cuenta (antes iban sobre la foto). */}
       <div className="flex items-center gap-2.5 px-[18px] pt-[max(12px,env(safe-area-inset-top))] pb-3">
         <Logo alto={24} soloIsotipo />
-        {campos && campos.length > 0 && (
+        {campos.length > 0 && (
           <div className="relative min-w-0">
             <button
               type="button"
@@ -98,28 +69,33 @@ function Hoy() {
               aria-expanded={eligiendo}
               className="flex h-10 max-w-full items-center gap-2 rounded-full border border-borde bg-superficie pr-3 pl-1.5 text-[15px] font-semibold text-texto"
             >
-              {color && (
-                <span className="grid size-7 shrink-0 place-items-center rounded-[7px] text-[12px] font-extrabold text-white" style={{ background: color.hex }}>
-                  {color.letra}
+              {campo ? (
+                <span className="grid size-7 shrink-0 place-items-center rounded-[7px] text-[12px] font-extrabold text-white" style={{ background: campo.color }}>
+                  {campo.letra}
+                </span>
+              ) : (
+                <span className="grid size-7 shrink-0 place-items-center text-texto-suave">
+                  <Icono nombre="Campos" tamano={16} />
                 </span>
               )}
-              <span className="truncate">{campo?.nombre}</span>
+              <span className="truncate">{campo?.nombre ?? 'Todos los campos'}</span>
               {campos.length > 1 && <Icono nombre="Desplegar" tamano={16} />}
             </button>
             {eligiendo && campos.length > 1 && (
               <ul className="absolute top-12 left-0 z-20 min-w-[220px] overflow-hidden rounded-[14px] border border-borde bg-superficie py-1.5 text-texto shadow-lg">
+                <li>
+                  <button type="button" onClick={() => elegir(null)} className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', !campo && 'font-bold')}>
+                    <span className="grid size-6 place-items-center text-texto-suave">
+                      <Icono nombre="Campos" tamano={16} />
+                    </span>
+                    Todos los campos
+                  </button>
+                </li>
                 {campos.map((c) => (
                   <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clima.elegir(c.id)
-                        setEligiendo(false)
-                      }}
-                      className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', c.id === campo?.id && 'font-bold')}
-                    >
-                      <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: colorDeCampo(c.colorIdx ?? 0).hex }}>
-                        {colorDeCampo(c.colorIdx ?? 0).letra}
+                    <button type="button" onClick={() => elegir(c.id)} className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', c.id === campo?.id && 'font-bold')}>
+                      <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: c.color }}>
+                        {c.letra}
                       </span>
                       {c.nombre}
                     </button>
@@ -131,17 +107,6 @@ function Hoy() {
         )}
         <MenuCuenta inicial={(nombre || membresia?.empresa?.nombre || 'T').charAt(0)} />
       </div>
-
-      {/* El saludo, con la misma tranquera que el Inicio de la compu (Lau, 16/11): chico, para que lo de hoy se vea sin bajar. */}
-      <motion.div {...entra(0)} className="px-[18px]">
-        <Cabecera imagen={tranquera} posicion="50% 42%" className="min-h-[128px] px-5 py-4" encima={variasCuentas ? <p className="text-[13.5px] font-semibold text-texto-suave">En {membresia?.empresa?.nombre}</p> : undefined}>
-          <h1 className="font-heading text-[28px] leading-[1.05] font-extrabold tracking-[-0.01em] text-texto">{saludo(new Date().getHours(), nombre)}</h1>
-          <p className="mt-1.5 max-w-[70%] text-[14.5px] leading-snug text-texto-suave">
-            {tempTexto}
-            {frase}
-          </p>
-        </Cabecera>
-      </motion.div>
 
       <div className="flex flex-col gap-5 px-[18px] pt-5">
         <Pendientes r={r} />
@@ -171,58 +136,8 @@ function Hoy() {
           </motion.button>
         ))}
 
-        <motion.section {...entra(2)} aria-labelledby="hoy-cosas">
-          <h2 id="hoy-cosas" className="font-heading text-[21px] font-extrabold text-texto">
-            {cosas.length === 0 ? 'Hoy no hay nada urgente' : `Hoy hay ${['', 'una cosa', 'dos cosas', 'tres cosas'][cosas.length]}`}
-          </h2>
-          {cosas.length === 0 ? (
-            <p className="mt-2 text-[15px] text-texto-suave">Lo que deje la recorrida o venza en la agenda aparece acá.</p>
-          ) : (
-            <ul className="mt-1">
-              {cosas.map((c) => (
-                <li key={c.key} className="flex items-center gap-3 border-b border-borde py-3.5 last:border-b-0">
-                  <span aria-hidden className={cn('w-1 self-stretch rounded-full', BARRA[c.tono])} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[16px] leading-snug font-semibold text-texto">{c.titulo}</p>
-                    <p className="text-[13.5px] leading-snug text-texto-suave">{c.detalle}</p>
-                  </div>
-                  {c.accion.to && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(c.accion.to)}
-                      className="h-10 shrink-0 rounded-full bg-superficie-hundida px-4 text-[15px] font-bold text-principal"
-                    >
-                      {c.accion.texto}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </motion.section>
-
-        {ve.hacienda && (
-          // Hacienda para mirar llega al celular más adelante (decisión 6, 16/11): hasta entonces, sin a dónde ir.
-          <motion.section {...entra(3)} aria-label="Las cabezas" className="flex flex-col gap-3 rounded-[20px] border border-borde bg-superficie p-5">
-            <span className="flex items-center gap-2 text-[14px] font-semibold text-texto-suave">
-              <span className="grid size-7 place-items-center rounded-full bg-principal-suave text-principal">
-                <Icono nombre="Vaca" tamano={16} />
-              </span>
-              Hacienda
-            </span>
-            <span className="flex items-baseline gap-2">
-              <span className="t-numero text-texto">{cabezas.toLocaleString('es-AR')}</span>
-              <span className="text-[14.5px] font-semibold text-texto-suave">cabezas en {campo?.nombre ?? quien.enLosCampos}</span>
-            </span>
-            {franjas.length > 0 && (
-              <span className="flex h-1.5 gap-1">
-                {franjas.map((f) => (
-                  <span key={f.nombre} className={cn('rounded-full', f.clase)} style={{ flexGrow: f.cabezas }} />
-                ))}
-              </span>
-            )}
-          </motion.section>
-        )}
+        {/* Lo mismo que el Inicio de la compu (Lau, 16/11): el saludo, los cuatro números y lo que hay para atender. */}
+        <ElDia celular />
 
         {/* Lo que cargó la persona (reemplaza al Historial, Lau 16/11): lo último, de ella. Lo que espera señal va arriba, en «Pendientes». */}
         {(ve.campos || ve.plata || carga.campos || carga.plata) && <LoQueCargaste plata={carga.plata} campos={carga.campos} />}
