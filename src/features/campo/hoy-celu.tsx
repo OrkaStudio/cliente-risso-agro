@@ -192,7 +192,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
                   <b className="t-cifra-chica text-texto">{Math.round([...registradas.data.values()].reduce((s, x) => s + x, 0))} mm</b> en tu pluviómetro
                 </>
               )}
-              {t.dias[1] && t.dias[1].lluviaProb >= 40 && <b className="text-sky"> · mañana {t.dias[1].lluviaProb} %</b>}
+              {t.dias[1] && t.dias[1].lluviaProb >= 40 && <b className="whitespace-nowrap text-sky"> · mañana {t.dias[1].lluviaProb} %</b>}
             </p>
           </motion.section>
         )}
@@ -415,9 +415,9 @@ function PlataSemanas({ vencimientos }: { vencimientos: Vencimiento[] }) {
       <div className="grid grid-cols-4 gap-2">
         {semanas.map((s, i) => (
           <div key={i} className="flex flex-col items-center gap-1">
-            <div className="flex h-[44px] w-full items-end justify-center">
+            {entra > 0 && <div className="flex h-[44px] w-full items-end justify-center">
               {s.entra > 0 && <span className="w-[60%] rounded-t-[5px] bg-estado-bien" style={{ height: `${Math.max(6, (s.entra / max) * 44)}px` }} />}
-            </div>
+            </div>}
             <div className="h-px w-full bg-borde" />
             <div className="flex h-[44px] w-full items-start justify-center">
               {s.sale > 0 && <span className="w-[60%] rounded-b-[5px] bg-estado-problema/85" style={{ height: `${Math.max(6, (s.sale / max) * 44)}px` }} />}
