@@ -1032,8 +1032,3 @@
 .sin-barra { scrollbar-width: none; }
 .sin-barra::-webkit-scrollbar { display: none; }
 
-/* El Hoy del celular usa las piezas del Inicio de la compu (Lau, 16/11) con la
-   escala del celular: el saludo en dos líneas y los números en su celda. */
-.hoy-celu .t-pagina { font-size: 30px; }
-.hoy-celu .t-seccion { font-size: 21px; }
-.hoy-celu .t-numero { font-size: 26px; white-space: nowrap; }

@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
-import { Logo } from '@/components/tropero/logo'
 import { useAuth } from '@/features/auth/auth-context'
-import { useCampoClima } from '@/features/cotizaciones/campo-clima'
-import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { ListaCambiarCuenta } from '@/features/empresa/elegir-cuenta'
 import { useCuentas, useEmpresa } from '@/features/empresa/use-empresa'
 import { saludo } from '@/features/inicio/tropero/dia'
@@ -15,12 +11,11 @@ import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
-import { ElDia } from '@/features/inicio/tropero/el-dia'
+import { HoyCelu } from './hoy-celu'
 import { fechaCorta, useLoUltimoMio } from '@/features/inicio/tropero/lo-ultimo-mio'
 import { useRecorrida } from './recorrida/use-recorrida'
 import { puedeCargar, puedeVer } from '@/features/empresa/secciones'
 
-const CURVA = [0.22, 1, 0.36, 1] as const
 
 /**
  * Hoy · El día en el celular (página 35): la foto con el campo elegido, lo
@@ -37,122 +32,56 @@ function Hoy() {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const r = useRecorrida()
-  // El campo que se mira: el mismo de la compu (la barra de campos); el clima lo sigue.
-  const inicio = useCampoElegido()
-  const clima = useCampoClima()
-  const campos = inicio.campos
-  const campo = inicio.elegido
-  const reducir = useReducedMotion()
-  const [eligiendo, setEligiendo] = useState(false)
   const carga = { campos: puedeCargar(membresia, 'campos'), plata: puedeCargar(membresia, 'plata'), hacienda: puedeCargar(membresia, 'hacienda') }
   const ve = { campos: puedeVer(membresia, 'campos'), plata: puedeVer(membresia, 'plata') }
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
-  const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
-  const elegir = (id: string | null) => {
-    inicio.elegir(id)
-    if (id) clima.elegir(id)
-    setEligiendo(false)
-  }
-  const entra = (i: number) =>
-    reducir ? {} : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35, delay: i * 0.06, ease: CURVA } }
 
   return (
     <div className="h-full overflow-y-auto bg-fondo pb-8">
-      {/* Arriba, en una barra clara: la marca, el campo y la cuenta (antes iban sobre la foto). */}
-      <div className="flex items-center gap-2.5 px-[18px] pt-[max(12px,env(safe-area-inset-top))] pb-3">
-        <Logo alto={24} soloIsotipo />
-        {campos.length > 0 && (
-          <div className="relative min-w-0">
-            <button
-              type="button"
-              onClick={() => setEligiendo((v) => !v)}
-              aria-expanded={eligiendo}
-              className="flex h-10 max-w-full items-center gap-2 rounded-full border border-borde bg-superficie pr-3 pl-1.5 text-[15px] font-semibold text-texto"
-            >
-              {campo ? (
-                <span className="grid size-7 shrink-0 place-items-center rounded-[7px] text-[12px] font-extrabold text-white" style={{ background: campo.color }}>
-                  {campo.letra}
-                </span>
-              ) : (
-                <span className="grid size-7 shrink-0 place-items-center text-texto-suave">
-                  <Icono nombre="Campos" tamano={16} />
-                </span>
-              )}
-              <span className="truncate">{campo?.nombre ?? 'Todos los campos'}</span>
-              {campos.length > 1 && <Icono nombre="Desplegar" tamano={16} />}
-            </button>
-            {eligiendo && campos.length > 1 && (
-              <ul className="absolute top-12 left-0 z-20 min-w-[220px] overflow-hidden rounded-[14px] border border-borde bg-superficie py-1.5 text-texto shadow-lg">
-                <li>
-                  <button type="button" onClick={() => elegir(null)} className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', !campo && 'font-bold')}>
-                    <span className="grid size-6 place-items-center text-texto-suave">
-                      <Icono nombre="Campos" tamano={16} />
+      <HoyCelu
+        cuenta={<MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />}
+        antes={
+          (!r.online || r.sinSubir > 0 || r.errores.length > 0 || r.abiertas.length > 0) && (
+            <div className="flex flex-col gap-3">
+              <Pendientes r={r} />
+              {r.abiertas.map((a) => (
+                <button
+                  key={a.recorridaId}
+                  type="button"
+                  onClick={async () => {
+                    await r.activar(a.recorridaId)
+                    navigate('/campo/recorrida')
+                  }}
+                  className="flex items-center gap-3.5 rounded-[18px] border-2 bg-superficie px-4 py-3.5 text-left"
+                  style={{ borderColor: a.color.hex }}
+                >
+                  <span className="grid size-11 shrink-0 place-items-center rounded-[14px] font-heading text-[19px] font-extrabold text-white" style={{ background: a.color.hex }}>
+                    {a.color.letra}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-heading text-[17px] font-extrabold text-texto">Seguí la recorrida de {a.campoNombre}</span>
+                    <span className="text-[13.5px] text-texto-suave">
+                      {a.hechos} de {a.total} potreros hechos
                     </span>
-                    Todos los campos
-                  </button>
-                </li>
-                {campos.map((c) => (
-                  <li key={c.id}>
-                    <button type="button" onClick={() => elegir(c.id)} className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[15px]', c.id === campo?.id && 'font-bold')}>
-                      <span className="grid size-6 place-items-center rounded-[6px] text-[11px] font-extrabold text-white" style={{ background: c.color }}>
-                        {c.letra}
-                      </span>
-                      {c.nombre}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                  </span>
+                  <Icono nombre="Siguiente" />
+                </button>
+              ))}
+            </div>
+          )
+        }
+        abajo={
+          <>
+            {(ve.campos || ve.plata || carga.campos || carga.plata) && <LoQueCargaste plata={carga.plata} campos={carga.campos} />}
+            {carga.hacienda && (
+              <button type="button" onClick={() => navigate('/campo/lector')} className="flex items-center gap-2 self-center py-2 text-[13.5px] font-semibold text-texto-suave">
+                <Icono nombre="Bastón lector" tamano={16} />
+                Probar un lector de caravana
+              </button>
             )}
-          </div>
-        )}
-        <MenuCuenta inicial={(nombre || membresia?.empresa?.nombre || 'T').charAt(0)} />
-      </div>
-
-      <div className="flex flex-col gap-5 px-[18px] pt-5">
-        <Pendientes r={r} />
-
-        {r.abiertas.map((a) => (
-          <motion.button
-            {...entra(1)}
-            key={a.recorridaId}
-            type="button"
-            onClick={async () => {
-              await r.activar(a.recorridaId)
-              navigate('/campo/recorrida')
-            }}
-            className="flex items-center gap-3.5 rounded-[18px] border-2 bg-superficie px-4 py-4 text-left"
-            style={{ borderColor: a.color.hex }}
-          >
-            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] font-heading text-[20px] font-extrabold text-white" style={{ background: a.color.hex }}>
-              {a.color.letra}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-heading text-[18px] font-extrabold text-texto">Seguí la recorrida de {a.campoNombre}</span>
-              <span className="text-[13.5px] text-texto-suave">
-                {a.hechos} de {a.total} potreros hechos
-              </span>
-            </span>
-            <Icono nombre="Siguiente" />
-          </motion.button>
-        ))}
-
-        {/* Lo mismo que el Inicio de la compu (Lau, 16/11): el saludo, los cuatro números y lo que hay para atender. */}
-        <ElDia celular />
-
-        {/* Lo que cargó la persona (reemplaza al Historial, Lau 16/11): lo último, de ella. Lo que espera señal va arriba, en «Pendientes». */}
-        {(ve.campos || ve.plata || carga.campos || carga.plata) && <LoQueCargaste plata={carga.plata} campos={carga.campos} />}
-
-        {carga.hacienda && (
-        <button
-          type="button"
-          onClick={() => navigate('/campo/lector')}
-          className="flex items-center gap-2 self-center py-2 text-[13.5px] font-semibold text-texto-suave"
-        >
-          <Icono nombre="Bastón lector" tamano={16} />
-          Probar un lector de caravana
-        </button>
-        )}
-      </div>
+          </>
+        }
+      />
     </div>
   )
 }
