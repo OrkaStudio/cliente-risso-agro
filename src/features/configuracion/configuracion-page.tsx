@@ -12,6 +12,7 @@ import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
 import { useAnimales } from '@/features/hacienda/hooks'
 import { useMapa } from '@/features/mapa/api'
+import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
 import { celularLindo, useBaja, useCambiarNombre, usePersonas, whatsappInvitacion, type Persona } from './api'
 import { nombrePropio } from '@/lib/texto'
@@ -93,7 +94,10 @@ function Personas({ empresa }: { empresa: string }) {
   const lista = personas.data ?? []
   const adentro = lista.filter((p) => p.userId)
   const invitados = lista.filter((p) => p.invitacionId)
-  const abrir = (rol?: Rol) => (setVez((v) => v + 1), setInvitar({ vez: vez + 1, rol }))
+  // Primero el mapa (Lau, 16/11): sin el campo y sus potreros dibujados no se suma gente; se va a terminarlo.
+  const sinMapa = useMapaPendiente()
+  const irAlMapa = useNavigate()
+  const abrir = (rol?: Rol) => (sinMapa ? irAlMapa('/campos') : (setVez((v) => v + 1), setInvitar({ vez: vez + 1, rol })))
 
   if (personas.isLoading) return <div className="h-64 animate-pulse rounded-[24px] bg-superficie-hundida" aria-busy />
   if (personas.error) return <p className="text-texto-suave">No pudimos cargar las personas. Revisá la conexión y probá de nuevo.</p>
@@ -111,12 +115,17 @@ function Personas({ empresa }: { empresa: string }) {
           )}
         </p>
         <button type="button" onClick={() => abrir()} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
-          Invitar a alguien
+          {sinMapa ? 'Terminar el mapa' : 'Invitar a alguien'}
           <span className="grid size-10 place-items-center rounded-full bg-acento text-acento-texto">
-            <Icono nombre="Agregar" tamano={16} />
+            <Icono nombre={sinMapa ? 'Campos' : 'Agregar'} tamano={16} />
           </span>
         </button>
       </div>
+      {sinMapa && (
+        <p className="-mt-2 rounded-[16px] bg-estado-atencion-suave px-4 py-3 text-[15px] text-texto">
+          Para sumar a tu gente, primero terminá el mapa: el borde de tus campos y sus potreros. Así, el que entra ve el campo como es.
+        </p>
+      )}
 
       {/* La tabla: una fila por persona, una columna por sección con su nivel. Se lee quién hace qué sin abrir nada. */}
       <section aria-label="Quién ve qué" className="overflow-hidden rounded-[24px] border border-borde bg-superficie">

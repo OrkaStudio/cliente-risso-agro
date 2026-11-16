@@ -41,6 +41,9 @@ insert into campo (id, empresa_id, nombre) values
   ('c0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000001', 'La Permisos');
 insert into potrero (id, empresa_id, campo_id, nombre) values
   ('b0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', '1A');
+-- Los campos con su mapa dibujado (sin el mapa no se invita, 16/11).
+update campo set contorno = '[[-36,-59],[-36.01,-59],[-36.01,-59.01]]'::jsonb where contorno is null;
+update potrero set poligono = '[[-36,-59],[-36.005,-59],[-36.005,-59.005]]'::jsonb where poligono is null;
 insert into animal (empresa_id, categoria, potrero_id) values
   ('e0000000-0000-0000-0000-000000000001', 'vaca', 'b0000000-0000-0000-0000-000000000001');
 insert into lluvia (empresa_id, campo_id, fecha, mm) values
