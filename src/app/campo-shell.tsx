@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
-import { ClipboardList, Leaf, LogOut } from 'lucide-react'
+import { Leaf, LogOut } from 'lucide-react'
 import { useAuth } from '@/features/auth/auth-context'
 import { AvisoEstadoCampo, ChipEstadoCampo } from '@/features/campo/estado-campo'
 import { useSeedOffline } from '@/features/campo/use-seed-offline'
@@ -80,6 +80,8 @@ export function CampoShell() {
   // Hoy trae su propia cabecera (la foto, el campo y la cuenta).
   const enHoy = useLocation().pathname === '/campo'
   const mapaPendiente = useMapaPendiente()
+  // Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos.
+  const navegables = NAV.filter(({ to }) => { const s = cargaDeRuta(to); return !s || puedeCargar(membresia, s) })
 
   return (
     <div className="campo relative flex h-full flex-col overflow-hidden">
@@ -104,21 +106,6 @@ export function CampoShell() {
           abierto={detalleAbierto}
           onToggle={() => setDetalleAbierto((v) => !v)}
         />
-        <NavLink
-          to="/campo/historial"
-          onPointerDown={() => prefetch(CHUNKS_CAMPO['/campo/historial'])}
-          className={({ isActive }) =>
-            cn(
-              'flex h-11 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-semibold transition-colors',
-              isActive
-                ? 'bg-sidebar-accent text-sidebar-foreground'
-                : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-            )
-          }
-        >
-          <ClipboardList className="size-[17px]" />
-          Historial
-        </NavLink>
         <SalirDeLaCuenta />
       </header>
       )}
@@ -151,10 +138,12 @@ export function CampoShell() {
       {/* Nav inferior (página 35): una píldora flotante; la sección activa, en
           un círculo terracota. Sin el mapa, sólo Hoy: lo demás necesita el campo. */}
       {/* En flujo (no flotando encima): así no tapa los pies fijos de la recorrida y la manga. */}
+      {/* Con una sola sección (el que sólo mira Hoy), la barra no tiene a dónde llevar: no va. */}
+      {navegables.length > 1 && (
       <nav aria-label="Modo Campo" className="shrink-0 bg-fondo px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between rounded-full bg-superficie p-1.5 shadow-[0_8px_28px_rgba(19,27,22,0.18)]">
           {/* Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos. */}
-          {NAV.filter(({ to }) => { const s = cargaDeRuta(to); return !s || puedeCargar(membresia, s) }).map(({ to, label, icono, end }) => {
+          {navegables.map(({ to, label, icono, end }) => {
             const cerrada = mapaPendiente && to !== '/campo'
             return (
               <NavLink
@@ -180,6 +169,7 @@ export function CampoShell() {
           })}
         </div>
       </nav>
+      )}
     </div>
   )
 }

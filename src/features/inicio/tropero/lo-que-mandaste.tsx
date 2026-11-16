@@ -1,36 +1,14 @@
-import { useQuery } from '@tanstack/react-query'
 import { Icono } from '@/components/tropero/icono'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
-import { useAuth } from '@/features/auth/auth-context'
-import { supabase } from '@/lib/supabase/client'
+import { fechaCorta as fecha, useLoUltimoMio } from './lo-ultimo-mio'
 
-const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
-const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 
 /**
  * El Inicio de quien sólo manda (permisos, 14/11): lo suyo va por WhatsApp. Se
  * le muestra cómo mandar y lo último que mandó (la base le deja ver sólo lo suyo).
  */
 export function LoQueMandaste({ plata, campos }: { plata: boolean; campos: boolean }) {
-  const { user } = useAuth()
-  const q = useQuery({
-    queryKey: ['lo-que-mandaste', user?.id, plata, campos],
-    enabled: !!user,
-    queryFn: async () => {
-      const [m, l] = await Promise.all([
-        plata ? supabase.from('movimiento_financiero').select('id, descripcion, monto, created_at, estado').eq('created_by', user!.id).neq('estado', 'anulado').order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [], error: null }),
-        campos ? supabase.from('lluvia').select('id, mm, created_at, campo(nombre)').eq('created_by', user!.id).order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [], error: null }),
-      ])
-      if (m.error) throw m.error
-      if (l.error) throw l.error
-      return [
-        ...(m.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, texto: `${x.descripcion || 'Gasto'} · ${pesos(Number(x.monto))}${x.estado === 'pendiente' ? ' · a pagar' : ''}` })),
-        ...(l.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, texto: `Lluvia · ${Number(x.mm)} mm${(x.campo as { nombre: string } | null)?.nombre ? ` en ${(x.campo as { nombre: string }).nombre}` : ''}` })),
-      ]
-        .sort((a, b) => b.cuando.localeCompare(a.cuando))
-        .slice(0, 5)
-    },
-  })
+  const q = useLoUltimoMio({ plata, campos })
   const que = [campos && 'lluvias y novedades del campo', plata && 'gastos, facturas o lo que hay que pagar'].filter(Boolean).join(', ')
   return (
     <section aria-label="Lo que mandás" className="flex flex-col gap-4 rounded-[20px] border border-borde bg-superficie p-6">
