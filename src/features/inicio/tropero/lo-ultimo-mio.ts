@@ -5,7 +5,17 @@ import { supabase } from '@/lib/supabase/client'
 const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
 export const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 
-export type Cargado = { id: string; cuando: string; texto: string }
+export type Cargado = {
+  id: string
+  cuando: string
+  /** En una línea, para la compu. */
+  texto: string
+  /** Para la lista del celular: qué es, el dato principal y el detalle. */
+  tipo: 'plata' | 'lluvia' | 'recorrida'
+  titulo: string
+  valor: string | null
+  detalle: string | null
+}
 
 /**
  * Lo último que cargó la persona (gastos, lluvias, recorridas), lo de ella sola:
@@ -28,9 +38,9 @@ export function useLoUltimoMio({ plata, campos, cuantos = 5 }: { plata: boolean;
       if (r.error) throw r.error
       const campoDe = (x: { campo: unknown }) => (x.campo as { nombre: string } | null)?.nombre
       return [
-        ...(m.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, texto: `${x.descripcion || 'Gasto'} · ${pesos(Number(x.monto))}${x.estado === 'pendiente' ? ' · a pagar' : ''}` })),
-        ...(l.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, texto: `Lluvia · ${Number(x.mm)} mm${campoDe(x) ? ` en ${campoDe(x)}` : ''}` })),
-        ...(r.data ?? []).map((x) => ({ id: x.id, cuando: x.created_at, texto: `Recorrida${campoDe(x) ? ` de ${campoDe(x)}` : ''}` })),
+        ...(m.data ?? []).map((x): Cargado => ({ id: x.id, cuando: x.created_at, texto: `${x.descripcion || 'Gasto'} · ${pesos(Number(x.monto))}${x.estado === 'pendiente' ? ' · a pagar' : ''}`, tipo: 'plata', titulo: x.descripcion || 'Gasto', valor: pesos(Number(x.monto)), detalle: x.estado === 'pendiente' ? 'A pagar' : null })),
+        ...(l.data ?? []).map((x): Cargado => ({ id: x.id, cuando: x.created_at, texto: `Lluvia · ${Number(x.mm)} mm${campoDe(x) ? ` en ${campoDe(x)}` : ''}`, tipo: 'lluvia', titulo: 'Lluvia', valor: `${Number(x.mm)} mm`, detalle: campoDe(x) ?? null })),
+        ...(r.data ?? []).map((x): Cargado => ({ id: x.id, cuando: x.created_at, texto: `Recorrida${campoDe(x) ? ` de ${campoDe(x)}` : ''}`, tipo: 'recorrida', titulo: 'Recorrida', valor: null, detalle: campoDe(x) ?? null })),
       ]
         .sort((a, b) => b.cuando.localeCompare(a.cuando))
         .slice(0, cuantos)

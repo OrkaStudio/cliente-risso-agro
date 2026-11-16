@@ -12,9 +12,7 @@ import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import { HoyCelu } from './hoy-celu'
-import { fechaCorta, useLoUltimoMio } from '@/features/inicio/tropero/lo-ultimo-mio'
 import { useRecorrida } from './recorrida/use-recorrida'
-import { puedeCargar, puedeVer } from '@/features/empresa/secciones'
 
 
 /**
@@ -32,8 +30,6 @@ function Hoy() {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const r = useRecorrida()
-  const carga = { campos: puedeCargar(membresia, 'campos'), plata: puedeCargar(membresia, 'plata'), hacienda: puedeCargar(membresia, 'hacienda') }
-  const ve = { campos: puedeVer(membresia, 'campos'), plata: puedeVer(membresia, 'plata') }
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
 
   return (
@@ -70,43 +66,8 @@ function Hoy() {
             </div>
           )
         }
-        abajo={
-          <>
-            {(ve.campos || ve.plata || carga.campos || carga.plata) && <LoQueCargaste plata={carga.plata} campos={carga.campos} />}
-            {carga.hacienda && (
-              <button type="button" onClick={() => navigate('/campo/lector')} className="flex items-center gap-2 self-center py-2 text-[13.5px] font-semibold text-texto-suave">
-                <Icono nombre="Bastón lector" tamano={16} />
-                Probar un lector de caravana
-              </button>
-            )}
-          </>
-        }
       />
     </div>
-  )
-}
-
-/** Lo último que cargó, del más nuevo al más viejo (lo de ella sola). */
-function LoQueCargaste({ plata, campos }: { plata: boolean; campos: boolean }) {
-  const q = useLoUltimoMio({ plata, campos })
-  if (!q.data?.length) return null
-  return (
-    <section aria-labelledby="lo-que-cargaste" className="flex flex-col gap-1">
-      <h2 id="lo-que-cargaste" className="font-heading text-[19px] font-extrabold text-texto">
-        Lo que cargaste
-      </h2>
-      <ul className="flex flex-col divide-y divide-borde/70">
-        {q.data.map((x) => (
-          <li key={x.id} className="flex items-center gap-3 py-2.5 text-[15px] text-texto">
-            <span className="t-cifra-chica w-14 shrink-0 text-texto-suave">{fechaCorta(x.cuando)}</span>
-            <span className="min-w-0 flex-1 truncate">{x.texto}</span>
-            <span className="shrink-0 text-estado-bien-texto" aria-label="Subido">
-              <Icono nombre="Guardar" tamano={16} />
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }
 
