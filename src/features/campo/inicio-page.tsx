@@ -8,7 +8,6 @@ import { useCuentas, useEmpresa } from '@/features/empresa/use-empresa'
 import { saludo } from '@/features/inicio/tropero/dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
-import { setForceOficina } from '@/lib/campo-mode'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import { HoyCelu } from './hoy-celu'
@@ -116,9 +115,8 @@ function Pendientes({ r }: { r: ReturnType<typeof useRecorrida> }) {
   )
 }
 
-/** El avatar: el historial, la Oficina en el celular y salir (con confirmación de dos toques). */
+/** El avatar: cambiar de cuenta y salir (con confirmación de dos toques). */
 function MenuCuenta({ inicial }: { inicial: string }) {
-  const navigate = useNavigate()
   const { signOut } = useAuth()
   const [abierto, setAbierto] = useState(false)
   const [salir, setSalir] = useState(false)
@@ -152,18 +150,6 @@ function MenuCuenta({ inicial }: { inicial: string }) {
           <li>
             <button
               type="button"
-              onClick={() => {
-                setForceOficina(true)
-                navigate('/')
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]"
-            >
-              <Icono nombre="Oficina" tamano={16} /> Ir a la Oficina
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
               onClick={() => (salir ? void signOut() : setSalir(true))}
               className={cn('flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]', salir && 'bg-estado-problema-suave font-bold text-estado-problema-texto')}
             >
@@ -178,7 +164,6 @@ function MenuCuenta({ inicial }: { inicial: string }) {
 
 /** Celu · Hoy, sin campo (página 35): el campo se arma mejor en la compu. */
 function HoySinCampo() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const { data: campos } = useMapa(membresia?.empresa_id)
@@ -220,13 +205,6 @@ function HoySinCampo() {
             Mandame el link a la compu
           </BotonPrincipal>
         )}
-        <button
-          type="button"
-          onClick={() => navigate(primero ? `/mapa/${primero.id}` : '/mapa')}
-          className="h-14 rounded-full border-[1.5px] border-principal text-[16.5px] font-bold text-principal"
-        >
-          Armarlo desde el celular
-        </button>
       </div>
     </div>
   )

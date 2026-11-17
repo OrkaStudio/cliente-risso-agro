@@ -175,3 +175,22 @@
 @media (prefers-reduced-motion: reduce) {
   .c-sweep::after { animation: none; opacity: 0; }
 }
+
+/* El teclado de Plata con la letra del celular nuevo (Lau, 17/11: un solo
+   sistema): Inter con cifras tabulares, sin mayúsculas forzadas. */
+.plata-nueva .c-mono {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.plata-nueva .c-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-stretch: 100%;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.plata-nueva .c-display {
+  font-stretch: 100%;
+}

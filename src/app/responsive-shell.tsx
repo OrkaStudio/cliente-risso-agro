@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Tractor } from 'lucide-react'
 import { useIsMobile } from '@/lib/use-is-mobile'
-import { setForceOficina, useForceOficina } from '@/lib/campo-mode'
 import { useMedirUso } from '@/features/guia/medir'
 
 /**
@@ -19,7 +17,6 @@ import { useMedirUso } from '@/features/guia/medir'
 export function ResponsiveShell() {
   useMedirUso()
   const isMobile = useIsMobile()
-  const forceOficina = useForceOficina()
   const location = useLocation()
   const enCampo = location.pathname.startsWith('/campo')
   const rutaOficina = `${location.pathname}${location.search}${location.hash}`
@@ -41,8 +38,9 @@ export function ResponsiveShell() {
     return <Navigate to={regresoResponsive ?? '/'} replace state={null} />
   }
 
-  // Teléfono, sin override y parado en una ruta de Oficina → al Modo Campo.
-  if (isMobile && !forceOficina && !enCampo) {
+  // El celular y la compu son dos cosas separadas (Lau, 17/11): un teléfono
+  // parado en una ruta de la compu vuelve siempre al celular, sin excepción.
+  if (isMobile && !enCampo) {
     return <Navigate to="/campo" replace state={{ regresoResponsive: rutaOficina }} />
   }
 
@@ -60,26 +58,6 @@ export function ResponsiveShell() {
       ) : (
         <Outlet />
       )}
-      {/* Móvil que se escapó a Oficina: cómo volver al Campo sin tocar el
-          AppShell de escritorio. */}
-      {isMobile && forceOficina && !enCampo && <VolverACampo />}
     </>
-  )
-}
-
-function VolverACampo() {
-  const navigate = useNavigate()
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setForceOficina(false)
-        navigate('/campo')
-      }}
-      className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-principal px-4 py-2.5 text-[15px] font-bold text-principal-texto shadow-[0_8px_24px_rgba(58,26,13,0.3)]"
-    >
-      <Tractor className="size-4" />
-      Volver a Modo Campo
-    </button>
   )
 }

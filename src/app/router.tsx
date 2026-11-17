@@ -86,8 +86,8 @@ const RecorridaPage = lazy(() =>
   })),
 )
 const PlataPage = lazy(() =>
-  import('@/features/campo/plata-page').then((m) => ({
-    default: m.PlataPage,
+  import('@/features/campo/plata-celu').then((m) => ({
+    default: m.PlataCelu,
   })),
 )
 const OnboardingPage = lazy(() =>

@@ -115,6 +115,16 @@ export function cargaDeRuta(path: string): Seccion | null {
   return null
 }
 
+/**
+ * ¿Entra a esta pantalla del celular? La Plata la abre quien carga plata (el
+ * teclado) o quien la ve (los números); lo demás, quien carga esa sección.
+ */
+export function entraEnCelular(m: Membresia | null | undefined, path: string): boolean {
+  const s = cargaDeRuta(path)
+  if (!s) return true
+  return puedeCargar(m, s) || (s === 'plata' && veePlata(m))
+}
+
 /** A dónde va alguien que entra a algo que no ve: su primera sección (el Inicio, que lo tienen todos). */
 export function primeraRuta(m: Membresia | null | undefined): string {
   return SECCIONES.find((s) => puedeVer(m, s.id))?.ruta ?? '/'
