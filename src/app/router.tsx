@@ -85,6 +85,8 @@ const RecorridaPage = lazy(() =>
     default: m.RecorridaPage,
   })),
 )
+const CamposCelu = lazy(() => import('@/features/campo/campos-celu').then((m) => ({ default: m.CamposCelu })))
+const HaciendaCelu = lazy(() => import('@/features/campo/hacienda-celu').then((m) => ({ default: m.HaciendaCelu })))
 const PlataPage = lazy(() =>
   import('@/features/campo/plata-celu').then((m) => ({
     default: m.PlataCelu,
@@ -248,6 +250,10 @@ export const router = createBrowserRouter([
                   { path: 'campo/lector', element: <LectorPage /> },
                   { path: 'campo/recorrida', element: <RecorridaPage /> },
                   { path: 'campo/plata', element: <PlataPage /> },
+                  // Para mirar (Lau, 17/11): los campos y sus potreros, y la hacienda con su buscador.
+                  { path: 'campo/campos', element: <CamposCelu /> },
+                  { path: 'campo/campos/:id', element: <CamposCelu /> },
+                  { path: 'campo/hacienda', element: <HaciendaCelu /> },
                   // El Historial se reemplazó por «Lo que cargaste» en Hoy (Lau, 16/11).
                   { path: 'campo/historial', element: <Navigate to="/campo" replace /> },
                   ],

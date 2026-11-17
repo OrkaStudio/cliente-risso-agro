@@ -28,6 +28,8 @@ const NAV: { to: string; label: string; icono: NombreIcono; end: boolean }[] = [
   { to: '/campo', label: 'Hoy', icono: 'Inicio', end: true },
   // La Recorrida sale de la barra (Lau, 17/11): lo que se ve en el campo se manda por audio.
   // La Manga vuelve después del lanzamiento (Lau, 16/11: sin bastón todavía).
+  { to: '/campo/campos', label: 'Campos', icono: 'Campos', end: false },
+  { to: '/campo/hacienda', label: 'Hacienda', icono: 'Vaca', end: false },
   { to: '/campo/plata', label: 'Plata', icono: 'Plata', end: false },
 ]
 
@@ -81,7 +83,7 @@ export function CampoShell() {
   const [detalleAbierto, setDetalleAbierto] = useState(false)
   // Hoy y Plata traen su propia cabecera (la marca, el campo y la cuenta).
   const ruta = useLocation().pathname
-  const enHoy = ruta === '/campo' || ruta.startsWith('/campo/plata')
+  const enHoy = ruta === '/campo' || ['/campo/plata', '/campo/campos', '/campo/hacienda'].some((r) => ruta.startsWith(r))
   const mapaPendiente = useMapaPendiente()
   // Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos.
   // Mandar un audio: quien carga algo de los campos o la plata (lo demás no se carga por WhatsApp).

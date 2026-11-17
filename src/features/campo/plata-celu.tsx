@@ -2,12 +2,10 @@ import { useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import trigal from '@/assets/tropero/trigal.webp'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
-import { Logo } from '@/components/tropero/logo'
 import { actividadLabel, fmtCompact, gastosPorCategoria, porActividad, porCampo } from '@/features/analitica/compute'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import { useDolarHistorico } from '@/features/analitica/tropero/dolar'
 import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Mes, type Periodo } from '@/features/analitica/tropero/plata'
-import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useCampos } from '@/features/campos/hooks'
 import { useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
@@ -15,9 +13,9 @@ import { puedeCargar, veePlata } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { ElegirCampo } from './elegir-campo'
-import { MenuCuenta } from './menu-cuenta'
 import { PlataPage } from './plata-page'
+import { BAJADA, MONTO, TARJETA } from './sistema'
+import { Barra, Encabezado, Portada } from './sistema-ui'
 
 /**
  * Plata en el celular (Lau, 17/11; maqueta elegida). Lo mismo que la Plata de
@@ -31,11 +29,6 @@ import { PlataPage } from './plata-page'
  */
 
 const CURVA = [0.22, 1, 0.36, 1] as const
-// El sistema de Hoy (hoy-celu.tsx): una tarjeta, un encabezado, un número grande y dos textos.
-const TARJETA = 'rounded-[20px] border border-borde bg-superficie'
-const TITULO = 'titulo-display text-[20px] leading-tight text-texto'
-const BAJADA = 'text-[13.5px] text-texto-suave'
-const MONTO = 'text-[15px] font-bold tabular-nums whitespace-nowrap'
 
 const pesos = (n: number) => fmtCompact(n)
 const conSigno = (n: number) => (n >= 0 ? `+${fmtCompact(n)}` : fmtCompact(n))
@@ -74,9 +67,6 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const pend = usePendientes()
   const dolar = useDolarHistorico()
   const identidad = useCampoElegido()
-  const { user } = useAuth()
-  const membresia = useEmpresa().data
-  const inicial = (String(user?.user_metadata?.nombre ?? '').trim() || membresia?.empresa?.nombre || 'T').charAt(0)
   const campoId = identidad.elegido?.id ?? null
   const campos = useCampos()
   const manualQ = useGordoActual(empresaId)
@@ -125,26 +115,11 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
 
   return (
     <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-      {/* La marca; el campo se elige en la portada. */}
-      <div className="flex items-center justify-between gap-2">
-        <Logo alto={24} />
-        <MenuCuenta inicial={inicial} />
-      </div>
+      <Barra />
 
       {/* 1. ¿Cómo vengo? */}
       <motion.section {...entra(0)} aria-labelledby="plata-titulo" className="flex flex-col gap-3">
-        <div className="relative z-10 h-[150px] rounded-[20px]">
-          <div className="absolute inset-0 overflow-hidden rounded-[20px] bg-[#e8c77e]">
-            <img src={trigal} alt="" className="absolute inset-0 size-full object-cover object-[50%_62%]" />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(251_250_246/0.92)_30%,rgb(251_250_246/0.2)_75%,transparent)]" />
-          </div>
-          <div className="absolute top-3.5 left-3.5 flex flex-col gap-1">
-            <ElegirCampo />
-            <h1 id="plata-titulo" className="mt-1.5 px-1 titulo-display text-[30px] text-texto">
-              Plata
-            </h1>
-          </div>
-        </div>
+        <Portada id="plata-titulo" titulo="Plata" imagen={trigal} posicion="50% 62%" />
         {/* El resultado en una tarjeta: el período, cuánto, de dónde sale y qué se hace. */}
         <div className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
           {!vacio && (
@@ -344,17 +319,6 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
 
       {/* Lugar para que el asistente no tape lo último. */}
       <div aria-hidden className="h-10" />
-    </div>
-  )
-}
-
-function Encabezado({ id, titulo, bajada }: { id: string; titulo: string; bajada: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <h2 id={id} className={TITULO}>
-        {titulo}
-      </h2>
-      <p className={BAJADA}>{bajada}</p>
     </div>
   )
 }

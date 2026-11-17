@@ -40,7 +40,9 @@ export function prefetchEnReposo(thunks: Thunk[]): () => void {
 export const CHUNKS_CAMPO: Record<string, Thunk> = {
   '/campo/recorrida': () => import('@/features/campo/recorrida-page'),
   '/campo/manga': () => import('@/features/campo/manga-page'),
-  '/campo/plata': () => import('@/features/campo/plata-page'),
+  '/campo/plata': () => import('@/features/campo/plata-celu'),
+  '/campo/campos': () => import('@/features/campo/campos-celu'),
+  '/campo/hacienda': () => import('@/features/campo/hacienda-celu'),
   '/campo/historial': () => import('@/features/campo/historial-page'),
 }
 
