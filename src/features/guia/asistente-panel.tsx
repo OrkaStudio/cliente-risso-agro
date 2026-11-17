@@ -19,7 +19,8 @@ import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
 import { registrar } from '@/lib/telemetria'
 import { useQuienMira } from '@/features/empresa/use-quien-mira'
-import { puedeCargar, puedeVer, seccionDeRuta as seccionDeRutaApp, veePlata } from '@/features/empresa/secciones'
+import { nivelDe, puedeCargar, puedeVer, seccionDeRuta as seccionDeRutaApp, veePlata } from '@/features/empresa/secciones'
+import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 
 /**
  * El asistente de Troppero en toda la Oficina (Lau, 28–29/10). Cerrado es una
@@ -78,6 +79,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
   const { user } = useAuth()
   const empresa = useEmpresa()
   const quien = useQuienMira()
+  const mandaCampos = ['carga', 'solo_manda'].includes(nivelDe(empresa.data, 'campos'))
   // Lo que ve quien pregunta: el asistente no sugiere ni contesta lo que no tiene habilitado.
   const ve = React.useMemo(() => ({ plata: veePlata(empresa.data), hacienda: puedeVer(empresa.data, 'hacienda'), campos: puedeVer(empresa.data, 'campos') }), [empresa.data])
   // Las fichas de ayuda: sólo de lo que ve, y el botón sólo si lleva a algo que puede hacer.
@@ -311,7 +313,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
     if (antes !== null && hechos > antes) {
       const nuevo = progreso.filter((p) => p.hecho).at(-1)
       setFesteja(true)
-      setGlobo(nuevo ? `¡Bien! ${nuevo.texto}: listo.` : '¡Bien!')
+      if (!celular) setGlobo(nuevo ? `¡Bien! ${nuevo.texto}: listo.` : '¡Bien!')
     }
   }
   React.useEffect(() => {
@@ -323,7 +325,8 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
     return () => clearTimeout(t)
   }, [festeja])
   React.useEffect(() => {
-    if (!uid || avisos.length === 0) return
+    // En el celular no hay avisos a la vista: no saluda con «Noté…».
+    if (celular || !uid || avisos.length === 0) return
     const clave = `tropero:asistente:saludo:${uid}`
     try {
       if (sessionStorage.getItem(clave) === '1') return
@@ -340,7 +343,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
       setGlobo((g) => g ?? `Noté ${avisos.length === 1 ? 'una cosa' : `${avisos.length} cosas`} en ${quien.enLosCampos}.`)
     }, 1800)
     return () => clearTimeout(t)
-  }, [uid, avisos.length, quien.enLosCampos])
+  }, [celular, uid, avisos.length, quien.enLosCampos])
   React.useEffect(() => {
     if (!globo) return
     const t = setTimeout(() => setGlobo(null), 8000)
@@ -372,10 +375,12 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
 
   const animo: Animo = festeja ? 'festeja' : duerme && !abierto && !marca ? 'duerme' : 'normal'
 
-  const nAvisos = avisos.length
+  // En el celular los avisos son de la compu: sin el punto de «tengo algo para contarte».
+  const nAvisos = celular ? 0 : avisos.length
   // Al bajar por la página la barra se achica al orbe y el número: no tapa la tabla.
   // Abierto, la barra se recoge al orbe (el panel ya tiene su ×): no queda «Cerrar» estirado (Lau, 07/11).
-  const verTexto = !abierto && (!compacta || sobre || !!globo)
+  // En el celular, sólo el orbe: la barra con texto tapaba los botones de la pantalla (17/11).
+  const verTexto = !celular && !abierto && (!compacta || sobre || !!globo)
   const etiqueta = nAvisos > 0 ? `El asistente de Troppero: notó ${nAvisos === 1 ? 'una cosa' : `${nAvisos} cosas`}` : 'El asistente de Troppero'
   // Debajo de los diálogos (z-50) mientras espera; arriba cuando está abierto o trabajando.
   const arriba = abierto || !!marca
@@ -406,7 +411,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
             <motion.aside
               role="dialog"
               aria-label="¿En qué te ayudo?"
-              className="fixed z-[75] flex flex-col overflow-hidden bg-superficie text-texto shadow-[0_24px_60px_rgba(40,22,10,0.28)] ring-1 ring-[#a9552c]/12 max-md:inset-x-2 max-md:bottom-2 max-md:h-[85dvh] max-md:rounded-[24px] md:right-6 md:bottom-[92px] md:h-[min(720px,calc(100dvh-116px))] md:w-[380px] md:rounded-[24px]"
+              className="fixed z-[75] flex flex-col overflow-hidden bg-superficie text-texto shadow-[0_24px_60px_rgba(40,22,10,0.28)] ring-1 ring-[#a9552c]/12 max-md:inset-x-2 max-md:bottom-2 max-md:h-[78dvh] max-md:rounded-[24px] md:right-6 md:bottom-[92px] md:h-[min(720px,calc(100dvh-116px))] md:w-[380px] md:rounded-[24px]"
               style={{ transformOrigin: 'bottom right', willChange: 'transform, opacity' }}
               // Nace de la barra y vuelve a ella: resorte sin rebote al abrir, salida suave al cerrar (Lau, 07/11).
               // Sólo transform y opacidad (lo que la placa de video mueve sin esfuerzo): sin trabas.
@@ -416,22 +421,35 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
               transition={{ type: 'spring', stiffness: 320, damping: 32, mass: 0.85, opacity: { type: 'tween', duration: 0.2, ease: 'easeOut' } }}
             >
               {/* Cabecera: quién es y para qué sirve. */}
-              <header className="flex items-center gap-3 border-b border-borde/70 px-5 py-4">
-                <Mascota tam={40} parpadea={parpadea} />
+              <header className={cn('flex items-center gap-3 border-b border-borde/70', celular ? 'px-4 py-3' : 'px-5 py-4')}>
+                <Mascota tam={celular ? 32 : 40} parpadea={parpadea} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[15.5px] leading-tight font-bold">Asistente de Troppero</p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">Te respondo sobre {quien.enLosCampos} y cómo usar la app</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">{celular ? 'Preguntame lo que quieras' : `Te respondo sobre ${quien.enLosCampos} y cómo usar la app`}</p>
                 </div>
                 <button type="button" aria-label="Cerrar el asistente" onClick={cerrarPanel} className="grid size-9 shrink-0 place-items-center rounded-full text-texto-suave hover:bg-fondo hover:text-texto">
                   <Icono nombre="Cerrar" tamano={16} />
                 </button>
               </header>
 
-              <div ref={hilo} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+              <div ref={hilo} className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto', celular ? 'gap-4 px-4 py-4' : 'gap-5 px-5 py-5')}>
                 <Burbuja>{nombre ? `Hola, ${nombre}. ¿Qué querés saber?` : '¡Hola! ¿Qué querés saber?'}</Burbuja>
 
-                {/* Lo que la app detectó en sus datos, cada cosa con el botón que la resuelve. */}
-                {nAvisos > 0 && (
+                {/* En el celular no hay recorrida (Lau, 17/11): lo que se ve en el campo se cuenta en un audio. */}
+                {celular && mandaCampos && (
+                  <section className="flex items-center gap-3 rounded-[18px] border border-borde bg-fondo/60 p-3.5">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14.5px] leading-snug font-bold">Contame cómo está tu campo</span>
+                      <span className="block text-[13px] leading-snug text-texto-suave">El agua, el pasto, los animales: un audio y lo anoto en cada potrero.</span>
+                    </span>
+                    <a href={`https://wa.me/${WHATSAPP_TROPERO}`} target="_blank" rel="noopener noreferrer" className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#25d366] px-3.5 text-[14px] font-bold text-white">
+                      Audio
+                    </a>
+                  </section>
+                )}
+
+                {/* Lo que la app detectó en sus datos, cada cosa con el botón que la resuelve (en la compu). */}
+                {!celular && nAvisos > 0 && (
                   <section className="flex flex-col gap-2">
                     <Titulo>Lo que vi en {quien.enLosCampos}</Titulo>
                     {avisos.map((a) => (
@@ -470,7 +488,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
                   <section className="flex flex-col gap-2">
                     <Titulo>Probá preguntarme</Titulo>
                     <ul className="flex flex-col overflow-hidden rounded-[18px] border border-borde">
-                      {sugerencias.map((q) => (
+                      {(celular ? sugerencias.slice(0, 3) : sugerencias).map((q) => (
                         <li key={q.texto} className="border-b border-borde/70 last:border-b-0">
                           <button type="button" onClick={() => preguntar(q.texto)} className="group flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-principal-suave/50">
                             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-fondo text-principal">
@@ -493,7 +511,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
                   ) : (
                     <Burbuja key={m.id}>
                       {m.texto}
-                      {m.accion && (
+                      {m.accion && !celular && (
                         <button
                           type="button"
                           onClick={() => hacer(m.accion!, `respuesta:${m.accion!.ruta}`)}
@@ -535,7 +553,8 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
                 className="flex items-center gap-2 border-t border-borde/70 bg-fondo/60 p-3"
               >
                 <input
-                  autoFocus
+                  // En el celular no abre el teclado solo: tapa la mitad de la pantalla.
+                  autoFocus={!celular}
                   value={borrador}
                   onChange={(e) => setBorrador(e.target.value)}
                   placeholder="Escribí tu pregunta"
@@ -570,9 +589,10 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
         aria-expanded={abierto}
         className={cn(
           // En el celular, arriba de la barra de abajo y a mano del pulgar.
-          celular ? 'fixed right-4 bottom-[calc(100px+env(safe-area-inset-bottom))]' : 'fixed right-6 bottom-6',
+          celular ? 'fixed right-4 bottom-[calc(100px+env(safe-area-inset-bottom))] w-14 justify-center' : 'fixed right-6 bottom-6',
           'flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
           verTexto ? (celular ? 'pr-4' : 'md:pr-3') : '',
+          celular && 'gap-0',
           // En el celular el panel ocupa el ancho: abierto, la barra se esconde (el panel tiene su ×).
           celular && abierto && 'pointer-events-none opacity-0',
           arriba ? 'z-[76]' : 'z-[45]',

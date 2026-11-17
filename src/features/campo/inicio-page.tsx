@@ -7,7 +7,8 @@ import { saludo } from '@/features/inicio/tropero/dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
-import textura from '@/assets/tropero/textura-campo.webp'
+import tranquera from '@/assets/tropero/tranquera.webp'
+import { Logo } from '@/components/tropero/logo'
 import { HoyCelu } from './hoy-celu'
 import { MenuCuenta } from './menu-cuenta'
 import { useRecorrida } from './recorrida/use-recorrida'
@@ -102,24 +103,25 @@ function HoySinCampo() {
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const primero = campos?.find((c) => !c.contorno) ?? campos?.[0]
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-fondo px-[18px] pt-[max(20px,env(safe-area-inset-top))] pb-6">
-      <h1 className="titulo-display text-[34px] leading-tight text-texto">{saludo(new Date().getHours(), nombre).replace(/\.$/, '')}</h1>
-      <div className="relative mt-4 grid h-[260px] place-items-center overflow-hidden rounded-[24px] bg-superficie-hundida">
-        <img src={textura} alt="" className="absolute inset-0 size-full object-cover opacity-30" />
-        <div className="relative grid h-[160px] w-[78%] place-items-center rounded-[18px] border-2 border-dashed border-texto-suave/50">
-          <p className="font-heading text-[16px] font-extrabold text-texto-suave">Tu campo va a estar acá</p>
-        </div>
+    <div className="flex h-full flex-col gap-8 overflow-y-auto bg-fondo px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
+      <div className="flex items-center justify-between gap-2">
+        <Logo alto={24} />
+        <MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />
       </div>
-      <h2 className="mt-7 font-heading text-[22px] font-extrabold text-texto">Todavía no armaste tu campo</h2>
-      <p className="mt-2 text-[15px] leading-snug text-texto-suave">
-        Con el campo y sus potreros cargados, Troppero sabe dónde pasa cada cosa que le mandás.
-      </p>
-      <p className="mt-5 flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
-        <Icono nombre="Campos" tamano={16} /> Lo primero es armar el campo. Después se abre todo.
-      </p>
-      <div className="mt-auto flex flex-col gap-3 pt-6">
+      {/* La misma portada que Hoy: el campo todavía está por armarse. */}
+      <div className="relative h-[240px] overflow-hidden rounded-[20px] bg-[#de8c61]">
+        <img src={tranquera} alt="" className="absolute bottom-0 left-0 w-full origin-bottom scale-[1.04] [mask-image:linear-gradient(180deg,transparent_0,transparent_6%,#000_14%)]" />
+        <h1 className="absolute inset-x-[18px] top-5 titulo-display text-[28px] leading-[1.02] text-[#2a1208]">{saludo(new Date().getHours(), nombre)}</h1>
+      </div>
+      <section aria-labelledby="sin-campo" className="flex flex-col gap-4 rounded-[20px] border border-borde bg-superficie p-4">
+        <div className="flex flex-col gap-0.5">
+          <h2 id="sin-campo" className="titulo-display text-[20px] leading-tight text-texto">
+            Primero, tu campo en el mapa
+          </h2>
+          <p className="text-[13.5px] text-texto-suave">Con el campo y sus potreros, Troppero sabe dónde pasa cada cosa que le mandás. Se arma en la compu, en unos minutos.</p>
+        </div>
         {mandado ? (
-          <p role="status" className="rounded-[18px] bg-estado-bien-suave px-4 py-3 text-center text-[15px] font-semibold text-estado-bien-texto">
+          <p role="status" className="rounded-full bg-estado-bien-suave px-4 py-2.5 text-center text-[15px] font-semibold text-estado-bien-texto">
             Listo: abrí el link en la compu.
           </p>
         ) : (
@@ -135,7 +137,7 @@ function HoySinCampo() {
             Mandame el link a la compu
           </BotonPrincipal>
         )}
-      </div>
+      </section>
     </div>
   )
 }

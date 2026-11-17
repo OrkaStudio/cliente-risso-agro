@@ -55,7 +55,6 @@ const ICONO_TONO: Record<Cosa['tono'], string> = {
   atencion: 'bg-estado-atencion-suave text-estado-atencion-texto',
   aviso: 'bg-superficie-hundida text-texto-suave',
 }
-const RAYA_TONO: Record<Cosa['tono'], string> = { problema: 'bg-estado-problema', atencion: 'bg-acento', aviso: 'bg-borde' }
 /** El color de cada categoría del rodeo: hembras en la gama terracota, machos en la verde. */
 const COLOR_CATEGORIA: Partial<Record<CategoriaConteo['categoria'], string>> = {
   vaca: '#b85c2e',
@@ -162,7 +161,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
             <span className="mt-2.5 px-1 text-[12.5px] font-semibold tracking-[0.04em] text-[#5a220c]/85 uppercase">{fecha}</span>
             <h1 className="px-1 titulo-display text-[28px] leading-[1.02] text-[#2a1208]">
               {saludo(new Date().getHours(), nombre)}
-              {variasCuentas && membresia?.empresa?.nombre ? <span className="mt-1 block text-[14px] font-semibold tracking-normal">{membresia.empresa.nombre}</span> : null}
+              {variasCuentas && membresia?.empresa?.nombre ? <span className="mt-1.5 block font-sans text-[14px] font-semibold tracking-normal text-[#5a220c]">{membresia.empresa.nombre}</span> : null}
             </h1>
           </div>
           <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
@@ -230,22 +229,22 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
           </motion.div>
         )}
 
-        {/* 4. Para hacer hoy: lo urgente y lo que cargó su gente, cada uno con su botón. */}
+        {/* 4. Para hacer hoy: una sola tarjeta con un renglón por cosa (Lau, 17/11: sin tarjetas sueltas). */}
         {v && (ve.campos || ve.plata) && (
-          <motion.section {...entra(3)} aria-labelledby="hoy-hacer" className="flex flex-col gap-3">
+          <motion.section {...entra(3)} aria-labelledby="hoy-hacer" className={cn(TARJETA, 'p-4')}>
             <Encabezado id="hoy-hacer" titulo="Para hacer hoy" bajada="De lo más urgente a lo que puede esperar" />
             {filas.length === 0 ? (
-              <p className={cn(TARJETA, 'flex items-center gap-3 p-4 text-[15px] text-texto')}>
-                <span className="grid size-9 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
+              <p className="mt-3 flex items-center gap-3 text-[15px] text-texto">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
                   <Icono nombre="Guardar" tamano={16} />
                 </span>
-                Nada pendiente. Lo que cargue tu gente aparece acá.
+                {dueno ? 'Nada pendiente. Lo que cargue tu gente aparece acá.' : 'Nada pendiente.'}
               </p>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {visibles.map((f) =>
+              <ul className="mt-3 divide-y divide-borde">
+                {visibles.map((f, i) =>
                   f.tipo === 'cosa' ? (
-                    <FilaCosa key={f.cosa.key} c={f.cosa} vencimiento={vencimientos.find((x) => `v-${x.id}` === f.cosa.key)} cargaPlata={carga.plata} cargaCampos={carga.campos} empresaId={membresia?.empresa_id ?? ''} />
+                    <FilaCosa key={f.cosa.key} primero={i === 0} c={f.cosa} vencimiento={vencimientos.find((x) => `v-${x.id}` === f.cosa.key)} cargaPlata={carga.plata} cargaCampos={carga.campos} empresaId={membresia?.empresa_id ?? ''} />
                   ) : (
                     <FilaGente key={f.por} quien={f.quien} cargas={f.cargas} />
                   ),
@@ -253,8 +252,9 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
               </ul>
             )}
             {filas.length > PRIMERAS && (
-              <button type="button" onClick={() => setTodas((x) => !x)} className="self-start text-[14px] font-bold text-principal">
-                {todas ? 'Ver menos' : `Ver las ${filas.length}`}
+              <button type="button" onClick={() => setTodas((x) => !x)} className="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-borde pt-3 text-[14px] font-bold text-principal">
+                {todas ? 'Ver menos' : 'Ver más'}
+                <Icono nombre="Desplegar" tamano={16} className={cn('transition-transform', todas && 'rotate-180')} />
               </button>
             )}
           </motion.section>
@@ -379,7 +379,7 @@ function Dato({ icono, clase, titulo, valor, unidad, tono, children }: { icono: 
 }
 
 /** Una cosa para hacer: lo vencido (se paga acá), el potrero que pide ir o el campo sin recorrer. */
-function FilaCosa({ c, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: Cosa; vencimiento?: Vencimiento; cargaPlata: boolean; cargaCampos: boolean; empresaId: string }) {
+function FilaCosa({ c, primero, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: Cosa; primero: boolean; vencimiento?: Vencimiento; cargaPlata: boolean; cargaCampos: boolean; empresaId: string }) {
   const liquidar = useLiquidar()
   const revertir = useRevertirLiquidacion()
   const [confirmar, setConfirmar] = useState(false)
@@ -406,47 +406,66 @@ function FilaCosa({ c, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: C
       : esWhatsapp && cargaCampos
         ? { texto: c.accion.texto, hacer: () => window.open(`https://wa.me/${WHATSAPP_TROPERO}?text=${encodeURIComponent(c.accion.to.slice(9))}`, '_blank', 'noopener') }
         : null
-  const titulo = vencimiento ? `${cobro ? 'Cobrar' : 'Pagar'}: ${vencimiento.descripcion}` : `${c.lugar} · ${c.que}`
+  const titulo = vencimiento ? mayuscula(vencimiento.descripcion ?? '') : `${c.lugar} · ${c.que}`
+  const meta = c.datos.join(' · ').replace(/^./, (x) => x.toUpperCase())
   return (
-    <li className={cn(TARJETA, 'relative overflow-hidden p-4')}>
-      <span aria-hidden className={cn('absolute top-4 bottom-4 left-0 w-[3px] rounded-r-full', RAYA_TONO[c.tono])} />
-      <div className="flex items-start gap-3">
-        <span className={cn('mt-0.5 grid size-10 shrink-0 place-items-center rounded-full', ICONO_TONO[c.tono])}>
-          <Icono nombre={c.icono} tamano={16} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] leading-snug font-semibold text-texto">{titulo}</p>
-          <p className={cn('text-[13.5px]', c.tono === 'problema' ? 'font-semibold text-estado-problema-texto' : 'text-texto-suave')}>{vencimiento ? c.datos.join(' · ').replace(/^./, (x) => x.toUpperCase()) : c.datos.join(' · ')}</p>
-          {(accion || (c.senal && empresaId)) && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+    <li className="py-3 first:pt-0 last:pb-0">
+      <Renglon icono={<Icono nombre={c.icono} tamano={16} />} iconoClase={ICONO_TONO[c.tono]} titulo={titulo} meta={meta} metaClase={c.tono === 'problema' ? 'font-semibold text-estado-problema-texto' : undefined} monto={vencimiento?.monto ? (cobro ? '+' : '') + plataCorta(vencimiento.monto) : null}>
+        {/* Al tocar «Ya lo pagué», el mismo renglón pregunta cuándo: hoy o el día que vencía. */}
+        {confirmar && vencimiento ? (
+          <div className="mt-2 flex flex-col gap-2">
+            <span className={BAJADA}>{cobro ? '¿Cuándo lo cobraste?' : '¿Cuándo lo pagaste?'}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <BotonChico lleno disabled={liquidar.isPending} onClick={() => pagar(hoy)}>
+                Hoy
+              </BotonChico>
+              {vencimiento.fechaVencimiento && (
+                <BotonChico disabled={liquidar.isPending} onClick={() => pagar(vencimiento.fechaVencimiento!)}>
+                  El {fechaCorta(vencimiento.fechaVencimiento)}
+                </BotonChico>
+              )}
+              <button type="button" onClick={() => setConfirmar(false)} className="h-8 px-2 text-[13.5px] font-semibold text-texto-suave">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          (accion || (c.senal && empresaId)) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               {accion && (
-                <button type="button" onClick={accion.hacer} aria-expanded={vencimiento ? confirmar : undefined} className={cn('h-9 rounded-full px-4 text-[13.5px] font-bold', c.tono === 'problema' ? 'bg-principal text-principal-texto' : 'border-[1.5px] border-principal/55 text-principal')}>
+                <BotonChico onClick={accion.hacer} lleno={primero} aria-expanded={vencimiento ? confirmar : undefined}>
                   {accion.texto}
-                </button>
+                </BotonChico>
               )}
               {c.senal && empresaId && <SeSoluciono senal={c.senal} empresaId={empresaId} compacto />}
             </div>
-          )}
-          {confirmar && vencimiento && (
-            <div className="mt-3 rounded-[14px] bg-fondo p-3">
-              <p className="text-[13.5px] text-texto">{cobro ? '¿Cuándo lo cobraste?' : '¿Cuándo lo pagaste?'} Sale de lo vencido y queda en la plata.</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" disabled={liquidar.isPending} onClick={() => pagar(hoy)} className="h-9 rounded-full bg-principal px-4 text-[13.5px] font-bold text-principal-texto">
-                  Hoy
-                </button>
-                {vencimiento.fechaVencimiento && (
-                  <button type="button" disabled={liquidar.isPending} onClick={() => pagar(vencimiento.fechaVencimiento!)} className="h-9 rounded-full border-[1.5px] border-principal/55 px-4 text-[13.5px] font-bold text-principal">
-                    El día que vencía, {fechaCorta(vencimiento.fechaVencimiento)}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-        {vencimiento?.monto ? <span className={cn(MONTO, 'mt-0.5 shrink-0 text-texto')}>{plataCorta(vencimiento.monto)}</span> : null}
-      </div>
+          )
+        )}
+      </Renglon>
     </li>
   )
+}
+
+/** Un renglón de lista: ícono, qué es y su dato, el monto a la derecha y, abajo, lo que se hace. */
+function Renglon({ icono, iconoClase, titulo, meta, metaClase, monto, montoClase, children }: { icono: React.ReactNode; iconoClase: string; titulo: string; meta: string; metaClase?: string; monto?: string | null; montoClase?: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className={cn('relative grid size-9 shrink-0 place-items-center rounded-full', iconoClase)}>{icono}</span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0 text-[15px] leading-snug font-semibold text-texto">{titulo}</span>
+          {monto && <span className={cn(MONTO, 'shrink-0', montoClase ?? 'text-texto')}>{monto}</span>}
+        </p>
+        <p className={cn('text-[13.5px] text-texto-suave', metaClase)}>{meta}</p>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** El botón de un renglón: chico, en una línea. */
+function BotonChico({ lleno = false, className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { lleno?: boolean }) {
+  return <button type="button" {...props} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap disabled:opacity-60', lleno ? 'bg-principal text-principal-texto' : 'border-[1.5px] border-principal/55 text-principal', className)} />
 }
 
 /** Lo que cargó alguien de su gente y no se miró: se abre, se ve cada cosa y se da por buena. */
@@ -454,62 +473,65 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
   const [abierto, setAbierto] = useState(false)
   const revisar = useMarcarRevisados()
   const total = cargas.reduce((s, c) => s + (c.tipo === 'ingreso' ? c.monto : -c.monto), 0)
+  const darPorBueno = () =>
+    revisar.mutate(
+      cargas.map((c) => c.id),
+      { onSuccess: () => toast.success(`Listo: revisaste lo de ${quien}`, { description: 'Ya está en tu plata, sin la marca de nuevo.' }), onError: () => toast.error('No se pudo guardar. Probá de nuevo.') },
+    )
   const porWhatsapp = cargas.some((c) => c.canal === 'whatsapp')
-  const que = cargas.length === 1 ? cargas[0]!.descripcion || 'Un gasto' : `${plural(cargas.length, 'carga', 'cargas')}: ${[...new Set(cargas.map((c) => c.descripcion.split(/[:·]/)[0]!.trim()).filter(Boolean))].slice(0, 2).join(', ')}`
-  return (
-    <li className={cn(TARJETA, 'relative overflow-hidden p-4')}>
-      <span aria-hidden className="absolute top-4 bottom-4 left-0 w-[3px] rounded-r-full bg-acento" />
-      <div className="flex items-start gap-3">
-        <span className="relative mt-0.5 grid size-10 shrink-0 place-items-center rounded-full bg-[#f7e7bd] text-[15px] font-extrabold text-acento-texto">
-          {quien.charAt(0).toLocaleUpperCase('es-AR')}
-          {porWhatsapp && (
-            <span title="Por WhatsApp" className="absolute -right-1 -bottom-1 grid size-[18px] place-items-center rounded-full border-2 border-superficie bg-[#25a366] text-white">
-              <svg viewBox="0 0 24 24" className="size-[9px]" aria-hidden>
-                <path d="M5 19l1.2-3.6A7.5 7.5 0 1 1 9 18.3z" fill="currentColor" />
-              </svg>
-            </span>
-          )}
+  const que = cargas.length === 1 ? mayuscula(cargas[0]!.descripcion) || 'Un gasto' : `${plural(cargas.length, 'carga', 'cargas')}: ${[...new Set(cargas.map((c) => c.descripcion.split(/[:·]/)[0]!.trim()).filter(Boolean))].slice(0, 2).join(', ')}`
+  const inicial = (
+    <>
+      {quien.charAt(0).toLocaleUpperCase('es-AR')}
+      {porWhatsapp && (
+        <span title="Por WhatsApp" className="absolute -right-1 -bottom-1 grid size-[17px] place-items-center rounded-full border-2 border-superficie bg-[#25d366] text-white">
+          <svg viewBox="0 0 24 24" className="size-[9px]" aria-hidden>
+            <path d="M5 19l1.2-3.6A7.5 7.5 0 1 1 9 18.3z" fill="currentColor" />
+          </svg>
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] leading-snug font-semibold text-texto">Revisar lo que cargó {quien}</p>
-          <p className={cn(BAJADA, 'line-clamp-2')}>
-            {que} · {cuando(cargas[0]!.cuando)}
-          </p>
-          <button type="button" onClick={() => setAbierto((x) => !x)} aria-expanded={abierto} className="mt-2.5 h-9 rounded-full border-[1.5px] border-principal/55 px-4 text-[13.5px] font-bold text-principal">
-            {abierto ? 'Cerrar' : 'Revisar'}
-          </button>
-          {abierto && (
-            <div className="mt-3 rounded-[14px] bg-fondo p-3">
-              <ul className="divide-y divide-borde">
-                {cargas.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-[14px]">
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold text-texto">{c.descripcion || (c.tipo === 'ingreso' ? 'Cobro' : 'Gasto')}</span>
-                      <span className={BAJADA}>{cuando(c.cuando)}</span>
-                    </span>
-                    <span className={cn(MONTO, 'shrink-0')}>{c.tipo === 'ingreso' ? '+' : '−'}{pesos(c.monto)}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-[13px] text-texto-suave">Si está bien, deja de figurar como nuevo. Si algo no cierra, corregilo en Plata desde la compu.</p>
-              <button
-                type="button"
-                disabled={revisar.isPending}
-                onClick={() =>
-                  revisar.mutate(
-                    cargas.map((c) => c.id),
-                    { onSuccess: () => toast.success(`Listo: revisaste lo de ${quien}`, { description: 'Ya está en tu plata, sin la marca de nuevo.' }), onError: () => toast.error('No se pudo guardar. Probá de nuevo.') },
-                  )
-                }
-                className="mt-2 h-9 rounded-full bg-principal px-4 text-[13.5px] font-bold text-principal-texto"
-              >
-                Está bien
-              </button>
+      )}
+    </>
+  )
+  return (
+    <li className="py-3 first:pt-0 last:pb-0">
+      <Renglon icono={inicial} iconoClase="bg-[#f7e7bd] text-[14px] font-extrabold text-acento-texto" titulo={`Cargó ${quien}`} meta={`${que} · ${cuando(cargas[0]!.cuando)}`} monto={plataCorta(total)} montoClase={total < 0 ? 'text-texto' : 'text-estado-bien-texto'}>
+        {cargas.length === 1 ? (
+          // Una sola carga: ya se ve entera en el renglón, se da por buena de una.
+          <div className="mt-2">
+            <BotonChico disabled={revisar.isPending} onClick={darPorBueno}>
+              Está bien
+            </BotonChico>
+          </div>
+        ) : (
+          <>
+            <div className="mt-2">
+              <BotonChico onClick={() => setAbierto((x) => !x)} aria-expanded={abierto}>
+                {abierto ? 'Cerrar' : `Ver las ${cargas.length}`}
+              </BotonChico>
             </div>
-          )}
-        </div>
-        <span className={cn(MONTO, 'mt-0.5 shrink-0', total < 0 ? 'text-texto' : 'text-estado-bien-texto')}>{plataCorta(total)}</span>
-      </div>
+            {abierto && (
+              <div className="mt-2">
+                <ul>
+                  {cargas.map((c) => (
+                    <li key={c.id} className="flex items-baseline justify-between gap-3 py-1 text-[14px]">
+                      <span className="min-w-0 truncate text-texto">
+                        {mayuscula(c.descripcion || (c.tipo === 'ingreso' ? 'Cobro' : 'Gasto'))} <span className="text-texto-suave">· {cuando(c.cuando)}</span>
+                      </span>
+                      <span className={cn(MONTO, 'shrink-0')}>
+                        {c.tipo === 'ingreso' ? '+' : '−'}
+                        {pesos(c.monto)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <BotonChico lleno className="mt-2" disabled={revisar.isPending} onClick={darPorBueno}>
+                  Están bien
+                </BotonChico>
+              </div>
+            )}
+          </>
+        )}
+      </Renglon>
     </li>
   )
 }
@@ -602,3 +624,6 @@ function cuando(iso: string): string {
   if (d.toDateString() === new Date(hoy.getTime() - 86_400_000).toDateString()) return 'Ayer'
   return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 }
+
+/** «gasoil» → «Gasoil»: lo cargado por WhatsApp a veces llega en minúscula. */
+const mayuscula = (t: string) => t.charAt(0).toLocaleUpperCase('es-AR') + t.slice(1)
