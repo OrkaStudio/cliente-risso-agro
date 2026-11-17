@@ -12,6 +12,7 @@ import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
+import grano from '@/assets/tropero/grano.png'
 import { entraEnCelular, nivelDe } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 
@@ -92,7 +93,10 @@ export function CampoShell() {
   const navegables = NAV.filter(({ to }) => { return entraEnCelular(membresia, to) })
 
   return (
-    <div className="campo relative flex h-full flex-col overflow-hidden">
+    <div className="campo relative isolate flex h-full flex-col overflow-hidden bg-[#fff8ec]">
+      {/* El granulado de troppero.com sobre su crema (#fff8ec), sin la aurora (Lau, 17/11): fijo, no se mueve con lo que scrollea.
+          En pantallas de 3x, 120px deja el grano igual de fino que en la landing. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 opacity-90 [background-size:120px_120px]" style={{ backgroundImage: `url(${grano})` }} />
       {/* Header — placa de máquina */}
       {!enHoy && (
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-line)] bg-sidebar px-3 py-2.5 text-sidebar-foreground">
@@ -150,7 +154,7 @@ export function CampoShell() {
       {/* El asistente acompaña todo el celular (Lau, 16/11). */}
       <AsistentePanel celular />
       {(navegables.length > 1 || puedeMandar) && (
-      <nav aria-label="Modo Campo" className="shrink-0 bg-fondo px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
+      <nav aria-label="Modo Campo" className="shrink-0 px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between rounded-full bg-superficie p-1.5 shadow-[0_8px_28px_rgba(19,27,22,0.18)]">
           {/* Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos. */}
           {(() => {

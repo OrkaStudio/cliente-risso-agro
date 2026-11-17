@@ -31,7 +31,7 @@ function Hoy() {
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
 
   return (
-    <div className="h-full overflow-y-auto bg-fondo pb-8">
+    <div className="h-full overflow-y-auto pb-8">
       <HoyCelu
         cuenta={<MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />}
         antes={
@@ -103,7 +103,7 @@ function HoySinCampo() {
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const primero = campos?.find((c) => !c.contorno) ?? campos?.[0]
   return (
-    <div className="flex h-full flex-col gap-8 overflow-y-auto bg-fondo px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
+    <div className="flex h-full flex-col gap-8 overflow-y-auto px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
       <div className="flex items-center justify-between gap-2">
         <Logo alto={24} />
         <MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />

@@ -32,7 +32,7 @@ export function CamposCelu() {
   const { id } = useParams()
   // Cada pantalla arranca arriba: la key cambia el contenedor que scrollea.
   return (
-    <div key={id ?? 'todos'} className="h-full overflow-y-auto bg-fondo">
+    <div key={id ?? 'todos'} className="h-full overflow-y-auto">
       {id ? <UnCampo id={id} /> : <TodosLosCampos />}
     </div>
   )

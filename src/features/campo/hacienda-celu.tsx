@@ -87,7 +87,7 @@ export function HaciendaCelu() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-fondo">
+    <div className="h-full overflow-y-auto">
       <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
         <Barra />
         <motion.section {...entra(0)} aria-labelledby="hacienda-titulo" className="flex flex-col gap-3">

@@ -78,7 +78,7 @@ export function AnimalCelu() {
   const estadoTexto = a.estado === 'activo' ? 'Activo' : a.estado === 'vendido' ? 'Vendido' : a.estado === 'muerto' ? 'Murió' : a.estado === 'corregido' ? 'Corregido' : 'De baja'
 
   return (
-    <div className="h-full overflow-y-auto bg-fondo">
+    <div className="h-full overflow-y-auto">
       <div className="flex flex-col gap-6 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
         <Barra />
         <button type="button" onClick={volver} className="-mb-2 flex items-center gap-1 self-start text-[14px] font-bold text-principal">

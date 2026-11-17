@@ -49,7 +49,7 @@ export function PlataCelu() {
   return (
     <>
       {/* El shell no scrollea: cada pantalla trae el suyo (como Hoy). */}
-      <div className="h-full overflow-y-auto bg-fondo">
+      <div className="h-full overflow-y-auto">
         <PlataNumeros carga={carga} onAnotar={setAnotar} />
       </div>
       {anotar && (
