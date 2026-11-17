@@ -40,6 +40,10 @@ const MONTO = 'text-[15px] font-bold tabular-nums whitespace-nowrap'
 const pesos = (n: number) => fmtCompact(n)
 const conSigno = (n: number) => (n >= 0 ? `+${fmtCompact(n)}` : fmtCompact(n))
 const diaYmes = (ymd: string) => new Date(`${ymd}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, (c) => c.toUpperCase())
+// La comparación ya está en dólares (US$): alcanza con decir contra qué.
+const CONTRA: Record<Periodo['clave'], string> = { doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior' }
+// En el celular, el período en palabras cortas que entran en una línea.
+const ETIQUETA_PERIODO: Record<Periodo['clave'], string> = { doce: '12 meses', campana: 'Esta campaña', pasada: 'La pasada' }
 const ICONO_AVISO: Record<string, NombreIcono> = { apretado: 'Agenda', subio: 'Plata', campo: 'Campos' }
 
 export function PlataCelu() {
@@ -117,7 +121,6 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const vacio = delCampo.length === 0
   const ganando = anio.resultado >= 0
   const comparacion = comparacionCorta(anio)
-  const contra = { doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior' }[clave]
   const verbo = periodo.enCurso ? (ganando ? 'Van ganando' : 'Van perdiendo') : ganando ? 'Ganaron' : 'Perdieron'
 
   return (
@@ -142,48 +145,68 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
             </h1>
           </div>
         </div>
-        {!vacio && (
-          <div role="tablist" aria-label="Período" className="flex gap-1 rounded-full bg-superficie-hundida p-1">
-            {todos.map((p) => (
-              <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-9 flex-auto rounded-full px-3 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-principal text-principal-texto' : 'text-texto')}>
-                {p.nombre}
+        {/* El resultado en una tarjeta: el período, cuánto, de dónde sale y qué se hace. */}
+        <div className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
+          {!vacio && (
+            <div className="flex items-center gap-2">
+            <div role="tablist" aria-label="Período" className="flex flex-1 gap-1 rounded-full bg-superficie-hundida p-1">
+              {todos.map((p) => (
+                <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 flex-1 rounded-full px-2 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-principal text-principal-texto' : 'text-texto')}>
+                  {ETIQUETA_PERIODO[p.clave]}
+                </button>
+              ))}
+            </div>
+            </div>
+          )}
+          {cargando ? (
+            <div className="h-[140px] animate-pulse rounded-[14px] bg-superficie-hundida" aria-busy />
+          ) : vacio ? (
+            <p className="text-[15px] text-texto-suave">Anotá el primer gasto y mirá cómo viene el campo.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+                <div>
+                  <p className={cn(BAJADA, 'font-semibold')}>{verbo}</p>
+                  <p className={cn('titulo-display text-[34px] leading-none', ganando ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{pesos(Math.abs(anio.resultado))}</p>
+                </div>
+              </div>
+              {/* De dónde sale: lo que entró contra lo que salió, en barras. */}
+              <div className="flex flex-col gap-2">
+                {[
+                  { texto: 'Entró', valor: anio.entro, clase: 'bg-plata-entra', tono: 'text-estado-bien-texto' },
+                  { texto: 'Salió', valor: anio.salio, clase: 'bg-plata-sale', tono: 'text-estado-problema-texto' },
+                ].map((b) => (
+                  <div key={b.texto} className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3">
+                    <span className={BAJADA}>{b.texto}</span>
+                    <span className="h-2.5 overflow-hidden rounded-full bg-superficie-hundida">
+                      <span className={cn('block h-full rounded-full', b.clase)} style={{ width: `${Math.max(b.valor > 0 ? 3 : 0, (b.valor / Math.max(anio.entro, anio.salio, 1)) * 100)}%` }} />
+                    </span>
+                    <span className={cn(MONTO, b.tono)}>{pesos(b.valor)}</span>
+                  </div>
+                ))}
+              </div>
+              {comparacion && (
+                <span className={cn('self-start rounded-full px-2.5 py-1 text-[13px] font-bold', comparacion.sube ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
+                  {comparacion.sube ? '▲' : '▼'} {comparacion.texto.replace(', en dólares', '')} {CONTRA[clave]}
+                </span>
+              )}
+            </div>
+          )}
+          {/* Anotar: el teclado del celular, o con la foto del comprobante. */}
+          {carga && (
+            <div className="flex gap-2 border-t border-borde pt-4">
+              <button type="button" onClick={() => onAnotar('teclado')} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-principal text-[15px] font-bold text-principal-texto">
+                <Icono nombre="Agregar" tamano={16} />
+                Anotar un gasto
               </button>
-            ))}
-          </div>
-        )}
-        {cargando ? (
-          <div className="h-[120px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
-        ) : vacio ? (
-          <p className="text-[15px] text-texto-suave">Anotá el primer gasto y mirá cómo viene el campo.</p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <p className={cn(BAJADA, 'font-semibold')}>{verbo}</p>
-            <p className={cn('titulo-display text-[40px] leading-none', ganando ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>{pesos(Math.abs(anio.resultado))}</p>
-            <p className={BAJADA}>
-              Entró <b className={cn(MONTO, 'text-estado-bien-texto')}>{pesos(anio.entro)}</b> · Salió <b className={cn(MONTO, 'text-estado-problema-texto')}>{pesos(anio.salio)}</b>
-            </p>
-            {comparacion && (
-              <span className={cn('mt-1 self-start rounded-full px-2.5 py-1 text-[13px] font-bold', comparacion.sube ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
-                {comparacion.sube ? '▲' : '▼'} {comparacion.texto} {contra}, en dólares
-              </span>
-            )}
-          </div>
-        )}
+              <button type="button" onClick={() => onAnotar('foto')} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
+                <Icono nombre="Foto" tamano={16} />
+                Con la foto
+              </button>
+            </div>
+          )}
+        </div>
       </motion.section>
-
-      {/* 2. Anotar: el teclado del celular, o con la foto del comprobante. */}
-      {carga && (
-        <motion.div {...entra(1)} className="flex gap-2">
-          <button type="button" onClick={() => onAnotar('teclado')} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-principal text-[15px] font-bold text-principal-texto">
-            <Icono nombre="Agregar" tamano={16} />
-            Anotar un gasto
-          </button>
-          <button type="button" onClick={() => onAnotar('foto')} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
-            <Icono nombre="Foto" tamano={16} />
-            Con la foto
-          </button>
-        </motion.div>
-      )}
 
       {!cargando && !vacio && (
         <>
@@ -208,9 +231,11 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
               <ul className="mt-3 divide-y divide-borde">
                 {viene.map((p) => (
                   <li key={p.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                    <span aria-hidden className={cn('h-9 w-1 shrink-0 rounded-full', p.tipo === 'ingreso' ? 'bg-estado-bien' : 'bg-acento')} />
+                    <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', p.tipo === 'ingreso' ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-superficie-hundida text-texto-suave')}>
+                      <Icono nombre="Plata" tamano={16} />
+                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold text-texto">{p.descripcion}</span>
+                      <span className="block truncate text-[15px] font-semibold text-texto">{(p.descripcion ?? '').replace(/^./, (x) => x.toLocaleUpperCase('es-AR'))}</span>
                       <span className={BAJADA}>{diaYmes(p.fechaVencimiento!)}</span>
                     </span>
                     <span className={cn(MONTO, p.tipo === 'ingreso' ? 'text-estado-bien-texto' : 'text-texto')}>{conSigno((p.tipo === 'ingreso' ? 1 : -1) * (p.monto ?? 0))}</span>

@@ -316,7 +316,7 @@ function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: bo
               className={cn(
                 'flex flex-1 items-center justify-center gap-1 text-[13.5px] font-semibold transition-colors',
                 esGasto
-                  ? 'bg-[var(--c-ink)] text-white'
+                  ? 'bg-principal text-principal-texto'
                   : 'bg-[var(--c-panel)] text-[var(--c-faint)]',
               )}
             >
@@ -499,7 +499,7 @@ function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: bo
           onClick={() => void guardar()}
           className={cn(
             'c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent text-[18px]',
-            esGasto ? 'bg-[var(--c-ink)] text-white' : 'bg-[var(--c-ok)] text-white',
+            esGasto ? 'bg-principal text-principal-texto' : 'bg-[var(--c-ok)] text-white',
           )}
         >
           <Check className="size-6" strokeWidth={2.5} />
