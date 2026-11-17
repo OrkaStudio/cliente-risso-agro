@@ -1,15 +1,26 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Icono } from '@/components/tropero/icono'
+import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { MapErrorBoundary } from '@/components/map-error-boundary'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { MapaCampo } from '@/features/campos/tropero/mapa-campo'
 import { MapaCampos } from '@/features/campos/tropero/mapa-campos'
+import type { CampoConPotreros } from '@/features/campos/api'
+import { useCamposConPotreros } from '@/features/campos/hooks'
+import { useDatosDelCampo } from '@/features/campos/tropero/datos-del-campo'
+import { diasPorPotrero, type Dias } from '@/features/campos/tropero/dias'
+import { descansoPrevio, historiaDelPotrero, LABOR, type Hecho, type Labor, type MovimientoPotrero } from '@/features/campos/tropero/historia'
+import { AGUA, avisosDelCampo, lluviaDesde, PASTO, textoDias, ultimaPorPotrero, type Lluvia, type Observacion } from '@/features/campos/tropero/panorama'
+import { usoDeEstado, type Uso } from '@/features/campos/use-campo-mapa'
+import { useNombres } from '@/features/empresa/use-nombres'
+import { useAnimales } from '@/features/hacienda/hooks'
+import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
+import { hoyLocal } from '@/lib/fecha'
 import { puedeVer } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useMapa } from '@/features/mapa/api'
-import type { CampoMapa, PotreroMapa } from '@/features/mapa/reglas'
+import type { CampoMapa } from '@/features/mapa/reglas'
 import { cn } from '@/lib/utils'
 import { BAJADA, TARJETA } from './sistema'
 import { Barra, Encabezado } from './sistema-ui'
@@ -26,7 +37,9 @@ const ha = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: 1 }
 const cabezas = (c: CampoMapa) => c.potreros.reduce((n, p) => n + p.cabezas, 0)
 const hectareas = (c: CampoMapa) => c.hectareas ?? c.potreros.reduce((n, p) => n + (p.hectareas ?? 0), 0)
 /** Qué tiene, para el color del potrero: lo mismo que en la compu, en suave. */
-const COLOR_TIPO: Record<NonNullable<PotreroMapa['tipo']>, string | null> = { hacienda: '#b85c2e', sembrado: '#ecc46a', descanso: '#82896b', vacio: null }
+// Los mismos colores de la compu: el mapa, la leyenda y la lista dicen lo mismo.
+const COLOR_USO: Record<Uso, string> = { ganadero: 'var(--color-principal)', agricola: 'var(--color-trigo-400)', vacio: '#8aa5c4' }
+const USO_TEXTO: Record<Uso, string> = { ganadero: 'Con hacienda', agricola: 'Sembrado', vacio: 'Descansa' }
 
 export function CamposCelu() {
   const { id } = useParams()
@@ -113,15 +126,26 @@ function UnCampo({ id }: { id: string }) {
   const navigate = useNavigate()
   const reducir = useReducedMotion()
   const { data: membresia } = useEmpresa()
+  const empresaId = membresia?.empresa_id ?? ''
   const mapa = useMapa(membresia?.empresa_id)
+  const camposQ = useCamposConPotreros()
+  const animales = useAnimales()
   const identidad = useCampoElegido()
   const veHacienda = puedeVer(membresia, 'hacienda')
   const [elegido, setElegido] = useState<string | null>(null)
-  const campo = mapa.data?.find((c) => c.id === id)
+  const detalle = useRef<HTMLDivElement>(null)
+  const campoMapa = mapa.data?.find((c) => c.id === id)
+  const campo = camposQ.data?.find((c) => c.id === id)
+  const datos = useDatosDelCampo(empresaId, id, campo?.potreros.map((p) => p.id) ?? [])
   const m = identidad.campos.find((c) => c.id === id)
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.05, ease: CURVA } })
-  if (mapa.isLoading) return <div className="m-4 h-[300px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
-  if (!campo) {
+  // Tocar un potrero (en el mapa o en la lista) abre su detalle debajo del mapa (Lau: el panel va abajo).
+  const elegir = (pid: string | null) => {
+    setElegido(pid)
+    if (pid) requestAnimationFrame(() => detalle.current?.scrollIntoView({ block: 'nearest', behavior: reducir ? 'auto' : 'smooth' }))
+  }
+  if (mapa.isLoading || camposQ.isLoading) return <div className="m-4 h-[300px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
+  if (!campoMapa || !campo) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <Barra />
@@ -132,51 +156,144 @@ function UnCampo({ id }: { id: string }) {
       </div>
     )
   }
-  // Los potreros con más hacienda primero; los vacíos al final.
-  const potreros = [...campo.potreros].sort((a, b) => b.cabezas - a.cabezas || a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
-  const dibujado = !!campo.contorno || campo.potreros.some((p) => p.poligono)
+  const hoy = hoyLocal()
+  const dias = diasPorPotrero(
+    campo.potreros.map((p) => p.id),
+    (animales.data ?? []).filter((a) => a.estado === 'activo' && a.id).map((a) => ({ id: a.id!, potreroId: a.potrero_id, alta: a.created_at ?? hoy })),
+    datos.data?.movimientos ?? [],
+    hoy,
+  )
+  const ultima = ultimaPorPotrero(datos.data?.observaciones ?? [])
+  const dibujados = new Set(campoMapa.potreros.filter((p) => p.poligono).map((p) => p.id))
+  const avisos = avisosDelCampo(campo.potreros.map((p) => ({ id: p.id, nombre: p.nombre, dibujado: dibujados.has(p.id) })), ultima)
+  const lluvia30 = lluviaDesde(datos.data?.lluvias ?? [], new Date(Date.parse(hoy) - 30 * 86_400_000).toISOString().slice(0, 10))
+  const usoDe = (pid: string): Uso => { const e = campo.potreros.find((x) => x.id === pid)?.estadoCiclo; return e ? usoDeEstado(e) : 'vacio' }
+  const usos = (['ganadero', 'agricola', 'vacio'] as Uso[])
+    .map((u) => ({ u, ps: campo.potreros.filter((p) => usoDeEstado(p.estadoCiclo) === u) }))
+    .map(({ u, ps }) => ({ u, ha: ps.reduce((t, p) => t + (p.hectareas ?? 0), 0), n: ps.length }))
+    .filter((x) => x.n > 0)
+  const potreros = [...campo.potreros].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
+  const potrero = campo.potreros.find((p) => p.id === elegido) ?? null
+  const dibujado = dibujados.size > 0
   return (
-    <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
+    <div className="flex flex-col gap-6 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
       <Barra />
-      <motion.section {...entra(0)} aria-labelledby="campo-titulo" className="flex flex-col gap-3">
-        <button type="button" onClick={() => navigate('/campo/campos')} className="flex items-center gap-1 self-start text-[14px] font-bold text-principal">
-          <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
-          Campos
-        </button>
-        <h1 id="campo-titulo" className="flex items-center gap-2.5 px-1 titulo-display text-[30px] leading-tight text-texto">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full font-sans text-[14px] font-extrabold text-white" style={{ background: m?.color ?? '#a9552c' }}>
+      <button type="button" onClick={() => navigate('/campo/campos')} className="-mb-2 flex items-center gap-1 self-start text-[14px] font-bold text-principal">
+        <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
+        Campos
+      </button>
+
+      {/* El campo: cuál es, sus números y en qué están sus hectáreas. */}
+      <motion.section {...entra(0)} aria-labelledby="campo-titulo" className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full text-[15px] font-extrabold text-white" style={{ background: m?.color ?? '#a9552c' }}>
             {m?.letra}
           </span>
-          <span className="min-w-0 truncate">{campo.nombre}</span>
-        </h1>
-        <p className={cn(BAJADA, 'px-1')}>
-          {ha(hectareas(campo))} ha · {campo.potreros.length} potreros{veHacienda && ` · ${cabezas(campo).toLocaleString('es-AR')} cabezas`}
-          {campo.localidad ? ` · ${campo.localidad}` : ''}
-        </p>
+          <div className="min-w-0">
+            <h1 id="campo-titulo" className="titulo-display truncate text-[26px] leading-tight text-texto">
+              {campo.nombre}
+            </h1>
+            {campo.ubicacion.localidad && <p className={BAJADA}>{campo.ubicacion.localidad}</p>}
+          </div>
+        </div>
+        <dl className="grid grid-cols-3 gap-2 border-y border-borde py-3">
+          <Num n={ha(campo.totalHa)} t="hectáreas" />
+          {veHacienda ? <Num n={campo.totalCabezas.toLocaleString('es-AR')} t="cabezas" /> : <Num n={String(campo.potreros.length)} t="potreros" />}
+          {/* Es la lluvia anotada en el pluviómetro: sin anotaciones, «0 mm» diría que no llovió. */}
+          {(datos.data?.lluvias.length ?? 0) > 0 ? <Num n={`${Math.round(lluvia30)} mm`} t="lluvia anotada, 30 d" /> : <Num n="—" t="sin lluvia anotada" />}
+        </dl>
+        {usos.length > 0 && (
+          <div>
+            <p className="text-[14px] font-semibold text-texto">En qué están las {ha(campo.totalHa)} hectáreas</p>
+            <div className="mt-2 flex h-2.5 gap-1 overflow-hidden rounded-full">
+              {usos.map((x) => (
+                <span key={x.u} className="h-full rounded-full" style={{ flexGrow: x.ha || x.n, background: COLOR_USO[x.u] }} />
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13.5px] text-texto-suave">
+              {usos.map((x) => (
+                <span key={x.u} className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full" style={{ background: COLOR_USO[x.u] }} />
+                  {USO_TEXTO[x.u]} {ha(x.ha)} ha
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {avisos.length > 0 && (
+          <ul className="flex flex-col gap-1.5" aria-label="Lo que pide atención">
+            {avisos.map((a) => (
+              <li key={a.texto}>
+                <button type="button" onClick={() => a.potreroId && elegir(a.potreroId)} className={cn('flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-[14px] font-semibold', a.tono === 'problema' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
+                  <span className={cn('size-2 shrink-0 rounded-full', a.tono === 'problema' ? 'bg-estado-problema' : 'bg-estado-atencion')} />
+                  {a.texto}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </motion.section>
+
+      {/* El mapa, pintado por lo que tiene cada potrero. */}
+      <motion.section {...entra(1)} aria-label={`Mapa de ${campo.nombre}`} className="flex flex-col gap-2">
         {dibujado ? (
           <div className="relative isolate h-[320px] overflow-hidden rounded-[20px] border border-borde bg-tinta">
             <MapErrorBoundary>
-              <MapaCampo campo={campo} elegido={elegido} onElegir={(pid) => setElegido((x) => (x === pid ? null : pid))} onFondo={() => setElegido(null)} color={(p) => (veHacienda ? COLOR_TIPO[p.tipo ?? 'vacio'] : null)} dato={(p) => (veHacienda && p.cabezas ? `${p.cabezas} cab` : null)} />
+              <MapaCampo campo={campoMapa} elegido={elegido} onElegir={(pid) => elegir(elegido === pid ? null : pid)} onFondo={() => setElegido(null)} color={(p) => COLOR_USO[usoDe(p.id)]} dato={(p) => (veHacienda && p.cabezas ? `${p.cabezas} cab` : null)} />
             </MapErrorBoundary>
           </div>
         ) : (
           <p className={cn(TARJETA, 'p-4 text-[15px] text-texto-suave')}>Este campo todavía no está dibujado. Se arma en la compu.</p>
         )}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-[13px] text-texto-suave">
+          {(['ganadero', 'agricola', 'vacio'] as Uso[]).map((u) => (
+            <span key={u} className="inline-flex items-center gap-1.5">
+              <span className="size-2.5 rounded-[3px]" style={{ background: COLOR_USO[u] }} />
+              {USO_TEXTO[u]}
+            </span>
+          ))}
+        </div>
       </motion.section>
 
-      <motion.section {...entra(1)} aria-labelledby="campo-potreros" className={cn(TARJETA, 'p-4')}>
-        <Encabezado id="campo-potreros" titulo="Potreros" bajada="Qué hay en cada uno. Tocalo acá o en el mapa." />
+      {/* El potrero tocado, abajo del mapa. */}
+      <div ref={detalle} className="scroll-mt-4">
+        {potrero && (
+          <DetallePotrero
+            key={potrero.id}
+            p={potrero}
+            dias={dias.get(potrero.id) ?? null}
+            obs={ultima.get(potrero.id) ?? null}
+            lluvias={datos.data?.lluvias ?? []}
+            movimientos={datos.data?.movimientos ?? []}
+            historia={historiaDelPotrero(potrero.id, datos.data?.observaciones ?? [], datos.data?.movimientos ?? [], datos.data?.labores ?? [])}
+            labores={(datos.data?.labores ?? []).filter((l) => l.potreroId === potrero.id)}
+            veHacienda={veHacienda}
+            onCerrar={() => setElegido(null)}
+          />
+        )}
+      </div>
+
+      <motion.section {...entra(2)} aria-labelledby="campo-potreros" className={cn(TARJETA, 'p-4')}>
+        <Encabezado id="campo-potreros" titulo="Potreros" bajada="Qué hay en cada uno y desde cuándo. Tocalo para ver más." />
         <ul className="mt-3 divide-y divide-borde">
           {potreros.map((p) => {
+            const u = usoDeEstado(p.estadoCiclo)
+            const d = dias.get(p.id) ?? null
             const activo = elegido === p.id
+            const que = u === 'ganadero' ? (veHacienda && p.cabezas ? `${p.cabezas} ${p.cabezas === 1 ? 'cabeza' : 'cabezas'}` : 'Con hacienda') : u === 'agricola' ? (p.cultivo ?? 'Sembrado') : 'Descansa'
+            const meta = [p.hectareas ? `${ha(p.hectareas)} ha` : null, d ? textoDias(d) : null].filter(Boolean).join(' · ')
             return (
               <li key={p.id}>
-                <button type="button" onClick={() => setElegido((x) => (x === p.id ? null : p.id))} aria-pressed={activo} className={cn('-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-[14px] px-2 py-3 text-left transition-colors', activo && 'bg-principal-suave/60')}>
-                  <span className="grid h-9 min-w-9 shrink-0 place-items-center rounded-full bg-superficie-hundida px-2 text-[13px] font-extrabold text-texto">{p.nombre}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold text-texto">{p.que || 'Sin nada cargado'}</span>
-                    <span className={BAJADA}>{p.hectareas ? `${ha(p.hectareas)} ha` : 'Sin hectáreas'}</span>
+                <button type="button" onClick={() => elegir(activo ? null : p.id)} aria-pressed={activo} className={cn('-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-[14px] px-2 py-3 text-left transition-colors', activo && 'bg-principal-suave/60')}>
+                  <span className="grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-2 text-[13px] font-extrabold text-white" style={{ background: COLOR_USO[u] }}>
+                    {p.nombre}
                   </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold text-texto">{que}</span>
+                    <span className={cn(BAJADA, 'block truncate')}>{meta || 'Sin datos todavía'}</span>
+                  </span>
+                  {ultima.get(p.id) && <span title="Tiene recorrida" className="size-2 shrink-0 rounded-full bg-salvia" />}
+                  <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
                 </button>
               </li>
             )
@@ -185,5 +302,174 @@ function UnCampo({ id }: { id: string }) {
       </motion.section>
       <div aria-hidden className="h-10" />
     </div>
+  )
+}
+
+function Num({ n, t }: { n: string; t: string }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <dd className="titulo-display truncate text-[22px] leading-tight text-texto">{n}</dd>
+      <dt className={BAJADA}>{t}</dt>
+    </div>
+  )
+}
+
+type PotreroC = CampoConPotreros['potreros'][number]
+const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
+const ICONO_CAT = (c: PotreroC['porCategoria'][number]['categoria']): NombreIcono =>
+  c === 'ternero' || c === 'ternera' ? 'Ternero' : especiePorCategoria[c] === 'ovino' ? 'Oveja' : especiePorCategoria[c] === 'equino' ? 'Caballo' : 'Vaca'
+
+/** Lo de un potrero, como en la compu: qué hay, desde cuándo, lo que se vio y su historia. */
+function DetallePotrero({ p, dias, obs, lluvias, movimientos, historia, labores, veHacienda, onCerrar }: { p: PotreroC; dias: Dias; obs: Observacion | null; lluvias: Lluvia[]; movimientos: MovimientoPotrero[]; historia: Hecho[]; labores: Labor[]; veHacienda: boolean; onCerrar: () => void }) {
+  const navigate = useNavigate()
+  const { quienCargo } = useNombres()
+  const [verHistoria, setVerHistoria] = useState(false)
+  const hoy = hoyLocal()
+  const uso = usoDeEstado(p.estadoCiclo)
+  const adentro = dias && 'adentro' in dias ? dias.adentro : null
+  const entrada = adentro != null ? new Date(Date.parse(hoy) - adentro * 86_400_000).toISOString().slice(0, 10) : null
+  const descanso = entrada ? descansoPrevio(p.id, entrada, movimientos) : null
+  const carga = p.cabezas && p.hectareas ? (p.cabezas / p.hectareas).toLocaleString('es-AR', { maximumFractionDigits: 1 }) : '—'
+  const desde = entrada ?? (uso === 'agricola' ? p.fechaSiembra : dias && 'descansa' in dias ? new Date(Date.parse(hoy) - dias.descansa * 86_400_000).toISOString().slice(0, 10) : null)
+  const mm = desde ? lluviaDesde(lluvias, desde) : 0
+  const alerta = obs && (obs.agua === 'baja' || obs.agua === 'seca' || obs.pasto === 'escaso' || obs.pasto === 'pelado' || obs.electrico === 'cortado')
+  return (
+    <section aria-labelledby="potrero-titulo" className={cn(TARJETA, 'flex flex-col gap-4 border-principal/40 p-4')}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="potrero-titulo" className="titulo-display text-[34px] leading-none text-texto">
+            {p.nombre}
+          </h2>
+          <p className={cn(BAJADA, 'mt-1')}>{[p.hectareas ? `${ha(p.hectareas)} ha` : null, uso === 'ganadero' ? 'con hacienda' : uso === 'agricola' ? (p.cultivo ?? 'sembrado') : 'descansa'].filter(Boolean).join(' · ')}</p>
+        </div>
+        <button type="button" onClick={onCerrar} aria-label="Cerrar el potrero" className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto">
+          <Icono nombre="Cerrar" tamano={16} />
+        </button>
+      </div>
+
+      {uso === 'ganadero' && veHacienda && (
+        <>
+          <dl className="grid grid-cols-3 gap-2 border-y border-borde py-3">
+            <Num n={String(p.cabezas)} t="cabezas" />
+            <Num n={adentro != null ? `${adentro} d` : '—'} t="adentro" />
+            <Num n={carga} t="cab/ha" />
+          </dl>
+          {adentro != null && descanso != null && (
+            <div>
+              <div className="flex h-2 gap-1 overflow-hidden rounded-full">
+                <span className="h-full rounded-full" style={{ flexGrow: descanso || 1, background: COLOR_USO.vacio }} />
+                <span className="h-full rounded-full bg-principal" style={{ flexGrow: adentro || 1 }} />
+              </div>
+              <div className="mt-1.5 flex justify-between text-[13.5px]">
+                <span className="text-texto-suave">Descansó {descanso} días</span>
+                <span className="text-principal">{adentro} días adentro</span>
+              </div>
+            </div>
+          )}
+          {p.porCategoria.length > 0 && (
+            <ul className="flex flex-col gap-2" aria-label="Qué hay adentro">
+              {[...p.porCategoria]
+                .sort((a, b) => b.cabezas - a.cabezas)
+                .map((c, _i, arr) => (
+                  <li key={c.categoria} className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3">
+                    <span className="grid size-8 place-items-center rounded-full bg-principal-suave text-principal">
+                      <Icono nombre={ICONO_CAT(c.categoria)} tamano={16} />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="text-[14.5px] font-semibold text-texto">{categoriaNombre(c.categoria, c.cabezas)}</span>
+                      <span className="h-1.5 overflow-hidden rounded-full bg-superficie-hundida">
+                        <span className="block h-full rounded-full bg-principal" style={{ width: `${(100 * c.cabezas) / Math.max(1, arr[0]!.cabezas)}%` }} />
+                      </span>
+                    </span>
+                    <b className="text-[15px] font-bold tabular-nums text-texto">{c.cabezas}</b>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {uso === 'agricola' && p.fechaSiembra && (
+        <div>
+          <p className="titulo-display text-[26px] text-texto">Día {Math.max(0, Math.round((Date.parse(hoy) - Date.parse(p.fechaSiembra)) / 86_400_000))}</p>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-superficie-hundida">
+            {p.fechaCosechaEstimada && <span className="block h-full rounded-full bg-trigo-400" style={{ width: `${Math.min(100, Math.max(4, (100 * (Date.parse(hoy) - Date.parse(p.fechaSiembra))) / Math.max(1, Date.parse(p.fechaCosechaEstimada) - Date.parse(p.fechaSiembra))))}%` }} />}
+          </div>
+          <div className="mt-1.5 flex justify-between text-[13px] text-texto-suave">
+            <span>Sembrado el {ddmm(p.fechaSiembra)}</span>
+            {p.fechaCosechaEstimada && <span>Cosecha cerca del {ddmm(p.fechaCosechaEstimada)}</span>}
+          </div>
+        </div>
+      )}
+
+      {uso === 'vacio' && dias && 'descansa' in dias && <p className="text-[15px] font-semibold text-texto">{textoDias(dias)}</p>}
+
+      {mm > 0 && (
+        <p className="flex items-center gap-2.5 rounded-[14px] bg-fondo px-3.5 py-2.5 text-[14.5px] text-texto">
+          <Icono nombre="Lluvia" tamano={16} className="text-sky" />
+          <span>
+            <b>{Math.round(mm)} mm</b> {entrada ? 'desde que entraron' : uso === 'agricola' ? 'desde la siembra' : 'en el descanso'}
+          </span>
+        </p>
+      )}
+
+      {obs && (
+        <div className={cn('rounded-[14px] px-3.5 py-2.5 text-[14.5px]', alerta ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-fondo text-texto')}>
+          <b>Última recorrida, {ddmm(obs.fecha)}:</b>{' '}
+          {[obs.pasto && `pasto ${PASTO[obs.pasto].toLowerCase()}`, obs.agua && `agua ${AGUA[obs.agua].toLowerCase()}`, obs.electrico === 'cortado' && 'eléctrico cortado'].filter(Boolean).join(', ') || 'sin novedades'}
+          {obs.novedad && <span className="block text-[13.5px]">«{obs.novedad}»</span>}
+        </div>
+      )}
+
+      {uso === 'agricola' && labores.length > 0 && (
+        <div>
+          <p className={cn(BAJADA, 'font-semibold')}>Lo último</p>
+          <ul className="mt-1 flex flex-col divide-y divide-borde">
+            {labores.slice(0, 3).map((l, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3 py-1.5 text-[14.5px]">
+                <b className="text-texto">{LABOR[l.tipo]}</b>
+                <span className="flex-1 truncate text-right text-[13px] text-texto-suave">{l.cultivo ?? l.nota ?? ''}</span>
+                <b className="tabular-nums text-texto">{ddmm(l.fecha)}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {uso === 'ganadero' && veHacienda && p.cabezas > 0 && (
+          <button type="button" onClick={() => navigate(`/campo/hacienda?potrero=${p.id}`)} className="flex h-10 items-center gap-1.5 rounded-full bg-principal px-4 text-[14px] font-bold text-principal-texto">
+            Ver {p.cabezas === 1 ? 'el animal' : `los ${p.cabezas} animales`}
+            <Icono nombre="Siguiente" tamano={16} />
+          </button>
+        )}
+        <button type="button" onClick={() => setVerHistoria((x) => !x)} aria-expanded={verHistoria} className="flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-principal/55 px-4 text-[14px] font-bold text-principal">
+          {verHistoria ? 'Ocultar la historia' : 'Ver su historia'}
+          <Icono nombre="Desplegar" tamano={16} className={cn('transition-transform', verHistoria && 'rotate-180')} />
+        </button>
+      </div>
+
+      {verHistoria &&
+        (historia.length === 0 ? (
+          <p className={BAJADA}>Todavía no hay nada anotado en este potrero.</p>
+        ) : (
+          <ol className="flex flex-col">
+            {historia.slice(0, 20).map((h, i, arr) => (
+              <li key={i} className="grid grid-cols-[44px_12px_minmax(0,1fr)] gap-x-3">
+                <span className="pt-0.5 text-right text-[13.5px] font-bold tabular-nums text-texto">{ddmm(h.fecha)}</span>
+                <span className="flex flex-col items-center">
+                  <span className={cn('mt-1.5 size-2.5 rounded-full', h.tipo === 'recorrida' ? 'bg-salvia' : h.tipo === 'labor' ? 'bg-trigo-400' : 'bg-principal')} />
+                  {i < arr.length - 1 && <span className="w-px flex-1 bg-borde" />}
+                </span>
+                <div className="pb-3">
+                  <p className="text-[15px] font-semibold text-texto">{h.titulo}</p>
+                  {h.detalle && <p className={BAJADA}>{h.detalle}</p>}
+                  {quienCargo(h.createdBy, h.canal) && <p className="text-[12.5px] font-semibold text-acento-texto">{quienCargo(h.createdBy, h.canal)}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        ))}
+    </section>
   )
 }
