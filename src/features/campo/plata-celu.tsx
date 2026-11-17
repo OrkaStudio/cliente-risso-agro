@@ -7,6 +7,7 @@ import { actividadLabel, fmtCompact, gastosPorCategoria, porActividad, porCampo 
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import { useDolarHistorico } from '@/features/analitica/tropero/dolar'
 import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Mes, type Periodo } from '@/features/analitica/tropero/plata'
+import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useCampos } from '@/features/campos/hooks'
 import { useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
@@ -14,6 +15,8 @@ import { puedeCargar, veePlata } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
+import { ElegirCampo } from './elegir-campo'
+import { MenuCuenta } from './menu-cuenta'
 import { PlataPage } from './plata-page'
 
 /**
@@ -67,6 +70,9 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const pend = usePendientes()
   const dolar = useDolarHistorico()
   const identidad = useCampoElegido()
+  const { user } = useAuth()
+  const membresia = useEmpresa().data
+  const inicial = (String(user?.user_metadata?.nombre ?? '').trim() || membresia?.empresa?.nombre || 'T').charAt(0)
   const campoId = identidad.elegido?.id ?? null
   const campos = useCampos()
   const manualQ = useGordoActual(empresaId)
@@ -116,19 +122,22 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
 
   return (
     <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-      {/* La marca; el campo que se ve lo dice la portada (se elige en Hoy). */}
-      <div className="flex h-9 items-center">
-        <Logo alto={16} />
+      {/* La marca; el campo se elige en la portada. */}
+      <div className="flex items-center justify-between gap-2">
+        <Logo alto={24} />
+        <MenuCuenta inicial={inicial} />
       </div>
 
       {/* 1. ¿Cómo vengo? */}
       <motion.section {...entra(0)} aria-labelledby="plata-titulo" className="flex flex-col gap-3">
-        <div className="relative h-[128px] overflow-hidden rounded-[20px] bg-[#e8c77e]">
-          <img src={trigal} alt="" className="absolute inset-0 size-full object-cover object-[50%_62%]" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(251_250_246/0.92)_30%,rgb(251_250_246/0.2)_75%,transparent)]" />
-          <div className="absolute top-4 left-4 flex flex-col gap-0.5">
-            <span className={cn(BAJADA, 'font-semibold')}>{identidad.elegido ? `Estás viendo ${identidad.elegido.nombre}` : 'Estás viendo todos tus campos'}</span>
-            <h1 id="plata-titulo" className="titulo-display text-[30px] text-texto">
+        <div className="relative z-10 h-[150px] rounded-[20px]">
+          <div className="absolute inset-0 overflow-hidden rounded-[20px] bg-[#e8c77e]">
+            <img src={trigal} alt="" className="absolute inset-0 size-full object-cover object-[50%_62%]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(251_250_246/0.92)_30%,rgb(251_250_246/0.2)_75%,transparent)]" />
+          </div>
+          <div className="absolute top-3.5 left-3.5 flex flex-col gap-1">
+            <ElegirCampo />
+            <h1 id="plata-titulo" className="mt-1.5 px-1 titulo-display text-[30px] text-texto">
               Plata
             </h1>
           </div>

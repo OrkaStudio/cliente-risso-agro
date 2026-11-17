@@ -1,16 +1,15 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
-import { ListaCambiarCuenta } from '@/features/empresa/elegir-cuenta'
-import { useCuentas, useEmpresa } from '@/features/empresa/use-empresa'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 import { saludo } from '@/features/inicio/tropero/dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import { cn } from '@/lib/utils'
 import textura from '@/assets/tropero/textura-campo.webp'
 import { HoyCelu } from './hoy-celu'
+import { MenuCuenta } from './menu-cuenta'
 import { useRecorrida } from './recorrida/use-recorrida'
 
 
@@ -25,7 +24,6 @@ export function CampoInicioPage() {
 }
 
 function Hoy() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const r = useRecorrida()
@@ -36,32 +34,9 @@ function Hoy() {
       <HoyCelu
         cuenta={<MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />}
         antes={
-          (!r.online || r.sinSubir > 0 || r.errores.length > 0 || r.abiertas.length > 0) && (
+          (!r.online || r.sinSubir > 0 || r.errores.length > 0) && (
             <div className="flex flex-col gap-3">
               <Pendientes r={r} />
-              {r.abiertas.map((a) => (
-                <button
-                  key={a.recorridaId}
-                  type="button"
-                  onClick={async () => {
-                    await r.activar(a.recorridaId)
-                    navigate('/campo/recorrida')
-                  }}
-                  className="flex items-center gap-3.5 rounded-[18px] border-2 bg-superficie px-4 py-3.5 text-left"
-                  style={{ borderColor: a.color.hex }}
-                >
-                  <span className="grid size-11 shrink-0 place-items-center rounded-[14px] font-heading text-[19px] font-extrabold text-white" style={{ background: a.color.hex }}>
-                    {a.color.letra}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-heading text-[17px] font-extrabold text-texto">Seguí la recorrida de {a.campoNombre}</span>
-                    <span className="text-[13.5px] text-texto-suave">
-                      {a.hechos} de {a.total} potreros hechos
-                    </span>
-                  </span>
-                  <Icono nombre="Siguiente" />
-                </button>
-              ))}
             </div>
           )
         }
@@ -115,52 +90,7 @@ function Pendientes({ r }: { r: ReturnType<typeof useRecorrida> }) {
   )
 }
 
-/** El avatar: cambiar de cuenta y salir (con confirmación de dos toques). */
-function MenuCuenta({ inicial }: { inicial: string }) {
-  const { signOut } = useAuth()
-  const [abierto, setAbierto] = useState(false)
-  const [salir, setSalir] = useState(false)
-  // Con varias cuentas (un veterinario que atiende varios campos), el cambio vive acá.
-  const varias = (useCuentas().data?.cuentas.length ?? 0) > 1
-  const [cuentas, setCuentas] = useState(false)
-  return (
-    <div className="relative ml-auto">
-      <button
-        type="button"
-        aria-label="Tu cuenta"
-        aria-expanded={abierto}
-        onClick={() => setAbierto((v) => !v)}
-        className="grid size-10 place-items-center rounded-full bg-acento font-heading text-[16px] font-extrabold text-acento-texto"
-      >
-        {inicial.toUpperCase()}
-      </button>
-      {abierto && (
-        <ul className="absolute top-12 right-0 z-20 min-w-[230px] overflow-hidden rounded-[14px] bg-superficie py-1.5 text-texto shadow-lg">
-          {varias && (
-            <li className="border-b border-borde">
-              {cuentas ? (
-                <ListaCambiarCuenta onElegido={() => setCuentas(false)} />
-              ) : (
-                <button type="button" onClick={() => setCuentas(true)} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px] font-semibold">
-                  <Icono nombre="Usuario" tamano={16} /> Cambiar de cuenta
-                </button>
-              )}
-            </li>
-          )}
-          <li>
-            <button
-              type="button"
-              onClick={() => (salir ? void signOut() : setSalir(true))}
-              className={cn('flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]', salir && 'bg-estado-problema-suave font-bold text-estado-problema-texto')}
-            >
-              <Icono nombre="Salir" tamano={16} /> {salir ? '¿Seguro? Tocá de nuevo' : 'Cerrar sesión'}
-            </button>
-          </li>
-        </ul>
-      )}
-    </div>
-  )
-}
+
 
 /** Celu · Hoy, sin campo (página 35): el campo se arma mejor en la compu. */
 function HoySinCampo() {
@@ -182,7 +112,7 @@ function HoySinCampo() {
       </div>
       <h2 className="mt-7 font-heading text-[22px] font-extrabold text-texto">Todavía no armaste tu campo</h2>
       <p className="mt-2 text-[15px] leading-snug text-texto-suave">
-        Con el campo y sus potreros cargados, el celular te ubica en cada uno en la recorrida y en la manga.
+        Con el campo y sus potreros cargados, Troppero sabe dónde pasa cada cosa que le mandás.
       </p>
       <p className="mt-5 flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
         <Icono nombre="Campos" tamano={16} /> Lo primero es armar el campo. Después se abre todo.

@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
 import tranquera from '@/assets/tropero/tranquera.webp'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
+import { ElegirCampo } from './elegir-campo'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { useLiquidar, useRevertirLiquidacion } from '@/features/agenda/hooks'
 import { useMarcarRevisados } from '@/features/analitica/hooks'
@@ -96,7 +96,6 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
   const manual = useGordoActual(membresia?.empresa_id ?? '')
   const { nombreDe } = useNombres()
   const reducir = useReducedMotion()
-  const [eligiendo, setEligiendo] = useState(false)
   const [todas, setTodas] = useState(false)
 
   const ve = { campos: puedeVer(membresia, 'campos'), hacienda: puedeVer(membresia, 'hacienda'), plata: veePlata(membresia) }
@@ -107,11 +106,6 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.05, ease: CURVA } })
-  const elegir = (id: string | null) => {
-    inicio.elegir(id)
-    if (id) clima.elegir(id)
-    setEligiendo(false)
-  }
 
   const v = panorama.data ? delCampo(campo?.id ?? null, panorama.data, atender.data) : null
   const vencimientos = v && ve.plata ? v.vencimientos : []
@@ -150,62 +144,23 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
       </div>
 
       <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-        {/* Arriba: la marca, el campo y la cuenta. */}
-        <div className="flex items-center gap-2">
-          <Logo alto={16} />
-          {inicio.campos.length > 0 && (
-            <div className="relative ml-auto min-w-0">
-              <button
-                type="button"
-                onClick={() => setEligiendo((x) => !x)}
-                aria-expanded={eligiendo}
-                aria-label={`Estás viendo ${campo?.nombre ?? 'todos los campos'}. Cambiar`}
-                className="flex h-9 max-w-[200px] items-center gap-1 rounded-full border border-borde bg-superficie pr-2 pl-1 text-[13px] font-bold text-texto"
-              >
-                {campo ? (
-                  <span className="grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-extrabold text-white" style={{ background: campo.color }}>
-                    {campo.letra}
-                  </span>
-                ) : (
-                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
-                    <Icono nombre="Campos" tamano={16} />
-                  </span>
-                )}
-                <span className="truncate">{campo?.nombre ?? 'Todos los campos'}</span>
-                {inicio.campos.length > 1 && <Icono nombre="Desplegar" tamano={16} />}
-              </button>
-              {eligiendo && inicio.campos.length > 1 && (
-                <ul className="absolute top-11 right-0 z-20 min-w-[230px] overflow-hidden rounded-[18px] bg-superficie py-1.5 text-texto shadow-[0_16px_40px_rgba(19,27,22,0.24)]">
-                  {[null, ...inicio.campos].map((c) => (
-                    <li key={c?.id ?? 'todos'}>
-                      <button type="button" onClick={() => elegir(c?.id ?? null)} className={cn('flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px]', (c?.id ?? null) === (campo?.id ?? null) && 'font-bold')}>
-                        {c ? (
-                          <span className="grid size-6 place-items-center rounded-full text-[11px] font-extrabold text-white" style={{ background: c.color }}>
-                            {c.letra}
-                          </span>
-                        ) : (
-                          <span className="grid size-6 place-items-center text-texto-suave">
-                            <Icono nombre="Campos" tamano={16} />
-                          </span>
-                        )}
-                        {c?.nombre ?? 'Todos los campos'}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          <span className={cn(inicio.campos.length === 0 && 'ml-auto')}>{cuenta}</span>
+        {/* Arriba: la marca y la cuenta (el campo se elige en la portada). */}
+        <div className="flex items-center justify-between gap-2">
+          <Logo alto={24} />
+          {cuenta}
         </div>
 
         {/* 1. La portada: la tranquera con el saludo en el cielo y el clima encima. */}
-        <motion.div {...entra(0)} className="relative h-[272px] overflow-hidden rounded-[20px] shadow-[0_16px_34px_-18px_rgba(90,40,15,0.5)]" style={{ background: CIELO }}>
-          <img src={tranquera} alt="" className="absolute bottom-0 left-0 w-full origin-bottom scale-[1.04] [mask-image:linear-gradient(180deg,transparent_0,transparent_6%,#000_14%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_62%,rgba(19,27,22,0.4))]" />
-          <div className="absolute inset-x-[18px] top-4 flex flex-col gap-1">
-            <span className="text-[12.5px] font-semibold tracking-[0.04em] text-[#5a220c]/85 uppercase">{fecha}</span>
-            <h1 className="titulo-display text-[28px] leading-[1.02] text-[#2a1208]">
+        <motion.div {...entra(0)} className="relative z-10 h-[310px] rounded-[20px] shadow-[0_16px_34px_-18px_rgba(90,40,15,0.5)]">
+          {/* La imagen recortada aparte: el menú del campo no se corta en el borde. */}
+          <div className="absolute inset-0 overflow-hidden rounded-[20px]" style={{ background: CIELO }}>
+            <img src={tranquera} alt="" className="absolute bottom-0 left-0 w-full origin-bottom scale-[1.04] [mask-image:linear-gradient(180deg,transparent_0,transparent_6%,#000_14%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_62%,rgba(19,27,22,0.4))]" />
+          </div>
+          <div className="absolute inset-x-[14px] top-3.5 flex flex-col gap-1">
+            <ElegirCampo />
+            <span className="mt-2.5 px-1 text-[12.5px] font-semibold tracking-[0.04em] text-[#5a220c]/85 uppercase">{fecha}</span>
+            <h1 className="px-1 titulo-display text-[28px] leading-[1.02] text-[#2a1208]">
               {saludo(new Date().getHours(), nombre)}
               {variasCuentas && membresia?.empresa?.nombre ? <span className="mt-1 block text-[14px] font-semibold tracking-normal">{membresia.empresa.nombre}</span> : null}
             </h1>
@@ -425,7 +380,6 @@ function Dato({ icono, clase, titulo, valor, unidad, tono, children }: { icono: 
 
 /** Una cosa para hacer: lo vencido (se paga acá), el potrero que pide ir o el campo sin recorrer. */
 function FilaCosa({ c, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: Cosa; vencimiento?: Vencimiento; cargaPlata: boolean; cargaCampos: boolean; empresaId: string }) {
-  const navigate = useNavigate()
   const liquidar = useLiquidar()
   const revertir = useRevertirLiquidacion()
   const [confirmar, setConfirmar] = useState(false)
@@ -451,9 +405,7 @@ function FilaCosa({ c, vencimiento, cargaPlata, cargaCampos, empresaId }: { c: C
       ? { texto: c.accion.texto, hacer: () => setConfirmar((x) => !x) }
       : esWhatsapp && cargaCampos
         ? { texto: c.accion.texto, hacer: () => window.open(`https://wa.me/${WHATSAPP_TROPERO}?text=${encodeURIComponent(c.accion.to.slice(9))}`, '_blank', 'noopener') }
-        : c.senal
-          ? { texto: 'Recorrerlo', hacer: () => navigate('/campo/recorrida') }
-          : null
+        : null
   const titulo = vencimiento ? `${cobro ? 'Cobrar' : 'Pagar'}: ${vencimiento.descripcion}` : `${c.lugar} · ${c.que}`
   return (
     <li className={cn(TARJETA, 'relative overflow-hidden p-4')}>
