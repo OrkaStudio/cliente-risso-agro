@@ -119,8 +119,8 @@ export function HaciendaCelu() {
         </motion.section>
 
         {/* Buscar: lo primero para encontrar un animal. */}
-        <motion.section {...entra(1)} aria-label="Buscar un animal" className="flex flex-col gap-3">
-          <label className="flex h-12 items-center gap-2.5 rounded-full border-[1.5px] border-borde bg-superficie px-4 focus-within:border-principal">
+        <motion.section {...entra(1)} aria-label="Buscar un animal" className={cn(TARJETA, 'flex flex-col gap-3 p-3')}>
+          <label className="flex h-12 items-center gap-2.5 rounded-full border-[1.5px] border-transparent bg-fondo px-4 focus-within:border-principal">
             <Icono nombre="Buscar" tamano={16} className="shrink-0 text-texto-suave" />
             <input
               value={buscar}
@@ -136,29 +136,28 @@ export function HaciendaCelu() {
               </button>
             )}
           </label>
-          {/* Filtros: qué es y qué hay que hacer. Se combinan; tocar el elegido lo saca. */}
-          <Fila etiqueta="Categoría">
+          {/* Los filtros en una sola tira: primero qué es, después lo que hay que hacer (con su punto de color). */}
+          <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none]" role="group" aria-label="Filtrar">
             {resumen.porCategoria.map((c) => (
               <Filtro key={c.categoria} activo={categoria === c.categoria} n={c.cabezas} onClick={() => (setCategoria((x) => (x === c.categoria ? null : c.categoria)), setMas(false))}>
+                <span aria-hidden className="size-2.5 rounded-[3px]" style={{ background: COLOR[c.categoria] ?? OTRO }} />
                 {categoriaNombre(c.categoria, 2)}
               </Filtro>
             ))}
-          </Fila>
-          {FILTROS.some((e) => (resumen.porEstado[e] ?? 0) > 0) && (
-            <Fila etiqueta="Para hacer">
-              {FILTROS.filter((e) => (resumen.porEstado[e] ?? 0) > 0).map((e) => (
-                <Filtro key={e} activo={estado === e} n={resumen.porEstado[e]!} onClick={() => (setEstado((x) => (x === e ? null : e)), setMas(false))}>
-                  {ESTADO_TEXTO[e]}
-                </Filtro>
-              ))}
-            </Fila>
-          )}
+            {FILTROS.some((e) => (resumen.porEstado[e] ?? 0) > 0) && <span aria-hidden className="mx-1 h-6 w-px shrink-0 bg-borde" />}
+            {FILTROS.filter((e) => (resumen.porEstado[e] ?? 0) > 0).map((e) => (
+              <Filtro key={e} activo={estado === e} n={resumen.porEstado[e]!} onClick={() => (setEstado((x) => (x === e ? null : e)), setMas(false))}>
+                <Icono nombre={e === 'sinCaravana' || e === 'sinElectronica' ? 'Caravana' : 'Agenda'} tamano={16} className="size-3.5" />
+                {ESTADO_TEXTO[e]}
+              </Filtro>
+            ))}
+          </div>
         </motion.section>
 
         <motion.section {...entra(2)} aria-labelledby="hacienda-lista" className={cn(TARJETA, 'p-4')}>
           {filtrando ? (
             <>
-              <Encabezado id="hacienda-lista" titulo={`${lista.length.toLocaleString('es-AR')} ${lista.length === 1 ? 'animal' : 'animales'}`} bajada="Tocá uno para ver su ficha" />
+              <Encabezado id="hacienda-lista" titulo={`${lista.length.toLocaleString('es-AR')} ${lista.length === 1 ? 'animal' : 'animales'}`} bajada={lista.some((f) => f.visual || f.rfid) ? 'Tocá uno para ver su ficha' : 'Sin caravana no se distingue uno de otro'} />
               {/* Lo que se está filtrando, a la vista: cada cosa con su × para sacarla. */}
               <div className="mt-3 flex flex-wrap gap-2">
                 {q && <Activo onQuitar={() => setBuscar('')}>Caravana «{buscar.trim()}»</Activo>}
@@ -175,7 +174,7 @@ export function HaciendaCelu() {
                 <p className={cn(BAJADA, 'mt-3')}>{q ? 'No hay ningún animal con esa caravana.' : 'No hay animales acá.'}</p>
               ) : (
                 <ul className="mt-3 divide-y divide-borde">
-                  {visibles.map((it) => (it.tipo === 'animal' ? <FilaAnimal key={it.f.id} f={it.f} /> : <FilaGrupo key={it.g.key} g={it.g} abierto={abierto === it.g.key} onTocar={() => setAbierto((x) => (x === it.g.key ? null : it.g.key))} />))}
+                  {visibles.map((it) => (it.tipo === 'animal' ? <FilaAnimal key={it.f.id} f={it.f} /> : <FilaGrupo key={it.g.key} g={it.g} />))}
                 </ul>
               )}
               {items.length > MAX && (
@@ -222,49 +221,20 @@ function FilaAnimal({ f }: { f: FilaRodeo }) {
   )
 }
 
-/** Los sin caravana, juntos: se despliegan para ver cada uno y entrar a su ficha. */
-function FilaGrupo({ g, abierto, onTocar }: { g: GrupoSinCaravana; abierto: boolean; onTocar: () => void }) {
-  const navigate = useNavigate()
-  const [todos, setTodos] = useState(false)
-  const filas = todos ? g.filas : g.filas.slice(0, 20)
+/** Los sin caravana, juntos: sin caravana no hay cómo distinguir uno de otro (Lau, 17/11: no se listan de a uno). */
+function FilaGrupo({ g }: { g: GrupoSinCaravana }) {
   return (
-    <li className="py-3 first:pt-0 last:pb-0">
-      <button type="button" onClick={onTocar} aria-expanded={abierto} className="flex w-full items-center gap-3 text-left">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
-          <Icono nombre="Vaca" tamano={16} />
+    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
+        <Icono nombre="Vaca" tamano={16} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-semibold text-texto">
+          {g.n.toLocaleString('es-AR')} {g.categoria ? categoriaNombre(g.categoria, g.n).toLocaleLowerCase('es-AR') : 'sin categoría'} sin caravana
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold text-texto">
-            {g.n} {g.categoria ? categoriaNombre(g.categoria, g.n).toLocaleLowerCase('es-AR') : 'sin categoría'} sin caravana
-          </span>
-          <span className={cn(BAJADA, 'block truncate')}>{g.donde ?? 'Sin potrero'}</span>
-        </span>
-        {g.estado !== 'nada' && g.estado !== 'sinCaravana' && <Chip estado={g.estado} />}
-        <Icono nombre="Desplegar" tamano={16} className={cn('shrink-0 text-texto-suave transition-transform', abierto && 'rotate-180')} />
-      </button>
-      {abierto && (
-        <div className="mt-2 ml-12 rounded-[14px] bg-fondo">
-          <ul className="divide-y divide-borde">
-            {filas.map((f) => (
-              <li key={f.id}>
-                <button type="button" onClick={() => navigate(`/campo/hacienda/${f.id}`)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
-                  <span className="min-w-0 flex-1 truncate text-[14px] text-texto">
-                    <b className="font-semibold">{f.queEs}</b>
-                    {[f.edad, f.ultimoDato].filter(Boolean).length > 0 && <span className="text-texto-suave"> · {[f.edad, f.ultimoDato].filter(Boolean).join(' · ')}</span>}
-                  </span>
-                  <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          {g.filas.length > 20 && (
-            <button type="button" onClick={() => setTodos((x) => !x)} className="flex w-full items-center justify-center gap-1.5 border-t border-borde py-2.5 text-[13.5px] font-bold text-principal">
-              {todos ? 'Ver menos' : `Ver los ${g.filas.length}`}
-              <Icono nombre="Desplegar" tamano={16} className={cn('transition-transform', todos && 'rotate-180')} />
-            </button>
-          )}
-        </div>
-      )}
+        <span className={cn(BAJADA, 'block')}>{[g.donde ?? 'Sin potrero', 'se distinguen cuando tengan caravana'].join(' · ')}</span>
+      </span>
+      {g.estado !== 'nada' && g.estado !== 'sinCaravana' && <Chip estado={g.estado} />}
     </li>
   )
 }
@@ -322,16 +292,6 @@ function PotreroFila({ g, abierto, onTocar, onVer }: { g: GrupoPotrero; abierto:
         </div>
       )}
     </li>
-  )
-}
-
-/** Una fila de filtros que se desliza de costado, con su nombre a la izquierda. */
-function Fila({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className={cn(BAJADA, 'font-semibold')}>{etiqueta}</span>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">{children}</div>
-    </div>
   )
 }
 
