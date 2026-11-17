@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import arreo from '@/assets/tropero/arreo.webp'
 import { Icono } from '@/components/tropero/icono'
@@ -43,7 +43,17 @@ export function HaciendaCelu() {
   const [estado, setEstado] = useState<Estado | null>(null)
   const [categoria, setCategoria] = useState<Categoria | null>(null)
   const [abierto, setAbierto] = useState<string | null>(null)
-  const [potrero, setPotrero] = useState<string | null | undefined>(undefined)
+  // Desde Campos («Ver los animales» de un potrero) llega con ?potrero=.
+  const [params] = useSearchParams()
+  const [potrero, setPotrero] = useState<string | null | undefined>(params.get('potrero') ?? undefined)
+  const lista$ = useRef<HTMLElement>(null)
+  // Llegando con un potrero, se va directo a sus animales.
+  const vinoConPotrero = !!params.get('potrero')
+  useEffect(() => {
+    if (!vinoConPotrero) return
+    const t = setTimeout(() => lista$.current?.scrollIntoView({ block: 'start' }), 300)
+    return () => clearTimeout(t)
+  }, [vinoConPotrero])
   const [mas, setMas] = useState(false)
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.05, ease: CURVA } })
 
@@ -154,7 +164,7 @@ export function HaciendaCelu() {
           </div>
         </motion.section>
 
-        <motion.section {...entra(2)} aria-labelledby="hacienda-lista" className={cn(TARJETA, 'p-4')}>
+        <motion.section ref={lista$} {...entra(2)} aria-labelledby="hacienda-lista" className={cn(TARJETA, 'scroll-mt-4 p-4')}>
           {filtrando ? (
             <>
               <Encabezado id="hacienda-lista" titulo={`${lista.length.toLocaleString('es-AR')} ${lista.length === 1 ? 'animal' : 'animales'}`} bajada={lista.some((f) => f.visual || f.rfid) ? 'Tocá uno para ver su ficha' : 'Sin caravana no se distingue uno de otro'} />
