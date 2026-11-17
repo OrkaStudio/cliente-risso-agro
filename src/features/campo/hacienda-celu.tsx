@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import arreo from '@/assets/tropero/arreo.webp'
 import { Icono } from '@/components/tropero/icono'
@@ -6,10 +7,13 @@ import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimales, useEventosSenales, usePotreros, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
 import { categoriaNombre } from '@/features/hacienda/labels'
 import { resumirEventos } from '@/features/hacienda/senales'
-import { ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, juntarSinCaravana, potrerosDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type GrupoSinCaravana } from '@/features/hacienda/tropero/rodeo'
+import type { Database } from '@/lib/supabase/types'
+import { ESTADO_TEXTO, filasDeSalidas, filasDelRodeo, juntarSinCaravana, potrerosDelRodeo, resumirRodeo, type Estado, type FilaRodeo, type GrupoPotrero, type GrupoSinCaravana } from '@/features/hacienda/tropero/rodeo'
+
+type Categoria = Database['public']['Enums']['categoria_animal']
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { BAJADA, MONTO, TARJETA } from './sistema'
+import { BAJADA, TARJETA } from './sistema'
 import { Barra, Encabezado, Portada } from './sistema-ui'
 
 /**
@@ -37,6 +41,8 @@ export function HaciendaCelu() {
   const campoId = elegido.elegido?.id ?? null
   const [buscar, setBuscar] = useState('')
   const [estado, setEstado] = useState<Estado | null>(null)
+  const [categoria, setCategoria] = useState<Categoria | null>(null)
+  const [abierto, setAbierto] = useState<string | null>(null)
   const [potrero, setPotrero] = useState<string | null | undefined>(undefined)
   const [mas, setMas] = useState(false)
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.05, ease: CURVA } })
@@ -59,12 +65,13 @@ export function HaciendaCelu() {
   const salidas = filasDeSalidas(salidasQ.data ?? [], pots, elegido.campos).filter((x) => !campoId || x.campoId === campoId)
   const resumen = resumirRodeo(base, elegido.campos, salidas)
   const q = buscar.trim().replace(/\s+/g, '')
-  const filtrando = !!q || !!estado || potrero !== undefined
+  const filtrando = !!q || !!estado || !!categoria || potrero !== undefined
   // Buscar una caravana busca en todo; el filtro y el potrero se suman.
   const lista = base.filter(
     (f) =>
       (!q || (f.visual ?? '').replace(/\s+/g, '').includes(q) || (f.rfid ?? '').replace(/\s+/g, '').includes(q)) &&
       (q || !estado || f.estado === estado) &&
+      (q || !categoria || f.categoria === categoria) &&
       (q || potrero === undefined || f.potreroId === potrero),
   )
   const items = juntarSinCaravana(lista)
@@ -74,6 +81,7 @@ export function HaciendaCelu() {
   const limpiar = () => {
     setBuscar('')
     setEstado(null)
+    setCategoria(null)
     setPotrero(undefined)
     setMas(false)
   }
@@ -128,30 +136,46 @@ export function HaciendaCelu() {
               </button>
             )}
           </label>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-            {FILTROS.filter((e) => (resumen.porEstado[e] ?? 0) > 0).map((e) => (
-              <button key={e} type="button" onClick={() => (setEstado((x) => (x === e ? null : e)), setMas(false))} aria-pressed={estado === e} className={cn('flex h-9 shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold whitespace-nowrap', estado === e ? 'border-principal bg-principal text-principal-texto' : 'border-borde bg-superficie text-texto')}>
-                {ESTADO_TEXTO[e]}
-                <span className={cn('tabular-nums', estado === e ? 'text-principal-texto/80' : 'text-texto-suave')}>{resumen.porEstado[e]}</span>
-              </button>
+          {/* Filtros: qué es y qué hay que hacer. Se combinan; tocar el elegido lo saca. */}
+          <Fila etiqueta="Categoría">
+            {resumen.porCategoria.map((c) => (
+              <Filtro key={c.categoria} activo={categoria === c.categoria} n={c.cabezas} onClick={() => (setCategoria((x) => (x === c.categoria ? null : c.categoria)), setMas(false))}>
+                {categoriaNombre(c.categoria, 2)}
+              </Filtro>
             ))}
-          </div>
+          </Fila>
+          {FILTROS.some((e) => (resumen.porEstado[e] ?? 0) > 0) && (
+            <Fila etiqueta="Para hacer">
+              {FILTROS.filter((e) => (resumen.porEstado[e] ?? 0) > 0).map((e) => (
+                <Filtro key={e} activo={estado === e} n={resumen.porEstado[e]!} onClick={() => (setEstado((x) => (x === e ? null : e)), setMas(false))}>
+                  {ESTADO_TEXTO[e]}
+                </Filtro>
+              ))}
+            </Fila>
+          )}
         </motion.section>
 
         <motion.section {...entra(2)} aria-labelledby="hacienda-lista" className={cn(TARJETA, 'p-4')}>
           {filtrando ? (
             <>
-              <div className="flex items-start justify-between gap-3">
-                <Encabezado id="hacienda-lista" titulo={q ? `Caravana «${buscar.trim()}»` : estado ? ESTADO_TEXTO[estado] : (nombrePotrero ?? '')} bajada={`${lista.length.toLocaleString('es-AR')} ${lista.length === 1 ? 'animal' : 'animales'}${nombrePotrero && (q || estado) ? ` · ${nombrePotrero}` : ''}`} />
-                <button type="button" onClick={limpiar} className="mt-1 shrink-0 text-[14px] font-bold text-principal">
-                  Ver todo
-                </button>
+              <Encabezado id="hacienda-lista" titulo={`${lista.length.toLocaleString('es-AR')} ${lista.length === 1 ? 'animal' : 'animales'}`} bajada="Tocá uno para ver su ficha" />
+              {/* Lo que se está filtrando, a la vista: cada cosa con su × para sacarla. */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {q && <Activo onQuitar={() => setBuscar('')}>Caravana «{buscar.trim()}»</Activo>}
+                {potrero !== undefined && <Activo onQuitar={() => setPotrero(undefined)}>{nombrePotrero}</Activo>}
+                {categoria && <Activo onQuitar={() => setCategoria(null)}>{categoriaNombre(categoria, 2)}</Activo>}
+                {estado && <Activo onQuitar={() => setEstado(null)}>{ESTADO_TEXTO[estado]}</Activo>}
+                {[q, potrero !== undefined, categoria, estado].filter(Boolean).length > 1 && (
+                  <button type="button" onClick={limpiar} className="h-8 px-1 text-[13.5px] font-bold text-principal">
+                    Sacar todo
+                  </button>
+                )}
               </div>
               {lista.length === 0 ? (
                 <p className={cn(BAJADA, 'mt-3')}>{q ? 'No hay ningún animal con esa caravana.' : 'No hay animales acá.'}</p>
               ) : (
                 <ul className="mt-3 divide-y divide-borde">
-                  {visibles.map((it) => (it.tipo === 'animal' ? <FilaAnimal key={it.f.id} f={it.f} /> : <FilaGrupo key={it.g.key} g={it.g} />))}
+                  {visibles.map((it) => (it.tipo === 'animal' ? <FilaAnimal key={it.f.id} f={it.f} /> : <FilaGrupo key={it.g.key} g={it.g} abierto={abierto === it.g.key} onTocar={() => setAbierto((x) => (x === it.g.key ? null : it.g.key))} />))}
                 </ul>
               )}
               {items.length > MAX && (
@@ -163,31 +187,10 @@ export function HaciendaCelu() {
             </>
           ) : (
             <>
-              <Encabezado id="hacienda-lista" titulo="Por potrero" bajada="Tocá uno para ver sus animales" />
+              <Encabezado id="hacienda-lista" titulo="Por potrero" bajada="Tocá uno para ver qué tiene" />
               <ul className="mt-3 divide-y divide-borde">
                 {grupos.map((g) => (
-                  <li key={g.potreroId ?? 'sin'}>
-                    <button type="button" onClick={() => setPotrero(g.potreroId)} className="flex w-full items-center gap-3 py-3 text-left">
-                      <span className={cn('grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-2 text-[13px] font-extrabold', g.potreroId ? 'bg-superficie-hundida text-texto' : 'border-[1.5px] border-dashed border-acento text-acento-texto')}>
-                        {g.potreroId ? (g.donde ?? '').split(',')[0] : '?'}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-semibold text-texto">
-                          {g.porCategoria
-                            .slice(0, 2)
-                            .map((c) => `${c.n} ${c.categoria ? categoriaNombre(c.categoria, c.n).toLocaleLowerCase('es-AR') : 'sin categoría'}`)
-                            .join(', ')}
-                          {g.porCategoria.length > 2 ? '…' : ''}
-                        </span>
-                        <span className={BAJADA}>
-                          {g.potreroId ? (g.donde ?? '').split(', ').slice(1).join(', ') || 'Potrero' : 'Sin potrero'}
-                          {g.atender > 0 ? ` · ${g.atender} para atender` : ''}
-                        </span>
-                      </span>
-                      <span className={cn(MONTO, 'text-texto')}>{g.total}</span>
-                      <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
-                    </button>
-                  </li>
+                  <PotreroFila key={g.potreroId ?? 'sin'} g={g} abierto={abierto === `p-${g.potreroId}`} onTocar={() => setAbierto((x) => (x === `p-${g.potreroId}` ? null : `p-${g.potreroId}`))} onVer={() => (setPotrero(g.potreroId), setAbierto(null))} />
                 ))}
               </ul>
             </>
@@ -199,65 +202,157 @@ export function HaciendaCelu() {
   )
 }
 
-/** Un animal con caravana: se reconoce por el número; tocándolo, lo que se sabe de él. */
+/** Un animal con caravana: se reconoce por el número; tocándolo, su ficha. */
 function FilaAnimal({ f }: { f: FilaRodeo }) {
-  const [abierto, setAbierto] = useState(false)
-  const datos = [
-    ['Caravana electrónica', f.rfid],
-    ['Edad', f.edad],
-    ['Peso', f.peso],
-    ['Tacto', f.tacto],
-    ['Retiro', f.retiro],
-    ['Lo último', f.ultimoDato],
-  ].filter((x): x is [string, string] => !!x[1])
+  const navigate = useNavigate()
   return (
     <li className="py-3 first:pt-0 last:pb-0">
-      <button type="button" onClick={() => setAbierto((x) => !x)} aria-expanded={abierto} className="flex w-full items-center gap-3 text-left">
+      <button type="button" onClick={() => navigate(`/campo/hacienda/${f.id}`)} className="flex w-full items-center gap-3 text-left">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#f7e7bd] text-acento-texto">
           <Icono nombre="Caravana" tamano={16} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-semibold text-texto">{f.visual ?? f.rfid}</span>
-          <span className={cn(BAJADA, 'block truncate')}>
-            {f.queEs}
-            {f.donde ? ` · ${f.donde}` : ''}
-          </span>
+          <span className={cn(BAJADA, 'block truncate')}>{[f.queEs, f.donde, f.ultimoDato].filter(Boolean).join(' · ')}</span>
         </span>
         {f.estado !== 'nada' && <Chip estado={f.estado} />}
+        <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
+      </button>
+    </li>
+  )
+}
+
+/** Los sin caravana, juntos: se despliegan para ver cada uno y entrar a su ficha. */
+function FilaGrupo({ g, abierto, onTocar }: { g: GrupoSinCaravana; abierto: boolean; onTocar: () => void }) {
+  const navigate = useNavigate()
+  const [todos, setTodos] = useState(false)
+  const filas = todos ? g.filas : g.filas.slice(0, 20)
+  return (
+    <li className="py-3 first:pt-0 last:pb-0">
+      <button type="button" onClick={onTocar} aria-expanded={abierto} className="flex w-full items-center gap-3 text-left">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
+          <Icono nombre="Vaca" tamano={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold text-texto">
+            {g.n} {g.categoria ? categoriaNombre(g.categoria, g.n).toLocaleLowerCase('es-AR') : 'sin categoría'} sin caravana
+          </span>
+          <span className={cn(BAJADA, 'block truncate')}>{g.donde ?? 'Sin potrero'}</span>
+        </span>
+        {g.estado !== 'nada' && g.estado !== 'sinCaravana' && <Chip estado={g.estado} />}
+        <Icono nombre="Desplegar" tamano={16} className={cn('shrink-0 text-texto-suave transition-transform', abierto && 'rotate-180')} />
       </button>
       {abierto && (
-        <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 pl-12 text-[14px]">
-          {datos.length === 0 ? (
-            <dd className={cn(BAJADA, 'col-span-2')}>Todavía no hay datos de este animal.</dd>
-          ) : (
-            datos.map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="text-texto-suave">{k}</dt>
-                <dd className="truncate font-semibold text-texto">{v}</dd>
-              </div>
-            ))
+        <div className="mt-2 ml-12 rounded-[14px] bg-fondo">
+          <ul className="divide-y divide-borde">
+            {filas.map((f) => (
+              <li key={f.id}>
+                <button type="button" onClick={() => navigate(`/campo/hacienda/${f.id}`)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
+                  <span className="min-w-0 flex-1 truncate text-[14px] text-texto">
+                    <b className="font-semibold">{f.queEs}</b>
+                    {[f.edad, f.ultimoDato].filter(Boolean).length > 0 && <span className="text-texto-suave"> · {[f.edad, f.ultimoDato].filter(Boolean).join(' · ')}</span>}
+                  </span>
+                  <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {g.filas.length > 20 && (
+            <button type="button" onClick={() => setTodos((x) => !x)} className="flex w-full items-center justify-center gap-1.5 border-t border-borde py-2.5 text-[13.5px] font-bold text-principal">
+              {todos ? 'Ver menos' : `Ver los ${g.filas.length}`}
+              <Icono nombre="Desplegar" tamano={16} className={cn('transition-transform', todos && 'rotate-180')} />
+            </button>
           )}
-        </dl>
+        </div>
       )}
     </li>
   )
 }
 
-/** Los sin caravana, juntos: no hay cómo distinguir uno de otro. */
-function FilaGrupo({ g }: { g: GrupoSinCaravana }) {
+/** Un potrero: qué tiene en una línea; abierto, cada categoría y cuántos tienen caravana. */
+function PotreroFila({ g, abierto, onTocar, onVer }: { g: GrupoPotrero; abierto: boolean; onTocar: () => void; onVer: () => void }) {
+  const [nombre, ...resto] = (g.donde ?? '').split(', ')
   return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida text-texto-suave">
-        <Icono nombre="Vaca" tamano={16} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-semibold text-texto">
-          {g.n} {g.categoria ? categoriaNombre(g.categoria, g.n).toLocaleLowerCase('es-AR') : 'sin categoría'} sin caravana
+    <li className="py-3 first:pt-0 last:pb-0">
+      <button type="button" onClick={onTocar} aria-expanded={abierto} className="flex w-full items-center gap-3 text-left">
+        <span className={cn('grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-2 text-[13px] font-extrabold', g.potreroId ? 'bg-superficie-hundida text-texto' : 'border-[1.5px] border-dashed border-acento text-acento-texto')}>{g.potreroId ? nombre : '?'}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold text-texto">
+            {g.total.toLocaleString('es-AR')} {g.total === 1 ? 'animal' : 'animales'}
+            {g.potreroId ? '' : ' sin potrero'}
+          </span>
+          <span className={cn(BAJADA, 'block truncate')}>
+            {[
+              g.porCategoria
+                .slice(0, 2)
+                .map((c) => `${c.n.toLocaleString('es-AR')} ${c.categoria ? categoriaNombre(c.categoria, c.n).toLocaleLowerCase('es-AR') : 'sin categoría'}`)
+                .join(', ') + (g.porCategoria.length > 2 ? '…' : ''),
+              resto.join(', '),
+              g.atender > 0 ? `${g.atender} para atender` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
         </span>
-        <span className={cn(BAJADA, 'block truncate')}>{g.donde ?? 'Sin potrero'}</span>
-      </span>
-      {g.estado !== 'nada' && g.estado !== 'sinCaravana' && <Chip estado={g.estado} />}
+        <Icono nombre="Desplegar" tamano={16} className={cn('shrink-0 text-texto-suave transition-transform', abierto && 'rotate-180')} />
+      </button>
+      {abierto && (
+        <div className="mt-3 ml-12 flex flex-col gap-3">
+          <span className="flex h-2 w-full gap-[2px] overflow-hidden rounded-full">
+            {g.porCategoria.map((c) => (
+              <span key={c.categoria ?? 'sin'} style={{ flexGrow: c.n, background: (c.categoria && COLOR[c.categoria]) || OTRO }} />
+            ))}
+          </span>
+          <ul className="flex flex-col gap-1.5">
+            {g.porCategoria.map((c) => (
+              <li key={c.categoria ?? 'sin'} className="flex items-center gap-2 text-[14px] text-texto">
+                <span className="size-2.5 rounded-[3px]" style={{ background: (c.categoria && COLOR[c.categoria]) || OTRO }} />
+                <span className="flex-1">{c.categoria ? categoriaNombre(c.categoria, c.n) : 'Sin categoría'}</span>
+                <b className="tabular-nums">{c.n.toLocaleString('es-AR')}</b>
+              </li>
+            ))}
+          </ul>
+          <p className={BAJADA}>
+            {g.conCaravana.toLocaleString('es-AR')} con caravana · {(g.total - g.conCaravana).toLocaleString('es-AR')} sin caravana
+          </p>
+          <button type="button" onClick={onVer} className="flex h-9 items-center justify-center gap-1.5 self-start rounded-full border-[1.5px] border-principal/55 px-4 text-[13.5px] font-bold text-principal">
+            Ver sus animales
+            <Icono nombre="Siguiente" tamano={16} />
+          </button>
+        </div>
+      )}
     </li>
+  )
+}
+
+/** Una fila de filtros que se desliza de costado, con su nombre a la izquierda. */
+function Fila({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className={cn(BAJADA, 'font-semibold')}>{etiqueta}</span>
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">{children}</div>
+    </div>
+  )
+}
+
+function Filtro({ activo, n, onClick, children }: { activo: boolean; n: number; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={activo} className={cn('flex h-9 shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-[13.5px] font-bold whitespace-nowrap', activo ? 'border-principal bg-principal text-principal-texto' : 'border-borde bg-superficie text-texto')}>
+      {children}
+      <span className={cn('tabular-nums', activo ? 'text-principal-texto/80' : 'text-texto-suave')}>{n.toLocaleString('es-AR')}</span>
+    </button>
+  )
+}
+
+/** Un filtro puesto: se ve qué se está mirando y se saca con la ×. */
+function Activo({ onQuitar, children }: { onQuitar: () => void; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-8 items-center gap-1 rounded-full bg-principal-suave pr-1 pl-3 text-[13.5px] font-bold text-principal">
+      {children}
+      <button type="button" onClick={onQuitar} aria-label={`Sacar «${typeof children === 'string' ? children : 'filtro'}»`} className="grid size-6 place-items-center rounded-full">
+        <Icono nombre="Cerrar" tamano={16} className="size-3.5" />
+      </button>
+    </span>
   )
 }
 

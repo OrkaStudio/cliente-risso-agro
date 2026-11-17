@@ -29,7 +29,7 @@ const NAV: { to: string; label: string; icono: NombreIcono; end: boolean }[] = [
   // La Recorrida sale de la barra (Lau, 17/11): lo que se ve en el campo se manda por audio.
   // La Manga vuelve después del lanzamiento (Lau, 16/11: sin bastón todavía).
   { to: '/campo/campos', label: 'Campos', icono: 'Campos', end: false },
-  { to: '/campo/hacienda', label: 'Hacienda', icono: 'Vaca', end: false },
+  { to: '/campo/hacienda', label: 'Hacienda', icono: 'Hacienda', end: false },
   { to: '/campo/plata', label: 'Plata', icono: 'Plata', end: false },
 ]
 

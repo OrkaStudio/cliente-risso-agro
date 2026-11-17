@@ -86,6 +86,7 @@ const RecorridaPage = lazy(() =>
   })),
 )
 const CamposCelu = lazy(() => import('@/features/campo/campos-celu').then((m) => ({ default: m.CamposCelu })))
+const AnimalCelu = lazy(() => import('@/features/campo/animal-celu').then((m) => ({ default: m.AnimalCelu })))
 const HaciendaCelu = lazy(() => import('@/features/campo/hacienda-celu').then((m) => ({ default: m.HaciendaCelu })))
 const PlataPage = lazy(() =>
   import('@/features/campo/plata-celu').then((m) => ({
@@ -254,6 +255,7 @@ export const router = createBrowserRouter([
                   { path: 'campo/campos', element: <CamposCelu /> },
                   { path: 'campo/campos/:id', element: <CamposCelu /> },
                   { path: 'campo/hacienda', element: <HaciendaCelu /> },
+                  { path: 'campo/hacienda/:id', element: <AnimalCelu /> },
                   // El Historial se reemplazó por «Lo que cargaste» en Hoy (Lau, 16/11).
                   { path: 'campo/historial', element: <Navigate to="/campo" replace /> },
                   ],
