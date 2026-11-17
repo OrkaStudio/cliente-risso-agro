@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -35,7 +35,8 @@ const DETALLES = ['Gasoil', 'Repuestos', 'Veterinaria', 'Ferretería', 'Flete', 
  * chips-con-valor que abren hoja) y opcionales (foto · detalle · efectivo ·
  * transf · voz). "Otra vez lo mismo" repite la última carga en un toque.
  */
-export function PlataPage() {
+/** `onCerrar`: abierto desde la Plata del celular, como una hoja con su ×. `conFoto`: arranca pidiendo la foto del comprobante. */
+export function PlataPage({ onCerrar, conFoto = false }: { onCerrar?: () => void; conFoto?: boolean } = {}) {
   const p = usePlata()
 
   if (p.cargando) {
@@ -70,9 +71,14 @@ export function PlataPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-md flex-col">
+    <div className="plata-nueva mx-auto flex h-full w-full max-w-md flex-col">
       {/* ===== Barra: señal · hoy · cola ===== */}
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 py-2">
+        {onCerrar && (
+          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="grid size-9 shrink-0 place-items-center rounded-full text-[var(--c-ink)]">
+            <X className="size-5" />
+          </button>
+        )}
         <div className="flex items-center gap-2">
           {p.online ? (
             <Wifi className="size-4 text-[var(--c-ok-deep)]" strokeWidth={2.5} />
@@ -131,14 +137,14 @@ export function PlataPage() {
         </div>
       )}
 
-      <PlataForm p={p} />
+      <PlataForm p={p} conFoto={conFoto} />
     </div>
   )
 }
 
 type Hoja = null | 'categoria' | 'campo'
 
-function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
+function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: boolean }) {
   const [tipo, setTipo] = useState<TipoMov>('gasto')
   const [monto, setMonto] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
@@ -155,6 +161,10 @@ function PlataForm({ p }: { p: ReturnType<typeof usePlata> }) {
   const [hoja, setHoja] = useState<Hoja>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Abierto con «Con la foto»: la cámara de una.
+  useEffect(() => {
+    if (conFoto) fileRef.current?.click()
+  }, [conFoto])
 
   const montoNum = Number(monto)
   const categorias = p.categorias.filter(

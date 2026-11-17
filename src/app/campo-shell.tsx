@@ -12,7 +12,7 @@ import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
-import { cargaDeRuta, nivelDe, puedeCargar } from '@/features/empresa/secciones'
+import { entraEnCelular, nivelDe } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 
 /**
@@ -79,14 +79,15 @@ export function CampoShell() {
   // que vive acá y no adentro de ninguno de los dos.
   const seed = useSeedOffline()
   const [detalleAbierto, setDetalleAbierto] = useState(false)
-  // Hoy trae su propia cabecera (la foto, el campo y la cuenta).
-  const enHoy = useLocation().pathname === '/campo'
+  // Hoy y Plata traen su propia cabecera (la marca, el campo y la cuenta).
+  const ruta = useLocation().pathname
+  const enHoy = ruta === '/campo' || ruta.startsWith('/campo/plata')
   const mapaPendiente = useMapaPendiente()
   // Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos.
   // Mandar un audio: quien carga algo de los campos o la plata (lo demás no se carga por WhatsApp).
   const manda = (sec: 'campos' | 'plata') => ['carga', 'solo_manda'].includes(nivelDe(membresia, sec))
   const puedeMandar = manda('campos') || manda('plata')
-  const navegables = NAV.filter(({ to }) => { const s = cargaDeRuta(to); return !s || puedeCargar(membresia, s) })
+  const navegables = NAV.filter(({ to }) => { return entraEnCelular(membresia, to) })
 
   return (
     <div className="campo relative flex h-full flex-col overflow-hidden">

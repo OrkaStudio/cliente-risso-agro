@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { registrar } from '@/lib/telemetria'
 import { useIsMobile } from '@/lib/use-is-mobile'
 
-// Store externo mínimo (idioma de lib/campo-mode): la burbuja del asistente,
+// Store externo mínimo (useSyncExternalStore): la burbuja del asistente,
 // la invitación, la misión en curso y la pastilla viven en árboles distintos
 // del AppShell → sin prop-drilling.
 const listeners = new Set<() => void>()
