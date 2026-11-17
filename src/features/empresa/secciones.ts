@@ -120,6 +120,9 @@ export function cargaDeRuta(path: string): Seccion | null {
  * teclado) o quien la ve (los números); lo demás, quien carga esa sección.
  */
 export function entraEnCelular(m: Membresia | null | undefined, path: string): boolean {
+  // Campos y Hacienda en el celular son para mirar: los abre quien los ve.
+  if (path.startsWith('/campo/campos')) return puedeVer(m, 'campos')
+  if (path.startsWith('/campo/hacienda')) return puedeVer(m, 'hacienda')
   const s = cargaDeRuta(path)
   if (!s) return true
   return puedeCargar(m, s) || (s === 'plata' && veePlata(m))

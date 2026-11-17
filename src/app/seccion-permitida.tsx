@@ -14,7 +14,7 @@ export function SeccionPermitida() {
   const destino = primeraRuta(membresia)
   // En el Modo Campo cada pantalla es para cargar: sin ese permiso, vuelve a Hoy.
   const carga = cargaDeRuta(pathname)
-  if (membresia && carga && !entraEnCelular(membresia, pathname)) return <Navigate to="/campo" replace />
+  if (membresia && pathname.startsWith('/campo/') && !entraEnCelular(membresia, pathname)) return <Navigate to="/campo" replace />
   if (membresia && seccion && !carga && !puedeVer(membresia, seccion) && destino !== pathname) return <Navigate to={destino} replace />
   return <Outlet />
 }
