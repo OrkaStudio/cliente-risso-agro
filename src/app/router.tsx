@@ -124,6 +124,12 @@ const LegalesPage = lazy(() =>
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
+const AnimacionesMuestra = lazy(() =>
+  import('@/components/tropero/animaciones-muestra').then((m) => ({ default: m.AnimacionesMuestra })),
+)
+const MarcaMuestra = lazy(() =>
+  import('@/components/tropero/marca-muestra').then((m) => ({ default: m.MarcaMuestra })),
+)
 
 export const router = createBrowserRouter([
   // Sólo en desarrollo: los componentes de Troppero juntos (/estilo).
@@ -131,6 +137,8 @@ export const router = createBrowserRouter([
     ? [
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
+        { path: '/estilo/animaciones', element: <Suspense fallback={null}><AnimacionesMuestra /></Suspense> },
+        { path: '/estilo/marca', element: <Suspense fallback={null}><MarcaMuestra /></Suspense> },
       ]
     : []),
   // Acceso (A1–A5): se entra con un código por WhatsApp, sin contraseñas. Comparten la foto
