@@ -1,9 +1,33 @@
 import postgres from 'npm:postgres@3.4.5'
 import * as db from '../../../functions/wa-webhook/db.ts'
+import { lecturasDelTurno } from '../../../functions/wa-webhook/lecturas-turno.ts'
+import { permisosDe } from '../../../functions/_shared/wa/permisos.ts'
 import { ddmm, hoyAR, inicioSemana, sumarDias } from '../../../functions/_shared/wa/texto.ts'
 import type { InfraNueva } from '../../../functions/_shared/wa/tipos.ts'
 
 if (Deno.env.get('WA_QA_LOCAL_DB') !== '1' || !Deno.env.get('SUPABASE_DB_URL')?.includes('@127.0.0.1:55442/postgres')) throw Error('Sólo base local descartable')
+function facturaPdfQA(): Uint8Array {
+  const lineas = ['Factura A', 'Cod. 01', 'Razon Social: Veterinaria QA', 'CUIT: 20-12345678-9',
+    'Comp. Nro: 00001-00000023', 'Fecha de Emision: 12/11/2026', 'Importe Neto Gravado: $ 10.000,00', 'Importe Total: $ 12.100,00']
+  const contenido = 'BT /F1 12 Tf 50 780 Td 18 TL\n' + lineas.map((linea, i) => `${i ? 'T* ' : ''}(${linea}) Tj`).join('\n') + '\nET\n'
+  const objetos = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${contenido.length} >>\nstream\n${contenido}endstream`,
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = objetos.map((o, i) => {
+    const offset = pdf.length
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`
+    return String(offset).padStart(10, '0') + ' 00000 n \n'
+  })
+  const xref = pdf.length
+  pdf += `xref\n0 6\n0000000000 65535 f \n${offsets.join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return new TextEncoder().encode(pdf)
+}
+
 const admin = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, onnotice: () => {} })
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const E1 = id(1), E2 = id(2), U1 = id(11), U2 = id(12), C1 = id(21), C2 = id(22), P8 = id(31), P9 = id(32), PX = id(33), V1 = id(41), V2 = id(42)
@@ -19,7 +43,9 @@ const v1: db.Vinculo = { id: V1, telefono: '5491111111101', user_id: U1, empresa
 const v2: db.Vinculo = { ...v1, id: V2, telefono: '5491111111102', user_id: U2, empresa_id: E2 }
 for (const v of [v1, v2]) await admin`insert into wa_vinculo (id,telefono,user_id,empresa_id) values (${v.id},${v.telefono},${v.user_id},${v.empresa_id})`
 
-const assert = (ok: unknown, m = 'Assertion falló') => { if (!ok) throw Error(m) }
+function assert(ok: unknown, mensaje = 'Assertion falló'): asserts ok {
+  if (!ok) throw Error(mensaje)
+}
 let fail = 0
 async function test(caso: string, run: () => Promise<void>) { try { await run(); console.log('PASA', caso) } catch (e) { fail++; console.error('FALLA', caso, e) } }
 async function denied(run: () => Promise<unknown>) { let rejected = false; try { await run() } catch { rejected = true } assert(rejected, 'Debía rechazarse') }
@@ -69,18 +95,30 @@ await test('Mapa: infraestructura, cabezas activas y recorrida sólo si el campo
 await admin`delete from infraestructura`
 
 await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctrico por borde, tranquera pegada y baja', async () => {
-  for (const [k, val] of [['WA_APP_SECRET', 'qa_local_secret'], ['WA_TOKEN', 'qa_local_token'], ['WA_PHONE_NUMBER_ID', 'qa_local_phone'], ['ANTHROPIC_API_KEY', 'qa_local'], ['OPENAI_API_KEY', 'qa_local']]) Deno.env.set(k, val)
+  const modeloReal = Deno.env.get('WA_QA_MODELO_REAL') === '1'
+  for (const [k, val] of [['WA_APP_SECRET', 'qa_local_secret'], ['WA_TOKEN', 'qa_local_token'], ['WA_PHONE_NUMBER_ID', 'qa_local_phone'], ['OPENAI_API_KEY', 'qa_local']]) Deno.env.set(k, val)
+  if (!modeloReal) Deno.env.set('ANTHROPIC_API_KEY', 'qa_local')
   let handler: ((r: Request) => Promise<Response>) | undefined
   const originalServe = Deno.serve, originalFetch = globalThis.fetch
   Deno.serve = ((fn: unknown) => { handler = fn as typeof handler; return {} }) as typeof Deno.serve
   const salida: { to?: string; type?: string; interactive?: { body?: { text?: string }; action?: { buttons?: { reply: { id: string } }[]; sections?: { rows: { id: string }[] }[] } }; text?: { body: string }; image?: { caption: string } }[] = []
   let seq = 0
   let interpretarComo: Record<string, unknown> | null = null
+  const interpretacionesReales: number[] = []
+  const usoLecturas: { herramienta: string; estado: string }[] = []
+  let tokensEnsayo = 0
+  let simularLecturas = false
+  let simularPotreroAmbiguo = false
+  const redaccionesReales: { status: number; texto: string | null }[] = []
+  let redactarComo: ((datos: { historial: unknown[] }) => string) | null = null
   let fallarRespuesta = false
   let transcripcionQA = ''
   let estadoLectorQA = 200
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.endsWith('/qa-factura')) return Response.json({ url: 'https://qa.invalid/factura.pdf', mime_type: 'application/pdf' })
+    if (url === 'https://qa.invalid/factura.pdf') return new Response(new Blob([facturaPdfQA() as Uint8Array<ArrayBuffer>]))
+    if (url.endsWith('/qa-pdf')) return new Response('', { status: 404 })
     if (url.endsWith('/qa-foto')) return Response.json({ url: 'https://qa.invalid/foto.jpg', mime_type: 'image/jpeg' })
     if (url === 'https://qa.invalid/foto.jpg') return new Response(new Uint8Array([255, 216, 255, 217]))
     if (url.endsWith('/functions/v1/extraer-comprobante')) return Response.json({ monto: null }, { status: estadoLectorQA })
@@ -95,6 +133,60 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
       return Response.json({ messages: [{ id: 'qa-out-' + (++seq) }] })
     }
     if (url.includes('arcgisonline.com')) return new Response('', { status: 503 })
+    if (url === 'https://api.anthropic.com/v1/messages' && (modeloReal || simularLecturas)) {
+      const pedido = JSON.parse(String(init?.body))
+      const ultima = pedido.messages.at(-1)?.content
+      if (Array.isArray(ultima)) {
+        const anterior = pedido.messages.at(-2)?.content ?? []
+        for (const resultado of ultima) {
+          const llamada = anterior.find((b: { id?: string }) => b.id === resultado.tool_use_id)
+          if (llamada?.name === 'resolver_potrero' || llamada?.name === 'consultar_stock') {
+            usoLecturas.push({ herramienta: llamada.name, estado: JSON.parse(resultado.content).estado })
+          }
+        }
+      }
+      if (simularLecturas && pedido.tools && interpretarComo) {
+        const expuesta = pedido.tools.some((h: { name: string }) => h.name === 'consultar_stock')
+        if (expuesta && pedido.tool_choice.type === 'auto') {
+          if (!Array.isArray(ultima)) return Response.json({ stop_reason: 'tool_use', content: [
+            { type: 'tool_use', id: 'resolver-qa', name: 'resolver_potrero', input: simularPotreroAmbiguo ? { potrero: '9B' } : { potrero: '9B', campo: 'La Porteña' } },
+          ] })
+          const resultado = JSON.parse(ultima[0].content)
+          if (resultado.estado === 'resuelto') return Response.json({ stop_reason: 'tool_use', content: [
+            { type: 'tool_use', id: 'stock-qa', name: 'consultar_stock', input: { referencia: resultado.referencia } },
+          ] })
+          if (simularPotreroAmbiguo) {
+            assert(resultado.estado === 'ambiguo' && resultado.opciones.length === 2, 'Se eligió un potrero ambiguo.')
+          } else {
+            assert(resultado.estado === 'verificado' && resultado.total === 2
+              && resultado.categorias[0]?.categoria === 'vaca', 'El modelo no recibió el stock real del potrero.')
+          }
+        }
+        return Response.json({ stop_reason: 'tool_use', content: [{ type: 'tool_use', input: interpretarComo }] })
+      }
+    }
+    if (url === 'https://api.anthropic.com/v1/messages' && modeloReal) {
+      const pedido = JSON.parse(String(init?.body))
+      const respuesta = await originalFetch(input, init)
+      if (pedido.tools) {
+        interpretacionesReales.push(respuesta.status)
+        if (respuesta.ok) {
+          const { usage } = await respuesta.clone().json()
+          tokensEnsayo += (usage?.input_tokens ?? 0) + (usage?.output_tokens ?? 0)
+        }
+      } else {
+        const datos = respuesta.ok ? await respuesta.clone().json() : null
+        const texto = datos?.content?.find((bloque: { type: string }) => bloque.type === 'text')?.text ?? null
+        redaccionesReales.push({ status: respuesta.status, texto })
+      }
+      return respuesta
+    }
+    if (url.includes('api.anthropic.com') && redactarComo) {
+      const pedido = JSON.parse(String(init?.body))
+      if (!pedido.tools) return Response.json({ stop_reason: 'end_turn', content: [{
+        type: 'text', text: redactarComo(JSON.parse(pedido.messages[0].content)),
+      }] })
+    }
     if (url.includes('api.anthropic.com') && interpretarComo) return Response.json({ content: [{ type: 'tool_use', input: interpretarComo }], stop_reason: 'tool_use' })
     if (url.includes('api.anthropic.com')) return new Response(null, { status: 401 })
     throw Error('Red externa no permitida en QA: ' + url)
@@ -120,6 +212,318 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
     const ubic = (v: db.Vinculo, lat: number, lng: number) => firmar(v, { type: 'location', location: { latitude: lat, longitude: lng } })
     const botones = (out: typeof salida) => out.flatMap(o => [...(o.interactive?.action?.buttons?.map(b => b.reply.id) ?? []), ...(o.interactive?.action?.sections?.flatMap(s => s.rows.map(r => r.id)) ?? [])])
     const textos = (out: typeof salida) => out.map(o => o.text?.body ?? o.interactive?.body?.text ?? o.image?.caption ?? '').join(' | ')
+
+    await test('Lecturas de turno: aislamiento, ambigüedad, referencia y permisos', async () => {
+      const contexto = { ...await db.contexto(v1, hoyAR()), permisos: (await db.permisosVinculados(v1))! }
+      const lecturas = lecturasDelTurno(contexto, b => db.hacienda(v1, b))
+      assert(lecturas.resolverPotrero({ potrero: '9B', campo: 'Campo Ajeno' }).estado === 'no_encontrado')
+      assert((await lecturas.consultarStock({ referencia: 1 })).estado === 'referencia_invalida')
+      const otroCampo = { id: C2, nombre: 'Otro campo QA', potreros: [{ id: PX, nombre: '9B' }] }
+      const varios = lecturasDelTurno({ ...contexto, campos: [...contexto.campos, otroCampo] }, () => {
+        throw Error('Una referencia ambigua no debe leer stock.')
+      })
+      assert(varios.resolverPotrero({ potrero: '9B' }).estado === 'ambiguo')
+      const limitado = lecturasDelTurno({ ...contexto, permisos: permisosDe({
+        rol: 'invitado', acceso: 'whatsapp', niveles: { hacienda: 'solo_manda', campos: 'solo_manda' }, secciones: null,
+      }) }, () => { throw Error('Un vínculo sin acceso no debe leer stock.') })
+      assert(!limitado.herramientas.length && limitado.resolverPotrero({ potrero: '9B' }).estado === 'sin_permiso'
+        && (await limitado.consultarStock({ referencia: 1 })).estado === 'sin_permiso')
+      let intentos = 0
+      const recuperable = lecturasDelTurno(contexto, async b => {
+        if (++intentos === 1) throw Error('Fallo local de lectura.')
+        return await db.hacienda(v1, b)
+      })
+      const resuelto = recuperable.resolverPotrero({ potrero: '9B' })
+      assert('referencia' in resuelto && resuelto.referencia === 1)
+      assert((await recuperable.consultarStock({ referencia: 1 })).estado === 'no_disponible')
+      const stock = await recuperable.consultarStock({ referencia: 1 })
+      assert('total' in stock && stock.total === 2)
+      const filas = await recuperable.stockVerificado({ tipo: 'consulta_hacienda', campoId: C1, potreroId: P9 })
+      assert(filas?.[0]?.cabezas === 2 && intentos === 2)
+    })
+
+    const variableLecturas = 'WA_LECTURAS_TURNO_EMPRESAS'
+    const limpiarConversacion = async () => {
+      await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${V1}`
+      await admin`delete from captura where empresa_id=${E1} and user_id=${U1}`
+      await admin`delete from wa_mensaje where empresa_id=${E1} and vinculo_id=${V1}`
+    }
+    for (const modo of ['actual', 'con_herramientas'] as const) {
+      await test('Comparación de recorrida firmada: ' + modo, async () => {
+        const hoy = hoyAR()
+        const limpiar = async () => {
+          await limpiarConversacion()
+          await admin`delete from lluvia where empresa_id=${E1} and fecha=${hoy} and mm=23`
+          await admin`delete from observacion_potrero where potrero_id in (${P8},${P9}) and recorrida_id in
+            (select id from recorrida where empresa_id=${E1} and fecha=${hoy})`
+        }
+        const env = variableLecturas
+        const previo = Deno.env.get(env)
+        if (modo === 'con_herramientas') Deno.env.set(env, E1)
+        else Deno.env.delete(env)
+        const observacion = 'Pasé por el 9B y estaba casi vacío el bebedero'
+        const consulta = '¿Cuántas cabezas figuran ahí?'
+        const lluvia = 'De paso, anotá 23 milímetros en La Porteña'
+        const antes = usoLecturas.length
+        const tokensAntes = tokensEnsayo
+        try {
+          await limpiar()
+          const stock = JSON.stringify(await db.hacienda(v1, { tipo: 'consulta_hacienda', campoId: C1, potreroId: P9 }))
+          transcripcionQA = `${observacion}. ${consulta} ${lluvia}.`
+          simularLecturas = !modeloReal
+          if (!modeloReal) interpretarComo = { pedidos: [
+            { intent: 'novedad', fragmento: observacion, observaciones: [{ potrero: '9B', agua: 'baja' }] },
+            { intent: 'consulta_hacienda', fragmento: consulta, potrero: null },
+            { intent: 'lluvia', fragmento: lluvia, mm: 23, campo: 'La Porteña' },
+          ] }
+          const inicio = performance.now()
+          const recibido = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+          console.log(JSON.stringify({ modo, modeloReal, msPrimerTurno: Math.round(performance.now() - inicio),
+            tokensPrimerTurno: modeloReal ? tokensEnsayo - tokensAntes : null, lecturas: usoLecturas.slice(antes) }))
+          assert(textos(recibido).includes('2 cabezas') && textos(recibido).includes('9B de La Porteña')
+            && textos(recibido).includes('23 mm'), textos(recibido))
+          const viejo = botones(recibido).find(x => x.includes('|si='))
+          assert(viejo)
+          assert(modo === 'actual' ? usoLecturas.length === antes : usoLecturas.slice(antes).some(
+            r => r.herramienta === 'consultar_stock' && r.estado === 'verificado'),
+            'El ensayo tiene que ejecutar el camino de herramientas sólo cuando está habilitado.')
+          interpretarComo = null
+          const correccion = await texto(v1, 'Lo del bebedero era en el 8B')
+          const aceptar = botones(correccion).find(x => x.includes('|si='))
+          assert(aceptar && aceptar !== viejo && textos(correccion).includes('del 9B al 8B'), textos(correccion))
+          await boton(v1, viejo)
+          const primero = await boton(v1, aceptar)
+          const aceptarLluvia = botones(primero).find(x => x.includes('|si='))
+          assert(aceptarLluvia, textos(primero))
+          await boton(v1, aceptarLluvia)
+          await boton(v1, aceptarLluvia)
+          const filas = await admin`select o.potrero_id, o.agua::text from observacion_potrero o
+            join recorrida r on r.id=o.recorrida_id where r.empresa_id=${E1} and r.fecha=${hoy}`
+          assert(filas.length === 1 && filas[0].potrero_id === P8 && filas[0].agua === 'baja')
+          const lluvias = await admin`select campo_id from lluvia where empresa_id=${E1} and fecha=${hoy} and mm=23`
+          assert(lluvias.length === 1 && lluvias[0].campo_id === C1)
+          assert(stock === JSON.stringify(await db.hacienda(v1, { tipo: 'consulta_hacienda', campoId: C1, potreroId: P9 })))
+        } finally {
+          if (previo === undefined) Deno.env.delete(env)
+          else Deno.env.set(env, previo)
+          simularLecturas = false
+          interpretarComo = null
+          transcripcionQA = ''
+          await limpiar()
+        }
+      })
+      await test('Comparación con dos potreros del mismo nombre: ' + modo, async () => {
+        const campo = id(1301)
+        const potrero = id(1302)
+        const previa = Deno.env.get(variableLecturas)
+        if (modo === 'con_herramientas') Deno.env.set(variableLecturas, E1)
+        else Deno.env.delete(variableLecturas)
+        const consulta = '¿Cuántas vacas figuran en el 9B?'
+        const novedad = 'Encontré una tranquera arrancada en el 8B de La Porteña'
+        const antes = usoLecturas.length
+        const tokensAntes = tokensEnsayo
+        try {
+          await limpiarConversacion()
+          await admin`insert into campo values (${campo},${E1},'Palo Blanco')`
+          await admin`insert into potrero (id,empresa_id,campo_id,nombre) values (${potrero},${E1},${campo},'9B')`
+          simularLecturas = simularPotreroAmbiguo = !modeloReal
+          if (!modeloReal) interpretarComo = { pedidos: [
+            { intent: 'consulta_hacienda', fragmento: consulta, potrero: '9B', categoria_animal: 'vaca' },
+            { intent: 'novedad', fragmento: novedad, observaciones: [{ campo: 'La Porteña', potrero: '8B', novedad: 'Tranquera arrancada' }] },
+          ] }
+          transcripcionQA = `${consulta} ${novedad}.`
+          const inicio = performance.now()
+          const recibido = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+          console.log(JSON.stringify({ modo, caso: 'potrero_ambiguo', modeloReal, msPrimerTurno: Math.round(performance.now() - inicio),
+            tokensPrimerTurno: modeloReal ? tokensEnsayo - tokensAntes : null, lecturas: usoLecturas.slice(antes) }))
+          const pendiente = (await db.vinculoDe(v1.telefono))?.pendiente
+          assert(pendiente?.tipo === 'turno' && pendiente.pasos.length === 2
+            && pendiente.pasos.some(x => x.pendiente.borrador.tipo === 'consulta_hacienda' && !x.pendiente.borrador.potreroId)
+            && pendiente.pasos.some(x => x.pendiente.borrador.tipo === 'recorrida'
+              && x.pendiente.borrador.observaciones?.some(o => o.potreroId === P8 && o.novedad?.toLowerCase().includes('tranquera'))),
+            textos(recibido))
+          assert(!/\b(?:0|2)\s+vacas\b/.test(textos(recibido)), textos(recibido))
+          assert(modo === 'actual' ? usoLecturas.length === antes : usoLecturas.slice(antes).some(
+            r => r.herramienta === 'resolver_potrero' && r.estado === 'ambiguo'), 'La herramienta debe detectar los nombres duplicados.')
+        } finally {
+          simularLecturas = simularPotreroAmbiguo = false
+          interpretarComo = null
+          transcripcionQA = ''
+          if (previa === undefined) Deno.env.delete(variableLecturas)
+          else Deno.env.set(variableLecturas, previa)
+          await limpiarConversacion()
+          await admin`delete from potrero where id=${potrero}`
+          await admin`delete from campo where id=${campo}`
+        }
+      })
+    }
+
+    if (modeloReal) {
+
+      await test('Audio real transcripto: conectores, tres pedidos y nota abierta recuperable', async () => {
+        try {
+          await limpiarConversacion()
+          transcripcionQA = 'Anotá una lluvia de 10 milímetros en el potrero 8B de La Porteña. Después, en el potrero del noveno B se encontró el eléctrico cortado y el molino no anda. y después, mostrame de cerca el mapa del potrero 9B.'
+          const recibido = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+          const resumen = recibido.filter(m => m.type !== 'image')
+          assert(resumen.length === 1 && recibido[0] === resumen[0] && recibido.at(-1)?.type === 'image', textos(recibido))
+          assert(textos(resumen).includes('10 mm') && textos(resumen).includes('eléctrico cortado')
+            && /molino/i.test(textos(resumen)) && !textos(resumen).includes('Me quedó por aclarar'), textos(resumen))
+          await limpiarConversacion()
+          transcripcionQA = ''
+          const mensaje = 'Dejame guardado que el encargado tiene la llave del galpón en su casa.'
+          const nota = await texto(v1, mensaje)
+          const pendiente = (await db.vinculoDe(v1.telefono))?.pendiente
+          assert(pendiente?.tipo === 'propuesta' && pendiente.borrador.tipo === 'nota', textos(nota))
+          const guardar = botones(nota).find(b => b.includes('|si'))
+          assert(guardar, textos(nota))
+          const respuesta = await boton(v1, guardar)
+          assert(textos(respuesta).includes('Guardé la nota'), textos(respuesta))
+          assert((await db.cargasRecientes(v1, null)).some(c => c.tipo === 'nota' && c.contenido === mensaje))
+        } finally {
+          transcripcionQA = ''
+          await limpiarConversacion()
+        }
+      })
+
+      await test('Charla diaria con modelo real: saludo, mapa y campos de la cuenta', async () => {
+        for (const saludo of ['Hola', 'Buenas, ¿cómo andás?']) {
+          const mapa = await texto(v1, 'Acercá el 9B')
+          assert(mapa.some(m => m.type === 'image'), textos(mapa))
+          const cantidadRedacciones = redaccionesReales.length
+          const dialogo = await texto(v1, saludo)
+          const redaccion = redaccionesReales.at(-1)
+          const salida = textos(dialogo)
+          assert(redaccionesReales.length > cantidadRedacciones && redaccion?.status === 200 && redaccion.texto?.trim() === salida,
+            'La respuesta del saludo tiene que salir del modelo real.')
+          assert(dialogo.length === 1 && /\b(?:hola|buenas|bien|como|todo)\b/i.test(salida)
+            && !/\b(?:9B|potrero|satelite|satélite|mapa|mandame un audio)\b/i.test(salida), salida)
+          const doble = await texto(v1, 'Quiero ver el potrero 9b con el satélite y saber que tengo ahí adentro')
+          assert(doble.some(m => m.type === 'image' && m.image?.caption.includes('9B'))
+            && doble.some(m => m.type === 'text' && m.text?.body.includes('2 cabezas')), textos(doble))
+          const cantidadInterpretadas = interpretacionesReales.length
+          const campos = await texto(v1, '¿Podrías enumerar los establecimientos de esta cuenta?')
+          assert(interpretacionesReales.length > cantidadInterpretadas && interpretacionesReales.at(-1) === 200,
+            'La paráfrasis tiene que pasar por el intérprete real.')
+          assert(textos(campos).includes('La Porteña') && !textos(campos).includes('Campo Ajeno') && !botones(campos).length, textos(campos))
+        }
+        const estado = await db.vinculoDe(v1.telefono)
+        assert(!estado?.pendiente && !(await admin`select 1 from lluvia where empresa_id=${E1}`).length
+          && !(await admin`select 1 from movimiento_financiero where empresa_id=${E1}`).length, 'La charla de consultas dejó una carga.')
+      })
+      await test('Asistente de recorrida con modelo real: audio y corrección de ubicación', async () => {
+        const antes = interpretacionesReales.length
+        transcripcionQA = 'En el 9B vi el bebedero bajo. ¿Cuántos animales tengo ahí? De paso, anotá 15 mm.'
+        try {
+          const inicio = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+          assert(interpretacionesReales.length > antes && interpretacionesReales.at(-1) === 200, 'El audio debe pasar por el intérprete real.')
+          assert(textos(inicio).includes('2 cabezas') && textos(inicio).includes('9B de La Porteña')
+            && textos(inicio).includes('15 mm') && botones(inicio).some(x => x.includes('|si=')), textos(inicio))
+          const pendientes = (await db.vinculoDe(v1.telefono))?.pendiente
+          assert(pendientes?.tipo === 'turno' && pendientes.pasos.length === 2, 'La charla debe conservar dos propuestas.')
+          const antesDelCambio = interpretacionesReales.length
+          const revisada = await texto(v1, 'Mové el registro del bebedero al 8B')
+          assert(interpretacionesReales.length > antesDelCambio && interpretacionesReales.at(-1) === 200, 'La paráfrasis debe pasar por el intérprete real.')
+          assert(textos(revisada).includes('del 9B al 8B'), textos(revisada))
+          const revisados = (await db.vinculoDe(v1.telefono))?.pendiente
+          assert(revisados?.tipo === 'turno' && JSON.stringify(revisados.pasos[1]) === JSON.stringify(pendientes.pasos[1]),
+            'La lluvia debe conservar su alcance al mover el bebedero.')
+        } finally {
+          transcripcionQA = ''
+          await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${V1}`
+        }
+      })
+      return
+    }
+
+
+    await test('Audio completo: un texto reúne lluvia, eléctrico y molino; el mapa llega después y el recordatorio no duplica', async () => {
+      const lluvia = 'Anotá una lluvia de 10 milímetros en el potrero 8B de La Porteña'
+      const novedad = 'en el potrero 9B se encontró el eléctrico cortado y el molino no anda'
+      const mapa = 'mostrame de cerca el mapa del potrero 9B'
+      try {
+        transcripcionQA = `${lluvia}. Después, ${novedad}. y después, ${mapa}.`
+        interpretarComo = { pedidos: [
+          { intent: 'lluvia', fragmento: lluvia, mm: 10, campo: 'La Porteña' },
+          { intent: 'novedad', fragmento: novedad, observaciones: [{ potrero: '9B', campo: 'La Porteña', electrico: 'cortado', novedad: 'molino no anda' }] },
+          { intent: 'consulta_mapa', fragmento: mapa, campo: 'La Porteña', potrero: '9B' },
+        ] }
+        const recibido = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+        const resumen = recibido.filter(m => m.type !== 'image')
+        assert(resumen.length === 1 && recibido[0] === resumen[0] && recibido.at(-1)?.type === 'image', textos(recibido))
+        assert(textos(resumen).includes('10 mm') && textos(resumen).includes('eléctrico cortado')
+          && textos(resumen).includes('molino no anda') && !textos(resumen).includes('Me quedó por aclarar'), textos(resumen))
+        const antes = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(antes?.tipo === 'turno' && antes.pasos.length === 2)
+        interpretarComo = { intent: 'novedad', observaciones: [{ campo: 'La Porteña', potrero: '9B', electrico: 'cortado' }] }
+        const recordatorio = await texto(v1, 'El eléctrico cortado te dije')
+        const despues = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(JSON.stringify(despues) === JSON.stringify(antes) && textos(recordatorio).includes('molino no anda'),
+          'Recordar el eléctrico cambió o duplicó las propuestas.')
+      } finally {
+        interpretarComo = null
+        transcripcionQA = ''
+        await admin`update wa_vinculo set pendiente=null,pendiente_at=null where id=${V1}`
+      }
+    })
+
+    await test('Nota fuera del catálogo: confirmar, recuperar, aislar y conservar el stock', async () => {
+      const contenido = 'Asigná las caravanas del archivo a los animales del 9B'
+      const stock = JSON.stringify(await db.hacienda(v1, { tipo: 'consulta_hacienda', potreroId: P9 }))
+      let captura: string | undefined
+      try {
+        interpretarComo = { intent: 'no_soportado', campo: 'La Porteña', potrero: '9B' }
+        const propuesta = await texto(v1, contenido)
+        assert(textos(propuesta).includes(contenido) && !textos(propuesta).includes('no puedo cargar'), textos(propuesta))
+        const pendiente = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(pendiente?.tipo === 'propuesta' && pendiente.borrador.tipo === 'nota', JSON.stringify(pendiente))
+        captura = pendiente.capturaId
+        assert(await db.verificarCargaDeCaptura(v1, captura) === null, 'La nota figuró guardada antes de confirmar.')
+        const guardar = botones(propuesta).find(b => b.includes('|si'))
+        assert(guardar, 'No hay botón para guardar la nota: ' + JSON.stringify(botones(propuesta)))
+        const recibido = await boton(v1, guardar)
+        assert(textos(recibido).includes('Guardé la nota'), textos(recibido))
+        await boton(v1, guardar)
+        assert(await db.verificarCargaDeCaptura(v1, captura) === true, 'La nota confirmada no quedó verificable.')
+        assert(await db.verificarCargaDeCaptura(v2, captura) === null)
+        const propias = await db.cargasRecientes(v1, null)
+        assert(propias.some(n => n.tipo === 'nota' && n.contenido === contenido), JSON.stringify(propias))
+        assert(!(await db.cargasRecientes(v2, null)).some(n => n.contenido === contenido))
+        assert(stock === JSON.stringify(await db.hacienda(v1, { tipo: 'consulta_hacienda', potreroId: P9 })))
+      } finally {
+        interpretarComo = null
+        await admin`update wa_vinculo set pendiente=null,pendiente_at=null where id=${V1}`
+        if (captura) await admin`delete from captura where id=${captura}`
+      }
+    })
+
+
+    await test('Nota confirmada: falla de envío, botón repetido y permiso revocado', async () => {
+      let captura: string | undefined
+      try {
+        interpretarComo = { intent: 'no_soportado' }
+        const propuesta = await texto(v1, 'Conservá el pedido de revisar las caravanas')
+        const pendiente = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(pendiente?.tipo === 'propuesta' && pendiente.borrador.tipo === 'nota')
+        captura = pendiente.capturaId
+        const guardar = botones(propuesta).find(b => b.includes('|si'))
+        assert(guardar)
+        fallarRespuesta = true
+        await boton(v1, guardar)
+        fallarRespuesta = false
+        assert(await db.verificarCargaDeCaptura(v1, captura) === true)
+        const repetido = await boton(v1, guardar)
+        assert(textos(repetido).includes('ya está guardada'), textos(repetido))
+        const restringido = permisosDe({ rol: 'invitado', acceso: 'app',
+          niveles: { hacienda: 'no', campos: 'carga', plata: 'no' }, secciones: null })
+        assert(!(await db.cargasRecientes(v1, null, restringido)).some(n => n.tipo === 'nota'))
+      } finally {
+        interpretarComo = null
+        fallarRespuesta = false
+        await admin`update wa_vinculo set pendiente=null,pendiente_at=null where id=${V1}`
+        if (captura) await admin`delete from captura where id=${captura}`
+      }
+    })
 
     await test('Lluvia: «sí, pero eran 35» pide una nueva confirmación y sólo guarda 35', async () => {
       const hoy = hoyAR()
@@ -580,6 +984,279 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
       })
     }
 
+    await test('Audio real reproducido: antes de ayer conserva el potrero y la mortandad consulta Hacienda', async () => {
+      const semana = 'Cuánto llovió en el 9B la semana pasada'
+      const dia = 'y antes de ayer'
+      const muertes = 'Después ayer encontré muertos dos novillos y una vaquillona en el 8B'
+      try {
+        transcripcionQA = `${semana} ${dia}. ${muertes}.`
+        interpretarComo = { pedidos: [
+          { intent: 'consulta_lluvia', fragmento: semana, potrero: '9B', periodo: 'semana' },
+          { intent: 'consulta_lluvia', fragmento: dia },
+          { intent: 'lluvia', fragmento: muertes, potrero: '8B', mortandad: {
+            campo: 'La Porteña', potrero: '8B', detalle: null,
+            grupos: [{ categoria: 'novillo', cantidad: 2 }, { categoria: 'vaquillona', cantidad: 1 }],
+          } },
+        ] }
+        const res = textos(await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } }))
+        assert(res.split('El 9B está en La Porteña').length === 3 && res.includes('murieron *2 novillos*')
+          && !res.includes('¿En qué campo llovió?'), res)
+        assert(!(await db.vinculoDe(v1.telefono))?.pendiente, 'El reporte abrió una carga de lluvia.')
+      } finally {
+        interpretarComo = null
+        transcripcionQA = ''
+      }
+    })
+
+    await test('Asistente general: datos del audio con y sin cruce, novedades abiertas y fragmentos omitidos', async () => {
+      const hoy = hoyAR()
+      const agua = 'En el 9B el bebedero estaba bajo'
+      const reporte = 'En el 9B encontraron dos vacas muertas y tres perros muertos'
+      const dron = 'También cayó un dron cerca del molino en el 9B'
+      const lluvia = 'Anotá 19 mm en La Porteña'
+      const sinInterpretar = 'Alguien dejó una caja sin etiqueta en la entrada'
+      const stock = await admin`select id, estado from animal where empresa_id=${E1} order by id`
+      try {
+        transcripcionQA = [agua, reporte, dron, lluvia, sinInterpretar].join('. ') + '.'
+        interpretarComo = { pedidos: [
+          { intent: 'novedad', fragmento: agua, observaciones: [{ potrero: '9B', campo: 'La Porteña', agua: 'baja' }] },
+          { intent: 'novedad', fragmento: reporte, mortandad: { potrero: '9B', campo: 'La Porteña',
+            grupos: [{ categoria: 'vaca', cantidad: 2 }, { categoria: 'perro', cantidad: 3 }] } },
+          { intent: 'novedad', fragmento: dron, observaciones: [{ potrero: '9B', campo: 'La Porteña', novedad: 'Cayó un dron cerca del molino' }] },
+          { intent: 'lluvia', fragmento: lluvia, mm: 19, campo: 'La Porteña' },
+        ] }
+        const recibido = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+        assert(textos(recibido).includes('2 vacas') && textos(recibido).includes('3 perros')
+          && textos(recibido).includes('fuera del cruce con Hacienda') && textos(recibido).includes(sinInterpretar), textos(recibido))
+        const incompleta = await admin`select 1 from captura where empresa_id=${E1} and texto=${sinInterpretar} and estado='incompleta'`
+        assert(incompleta.length === 1, 'El fragmento omitido quedó fuera del registro.')
+        const pendientes = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(pendientes?.tipo === 'turno' && pendientes.pasos.length === 4, 'Se perdió una propuesta del audio.')
+        let salida = recibido
+        for (let i = 0; i < pendientes.pasos.length; i++) {
+          const aceptar = botones(salida).find(x => x.includes('|si='))
+          assert(aceptar, textos(salida))
+          salida = await boton(v1, aceptar)
+        }
+        const [final] = await admin`select op.agua::text,op.novedad from observacion_potrero op
+          join recorrida r on r.id=op.recorrida_id where r.empresa_id=${E1} and r.fecha=${hoy} and op.potrero_id=${P9}`
+        assert(final?.agua === 'baja' && final.novedad?.includes(reporte) && final.novedad.includes('Cayó un dron')
+          && !final.novedad.includes(sinInterpretar), JSON.stringify(final))
+        assert((await admin`select 1 from lluvia where empresa_id=${E1} and fecha=${hoy} and mm=19`).length === 1,
+          'Se perdió la lluvia del mismo audio.')
+        assert(JSON.stringify(await admin`select id, estado from animal where empresa_id=${E1} order by id`) === JSON.stringify(stock),
+          'Un aviso de mortandad alteró Hacienda.')
+      } finally {
+        interpretarComo = null
+        transcripcionQA = ''
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${V1}`
+        await admin`delete from lluvia where empresa_id=${E1} and fecha=${hoy} and mm=19`
+        await admin`delete from observacion_potrero where potrero_id=${P9} and recorrida_id in
+          (select id from recorrida where empresa_id=${E1} and fecha=${hoy})`
+      }
+    })
+
+    await test('Asistente de recorrida: audio, stock exacto, corrección parcial y confirmaciones idempotentes', async () => {
+      const potrero12 = id(801)
+      const otroCampo = id(802)
+      const animales12 = [id(803), id(804), id(805)]
+      const hoy = hoyAR()
+      await admin`insert into campo values (${otroCampo},${E1},'Otro campo QA')`
+      await admin`insert into potrero (id,empresa_id,campo_id,nombre,poligono) values
+        (${potrero12},${E1},${C1},'12B',${admin.json(pol8)})`
+      for (const animal of animales12) {
+        await admin`insert into animal (id,empresa_id,potrero_id,estado) values (${animal},${E1},${potrero12},'activo')`
+      }
+      const observacion = 'En el 12B vi el bebedero bajo y el pasto escaso'
+      const consulta = '¿Cuántos animales tengo ahí?'
+      const lluvia = 'De paso, anotá 15 mm'
+      try {
+        transcripcionQA = `${observacion}. ${consulta} ${lluvia}.`
+        interpretarComo = { pedidos: [
+          { intent: 'novedad', fragmento: observacion, observaciones: [{ potrero: '12B', agua: 'baja', pasto: 'escaso' }] },
+          { intent: 'consulta_hacienda', fragmento: consulta, potrero: null, campo: null },
+          { intent: 'lluvia', fragmento: lluvia, mm: 15, campo: null },
+        ] }
+        const recibido = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+        const original = botones(recibido).find(b => b.includes('|si='))
+        assert(original && textos(recibido).includes('3 cabezas') && textos(recibido).includes('12B de La Porteña')
+          && textos(recibido).includes('aguada baja, pasto escaso') && textos(recibido).includes('15 mm'), textos(recibido))
+        const antes = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(antes?.tipo === 'turno' && antes.pasos.length === 2 && antes.pasos[1].pendiente.borrador.campoId === C1,
+          'La lluvia y la recorrida deben quedar para confirmar en el campo resuelto del audio.')
+
+        interpretarComo = null
+        const lluviaPrimero = await texto(v1, 'siguiente pendiente')
+        const botonLluvia = botones(lluviaPrimero).find(b => b.includes('|si='))
+        assert(botonLluvia && textos(lluviaPrimero).includes('15 mm en La Porteña'), textos(lluviaPrimero))
+        const corregida = await texto(v1, 'Lo del bebedero era en el 9B')
+        const botonRecorrida = botones(corregida).find(b => b.includes('|si='))
+        assert(botonRecorrida && botonRecorrida !== original && textos(corregida).includes('del 12B al 9B'), textos(corregida))
+        const luego = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(luego?.tipo === 'turno' && JSON.stringify(luego.pasos[1]) === JSON.stringify(antes.pasos[1]),
+          'Corregir el agua modificó el borrador o el botón de lluvia.')
+        assert(luego.pasos[0].pendiente.borrador.observaciones?.some(o => o.potreroId === P9 && o.agua === 'baja')
+          && luego.pasos[0].pendiente.borrador.observaciones?.some(o => o.potreroId === potrero12 && o.pasto === 'escaso' && o.agua === null),
+          'La corrección debe mover sólo el agua.')
+
+        const observacionesGuardadas = () => admin`select op.potrero_id, op.agua::text, op.pasto::text
+          from observacion_potrero op join recorrida r on r.id=op.recorrida_id
+          where r.empresa_id=${E1} and r.fecha=${hoy} and op.potrero_id in (${potrero12},${P9}) order by op.potrero_id`
+        const antesGuardar = JSON.stringify(await observacionesGuardadas())
+        await boton(v1, original)
+        assert(JSON.stringify(await observacionesGuardadas()) === antesGuardar, 'Se guardó con un botón anterior a la corrección.')
+        assert(!(await admin`select 1 from lluvia where empresa_id=${E1} and mm=15 and fecha=${hoy}`).length, 'Se guardó lluvia antes de confirmarla.')
+
+        const sigue = await boton(v1, botonRecorrida)
+        assert(botones(sigue).includes(botonLluvia), textos(sigue))
+        const filas = await observacionesGuardadas()
+        assert(filas.some(o => o.potrero_id === P9 && o.agua === 'baja')
+          && filas.some(o => o.potrero_id === potrero12 && o.pasto === 'escaso' && o.agua === null), JSON.stringify(filas))
+        await boton(v1, botonRecorrida)
+        assert(JSON.stringify(await observacionesGuardadas()) === JSON.stringify(filas), 'Repetir el botón cambió la recorrida.')
+        await boton(v1, botonLluvia)
+        await boton(v1, botonLluvia)
+        const guardadas = await admin`select campo_id from lluvia where empresa_id=${E1} and mm=15 and fecha=${hoy}`
+        assert(guardadas.length === 1 && guardadas[0].campo_id === C1, 'La lluvia debe guardarse una sola vez en el campo original.')
+        assert(!(await db.vinculoDe(v1.telefono))?.pendiente, 'Quedó un pendiente después de confirmar las dos cargas.')
+      } finally {
+        interpretarComo = null
+        transcripcionQA = ''
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${V1}`
+        await admin`delete from lluvia where empresa_id=${E1} and mm=15 and fecha=${hoy}`
+        await admin`delete from observacion_potrero where potrero_id in (${potrero12},${P9})
+          and recorrida_id in (select id from recorrida where empresa_id=${E1} and fecha=${hoy})`
+        await admin`delete from animal where potrero_id=${potrero12}`
+        await admin`delete from potrero where id=${potrero12}`
+        await admin`delete from campo where id=${otroCampo}`
+      }
+    })
+
+    await test('Asistente de recorrida: «ahí» sin referencia pide potrero y queda listo para continuar', async () => {
+      try {
+        interpretarComo = { intent: 'consulta_hacienda', campo: null, potrero: null }
+        const pregunta = await texto(v1, '¿Cuántos animales tengo ahí?')
+        assert(textos(pregunta).includes('En qué potrero') && !textos(pregunta).includes('en total'), textos(pregunta))
+        interpretarComo = null
+        const respuesta = await texto(v1, '9B')
+        assert(textos(respuesta).includes('2 cabezas') && textos(respuesta).includes('9B de La Porteña'), textos(respuesta))
+        assert(!(await db.vinculoDe(v1.telefono))?.pendiente, 'La consulta llegó al resultado y el pendiente tiene que cerrarse.')
+      } finally {
+        interpretarComo = null
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${V1}`
+      }
+    })
+
+    await test('Charla diaria: un saludo después del mapa abre un intercambio nuevo', async () => {
+      const vista = await texto(v1, 'Acercá el 9B')
+      assert(vista.some(m => m.type === 'image'), textos(vista))
+      try {
+        interpretarComo = { intent: 'saludo' }
+        redactarComo = datos => datos.historial.length
+          ? '¡Hola! El potrero 9B no lo puedo acercar desde acá.'
+          : '¡Hola! ¿Todo bien?'
+        const saludo = await texto(v1, 'Hola')
+        assert(saludo.length === 1 && textos(saludo) === '¡Hola! ¿Todo bien?', textos(saludo))
+      } finally {
+        interpretarComo = null
+        redactarComo = null
+      }
+    })
+
+    await test('Charla diaria: pedir el satélite y qué hay dentro entrega imagen y stock del mismo potrero', async () => {
+      for (const pedido of ['Quiero ver el potrero 9b con el satélite y saber que tengo ahí adentro',
+        'Mostrame el potrero 9B con satélite y decime qué hay adentro']) {
+        const salida = await texto(v1, pedido)
+        const imagen = salida.find(m => m.type === 'image')
+        assert(imagen?.image?.caption.includes('Detalle de 9B'), textos(salida))
+        assert(imagen?.image?.caption.includes('no pude obtener la imagen satelital'), 'Esri está simulado en 503: debe informar el respaldo.')
+        const stock = salida[0]
+        assert(stock?.type === 'text' && stock.text?.body.includes('2 cabezas') && stock.text.body.includes('9B'),
+          'La consulta de Hacienda debe salir antes de esperar la foto. ' + textos(salida))
+        assert(!botones(salida).length, 'Una doble consulta terminó en una propuesta.')
+      }
+    })
+
+    await test('Charla diaria: «potrero o campo entero» entrega una sola vista y conserva los pedidos con «y»', async () => {
+      const sinDibujo = id(34)
+      await admin`insert into potrero (id,empresa_id,campo_id,nombre) values (${sinDibujo},${E1},${C1},'10C')`
+      try {
+        for (const [potrero, conector, esperadas, pie] of [
+          ['9B', 'o', 1, 'Detalle de 9B'],
+          ['10C', 'o', 1, 'Te muestro La Porteña'],
+          ['91X', 'o', 1, 'Te muestro La Porteña'],
+          ['9B', 'y', 2, 'Detalle de 9B'],
+        ] as const) {
+          const alternativa = conector + ' mandarme todo el campo La Porteña?'
+          transcripcionQA = 'Hola, ¿me pueden mandar el potrero ' + potrero + ' en el campo La Porteña ' + alternativa
+          interpretarComo = { pedidos: [
+            { intent: 'consulta_mapa', fragmento: transcripcionQA, campo: 'La Porteña', potrero },
+            { intent: 'consulta_mapa', fragmento: alternativa, campo: 'La Porteña' },
+          ] }
+          const salida = await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } })
+          assert(salida.filter(m => m.type === 'image').length === esperadas, textos(salida))
+          assert(salida.find(m => m.type === 'image')?.image?.caption.includes(pie), textos(salida))
+        }
+      } finally {
+        await admin`delete from potrero where id=${sinDibujo}`
+        interpretarComo = null
+        transcripcionQA = ''
+      }
+    })
+
+    await test('Charla diaria: preguntar qué campos tenemos devuelve nombres propios', async () => {
+      try {
+        interpretarComo = { intent: 'ayuda_general' }
+        for (const pregunta of ['Qué campos tenemos ?', '¿Cuáles son mis campos?', 'Mostrame los campos que tenemos']) {
+          const respuesta = textos(await texto(v1, pregunta))
+          assert(respuesta.includes('La Porteña') && !respuesta.includes('Campo Ajeno')
+            && !respuesta.includes('Mandame un audio'), respuesta)
+        }
+      } finally {
+        interpretarComo = null
+      }
+    })
+
+    await test('Pedidos de mapa y PDF salen del pendiente y la aclaración vuelve al adjunto', async () => {
+      const campo = 'La Porteña'
+      const lluvia = 'Anotá 24 mm en La Porteña'
+      const gasto = 'Pagué gasoil en La Porteña'
+      try {
+        interpretarComo = { pedidos: [
+          { intent: 'lluvia', fragmento: lluvia, campo, mm: 24 },
+          { intent: 'gasto', fragmento: gasto, campo },
+        ] }
+        await texto(v1, `${lluvia}. ${gasto}.`)
+        const antes = (await db.vinculoDe(v1.telefono))?.pendiente
+        assert(antes?.tipo === 'turno')
+        interpretarComo = null
+        for (const pedido of ['Mostrarme el campo', 'No me podes mostrar los potreros ?']) {
+          const mapa = await texto(v1, pedido)
+          assert(mapa.some(m => m.type === 'image') || textos(mapa).includes('No pude enviar el mapa'), textos(mapa))
+          assert(!textos(mapa).includes('¿Los guardo?'), textos(mapa))
+        }
+        const natural = await texto(v1, 'Me mostras el campo la porteña por favor')
+        assert(natural.some(m => m.type === 'image'), textos(natural))
+        const pedidoVisual = 'Quiero tener a la vista La Porteña entera'
+        const pedidoLluvia = '¿Cuánto llovió la semana pasada?'
+        interpretarComo = { pedidos: [
+          { intent: 'consulta_mapa', fragmento: pedidoVisual, campo },
+          { intent: 'consulta_lluvia', fragmento: pedidoLluvia, campo, periodo: 'semana' },
+        ] }
+        const mixto = await texto(v1, pedidoVisual + '. ' + pedidoLluvia)
+        assert(mixto.some(m => m.type === 'image') && textos(mixto).includes('Lluvia'), textos(mixto))
+        interpretarComo = null
+        const pdf = textos(await firmar(v1, { type: 'document', document: { id: 'qa-factura', filename: 'factura.pdf', mime_type: 'application/pdf' } }))
+        assert(pdf.includes('Leí la factura 00001-00000023 de Veterinaria QA') && pdf.includes('$12.100,00') && !pdf.includes('¿Los guardo?'), pdf)
+        const aclaracion = textos(await texto(v1, 'Eso es una factura'))
+        assert(aclaracion === pdf, aclaracion)
+        assert(JSON.stringify((await db.vinculoDe(v1.telefono))?.pendiente) === JSON.stringify(antes), 'El documento modificó la propuesta.')
+      } finally {
+        interpretarComo = null
+        await admin`update wa_vinculo set pendiente=null, pendiente_at=null where id=${v1.id}`
+      }
+    })
+
     await test('PDF reenviado y audio vacío: explicar cómo seguir y conservar la propuesta', async () => {
       try {
         interpretarComo = { intent: 'lluvia', mm: 24, fecha: hoyAR(), campo: 'La Porteña' }
@@ -588,7 +1265,7 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
         assert(antes?.tipo === 'propuesta', 'Falta la propuesta de lluvia.')
         const pdf = textos(await firmar(v1, { type: 'document', document: { id: 'qa-pdf', filename: 'factura.pdf', mime_type: 'application/pdf' } }))
         const audio = textos(await firmar(v1, { type: 'audio', audio: { id: 'qa-audio' } }))
-        assert(pdf.includes('foto del ticket o la factura') && audio.includes('¿Me lo escribís?'), `PDF: ${pdf}. Audio: ${audio}`)
+        assert(pdf.includes('No pude abrir el PDF') && audio.includes('¿Me lo escribís?'), `PDF: ${pdf}. Audio: ${audio}`)
         assert(JSON.stringify((await db.vinculoDe(v1.telefono))?.pendiente) === JSON.stringify(antes), 'Se perdió la propuesta.')
         assert(!(await admin`select 1 from lluvia where empresa_id=${E1} and mm=24`).length, 'Se guardó lluvia sin confirmación.')
       } finally {
@@ -936,6 +1613,60 @@ await test('WhatsApp completo: ubicación, tanque, guardar una sola vez, eléctr
       assert(textos(await boton(v1, p.guardar)).includes('ya está guardado'))
       assert((await admin`select 1 from infraestructura where apodo='entrega'`).length === 1)
     })
+    await test('Permisos por persona de Tropero: lectura, Solo manda, cuenta vinculada y baja de permiso', async () => {
+      const niveles = (campos: string) => admin.json({ campos, hacienda: 'no', plata: 'no' })
+      await admin`update wa_vinculo set pendiente=null,pendiente_at=null where id=${V1}`
+      const hoy = hoyAR()
+      try {
+        await admin`insert into miembro_empresa(user_id,empresa_id,rol,niveles,acceso) values
+          (${U1},${E2},'dueno',null,'app')`
+        await admin`update miembro_empresa set rol='Ingeniero QA',niveles=${niveles('ve')},acceso='app'
+          where user_id=${U1} and empresa_id=${E1}`
+        const cuenta = await db.comoUsuario(v1, tx => tx<{ id: string }[]>`select auth_empresa_ids() as id`)
+        assert(cuenta.length === 1 && cuenta[0].id === E1, 'El encabezado del vínculo no eligió exclusivamente su empresa.')
+        const mapa = await texto(v1, 'Mostrame el campo La Porteña')
+        assert(mapa.some(x => x.type === 'image'), textos(mapa))
+        assert((await db.datosMapa(v1, C1, false))?.potreros.every(p => p.cabezas === undefined), 'El mapa conserva datos de Hacienda que no corresponden.')
+        interpretarComo = { intent: 'consulta_hacienda', campo: 'La Porteña' }
+        const hacienda = textos(await texto(v1, '¿Cuántos animales hay?'))
+        assert(hacienda.includes('Tu acceso a Hacienda no permite'), hacienda)
+        interpretarComo = { intent: 'consulta_vencimientos' }
+        assert(textos(await texto(v1, '¿Qué tengo que pagar?')).includes('Plata y Agenda'))
+        interpretarComo = { intent: 'lluvia', mm: 71, campo: 'La Porteña', fecha: hoy }
+        const lectura = await texto(v1, 'Anotá 71 mm en La Porteña')
+        assert(!botones(lectura).length && textos(lectura).includes('no permite registrar'), textos(lectura))
+
+        await admin`update miembro_empresa set rol='Empleado QA',niveles=${niveles('solo_manda')},acceso='whatsapp'
+          where user_id=${U1} and empresa_id=${E1}`
+        const consultaAjena = await texto(v1, '¿Cuánto llovió ayer?')
+        assert(textos(consultaAjena).includes('no permite esa consulta'), textos(consultaAjena))
+        const sinMapa = await texto(v1, 'Mostrame el campo La Porteña')
+        assert(!sinMapa.some(x => x.type === 'image') && textos(sinMapa).includes('Tu acceso a Campos'), textos(sinMapa))
+        const propuesta = await texto(v1, 'Anotá 71 mm en La Porteña')
+        const aceptar = botones(propuesta).find(id => id.includes('|si'))
+        assert(aceptar, textos(propuesta))
+        const guardada = textos(await boton(v1, aceptar))
+        assert(guardada.includes('71 mm') && !/acumulad|este mes|año pasado/i.test(guardada), guardada)
+        assert((await admin`select id from lluvia where empresa_id=${E1} and campo_id=${C1} and mm=71`).length === 1)
+        interpretarComo = { intent: 'consulta_cargas' }
+        assert(textos(await texto(v1, 'Mostrame mis últimas cargas')).includes('71'), 'Solo manda no pudo ver su propia carga.')
+
+        interpretarComo = { intent: 'lluvia', mm: 72, campo: 'La Porteña', fecha: hoy }
+        const anterior = await texto(v1, 'Anotá 72 mm en La Porteña')
+        const viejo = botones(anterior).find(id => id.includes('|si'))
+        assert(viejo, textos(anterior))
+        await admin`update miembro_empresa set niveles=${niveles('ve')},acceso='app' where user_id=${U1} and empresa_id=${E1}`
+        assert(textos(await boton(v1,viejo)).includes('no permite registrar'), 'El botón viejo conservó permiso de carga.')
+        assert(!(await admin`select 1 from lluvia where empresa_id=${E1} and mm=72`).length)
+      } finally {
+        interpretarComo = null
+        await admin`update miembro_empresa set rol='dueno',niveles=null,acceso=null where user_id=${U1} and empresa_id=${E1}`
+        await admin`delete from miembro_empresa where user_id=${U1} and empresa_id=${E2}`
+        await admin`update wa_vinculo set pendiente=null,pendiente_at=null where id=${V1}`
+        await admin`delete from lluvia where empresa_id=${E1} and mm in (71,72)`
+      }
+    })
+
     await test('Una confirmación antigua sin dato comprobado nunca anuncia éxito', async () => {
       const p = await proponerMolino('legado')
       await admin`update captura set estado='confirmada' where id=${p.captura}`

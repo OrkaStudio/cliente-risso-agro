@@ -202,7 +202,7 @@ describe('lo que se dice', () => {
   })
   it('una muerte avisa que la baja se hace en la app', () => {
     const paso = siguientePaso('c', borrador([obs({ potrero: '3', campo: 'La Porteña', novedad: 'vaca muerta, caravana 4521' })]), ctx)
-    expect(paso.k === 'proponer' && paso.mensaje.texto).toContain('La baja del animal se hace en Hacienda.')
+    expect(paso.k === 'proponer' && paso.mensaje.texto).toContain('El stock de Hacienda se actualiza por separado.')
   })
   it('después de guardar, cuánto va de la recorrida de hoy', () => {
     expect(trasRecorrida(3, [{ campo: 'La Porteña', recorridos: 4, total: 12 }]))

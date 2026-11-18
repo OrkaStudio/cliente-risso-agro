@@ -18,13 +18,19 @@ import {
   ayudaConPendiente,
   AUDIO_PRONTO,
   conUbicacion,
+  consultaCamposDirecta,
   corregir,
+  datoQueFalta,
   leer,
+  NO_SE,
   QUE_PUEDO,
+  saludo,
+  saludoSolo,
   siguientePaso,
   preguntaRecorrida,
   type Paso,
 } from '../_shared/wa/conversacion.ts'
+import { accesoDenegado, puedeMandar, puedeVer, puedeVerTodo, seccionDe } from '../_shared/wa/permisos.ts'
 import { confirmarConVerificacion, type EstadoCarga } from '../_shared/wa/confirmacion.ts'
 import { niegaRecorrida, nombraHacienda, periodoRepreguntaLluvia, preguntaLluvia } from '../_shared/wa/consulta-lluvia.ts'
 import { EntradaIncompleta, limpiarInterpretacion, pistaTranscripcion } from '../_shared/wa/interpretar.ts'
@@ -34,12 +40,20 @@ import { campoPorId, potreroEnPunto, potreroPorId, resolverParaMostrar } from '.
 import { esFecha, finDeMes, hoyAR, inicioSemana, sumarDias, norm, plural } from '../_shared/wa/texto.ts'
 import type { Borrador, Contexto, Mensaje, Pendiente, PendienteInfra, PendienteMortandad, PendienteTurno } from '../_shared/wa/tipos.ts'
 import * as db from './db.ts'
-import { interpretar, leerComprobante, transcribir } from './llm.ts'
+import { interpretar, leerComprobante, redactarConversacion, transcribir } from './llm.ts'
 import { corregirMortandad, resumenMortandad, textoRevisionMortandad } from './mortandad.ts'
-import { actualizarPasoTurno, continuarTurno, incorporarTurno, type BorradorTurno, type IOCompuesto } from './turno-compuesto.ts'
+import { atenderDocumentosVeterinarios } from './documentos-veterinarios.ts'
+import { responderPdf } from './leer-pdf.ts'
+import { interpretarConAdjuntos } from './turno-adjuntos.ts'
+import { resolverVacunacion } from './vacunacion-planilla.ts'
+import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
+import { lecturasDelTurno, type LecturasTurno } from './lecturas-turno.ts'
+import { actualizarPasoTurno, continuarTurno, incorporarTurno, reubicarObservacion, type BorradorTurno, type IOCompuesto } from './turno-compuesto.ts'
 import * as meta from './meta.ts'
 import { atenderMapa, campoParaMapa, comandoMapa, elegirMapa, noRecuerdaPotrero, type PedidoMapa } from '../_shared/wa/mapa.ts'
 import { imagenMapa } from './mapa-imagen.ts'
+import { conContextoRecorrida } from '../_shared/wa/recorrida-turno.ts'
+import { poligonoMapa } from '../_shared/wa/mapa-svg.ts'
 import { colaHabilitada, tomarTrabajo, terminarTrabajo, canalEnRevision,canalesConTrabajo } from './cola.ts'
 import { atenderPiloto } from './piloto.ts'
 import { atenderInfra, cargarEnUbicacion, ofrecerCarga, type IOInfra } from './infra.ts'
@@ -65,6 +79,8 @@ type MensajeMeta = {
   interactive?: { button_reply?: { id: string; title: string }; list_reply?: { id: string; title: string } }
   button?: { payload: string; text: string }
   image?: { id: string; mime_type: string; caption?: string }
+  document?: { id: string; mime_type?: string; filename?: string; caption?: string }
+  context?: { id?: string }
   audio?: { id: string }
   location?: { latitude: number; longitude: number; name?: string; address?: string }
 }
@@ -133,7 +149,7 @@ Deno.serve(async (req) => {
 
 /** Guarda el mensaje (una sola vez por wamid) y deja el procesamiento en segundo plano. */
 async function recibir(m: MensajeMeta): Promise<void> {
-  const vinculo = await db.vinculoDe(m.from)
+  const vinculo = await db.vinculoDe(m.from) ?? await db.vincularAccesoWhatsapp(m.from)
   // Un número sin vincular: sólo el registro técnico, no su contenido.
   const cuerpo = vinculo ? m : { type: m.type, sin_vincular: true }
   const mensajeId = await db.guardarEntrante({ wamid: m.id, telefono: m.from, tipo: m.type, cuerpo, vinculo })
@@ -176,9 +192,11 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     await responder(null, m.from, { texto: NO_VINCULADO })
     return
   }
+  const permisos = await db.permisosVinculados(v)
+  if (!permisos) { await responder(null, m.from, { texto: NO_VINCULADO }); return }
   await meta.leidoYEscribiendo(m.id)
   const hoy = hoyAR()
-  const ctx = { ...await db.contexto(v, hoy),fechaMensaje:await db.fechaDeEntrada(v,mensajeId), semanalHabilitado: Deno.env.get('WA_WEEKLY_ENABLED') === 'true', pilotoHabilitado: Deno.env.get('WA_PILOT_ENABLED') === 'true' && colaHabilitada(v.empresa_id) }
+  const ctx = { ...await db.contexto(v, hoy),permisos,fechaMensaje:await db.fechaDeEntrada(v,mensajeId), semanalHabilitado: Deno.env.get('WA_WEEKLY_ENABLED') === 'true', pilotoHabilitado: permisos.dueno && Deno.env.get('WA_PILOT_ENABLED') === 'true' && colaHabilitada(v.empresa_id) }
 
   // Lo que el bot preguntó hace mucho ya no se espera.
   let crudo = v.pendiente
@@ -198,9 +216,29 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
   const pendienteMortandad = crudo?.tipo === 'mortandad' ? crudo : null
   const turno = crudo?.tipo === 'turno' ? crudo : null
   const pendiente: Pendiente | null = crudo?.tipo === 'infra' || crudo?.tipo === 'mortandad' || crudo?.tipo === 'turno' ? null : crudo
+  const lecturas = empresaEnPiloto(Deno.env.get('WA_LECTURAS_TURNO_EMPRESAS'), v.empresa_id)
+    ? lecturasDelTurno(ctx, b => db.hacienda(v, b)) : undefined
+  let historial: Promise<db.MensajeReciente[]> | undefined
+  const historialDelTurno = () => historial ??= db.conversacionReciente(v, mensajeId, puedeVerTodo(permisos)).catch(() => [])
+  const conversar: IOCompuesto['conversar'] = async (mensaje, motivo) => {
+    const actual = motivo === 'saludo' ? null : turno?.pasos[0]?.pendiente ?? pendiente
+    const falta = datoQueFalta(actual)
+    const borrador = actual && actual.tipo !== 'ubicado' ? actual.borrador : null
+    const campo = campoPorId(ctx.campos, borrador?.campoId)?.nombre ?? null
+    const potrero = potreroPorId(ctx.campos, borrador?.potreroId)?.potrero.nombre ?? null
+    const redaccion = await redactarConversacion({
+      mensaje, historial: motivo === 'saludo' ? [] : await historialDelTurno(), motivo, pendiente: Boolean(crudo && crudo.tipo !== 'ubicado'),
+      datoEsperado: falta ? { operacion: falta.operacion, dato: falta.dato, campo, potrero } : null,
+      puedeVerMapas: puedeVer(permisos, 'campos'),
+    }).catch(() => null)
+    if (redaccion) return redaccion
+    if (motivo === 'saludo') return saludo(ctx.nombre)
+    return falta?.pregunta ?? NO_SE
+  }
   const ioCompuesto: IOCompuesto = {
+    conversar,
     responder: mensaje => responder(v, m.from, mensaje),
-    consultar: borrador => consultar(v, ctx, borrador),
+    consultar: borrador => consultar(v, ctx, borrador, lecturas),
     confirmar: (id, b, p, estado, siguiente) => confirmar(v, ctx, id, b, p, { estado, siguiente }),
   }
   const compuesto = turno ? { turno, io: ioCompuesto } : undefined
@@ -212,7 +250,12 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
   }
   try {
     if (m.type === 'location' && m.location) {
+      if (!puedeMandar(permisos, 'campos') && !puedeVer(permisos, 'campos')) {
+        await responder(v, m.from, { texto: accesoDenegado('campos', 'ver') })
+        return
+      }
       if (pendienteInfra?.paso === 'ubicacion') {
+        if (permisos.niveles.campos !== 'carga') { await responder(v, m.from, { texto: accesoDenegado('campos', 'cargar') }); return }
         await cargarEnUbicacion({ v, ctx, mensajeId, texto: '', pendiente: pendienteInfra, entrada: 'texto' }, ioInfra, pendienteInfra, [m.location.latitude, m.location.longitude])
         return
       }
@@ -221,6 +264,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       return
     }
     if (m.type === 'image' && m.image) {
+      if (!puedeMandar(permisos, 'plata')) { await responder(v, m.from, { texto: accesoDenegado('plata', 'cargar') }); return }
       capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada: 'foto', texto: m.image.caption ?? null })
       await foto(v, ctx, capturaId, m.image, crudo?.capturaId, compuesto)
       return
@@ -245,12 +289,54 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       }
     }
 
+    const responderDocumento = (mensaje: Mensaje) => responder(v, m.from, mensaje)
+    if (botonId?.startsWith('vacplan:')) {
+      const respuesta = await resolverVacunacion(v, botonId)
+      if (respuesta) { await responderDocumento(respuesta); return }
+    }
+    const adjuntosHabilitados = empresaEnPiloto(Deno.env.get('WA_ADJUNTOS_TURNO_EMPRESAS'), v.empresa_id)
+    const mapa = comandoMapa(texto, botonId, ctx.campos)
+    const esDocumento = m.type === 'document'
+    const conAdjuntos = adjuntosHabilitados && !botonId && (esDocumento || texto) && !mapa
+      ? await interpretarConAdjuntos(v, ctx, {
+        id: mensajeId, texto: m.document?.caption || texto,
+        respuestaA: m.context?.id, audio: porAudio,
+      }, responderDocumento, historialDelTurno, lecturas)
+      : null
+    const resultadoConAdjuntos = conAdjuntos?.resultado
+    if (conAdjuntos?.atendido && !resultadoConAdjuntos?.pedidos.length) return
+    if (resultadoConAdjuntos?.pedidos.length && (conAdjuntos?.atendido || esDocumento)) {
+      await atenderPedidosCompuestos(v, ctx, mensajeId, crudo, pendiente, resultadoConAdjuntos,
+        porAudio ? 'audio' : 'texto', ioCompuesto)
+      return
+    }
+    if (m.type === 'document') {
+      const pdf = m.document
+      if (pdf?.id && (pdf.mime_type === 'application/pdf' || /\.pdf$/i.test(pdf.filename ?? ''))) {
+        if (await atenderDocumentosVeterinarios(v, mensajeId, { pdf: pdf.id }, responderDocumento)) return
+        await responderDocumento({ texto: await responderPdf(pdf.id, { permisos }) })
+      } else {
+        await responderDocumento({ texto: 'Me llegó el archivo. ¿Podés mandarme el comprobante como PDF o foto?' })
+      }
+      return
+    }
     if (!botonId && !texto) {
       await responder(v, m.from, { texto: 'No puedo leer ese mensaje. Mandame texto, un audio o una foto del ticket o la factura.' })
       return
     }
 
-    if (!botonId && pendienteMortandad) {
+    if (!botonId && /^(?:(?:si[, ]+)?(?:eso|esto|esa|esta) es (?:una |la )?|es (?:una |la )?)factura[.!?\s]*$/.test(norm(texto))) {
+      const pdf = await db.pdfAnterior(v, mensajeId)
+      if (pdf) {
+        if (await atenderDocumentosVeterinarios(v, pdf.id, { pdf: pdf.media }, responderDocumento)) return
+        await responderDocumento({ texto: await responderPdf(pdf.media, { permisos }) })
+        return
+      }
+    }
+
+    if (await atenderDocumentosVeterinarios(v, mensajeId, { texto, boton: botonId, hoy: ctx.fechaMensaje }, responderDocumento)) return
+
+    if (!botonId && pendienteMortandad && puedeVer(permisos, 'hacienda')) {
       const comando = norm(texto).replace(/[¿?¡!.,]+$/g, '').trim()
       if (comando === 'cancelar mortandad' || comando === 'cancelar') {
         await db.guardarPendiente(v.id, null)
@@ -271,10 +357,17 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       await responder(v,m.from,{texto:'Para hablar con el equipo, escribí a francisco@troppero.com. Contanos qué intentaste cargar y cuándo. Tu carga pendiente se conserva. También podés pedir una copia de tus datos o la desvinculación del número.'})
       return
     }
-    const mapa = comandoMapa(texto, botonId)
+    if (!botonId && saludoSolo(texto)) {
+      await responder(v, m.from, { texto: await conversar(texto, 'saludo') })
+      return
+    }
+    if (!botonId && consultaCamposDirecta(texto)) {
+      await responder(v, m.from, { texto: await consultar(v, ctx, { tipo: 'consulta_campos' }) })
+      return
+    }
     if (mapa) { await mostrarMapa(v, ctx, turno?.pasos[0]?.pendiente ?? pendiente, mapa); return }
-    if (!turno && await atenderInfra({ v, ctx, mensajeId, texto, botonId, pendiente: pendienteInfra ?? pendiente, entrada: porAudio ? 'audio' : botonId ? 'boton' : 'texto' }, ioInfra)) return
-    if (!botonId && noRecuerdaPotrero(texto, pendiente)) {
+    if (!turno && permisos.niveles.campos === 'carga' && await atenderInfra({ v, ctx, mensajeId, texto, botonId, pendiente: pendienteInfra ?? pendiente, entrada: porAudio ? 'audio' : botonId ? 'boton' : 'texto' }, ioInfra)) return
+    if (!botonId && puedeVer(permisos, 'campos') && noRecuerdaPotrero(texto, pendiente)) {
       await db.guardarPendiente(v.id, pendiente)
       await responder(v, m.from, { texto: 'Conservé la observación pendiente de ubicar. Podés pedirme «mapa» y responder con el potrero cuando lo reconozcas; no hace falta repetir el audio.', botones: [{ id: 'ver_mapa', titulo: 'Ver mapa' }] })
       return
@@ -296,6 +389,7 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
           : { texto: '¿Qué querés consultar para ese día? Decime también el campo si corresponde.' }
       }
       if (lluvia && !(turno && niegaRecorrida(texto))) {
+        if (!puedeVer(permisos, 'campos')) { await responder(v, m.from, { texto: accesoDenegado('campos', 'ver') }); return }
         const pausa = await pausarRecorridaNegada(v, pendiente, texto)
         if ('texto' in lluvia) {
           await responder(v, m.from, { texto: lluvia.texto + pausa })
@@ -316,6 +410,10 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
     }
     const weekly = !botonId ? comandoSemanal(texto ?? '') : null
     if (weekly) {
+      if (!puedeVerTodo(permisos)) {
+        await responder(v, m.from, { texto: 'El resumen completo requiere acceso de lectura a Campos, Hacienda y Plata.' })
+        return
+      }
       if (Deno.env.get('WA_WEEKLY_ENABLED') !== 'true') {
         // El paquete puede incluir código preparado, pero no consulta las tablas
         // del resumen ni ofrece documentos hasta activar su piloto completo.
@@ -388,6 +486,11 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
           }
           // Una recorrida se corrige mandándola de nuevo: reemplaza la propuesta.
           const { interpretacion, uso } = await interpretar(l.texto, ctx)
+          if (interpretacion.intent === 'saludo') {
+            capturaId = null
+            await responder(v, m.from, { texto: await conversar(l.texto, interpretacion.intent) })
+            return
+          }
           await db.actualizarCaptura(l.capturaId, {
             notas: [`Corrección: "${l.texto}"`], tokensEntrada: uso.entrada, tokensSalida: uso.salida,
           })
@@ -411,6 +514,11 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
           return
         }
         const { interpretacion, uso } = await interpretar(l.texto, ctx, l.borrador)
+        if (interpretacion.intent === 'saludo') {
+          capturaId = null
+          await responder(v, m.from, { texto: await conversar(l.texto, interpretacion.intent) })
+          return
+        }
         if (interpretacion.intent.startsWith('consulta_')) {
           capturaId = null
           const tipo = l.borrador.tipo === 'gasto' ? 'el gasto' : 'la lluvia'
@@ -432,40 +540,12 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
       case 'nuevo': {
         const entrada = porAudio ? 'audio' : botonId ? 'boton' : 'texto'
         capturaId = await db.crearCaptura({ vinculo: v, mensajeId, entrada, texto })
-        const { interpretacion, pedidos, uso } = await interpretar(texto, ctx, undefined, true)
-        if (pedidos.length > 1 || turno) {
+        const { interpretacion, pedidos, uso } = resultadoConAdjuntos ?? await interpretar(texto, ctx, undefined, true, { historial: await historialDelTurno(), lecturas })
+        if (pedidos.length > 1 || turno || interpretacion.intent === 'reubicar_observacion' || interpretacion.intent === 'consulta_mapa' || interpretacion.intent === 'vacunacion_planilla' || interpretacion.intent === 'revisar_pdf' || interpretacion.intent === 'guardar_pdf' || (interpretacion.mortandad && interpretacion.intent !== 'lluvia')
+          || (interpretacion.mortandad && interpretacion.mm == null && !mencionaLluvia(texto))) {
           const primera = capturaId
           capturaId = null
-          const avisos: string[] = []
-          const borradores: BorradorTurno[] = []
-          const ubicado = pendiente?.tipo === 'ubicado' ? pendiente.ubicado : null
-          const tieneNovedad = pedidos.some(p => p.interpretacion.intent === 'novedad')
-          const campoHoy = tieneNovedad
-            ? await db.campoRecorridoHoy(v, ctx.hoy).catch(() => null) ?? await db.campoMapaReciente(v).catch(() => null)
-            : null
-          const sesion = ctx.pilotoHabilitado && tieneNovedad ? await pilotoStore.sesionActiva(v) : null
-          for (const [i, { fragmento, interpretacion: it }] of pedidos.entries()) {
-            const id = i === 0 ? primera : await db.crearCaptura({ vinculo: v, mensajeId, entrada, texto: fragmento })
-            await db.actualizarCaptura(id, {
-              interpretacion: { ...it, fragmento }, interpretadoPor: 'claude-haiku-4-5',
-              ...(i === 0 ? { tokensEntrada: uso.entrada, tokensSalida: uso.salida } : {}),
-            })
-            const ambiguo = porAudio && it.intent === 'consulta_hacienda' && !nombraHacienda(fragmento)
-            if (ambiguo || (sesion && it.intent === 'novedad')) {
-              avisos.push(ambiguo ? ACLARAR_CONSULTA_AUDIO : 'Tenés una recorrida abierta. La novedad quedó en este mensaje para que la retomes desde la sesión.')
-              await db.actualizarCaptura(id, { estado: 'incompleta' })
-              continue
-            }
-            const a = arrancar(it, ctx, fragmento, { ubicado, campoHoy })
-            if ('respuesta' in a) {
-              await db.actualizarCaptura(id, { estado: a.estado })
-              avisos.push(a.respuesta)
-              continue
-            }
-            if (it.mortandad) avisos.push('Conservé el aviso de mortandad en el mensaje. Revisá los animales en Hacienda para una baja.')
-            borradores.push({ capturaId: id, borrador: a.borrador })
-          }
-          await incorporarTurno(v, ctx, crudo, borradores, avisos, ioCompuesto)
+          await atenderPedidosCompuestos(v, ctx, mensajeId, crudo, pendiente, { interpretacion, pedidos, uso }, entrada, ioCompuesto, primera)
           return
         }
         await db.actualizarCaptura(capturaId, {
@@ -486,14 +566,22 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
           ? interpretacion.mortandad : null
         const a = arrancar(mortandad ? { ...interpretacion, otrosRegistros: [] } : interpretacion, ctx, texto, { ubicado, campoHoy })
         if ('respuesta' in a) {
-          await db.actualizarCaptura(capturaId, { estado: a.estado })
-          await responder(v, m.from, { texto: a.respuesta })
+          const motivo = interpretacion.intent === 'saludo' ? 'saludo' : a.respuesta === NO_SE ? 'otro' : null
+          await db.actualizarCaptura(capturaId, { estado: motivo ? 'respondida' : a.estado })
+          capturaId = null
+          await responder(v, m.from, { texto: motivo ? await conversar(texto, motivo) : a.respuesta })
+          return
+        }
+        const bloqueo = permisoDelBorrador(ctx, a.borrador)
+        if (bloqueo) {
+          await db.actualizarCaptura(capturaId, { estado: 'descartada' })
+          await responder(v, m.from, { texto: bloqueo })
           return
         }
         if (a.borrador.tipo.startsWith('consulta_')) {
           const consulta = siguientePaso(capturaId, a.borrador, ctx)
           if (consulta.k === 'consultar') {
-            await responder(v, m.from, { texto: await consultar(v, ctx, consulta.borrador) })
+            await responder(v, m.from, { texto: await consultar(v, ctx, consulta.borrador, lecturas) })
             await db.actualizarCaptura(capturaId, { estado: 'respondida', propuesta: consulta.borrador })
             return
           }
@@ -537,6 +625,106 @@ async function procesar(m: MensajeMeta, mensajeId: string, v: db.Vinculo | null)
   }
 }
 
+async function atenderPedidosCompuestos(
+  v: db.Vinculo, ctx: Contexto, mensajeId: string, crudo: db.Vinculo['pendiente'], pendiente: Pendiente | null,
+  resultado: Awaited<ReturnType<typeof interpretar>>, entrada: 'audio' | 'texto' | 'boton', io: IOCompuesto,
+  primera?: string,
+) {
+  const avisos: string[] = []
+  const borradores: BorradorTurno[] = []
+  const mapas: PedidoMapa[] = []
+  const ubicado = pendiente?.tipo === 'ubicado' ? pendiente.ubicado : null
+  const tieneNovedad = resultado.pedidos.some(p => p.interpretacion.intent === 'novedad')
+  const campoHoy = tieneNovedad
+    ? await db.campoRecorridoHoy(v, ctx.hoy).catch(() => null) ?? await db.campoMapaReciente(v).catch(() => null)
+    : null
+  const sesion = ctx.pilotoHabilitado && tieneNovedad ? await pilotoStore.sesionActiva(v) : null
+  let estado = crudo
+  const pedidos = conContextoRecorrida(resultado.pedidos, ctx)
+  for (const [i, { fragmento, interpretacion: it, campoComoAlternativa, sinInterpretar }] of pedidos.entries()) {
+    const id = i === 0 && primera ? primera : await db.crearCaptura({ vinculo: v, mensajeId, entrada, texto: fragmento })
+    await db.actualizarCaptura(id, {
+      interpretacion: { ...it, fragmento }, interpretadoPor: 'claude-haiku-4-5',
+      ...(i === 0 ? { tokensEntrada: resultado.uso.entrada, tokensSalida: resultado.uso.salida } : {}),
+    })
+    if (sinInterpretar || (it.intent === 'otro' && pedidos.length > 1 && !it.mortandad)) {
+      await db.actualizarCaptura(id, { estado: 'incompleta', notas: ['Fragmento literal pendiente de aclaración.'] })
+      avisos.push(`Me quedó por aclarar «${fragmento}». ¿Qué querés que haga con esa parte?`)
+      continue
+    }
+    let registro = it
+    if (it.intent === 'reubicar_observacion') {
+      if (estado?.tipo !== 'turno') {
+        avisos.push('¿Qué observación querés corregir? Necesito el borrador de la recorrida para poder moverla.')
+        await db.actualizarCaptura(id, { estado: 'incompleta' })
+        continue
+      }
+      const movida = await reubicarObservacion(v, ctx, estado, { aspecto: it.aspectoObservacion, potrero: it.potrero, campo: it.campo }, io)
+      await db.actualizarCaptura(id, { estado: movida ? 'respondida' : 'incompleta' })
+      estado = movida ?? estado
+      continue
+    }
+    if (it.intent === 'consulta_mapa') {
+      const nombre = it.campo ?? undefined
+      const potrero = it.potrero ?? undefined
+      mapas.push({ nombre, potrero, campoComoAlternativa })
+      await db.actualizarCaptura(id, { estado: 'respondida' })
+      continue
+    }
+    if (it.mortandad && (it.intent !== 'lluvia' || !mencionaLluvia(fragmento))) {
+      try {
+        avisos.push(!it.mortandad.grupos.length || puedeVer(ctx.permisos, 'hacienda')
+          ? await textoRevisionMortandad(v, ctx, it.mortandad)
+          : 'Recibí tu aviso. Tu acceso a Hacienda no permite consultar el stock.')
+      } catch (e) {
+        console.error('wa-webhook revisar mortandad', e)
+        avisos.push('Recibí el aviso de mortandad. No pude revisar el stock ahora.')
+      }
+      if (it.intent !== 'novedad' && !it.mortandad.otrosGrupos?.length) {
+        await db.actualizarCaptura(id, { estado: 'incompleta', notas: ['Mortandad informada; queda por revisar en Hacienda.'] })
+        continue
+      }
+      // El audio queda como evidencia en la novedad, aun cuando parte del relato no sea cruzable.
+      const { campo, potrero } = it.mortandad
+      const observaciones = it.observaciones.some(o => o.novedad === fragmento)
+        ? it.observaciones : [...it.observaciones, {
+          campo, potrero, aca: !potrero, agua: null, pasto: null, electrico: null, conteo: null, novedad: fragmento,
+        }]
+      registro = { ...it, intent: 'novedad', observaciones }
+    }
+    const ambiguo = entrada === 'audio' && it.intent === 'consulta_hacienda' && !nombraHacienda(fragmento)
+    if (ambiguo || (sesion && registro.intent === 'novedad')) {
+      avisos.push(ambiguo ? ACLARAR_CONSULTA_AUDIO : 'Tenés una recorrida abierta. La novedad quedó en este mensaje para que la retomes desde la sesión.')
+      await db.actualizarCaptura(id, { estado: 'incompleta' })
+      continue
+    }
+    if (it.intent === 'vacunacion_planilla' || it.intent === 'revisar_pdf' || it.intent === 'guardar_pdf') {
+      avisos.push(it.intent === 'vacunacion_planilla' ? '¿Me adjuntás la planilla de esa vacunación?'
+        : it.intent === 'guardar_pdf' ? '¿Cuál PDF querés guardar? Reenviámelo así lo ubico.'
+        : '¿Me adjuntás el PDF que querés revisar?')
+      await db.actualizarCaptura(id, { estado: 'incompleta' })
+      continue
+    }
+    const a = arrancar(registro, ctx, fragmento, { ubicado, campoHoy })
+    if ('respuesta' in a) {
+      await db.actualizarCaptura(id, { estado: a.respuesta === NO_SE ? 'respondida' : a.estado })
+      if (a.respuesta === NO_SE) avisos.push(await io.conversar(fragmento, 'otro'))
+      else if (it.intent !== 'saludo') avisos.push(a.respuesta)
+      else if (resultado.pedidos.length === 1) avisos.push(await io.conversar(fragmento, 'saludo'))
+      continue
+    }
+    if (it.mortandad && registro === it) avisos.push('Conservé el aviso de mortandad en el mensaje. Revisá los animales en Hacienda para una baja.')
+    const bloqueo = permisoDelBorrador(ctx, a.borrador)
+    if (bloqueo) {
+      await db.actualizarCaptura(id, { estado: 'descartada' })
+      avisos.push(bloqueo)
+    } else borradores.push({ capturaId: id, borrador: a.borrador })
+  }
+  await incorporarTurno(v, ctx, estado, borradores, avisos, io)
+  for (const mapa of mapas) await mostrarMapa(v, ctx,
+    crudo?.tipo === 'turno' ? crudo.pasos[0]?.pendiente ?? pendiente : pendiente, mapa)
+}
+
 async function abandonar(capturaId: string): Promise<void> {
   await db.actualizarCaptura(capturaId, {
     estado: 'incompleta',
@@ -545,30 +733,64 @@ async function abandonar(capturaId: string): Promise<void> {
 }
 
 async function mostrarMapa(v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | null, pedido: PedidoMapa, automatico = false): Promise<boolean> {
+  if (!puedeVer(ctx.permisos, 'campos')) {
+    if (!automatico) await responder(v, v.telefono, { texto: accesoDenegado('campos', 'ver') })
+    return false
+  }
   try {
-    const reciente = await db.campoMapaReciente(v).catch(() => null) ?? await db.campoRecorridoHoy(v, ctx.hoy).catch(() => null)
+    const reciente = pedido.campoId || pedido.nombre || pedido.potreroId ? null
+      : await db.campoMapaReciente(v).catch(() => null) ?? await db.campoRecorridoHoy(v, ctx.hoy).catch(() => null)
     let campo = campoParaMapa(pedido, ctx, pendiente, reciente)
+    if (pedido.nombre && !campo) {
+      if (!automatico) await responder(v, v.telefono, elegirMapa(ctx, true))
+      return false
+    }
     let focoId = pedido.potreroId
+    let vistaGeneral = false
     if (pedido.potreroId) {
       const elegido = potreroPorId(ctx.campos, pedido.potreroId)
       if (!elegido) { await responder(v, v.telefono, { texto: 'Ese potrero no está disponible para tu cuenta.' }); return false }
       campo = elegido.campo
     } else if (pedido.potrero) {
       const elegido = resolverParaMostrar(pedido.potrero, ctx.campos, campo?.id ?? null)
-      if ('varios' in elegido) {
+      if ('ok' in elegido && (!pedido.campoComoAlternativa || !campo || elegido.ok.campo.id === campo.id)) {
+        campo = elegido.ok.campo
+        focoId = elegido.ok.potrero.id
+      } else if (pedido.campoComoAlternativa && campo) {
+        vistaGeneral = true
+      } else if ('varios' in elegido) {
         await responder(v, v.telefono, { texto: '¿De cuál campo querés el detalle?', lista: { boton: 'Elegir potrero', filas: elegido.varios.slice(0, 10).map(x => ({ id: `acercar@${x.potrero.id}`, titulo: x.potrero.nombre, detalle: x.campo.nombre })) } }); return false
+      } else {
+        await responder(v, v.telefono, { texto: 'No encontré ese potrero. Decime el nombre como aparece en el mapa.' })
+        return false
       }
-      if (!('ok' in elegido)) { await responder(v, v.telefono, { texto: 'No encontré ese potrero. Decime el nombre como aparece en el mapa.' }); return false }
-      campo = elegido.ok.campo; focoId = elegido.ok.potrero.id
     }
     if (!campo) { if (!automatico) await responder(v, v.telefono, elegirMapa(ctx, Boolean(pedido.nombre || pedido.campoId))); return false }
     const capturaId = pendiente?.capturaId ?? null
     if (automatico && capturaId && await db.mapaEnviadoParaCaptura(v, capturaId, campo.id)) return false
+    if (pedido.conHacienda && focoId) {
+      const texto = await consultar(v, ctx, { tipo: 'consulta_hacienda', campoId: campo.id, potreroId: focoId })
+        .catch(() => 'No pude consultar los animales de ese potrero ahora.')
+      await responder(v, v.telefono, { texto }).catch(() => console.warn('wa-webhook no se pudo enviar la consulta de Hacienda'))
+    }
+    const datos = await db.datosMapa(v, campo.id, puedeVer(ctx.permisos, 'hacienda'))
+    if (pedido.campoComoAlternativa && focoId && datos?.id === campo.id
+      && !poligonoMapa(datos.potreros.find(p => p.id === focoId)?.poligono)) {
+      focoId = undefined
+      vistaGeneral = true
+    }
+    const detalle = focoId ? potreroPorId(ctx.campos, focoId)?.potrero.nombre : null
+    const pie = automatico && pendiente?.tipo === 'ubicacion' ? preguntaRecorrida(pendiente, ctx)
+      : vistaGeneral ? `Te muestro ${campo.nombre} porque no encontré un mapa disponible para el potrero ${pedido.potrero}.`
+      : detalle ? `Detalle de ${detalle}.` : undefined
     return await atenderMapa(campo, {
-      datos: async id => { const datos=await db.datosMapa(v,id); return datos && ctx.pilotoHabilitado ? {...datos,alertas:await pilotoStore.potrerosConProblemas(v,id),equipos:await pilotoStore.equiposConProblemas(v,id)} : datos }, render: datos => imagenMapa(datos, ctx.hoy, fetch, focoId),
+      datos: async id => datos && ctx.pilotoHabilitado
+        ? { ...datos, alertas: await pilotoStore.potrerosConProblemas(v, id), equipos: await pilotoStore.equiposConProblemas(v, id) }
+        : datos,
+      render: datos => imagenMapa(datos, ctx.hoy, fetch, focoId),
       responder: m => responder(v, v.telefono, m),
       enviarImagen: (bytes, caption, campoId) => enviarImagenMapa(v, bytes, caption, campoId, capturaId),
-    }, automatico && pendiente?.tipo === 'ubicacion' ? preguntaRecorrida(pendiente,ctx) : focoId ? `Detalle de ${potreroPorId(ctx.campos, focoId)?.potrero.nombre}.` : undefined)
+    }, pie)
   } catch (e) {
     console.warn('wa-webhook: no se pudo preparar o enviar el mapa', e instanceof Error ? e.message : String(e))
     if (!automatico) await responder(v, v.telefono, { texto: 'No pude enviar el mapa ahora. Conservé tu carga pendiente; podés escribir el nombre del potrero o pedirme el mapa nuevamente.' }).catch(() => {})
@@ -576,7 +798,17 @@ async function mostrarMapa(v: db.Vinculo, ctx: Contexto, pendiente: Pendiente | 
   }
 }
 
+function permisoDelBorrador(ctx: Contexto, b: Borrador): string | null {
+  const seccion = b.tipo === 'nota' ? b.seccionNota ?? 'campos' : seccionDe(b.tipo)
+  if (!seccion) return null
+  const esConsulta = b.tipo.startsWith('consulta_')
+  const permite = esConsulta ? puedeVer(ctx.permisos, seccion) : puedeMandar(ctx.permisos, seccion)
+  return permite ? null : accesoDenegado(seccion, esConsulta ? 'ver' : 'cargar')
+}
+
 async function avanzar(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Borrador, notasPrevias: string[], mensajeId: string = capturaId, confirmaSeleccion = false): Promise<void> {
+  const bloqueo = permisoDelBorrador(ctx, b)
+  if (bloqueo) { await responder(v, v.telefono, { texto: bloqueo }); return }
   const paso: Paso = siguientePaso(capturaId, b, ctx)
   const notas = [...notasPrevias, ...paso.notas]
   const to = v.telefono
@@ -643,6 +875,8 @@ async function avanzar(v: db.Vinculo, ctx: Contexto, capturaId: string, b: Borra
   }
 }
 
+const mencionaLluvia = (texto: string) => /\b(?:lluvia|llovio|llovieron|llovido|pluviometro|milimetros?|mm)\b/.test(norm(texto))
+
 const ACLARAR_CONSULTA_AUDIO = 'No me quedó clara la pregunta. ¿Me la repetís en otro audio o por texto?'
 
 async function pausarRecorridaNegada(v: db.Vinculo, pendiente: Pendiente | null, texto: string): Promise<string> {
@@ -659,7 +893,9 @@ async function responderConsulta(v: db.Vinculo, ctx: Contexto, capturaId: string
   return 'Decime qué dato querés consultar y en qué campo.'
 }
 
-async function consultar(v: db.Vinculo, ctx: Contexto, b: Borrador): Promise<string> {
+async function consultar(v: db.Vinculo, ctx: Contexto, b: Borrador, lecturas?: LecturasTurno): Promise<string> {
+  const bloqueo = permisoDelBorrador(ctx, b)
+  if (bloqueo) return bloqueo
   const campo = campoPorId(ctx.campos, b.campoId)
   const potrero = potreroPorId(ctx.campos, b.potreroId)
   const desde = b.periodo === 'anio' ? `${ctx.hoy.slice(0, 4)}-01-01` : b.periodo === 'semana' ? inicioSemana(ctx.hoy) : `${ctx.hoy.slice(0, 7)}-01`
@@ -675,9 +911,14 @@ async function consultar(v: db.Vinculo, ctx: Contexto, b: Borrador): Promise<str
     case 'consulta_gastos':
       return R.resumenGastos(desde, ctx.hoy, await db.resumenGastos(v, desde, ctx.hoy, b.campoId ?? null, b.categoriaId ?? null))
     case 'consulta_cargas':
-      return R.cargasRecientes(await db.cargasRecientes(v, b.campoId ?? null))
+      return R.cargasRecientes(await db.cargasRecientes(v, b.campoId ?? null, ctx.permisos))
+    case 'consulta_campos': {
+      const nombres = ctx.campos.map(c => c.nombre)
+      if (!nombres.length) return 'Todavía no veo campos registrados en esta cuenta.'
+      return nombres.length === 1 ? 'Tenés registrado el campo ' + nombres[0] + '.' : 'Estos son tus campos:\n' + nombres.map(n => '• ' + n).join('\n')
+    }
     case 'consulta_hacienda': {
-      const filas = await db.hacienda(v, b)
+      const filas = await (lecturas?.stockVerificado(b) ?? db.hacienda(v, b))
       if (!b.categoriaAnimal) return R.hacienda(filas, { campo: potrero?.campo.nombre ?? campo?.nombre, potrero: potrero?.potrero.nombre })
       const cantidad = filas.filter(f => f.categoria === b.categoriaAnimal).reduce((total, f) => total + f.cabezas, 0)
       const donde = potrero ? `en el ${potrero.potrero.nombre} de ${potrero.campo.nombre}` : campo ? `en ${campo.nombre}` : 'en tus campos'
@@ -718,6 +959,8 @@ async function confirmar(
   compuesto?: { estado: PendienteTurno; siguiente: db.Vinculo['pendiente'] },
 ): Promise<EstadoCarga | null> {
   const to = v.telefono
+  const bloqueo = permisoDelBorrador(ctx, b)
+  if (bloqueo) { await responder(v, to, { texto: bloqueo }); return null }
   const siguiente: PendienteMortandad | null = b.tipo === 'lluvia' && b.mortandad
     ? { tipo: 'mortandad', capturaId: null, reporte: b.mortandad }
     : null
@@ -732,6 +975,12 @@ async function confirmar(
     return null
   }
 
+  if (b.tipo === 'nota') {
+    await responder(v, to, { texto: 'Guardé la nota. Podés pedirme «mis notas guardadas» para recuperarla.'
+      + (b.seccionNota === 'hacienda' ? ' El pedido queda disponible para revisar su aplicación en Hacienda.' : '') })
+      .catch(e => console.error('wa-webhook enviar confirmación de nota', e))
+    return 'guardada'
+  }
   if (b.tipo === 'recorrida') return await confirmarRecorrida(v, ctx, capturaId, b)
   if (b.tipo !== 'lluvia' && b.tipo !== 'gasto') return null
   // Registrar el campo elegido sólo después de ganar el bloqueo de confirmación.
@@ -766,6 +1015,9 @@ async function confirmar(
     verificar: () => db.verificarCarga(v, tabla, id),
     mensajeGuardada: lluvia ? R.lluviaAnotada(lluvia) : `${R.gastoAnotado(gasto)}${fotoFalto}`,
     resumir: async () => {
+      if (!puedeVer(ctx.permisos, lluvia ? 'campos' : 'plata')) {
+        return lluvia ? R.lluviaAnotada(lluvia) : R.gastoAnotado(gasto) + fotoFalto
+      }
       if (lluvia) {
         // Un mes ya terminado se cuenta entero; el actual, hasta hoy.
         const hasta = fecha.slice(0, 7) < ctx.hoy.slice(0, 7) ? finDeMes(fecha) : ctx.hoy

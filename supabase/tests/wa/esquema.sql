@@ -1,7 +1,7 @@
 -- Esquema mínimo copiado de producción (12/10/2026): sólo lo que toca el guardado de la recorrida.
 create role authenticated nologin;
 create schema auth;
-create table auth.users(id uuid primary key,raw_user_meta_data jsonb not null default '{}');
+create table auth.users(id uuid primary key,raw_user_meta_data jsonb not null default '{}',phone text,phone_confirmed_at timestamptz);
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
 grant usage on schema auth to authenticated;
@@ -11,7 +11,7 @@ create type pasto_estado as enum ('abundante','normal','escaso','pelado');
 create type electrico_estado as enum ('ok','cortado');
 
 create table empresa (id uuid primary key, nombre text not null);
-create table miembro_empresa (user_id uuid not null, empresa_id uuid not null references empresa(id));
+create table miembro_empresa (user_id uuid not null, empresa_id uuid not null references empresa(id), rol text not null default 'dueno', niveles jsonb, acceso text);
 create table campo (id uuid primary key, empresa_id uuid not null references empresa(id), nombre text not null);
 create table potrero (id uuid primary key, empresa_id uuid not null references empresa(id), campo_id uuid not null references campo(id), nombre text not null, poligono jsonb);
 create table recorrida (
@@ -42,7 +42,12 @@ create view v_stock_potrero with (security_invoker = true) as
   select empresa_id, potrero_id, count(*)::integer as cabezas from animal a where estado = 'activo' and potrero_id is not null group by empresa_id, potrero_id;
 
 create function auth_empresa_ids() returns setof uuid language sql stable set search_path to 'public' as $$
-  select empresa_id from miembro_empresa where user_id = auth.uid() $$;
+  select empresa_id from miembro_empresa
+  where user_id = auth.uid() and case
+    when nullif(current_setting('request.headers',true),'')::jsonb ? 'x-troppero-cuenta'
+      then empresa_id::text = nullif(current_setting('request.headers',true),'')::jsonb->>'x-troppero-cuenta'
+    else (select count(*) from miembro_empresa where user_id=auth.uid()) = 1
+  end $$;
 grant select on miembro_empresa, empresa to authenticated;
 grant all on campo, potrero, recorrida, observacion_potrero to authenticated;
 grant select on animal, v_stock_potrero to authenticated;

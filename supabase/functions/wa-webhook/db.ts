@@ -8,6 +8,7 @@
 //   queda con su id. Nunca con la clave de servicio.
 
 import postgres from 'npm:postgres@3.4.5'
+import { permisosDe, puedeMandar, puedeVer, type MembresiaWhatsApp, type PermisosWhatsApp, type Seccion } from '../_shared/wa/permisos.ts'
 import { finDeMes, sumarDias,hoyAR } from '../_shared/wa/texto.ts'
 import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
 import type { Agua, Borrador, Campo, Categoria, Contexto, Electrico, InfraNueva, Pasto, Pendiente, PendienteInfra, PendienteMortandad, PendienteTurno } from '../_shared/wa/tipos.ts'
@@ -39,6 +40,41 @@ export async function vinculoDe(telefono: string): Promise<Vinculo | null> {
         where m.user_id = v.user_id and m.empresa_id = v.empresa_id
       )`
   return v ?? null
+}
+
+// Sólo desde un mensaje firmado por Meta. La invitación aceptada ya verificó
+// el número en Auth y delegó el canal. Un vínculo inactivo requiere revisión.
+export async function vincularAccesoWhatsapp(telefono: string): Promise<Vinculo | null> {
+  if (!/^\d{8,15}$/.test(telefono)) return null
+  const [v] = await sql<Vinculo[]>`
+    with elegible as (
+      select u.id as user_id, m.empresa_id
+      from auth.users u join miembro_empresa m on m.user_id=u.id
+      where u.phone_confirmed_at is not null and u.phone in (${telefono}, ${'+' + telefono})
+        and to_jsonb(m)->>'acceso'='whatsapp'
+        and (select count(*) from miembro_empresa otras where otras.user_id=u.id)=1
+        and not exists (select 1 from wa_vinculo previo where previo.telefono=${telefono} or previo.user_id=u.id)
+      for share of u,m
+    )
+    insert into wa_vinculo(telefono,user_id,empresa_id)
+    select ${telefono}, user_id, empresa_id from elegible where (select count(*) from elegible)=1
+    on conflict do nothing
+    returning id,telefono,user_id,empresa_id,pendiente,pendiente_at`
+  return v ?? await vinculoDe(telefono)
+}
+
+export async function permisosVinculados(v: Vinculo, tx: Tx | typeof sql = sql, bloquear = false) {
+  const [m] = await tx<MembresiaWhatsApp[]>`select to_jsonb(m)->>'rol' as rol,
+    to_jsonb(m)->'niveles' as niveles, to_jsonb(m)->'secciones' as secciones, to_jsonb(m)->>'acceso' as acceso
+    from wa_vinculo w join miembro_empresa m on m.user_id=w.user_id and m.empresa_id=w.empresa_id
+    where w.id=${v.id} and w.telefono=${v.telefono} and w.user_id=${v.user_id} and w.empresa_id=${v.empresa_id} and w.activo
+    ${bloquear ? tx`for share of w,m` : tx``}`
+  return m ? permisosDe(m) : null
+}
+
+export async function exigirCarga(tx: Tx, v: Vinculo, seccion: Seccion): Promise<void> {
+  const p = await permisosVinculados(v, tx, true)
+  if (!p || !puedeMandar(p, seccion)) throw new Error('Permiso de carga revocado')
 }
 
 /** Guarda el mensaje entrante. null = ya estaba (Meta lo reenvió): no se procesa de nuevo. */
@@ -90,11 +126,49 @@ export async function guardarPendiente(vinculoId: string, p: Vinculo['pendiente'
     where id = ${vinculoId}`
 }
 
+/** La aclaración del usuario puede referirse al último PDF recibido en su chat. */
+export async function pdfAnterior(v: Vinculo, mensajeId: string): Promise<{ id: string; media: string } | null> {
+  const [r] = await sql<{ id: string; tipo: string; id_media: string | null }[]>`
+    select anterior.id, anterior.tipo, anterior.cuerpo #>> '{document,id}' as id_media
+    from wa_mensaje actual join wa_mensaje anterior
+      on anterior.vinculo_id = actual.vinculo_id and anterior.empresa_id = actual.empresa_id
+    where actual.id = ${mensajeId} and actual.vinculo_id = ${v.id} and actual.empresa_id = ${v.empresa_id}
+      and anterior.direccion = 'entrante' and anterior.created_at < actual.created_at
+      and anterior.created_at >= actual.created_at - interval '15 minutes'
+    order by anterior.created_at desc limit 1`
+  return r?.tipo === 'document' && r.id_media ? { id: r.id, media: r.id_media } : null
+}
+
 /** La fecha relativa del mensaje no cambia si el procesamiento cruza medianoche. */
 export async function fechaDeEntrada(v:Vinculo,mensajeId:string):Promise<string>{
   const [r]=await sql<{created_at:string}[]>`select created_at::text from wa_mensaje where id=${mensajeId} and vinculo_id=${v.id} and empresa_id=${v.empresa_id} and direccion='entrante'`
   if(!r)throw Error('Mensaje no disponible para este vínculo')
   return hoyAR(new Date(r.created_at))
+}
+
+export type MensajeReciente = { autor: 'productor' | 'tropero'; texto: string }
+
+export async function conversacionReciente(v: Vinculo, mensajeId: string, incluirRespuestas = true): Promise<MensajeReciente[]> {
+  const filas = await sql<MensajeReciente[]>`
+    select case when m.direccion='entrante' then 'productor' else 'tropero' end as autor, contenido.texto
+    from wa_mensaje entrada join wa_mensaje m
+      on m.vinculo_id=entrada.vinculo_id and m.empresa_id=entrada.empresa_id and m.telefono=entrada.telefono
+    cross join lateral (
+      select left(coalesce(m.cuerpo #>> '{text,body}', m.cuerpo #>> '{interactive,body,text}',
+        m.cuerpo #>> '{document,caption}', (
+          select c.texto from captura c where c.mensaje_id=m.id and c.entrada='audio'
+            and c.user_id=${v.user_id} and c.empresa_id=m.empresa_id and c.texto is not null
+          order by c.created_at, c.id limit 1
+        )),300) as texto
+    ) contenido
+    where entrada.id=${mensajeId} and entrada.direccion='entrante' and entrada.vinculo_id=${v.id}
+      and entrada.empresa_id=${v.empresa_id} and entrada.telefono=${v.telefono}
+      and m.created_at < entrada.created_at and m.created_at >= entrada.created_at - interval '24 hours'
+      and (${incluirRespuestas} or m.direccion='entrante')
+      and m.tipo in ('text','audio','document','interactive')
+      and nullif(trim(contenido.texto),'') is not null
+    order by m.created_at desc, m.id desc limit 8`
+  return filas.reverse()
 }
 
 /** Contexto de la consulta de lluvia más reciente de este número. */
@@ -190,7 +264,11 @@ export async function tomarPropuesta(v: Vinculo, id: string, pendiente: Pendient
       and exists (select 1 from miembro_empresa m where m.user_id = w.user_id and m.empresa_id = w.empresa_id)
       for update`
     if (!vigente) return false
-    const [captura] = await tx`update captura set estado = 'confirmada', updated_at = now()
+    if (actual.borrador.tipo === 'nota') await exigirCarga(tx, v, actual.borrador.seccionNota ?? 'campos')
+    const esNota = actual.borrador.tipo === 'nota'
+    const [captura] = await tx`update captura set estado = 'confirmada', updated_at = now(),
+      escrito_tabla = case when ${esNota} then 'captura' else escrito_tabla end,
+      escrito_id = case when ${esNota} then id else escrito_id end
       where id = ${id} and empresa_id = ${v.empresa_id} and user_id = ${v.user_id}
       and estado = 'propuesta' returning id`
     if (!captura) return false
@@ -208,10 +286,16 @@ export async function estadoCaptura(id: string): Promise<string | null> {
 
 // ── Como el usuario ────────────────────────────────────────────────────
 
-export async function comoUsuario<T>(userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+export async function usarCuentaVinculada(tx: Tx, v: Vinculo): Promise<void> {
+  await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: v.user_id, role: 'authenticated' })}, true),
+    set_config('request.headers', ${JSON.stringify({ 'x-troppero-cuenta': v.empresa_id })}, true)`
+  await tx.unsafe('set local role authenticated')
+}
+
+export async function comoUsuario<T>(v: Vinculo, fn: (tx: Tx) => Promise<T>, carga?: Seccion): Promise<T> {
   return (await sql.begin(async (tx) => {
-    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId, role: 'authenticated' })}, true)`
-    await tx.unsafe('set local role authenticated')
+    if (carga) await exigirCarga(tx, v, carga)
+    await usarCuentaVinculada(tx, v)
     return fn(tx)
   })) as T
 }
@@ -219,8 +303,7 @@ export async function comoUsuario<T>(userId: string, fn: (tx: Tx) => Promise<T>)
 /** Un snapshot consistente para el PDF; lee tanto registros de app como de WhatsApp. */
 export async function datosSemana(v: Vinculo, periodo: PeriodoSemana): Promise<SemanaCampo> {
   return await sql.begin('isolation level repeatable read read only', async tx => {
-    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: v.user_id, role: 'authenticated' })}, true)`
-    await tx.unsafe('set local role authenticated')
+    await usarCuentaVinculada(tx, v)
     const [empresa] = await tx<{ nombre: string }[]>`select nombre from empresa where id=${v.empresa_id}
       and exists(select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id})`
     if (!empresa) throw new Error('El vínculo no tiene acceso a esta empresa')
@@ -256,7 +339,7 @@ export async function datosSemana(v: Vinculo, periodo: PeriodoSemana): Promise<S
 export async function contexto(v: Vinculo, hoy: string): Promise<Contexto & { categoriasOcr: { id: string; nombre: string; grupo: string | null; aplica_a: string | null }[] }> {
   const [u] = await sql<{ nombre: string | null }[]>`
     select nullif(trim(raw_user_meta_data->>'nombre'), '') as nombre from auth.users where id = ${v.user_id}`
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const filas = await tx<{ campo_id: string; campo: string; potrero_id: string | null; potrero: string | null }[]>`
       select c.id as campo_id, c.nombre as campo, p.id as potrero_id, p.nombre as potrero
       from campo c left join potrero p on p.campo_id = c.id
@@ -284,7 +367,7 @@ export type TablaCarga = 'lluvia' | 'movimiento_financiero' | 'observacion_potre
 
 /** Comprueba el ID concreto con RLS y dentro de la empresa del vínculo. */
 export function verificarCarga(v: Vinculo, tabla: TablaCarga, id: string): Promise<boolean> {
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const filas = tabla === 'lluvia'
       ? await tx`select id from lluvia where id = ${id} and empresa_id = ${v.empresa_id}`
       : tabla === 'observacion_potrero'
@@ -301,6 +384,11 @@ export async function verificarCargaDeCaptura(v: Vinculo, id: string): Promise<b
     select escrito_tabla, escrito_id from captura
     where id = ${id} and empresa_id = ${v.empresa_id} and user_id = ${v.user_id}`
   const tablas: string[] = ['lluvia', 'movimiento_financiero', 'observacion_potrero']
+  if (c?.escrito_tabla === 'captura' && c.escrito_id === id) {
+    const [nota] = await sql`select 1 from captura where id=${id} and empresa_id=${v.empresa_id} and user_id=${v.user_id}
+      and estado='confirmada' and propuesta->>'tipo'='nota'`
+    return Boolean(nota)
+  }
   if (!c?.escrito_id || !c.escrito_tabla || !tablas.includes(c.escrito_tabla)) return null
   return verificarCarga(v, c.escrito_tabla as TablaCarga, c.escrito_id)
 }
@@ -308,7 +396,7 @@ export async function verificarCargaDeCaptura(v: Vinculo, id: string): Promise<b
 // ── Escrituras ─────────────────────────────────────────────────────────
 
 export function escribirLluvia(v: Vinculo, b: Borrador, id: string): Promise<string> {
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const campo = await tx`select 1 from campo where id=${b.campoId!} and empresa_id=${v.empresa_id}`
     if(campo.length!==1)throw new Error('Campo ajeno a la empresa')
     const [r] = await tx<{ id: string }[]>`
@@ -316,14 +404,14 @@ export function escribirLluvia(v: Vinculo, b: Borrador, id: string): Promise<str
       values (${id}, ${v.empresa_id}, ${b.campoId!}, ${b.fecha!}, ${b.mm!}, 'manual')
       returning id`
     return r.id
-  })
+  }, 'campos')
 }
 
 export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | null, id: string): Promise<string> {
   const lineas = (b.ivaLineas ?? []).filter((l) => l.neto || l.iva)
   const neto = lineas.reduce((s, l) => s + (l.neto || 0), 0)
   const iva = lineas.reduce((s, l) => s + (l.iva || 0), 0)
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const campo = await tx`select 1 from campo where id=${b.campoId!} and empresa_id=${v.empresa_id}`
     const categoria = await tx`select 1 from categoria_movimiento where id=${b.categoriaId!} and (empresa_id is null or empresa_id=${v.empresa_id})`
     if(campo.length!==1 || categoria.length!==1)throw new Error('Campo o categoría ajenos a la empresa')
@@ -345,7 +433,7 @@ export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | 
         values (${v.empresa_id}, ${id}, ${l.concepto ?? null}, ${l.neto || 0}, ${l.alicuota}, ${l.iva || 0}, ${i})`
     }
     return id
-  })
+  }, 'plata')
 }
 
 /** Sube la foto al bucket privado, con el mismo path que usa la app. */
@@ -377,7 +465,7 @@ export function lluviaMes(v: Vinculo, campoId: string | null, hasta: string, sol
   const antDesde = `${Number(hasta.slice(0, 4)) - 1}${hasta.slice(4, 7)}-01`
   const antDia = Math.min(Number(hasta.slice(8)), Number(finDeMes(antDesde).slice(8)))
   const antHasta = `${antDesde.slice(0, 8)}${String(antDia).padStart(2, '0')}`
-  return comoUsuario(v.user_id, (tx) =>
+  return comoUsuario(v, (tx) =>
     tx<{ campo_id: string; campo: string; mes_mm: number; mes_mediciones: number; ant_mm: number | null }[]>`
       select c.id as campo_id, c.nombre as campo,
         coalesce(sum(l.mm) filter (where l.fecha between ${desde} and ${hasta}), 0)::float8 as mes_mm,
@@ -393,7 +481,7 @@ export function lluviaMes(v: Vinculo, campoId: string | null, hasta: string, sol
 
 /** Devuelve cada fuente por separado. Un cero registrado se conserva como tal. */
 export function lluviaPeriodo(v: Vinculo, campoId: string | null, desde: string, hasta: string) {
-  return comoUsuario(v.user_id, tx =>
+  return comoUsuario(v, tx =>
     tx<{ campo: string; medida: number | null; estimada: number | null; dias_estimados: number }[]>`
       select c.nombre as campo,
         sum(l.mm) filter (where l.fuente = 'manual')::float8 as medida,
@@ -410,7 +498,7 @@ export function lluviaPeriodo(v: Vinculo, campoId: string | null, desde: string,
 /** Total de la categoría en el mes de `fecha` (el del gasto, no el de hoy). */
 export async function gastoMes(v: Vinculo, categoriaId: string, fecha: string) {
   const desde = `${fecha.slice(0, 7)}-01`
-  const [r] = await comoUsuario(v.user_id, (tx) =>
+  const [r] = await comoUsuario(v, (tx) =>
     tx<{ total: number; cantidad: number }[]>`
       select coalesce(sum(monto), 0)::float8 as total, count(*)::int as cantidad
       from movimiento_financiero
@@ -422,7 +510,7 @@ export async function gastoMes(v: Vinculo, categoriaId: string, fecha: string) {
 }
 
 export function hacienda(v: Vinculo, b: Borrador): Promise<FilaHacienda[]> {
-  return comoUsuario(v.user_id, (tx) =>
+  return comoUsuario(v, (tx) =>
     tx<FilaHacienda[]>`
       select c.nombre as campo, p.nombre as potrero, a.categoria::text as categoria, count(*)::int as cabezas
       from animal a join potrero p on p.id = a.potrero_id join campo c on c.id = p.campo_id
@@ -435,7 +523,7 @@ export function hacienda(v: Vinculo, b: Borrador): Promise<FilaHacienda[]> {
 
 export async function vencimientos(v: Vinculo, hoy: string, dias: number): Promise<{ hasta: string; filas: FilaVencimiento[] }> {
   const hasta = sumarDias(hoy, dias)
-  const filas = await comoUsuario(v.user_id, (tx) =>
+  const filas = await comoUsuario(v, (tx) =>
     tx<FilaVencimiento[]>`
       select m.fecha_vencimiento::text as fecha, m.tipo::text as tipo, m.monto::float8 as monto,
              m.descripcion, m.contraparte, cat.nombre as categoria
@@ -450,7 +538,7 @@ export async function vencimientos(v: Vinculo, hoy: string, dias: number): Promi
 
 /** Cuándo llegó cada animal al potrero: su último movimiento (o su alta). */
 export function diasEnPotrero(v: Vinculo, potreroId: string) {
-  return comoUsuario(v.user_id, (tx) =>
+  return comoUsuario(v, (tx) =>
     tx<{ desde: string; cabezas: number }[]>`
       select coalesce(ult.fecha, a.created_at::date)::text as desde, count(*)::int as cabezas
       from animal a
@@ -484,7 +572,7 @@ export type ObsEscrita = {
  * que dijo y la novedad se suma. Devuelve el id de cada observación.
  */
 export function escribirRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): Promise<string[]> {
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const filas=await tx<{id:string;campo_id:string}[]>`select p.id,p.campo_id from potrero p join campo c on c.id=p.campo_id
       where p.empresa_id=${v.empresa_id} and c.empresa_id=${v.empresa_id} and p.id=any(${sql.array(obs.map(o=>o.potreroId))}::uuid[])`
     const campos=new Map(filas.map(p=>[p.id,p.campo_id]))
@@ -535,13 +623,13 @@ export function escribirRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): P
       }
     }
     return ids
-  })
+  }, 'campos')
 }
 
 // ── Consultas nuevas: datos del productor bajo el mismo RLS ──────────────
 
 export function resumenRecorrida(v: Vinculo, fecha: string, campoId: string | null) {
-  return comoUsuario(v.user_id, (tx) => tx<{ campo: string; recorridos: number; total: number; pendientes: string[] }[]>`
+  return comoUsuario(v, (tx) => tx<{ campo: string; recorridos: number; total: number; pendientes: string[] }[]>`
     select c.nombre as campo, count(p.id)::int as total,
       count(p.id) filter (where exists (select 1 from observacion_potrero o join recorrida r on r.id=o.recorrida_id
         where o.potrero_id=p.id and r.fecha=${fecha} and r.empresa_id=${v.empresa_id}))::int as recorridos,
@@ -555,7 +643,7 @@ export function resumenRecorrida(v: Vinculo, fecha: string, campoId: string | nu
 
 export type UltimaObservacion = { fecha: string; campo: string; potrero: string; agua: Agua | null; pasto: Pasto | null; electrico: Electrico | null; conteo: number | null; novedad: string | null }
 export async function ultimaObservacion(v: Vinculo, potreroId: string): Promise<UltimaObservacion | null> {
-  const filas = await comoUsuario(v.user_id, (tx) => tx<UltimaObservacion[]>`
+  const filas = await comoUsuario(v, (tx) => tx<UltimaObservacion[]>`
     select r.fecha::text,c.nombre as campo,p.nombre as potrero,o.agua,o.pasto,o.electrico,o.conteo,o.novedad
     from observacion_potrero o join recorrida r on r.id=o.recorrida_id join potrero p on p.id=o.potrero_id join campo c on c.id=r.campo_id
     where o.empresa_id=${v.empresa_id} and p.id=${potreroId}
@@ -564,7 +652,7 @@ export async function ultimaObservacion(v: Vinculo, potreroId: string): Promise<
 }
 
 export function novedades(v: Vinculo, desde: string, hasta: string, campoId: string | null) {
-  return comoUsuario(v.user_id, (tx) => tx<{ fecha: string; campo: string; potrero: string; novedad: string }[]>`
+  return comoUsuario(v, (tx) => tx<{ fecha: string; campo: string; potrero: string; novedad: string }[]>`
     select r.fecha::text,c.nombre as campo,p.nombre as potrero,o.novedad
     from observacion_potrero o join recorrida r on r.id=o.recorrida_id join potrero p on p.id=o.potrero_id join campo c on c.id=r.campo_id
     where o.empresa_id=${v.empresa_id} and r.fecha between ${desde} and ${hasta}
@@ -573,7 +661,7 @@ export function novedades(v: Vinculo, desde: string, hasta: string, campoId: str
 }
 
 export function resumenGastos(v: Vinculo, desde: string, hasta: string, campoId: string | null, categoriaId: string | null) {
-  return comoUsuario(v.user_id, (tx) => tx<{ campo: string; categoria: string; cantidad: number; total: number }[]>`
+  return comoUsuario(v, (tx) => tx<{ campo: string; categoria: string; cantidad: number; total: number }[]>`
     select c.nombre as campo,coalesce(cat.nombre,'Sin categoría') as categoria,count(*)::int as cantidad,sum(m.monto)::float8 as total
     from movimiento_financiero m join campo c on c.id=m.campo_id left join categoria_movimiento cat on cat.id=m.categoria_id
     where m.empresa_id=${v.empresa_id} and m.tipo='gasto' and m.estado<>'anulado'
@@ -582,28 +670,42 @@ export function resumenGastos(v: Vinculo, desde: string, hasta: string, campoId:
     group by c.nombre,cat.nombre order by c.nombre,cat.nombre`)
 }
 
-export type CargaReciente = { fecha: string; tipo: string; campo: string; cantidad: number | null }
+export type CargaReciente = { fecha: string; tipo: string; campo: string; cantidad: number | null; contenido?: string | null }
 /** Una captura confirmada sólo se muestra cuando el registro concreto sigue existiendo. */
-export function cargasRecientes(v: Vinculo, campoId: string | null) {
-  return comoUsuario(v.user_id, (tx) => tx<CargaReciente[]>`
-    select x.fecha,x.tipo,x.campo,x.cantidad from (
-      select cap.created_at, l.fecha::text as fecha,'lluvia' as tipo,c.nombre as campo,l.mm::float8 as cantidad
+export async function cargasRecientes(v: Vinculo, campoId: string | null, permisos?: PermisosWhatsApp) {
+  const p = permisos ?? await permisosVinculados(v) ?? undefined
+  const campos = puedeVer(p, 'campos') || puedeMandar(p, 'campos')
+  const plata = puedeVer(p, 'plata') || puedeMandar(p, 'plata')
+  const hacienda = puedeVer(p, 'hacienda') || puedeMandar(p, 'hacienda')
+  return comoUsuario(v, (tx) => tx<CargaReciente[]>`
+    select x.fecha,x.tipo,x.campo,x.cantidad,x.contenido from (
+      select cap.created_at, l.fecha::text as fecha,'lluvia' as tipo,c.nombre as campo,l.mm::float8 as cantidad,null::text as contenido
       from captura cap join lluvia l on cap.escrito_tabla='lluvia' and l.id=cap.escrito_id and l.empresa_id=cap.empresa_id join campo c on c.id=l.campo_id
-      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
+      where ${campos} and cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
       union all
-      select cap.created_at,m.fecha_devengo::text,'gasto',c.nombre,m.monto::float8
+      select cap.created_at,m.fecha_devengo::text,'gasto',c.nombre,m.monto::float8,null::text
       from captura cap join movimiento_financiero m on cap.escrito_tabla='movimiento_financiero' and m.id=cap.escrito_id and m.empresa_id=cap.empresa_id join campo c on c.id=m.campo_id
-      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and m.estado<>'anulado' and (${campoId}::uuid is null or c.id=${campoId})
+      where ${plata} and cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and m.estado<>'anulado' and (${campoId}::uuid is null or c.id=${campoId})
       union all
-      select cap.created_at,r.fecha::text,'recorrida',c.nombre,null::float8
+      select cap.created_at,r.fecha::text,'recorrida',c.nombre,null::float8,null::text
       from captura cap join observacion_potrero o on cap.escrito_tabla='observacion_potrero' and o.id=cap.escrito_id and o.empresa_id=cap.empresa_id join recorrida r on r.id=o.recorrida_id join campo c on c.id=r.campo_id
-      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
+      where ${campos} and cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
+      union all
+      select cap.created_at,coalesce(cap.propuesta->>'fecha',cap.created_at::date::text),'nota',coalesce(c.nombre,'Sin campo indicado'),null::float8,
+        cap.propuesta->>'descripcion'
+      from captura cap left join campo c on c.id=nullif(cap.propuesta->>'campoId','')::uuid and c.empresa_id=cap.empresa_id
+      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada'
+        and cap.escrito_tabla='captura' and cap.escrito_id=cap.id and cap.propuesta->>'tipo'='nota'
+        and ((coalesce(cap.propuesta->>'seccionNota','campos')='campos' and ${campos})
+          or (cap.propuesta->>'seccionNota'='hacienda' and ${hacienda})
+          or (cap.propuesta->>'seccionNota'='plata' and ${plata}))
+        and (${campoId}::uuid is null or c.id=${campoId})
     ) x order by x.created_at desc limit 5`)
 }
 
 /** Después de un error: ¿cada potrero quedó hoy con lo que dijo? Un update no deja un id propio para buscar. */
 export function verificarRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): Promise<boolean> {
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     for (const o of obs) {
       const filas = await tx`
         select 1 from observacion_potrero op join recorrida r on r.id = op.recorrida_id
@@ -623,7 +725,7 @@ export function verificarRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): 
 
 /** Cuántos potreros de cada campo tienen observación hoy, sobre el total. */
 export function avanceRecorrida(v: Vinculo, hoy: string, campoIds: string[]) {
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const filas: { campo: string; recorridos: number; total: number }[] = []
     for (const id of campoIds) {
       const [f] = await tx<{ campo: string; recorridos: number; total: number }[]>`
@@ -640,7 +742,7 @@ export function avanceRecorrida(v: Vinculo, hoy: string, campoIds: string[]) {
 
 /** El campo que este usuario recorre hoy, si tiene recorrida hoy en uno solo: desempata "el 5". */
 export async function campoRecorridoHoy(v: Vinculo, hoy: string): Promise<string | null> {
-  const filas = await comoUsuario(v.user_id, (tx) => tx<{ campo_id: string }[]>`
+  const filas = await comoUsuario(v, (tx) => tx<{ campo_id: string }[]>`
     select distinct campo_id from recorrida
     where empresa_id = ${v.empresa_id} and fecha = ${hoy} and created_by = ${v.user_id}`)
   return filas.length === 1 ? filas[0].campo_id : null
@@ -648,7 +750,7 @@ export async function campoRecorridoHoy(v: Vinculo, hoy: string): Promise<string
 
 /** Los potreros con dibujo, para ubicar al que comparte su ubicación. */
 export async function potrerosDibujados(v: Vinculo): Promise<PotreroDibujado[]> {
-  const filas = await comoUsuario(v.user_id, (tx) => tx<{ id: string; nombre: string; campo_id: string; campo: string; poligono: unknown }[]>`
+  const filas = await comoUsuario(v, (tx) => tx<{ id: string; nombre: string; campo_id: string; campo: string; poligono: unknown }[]>`
     select p.id, p.nombre, c.id as campo_id, c.nombre as campo, p.poligono
     from potrero p join campo c on c.id = p.campo_id
     where c.empresa_id = ${v.empresa_id} and p.poligono is not null`)
@@ -663,18 +765,23 @@ export async function potrerosDibujados(v: Vinculo): Promise<PotreroDibujado[]> 
 }
 
 /** Campo y polígonos con el rol del usuario, y acotados a la empresa del vínculo. */
-export function datosMapa(v: Vinculo, campoId: string): Promise<MapaCampo | null> {
-  return comoUsuario(v.user_id, async tx => {
-    const [campo] = await tx<{ id: string; nombre: string }[]>`select c.id,c.nombre from campo c where c.id=${campoId} and c.empresa_id=${v.empresa_id}
+export function datosMapa(v: Vinculo, campoId: string, mostrarHacienda = true): Promise<MapaCampo | null> {
+  return comoUsuario(v, async tx => {
+    const [campo] = await tx<{ id: string; nombre: string; contorno: unknown }[]>`select c.id,c.nombre,to_jsonb(c)->'contorno' as contorno from campo c where c.id=${campoId} and c.empresa_id=${v.empresa_id}
       and exists(select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id})`
     if (!campo) return null
     // Cabezas activas (vista con security_invoker: respeta RLS) y la última recorrida de cada potrero.
-    const potreros = await tx<MapaCampo['potreros']>`select p.id,p.nombre,p.poligono,
-        coalesce((select s.cabezas from v_stock_potrero s where s.potrero_id=p.id and s.empresa_id=${v.empresa_id}),0)::int as cabezas,
+    const potreros = await tx<MapaCampo['potreros']>`select p.id,p.nombre,p.poligono,to_jsonb(p)->>'estado_ciclo' as "estadoCiclo",
+        case when ${mostrarHacienda} then coalesce((select s.cabezas from v_stock_potrero s where s.potrero_id=p.id and s.empresa_id=${v.empresa_id}),0)::int end as cabezas,
         (select max(r.fecha)::text from observacion_potrero o join recorrida r on r.id=o.recorrida_id
-          where o.potrero_id=p.id and r.empresa_id=${v.empresa_id}) as "ultimaRecorrida"
+          where o.potrero_id=p.id and r.empresa_id=${v.empresa_id}) as "ultimaRecorrida",
+        (select jsonb_build_object('fecha',r.fecha::text,'agua',o.agua::text,'electrico',o.electrico::text,'novedad',o.novedad)
+          from observacion_potrero o join recorrida r on r.id=o.recorrida_id
+          where o.potrero_id=p.id and o.empresa_id=${v.empresa_id} and r.empresa_id=${v.empresa_id}
+          order by r.fecha desc,o.created_at desc,o.id desc limit 1) as "ultimaObservacion"
       from potrero p join campo c on c.id=p.campo_id
       where c.id=${campo.id} and c.empresa_id=${v.empresa_id} and p.empresa_id=${v.empresa_id} order by p.nombre`
+    if (!mostrarHacienda) for (const p of potreros) delete p.cabezas
     // Un campo que todavía no usa recorridas no se llena de «nunca».
     if (!potreros.some(p => p.ultimaRecorrida)) for (const p of potreros) delete p.ultimaRecorrida
     const infra = await tx<{ id: string; tipo: ElementoMapa['tipo']; apodo: string | null; lat: number; lng: number; linea: [number, number][] | null }[]>`
@@ -706,7 +813,7 @@ export type InfraGuardada = { id: string; campo_id: string; tipo: InfraNueva['ti
 
 /** Lo cargado de la empresa, para resolver «el tanque del 9B» y avisar duplicados. */
 export function infraDeEmpresa(v: Vinculo): Promise<InfraGuardada[]> {
-  return comoUsuario(v.user_id, (tx) => tx<InfraGuardada[]>`
+  return comoUsuario(v, (tx) => tx<InfraGuardada[]>`
     select id, campo_id, tipo::text as tipo, apodo, lat, lng, linea from infraestructura
     where empresa_id = ${v.empresa_id} and tipo::text in ('molino','tanque','bebedero','energizador','tranquera','electrico')
     order by created_at limit 500`)
@@ -714,7 +821,7 @@ export function infraDeEmpresa(v: Vinculo): Promise<InfraGuardada[]> {
 
 /** Como el usuario: RLS y el disparador de la migración rechazan otra empresa o un campo ajeno. */
 export function guardarInfra(v: Vinculo, e: InfraNueva): Promise<string> {
-  return comoUsuario(v.user_id, async (tx) => {
+  return comoUsuario(v, async (tx) => {
     const [r] = await tx<{ id: string }[]>`
       insert into infraestructura (empresa_id, campo_id, tipo, apodo, lat, lng, linea)
       values (${v.empresa_id}, ${e.campoId}, ${e.tipo}::public.tipo_infraestructura, ${e.apodo}, ${e.lat}, ${e.lng},
@@ -725,7 +832,7 @@ export function guardarInfra(v: Vinculo, e: InfraNueva): Promise<string> {
 }
 
 export function borrarInfra(v: Vinculo, id: string): Promise<boolean> {
-  return comoUsuario(v.user_id, async (tx) => (await tx`delete from infraestructura where id = ${id} and empresa_id = ${v.empresa_id} returning id`).length === 1)
+  return comoUsuario(v, async (tx) => (await tx`delete from infraestructura where id = ${id} and empresa_id = ${v.empresa_id} returning id`).length === 1)
 }
 
 type PropuestaInfra = (InfraNueva & { carga: 'infraestructura' }) | { carga: 'infraestructura_baja'; id: string; nombre: string }
@@ -749,10 +856,9 @@ async function operarInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'b
         and m.vinculo_id=${v.id} and m.empresa_id=${v.empresa_id} for update of c`
     if (!c || c.propuesta?.carga !== (accion === 'guardar' ? 'infraestructura' : 'infraestructura_baja')) return 'vieja'
     if (c.estado !== 'propuesta' && c.estado !== 'confirmada') return 'vieja'
-    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: v.user_id, role: 'authenticated' })}, true)`
-    await tx.unsafe('set local role authenticated')
-    const acceso = await tx`select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
-    if (!acceso.length) throw new Error('El vínculo ya no tiene acceso a esta empresa')
+    const acceso = await permisosVinculados(v, tx, true)
+    if (acceso?.niveles.campos !== 'carga') throw new Error('Permiso de infraestructura revocado')
+    await usarCuentaVinculada(tx, v)
     if (c.estado === 'confirmada') {
       // Las versiones anteriores podían marcar confirmada antes de escribir.
       // No adivinar éxito ni repetir una operación cuyo resultado no consta.

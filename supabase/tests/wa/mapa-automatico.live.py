@@ -32,7 +32,7 @@ def send(text,kind):
     raise AssertionError('No llegó la respuesta '+kind)
 rows=send('En La Porteña vi un eléctrico cortado, pero no me acuerdo en qué potrero.', 'image')
 image=next(row for row in rows if row['type']=='image')
-assert not image['image']['caption'].startswith('Croquis')
+assert not image['image']['caption'].casefold().startswith(('croquis', 'te mando el croquis'))
 assert not any(row.get('interactive',{}).get('type')=='location_request_message' for row in rows)
 pending=lambda:db(f"select pendiente from wa_vinculo where id='{link}'")[0]['pendiente']
 p=pending();assert p and p['tipo'] in ['ubicacion','potrero']

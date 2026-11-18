@@ -96,9 +96,9 @@ await test('Anular lluvia conserva antes y rechaza modificar un dato ajeno',asyn
  await store.aplicar(v1,op,{k:'ajustar',id:row,tabla:'lluvia',antes:carga.datos,anular:true})
  assert((await admin`select 1 from lluvia where id=${row}`).length===0)
  assert(Number((await admin`select antes from wa_piloto_evento where operacion_id=${op}`)[0].antes.mm)===12)
- await denied(()=>db.comoUsuario(U1,tx=>tx`update wa_piloto_evento set tipo='falso' where operacion_id=${op}`))
- await denied(()=>db.comoUsuario(U1,tx=>tx`insert into wa_piloto_evento(operacion_id,empresa_id,tipo,objeto_id)values(${crypto.randomUUID()},${E1},'anular',${row})`))
- await denied(()=>db.comoUsuario(U1,async tx=>{await tx.unsafe('create temporary table intento_falso(id uuid) on commit drop');await tx.unsafe('create trigger falsificar after insert on intento_falso for each row execute function public.wa_piloto_auditar()')}))
+ await denied(()=>db.comoUsuario(v1,tx=>tx`update wa_piloto_evento set tipo='falso' where operacion_id=${op}`))
+ await denied(()=>db.comoUsuario(v1,tx=>tx`insert into wa_piloto_evento(operacion_id,empresa_id,tipo,objeto_id)values(${crypto.randomUUID()},${E1},'anular',${row})`))
+ await denied(()=>db.comoUsuario(v1,async tx=>{await tx.unsafe('create temporary table intento_falso(id uuid) on commit drop');await tx.unsafe('create trigger falsificar after insert on intento_falso for each row execute function public.wa_piloto_auditar()')}))
 })
 await test('Sesión persiste al pausar/retomar, rechaza repetidos y no escribe observaciones antes de cerrar',async()=>{
  const s=await store.abrirSesion(v1,C1,ayer),m=await message()

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fondoSatelital, pedidoSatelital } from './mapa-satelital.ts'
 import { geometriaMapa, proyectarMapa, svgMapa } from './mapa-svg.ts'
 import { atenderMapa } from './mapa.ts'
@@ -40,15 +40,41 @@ describe('Satélite georreferenciado para WhatsApp', () => {
   ])('usa respaldo ante respuesta inválida del proveedor %#', async response => {
     expect(await fondoSatelital(campo, async () => response)).toBeNull()
   })
+  it('espera el JPEG completo aunque su último fragmento llegue después de 3,5 s', async () => {
+    vi.useFakeTimers()
+    try {
+      const fondo = fondoSatelital(campo, async (_, init) => new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array([255, 216]))
+          const timer = setTimeout(() => {
+            controller.enqueue(new Uint8Array([255, 217]))
+            controller.close()
+          }, 5_000)
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(timer)
+            controller.error(new Error('Descarga abortada'))
+          })
+        },
+      }), { headers: { 'content-type': 'image/jpeg' } }))
+      await vi.advanceTimersByTimeAsync(5_000)
+      await expect(fondo).resolves.toMatchObject({ dataUri: 'data:image/jpeg;base64,/9j/2Q==' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
   it('un proveedor sin conexión conserva la posibilidad de responder', async () => {
     expect(await fondoSatelital(campo, async () => { throw Error('sin red') })).toBeNull()
   })
-  it('el satélite conserva nombres y atribución, sin leyenda duplicada ni rellenos', () => {
-    const r = svgMapa(campo, '2026-10-14', { dataUri: 'data:image/jpeg;base64,/9j/2Q==', atribucion: 'Fuente: Esri & colaboradores' })!
+  it('el satélite conserva los nombres, la atribución y la etiqueta de uso sin cubrir la imagen', () => {
+    const conUso = { ...campo, potreros: [{ ...campo.potreros[0], estadoCiclo: 'cultivo' }] }
+    const r = svgMapa(conUso, '2026-10-14', { dataUri: 'data:image/jpeg;base64,/9j/2Q==', atribucion: 'Fuente: Esri & colaboradores' })!
     expect(r.svg).toContain('<image ')
     expect(r.svg).toContain('Fuente: Esri &amp; colaboradores')
-    expect(r.svg).toContain('7B'); expect(r.svg).toContain('stroke="#fff3b3"')
-    expect(r.svg).not.toMatch(/<polygon [^>]*fill="(?!none)/)
+    expect(r.svg).toContain('7B')
+    expect(r.svg).toMatch(/<polygon [^>]*fill="#ecc46a"[^>]*stroke="#fbfaf6"/)
+    expect(r.svg).toContain('Sembrado')
+    expect(r.svg).toMatch(/<polygon [^>]*fill-opacity="0"/)
+    expect(r.svg).not.toContain('Descansa')
     expect(r.svg).not.toMatch(/href="https?:/)
     expect(r.svg).toContain('Imagen de referencia')
     expect(r.svg).not.toContain('Todos los potreros')
@@ -60,7 +86,7 @@ describe('Satélite georreferenciado para WhatsApp', () => {
     await atenderMapa(campo, { datos: async () => campo,
       render: async () => ({ bytes: new Uint8Array(), dibujados: 1, faltantes: [], satelital: false }),
       enviarImagen: async (_, text) => { caption = text }, responder: async () => {} })
-    expect(caption).toContain('satélite no está disponible')
+    expect(caption).toContain('no pude obtener la imagen satelital')
     expect(caption).toContain('acercá')
     expect(caption).not.toContain('referencia están en la lista')
   })

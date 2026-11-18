@@ -11,6 +11,24 @@ python3 supabase/tests/wa/run.py
 
 `run.py` crea un contenedor PostgreSQL 16 descartable, ejecuta el `db.ts` real con RLS y lo elimina al terminar. Usa solamente `127.0.0.1:55439`; aborta si ya existe su contenedor. El fixture retoma los doce casos de recorrida preparados con Claude y agrega consultas/concurrencia. No aplica migraciones ni usa credenciales de producción.
 
+### Charlas del productor
+
+La suite de infraestructura repite turnos observados en WhatsApp y variantes con datos de ejemplo. Comprueba el mensaje y su efecto: saludo después de un mapa, imagen y stock para el mismo potrero, campos propios, seguimiento de lluvia, corrección, archivos y pendientes. En el modo simulado, el modelo y la entrega de WhatsApp se reemplazan por respuestas controladas para verificar el procesamiento del servidor.
+
+```bash
+python3 supabase/tests/wa/infra/run.py
+python3 supabase/tests/wa/infra/run.py --modelo-real
+deno run --no-config --no-lock --allow-env=ANTHROPIC_API_KEY --allow-net=api.anthropic.com supabase/tests/wa/evaluar-interprete.ts claude-haiku-4-5
+```
+
+El segundo comando usa la credencial de QA ya cargada en `ANTHROPIC_API_KEY`. Envía a Anthropic sólo conversaciones y campos ficticios. La base es descartable y Meta sigue simulado. Comprueba que la respuesta seleccionada salió del modelo y que una paráfrasis llegó al intérprete. El último comando evalúa las intenciones y devuelve un código de error si falta un pedido, aparece uno extra o falla el proveedor. La entrega en el teléfono se verifica en la conversación real de la versión publicada.
+
+### Comparación de lecturas durante el turno
+
+`python3 supabase/tests/wa/infra/run.py` prueba el modo actual y el modo experimental con dos conversaciones ficticias. Cubre stock, corrección de ubicación, botones repetidos y dos potreros llamados igual. También comprueba permisos y recuperación de una lectura fallida. `--modelo-real` repite ambos modos con Haiku 4.5 usando `ANTHROPIC_API_KEY` de QA. WhatsApp y la transcripción de audio se simulan. PostgreSQL es descartable.
+
+El ensayo imprime por modo las lecturas realizadas, el tiempo del primer turno y, con el modelo real, el total de tokens de interpretación. El modo experimental se habilita por empresa con `WA_LECTURAS_TURNO_EMPRESAS` como lista de UUID separados por coma. El ensayo configura esta variable sobre la empresa ficticia y la restaura al terminar.
+
 ### Mapa de recorrida
 
 `mapa.test.ts` verifica comandos, selección autorizada, conservación del borrador, varias observaciones sin potrero, fallback de geometrías y payload de imagen. El bloque nuevo de `db.integration.ts` prueba con `db.ts` real el acceso entre empresas, membresía revocada, referencias recientes y deduplicación de imagen por captura/campo.

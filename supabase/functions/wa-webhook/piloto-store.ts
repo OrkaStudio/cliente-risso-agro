@@ -36,7 +36,7 @@ export async function confirmar(v: Vinculo, id: string): Promise<string> {
   const [p] = await sql<Propuesta[]>`update interno.wa_propuesta_piloto set estado='ejecutando' where id=${id}
     and vinculo_id=${v.id} and estado='pendiente' and created_at>now()-interval '1 hour' returning id,accion,estado`
   if (!p) {
-    const saved = await comoUsuario(v.user_id, tx => tx`select 1 from wa_piloto_evento where operacion_id=${id} and empresa_id=${v.empresa_id} and actor_id=${v.user_id}`)
+    const saved = await comoUsuario(v, tx => tx`select 1 from wa_piloto_evento where operacion_id=${id} and empresa_id=${v.empresa_id} and actor_id=${v.user_id}`)
     return saved.length ? 'Esa acción ya quedó guardada. No la repetí.' : 'Esa propuesta venció, fue cancelada o necesita revisión. No la ejecuté de nuevo.'
   }
   try {
@@ -44,7 +44,7 @@ export async function confirmar(v: Vinculo, id: string): Promise<string> {
     await sql`update interno.wa_propuesta_piloto set estado='completo' where id=${id} and vinculo_id=${v.id}`
     return texto
   } catch {
-    const saved = await comoUsuario(v.user_id, tx => tx`select 1 from wa_piloto_evento where operacion_id=${id} and empresa_id=${v.empresa_id} and actor_id=${v.user_id}`).catch(() => null)
+    const saved = await comoUsuario(v, tx => tx`select 1 from wa_piloto_evento where operacion_id=${id} and empresa_id=${v.empresa_id} and actor_id=${v.user_id}`).catch(() => null)
     await sql`update interno.wa_propuesta_piloto set estado=${saved?.length ? 'completo' : 'revision'} where id=${id} and vinculo_id=${v.id}`.catch(() => {})
     return saved?.length ? 'Comprobé que la acción quedó guardada. No la repetí.' : 'No pude completar o comprobar esa acción. Conservé el historial y tu otra carga pendiente. Pedí revisión a Fran o Lau antes de repetirla.'
   }
@@ -52,7 +52,7 @@ export async function confirmar(v: Vinculo, id: string): Promise<string> {
 
 /** Datos y auditoría se escriben juntos, con RLS y bloqueo por operación. */
 export async function aplicar(v: Vinculo, operacionId: string, a: Accion): Promise<string> {
-  return comoUsuario(v.user_id, async tx => {
+  return comoUsuario(v, async tx => {
     await tx`select pg_advisory_xact_lock(hashtextextended(${operacionId},711))`
     const done = await tx`select 1 from wa_piloto_evento where operacion_id=${operacionId} and empresa_id=${v.empresa_id} and actor_id=${v.user_id}`
     if (done.length) return 'Esa acción ya quedó guardada. No la repetí.'
@@ -121,7 +121,7 @@ export async function aplicar(v: Vinculo, operacionId: string, a: Accion): Promi
 }
 
 export async function ultimaCarga(v: Vinculo): Promise<{ tabla: 'lluvia' | 'movimiento_financiero'; datos: Datos } | null> {
-  return comoUsuario(v.user_id, async tx => {
+  return comoUsuario(v, async tx => {
     const [c] = await tx<{ escrito_tabla: string; escrito_id: string }[]>`select escrito_tabla,escrito_id from captura c where empresa_id=${v.empresa_id}
       and user_id=${v.user_id} and estado='confirmada' and escrito_id is not null
       and not exists(select 1 from wa_piloto_evento e where e.empresa_id=c.empresa_id and e.objeto_id=c.escrito_id and e.tipo='anular')
@@ -137,29 +137,29 @@ export async function ultimaCarga(v: Vinculo): Promise<{ tabla: 'lluvia' | 'movi
 
 export type Incidencia = { id: string; descripcion: string; campo_id: string; potrero_id: string; estado: string; version: number }
 export type Tarea = { id: string; descripcion: string; responsable_id: string; vence: string; estado: string; version: number }
-export const incidencias = (v: Vinculo, pagina=1) => comoUsuario(v.user_id, tx => tx<Incidencia[]>`select id,descripcion,campo_id,potrero_id,estado,version from campo_incidencia where empresa_id=${v.empresa_id} and estado='abierta' order by created_at,id limit 11 offset ${(Math.max(1,pagina)-1)*10}`)
-export const tareas = (v: Vinculo, pagina=1) => comoUsuario(v.user_id, tx => tx<Tarea[]>`select id,descripcion,responsable_id,vence::text,estado,version from campo_tarea where empresa_id=${v.empresa_id} and estado<>'completa' order by vence,id limit 11 offset ${(Math.max(1,pagina)-1)*10}`)
-export const potrerosConProblemas = (v: Vinculo, campoId: string) => comoUsuario(v.user_id, async tx => (await tx<{potrero_id:string}[]>`select distinct potrero_id from campo_incidencia where empresa_id=${v.empresa_id} and campo_id=${campoId} and estado='abierta'`).map(r=>r.potrero_id))
-export const equiposConProblemas = (v: Vinculo,campoId:string) => comoUsuario(v.user_id,tx=>tx<{id:string;lat:number;lng:number}[]>`select distinct i.id,i.lat,i.lng from infraestructura i join campo_incidencia c on c.infraestructura_id=i.id where i.empresa_id=${v.empresa_id} and i.campo_id=${campoId} and c.empresa_id=${v.empresa_id} and c.estado='abierta'`)
+export const incidencias = (v: Vinculo, pagina=1) => comoUsuario(v, tx => tx<Incidencia[]>`select id,descripcion,campo_id,potrero_id,estado,version from campo_incidencia where empresa_id=${v.empresa_id} and estado='abierta' order by created_at,id limit 11 offset ${(Math.max(1,pagina)-1)*10}`)
+export const tareas = (v: Vinculo, pagina=1) => comoUsuario(v, tx => tx<Tarea[]>`select id,descripcion,responsable_id,vence::text,estado,version from campo_tarea where empresa_id=${v.empresa_id} and estado<>'completa' order by vence,id limit 11 offset ${(Math.max(1,pagina)-1)*10}`)
+export const potrerosConProblemas = (v: Vinculo, campoId: string) => comoUsuario(v, async tx => (await tx<{potrero_id:string}[]>`select distinct potrero_id from campo_incidencia where empresa_id=${v.empresa_id} and campo_id=${campoId} and estado='abierta'`).map(r=>r.potrero_id))
+export const equiposConProblemas = (v: Vinculo,campoId:string) => comoUsuario(v,tx=>tx<{id:string;lat:number;lng:number}[]>`select distinct i.id,i.lat,i.lng from infraestructura i join campo_incidencia c on c.infraestructura_id=i.id where i.empresa_id=${v.empresa_id} and i.campo_id=${campoId} and c.empresa_id=${v.empresa_id} and c.estado='abierta'`)
 export async function equipoParaProblema(v:Vinculo,campoId:string,potreroId:string,descripcion:string):Promise<string|undefined>{
   const tipo=descripcion.toLowerCase().match(/\b(molino|laguna|tranquera|manga)\b/)?.[1]
   if(!tipo)return undefined
-  const equipos=await comoUsuario(v.user_id,tx=>tx<{id:string;lat:number;lng:number}[]>`select id,lat,lng from infraestructura where empresa_id=${v.empresa_id} and campo_id=${campoId} and tipo::text=${tipo}`)
+  const equipos=await comoUsuario(v,tx=>tx<{id:string;lat:number;lng:number}[]>`select id,lat,lng from infraestructura where empresa_id=${v.empresa_id} and campo_id=${campoId} and tipo::text=${tipo}`)
   const dibujos=await potrerosDibujados(v)
   const candidatos=equipos.filter(e=>potreroEnPunto(e.lat,e.lng,dibujos)?.id===potreroId)
   return candidatos.length===1?candidatos[0].id:undefined
 }
-export const incidenciasEnPotrero=(v:Vinculo,potreroId:string)=>comoUsuario(v.user_id,tx=>tx<Incidencia[]>`select id,descripcion,campo_id,potrero_id,estado,version from campo_incidencia where empresa_id=${v.empresa_id} and potrero_id=${potreroId} and estado='abierta' order by created_at,id`)
-export const cierrePrevio=(v:Vinculo,sesionId:string)=>comoUsuario(v.user_id,async tx=>(await tx<{id:string;estado:string}[]>`select id,estado from captura where empresa_id=${v.empresa_id} and user_id=${v.user_id}
+export const incidenciasEnPotrero=(v:Vinculo,potreroId:string)=>comoUsuario(v,tx=>tx<Incidencia[]>`select id,descripcion,campo_id,potrero_id,estado,version from campo_incidencia where empresa_id=${v.empresa_id} and potrero_id=${potreroId} and estado='abierta' order by created_at,id`)
+export const cierrePrevio=(v:Vinculo,sesionId:string)=>comoUsuario(v,async tx=>(await tx<{id:string;estado:string}[]>`select id,estado from captura where empresa_id=${v.empresa_id} and user_id=${v.user_id}
  and propuesta->>'sesionId'=${sesionId} and propuesta->>'cerrarSesion'='true' and estado in ('confirmada','error') and escrito_tabla='observacion_potrero' order by created_at desc limit 1`)[0]??null)
-export const buscarIncidencia = (v: Vinculo, codigo: string) => comoUsuario(v.user_id, tx => tx<Incidencia[]>`select id,descripcion,campo_id,potrero_id,estado,version from campo_incidencia where empresa_id=${v.empresa_id} and estado='abierta' and id::text like ${codigo + '%'} limit 2`)
-export const buscarTarea = (v: Vinculo, codigo: string) => comoUsuario(v.user_id, tx => tx<Tarea[]>`select id,descripcion,responsable_id,vence::text,estado,version from campo_tarea where empresa_id=${v.empresa_id} and estado<>'completa' and id::text like ${codigo + '%'} limit 2`)
+export const buscarIncidencia = (v: Vinculo, codigo: string) => comoUsuario(v, tx => tx<Incidencia[]>`select id,descripcion,campo_id,potrero_id,estado,version from campo_incidencia where empresa_id=${v.empresa_id} and estado='abierta' and id::text like ${codigo + '%'} limit 2`)
+export const buscarTarea = (v: Vinculo, codigo: string) => comoUsuario(v, tx => tx<Tarea[]>`select id,descripcion,responsable_id,vence::text,estado,version from campo_tarea where empresa_id=${v.empresa_id} and estado<>'completa' and id::text like ${codigo + '%'} limit 2`)
 export async function miembros(v: Vinculo): Promise<{ id: string; nombre: string }[]> {
   return sql<{ id: string; nombre: string }[]>`select m.user_id as id,coalesce(nullif(trim(u.raw_user_meta_data->>'nombre'),''),left(m.user_id::text,8)) as nombre
     from miembro_empresa m join auth.users u on u.id=m.user_id where m.empresa_id=${v.empresa_id}
     and exists(select 1 from miembro_empresa actor where actor.user_id=${v.user_id} and actor.empresa_id=${v.empresa_id}) order by nombre`
 }
-export const comparar = (v: Vinculo) => comoUsuario(v.user_id, tx => tx<Comparacion[]>`
+export const comparar = (v: Vinculo) => comoUsuario(v, tx => tx<Comparacion[]>`
   select c.nombre as campo,p.nombre as potrero,a.fecha,a.agua,a.pasto,a.electrico,b.fecha as anterior_fecha,b.agua as anterior_agua,b.pasto as anterior_pasto,b.electrico as anterior_electrico
   from potrero p join campo c on c.id=p.campo_id
   left join lateral(select distinct on(r.fecha) r.fecha::text,o.agua::text,o.pasto::text,o.electrico::text from observacion_potrero o join recorrida r on r.id=o.recorrida_id
@@ -169,9 +169,9 @@ export const comparar = (v: Vinculo) => comoUsuario(v.user_id, tx => tx<Comparac
   where p.empresa_id=${v.empresa_id} and c.empresa_id=${v.empresa_id} order by c.nombre,p.nombre`)
 
 export type Sesion = { id: string; fecha: string; campo_id: string; estado: string; borrador: Borrador; version: number }
-export const sesionActiva = (v: Vinculo) => comoUsuario(v.user_id, async tx => (await tx<Sesion[]>`select id,fecha::text,campo_id,estado,borrador,version from wa_recorrida_sesion where user_id=${v.user_id} and empresa_id=${v.empresa_id} and estado='abierta'`)[0] ?? null)
+export const sesionActiva = (v: Vinculo) => comoUsuario(v, async tx => (await tx<Sesion[]>`select id,fecha::text,campo_id,estado,borrador,version from wa_recorrida_sesion where user_id=${v.user_id} and empresa_id=${v.empresa_id} and estado='abierta'`)[0] ?? null)
 export async function abrirSesion(v: Vinculo, campoId: string, fecha: string): Promise<Sesion> {
-  return comoUsuario(v.user_id, async tx => {
+  return comoUsuario(v, async tx => {
     const b: Borrador = { tipo:'recorrida',campoId,fecha,observaciones:[] }
     const [s] = await tx<Sesion[]>`insert into wa_recorrida_sesion(empresa_id,campo_id,fecha,borrador)
       values(${v.empresa_id},${campoId},${fecha},${json(b)}) returning id,fecha::text,campo_id,estado,borrador,version`
@@ -179,14 +179,14 @@ export async function abrirSesion(v: Vinculo, campoId: string, fecha: string): P
   })
 }
 export async function retomarSesion(v: Vinculo): Promise<Sesion | null> {
-  return comoUsuario(v.user_id, async tx => {
+  return comoUsuario(v, async tx => {
     const [row] = await tx<Sesion[]>`update wa_recorrida_sesion set estado='abierta',version=version+1,updated_at=now() where id=(select id from wa_recorrida_sesion
       where user_id=${v.user_id} and empresa_id=${v.empresa_id} and estado='pausada' order by updated_at desc limit 1) returning id,fecha::text,campo_id,estado,borrador,version`
     return row ?? null
   })
 }
 export async function guardarSesion(v: Vinculo, s: Sesion, b: Borrador, mensajeId: string): Promise<boolean> {
-  return comoUsuario(v.user_id, async tx => {
+  return comoUsuario(v, async tx => {
     const rows = await tx`update wa_recorrida_sesion set borrador=${json(b)},mensajes=array_append(mensajes,${mensajeId}::uuid),version=version+1,updated_at=now()
       where id=${s.id} and user_id=${v.user_id} and empresa_id=${v.empresa_id} and estado='abierta' and version=${s.version}
       and not (${mensajeId}::uuid=any(mensajes)) returning id`
@@ -194,6 +194,6 @@ export async function guardarSesion(v: Vinculo, s: Sesion, b: Borrador, mensajeI
   })
 }
 export async function estadoSesion(v: Vinculo, id: string, estado: 'pausada' | 'cerrada'): Promise<void> {
-  await comoUsuario(v.user_id, tx => tx`update wa_recorrida_sesion set estado=${estado},version=version+1,updated_at=now()
+  await comoUsuario(v, tx => tx`update wa_recorrida_sesion set estado=${estado},version=version+1,updated_at=now()
     where id=${id} and user_id=${v.user_id} and empresa_id=${v.empresa_id} and estado='abierta'`)
 }

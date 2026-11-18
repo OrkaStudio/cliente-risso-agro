@@ -6,6 +6,7 @@
 // el código; si hay más de un candidato se pregunta.
 
 import { campoEnTexto, campoExacto, resolverCampo, resolverCategoria, resolverPotrero, campoPorId, potreroPorId, type PotreroDe } from './resolver.ts'
+import { refiereAlPotrero } from './recorrida-turno.ts'
 import { cuandoTexto, esFecha, mmTexto, norm, numeroEn, pesos, sumarDias } from './texto.ts'
 import type { Borrador, Boton, Campo, Contexto, Interpretacion, Mensaje, ObsBorrador, ObsInterpretada, Pendiente, Ubicado } from './tipos.ts'
 
@@ -39,7 +40,43 @@ export function ayudaConPendiente(p: Pendiente | null, ctx: Contexto): string {
   return `${base}\n\nSigue pendiente ${asunto}. Podés responder la pregunta anterior o escribir «cancelar».`
 }
 
-export const NO_SE = 'No pude resolver eso desde acá. Probá con una consulta de lluvia, hacienda o vencimientos, o decime qué lluvia o gasto querés anotar.'
+export function esCharla(intent: Interpretacion['intent']): intent is 'saludo' | 'otro' {
+  return intent === 'saludo' || intent === 'otro'
+}
+
+export function saludoSolo(texto: string): boolean {
+  return /^(?:hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches|que tal)[.!?¡¿\s]*$/.test(norm(texto).replace(/^[¡¿]+/, ''))
+}
+
+export function consultaCamposDirecta(texto: string): boolean {
+  const t = norm(texto).replace(/^[¿¡]+|[¿?¡!.,]+$/g, '').trim()
+  return /^(?:(?:che|hola|buenas)[, ]+)?(?:(?:que|cuales) (?:campos|establecimientos) (?:tenemos|tengo|hay|figuran|estan cargados)|cuales son (?:mis|nuestros|los) (?:campos|establecimientos)(?: (?:registrados|cargados))?|(?:listame|decime|mostrame) (?:mis |los )?(?:campos|establecimientos)(?: que (?:tenemos|tengo))?)$/.test(t)
+}
+
+export function saludo(nombre: string | null): string {
+  return '¡Hola' + (nombre ? ' ' + nombre : '') + '! Todo bien por acá. ¿Cómo viene el campo?'
+}
+
+export function datoQueFalta(pendiente: Pendiente | null) {
+  if (!pendiente || pendiente.tipo === 'ubicado' || pendiente.tipo === 'propuesta' || pendiente.tipo === 'corregir') return null
+  const operacion = pendiente.borrador.tipo
+  switch (pendiente.tipo) {
+    case 'campo':
+      return { operacion, dato: 'campo', pregunta: '¿De qué campo se trata?' }
+    case 'potrero':
+      return { operacion, dato: 'potrero', pregunta: '¿Me decís el nombre del potrero?' }
+    case 'ubicacion':
+      return { operacion, dato: 'ubicación o nombre del potrero', pregunta: '¿Me mandás la ubicación o el nombre del potrero?' }
+    case 'categoria':
+      return { operacion, dato: 'categoría del gasto', pregunta: '¿En qué categoría va el gasto?' }
+    case 'dato':
+      return pendiente.dato === 'mm'
+        ? { operacion, dato: 'milímetros', pregunta: '¿Cuántos milímetros llovieron?' }
+        : { operacion, dato: 'importe', pregunta: '¿Cuánto pagaste?' }
+  }
+}
+
+export const NO_SE = 'Me faltó entender qué querés hacer con eso. ¿Me lo contás de otra forma?'
 
 export const NO_SOPORTADO =
   'Por WhatsApp no puedo cargar muertes, nacimientos ni movimientos de hacienda. Cargalos desde Hacienda en la app.'
@@ -140,7 +177,7 @@ function obsDesde(o: ObsInterpretada, it: Interpretacion, r: Recorriendo): ObsBo
 
 export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: Recorriendo = {}): Arranque {
   const it = fechaDelMensaje(campoDelMensaje(it0, ctx, texto), ctx, texto)
-  if (it.otrosRegistros?.length) return { respuesta: 'Escuché más de un tipo de carga. Mandame la lluvia, el gasto y la recorrida en mensajes separados para no dejar nada afuera. No guardé este mensaje; tu pendiente anterior se conserva.', estado: 'respondida' }
+  if (it.otrosRegistros?.length) return { respuesta: 'No guardé una parte suelta de ese mensaje. ¿Con cuál de los pedidos querés que siga primero? Si ya tenías una carga pendiente, sigue ahí.', estado: 'respondida' }
   if (['otro', 'no_soportado'].includes(it.intent) && texto) {
     const mencionado = norm(texto).match(/^en (?:el )?(?:potrero )?(\d+[a-z]?)\b/)
     if (mencionado && 'ninguno' in resolverPotrero(mencionado[1], ctx.campos, null))
@@ -167,13 +204,17 @@ export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: 
       return { borrador: { tipo: it.intent, campoMencion: it.campo, potreroMencion: it.potrero, fecha: it.fecha,
         periodo: it.periodo, semanaPasada: /\bsemana pasada\b/.test(norm(texto)) } }
     case 'consulta_hacienda':
-      return { borrador: { tipo: it.intent, campoMencion: it.campo, potreroMencion: it.potrero, categoriaAnimal: it.categoriaAnimal, periodo: it.periodo } }
+      return { borrador: { tipo: it.intent, campoMencion: it.campo, potreroMencion: it.potrero,
+        categoriaAnimal: it.categoriaAnimal, periodo: it.periodo,
+        ...(refiereAlPotrero(texto ?? '') && (!it.campo || it.potrero) ? { requierePotrero: true } : {}),
+      } }
     case 'consulta_vencimientos':
     case 'consulta_dias_potrero':
     case 'consulta_recorrida':
     case 'consulta_observacion':
     case 'consulta_novedades':
     case 'consulta_cargas':
+    case 'consulta_campos':
       return { borrador: { tipo: it.intent, campoMencion: it.campo, potreroMencion: it.potrero, periodo: it.periodo } }
     case 'consulta_gastos':
       return { borrador: { tipo: it.intent, campoMencion: it.campo, categoriaMencion: it.categoria, periodo: it.periodo } }
@@ -188,13 +229,19 @@ export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: 
           observaciones: it.observaciones.map((o) => obsDesde(o, it, r)),
         },
       }
+    case 'nota':
     case 'no_soportado':
-      return { respuesta: NO_SOPORTADO, estado: 'descartada' }
+      return { borrador: { tipo: 'nota', descripcion: texto?.trim() || it.descripcion,
+        campoMencion: it.campo, potreroMencion: it.potrero,
+        seccionNota: it.intent === 'no_soportado' ? 'hacienda' : 'campos', fecha: it.fecha ?? fechaBase(ctx),
+      } }
     case 'ayuda_gasto':
       return { respuesta: ayudaGasto(ctx), estado: 'respondida' }
     case 'ayuda_lluvia':
       return { respuesta: ayudaLluvia(ctx), estado: 'respondida' }
     case 'saludo':
+      return { respuesta: saludo(ctx.nombre), estado: 'respondida' }
+    case 'ayuda_general':
       return { respuesta: ayuda(ctx.nombre, ctx), estado: 'respondida' }
     default:
       return { respuesta: NO_SE, estado: 'descartada' }
@@ -205,6 +252,7 @@ export function arrancar(it0: Interpretacion, ctx: Contexto, texto?: string, r: 
 export function corregir(b: Borrador, it0: Interpretacion, ctx: Contexto, texto?: string): Borrador {
   const it = fechaDelMensaje(campoDelMensaje(it0, ctx, texto), ctx, texto, b.tipo)
   const n: Borrador = { ...b }
+  if (b.tipo === 'nota' && texto?.trim()) n.descripcion = texto.trim()
   if (it.campo) Object.assign(n, { campoMencion: it.campo, campoId: null })
   if (it.potrero) Object.assign(n, { potreroMencion: it.potrero, potreroId: null })
   if (it.mm !== null && b.tipo === 'lluvia') n.mm = it.mm
@@ -291,7 +339,7 @@ export function leer(
   }
 
   const texto = (entrada.texto ?? '').trim()
-  if (/^(hola|buenas|ayuda|que (podes|puedes) hacer)[?!.\s]*$/.test(norm(texto).replace(/^[¿¡]+/, '')))
+  if (/^(ayuda|que (podes|puedes) hacer)[?!.\s]*$/.test(norm(texto).replace(/^[¿¡]+/, '')))
     return { k: 'ayuda' }
   if (!p) return { k: 'nuevo', abandona: null }
   const t = norm(texto)
@@ -494,7 +542,7 @@ function textoRecorrida(obs: ObsBorrador[], ctx: Contexto, aviso: string, fecha:
   }
   const cuerpo = [...grupos.entries()].map(([campo, lineas]) => `${campo}\n${lineas.join('\n')}`).join('\n\n')
   const baja = obs.some((o) => o.novedad && MUERTE.test(o.novedad))
-    ? '\n\nEsto queda como novedad de la recorrida. La baja del animal se hace en Hacienda.'
+    ? '\n\nEsto queda como novedad de la recorrida. El stock de Hacienda se actualiza por separado.'
     : ''
   return `${aviso}Esto entendí de la recorrida de ${cuandoTexto(fecha, ctx.hoy)}. ¿La guardo así?\n\n${cuerpo}${baja}`
 }
@@ -587,6 +635,20 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto, co
   if (b0.tipo === 'recorrida') return pasoRecorrida(capturaId, b0, ctx)
   const b: Borrador = { ...b0 }
   const notas: string[] = []
+  if (b.tipo === 'nota') {
+    const contenido = b.descripcion?.trim()
+    if (!contenido) return { k: 'decir', mensaje: { texto: '¿Qué querés que conserve en la nota?' }, notas }
+    const campo = b.campoMencion ? campoExacto(b.campoMencion, ctx.campos) : campoPorId(ctx.campos, b.campoId)
+    b.campoId = campo?.id ?? null
+    b.descripcion = contenido
+    return {
+      k: 'proponer', borrador: b, notas,
+      mensaje: { texto: `Te dejo esta nota${campo ? ' en ' + campo.nombre : ''} para guardar.\n\n${contenido}${b.seccionNota === 'hacienda' ? '\n\nEl pedido queda registrado para revisar su aplicación en Hacienda.' : ''}`,
+        botones: [{ id: botonId(capturaId, 'si'), titulo: 'Guardar nota' },
+          { id: botonId(capturaId, 'corregir'), titulo: 'Corregir' }, { id: botonId(capturaId, 'cancelar'), titulo: 'Cancelar' }] },
+      pendiente: { tipo: 'propuesta', capturaId, borrador: b },
+    }
+  }
   // Si nombró un campo que no existe, la pregunta lo dice: si no, parece que no lo leyó.
   let aviso = ''
 
@@ -718,6 +780,12 @@ export function siguientePaso(capturaId: string, b0: Borrador, ctx: Contexto, co
     b.categoriaId = categoria.id
   }
 
+  if (b.tipo === 'consulta_hacienda' && b.requierePotrero && !b.potreroId) {
+    const campos = b.campoId ? ctx.campos.filter(c => c.id === b.campoId) : ctx.campos
+    const candidatos = campos.flatMap(campo => campo.potreros.map(potrero => ({ campo, potrero })))
+    if (!candidatos.length) return { k: 'decir', mensaje: { texto: 'No encontré potreros disponibles para consultar el stock.' }, notas }
+    return preguntarPotrero(capturaId, b, candidatos, '¿En qué potrero querés que mire los animales?', notas)
+  }
   if ((b.tipo === 'consulta_dias_potrero' || b.tipo === 'consulta_observacion') && !b.potreroId) {
     if (!b.campoId) {
       if (unico) b.campoId = unico.id

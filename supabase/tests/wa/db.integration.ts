@@ -12,11 +12,13 @@ const E1 = id('e1', 1), E2 = id('e2', 2), U1 = id('a1', 1), U2 = id('a2', 2)
 const LP = id('c1', 1), TO = id('c1', 2), X = id('c2', 1)
 const P2B = id('b1', 2), P5B = id('b1', 5), P7B = id('b1', 7), P2C = id('b2', 2), P1X = id('b3', 1)
 const HOY = '2026-10-12', AYER = '2026-10-11'
-const v1: db.Vinculo = { id: 'v1', telefono: '549', user_id: U1, empresa_id: E1, pendiente: null, pendiente_at: null }
-const v2: db.Vinculo = { ...v1, id: 'v2', user_id: U2, empresa_id: E2 }
+const v1: db.Vinculo = { id: id('d1', 1), telefono: '5491111111101', user_id: U1, empresa_id: E1, pendiente: null, pendiente_at: null }
+const v2: db.Vinculo = { ...v1, id: id('d2', 2), telefono: '5491111111102', user_id: U2, empresa_id: E2 }
 
 await admin`insert into empresa values (${E1}, 'Orka Pruebas'), (${E2}, 'Otra')`
 await admin`insert into miembro_empresa values (${U1}, ${E1}), (${U2}, ${E2})`
+await admin`insert into wa_vinculo(id,telefono,user_id,empresa_id) values
+  (${v1.id},${v1.telefono},${U1},${E1}),(${v2.id},${v2.telefono},${U2},${E2})`
 await admin`insert into campo values (${LP}, ${E1}, 'La Porteña'), (${TO}, ${E1}, 'Toimil'), (${X}, ${E2}, 'Ajeno')`
 await admin`insert into potrero (id, empresa_id, campo_id, nombre) values
   (${P2B}, ${E1}, ${LP}, '2B'), (${P5B}, ${E1}, ${LP}, '5B'), (${P7B}, ${E1}, ${LP}, '7B'),
@@ -233,16 +235,16 @@ await prueba('mapa: revocar membresía impide la lectura aun con referencia prev
 await prueba('mapa: referencia reciente aislada por vínculo y empresa, vence a las 12 horas', async () => {
   const payload = { tropero_mapa: { campo_id: LP, captura_id: 'captura-qa' } }
   await admin`insert into wa_mensaje(vinculo_id,empresa_id,direccion,tipo,cuerpo,created_at) values
-    ('v1',${E1},'saliente','image',${admin.json(payload)},now()-interval '13 hours')`
+    (${v1.id},${E1},'saliente','image',${admin.json(payload)},now()-interval '13 hours')`
   igual(await db.campoMapaReciente(v1), null, 'expirada')
-  await admin`insert into wa_mensaje(vinculo_id,empresa_id,direccion,tipo,cuerpo) values ('v1',${E1},'saliente','image',${admin.json(payload)})`
+  await admin`insert into wa_mensaje(vinculo_id,empresa_id,direccion,tipo,cuerpo) values (${v1.id},${E1},'saliente','image',${admin.json(payload)})`
   igual(await db.campoMapaReciente(v1), LP, 'vigente')
   igual(await db.campoMapaReciente(v2), null, 'otro vínculo')
   igual(await db.campoMapaReciente({ ...v1, empresa_id: E2 }), null, 'otra empresa')
 })
 await prueba('mapa: evita repetir imagen de la misma captura sin afectar otras', async () => {
   const payload = { tropero_mapa: { campo_id: LP, captura_id: 'captura-qa' } }
-  await admin`insert into wa_mensaje(vinculo_id,empresa_id,direccion,tipo,cuerpo) values ('v1',${E1},'saliente','image',${admin.json(payload)})`
+  await admin`insert into wa_mensaje(vinculo_id,empresa_id,direccion,tipo,cuerpo) values (${v1.id},${E1},'saliente','image',${admin.json(payload)})`
   igual(await db.mapaEnviadoParaCaptura(v1, 'captura-qa', LP), true, 'enviada')
   igual(await db.mapaEnviadoParaCaptura(v1, 'otra', LP), false, 'otra captura')
   igual(await db.mapaEnviadoParaCaptura(v1, 'captura-qa', TO), false, 'otro campo')
