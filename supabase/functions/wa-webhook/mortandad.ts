@@ -10,6 +10,9 @@ function animales(cantidad: number, categoria: GrupoMortandad['categoria']): str
 
 export function resumenMortandad(reporte: ReporteMortandad): string {
   const grupos = reporte.grupos.map(g => animales(g.cantidad, g.categoria))
+  for (const { cantidad, nombre } of reporte.otrosGrupos ?? []) {
+    grupos.push(cantidad + ' ' + (/s$/i.test(nombre) ? nombre : plural(nombre, cantidad)))
+  }
   return grupos.length === 1 ? grupos[0] : `${grupos.slice(0, -1).join(', ')} y ${grupos.at(-1)}`
 }
 
@@ -28,22 +31,30 @@ export function corregirMortandad(reporte: ReporteMortandad, texto: string): Rep
 }
 
 export async function textoRevisionMortandad(v: db.Vinculo, ctx: Contexto, reporte: ReporteMortandad): Promise<string> {
+  const sinCruce = reporte.otrosGrupos?.map(({ cantidad, nombre }) =>
+    cantidad + ' ' + (/s$/i.test(nombre) ? nombre : plural(nombre, cantidad))) ?? []
+  const adicional = sinCruce.length
+    ? `Me avisaste de *${sinCruce.join(', ')}*. Ese dato va en la novedad de la recorrida y queda fuera del cruce con Hacienda.`
+    : ''
+  if (!reporte.grupos.length) return adicional
+  const acompañar = (texto: string) => [texto, adicional].filter(Boolean).join('\n\n')
+  // Quien no ve Hacienda no recibe el stock del potrero (permisos, 13/11).
   if (!veSeccion(ctx.niveles ?? null, 'hacienda'))
-    return 'Anoté el aviso, pero el stock de hacienda lo ve el dueño del campo: avisale para que revise y dé la baja en Hacienda.'
+    return acompañar('Anoté el aviso, pero el stock de hacienda lo ve el dueño del campo: avisale para que revise y dé la baja en Hacienda.')
   const campo = campoExacto(reporte.campo, ctx.campos)
   if (reporte.campo && !campo) {
-    return `No encontré el campo «${reporte.campo}». ¿Me pasás el potrero y el campo como figuran en la app?`
+    return acompañar(`No encontré el campo «${reporte.campo}». ¿Me pasás el potrero y el campo como figuran en la app?`)
   }
-  if (!reporte.potrero) return '¿En qué potrero fue la mortandad? Pasame el nombre para revisar cuántos figuran en Hacienda.'
+  if (!reporte.potrero) return acompañar('¿En qué potrero fue la mortandad? Pasame el nombre para revisar cuántos figuran en Hacienda.')
   const lugar = resolverPotrero(reporte.potrero, ctx.campos, campo?.id, true)
-  if ('varios' in lugar) return `Hay más de un potrero «${reporte.potrero}». ¿De qué campo es?`
+  if ('varios' in lugar) return acompañar(`Hay más de un potrero «${reporte.potrero}». ¿De qué campo es?`)
   if ('ninguno' in lugar) {
     const numero = norm(reporte.potrero).match(/^(\d+)\s*[a-z]$/)?.[1]
     const similares = campo?.potreros.filter(p => norm(p.nombre).match(/^(\d+)\s*[a-z]$/)?.[1] === numero) ?? []
     const donde = campo ? ` en ${campo.nombre}` : ''
-    return `No encontré el «${reporte.potrero}»${donde}.` + (numero && similares.length === 1
+    return acompañar(`No encontré el «${reporte.potrero}»${donde}.` + (numero && similares.length === 1
       ? ` ¿Era el ${similares[0].nombre}? Si es ese, escribime «${similares[0].nombre}».`
-      : ' ¿Me pasás el nombre como figura en la app?')
+      : ' ¿Me pasás el nombre como figura en la app?'))
   }
 
   const { potrero, campo: encontrado } = lugar.ok
@@ -53,6 +64,7 @@ export async function textoRevisionMortandad(v: db.Vinculo, ctx: Contexto, repor
     const activas = filas.filter(f => f.categoria === categoria).reduce((total, f) => total + f.cabezas, 0)
     return cantidad > activas ? [`En ${donde} hoy ${activas === 1 ? 'figura' : 'figuran'} *${animales(activas, categoria)}*. Me dijiste que murieron *${animales(cantidad, categoria)}*.`] : []
   })
-  if (diferencias.length) return diferencias.join('\n') + ' ¿Fueron menos o fue en otro potrero?'
-  return `Revisé ${donde}. El stock de hoy alcanza para las cantidades que me pasaste (*${resumenMortandad(reporte)}*). Para dar de baja los animales, falta identificarlos en Hacienda.`
+  if (diferencias.length) return acompañar(diferencias.join('\n') + ' ¿Fueron menos o fue en otro potrero?')
+  const cruzados = resumenMortandad({ ...reporte, otrosGrupos: undefined })
+  return acompañar(`Revisé ${donde}. El stock de hoy alcanza para las cantidades que me pasaste (*${cruzados}*). Para dar de baja los animales, falta identificarlos en Hacienda.`)
 }

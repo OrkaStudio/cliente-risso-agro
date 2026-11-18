@@ -16,7 +16,7 @@ try:
         time.sleep(1)
     else: raise RuntimeError('Postgres de QA no arrancó')
     # El esquema copiado de producción más las migraciones que el bot ya usa.
-    for file in [root/'esquema.sql',root.parents[2]/'supabase/migrations/20261015200000_infraestructura_carga_whatsapp.sql']:
+    for file in [root/'esquema.sql',root/'piloto'/'esquema-extra.sql',root.parents[2]/'supabase/migrations/20261015200000_infraestructura_carga_whatsapp.sql']:
         subprocess.run(['docker','exec','-i',name,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],input=file.read_text(),text=True,check=True,stdout=subprocess.DEVNULL)
     env=dict(os.environ,SUPABASE_DB_URL='postgres://postgres:qa_local_only@127.0.0.1:'+port+'/postgres',WA_QA_LOCAL_DB='1')
     subprocess.run([deno,'run','--no-config','--no-lock','--node-modules-dir=none','--allow-env','--allow-net=127.0.0.1:'+port,'--allow-read',str(root/'db.integration.ts')],env=env,check=True)

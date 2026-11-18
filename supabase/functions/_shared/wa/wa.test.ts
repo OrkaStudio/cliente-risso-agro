@@ -271,9 +271,9 @@ describe('conversación', () => {
       expect(paso.k === 'preguntar' && paso.mensaje.texto).not.toContain('escribime')
     })
   })
-  it('lo que no se carga por acá no arma borrador', () => {
+  it('la operación pendiente de hacienda queda en un borrador de nota', () => {
     const r = arrancar({ ...limpiarInterpretacion({}), intent: 'no_soportado' }, ctx)
-    expect('respuesta' in r && r.estado).toBe('descartada')
+    expect(r).toMatchObject({ borrador: { tipo: 'nota', seccionNota: 'hacienda' } })
   })
   it('"¿cómo cargo un gasto?" explica la foto del ticket, con los campos de la empresa', () => {
     const r = arrancar({ ...limpiarInterpretacion({}), intent: 'ayuda_gasto' }, ctx)

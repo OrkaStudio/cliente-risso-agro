@@ -10,7 +10,7 @@
 import postgres from 'npm:postgres@3.4.5'
 import { finDeMes, sumarDias,hoyAR } from '../_shared/wa/texto.ts'
 import { empresaEnPiloto } from '../_shared/wa/servicios.ts'
-import { veSeccion, type Niveles } from '../_shared/wa/permisos.ts'
+import { cargaSeccion, nivelDe, nivelesDe, tieneSeccion, veSeccion, type Niveles, type Seccion } from '../_shared/wa/permisos.ts'
 import type { Agua, Borrador, Campo, Categoria, Contexto, Cuenta, PendienteCuenta, Electrico, InfraNueva, Pasto, Pendiente, PendienteInfra, PendienteMortandad, PendienteTurno } from '../_shared/wa/tipos.ts'
 import type { PotreroDibujado } from '../_shared/wa/resolver.ts'
 import type { FilaHacienda, FilaVencimiento } from '../_shared/wa/respuestas.ts'
@@ -128,6 +128,50 @@ function cuentaDelRegistro(v: Vinculo | null): string | null {
   return v.empresa_id
 }
 
+// Sólo desde un mensaje firmado por Meta. La invitación aceptada ya verificó
+// el número en Auth y delegó el canal. Un vínculo inactivo requiere revisión.
+export async function vincularAccesoWhatsapp(telefono: string): Promise<Vinculo | null> {
+  if (!/^\d{8,15}$/.test(telefono)) return null
+  const [v] = await sql<Vinculo[]>`
+    with elegible as (
+      select u.id as user_id, m.empresa_id
+      from auth.users u join miembro_empresa m on m.user_id=u.id
+      where u.phone_confirmed_at is not null and u.phone in (${telefono}, ${'+' + telefono})
+        and to_jsonb(m)->>'acceso'='whatsapp'
+        and (select count(*) from miembro_empresa otras where otras.user_id=u.id)=1
+        and not exists (select 1 from wa_vinculo previo where previo.telefono=${telefono} or previo.user_id=u.id)
+      for share of u,m
+    )
+    insert into wa_vinculo(telefono,user_id,empresa_id)
+    select ${telefono}, user_id, empresa_id from elegible where (select count(*) from elegible)=1
+    on conflict do nothing
+    returning id,telefono,user_id,empresa_id,pendiente,pendiente_at`
+  return v ?? await vinculoDe(telefono)
+}
+
+/**
+ * Los niveles vigentes del vínculo en su cuenta; undefined si el vínculo ya no
+ * está activo o la persona dejó de ser miembro. Con `bloquear`, la fila queda
+ * tomada hasta el final de la transacción: el dueño no la cambia en el medio.
+ */
+export async function nivelesVinculados(v: Vinculo, tx: Tx | typeof sql = sql, bloquear = false): Promise<Niveles | undefined> {
+  const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select m.rol, m.niveles
+    from wa_vinculo w join miembro_empresa m on m.user_id=w.user_id and m.empresa_id=w.empresa_id
+    where w.id=${v.id} and w.telefono=${v.telefono} and w.user_id=${v.user_id} and w.empresa_id=${v.empresa_id} and w.activo
+    ${bloquear ? tx`for share of w,m` : tx``}`
+  return m ? nivelesDe(m) : undefined
+}
+
+/**
+ * El permiso se revisa también al guardar (Fran, 17/11): si el dueño lo sacó
+ * entre la propuesta y el botón, no se guarda. RLS ya frena lluvia, gastos y
+ * recorridas; las notas libres van a `captura`, que no tiene RLS.
+ */
+export async function exigirCarga(tx: Tx, v: Vinculo, seccion: Seccion): Promise<void> {
+  const n = await nivelesVinculados(v, tx, true)
+  if (n === undefined || !cargaSeccion(n, seccion)) throw new Error('Permiso de carga revocado')
+}
+
 /** Guarda el mensaje entrante. null = ya estaba (Meta lo reenvió): no se procesa de nuevo. */
 export async function guardarEntrante(m: {
   wamid: string
@@ -177,12 +221,50 @@ export async function guardarPendiente(vinculoId: string, p: Vinculo['pendiente'
     where id = ${vinculoId}`
 }
 
+/** La aclaración del usuario puede referirse al último PDF recibido en su chat. */
+export async function pdfAnterior(v: Vinculo, mensajeId: string): Promise<{ id: string; media: string } | null> {
+  const [r] = await sql<{ id: string; tipo: string; id_media: string | null }[]>`
+    select anterior.id, anterior.tipo, anterior.cuerpo #>> '{document,id}' as id_media
+    from wa_mensaje actual join wa_mensaje anterior
+      on anterior.vinculo_id = actual.vinculo_id and anterior.empresa_id = actual.empresa_id
+    where actual.id = ${mensajeId} and actual.vinculo_id = ${v.id} and actual.empresa_id = ${v.empresa_id}
+      and anterior.direccion = 'entrante' and anterior.created_at < actual.created_at
+      and anterior.created_at >= actual.created_at - interval '15 minutes'
+    order by anterior.created_at desc limit 1`
+  return r?.tipo === 'document' && r.id_media ? { id: r.id, media: r.id_media } : null
+}
+
 /** La fecha relativa del mensaje no cambia si el procesamiento cruza medianoche. */
 export async function fechaDeEntrada(v:Vinculo,mensajeId:string):Promise<string>{
   // Sin cuenta todavía: quien está en varias y no dijo de cuál es (varias cuentas, 14/11).
   const [r]=await sql<{created_at:string}[]>`select created_at::text from wa_mensaje where id=${mensajeId} and vinculo_id=${v.id} and (empresa_id=${v.empresa_id} or empresa_id is null) and direccion='entrante'`
   if(!r)throw Error('Mensaje no disponible para este vínculo')
   return hoyAR(new Date(r.created_at))
+}
+
+export type MensajeReciente = { autor: 'productor' | 'tropero'; texto: string }
+
+export async function conversacionReciente(v: Vinculo, mensajeId: string, incluirRespuestas = true): Promise<MensajeReciente[]> {
+  const filas = await sql<MensajeReciente[]>`
+    select case when m.direccion='entrante' then 'productor' else 'tropero' end as autor, contenido.texto
+    from wa_mensaje entrada join wa_mensaje m
+      on m.vinculo_id=entrada.vinculo_id and m.empresa_id=entrada.empresa_id and m.telefono=entrada.telefono
+    cross join lateral (
+      select left(coalesce(m.cuerpo #>> '{text,body}', m.cuerpo #>> '{interactive,body,text}',
+        m.cuerpo #>> '{document,caption}', (
+          select c.texto from captura c where c.mensaje_id=m.id and c.entrada='audio'
+            and c.user_id=${v.user_id} and c.empresa_id=m.empresa_id and c.texto is not null
+          order by c.created_at, c.id limit 1
+        )),300) as texto
+    ) contenido
+    where entrada.id=${mensajeId} and entrada.direccion='entrante' and entrada.vinculo_id=${v.id}
+      and entrada.empresa_id=${v.empresa_id} and entrada.telefono=${v.telefono}
+      and m.created_at < entrada.created_at and m.created_at >= entrada.created_at - interval '24 hours'
+      and (${incluirRespuestas} or m.direccion='entrante')
+      and m.tipo in ('text','audio','document','interactive')
+      and nullif(trim(contenido.texto),'') is not null
+    order by m.created_at desc, m.id desc limit 8`
+  return filas.reverse()
 }
 
 /** Contexto de la consulta de lluvia más reciente de este número. */
@@ -278,7 +360,11 @@ export async function tomarPropuesta(v: Vinculo, id: string, pendiente: Pendient
       and exists (select 1 from miembro_empresa m where m.user_id = w.user_id and m.empresa_id = w.empresa_id)
       for update`
     if (!vigente) return false
-    const [captura] = await tx`update captura set estado = 'confirmada', updated_at = now()
+    if (actual.borrador.tipo === 'nota') await exigirCarga(tx, v, actual.borrador.seccionNota ?? 'campos')
+    const esNota = actual.borrador.tipo === 'nota'
+    const [captura] = await tx`update captura set estado = 'confirmada', updated_at = now(),
+      escrito_tabla = case when ${esNota} then 'captura' else escrito_tabla end,
+      escrito_id = case when ${esNota} then id else escrito_id end
       where id = ${id} and empresa_id = ${v.empresa_id} and user_id = ${v.user_id}
       and estado = 'propuesta' returning id`
     if (!captura) return false
@@ -299,14 +385,22 @@ export async function estadoCaptura(id: string): Promise<string | null> {
 /**
  * Con el vínculo, la transacción va además con su cuenta (`x-troppero-cuenta`,
  * varias cuentas 14/11): la base ve y carga sólo en ésa, como en la app. Con un
- * id suelto (aceptar una invitación), sin cuenta.
+ * id suelto (aceptar una invitación), sin cuenta. Con `carga`, antes de nada se
+ * revisa que siga pudiendo cargar en esa sección.
  */
-export async function comoUsuario<T>(quien: string | Pick<Vinculo, 'user_id' | 'empresa_id'>, fn: (tx: Tx) => Promise<T>): Promise<T> {
+export async function comoUsuario<T>(quien: string | Pick<Vinculo, 'user_id' | 'empresa_id'>, fn: (tx: Tx) => Promise<T>, carga?: Seccion): Promise<T> {
   return (await sql.begin(async (tx) => {
+    if (carga) {
+      if (typeof quien === 'string' || !('id' in quien)) throw new Error('Una carga necesita el vínculo completo')
+      await exigirCarga(tx, quien as Vinculo, carga)
+    }
     await comoEl(tx, quien)
     return fn(tx)
   })) as T
 }
+
+/** Para las transacciones que arman otros módulos (la planilla de vacunación): como el usuario, en su cuenta. */
+export const usarCuentaVinculada = (tx: Tx, v: Pick<Vinculo, 'user_id' | 'empresa_id'>) => comoEl(tx, v)
 
 async function comoEl(tx: Tx, quien: string | Pick<Vinculo, 'user_id' | 'empresa_id'>): Promise<void> {
   const userId = typeof quien === 'string' ? quien : quien.user_id
@@ -349,7 +443,7 @@ export async function datosSemana(v: Vinculo, periodo: PeriodoSemana): Promise<S
       left join categoria_movimiento cat on cat.id=m.categoria_id where m.empresa_id=${v.empresa_id} and m.estado='pendiente'
       and m.fecha_vencimiento is not null and m.fecha_vencimiento<=${periodo.vencimientosHasta} order by m.fecha_vencimiento,m.id`
     const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select rol, niveles from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
-    const niveles: Niveles = !m || m.rol === 'dueno' ? null : (m.niveles ?? {})
+    const niveles: Niveles = m ? nivelesDe(m) : {}
     const ve = { campos: veSeccion(niveles, 'campos'), hacienda: veSeccion(niveles, 'hacienda'), plata: veSeccion(niveles, 'plata') }
     return { empresa: empresa.nombre, periodo, lluvia, recorridas, observaciones, gastos, hacienda, vencimientos, ve }
   }) as SemanaCampo
@@ -380,7 +474,7 @@ export async function contexto(v: Vinculo, hoy: string): Promise<Contexto & { ca
       .map((c) => ({ id: c.id, nombre: c.nombre }))
     const [m] = await tx<{ rol: string; niveles: Niveles }[]>`
       select rol, niveles from miembro_empresa where user_id = ${v.user_id} and empresa_id = ${v.empresa_id}`
-    return { hoy, nombre: u?.nombre ?? null, campos, categoriasGasto, categoriasOcr: cats, niveles: !m || m.rol === 'dueno' ? null : (m.niveles ?? {}) }
+    return { hoy, nombre: u?.nombre ?? null, campos, categoriasGasto, categoriasOcr: cats, niveles: m ? nivelesDe(m) : {} }
   })
 }
 
@@ -426,6 +520,11 @@ export async function verificarCargaDeCaptura(v: Vinculo, id: string): Promise<b
     select escrito_tabla, escrito_id from captura
     where id = ${id} and empresa_id = ${v.empresa_id} and user_id = ${v.user_id}`
   const tablas: string[] = ['lluvia', 'movimiento_financiero', 'observacion_potrero']
+  if (c?.escrito_tabla === 'captura' && c.escrito_id === id) {
+    const [nota] = await sql`select 1 from captura where id=${id} and empresa_id=${v.empresa_id} and user_id=${v.user_id}
+      and estado='confirmada' and propuesta->>'tipo'='nota'`
+    return Boolean(nota)
+  }
   if (!c?.escrito_id || !c.escrito_tabla || !tablas.includes(c.escrito_tabla)) return null
   return verificarCarga(v, c.escrito_tabla as TablaCarga, c.escrito_id)
 }
@@ -441,7 +540,7 @@ export function escribirLluvia(v: Vinculo, b: Borrador, id: string): Promise<str
       values (${id}, ${v.empresa_id}, ${b.campoId!}, ${b.fecha!}, ${b.mm!}, 'manual', 'whatsapp')
       returning id`
     return r.id
-  })
+  }, 'campos')
 }
 
 /** `quien`: el nombre de quien lo adelantó, para el reintegro. */
@@ -477,7 +576,7 @@ export function escribirGasto(v: Vinculo, b: Borrador, comprobanteUrl: string | 
         values (${v.empresa_id}, ${id}, ${l.concepto ?? null}, ${l.neto || 0}, ${l.alicuota}, ${l.iva || 0}, ${i}, 'whatsapp')`
     }
     return id
-  })
+  }, 'plata')
 }
 
 /** Sube la foto al bucket privado, con el mismo path que usa la app. */
@@ -667,7 +766,7 @@ export function escribirRecorrida(v: Vinculo, hoy: string, obs: ObsEscrita[]): P
       }
     }
     return ids
-  })
+  }, 'campos')
 }
 
 // ── Consultas nuevas: datos del productor bajo el mismo RLS ──────────────
@@ -714,22 +813,39 @@ export function resumenGastos(v: Vinculo, desde: string, hasta: string, campoId:
     group by c.nombre,cat.nombre order by c.nombre,cat.nombre`)
 }
 
-export type CargaReciente = { fecha: string; tipo: string; campo: string; cantidad: number | null }
+export type CargaReciente = { fecha: string; tipo: string; campo: string; cantidad: number | null; contenido?: string | null }
 /** Una captura confirmada sólo se muestra cuando el registro concreto sigue existiendo. */
-export function cargasRecientes(v: Vinculo, campoId: string | null) {
+export async function cargasRecientes(v: Vinculo, campoId: string | null, niveles?: Niveles) {
+  // Cada uno ve lo suyo, y sólo de las secciones donde ve o manda.
+  // null es el dueño: no confundirlo con «sin dato» (undefined = ya no es miembro, nada).
+  const vigentes = niveles !== undefined ? niveles : await nivelesVinculados(v)
+  const n: Niveles = vigentes === undefined ? {} : vigentes
+  const campos = tieneSeccion(n, 'campos')
+  const plata = tieneSeccion(n, 'plata')
+  const hacienda = tieneSeccion(n, 'hacienda')
   return comoUsuario(v, (tx) => tx<CargaReciente[]>`
-    select x.fecha,x.tipo,x.campo,x.cantidad from (
-      select cap.created_at, l.fecha::text as fecha,'lluvia' as tipo,c.nombre as campo,l.mm::float8 as cantidad
+    select x.fecha,x.tipo,x.campo,x.cantidad,x.contenido from (
+      select cap.created_at, l.fecha::text as fecha,'lluvia' as tipo,c.nombre as campo,l.mm::float8 as cantidad,null::text as contenido
       from captura cap join lluvia l on cap.escrito_tabla='lluvia' and l.id=cap.escrito_id and l.empresa_id=cap.empresa_id join campo c on c.id=l.campo_id
-      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
+      where ${campos} and cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
       union all
-      select cap.created_at,m.fecha_devengo::text,'gasto',c.nombre,m.monto::float8
+      select cap.created_at,m.fecha_devengo::text,'gasto',c.nombre,m.monto::float8,null::text
       from captura cap join movimiento_financiero m on cap.escrito_tabla='movimiento_financiero' and m.id=cap.escrito_id and m.empresa_id=cap.empresa_id join campo c on c.id=m.campo_id
-      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and m.estado<>'anulado' and (${campoId}::uuid is null or c.id=${campoId})
+      where ${plata} and cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and m.estado<>'anulado' and (${campoId}::uuid is null or c.id=${campoId})
       union all
-      select cap.created_at,r.fecha::text,'recorrida',c.nombre,null::float8
+      select cap.created_at,r.fecha::text,'recorrida',c.nombre,null::float8,null::text
       from captura cap join observacion_potrero o on cap.escrito_tabla='observacion_potrero' and o.id=cap.escrito_id and o.empresa_id=cap.empresa_id join recorrida r on r.id=o.recorrida_id join campo c on c.id=r.campo_id
-      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
+      where ${campos} and cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada' and (${campoId}::uuid is null or c.id=${campoId})
+      union all
+      select cap.created_at,coalesce(cap.propuesta->>'fecha',cap.created_at::date::text),'nota',coalesce(c.nombre,'Sin campo indicado'),null::float8,
+        cap.propuesta->>'descripcion'
+      from captura cap left join campo c on c.id=nullif(cap.propuesta->>'campoId','')::uuid and c.empresa_id=cap.empresa_id
+      where cap.empresa_id=${v.empresa_id} and cap.user_id=${v.user_id} and cap.estado='confirmada'
+        and cap.escrito_tabla='captura' and cap.escrito_id=cap.id and cap.propuesta->>'tipo'='nota'
+        and ((coalesce(cap.propuesta->>'seccionNota','campos')='campos' and ${campos})
+          or (cap.propuesta->>'seccionNota'='hacienda' and ${hacienda})
+          or (cap.propuesta->>'seccionNota'='plata' and ${plata}))
+        and (${campoId}::uuid is null or c.id=${campoId})
     ) x order by x.created_at desc limit 5`)
 }
 
@@ -795,18 +911,23 @@ export async function potrerosDibujados(v: Vinculo): Promise<PotreroDibujado[]> 
 }
 
 /** Campo y polígonos con el rol del usuario, y acotados a la empresa del vínculo. */
-export function datosMapa(v: Vinculo, campoId: string): Promise<MapaCampo | null> {
+export function datosMapa(v: Vinculo, campoId: string, mostrarHacienda = true): Promise<MapaCampo | null> {
   return comoUsuario(v, async tx => {
-    const [campo] = await tx<{ id: string; nombre: string }[]>`select c.id,c.nombre from campo c where c.id=${campoId} and c.empresa_id=${v.empresa_id}
+    const [campo] = await tx<{ id: string; nombre: string; contorno: unknown }[]>`select c.id,c.nombre,to_jsonb(c)->'contorno' as contorno from campo c where c.id=${campoId} and c.empresa_id=${v.empresa_id}
       and exists(select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id})`
     if (!campo) return null
     // Cabezas activas (vista con security_invoker: respeta RLS) y la última recorrida de cada potrero.
-    const potreros = await tx<MapaCampo['potreros']>`select p.id,p.nombre,p.poligono,
-        coalesce((select s.cabezas from v_stock_potrero s where s.potrero_id=p.id and s.empresa_id=${v.empresa_id}),0)::int as cabezas,
+    const potreros = await tx<MapaCampo['potreros']>`select p.id,p.nombre,p.poligono,to_jsonb(p)->>'estado_ciclo' as "estadoCiclo",
+        case when ${mostrarHacienda} then coalesce((select s.cabezas from v_stock_potrero s where s.potrero_id=p.id and s.empresa_id=${v.empresa_id}),0)::int end as cabezas,
         (select max(r.fecha)::text from observacion_potrero o join recorrida r on r.id=o.recorrida_id
-          where o.potrero_id=p.id and r.empresa_id=${v.empresa_id}) as "ultimaRecorrida"
+          where o.potrero_id=p.id and r.empresa_id=${v.empresa_id}) as "ultimaRecorrida",
+        (select jsonb_build_object('fecha',r.fecha::text,'agua',o.agua::text,'electrico',o.electrico::text,'novedad',o.novedad)
+          from observacion_potrero o join recorrida r on r.id=o.recorrida_id
+          where o.potrero_id=p.id and o.empresa_id=${v.empresa_id} and r.empresa_id=${v.empresa_id}
+          order by r.fecha desc,o.created_at desc,o.id desc limit 1) as "ultimaObservacion"
       from potrero p join campo c on c.id=p.campo_id
       where c.id=${campo.id} and c.empresa_id=${v.empresa_id} and p.empresa_id=${v.empresa_id} order by p.nombre`
+    if (!mostrarHacienda) for (const p of potreros) delete p.cabezas
     // Un campo que todavía no usa recorridas no se llena de «nunca».
     if (!potreros.some(p => p.ultimaRecorrida)) for (const p of potreros) delete p.ultimaRecorrida
     const infra = await tx<{ id: string; tipo: ElementoMapa['tipo']; apodo: string | null; lat: number; lng: number; linea: [number, number][] | null }[]>`
@@ -881,9 +1002,11 @@ async function operarInfra(v: Vinculo, capturaId: string, accion: 'guardar' | 'b
         and m.vinculo_id=${v.id} and m.empresa_id=${v.empresa_id} for update of c`
     if (!c || c.propuesta?.carga !== (accion === 'guardar' ? 'infraestructura' : 'infraestructura_baja')) return 'vieja'
     if (c.estado !== 'propuesta' && c.estado !== 'confirmada') return 'vieja'
+    // Guardar pide cargar Campos; borrar, «Ve y carga» (como permisoInfra). Se revisa al guardar.
+    const niveles = await nivelesVinculados(v, tx, true)
+    const puede = niveles !== undefined && (accion === 'borrar' ? nivelDe(niveles, 'campos') === 'carga' : cargaSeccion(niveles, 'campos'))
+    if (!puede) throw new Error('Permiso de infraestructura revocado')
     await comoEl(tx, v)
-    const acceso = await tx`select 1 from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
-    if (!acceso.length) throw new Error('El vínculo ya no tiene acceso a esta empresa')
     if (c.estado === 'confirmada') {
       // Las versiones anteriores podían marcar confirmada antes de escribir.
       // No adivinar éxito ni repetir una operación cuyo resultado no consta.

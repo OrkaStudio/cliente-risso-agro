@@ -1,3 +1,4 @@
+import jpeg from 'npm:jpeg-js@0.4.4'
 import { imagenMapa } from '../../functions/wa-webhook/mapa-imagen.ts'
 import { svgMapa } from '../../functions/_shared/wa/mapa-svg.ts'
 const sample = { id: 'campo-qa', nombre: 'Campo de ejemplo · La Porteña', potreros: [
@@ -19,4 +20,34 @@ Deno.test('PNG real, nombres acentuados, cache y faltantes', async () => {
   const changed = await imagenMapa({ ...sample, nombre: 'Nombre corregido' }, '2026-10-13', offline)
   if (changed?.bytes === image.bytes) throw Error('Cache no invalida cambio')
   console.log(JSON.stringify({ bytes:image.bytes.length, width:model.width,height:model.height,elapsed_ms:Math.round(performance.now()-t), network_requests:0 }))
+})
+
+Deno.test('la vista general y los detalles reutilizan la misma descarga de fondo', async () => {
+  const jpegBytes = new Uint8Array(jpeg.encode({
+    data: new Uint8Array(64 * 64 * 4).fill(170), width: 64, height: 64,
+  }, 75).data)
+  const campo = { ...sample, id: 'qa-fondo-compartido' }
+  let llamadas = 0
+  let inicio!: () => void
+  let continuar!: () => void
+  const iniciada = new Promise<void>(r => { inicio = r })
+  const espera = new Promise<void>(r => { continuar = r })
+  const proveedor: typeof fetch = async () => {
+    llamadas++
+    inicio()
+    await espera
+    return new Response(jpegBytes.slice(), { headers: { 'content-type': 'image/jpeg' } })
+  }
+  const general = imagenMapa(campo, '2026-10-13', proveedor)
+  await iniciada
+  const detalle = imagenMapa(campo, '2026-10-13', proveedor, '7b')
+  continuar()
+  const [vista, acercamiento] = await Promise.all([general, detalle])
+  const otro = await imagenMapa(campo, '2026-10-13', proveedor, '8b')
+  if (![vista, acercamiento, otro].every(r => r?.satelital && r.bytes[0] === 255 && r.bytes[1] === 216)) {
+    throw Error('La vista general y los detalles deben ser JPEG con fondo')
+  }
+  if (Number(llamadas) !== 1) throw Error('El mismo encuadre se descargó más de una vez')
+  await imagenMapa({ ...campo, id: 'qa-otro-campo' }, '2026-10-13', proveedor, '7b')
+  if (Number(llamadas) !== 2) throw Error('La caché reutilizó el fondo para otro campo')
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { arrancar, corregir, leer, siguientePaso } from './conversacion.ts'
-import { limpiarInterpretacion, promptInterpretar } from './interpretar.ts'
+import { limpiarInterpretacion, promptInterpretar, textoSinInterpretar } from './interpretar.ts'
 import { potreroEnPunto } from './resolver.ts'
 import { payload, prepararMensajes } from '../../wa-webhook/meta.ts'
 import { resumenGastos, resumenRecorrida, ultimaObservacion, novedades, cargasRecientes, lluviaConsulta } from './respuestas.ts'
@@ -13,6 +13,15 @@ const ctx: Contexto = {
   categoriasGasto: [{ id: 'gas', nombre: 'Combustible' }],
 }
 const interpretacion = (raw: unknown) => limpiarInterpretacion(raw)
+
+it('conserva hechos sin clasificar y respeta los fragmentos literales', () => {
+  const lluvia = 'Anotá 20 mm'
+  const consulta = '¿Cuántos animales tengo?'
+  const novedad = 'Vi una luz prendida en un galpón vacío'
+  const mensaje = 'Hola. ' + lluvia + '. ' + novedad + '. ' + consulta + ' Gracias.'
+  expect(textoSinInterpretar(mensaje, [lluvia, consulta]).map(p => p.fragmento)).toEqual([novedad])
+  expect(textoSinInterpretar(mensaje, [lluvia, novedad, consulta])).toEqual([])
+})
 
 describe('nuevas consultas', () => {
   for (const intent of ['consulta_recorrida', 'consulta_observacion', 'consulta_novedades', 'consulta_gastos', 'consulta_cargas']) {
@@ -49,11 +58,14 @@ describe('nuevas consultas', () => {
 
 describe('ayuda y validación', () => {
   const pending: Pendiente = { tipo: 'propuesta', capturaId: 'cap', borrador: { tipo: 'lluvia', campoId: 'c', mm: 10, fecha: ctx.hoy } }
-  for (const texto of ['ayuda', 'hola', '¿qué podés hacer?']) {
+  for (const texto of ['ayuda', '¿qué podés hacer?']) {
     it(`pedir ${texto} no abandona la carga`, () => {
       expect(leer({ texto }, pending, ctx).k).toBe('ayuda')
     })
   }
+  it('un saludo va al diálogo aunque haya una propuesta', () => {
+    expect(leer({ texto: 'hola' }, pending, ctx).k).toBe('nuevo')
+  })
   it('una fecha futura no se cambia por hoy ni se propone guardar', () => {
     const paso = siguientePaso('cap', { tipo: 'lluvia', campoId: 'c', mm: 10, fecha: '2026-10-13' }, ctx)
     expect(paso.k).toBe('preguntar')
@@ -183,4 +195,25 @@ describe('propuestas y respuestas completas', () => {
   it('los potreros pendientes se leen en orden numérico', () => {
     expect(resumenRecorrida(ctx.hoy, [{ campo: 'La Porteña', recorridos: 0, total: 3, pendientes: ['10B', '1B', '3B'] }])).toContain('Faltan: 1B, 3B, 10B')
   })
+})
+
+
+it('los conectores del audio real no abren aclaraciones y un hecho nuevo se conserva', () => {
+  const lluvia = 'Anotá 10 mm en La Porteña'
+  const electrico = 'en el 7B está el eléctrico cortado'
+  const mapa = 'mostrame el mapa del 7B'
+  const texto = `Bien. ${lluvia}. Después, ${electrico}. y después, ${mapa}.`
+  expect(textoSinInterpretar(texto, [lluvia, electrico, mapa])).toEqual([])
+  expect(textoSinInterpretar(texto + ' Después salió humo del galpón', [lluvia, electrico, mapa])
+    .map(p => p.fragmento)).toEqual(['Después salió humo del galpón'])
+})
+
+it('una nota abierta conserva el pedido literal y ofrece confirmación sin exigir potrero', () => {
+  const texto = 'Guardá que el herrero trae el portón el viernes'
+  const a = arrancar(limpiarInterpretacion({ intent: 'nota' }), ctx, texto)
+  expect(a).toMatchObject({ borrador: { tipo: 'nota', descripcion: texto } })
+  if (!('borrador' in a)) throw Error()
+  const paso = siguientePaso('nota', a.borrador, ctx)
+  expect(paso).toMatchObject({ k: 'proponer', pendiente: { tipo: 'propuesta' } })
+  expect('mensaje' in paso && paso.mensaje.texto).toContain(texto)
 })

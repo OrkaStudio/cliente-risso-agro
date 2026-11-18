@@ -1,6 +1,14 @@
-"""Base PostgreSQL descartable con la migración real de infraestructura. No lee credenciales ni usa la base compartida."""
+"""Webhook contra PostgreSQL descartable. El modo de conversación puede usar el modelo real."""
+import argparse
 import os,subprocess,time,shutil
 from pathlib import Path
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--modelo-real', action='store_true', help='Repite charlas con Anthropic y datos ficticios. Meta permanece simulado.')
+args = parser.parse_args()
+if args.modelo_real and not os.environ.get('ANTHROPIC_API_KEY'):
+    parser.error('Falta ANTHROPIC_API_KEY para probar el modelo real.')
+
 here=Path(__file__).resolve().parent
 root=here.parents[3]
 name='tropero-wa-infra-20261015'
@@ -18,7 +26,9 @@ try:
     time.sleep(1)
     for file in [here.parent/'esquema.sql',here.parent/'piloto'/'esquema-extra.sql',root/'supabase/migrations/20261015120000_whatsapp_piloto_productores.sql',root/'supabase/migrations/20261015200000_infraestructura_carga_whatsapp.sql']:
         subprocess.run(['docker','exec','-i',name,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],input=file.read_text(),text=True,check=True,stdout=subprocess.DEVNULL)
-    env=dict(os.environ,SUPABASE_DB_URL='postgres://postgres:qa_local_only@127.0.0.1:'+port+'/postgres',WA_QA_LOCAL_DB='1')
-    subprocess.run([deno,'run','--no-config','--no-lock','--node-modules-dir=none','--allow-env','--allow-read','--allow-write','--allow-net=127.0.0.1:'+port,str(here/'integracion.ts')],env=env,check=True)
+    env=dict(os.environ,SUPABASE_DB_URL='postgres://postgres:qa_local_only@127.0.0.1:'+port+'/postgres',WA_QA_LOCAL_DB='1',
+             WA_QA_MODELO_REAL='1' if args.modelo_real else '0')
+    red = '127.0.0.1:'+port+(',api.anthropic.com:443' if args.modelo_real else '')
+    subprocess.run([deno,'run','--check','--no-config','--no-lock','--node-modules-dir=none','--allow-env','--allow-read','--allow-write','--allow-net='+red,str(here/'integracion.ts')],env=env,check=True)
 finally:
     subprocess.run(['docker','rm','-f',name],check=True,stdout=subprocess.DEVNULL)

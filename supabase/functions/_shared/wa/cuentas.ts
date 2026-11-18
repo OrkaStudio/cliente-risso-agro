@@ -47,6 +47,7 @@ export function cuentaPorTexto(texto: string, cuentas: Cuenta[]): Cuenta | null 
 export function deQueSeTrata(m: { tipo: string; texto: string | null }): string {
   if (m.tipo === 'image') return m.texto ? `la foto «${corto(m.texto)}»` : 'la foto que mandaste'
   if (m.tipo === 'location') return 'la ubicación que mandaste'
+  if (m.tipo === 'document') return m.texto ? `el archivo «${corto(m.texto)}»` : 'el archivo que mandaste'
   if (m.texto) return `«${corto(m.texto)}»`
   return 'lo que mandaste'
 }

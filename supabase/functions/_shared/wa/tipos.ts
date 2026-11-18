@@ -16,15 +16,25 @@ export type Contexto = {
   categoriasGasto: Categoria[]
   semanalHabilitado?: boolean
   pilotoHabilitado?: boolean
-  /** Lo que el dueño le habilitó a quien escribe; null = el dueño (todo). Sin dato, como dueño. */
+  /**
+   * Lo que el dueño le habilitó a quien escribe; null = el dueño (todo). Sin dato,
+   * como dueño: el webhook corta antes a quien ya no es miembro de la cuenta.
+   */
   niveles?: Niveles
 }
 
 export const INTENTS = [
   'lluvia',
   'novedad',
+  'reubicar_observacion',
   'gasto',
+  'nota',
+  'vacunacion_planilla',
+  'revisar_pdf',
+  'guardar_pdf',
   'consulta_hacienda',
+  'consulta_mapa',
+  'consulta_campos',
   'consulta_lluvia',
   'consulta_vencimientos',
   'consulta_dias_potrero',
@@ -37,6 +47,7 @@ export const INTENTS = [
   'ayuda_gasto',
   'ayuda_lluvia',
   'saludo',
+  'ayuda_general',
   'otro',
 ] as const
 export type Intent = (typeof INTENTS)[number]
@@ -72,8 +83,12 @@ export type ReporteMortandad = {
   potrero: string | null
   detalle: string | null
   grupos: GrupoMortandad[]
+  otrosGrupos?: { nombre: string; cantidad: number }[]
 }
 export type PendienteMortandad = { tipo: 'mortandad'; capturaId: null; reporte: ReporteMortandad }
+
+export const ASPECTOS_RECORRIDA = ['agua', 'pasto', 'electrico', 'conteo', 'novedad'] as const
+export type AspectoRecorrida = (typeof ASPECTOS_RECORRIDA)[number]
 
 /** Lo que devuelve el modelo, ya limpio. Nunca se escribe tal cual: es una propuesta. */
 export type Interpretacion = {
@@ -85,6 +100,9 @@ export type Interpretacion = {
   fechaInvalida?: boolean
   monto: number | null
   categoria: string | null
+  archivo?: number | null
+  vacuna?: string | null
+  aspectoObservacion?: AspectoRecorrida | null
   categoriaAnimal?: GrupoMortandad['categoria'] | null
   contraparte: string | null
   descripcion: string | null
@@ -95,13 +113,15 @@ export type Interpretacion = {
   mortandad?: ReporteMortandad | null
 }
 
-export type PedidoInterpretado = { fragmento: string; interpretacion: Interpretacion }
+export type PedidoInterpretado = { fragmento: string; interpretacion: Interpretacion; campoComoAlternativa?: boolean; sinInterpretar?: boolean }
 
 export type TipoBorrador =
   | 'recorrida'
+  | 'nota'
   | 'lluvia'
   | 'gasto'
   | 'consulta_hacienda'
+  | 'consulta_campos'
   | 'consulta_lluvia'
   | 'consulta_vencimientos'
   | 'consulta_dias_potrero'
@@ -136,6 +156,7 @@ export type Borrador = {
   tipo: TipoBorrador
   campoId?: string | null
   potreroId?: string | null
+  requierePotrero?: boolean
   /** Lo que escribió el productor y todavía no se resolvió contra la base. */
   campoMencion?: string | null
   potreroMencion?: string | null
@@ -148,6 +169,7 @@ export type Borrador = {
   categoriaAnimal?: GrupoMortandad['categoria'] | null
   contraparte?: string | null
   descripcion?: string | null
+  seccionNota?: 'campos' | 'hacienda' | 'plata'
   cuit?: string | null
   comprobanteTipo?: 'a' | 'b' | 'c' | 'otro' | null
   ivaLineas?: IvaLinea[]

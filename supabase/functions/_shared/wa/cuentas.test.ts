@@ -73,6 +73,9 @@ describe('textos', () => {
   it('de qué se trata lo que mandó', () => {
     expect(deQueSeTrata({ tipo: 'audio', texto: 'llovieron 20' })).toBe('«llovieron 20»')
     expect(deQueSeTrata({ tipo: 'image', texto: null })).toBe('la foto que mandaste')
+    // Un PDF también se pregunta (unión, 18/11): se nombra como archivo.
+    expect(deQueSeTrata({ tipo: 'document', texto: null })).toBe('el archivo que mandaste')
+    expect(deQueSeTrata({ tipo: 'document', texto: 'factura vete' })).toBe('el archivo «factura vete»')
     expect(deQueSeTrata({ tipo: 'location', texto: null })).toBe('la ubicación que mandaste')
     expect(deQueSeTrata({ tipo: 'text', texto: 'x'.repeat(200) })).toMatch(/…»$/)
   })
