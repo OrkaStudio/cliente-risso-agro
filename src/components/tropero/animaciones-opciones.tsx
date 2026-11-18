@@ -19,7 +19,13 @@ import { BotonChico } from "./boton"
 import { Icono, type NombreIcono } from "./icono"
 import { BotonVolver, Grupo, Opciones } from "./panel-lateral"
 
-export type Personalidad = "cuerpo" | "marca" | "desliza"
+// E · Cuerpo y marca (propuesta de Lau, 18/11): lo que se siente de la B y lo que se ve de la C.
+export type Personalidad = "cuerpo" | "marca" | "desliza" | "cuerpoMarca"
+
+/** Las que se mueven con resorte (B y E). */
+const conResorte = (p: Personalidad) => p === "cuerpo" || p === "cuerpoMarca"
+/** Las que llevan el trigo en la barra de pasos (C y E). */
+const conTrigo = (p: Personalidad) => p === "marca" || p === "cuerpoMarca"
 
 type BotonLabProps = {
   fase: Fase
@@ -219,11 +225,12 @@ export function BotonConCuerpo(props: BotonLabProps) {
 
 const SACUDIDA_C = [0, -3, 3, -3, 3, -2, 2, 0]
 
-export function BotonConMarca(props: BotonLabProps) {
-  const { fase, texto, icono, iconoError, apagado, sacudida, onClick } = props
+export function BotonConMarca(props: BotonLabProps & { cuerpo?: boolean }) {
+  const { fase, texto, icono, iconoError, apagado, sacudida, onClick, cuerpo } = props
   const f = useVelocidad()
   const reducir = useReducedMotion()
-  const scope = useSacudida(sacudida, SACUDIDA_C, 0.36 * f)
+  // Con cuerpo (E), el «no» es la sacudida grande de la B.
+  const scope = useSacudida(sacudida, cuerpo ? SACUDIDA_B : SACUDIDA_C, (cuerpo ? 0.42 : 0.36) * f)
   // Cuánto del botón cubre el trigo, de 0 a 100. Donde pasa, el texto se invierte a tinta.
   const lleno = useMotionValue(0)
   const recorte = useTransform(lleno, (v) => `inset(0 ${100 - v}% 0 0)`)
@@ -242,19 +249,28 @@ export function BotonConMarca(props: BotonLabProps) {
           : animate(lleno, 0, { duration: (fase === "error" ? 0.25 : 0.45) * f, ease: CURVA })
     return () => c.stop()
   }, [fase, cubre, f, lleno, reducir])
+  // Con cuerpo (E): el sello pega y la píldora acusa el golpe, se hunde y rebota.
+  const [golpe, animarGolpe] = useAnimate<HTMLButtonElement>()
+  useEffect(() => {
+    if (!cuerpo || reducir || !cubre || !golpe.current) return
+    void animarGolpe(golpe.current, { scale: [1, 0.95, 1.025, 1] }, { duration: 0.42 * f, times: [0, 0.3, 0.65, 1], ease: "easeOut", delay: 0.06 * f })
+  }, [cuerpo, cubre, fase, reducir, f, golpe, animarGolpe])
   const empuje = { type: "spring", visualDuration: 0.18 * f, bounce: 0.5 } as const
+  const hundir = { type: "spring", visualDuration: 0.2 * f, bounce: 0.55 } as const
   const etiqueta = fase === "error" ? (props.textoFin ?? texto) : texto
   return (
     <div ref={scope} className="w-full">
       <motion.button
+        ref={golpe}
         type="button"
         onClick={onClick}
         aria-busy={fase === "cargando" || undefined}
         aria-disabled={apagado || undefined}
         whileTap="apretado"
+        variants={cuerpo ? { apretado: { scale: 0.95, transition: hundir } } : undefined}
         initial={false}
-        animate={{ opacity: apagado ? 0.6 : 1 }}
-        transition={{ duration: 0.15 * f }}
+        animate={{ opacity: apagado ? 0.6 : 1, scale: 1 }}
+        transition={{ duration: 0.15 * f, scale: hundir }}
         className={cn(PILDORA, "w-full overflow-hidden pl-[26px]")}
       >
         <span className="grid min-w-0 flex-1">
@@ -296,7 +312,14 @@ export function BotonConMarca(props: BotonLabProps) {
             )}
           </span>
           <motion.span variants={{ apretado: { x: 5 } }} transition={empuje} className="grid size-12 shrink-0 place-items-center rounded-full bg-principal text-principal-texto">
-            <Icono nombre={fase === "listo" ? "Guardar" : fase === "telefono" ? "Sin señal" : icono} />
+            {cuerpo && fase === "telefono" && !reducir ? (
+              // Con cuerpo (E), late como en la B: todavía falta subir.
+              <motion.span className="grid place-items-center" animate={{ scale: [1, 1.14, 1] }} transition={{ duration: 1.1 * f, repeat: Infinity, ease: "easeInOut" }}>
+                <Icono nombre="Sin señal" />
+              </motion.span>
+            ) : (
+              <Icono nombre={fase === "listo" ? "Guardar" : fase === "telefono" ? "Sin señal" : icono} />
+            )}
           </motion.span>
         </motion.span>
       </motion.button>
@@ -387,6 +410,19 @@ function BotonSimple({ p, tipo, icono, children }: { p: Personalidad; tipo: keyo
     "inline-flex shrink-0 items-center justify-center whitespace-nowrap outline-none select-none transition-colors focus-visible:ring-3 focus-visible:ring-principal/40 focus-visible:ring-offset-2 focus-visible:ring-offset-fondo",
     SIMPLE[tipo],
   )
+  if (p === "cuerpoMarca") {
+    // E: se hunde y rebota como la B, y el ícono empuja hacia adelante como la C.
+    return (
+      <motion.button type="button" whileTap="apretado" variants={{ apretado: { scale: 0.93 } }} transition={{ type: "spring", visualDuration: 0.2 * f, bounce: 0.55 }} className={clase}>
+        {icono && (
+          <motion.span variants={{ apretado: { x: 3 } }} transition={{ type: "spring", visualDuration: 0.18 * f, bounce: 0.5 }} className="inline-flex">
+            <Icono nombre={icono} tamano={16} />
+          </motion.span>
+        )}
+        {children}
+      </motion.button>
+    )
+  }
   if (p === "cuerpo") {
     return (
       <motion.button type="button" whileTap={{ scale: 0.93 }} transition={{ type: "spring", visualDuration: 0.2 * f, bounce: 0.55 }} className={clase}>
@@ -410,12 +446,17 @@ function BotonSimple({ p, tipo, icono, children }: { p: Personalidad; tipo: keyo
 
 // ===== Las demostraciones de cada momento =====
 
-const BOTON: Record<Personalidad, ComponentType<BotonLabProps>> = { cuerpo: BotonConCuerpo, marca: BotonConMarca, desliza: BotonDesliza }
+/** E · Cuerpo y marca: el botón de la C con el cuerpo de la B. */
+export function BotonCuerpoMarca(props: BotonLabProps) {
+  return <BotonConMarca {...props} cuerpo />
+}
+
+const BOTON: Record<Personalidad, ComponentType<BotonLabProps>> = { cuerpo: BotonConCuerpo, marca: BotonConMarca, desliza: BotonDesliza, cuerpoMarca: BotonCuerpoMarca }
 
 /** Cómo aparece un mensaje (el motivo de un error, lo que falta subir): con resorte o deslizándose como el trigo. */
 function useEntrada(p: Personalidad) {
   const f = useVelocidad()
-  return p === "cuerpo"
+  return conResorte(p)
     ? {
         initial: { opacity: 0, y: 10, scale: 0.97 },
         animate: { opacity: 1, y: 0, scale: 1 },
@@ -599,8 +640,8 @@ export function DemoPasos({ p }: { p: Personalidad }) {
     setDireccion(n > paso ? 1 : -1)
     setPaso(n)
   }
-  const mov = p === "cuerpo" ? ({ type: "spring", visualDuration: 0.4 * f, bounce: 0.22 } as const) : { duration: 0.34 * f, ease: CURVA }
-  const distancia = reducir ? 0 : p === "cuerpo" ? 64 : 40
+  const mov = conResorte(p) ? ({ type: "spring", visualDuration: 0.4 * f, bounce: 0.22 } as const) : { duration: 0.34 * f, ease: CURVA }
+  const distancia = reducir ? 0 : conResorte(p) ? 64 : 40
   return (
     <div className="flex flex-col gap-4 overflow-hidden rounded-[22px] border border-borde bg-fondo p-5">
       <div>
@@ -616,7 +657,7 @@ export function DemoPasos({ p }: { p: Personalidad }) {
               <span key={n} className="relative h-1.5 w-8 overflow-hidden rounded-full bg-borde">
                 {/* Con la marca, el paso que estás llenando es trigo; los terminados, terracota. */}
                 <motion.span
-                  className={cn("absolute inset-0 origin-left rounded-full", p === "marca" && n === paso ? "bg-acento" : "bg-principal")}
+                  className={cn("absolute inset-0 origin-left rounded-full", conTrigo(p) && n === paso ? "bg-acento" : "bg-principal")}
                   initial={false}
                   animate={{ scaleX: n <= paso ? 1 : 0 }}
                   transition={mov}
@@ -688,7 +729,7 @@ export function DemoPanel({ p }: { p: Personalidad }) {
     window.addEventListener("keydown", alTeclear)
     return () => window.removeEventListener("keydown", alTeclear)
   }, [abierto])
-  const entrada = p === "cuerpo" ? ({ type: "spring", visualDuration: 0.45 * f, bounce: 0.2 } as const) : { duration: 0.34 * f, ease: CURVA }
+  const entrada = conResorte(p) ? ({ type: "spring", visualDuration: 0.45 * f, bounce: 0.2 } as const) : { duration: 0.34 * f, ease: CURVA }
   const afuera = reducir ? { opacity: 0 } : { x: "115%" }
   return (
     <>

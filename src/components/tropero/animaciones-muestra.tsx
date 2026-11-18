@@ -15,6 +15,7 @@ import { esperar, MONTO, Velocidad } from "./animaciones-base"
 import {
   BotonConCuerpo,
   BotonConMarca,
+  BotonCuerpoMarca,
   BotonDesliza,
   BotonSobrio,
   DemoApagado,
@@ -46,7 +47,7 @@ type Momento = {
 
 type Opcion = {
   /** La letra de la personalidad, fija en todas las filas: A Sobria, B Con cuerpo, C Con la marca, D Se desliza. */
-  letra: "A" | "B" | "C" | "D"
+  letra: "A" | "B" | "C" | "D" | "E"
   nombre: string
   /** La idea en una frase: qué cambia respecto de hoy. */
   idea: string
@@ -64,6 +65,8 @@ const B = { letra: "B", nombre: "Con cuerpo" } as const
 const C = { letra: "C", nombre: "Con la marca" } as const
 // D: el botón con ícono de shadcnspace, que cruza el círculo al pasar el mouse; acá cruza al apretar.
 const D = { letra: "D", nombre: "Se desliza" } as const
+// E: propuesta de Lau (18/11), lo que se siente de la B con lo que se ve de la C.
+const E = { letra: "E", nombre: "Cuerpo y marca" } as const
 
 const OPCIONES: Record<string, Opcion[]> = {
   tocar: [
@@ -74,6 +77,7 @@ const OPCIONES: Record<string, Opcion[]> = {
       Demo: () => <DemoTocar p="marca" />,
     },
     { ...D, idea: "Al apretar, el círculo cruza la píldora hacia la izquierda y el texto se corre; al soltar vuelve. Los botones chicos empujan el ícono.", Demo: () => <DemoTocar p="desliza" /> },
+    { ...E, idea: "Todo el botón se hunde y rebota como la B, y a la vez el círculo trigo (o el ícono) empuja hacia adelante como la C.", Demo: () => <DemoTocar p="cuerpoMarca" /> },
   ],
   cargando: [
     {
@@ -89,6 +93,7 @@ const OPCIONES: Record<string, Opcion[]> = {
       Demo: () => <DemoCargando Boton={BotonConMarca} />,
     },
     { ...D, idea: "El círculo cruza apenas lo apretás, sin esperar los 0,3 s, y del otro lado gira mientras espera. Al terminar vuelve a su lugar.", Demo: () => <DemoCargando Boton={BotonDesliza} /> },
+    { ...E, idea: "Como la C: el trigo va llenando el botón. No se encoge, para que se vea cuánto avanzó.", Demo: () => <DemoCargando Boton={BotonCuerpoMarca} /> },
   ],
   listo: [
     {
@@ -100,6 +105,7 @@ const OPCIONES: Record<string, Opcion[]> = {
     { ...B, idea: "Después de cargar, el botón se vuelve a abrir diciendo «Listo» y el tilde salta en el círculo.", Demo: () => <DemoListo Boton={BotonConCuerpo} /> },
     { ...C, idea: "El trigo termina de cubrir el botón y «Listo» cae estampado, como el sello de la caravana.", Demo: () => <DemoListo Boton={BotonConMarca} /> },
     { ...D, idea: "Cruza, espera girando y del otro lado se vuelve un tilde verde mientras dice «Listo». Después vuelve a su lugar.", Demo: () => <DemoListo Boton={BotonDesliza} /> },
+    { ...E, idea: "El trigo cubre el botón, cae el sello «Listo» y la píldora acusa el golpe: se hunde y rebota, como cuando pega un sello de verdad.", Demo: () => <DemoListo Boton={BotonCuerpoMarca} /> },
   ],
   telefono: [
     {
@@ -113,6 +119,7 @@ const OPCIONES: Record<string, Opcion[]> = {
       Demo: () => <DemoTelefono p="marca" />,
     },
     { ...D, idea: "Cruza y del otro lado queda ámbar con el ícono de sin señal, mientras dice «En el teléfono».", Demo: () => <DemoTelefono p="desliza" /> },
+    { ...E, idea: "Sello punteado «En el teléfono» con el golpe, y el ícono de sin señal latiendo como en la B. Lo que falta subir entra con resorte.", Demo: () => <DemoTelefono p="cuerpoMarca" /> },
   ],
   fallo: [
     {
@@ -126,11 +133,13 @@ const OPCIONES: Record<string, Opcion[]> = {
       Demo: () => <DemoFallo p="marca" />,
     },
     { ...D, idea: "El círculo cruza, se pone rojo y se queda del otro lado diciendo «Falló. Tocá de nuevo» hasta el próximo toque.", Demo: () => <DemoFallo p="desliza" /> },
+    { ...E, idea: "El «no» es la sacudida grande de la B y el círculo se pone rojo; si no se pudo guardar, el trigo se retira como en la C.", Demo: () => <DemoFallo p="cuerpoMarca" /> },
   ],
   apagado: [
     { ...B, idea: "Se ve al 60 %, pero se puede tocar: dice que no con una sacudida y explica qué falta.", Demo: () => <DemoApagado p="cuerpo" /> },
     { ...C, idea: "Se ve al 60 %; al tocarlo tiembla corto y aparece qué falta, deslizándose.", Demo: () => <DemoApagado p="marca" /> },
     { ...D, idea: "Apagado, el círculo no cruza: el botón tiembla corto y aparece qué falta.", Demo: () => <DemoApagado p="desliza" /> },
+    { ...E, idea: "Se ve al 60 %; al tocarlo dice que no con la sacudida de la B y aparece qué falta con resorte.", Demo: () => <DemoApagado p="cuerpoMarca" /> },
   ],
   pasos: [
     {
@@ -144,11 +153,13 @@ const OPCIONES: Record<string, Opcion[]> = {
       Demo: () => <DemoPasos p="marca" />,
     },
     { ...D, idea: "Al apretar Seguir el círculo cruza y el paso nuevo se desliza sin rebote. «Anotar» cruza, espera y termina en tilde.", Demo: () => <DemoPasos p="desliza" /> },
+    { ...E, idea: "El paso entra con el resorte de la B; en la barra, el paso que estás llenando es trigo como en la C. «Anotar» termina con el sello y el golpe.", Demo: () => <DemoPasos p="cuerpoMarca" /> },
   ],
   panel: [
     { ...B, idea: "El panel entra con un resorte suave. Al anotar, el botón dice «Listo» y el panel se cierra solo.", Demo: () => <DemoPanel p="cuerpo" /> },
     { ...C, idea: "El panel entra con la curva de la casa, sin rebote. Al anotar cae el sello «Listo» y el panel se cierra solo.", Demo: () => <DemoPanel p="marca" /> },
     { ...D, idea: "El panel entra deslizándose sin rebote. Al anotar, el círculo cruza, se vuelve tilde y el panel se cierra solo.", Demo: () => <DemoPanel p="desliza" /> },
+    { ...E, idea: "El panel entra con el resorte suave de la B. Al anotar cae el sello «Listo» con el golpe y el panel se cierra solo.", Demo: () => <DemoPanel p="cuerpoMarca" /> },
   ],
 }
 

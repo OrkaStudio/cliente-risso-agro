@@ -127,6 +127,9 @@ const MuestraPage = lazy(() =>
 const AnimacionesMuestra = lazy(() =>
   import('@/components/tropero/animaciones-muestra').then((m) => ({ default: m.AnimacionesMuestra })),
 )
+const ColoresMuestra = lazy(() =>
+  import('@/components/tropero/colores-muestra').then((m) => ({ default: m.ColoresMuestra })),
+)
 const MarcaMuestra = lazy(() =>
   import('@/components/tropero/marca-muestra').then((m) => ({ default: m.MarcaMuestra })),
 )
@@ -138,6 +141,7 @@ export const router = createBrowserRouter([
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
         { path: '/estilo/animaciones', element: <Suspense fallback={null}><AnimacionesMuestra /></Suspense> },
+        { path: '/estilo/colores', element: <Suspense fallback={null}><ColoresMuestra /></Suspense> },
         { path: '/estilo/marca', element: <Suspense fallback={null}><MarcaMuestra /></Suspense> },
       ]
     : []),
