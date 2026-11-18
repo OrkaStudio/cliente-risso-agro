@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { MapErrorBoundary } from '@/components/map-error-boundary'
@@ -54,6 +54,8 @@ export function CamposCelu() {
 function TodosLosCampos() {
   const navigate = useNavigate()
   const reducir = useReducedMotion()
+  // Volviendo de un campo: el mapa arranca en él y se aleja hasta ver todos (como en la compu).
+  const desde = (useLocation().state as { desde?: string } | null)?.desde ?? null
   const { data: membresia } = useEmpresa()
   const mapa = useMapa(membresia?.empresa_id)
   const identidad = useCampoElegido()
@@ -63,19 +65,19 @@ function TodosLosCampos() {
   const totalHa = campos.reduce((n, c) => n + hectareas(c), 0)
   const totalCab = campos.reduce((n, c) => n + cabezas(c), 0)
   const entra = (i: number) => (reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.05, ease: CURVA } })
-  const abrir = (cid: string) => navigate(`/campo/campos/${cid}`)
+  const abrir = (cid: string) => navigate(`/campo/campos/${cid}`, { state: { entrando: true } })
   return (
     <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
       <Barra />
       <motion.section {...entra(0)} aria-labelledby="campos-titulo" className="flex flex-col gap-3">
-        <h1 id="campos-titulo" className="px-1 titulo-display text-[30px] text-texto">
+        <h1 id="campos-titulo" className="flex h-9 items-center px-1 titulo-display text-[30px] leading-tight text-texto">
           Campos
         </h1>
-        {/* Todos sobre el satélite: tocar uno lo abre. */}
+        {/* Todos sobre el satélite: tocar uno viaja hasta él y lo abre. */}
         <div className="relative isolate h-[300px] overflow-hidden rounded-[20px] border border-borde bg-tinta">
           {campos.length > 0 && (
             <MapErrorBoundary>
-              <MapaCampos campos={campos.map((c) => ({ campo: c, letra: marca(c.id)?.letra ?? '', color: marca(c.id)?.color ?? '#a9552c' }))} onElegir={abrir} />
+              <MapaCampos campos={campos.map((c) => ({ campo: c, letra: marca(c.id)?.letra ?? '', color: marca(c.id)?.color ?? '#a9552c' }))} onElegir={abrir} desde={desde} />
             </MapErrorBoundary>
           )}
         </div>
@@ -125,6 +127,9 @@ function TodosLosCampos() {
 function UnCampo({ id }: { id: string }) {
   const navigate = useNavigate()
   const reducir = useReducedMotion()
+  // Entró tocándolo en «Campos»: su mapa arranca en esa vista y viaja hasta el campo.
+  const entrando = !!(useLocation().state as { entrando?: boolean } | null)?.entrando
+  const volver = () => navigate('/campo/campos', { state: { desde: id } })
   const { data: membresia } = useEmpresa()
   const empresaId = membresia?.empresa_id ?? ''
   const mapa = useMapa(membresia?.empresa_id)
@@ -150,7 +155,7 @@ function UnCampo({ id }: { id: string }) {
       <div className="flex flex-col gap-4 p-4">
         <Barra />
         <p className="text-[15px] text-texto-suave">No encontramos ese campo.</p>
-        <button type="button" onClick={() => navigate('/campo/campos')} className="self-start text-[15px] font-bold text-principal">
+        <button type="button" onClick={volver} className="self-start text-[15px] font-bold text-principal">
           Ver los campos
         </button>
       </div>
@@ -178,21 +183,61 @@ function UnCampo({ id }: { id: string }) {
   return (
     <div className="flex flex-col gap-6 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
       <Barra />
-      <button type="button" onClick={() => navigate('/campo/campos')} className="-mb-2 flex items-center gap-1 self-start text-[14px] font-bold text-principal">
-        <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
-        Campos
-      </button>
+      {/* El título y el mapa en el mismo lugar que en «Campos»: el viaje de la cámara se lee como uno solo. */}
+      <section aria-labelledby="campo-titulo" className="mt-2 flex flex-col gap-3">
+        <div className="flex h-9 items-center gap-2">
+          <button type="button" onClick={volver} aria-label="Volver a Campos" className="-ml-1 grid size-9 shrink-0 place-items-center rounded-full text-principal">
+            <Icono nombre="Siguiente" tamano={24} className="rotate-180" />
+          </button>
+          <h1 id="campo-titulo" className="min-w-0 truncate titulo-display text-[30px] leading-tight text-texto">
+            {campo.nombre}
+          </h1>
+        </div>
+        {dibujado ? (
+          <div className="relative isolate h-[300px] overflow-hidden rounded-[20px] border border-borde bg-tinta">
+            <MapErrorBoundary>
+              <MapaCampo campo={campoMapa} elegido={elegido} onElegir={(pid) => elegir(elegido === pid ? null : pid)} onFondo={() => setElegido(null)} color={(p) => COLOR_USO[usoDe(p.id)]} dato={(p) => (veHacienda && p.cabezas ? `${p.cabezas} cab` : null)} entrando={entrando} />
+            </MapErrorBoundary>
+          </div>
+        ) : (
+          <p className={cn(TARJETA, 'p-4 text-[15px] text-texto-suave')}>Este campo todavía no está dibujado. Se arma en la compu.</p>
+        )}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-[13px] text-texto-suave">
+          {(['ganadero', 'agricola', 'vacio'] as Uso[]).map((u) => (
+            <span key={u} className="inline-flex items-center gap-1.5">
+              <span className="size-2.5 rounded-[3px]" style={{ background: COLOR_USO[u] }} />
+              {USO_TEXTO[u]}
+            </span>
+          ))}
+        </div>
+      </section>
 
-      {/* El campo: cuál es, sus números y en qué están sus hectáreas. */}
-      <motion.section {...entra(0)} aria-labelledby="campo-titulo" className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
+      {/* El potrero tocado, abajo del mapa. */}
+      <div ref={detalle} className="scroll-mt-4 empty:hidden">
+        {potrero && (
+          <DetallePotrero
+            key={potrero.id}
+            p={potrero}
+            dias={dias.get(potrero.id) ?? null}
+            obs={ultima.get(potrero.id) ?? null}
+            lluvias={datos.data?.lluvias ?? []}
+            movimientos={datos.data?.movimientos ?? []}
+            historia={historiaDelPotrero(potrero.id, datos.data?.observaciones ?? [], datos.data?.movimientos ?? [], datos.data?.labores ?? [])}
+            labores={(datos.data?.labores ?? []).filter((l) => l.potreroId === potrero.id)}
+            veHacienda={veHacienda}
+            onCerrar={() => setElegido(null)}
+          />
+        )}
+      </div>
+
+      {/* El campo: sus números y en qué están sus hectáreas. */}
+      <motion.section {...entra(0)} aria-label={`Resumen de ${campo.nombre}`} className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
         <div className="flex items-center gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-full text-[15px] font-extrabold text-white" style={{ background: m?.color ?? '#a9552c' }}>
             {m?.letra}
           </span>
           <div className="min-w-0">
-            <h1 id="campo-titulo" className="titulo-display truncate text-[26px] leading-tight text-texto">
-              {campo.nombre}
-            </h1>
+            <p className="truncate text-[17px] font-bold text-texto">{campo.potreros.length} potreros</p>
             {campo.ubicacion.localidad && <p className={BAJADA}>{campo.ubicacion.localidad}</p>}
           </div>
         </div>
@@ -233,45 +278,6 @@ function UnCampo({ id }: { id: string }) {
           </ul>
         )}
       </motion.section>
-
-      {/* El mapa, pintado por lo que tiene cada potrero. */}
-      <motion.section {...entra(1)} aria-label={`Mapa de ${campo.nombre}`} className="flex flex-col gap-2">
-        {dibujado ? (
-          <div className="relative isolate h-[320px] overflow-hidden rounded-[20px] border border-borde bg-tinta">
-            <MapErrorBoundary>
-              <MapaCampo campo={campoMapa} elegido={elegido} onElegir={(pid) => elegir(elegido === pid ? null : pid)} onFondo={() => setElegido(null)} color={(p) => COLOR_USO[usoDe(p.id)]} dato={(p) => (veHacienda && p.cabezas ? `${p.cabezas} cab` : null)} />
-            </MapErrorBoundary>
-          </div>
-        ) : (
-          <p className={cn(TARJETA, 'p-4 text-[15px] text-texto-suave')}>Este campo todavía no está dibujado. Se arma en la compu.</p>
-        )}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-[13px] text-texto-suave">
-          {(['ganadero', 'agricola', 'vacio'] as Uso[]).map((u) => (
-            <span key={u} className="inline-flex items-center gap-1.5">
-              <span className="size-2.5 rounded-[3px]" style={{ background: COLOR_USO[u] }} />
-              {USO_TEXTO[u]}
-            </span>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* El potrero tocado, abajo del mapa. */}
-      <div ref={detalle} className="scroll-mt-4">
-        {potrero && (
-          <DetallePotrero
-            key={potrero.id}
-            p={potrero}
-            dias={dias.get(potrero.id) ?? null}
-            obs={ultima.get(potrero.id) ?? null}
-            lluvias={datos.data?.lluvias ?? []}
-            movimientos={datos.data?.movimientos ?? []}
-            historia={historiaDelPotrero(potrero.id, datos.data?.observaciones ?? [], datos.data?.movimientos ?? [], datos.data?.labores ?? [])}
-            labores={(datos.data?.labores ?? []).filter((l) => l.potreroId === potrero.id)}
-            veHacienda={veHacienda}
-            onCerrar={() => setElegido(null)}
-          />
-        )}
-      </div>
 
       <motion.section {...entra(2)} aria-labelledby="campo-potreros" className={cn(TARJETA, 'p-4')}>
         <Encabezado id="campo-potreros" titulo="Potreros" bajada="Qué hay en cada uno y desde cuándo. Tocalo para ver más." />

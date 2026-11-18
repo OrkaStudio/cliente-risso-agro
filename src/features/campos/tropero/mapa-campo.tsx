@@ -70,25 +70,33 @@ export function MapaCampo({
     capa.current = L.layerGroup().addTo(map)
     map.on('click', () => fondo.current?.())
     const puntos = [...(campo.contorno ?? []), ...campo.potreros.flatMap((p) => p.poligono ?? [])]
+    // En la compu el mapa ocupa la pantalla y deja lugar arriba a la barra; en el celular es una
+    // tarjeta chica: ahí el campo la llena con un margen parejo.
+    const relleno = (): L.FitBoundsOptions => {
+      const ancho = host.current?.clientWidth ?? 0
+      if (ancho < 600) return { paddingTopLeft: [20, 20], paddingBottomRight: [20, 20] }
+      const derecha = ancho > 900 ? margenDerecho : 0
+      return { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70] }
+    }
     const encuadrar = () => {
       if (!puntos.length) return
-      const ancho = host.current?.clientWidth ?? 0
-      const derecha = ancho > 900 ? margenDerecho : 0
-      map.fitBounds(L.latLngBounds(puntos), { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70] })
+      map.fitBounds(L.latLngBounds(puntos), relleno())
     }
     const desde = entrando ? vistaGeneral() : null
     if (desde && puntos.length) {
       // El viaje: desde donde estaba la vista general hasta el campo, en un solo movimiento.
       capaPotreros.style.opacity = '0'
       map.setView([desde.lat, desde.lng], desde.zoom, { animate: false })
-      const derecha = (host.current?.clientWidth ?? 0) > 900 ? margenDerecho : 0
       const destino = L.latLngBounds(puntos)
-      const z = map.getBoundsZoom(destino, false, L.point(derecha + 80, 190))
+      const r = relleno()
+      const [izq, arriba] = r.paddingTopLeft as [number, number]
+      const [der, abajo] = r.paddingBottomRight as [number, number]
+      const z = map.getBoundsZoom(destino, false, L.point(izq + der, arriba + abajo))
       // Antes de viajar, pide las imágenes de donde va a llegar (sin huecos oscuros en el camino).
       void precargarVista(map, destino.pad(0.6), z).then(() => {
         if (!vivo) return
         map.once('moveend', () => (capaPotreros.style.opacity = '1'))
-        map.flyToBounds(destino, { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70], duration: VIAJE, easeLinearity: 0.1 })
+        map.flyToBounds(destino, { ...r, duration: VIAJE, easeLinearity: 0.1 })
       })
     } else encuadrar()
     // Dónde quedó: la vuelta a «Todos tus campos» arranca acá.
