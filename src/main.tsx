@@ -8,10 +8,14 @@ import { queryClient } from '@/lib/query-client'
 import { AuthProvider } from '@/features/auth/auth-context'
 import { router } from '@/app/router'
 import { Toaster } from '@/components/ui/sonner'
+import { instalarHundir } from '@/lib/hundir'
 
 // Commit del build, invisible: se lee con `document.documentElement.dataset.build`
 // (DevTools) para saber qué versión tiene un teléfono con la PWA cacheada.
 document.documentElement.dataset.build = __BUILD_SHA__
+
+// Todo botón se hunde al apretarlo y rebota al soltarlo (también los escritos a mano).
+instalarHundir()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

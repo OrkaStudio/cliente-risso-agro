@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* archivo/ guarda pantallas que salieron de la app: sus clases no van al CSS (18/11). */
+@source not "../archivo";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 

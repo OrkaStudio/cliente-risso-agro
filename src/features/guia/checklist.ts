@@ -6,6 +6,8 @@ import {
   type Resumen,
 } from '@/features/guia/estado'
 import { supabase } from '@/lib/supabase/client'
+import { todasLasFilas } from '@/lib/todas-las-filas'
+import { errorDeBase } from '@/lib/error-de-base'
 
 export type { CampoSinContorno, EstadoPuestaAPunto, ItemChecklist, Resumen } from '@/features/guia/estado'
 
@@ -24,7 +26,7 @@ export type { CampoSinContorno, EstadoPuestaAPunto, ItemChecklist, Resumen } fro
  */
 
 function head(count: number | null, error: { message: string } | null): number {
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return count ?? 0
 }
 
@@ -98,14 +100,15 @@ export function useEstadoPuestaAPunto() {
             if (r.error) throw new Error(r.error.message)
             return r.data ?? []
           }),
-        supabase
-          .from('movimiento_financiero')
-          .select('campo_id, categoria:categoria_movimiento!inner(nombre)')
-          .eq('categoria.nombre', 'Alquiler de campo')
-          .then((r) => {
-            if (r.error) throw new Error(r.error.message)
-            return new Set((r.data ?? []).map((m) => m.campo_id))
-          }),
+        // De a tandas: los pagos de alquiler se acumulan (12 por año y por campo).
+        todasLasFilas((desde, hasta) =>
+          supabase
+            .from('movimiento_financiero')
+            .select('id, campo_id, categoria:categoria_movimiento!inner(nombre)')
+            .eq('categoria.nombre', 'Alquiler de campo')
+            .order('id')
+            .range(desde, hasta),
+        ).then((filas) => new Set(filas.map((m) => m.campo_id))),
         // Las que salieron sin identificar ya no están: se restan de las cabezas.
         supabase
           .from('salida_pendiente')

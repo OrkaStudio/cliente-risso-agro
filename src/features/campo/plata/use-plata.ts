@@ -162,9 +162,10 @@ export function usePlata() {
 
   /** Encola el movimiento (local) y dispara el sync. */
   const guardar = useCallback(
-    async (n: NuevoGasto) => {
+    async (n: NuevoGasto): Promise<string> => {
+      const id = crypto.randomUUID()
       await platadb.outbox.add({
-        id: crypto.randomUUID(),
+        id,
         empresa_id: n.empresaId,
         campo_id: n.campoId,
         tipo: n.tipo,
@@ -185,6 +186,7 @@ export function usePlata() {
       })
       localStorage.setItem(CAMPO_KEY, n.campoId)
       void sincronizar()
+      return id
     },
     [sincronizar],
   )

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { OpcionesCampo } from '@/features/campos/opciones-campo'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { Boton, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
@@ -9,7 +10,7 @@ import { Segmentos } from '@/components/tropero/segmentos'
 import { CampoFecha } from '@/components/ui/campo-fecha'
 import type { ComprobanteTipo, IvaLinea } from '@/features/analitica/api'
 import { actividadLabel, fmtCompact } from '@/features/analitica/compute'
-import { useCategorias, useCrearMovimiento, useCrearSerie, useMovimientos } from '@/features/analitica/hooks'
+import { useAnularMovimiento, useCancelarSerie, useCategorias, useCrearMovimiento, useCrearSerie, useMovimientos } from '@/features/analitica/hooks'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { usePotreros } from '@/features/campos/hooks'
 import { formatearNumero, numeroDeFormateado } from '@/features/onboarding/numeros'
@@ -154,6 +155,8 @@ function Formulario({
   const movs = useMovimientos()
   const crear = useCrearMovimiento()
   const crearSerie = useCrearSerie()
+  const anular = useAnularMovimiento()
+  const cancelarSerie = useCancelarSerie()
   const archivo = useRef<HTMLInputElement>(null)
 
   const [modo, setModo] = useState<Modo>('mano')
@@ -224,7 +227,6 @@ function Formulario({
   const veces = fechasSerie.length
   const cuota = esTotal === 'cada' ? total : veces > 0 ? Math.round((total / veces) * 100) / 100 : 0
   const totalSerie = cuota * veces
-  const ocupado = crear.isPending || crearSerie.isPending
   const nombreCategoria = opcionesCategoria.find((c) => c.id === categoriaId)?.nombre
   const nombreCampo = campos.find((c) => c.id === campoId)?.nombre
 
@@ -318,69 +320,75 @@ function Formulario({
   async function guardar() {
     setError(null)
     const f = faltante()
-    if (f || !tipo) return setError(f ?? faltaTipo)
+    if (f || !tipo) { setError(f ?? faltaTipo); return 'falta' }
     const dia = cuando === 'otro' ? fecha : hoyLocal()
     const medioFinal = pendiente ? previsto : cuenta
-    try {
-      await crear.mutateAsync({
-        empresaId,
-        tipo,
-        categoriaId,
-        campoId,
-        potreroId: potreroId || null,
-        monto: total,
-        fechaDevengo: pendiente ? vence : dia,
-        fechaVencimiento: pendiente ? vence : null,
-        fechaCobroPago: pendiente ? null : dia,
-        medioPago: pendiente ? previsto || null : (cuenta as Medio),
-        actividad: actividad || null,
-        descripcion,
-        esEcheq: medioFinal === 'cheque' && esEcheq === 'echeq',
-        chequeNumero: medioFinal === 'cheque' ? chequeNumero : '',
-        chequeBanco: medioFinal === 'cheque' ? chequeBanco : '',
-        contraparte,
-        cuit,
-        comprobanteTipo: factura === 'no' ? null : factura,
-        ivaLineas: lineas,
-        comprobanteImg: foto,
+    const id = await crear.mutateAsync({
+      empresaId,
+      tipo,
+      categoriaId,
+      campoId,
+      potreroId: potreroId || null,
+      monto: total,
+      fechaDevengo: pendiente ? vence : dia,
+      fechaVencimiento: pendiente ? vence : null,
+      fechaCobroPago: pendiente ? null : dia,
+      medioPago: pendiente ? previsto || null : (cuenta as Medio),
+      actividad: actividad || null,
+      descripcion,
+      esEcheq: medioFinal === 'cheque' && esEcheq === 'echeq',
+      chequeNumero: medioFinal === 'cheque' ? chequeNumero : '',
+      chequeBanco: medioFinal === 'cheque' ? chequeBanco : '',
+      contraparte,
+      cuit,
+      comprobanteTipo: factura === 'no' ? null : factura,
+      ivaLineas: lineas,
+      comprobanteImg: foto,
+    })
+    return () =>
+      toast.success(`Listo: ${esGasto ? 'salieron' : 'entraron'} ${pesos(total)}`, {
+        description: pendiente ? 'Quedó en la Agenda para cuando vence.' : 'Lo ves en los movimientos.',
+        action: {
+          label: 'Deshacer',
+          onClick: () =>
+            anular.mutate(id, {
+              onSuccess: () => toast.success('Listo: lo deshiciste', { description: 'Ya no cuenta en Plata ni en la Agenda.' }),
+              onError: () => toast.error('No se pudo deshacer. Anulalo desde los movimientos.'),
+            }),
+        },
       })
-      toast.success(`Listo: ${esGasto ? 'salieron' : 'entraron'} ${pesos(total)}`, { description: pendiente ? 'Quedó en la Agenda para cuando vence.' : 'Lo ves en los movimientos.' })
-      onCerrar()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
-    }
   }
+
+  // Si no sale, el motivo lo dice el botón; al «Listo», el aviso y se cierra el panel.
+  const anotar = useAccion(guardar, { alTerminar: onCerrar })
+  const anotarSimple = useAccion(guardar, { alTerminar: onCerrar })
 
   async function guardarCuotas() {
     setError(null)
     const f = faltante(true)
-    if (f || !tipo) return setError(f ?? faltaTipo)
-    if (!forma) return setError(`Tocá cómo ${esGasto ? 'se paga' : 'se cobra'}: a plazos o todos los meses.`)
-    if (!veces) return setError(forma === 'plazos' ? 'Tocá a cuántos días es cada pago.' : 'Tocá cuántos meses.')
-    try {
-      await crearSerie.mutateAsync({
-        empresaId,
-        tipo,
-        categoriaId,
-        campoId,
-        potreroId: potreroId || null,
-        actividad: actividad || null,
-        montoCuota: cuota,
-        frecuencia: 'mensual',
-        primeraFecha: fechasSerie[0]!,
-        cantidad: veces,
-        fechas: fechasSerie,
-        // Un sueldo o un alquiler (lo mismo cada mes) no lleva «cuota 3/12».
-        sinNumerar: forma === 'mensual' && esTotal === 'cada',
-        descripcion: descripcion.trim() || nombreCategoria || (esGasto ? 'Gasto' : 'Ingreso'),
-        medioPago: null,
-      })
-      toast.success(`Listo: ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${pesos(cuota)} en la Agenda`, { description: `El primero el ${Number(fechasSerie[0]!.slice(8))} de ${nombreMes(fechasSerie[0]!.slice(0, 7))}.` })
-      onCerrar()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
-    }
+    if (f || !tipo) { setError(f ?? faltaTipo); return 'falta' }
+    if (!forma) { setError(`Tocá cómo ${esGasto ? 'se paga' : 'se cobra'}: a plazos o todos los meses.`); return 'falta' }
+    if (!veces) { setError(forma === 'plazos' ? 'Tocá a cuántos días es cada pago.' : 'Tocá cuántos meses.'); return 'falta' }
+    const serieId = await crearSerie.mutateAsync({
+      empresaId,
+      tipo,
+      categoriaId,
+      campoId,
+      potreroId: potreroId || null,
+      actividad: actividad || null,
+      montoCuota: cuota,
+      frecuencia: 'mensual',
+      primeraFecha: fechasSerie[0]!,
+      cantidad: veces,
+      fechas: fechasSerie,
+      // Un sueldo o un alquiler (lo mismo cada mes) no lleva «cuota 3/12».
+      sinNumerar: forma === 'mensual' && esTotal === 'cada',
+      descripcion: descripcion.trim() || nombreCategoria || (esGasto ? 'Gasto' : 'Ingreso'),
+      medioPago: null,
+    })
+    return () => toast.success(`Listo: ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${pesos(cuota)} en la Agenda`, { description: `El primero el ${Number(fechasSerie[0]!.slice(8))} de ${nombreMes(fechasSerie[0]!.slice(0, 7))}.` , action: { label: 'Deshacer', onClick: () => cancelarSerie.mutate(serieId, { onSuccess: () => toast.success('Listo: lo deshiciste', { description: 'Esos pagos ya no están en la Agenda.' }), onError: () => toast.error('No se pudo deshacer. Cancelalos desde la Agenda.') }) } })
   }
+  const anotarCuotas = useAccion(guardarCuotas, { alTerminar: onCerrar })
 
   const inputFoto = (
     <input
@@ -437,7 +445,7 @@ function Formulario({
         pie={
           <>
             {errorAviso}
-            <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardarCuotas()}>
+            <BotonPrincipal icono="Siguiente" accion={anotarCuotas}>
               {veces > 0 ? `Anotar ${veces} ${veces === 1 ? 'pago' : 'pagos'} de ${fmtCompact(cuota)}` : 'Anotar los pagos'}
             </BotonPrincipal>
           </>
@@ -682,7 +690,7 @@ function Formulario({
   )
 
   const botonAnotar = (
-    <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={() => void guardar()} className="flex-1">
+    <BotonPrincipal icono="Siguiente" accion={anotar} className="flex-1">
       {total > 0 ? (pendiente && vence ? `Anotar: ${esGasto ? 'pagás' : 'cobrás'} ${fmtCompact(total)} el ${Number(vence.slice(8))}/${Number(vence.slice(5, 7))}` : `Anotar ${pesos(total)}`) : 'Anotar'}
     </BotonPrincipal>
   )
@@ -728,9 +736,9 @@ function Formulario({
             )}
           </div>
           {!leyo && paso === 2 && (
-            <button type="button" onClick={() => void guardar()} disabled={ocupado} className="mt-2.5 h-12 w-full rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto hover:border-principal hover:text-principal disabled:opacity-50">
+            <Boton tipo="secundario" accion={anotarSimple} className="mt-2.5 h-12 w-full rounded-full border-borde text-[15px] font-bold text-texto hover:border-principal hover:text-principal">
               Anotar así, sin más detalle
-            </button>
+            </Boton>
           )}
         </>
       }

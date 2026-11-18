@@ -669,10 +669,11 @@ function FilaPotrero({ g, onClick }: { g: GrupoPotrero; onClick: () => void }) {
   return (
     <tr onClick={onClick} className="cursor-pointer transition-colors hover:bg-superficie-hundida/50">
       <td className="py-3.5 pl-5">
-        <a href="#" onClick={(e) => (e.preventDefault(), onClick())} className="flex flex-col">
+        {/* Botón y no link (regla de la marca): el que se alcanza con el teclado. */}
+        <button type="button" onClick={(e) => (e.stopPropagation(), onClick())} className="flex flex-col text-left">
           <span className="t-cifra font-bold text-texto">{potrero}</span>
           {campo && <span className="text-[13px] text-texto-suave">{campo}</span>}
-        </a>
+        </button>
       </td>
       <td className="py-3.5 pr-4">
         <span className="block text-[15px] font-semibold text-texto">
@@ -685,7 +686,8 @@ function FilaPotrero({ g, onClick }: { g: GrupoPotrero; onClick: () => void }) {
         {g.atender ? <span className="font-semibold text-texto">{g.atender === 1 ? '1 para atender' : `${g.atender} para atender`}</span> : <span className="text-texto-suave">—</span>}
       </td>
       <td className="py-3.5 pr-5 text-right">
-        <span className="inline-flex items-center gap-1 text-[14.5px] font-bold text-principal">
+        {/* Con forma de botón (Lau, 18/11: lo que se toca es un botón). Toda la fila lo abre. */}
+        <span className="inline-flex h-9 items-center gap-1 rounded-full border-[1.5px] border-principal/55 px-3.5 text-[14px] font-bold text-principal">
           Ver <Icono nombre="Siguiente" tamano={16} />
         </span>
       </td>

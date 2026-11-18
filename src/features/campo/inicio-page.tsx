@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { BotonPrincipal } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
@@ -6,92 +6,60 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { saludo } from '@/features/inicio/tropero/dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
-import { cn } from '@/lib/utils'
 import tranquera from '@/assets/tropero/tranquera.webp'
 import { Logo } from '@/components/tropero/logo'
 import { HoyCelu } from './hoy-celu'
 import { MenuCuenta } from './menu-cuenta'
-import { useRecorrida } from './recorrida/use-recorrida'
 
 
 /**
  * Hoy · El día en el celular (página 35): la foto con el campo elegido, lo
- * que hay para hacer hoy en ese campo y sus cabezas. Antes, lo que no puede
- * esperar del Modo Campo: sin señal, lo que falta subir y las recorridas
- * abiertas para retomar. Sin el mapa armado, «Hoy, sin campo».
+ * que hay para hacer hoy en ese campo y sus cabezas. Antes, si no hay señal, el aviso.
+ * Sin el mapa armado, «Hoy, sin campo». (La recorrida y sus observaciones sin subir
+ * salieron de la app el 18/11: se hacen por WhatsApp con el bot; archivo/.)
  */
 export function CampoInicioPage() {
   return useMapaPendiente() ? <HoySinCampo /> : <Hoy />
 }
 
+/** Si el teléfono tiene señal (se actualiza al perderla o recuperarla). */
+function useEnLinea(): boolean {
+  return useSyncExternalStore(
+    (avisar) => {
+      window.addEventListener('online', avisar)
+      window.addEventListener('offline', avisar)
+      return () => {
+        window.removeEventListener('online', avisar)
+        window.removeEventListener('offline', avisar)
+      }
+    },
+    () => navigator.onLine,
+    () => true,
+  )
+}
+
 function Hoy() {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
-  const r = useRecorrida()
+  const enLinea = useEnLinea()
   const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
 
   return (
-    <div className="h-full overflow-y-auto pb-8">
+    // Sin margen propio abajo: HoyCelu ya trae el suyo (pb-6), el mismo que Campos, Hacienda y Plata.
+    <div className="h-full overflow-y-auto">
       <HoyCelu
         cuenta={<MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />}
         antes={
-          (!r.online || r.sinSubir > 0 || r.errores.length > 0) && (
-            <div className="flex flex-col gap-3">
-              <Pendientes r={r} />
-            </div>
+          !enLinea && (
+            <p className="flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
+              <Icono nombre="Sin señal" tamano={16} /> Sin señal: trabajás igual y se sube solo cuando vuelva.
+            </p>
           )
         }
       />
     </div>
   )
 }
-
-/** Lo que el Modo Campo no puede callar: sin señal, lo que falta subir y lo que se rechazó. */
-function Pendientes({ r }: { r: ReturnType<typeof useRecorrida> }) {
-  return (
-    <>
-      {!r.online && (
-        <p className="flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
-          <Icono nombre="Sin señal" tamano={16} /> Sin señal: trabajás igual y se sube solo cuando vuelva.
-        </p>
-      )}
-      {r.sinSubir > 0 && (
-        <p className="flex items-center gap-2.5 rounded-[14px] bg-superficie px-4 py-3 text-[14px] text-texto-suave">
-          <span className={cn('inline-flex', r.sincronizando && 'animate-spin')}>
-            <Icono nombre="Reintentar" tamano={16} />
-          </span>
-          <span>
-            <b className="text-texto">
-              {r.sinSubir === 1 ? '1 observación' : `${r.sinSubir} observaciones`}
-            </b>{' '}
-            sin subir: se sube sola.
-          </span>
-        </p>
-      )}
-      {r.errores.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-[14px] bg-estado-problema-suave px-4 py-3">
-          <p className="text-[14px] font-bold text-estado-problema-texto">
-            {r.errores.length === 1 ? 'Una observación no se pudo guardar' : `${r.errores.length} observaciones no se pudieron guardar`}
-          </p>
-          <ul className="text-[13px] text-estado-problema-texto">
-            {r.errores.slice(0, 3).map((e) => (
-              <li key={`${e.recorrida_id}-${e.potrero_id}`}>{e.error ?? 'Error al subir'}</li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void r.descartarErrores()}
-            className="h-10 self-start rounded-full border-[1.5px] border-estado-problema-texto/50 bg-superficie px-4 text-[14px] font-bold text-estado-problema-texto"
-          >
-            Descartarlas
-          </button>
-        </div>
-      )}
-    </>
-  )
-}
-
-
 
 /** Celu · Hoy, sin campo (página 35): el campo se arma mejor en la compu. */
 function HoySinCampo() {

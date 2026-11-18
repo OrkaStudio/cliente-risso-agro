@@ -135,7 +135,7 @@ export function CambiarNumeroPage() {
             <CampoCodigo id="codigo-nuevo" valor={codigo} onCambio={escribir} error={!!error} autoFocus />
             {error && <p className="text-[14px] text-estado-problema-texto" role="alert">{error}</p>}
           </div>
-          <BotonPrincipal type="submit" icono="Guardar" cargando={ocupado} disabled={codigo.length !== 6 || ocupado}>
+          <BotonPrincipal type="submit" icono="Siguiente" cargando={ocupado} disabled={codigo.length !== 6 || ocupado}>
             {ocupado ? 'Cambiando…' : 'Cambiar el número'}
           </BotonPrincipal>
           <Preguntas

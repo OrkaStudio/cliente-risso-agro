@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Boton } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { CampoTexto } from '@/components/tropero/campo-texto'
@@ -246,15 +248,12 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
   const celular = user?.phone ? celularLindo(user.phone) : null
 
   async function guardar() {
-    if (!nombre.trim()) return
-    try {
-      await cambiar.mutateAsync(nombre)
-      setGuardado(nombre.trim())
-      toast.success('Listo: guardamos tu nombre', { description: 'Así te saluda el asistente.' })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
-    }
+    if (!nombre.trim()) return 'falta'
+    await cambiar.mutateAsync(nombre)
+    setGuardado(nombre.trim())
+    return () => toast.success('Listo: guardamos tu nombre', { description: 'Así te saluda el asistente.' })
   }
+  const guardarNombre = useAccion(guardar)
 
   return (
     <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -275,9 +274,9 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
           <p className="mt-1 text-[15px] text-texto-suave">Con este te saluda el asistente y te ven las personas que invitás.</p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <CampoTexto className="min-w-[240px] flex-1" etiqueta="Cómo te llamás" placeholder="Daniel" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} />
-            <button type="button" onClick={() => void guardar()} disabled={!nombre.trim() || nombre.trim() === guardado || cambiar.isPending} className="h-[52px] rounded-full bg-principal px-6 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-40">
+            <Boton accion={guardarNombre} disabled={guardarNombre.estado === 'reposo' && (!nombre.trim() || nombre.trim() === guardado)} className="h-[52px] rounded-full px-6 text-[15.5px] font-bold disabled:opacity-40">
               Guardar el nombre
-            </button>
+            </Boton>
           </div>
         </section>
 

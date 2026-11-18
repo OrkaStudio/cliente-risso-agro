@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Aviso } from '@/components/tropero/aviso'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
@@ -60,8 +61,8 @@ function Formulario({ empresaId, abierto, onCerrar, onCreado }: { empresaId: str
   async function guardar() {
     setIntento(true)
     setError(null)
-    if (!valido || !localidad || n === null) return
-    try {
+    if (!valido || !localidad || n === null) return 'falta'
+    {
       const nuevo = await crear.mutateAsync({
         empresaId,
         nombre: nombre.trim(),
@@ -70,13 +71,21 @@ function Formulario({ empresaId, abierto, onCerrar, onCreado }: { empresaId: str
         actividad: null,
         ubicacion: { localidad: localidad.nombre, provincia: localidad.provincia, lat: localidad.lat, lon: localidad.lon },
       })
-      toast.success(`Listo: sumamos ${nombre.trim()}`, { description: 'Ahora dibujá su borde y sus potreros.' })
-      onCerrar()
-      onCreado(nuevo.id)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
+      creado.current = nuevo.id
+      const n2 = nombre.trim()
+      return () => toast.success(`Listo: sumamos ${n2}`, { description: 'Ahora dibujá su borde y sus potreros.' })
     }
   }
+  // Guarda y pasa a dibujarlo: lo que confirma es la pantalla nueva (sin «Listo»).
+  // Si no sale, el motivo lo dice el botón.
+  const creado = useRef('')
+  const sumar = useAccion(guardar, {
+    sinListo: true,
+    alTerminar: () => {
+      onCerrar()
+      onCreado(creado.current)
+    },
+  })
 
   return (
     <PanelLateral
@@ -85,7 +94,7 @@ function Formulario({ empresaId, abierto, onCerrar, onCreado }: { empresaId: str
       titulo="Sumar un campo"
       bajada="Con la ubicación te mostramos el clima de tu campo todos los días."
       pie={
-        <BotonPrincipal icono="Siguiente" cargando={crear.isPending} disabled={crear.isPending || !empresaId} onClick={() => void guardar()}>
+        <BotonPrincipal icono="Siguiente" accion={sumar} disabled={sumar.estado === 'reposo' && !empresaId}>
           {crear.isPending ? 'Guardando…' : 'Guardar el campo'}
         </BotonPrincipal>
       }
@@ -95,7 +104,7 @@ function Formulario({ empresaId, abierto, onCerrar, onCreado }: { empresaId: str
         noValidate
         onSubmit={(e) => {
           e.preventDefault()
-          void guardar()
+          void sumar.correr()
         }}
       >
         <CampoTexto

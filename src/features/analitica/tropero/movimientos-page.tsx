@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Boton } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
+import { useAccion } from '@/components/tropero/use-accion'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { AnotarPlata } from './anotar-plata'
@@ -39,6 +41,13 @@ export function MovimientosPage() {
   const [soloNuevos, setSoloNuevos] = useState(() => params.get('nuevos') === '1')
   const [abierto, setAbierto] = useState<MovimientoConDetalle | null>(null)
   const nuevos = (movs.data ?? []).filter((m) => carga && !m.revisado_at)
+  // «Ya los vi»: lo que confirma es que el aviso se va (sin «Listo»); si no sale, lo dice el botón.
+  const yaLosVi = useAccion(
+    async () => {
+      await revisar.mutateAsync(nuevos.map((m) => m.id))
+    },
+    { sinListo: true, alTerminar: () => setSoloNuevos(false) },
+  )
   // Los que cargaron algo (lo de antes del 13/11 no tiene autor: sólo entra en «Cargó cualquiera»).
   const autores = [...new Set((movs.data ?? []).map((m) => m.created_by).filter((x): x is string => !!x))]
   // Sin nuevos por ver, «sólo los nuevos» no tiene sentido: vuelve a todos.
@@ -123,14 +132,9 @@ export function MovimientosPage() {
           <button type="button" onClick={() => setSoloNuevos((v) => !v)} className="inline-flex h-10 items-center rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave">
             {soloNuevos ? 'Ver todos' : 'Ver sólo los nuevos'}
           </button>
-          <button
-            type="button"
-            disabled={revisar.isPending}
-            onClick={() => revisar.mutate(nuevos.map((m) => m.id), { onSuccess: () => setSoloNuevos(false) })}
-            className="inline-flex h-10 items-center rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-50"
-          >
+          <Boton accion={yaLosVi} className="h-10 rounded-full px-4 text-[14.5px] font-bold">
             Ya los vi
-          </button>
+          </Boton>
         </div>
       )}
 

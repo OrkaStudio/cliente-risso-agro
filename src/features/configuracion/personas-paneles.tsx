@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { Boton, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
@@ -90,21 +91,20 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
 
   async function enviar() {
     setError(null)
-    if (!nombre.trim()) return setError('Escribí cómo se llama.')
-    if (!cel) return setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.')
-    if (!tipoRol) return setError('Tocá qué hace en el campo.')
-    if (tipoRol === 'otro' && otroRol.trim().length < 2) return setError('Escribí qué hace en el campo.')
-    if (!acceso) return setError('Elegí cómo va a usar Troppero.')
+    if (!nombre.trim()) { setError('Escribí cómo se llama.'); return 'falta' }
+    if (!cel) { setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.'); return 'falta' }
+    if (!tipoRol) { setError('Tocá qué hace en el campo.'); return 'falta' }
+    if (tipoRol === 'otro' && otroRol.trim().length < 2) { setError('Escribí qué hace en el campo.'); return 'falta' }
+    if (!acceso) { setError('Elegí cómo va a usar Troppero.'); return 'falta' }
     const falta = faltaElegir(niveles)
-    if (falta) return setError(falta)
-    try {
-      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles, acceso }))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo invitar. Probá de nuevo.')
-    }
+    if (falta) { setError(falta); return 'falta' }
+    setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles, acceso }))
   }
 
   const cel = normalizarCelularAR(celular)?.slice(1) ?? null
+  // Invitar pasa a la pantalla con el link para mandarle: eso confirma (sin «Listo»).
+  const invitarAccion = useAccion(enviar, { sinListo: true })
+
   if (token && cel)
     return (
       <PanelLateral
@@ -145,7 +145,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
       pie={
         <>
           {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-          <BotonPrincipal icono="Siguiente" cargando={invitar.isPending} disabled={invitar.isPending} onClick={() => void enviar()}>
+          <BotonPrincipal icono="Siguiente" accion={invitarAccion}>
             {nombre.trim() ? `Invitar a ${nombre.trim().split(' ')[0]}` : 'Invitar'}
           </BotonPrincipal>
         </>
@@ -228,24 +228,23 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
   async function guardar() {
     setError(null)
     const falta = faltaElegir(niveles)
-    if (falta) return setError(falta === SIN_NADA ? `${falta} Para que no entre más, sacale el acceso.` : falta)
-    try {
+    if (falta) { setError(falta === SIN_NADA ? `${falta} Para que no entre más, sacale el acceso.` : falta); return 'falta' }
+    {
       await cambiar.mutateAsync({ userId: p.userId!, niveles })
-      onCerrar()
-      toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Rige la próxima vez que abra Troppero.` })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+      return () => toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Rige la próxima vez que abra Troppero.` })
     }
   }
   async function sacar() {
-    try {
+    {
       await quitar.mutateAsync(p)
-      onCerrar()
-      toast.success(pendiente ? `Listo: cancelaste la invitación de ${nombre}` : `Listo: ${nombre} ya no entra a tu campo`, { description: pendiente ? 'El link ya no sirve.' : 'Para que vuelva, invitalo de nuevo.' })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo.')
+      return () => toast.success(pendiente ? `Listo: cancelaste la invitación de ${nombre}` : `Listo: ${nombre} ya no entra a tu campo`, { description: pendiente ? 'El link ya no sirve.' : 'Para que vuelva, invitalo de nuevo.' })
     }
   }
+  // Guardar dice «Listo» y cierra. Sacar no se puede deshacer: ya preguntó, y lo que confirma
+  // es que la persona deja de estar (sin «Listo»). Si algo no sale, el motivo va en el botón.
+  const guardarAccion = useAccion(guardar, { alTerminar: onCerrar })
+  const sacarAccion = useAccion(sacar, { sinListo: true, alTerminar: onCerrar })
+
 
   return (
     <PanelLateral
@@ -267,7 +266,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
             </a>
           )}
           {!pendiente && (
-            <BotonPrincipal icono="Guardar" cargando={cambiar.isPending} disabled={cambiar.isPending} onClick={() => void guardar()}>
+            <BotonPrincipal icono="Siguiente" accion={guardarAccion}>
               Guardar
             </BotonPrincipal>
           )}
@@ -275,9 +274,9 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
             <div className="mt-3 flex flex-col gap-2 rounded-[16px] bg-estado-problema-suave p-4">
               <p className="text-[14.5px] font-semibold text-estado-problema-texto">{pendiente ? `¿Cancelás la invitación? El link ya no va a servir.` : `¿Le sacás el acceso a ${nombre}? Deja de entrar a tu campo; lo que cargó queda.`}</p>
               <div className="flex gap-2">
-                <button type="button" onClick={() => void sacar()} disabled={quitar.isPending} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie disabled:opacity-50">
+                <Boton accion={sacarAccion} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie hover:bg-estado-problema">
                   {pendiente ? 'Sí, cancelarla' : 'Sí, sacarle el acceso'}
-                </button>
+                </Boton>
                 <button type="button" onClick={() => setSeguro(false)} className="h-11 flex-1 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
                   No
                 </button>

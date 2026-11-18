@@ -158,15 +158,7 @@ export function itemsDe(r: Resumen): ItemChecklist[] {
           },
         ]
       : []),
-    {
-      id: 'recorrida',
-      titulo: 'Probá la Recorrida',
-      detalle: 'Una vez con señal, y queda lista para el campo.',
-      cta: '',
-      ruta: '/campo/recorrida',
-      accion: null,
-      movil: true,
-      hecho: r.recorridas >= 1,
-    },
+    // «Probá la Recorrida» salió (18/11): la pantalla ya no está en la app; la recorrida se
+    // manda por WhatsApp con el bot. El aviso y el progreso de la primera recorrida siguen (avisos.ts).
   ]
 }

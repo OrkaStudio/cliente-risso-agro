@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   Banknote,
   Camera,
-  Check,
   ChevronDown,
   CloudOff,
   Landmark,
@@ -18,6 +17,12 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePlata } from './plata/use-plata'
+import { platadb } from './plata/db'
+import { comoQuedo } from './como-quedo'
+import { useMovimiento } from '@/components/tropero/boton-movimiento'
+import { Giro, Texto, Tilde } from '@/components/tropero/boton-partes'
+import { Icono } from '@/components/tropero/icono'
+import { useAccion } from '@/components/tropero/use-accion'
 import { fotoAJpegBlob, type MedioPago, type TipoMov } from './plata/api'
 import { CChip, CLabel, CNumpad, CSheet, NotaVoz } from './ui'
 
@@ -229,12 +234,21 @@ function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: bo
   }
 
   const guardar = async () => {
-    if (!montoNum || montoNum <= 0) return setAviso('Poné el monto')
-    if (!categoriaId) return setAviso('Elegí la categoría')
-    if (!campo || !categoria) return setAviso('Elegí el campo')
+    if (!montoNum || montoNum <= 0) {
+      setAviso('Poné el monto')
+      return 'falta' as const
+    }
+    if (!categoriaId) {
+      setAviso('Elegí la categoría')
+      return 'falta' as const
+    }
+    if (!campo || !categoria) {
+      setAviso('Elegí el campo')
+      return 'falta' as const
+    }
     if ('vibrate' in navigator) navigator.vibrate(50)
     const descripcion = [...detalles, detalleLibre.trim()].filter(Boolean).join(' · ')
-    await p.guardar({
+    const id = await p.guardar({
       tipo,
       monto: montoNum,
       categoriaId: categoria.id,
@@ -246,7 +260,12 @@ function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: bo
       foto,
       audio,
     })
-    // Lista para la próxima: quedan tipo y campo (cargas seguidas).
+    // Ya quedó en el teléfono. ¿Subió? Se mira el estado real (como-quedo.ts).
+    return comoQuedo(async () => (await platadb.outbox.get(id))?.estado)
+  }
+  // Lista para la próxima: quedan tipo y campo (cargas seguidas). Se limpia después del
+  // «Listo» (o del «Guardado en el teléfono»), así se ve qué se guardó.
+  const limpiar = () => {
     setMonto('')
     setCategoriaId('')
     setMedio(null)
@@ -258,6 +277,8 @@ function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: bo
     limpiarFoto()
     setAviso(null)
   }
+  const guardarAccion = useAccion(guardar, { alTerminar: limpiar })
+  const refGuardar = useMovimiento(guardarAccion)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -495,16 +516,37 @@ function PlataForm({ p, conFoto }: { p: ReturnType<typeof usePlata>; conFoto: bo
       {/* Acción principal: footer fijo */}
       <div className="shrink-0 border-t border-[var(--c-line)] bg-[var(--c-bg)] px-4 pb-3.5 pt-2.5">
         <button
+          ref={refGuardar}
           type="button"
-          onClick={() => void guardar()}
+          onClick={() => void guardarAccion.correr()}
+          aria-busy={guardarAccion.estado === 'cargando' || undefined}
           className={cn(
-            'c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent text-[18px]',
-            esGasto ? 'bg-principal text-principal-texto' : 'bg-[var(--c-ok)] text-white',
+            'c-display c-hard flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-transparent text-[18px] transition-colors duration-200',
+            guardarAccion.estado === 'listo' ? 'bg-listo text-listo-texto' : esGasto ? 'bg-principal text-principal-texto' : 'bg-[var(--c-ok)] text-white',
           )}
         >
-          <Check className="size-6" strokeWidth={2.5} />
-          Guardar {esGasto ? 'gasto' : 'ingreso'}
+          {guardarAccion.estado === 'cargando' ? (
+            <Giro className="size-5" />
+          ) : guardarAccion.estado === 'listo' ? (
+            <Tilde tamano={24} />
+          ) : (
+            <Icono nombre={guardarAccion.estado === 'telefono' ? 'Celular' : guardarAccion.estado === 'motivo' || guardarAccion.estado === 'fallo' ? 'Reintentar' : 'Siguiente'} tamano={24} />
+          )}
+          <Texto k={guardarAccion.estado === 'motivo' ? `m${guardarAccion.sacudidas}` : guardarAccion.estado}>
+            {guardarAccion.estado === 'listo'
+              ? 'Listo'
+              : guardarAccion.estado === 'telefono'
+                ? 'Guardado en el teléfono'
+                : guardarAccion.estado === 'motivo'
+                  ? guardarAccion.motivo
+                  : guardarAccion.estado === 'fallo'
+                    ? 'Probar de nuevo'
+                    : `Guardar ${esGasto ? 'gasto' : 'ingreso'}`}
+          </Texto>
         </button>
+        <span className="sr-only" role="status" aria-live="polite">
+          {guardarAccion.estado === 'listo' ? 'Listo' : guardarAccion.estado === 'telefono' ? 'Guardado en el teléfono' : guardarAccion.estado === 'motivo' ? guardarAccion.motivo : ''}
+        </span>
       </div>
 
       {/* Hojas de selección: botones grandes, nada de listas apretadas */}

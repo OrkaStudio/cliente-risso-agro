@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoFecha } from '@/components/ui/campo-fecha'
@@ -89,7 +90,6 @@ export function AlquilerDialog({
   const [primerPago, setPrimerPago] = useState(hoyISO())
   const [precio, setPrecio] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [ocupado, setOcupado] = useState(false)
 
   const u = UNIDADES.find((x) => x.valor === unidad) ?? null
   const esMoneda = unidad === 'pesos' || unidad === 'dolares'
@@ -148,11 +148,9 @@ export function AlquilerDialog({
     setSub('resumen')
   }
 
-  async function guardar(e?: { preventDefault: () => void }) {
-    e?.preventDefault()
-    if (!campo || !u || montoCuota === null || cant === null) return
-    setOcupado(true)
-    try {
+  async function guardar() {
+    if (!campo || !u || montoCuota === null || cant === null) return 'falta'
+    {
       const cantidadConUnidad = esMoneda ? `${u.nombre} ${cantidad}` : `${cantidad} ${u.nombre}`
       const detalle = `${cantidadConUnidad}${base === 'ha' ? '/ha' : ''}/${periodo === 'mes' ? 'mes' : 'año'}`
       const estimado = unidad === 'pesos' ? '' : ` · est. a ${pesos(precioNum!)}${unidad === 'dolares' ? ' (blue)' : ''}`
@@ -173,14 +171,13 @@ export function AlquilerDialog({
         }
       }
       invalidar()
-      toast.success(`Listo: anotamos el alquiler de ${campo.nombre}`, { description: `${pesos(montoCuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}; cada pago lo ves en la Agenda.` })
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el alquiler.')
-    } finally {
-      setOcupado(false)
+      const nombre = campo.nombre
+      const cuota = montoCuota
+      return () => toast.success(`Listo: anotamos el alquiler de ${nombre}`, { description: `${pesos(cuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}; cada pago lo ves en la Agenda.` })
     }
   }
+  // El botón dice «Listo» (o el motivo si no sale); después el aviso y se cierra.
+  const alquilar = useAccion(guardar, { alTerminar: () => onOpenChange(false) })
 
 
   const labelCantidad = !u
@@ -225,8 +222,8 @@ export function AlquilerDialog({
         sub === 'resumen' ? (
           <>
             {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-            <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado || montoCuota === null} onClick={() => void guardar()}>
-              {ocupado ? 'Guardando…' : 'Guardar el alquiler'}
+            <BotonPrincipal icono="Siguiente" accion={alquilar} disabled={alquilar.estado === 'reposo' && montoCuota === null}>
+              Guardar el alquiler
             </BotonPrincipal>
           </>
         ) : confirmar ? (
@@ -244,7 +241,7 @@ export function AlquilerDialog({
         onSubmit={(e) => {
           e.preventDefault()
           if (confirmar) confirmar()
-          else if (sub === 'resumen') void guardar(e)
+          else if (sub === 'resumen') void alquilar.correr()
         }}
       >
         {sub === 'campo' && (

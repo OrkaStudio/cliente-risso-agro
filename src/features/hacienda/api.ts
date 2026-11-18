@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { errorDeBase } from '@/lib/error-de-base'
+import { todasLasFilas } from '@/lib/todas-las-filas'
 
 type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
 type PropositoLote = Database['public']['Enums']['proposito_lote']
@@ -9,12 +11,15 @@ export type AnimalConCaravana =
 export type Evento = Database['public']['Tables']['evento']['Row']
 
 export async function listAnimales(): Promise<AnimalConCaravana[]> {
-  const { data, error } = await supabase
-    .from('v_animal_con_caravana')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return data
+  // Todos, de a tandas: un rodeo de más de 1000 cabezas se cortaba en silencio.
+  return todasLasFilas((desde, hasta) =>
+    supabase
+      .from('v_animal_con_caravana')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(desde, hasta),
+  )
 }
 
 export async function getAnimal(id: string): Promise<AnimalConCaravana | null> {
@@ -136,7 +141,7 @@ export async function crearAnimal(input: NuevoAnimal): Promise<string> {
     p_origen: input.origen?.trim() || undefined,
     p_fecha_nacimiento: input.fechaNacimiento || undefined,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -193,7 +198,7 @@ export async function crearAnimalesMasivo(input: CargaMasiva): Promise<number> {
     p_origen: input.origen?.trim() || undefined,
     p_bloques: bloques,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const res = data as { lote_id: string | null; total: number }
   return res.total
 }
@@ -213,12 +218,16 @@ export type TropaDelPotrero = {
 export async function getTropasDelPotrero(
   potreroId: string,
 ): Promise<TropaDelPotrero[]> {
-  const { data: animales, error } = await supabase
-    .from('v_animal_con_caravana')
-    .select('lote_id, categoria, caravana_rfid')
-    .eq('potrero_id', potreroId)
-    .eq('estado', 'activo')
-  if (error) throw new Error(error.message)
+  // De a tandas: un potrero grande pasa de 1000 cabezas y la cuenta daba de menos.
+  const animales = await todasLasFilas((desde, hasta) =>
+    supabase
+      .from('v_animal_con_caravana')
+      .select('id, lote_id, categoria, caravana_rfid')
+      .eq('potrero_id', potreroId)
+      .eq('estado', 'activo')
+      .order('id')
+      .range(desde, hasta),
+  )
 
   const porLote = new Map<
     string | null,
@@ -241,7 +250,7 @@ export async function getTropasDelPotrero(
       .from('lote')
       .select('id, nombre, proposito')
       .in('id', loteIds)
-    if (eL) throw new Error(eL.message)
+    if (eL) throw errorDeBase(eL)
     for (const l of lotes ?? []) nombres.set(l.id, l)
   }
 
@@ -267,7 +276,7 @@ export async function listTropasCampo(campoId: string) {
     .select('id, nombre, proposito')
     .eq('campo_id', campoId)
     .order('nombre')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data ?? []
 }
 
@@ -317,7 +326,7 @@ export async function moverAnimales(
       ? { p_lote_nuevo: input.destino.nuevoNombre.trim() }
       : {}),
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const res = data as {
     movidos: number
     lote_destino_id: string | null
@@ -343,7 +352,7 @@ export async function darBaja(input: {
     p_motivo: input.motivo?.trim() || undefined,
     p_fecha: input.fecha || undefined,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** Tipos de evento que se cargan a mano (alta/baja/cambio_caravana son automáticos). */
@@ -379,7 +388,7 @@ export async function registrarEvento(input: {
     nota: input.nota?.trim() || null,
     datos: (input.datos ?? {}) as Database['public']['Tables']['evento']['Insert']['datos'],
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**
@@ -395,7 +404,7 @@ export async function borrarAltaOnboarding(potreroIds: string[]): Promise<void> 
     .delete()
     .in('potrero_id', potreroIds)
     .eq('origen', 'onboarding')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** Igual que la anterior, para la hacienda cargada sin potrero (campo entero). */
@@ -406,7 +415,7 @@ export async function borrarAltaOnboardingSinPotrero(empresaId: string): Promise
     .eq('empresa_id', empresaId)
     .is('potrero_id', null)
     .eq('origen', 'onboarding')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export type MotivoSalida = 'venta' | 'muerte' | 'correccion'
@@ -435,7 +444,7 @@ export async function salidaPorCantidad(input: {
     p_nota: input.nota?.trim() || undefined,
     p_caravanas: input.caravanas?.length ? input.caravanas : undefined,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const r = data as { salieron: number; sin_identificar: number; salida_id: string }
   return { salieron: r.salieron, sinIdentificar: r.sin_identificar, salidaId: r.salida_id }
 }
@@ -457,13 +466,16 @@ export type SalidaSinIdentificar = {
  * o muerte, con cuántas faltan identificar y sus posibles.
  */
 export async function listSalidasSinIdentificar(): Promise<SalidaSinIdentificar[]> {
-  const [{ data: salidas, error: e1 }, { data: posibles, error: e2 }] = await Promise.all([
-    supabase.from('v_salidas_sin_identificar').select('salida_id, potrero_id, categoria, motivo, fecha, pendientes, posibles').order('created_at'),
-    supabase.from('v_posibles_salida').select('salida_id, animal_id'),
+  // Todas, de a tandas: las posibles son una fila por venta y por animal del potrero, y con
+  // unas pocas ventas sin identificar en un potrero grande pasaban de 1000 y se cortaban: la
+  // ficha de una vaca posible no preguntaba «¿Fue ésta?» (18/11).
+  const [salidas, posibles] = await Promise.all([
+    todasLasFilas((desde, hasta) =>
+      supabase.from('v_salidas_sin_identificar').select('salida_id, potrero_id, categoria, motivo, fecha, pendientes, posibles').order('created_at').order('salida_id').range(desde, hasta),
+    ),
+    todasLasFilas((desde, hasta) => supabase.from('v_posibles_salida').select('salida_id, animal_id').order('salida_id').order('animal_id').range(desde, hasta)),
   ])
-  if (e1) throw new Error(e1.message)
-  if (e2) throw new Error(e2.message)
-  return (salidas ?? []).map((s) => ({
+  return salidas.map((s) => ({
     salidaId: s.salida_id!,
     potreroId: s.potrero_id!,
     categoria: s.categoria!,
@@ -471,53 +483,53 @@ export async function listSalidasSinIdentificar(): Promise<SalidaSinIdentificar[
     fecha: s.fecha!,
     pendientes: s.pendientes ?? 0,
     posibles: s.posibles ?? 0,
-    posiblesIds: (posibles ?? []).filter((p) => p.salida_id === s.salida_id).map((p) => p.animal_id!),
+    posiblesIds: posibles.filter((p) => p.salida_id === s.salida_id).map((p) => p.animal_id!),
   }))
 }
 
 /** Por caravana (la planilla de la venta, o elegidas de la lista). */
 export async function identificarSalida(input: { empresaId: string; caravanas: string[]; salidaId?: string }): Promise<{ identificadas: number }> {
   const { data, error } = await supabase.rpc('identificar_salida', { p_empresa_id: input.empresaId, p_caravanas: input.caravanas, p_salida_id: input.salidaId })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data as { identificadas: number }
 }
 
 /** «Fue ésta»: desde la ficha o la lista. */
 export async function identificarAnimal(input: { animalId: string; salidaId?: string }): Promise<void> {
   const { error } = await supabase.rpc('identificar_animal', { p_animal_id: input.animalId, p_salida_id: input.salidaId })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** «No sé cuál fue»: sale una cualquiera de las posibles y su ficha lo dice. */
 export async function resolverSinSaber(input: { salidaId: string; animalIds: string[] }): Promise<number> {
   const { data, error } = await supabase.rpc('resolver_sin_saber', { p_salida_id: input.salidaId, p_animal_ids: input.animalIds })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data as number
 }
 
 /** «Sigue en el campo»: la que salió sin identificar vuelve y la salida se reabre sin ella. */
 export async function reabrirSinSaber(animalId: string): Promise<void> {
   const { error } = await supabase.rpc('reabrir_sin_saber', { p_animal_id: animalId })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** «Me equivoqué al cargarla»: rehace esa categoría con el potrero y la cantidad correctos (0 = no salió). */
 export async function corregirSalida(input: { salidaId: string; categoria: CategoriaAnimal; potreroId: string; cantidad: number }): Promise<void> {
   const { error } = await supabase.rpc('corregir_salida', { p_salida_id: input.salidaId, p_categoria: input.categoria, p_potrero_id: input.potreroId, p_cantidad: input.cantidad })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** «Fue un error»: la salida entera se deshace. */
 export async function anularSalida(salidaId: string): Promise<number> {
   const { data, error } = await supabase.rpc('anular_salida', { p_salida_id: salidaId })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data as number
 }
 
 /** Cabezas por potrero y categoría, ya sin las salidas sin identificar: la fuente de todos los números. */
 export async function listComposicion() {
   const { data, error } = await supabase.from('v_composicion_potrero').select('potrero_id, categoria, cabezas')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data ?? []
 }
 
@@ -541,14 +553,14 @@ export async function asignarCaravanas(input: {
     p_chips: input.chips.map((c) => ({ animal_id: c.animalId, rfid: c.rfid })),
     p_altas: input.altas.map((a) => ({ categoria: a.categoria, potrero_id: a.potreroId, visual: a.visual, rfid: a.rfid, nacimiento: a.nacimiento, raza: a.raza })),
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data as { asignadas: number; chips: number; altas: number }
 }
 
 /** Saca las caravanas de una carga (las que siguen puestas). */
 export async function deshacerCaravanas(lote: string): Promise<number> {
   const { data, error } = await supabase.rpc('deshacer_caravanas', { p_lote: lote })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data as number
 }
 
@@ -558,7 +570,7 @@ export type Correccion = Partial<{ categoria: CategoriaAnimal; fecha_nacimiento:
 /** Corregir lo que estaba mal cargado, todo o nada; lo de antes queda en su historia (RPC). */
 export async function corregirAnimal(input: { animalId: string; cambios: Correccion }): Promise<void> {
   const { error } = await supabase.rpc('corregir_animal', { p_animal_id: input.animalId, p_cambios: input.cambios })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export type Baja = { animalId: string; fecha: string; estado: string; motivo: string | null; sinIdentificar: boolean }
@@ -566,7 +578,7 @@ export type Baja = { animalId: string; fecha: string; estado: string; motivo: st
 /** La última baja de cada animal que salió (para la pestaña «Salieron» de Hacienda). */
 export async function listBajas(): Promise<Baja[]> {
   const { data, error } = await supabase.from('evento').select('animal_id, fecha, datos, created_at').eq('tipo', 'baja').order('created_at', { ascending: false }).limit(5000)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const vistos = new Set<string>()
   const out: Baja[] = []
   for (const e of data ?? []) {

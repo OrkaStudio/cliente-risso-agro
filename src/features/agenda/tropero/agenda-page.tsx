@@ -2,7 +2,9 @@ import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
+import { Boton } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
+import { useAccion } from '@/components/tropero/use-accion'
 import type { Vencimiento } from '@/features/agenda/api'
 import { useLiquidar, useRevertirLiquidacion, useVencimientos } from '@/features/agenda/hooks'
 import { fmtCompact } from '@/features/analitica/compute'
@@ -242,30 +244,26 @@ function YaPagaste({ vencidos, hoy, onAbrir }: { vencidos: Vencimiento[]; hoy: s
   const liquidar = useLiquidar()
   const revertir = useRevertirLiquidacion()
   const [tildados, setTildados] = useState<Set<string>>(() => new Set())
-  const [ocupado, setOcupado] = useState(false)
   const elegidos = vencidos.filter((v) => tildados.has(v.id))
 
   async function marcar() {
-    setOcupado(true)
-    try {
+    {
       // El día que vencía: es cuando casi seguro se pagó.
       for (const v of elegidos) await liquidar.mutateAsync({ id: v.id, fecha: v.fechaVencimiento! })
-      toast.success(`Listo: ${elegidos.length === 1 ? 'marcaste 1 cosa vencida' : `marcaste ${elegidos.length} cosas vencidas`}`, {
+      return () => toast.success(`Listo: ${elegidos.length === 1 ? 'marcaste 1 cosa vencida' : `marcaste ${elegidos.length} cosas vencidas`}`, {
         description: elegidos.length === 1 ? 'Pasó a Plata con la fecha en que vencía.' : 'Pasaron a Plata con la fecha en que vencían.',
         action: { label: 'Deshacer', onClick: () => elegidos.forEach((v) => revertir.mutate({ id: v.id, fechaVencimiento: v.fechaVencimiento, fechaCobroPago: v.fechaVencimiento })) },
       })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo. Probá de nuevo.')
-    } finally {
-      setOcupado(false)
     }
   }
+  // «Listo» en el botón (o el motivo si no sale); después el aviso con su Deshacer.
+  const marcarAccion = useAccion(marcar)
 
   return (
     <section aria-label="Vencido sin marcar">
-      <button type="button" disabled={!elegidos.length || ocupado} onClick={() => void marcar()} className="mb-2 h-12 w-full rounded-full bg-principal px-6 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-40">
-        {ocupado ? 'Marcando…' : elegidos.length ? `Sí, ya ${elegidos.length === 1 ? 'está' : 'están'}: marcar ${elegidos.length}` : 'Tildá lo que ya está'}
-      </button>
+      <Boton accion={marcarAccion} disabled={marcarAccion.estado === 'reposo' && !elegidos.length} className="mb-2 h-12 w-full rounded-full px-6 text-[15.5px] font-bold disabled:opacity-40">
+        {elegidos.length ? `Sí, ya ${elegidos.length === 1 ? 'está' : 'están'}: marcar ${elegidos.length}` : 'Tildá lo que ya está'}
+      </Boton>
       <button type="button" onClick={() => setTildados(elegidos.length === vencidos.length ? new Set() : new Set(vencidos.map((v) => v.id)))} className="mb-1 h-10 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
         {elegidos.length === vencidos.length ? 'Destildar todas' : 'Tildar todas'}
       </button>

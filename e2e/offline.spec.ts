@@ -110,11 +110,12 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     // membresía conocida y un móvil cae al Modo Campo. El landing por estado
     // (commit 7d78253) manda al hub `/campo` pelado, no a una sub-ruta.
     await expect(page).toHaveURL(/\/campo(?:\/|$)/)
-    await expect(page.getByRole('link', { name: 'Recorrida' })).toBeVisible()
-
-    // La Recorrida (offline-first, Dexie) abre sin red.
-    await page.getByRole('link', { name: 'Recorrida' }).click()
-    await expect(page).toHaveURL(/\/campo\/recorrida/)
+    // El celular nuevo (17/11) cae en Hoy. La Recorrida ya no está en la app (Lau, 18/11:
+    // manga y recorrida se hacen por WhatsApp con el bot); lo que se carga sin red es Plata.
+    const barra = page.getByRole('navigation', { name: 'Modo Campo' })
+    await expect(barra.getByRole('link', { name: 'Hoy' })).toBeVisible()
+    await barra.getByRole('link', { name: 'Plata' }).click()
+    await expect(page).toHaveURL(/\/campo\/plata/)
 
     await context.close()
   })
@@ -154,7 +155,7 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
     // (RLS es la barrera real; las escrituras van al outbox). Aterriza en el
     // hub `/campo` pelado (landing por estado), no en una sub-ruta.
     await expect(page).toHaveURL(/\/campo(?:\/|$)/, { timeout: 20_000 })
-    await expect(page.getByRole('link', { name: 'Recorrida' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Modo Campo' }).getByRole('link', { name: 'Hoy' })).toBeVisible()
 
     await context.close()
   })
@@ -192,6 +193,27 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
         body: JSON.stringify(membresiaFabricada),
       }),
     )
+    /* Desde «varias cuentas» (14/11) la app pide la lista con `mis_cuentas`: sin ella el guard
+     * ve un usuario sin cuentas y lo manda al onboarding. Una cuenta con todo terminado. */
+    await context.route(/(?:supabase\.co|127\.0\.0\.1:54321)\/rest\/v1\/rpc\/mis_cuentas/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify([
+          {
+            empresa_id: membresiaFabricada.empresa_id,
+            nombre: membresiaFabricada.empresa.nombre,
+            rol: 'dueno',
+            niveles: null,
+            acceso: 'app',
+            onboarding_completo_at: '2026-08-01T00:00:00Z',
+            mapa_completo_at: '2026-08-01T00:00:00Z',
+            created_at: '2026-08-01T00:00:00Z',
+          },
+        ]),
+      }),
+    )
     await context.route(/(?:supabase\.co|127\.0\.0\.1:54321)\/rest\/v1\/movimiento_financiero/, (route) => {
       if (route.request().method() === 'POST') insertados.push(route.request().url())
       return route.fulfill({
@@ -215,7 +237,11 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
      * vez por Plata (con la cola VACÍA, así que no sube nada) y se sale. A
      * partir de acá la pantalla de Plata queda desmontada. */
     await page.goto('/campo/plata')
-    await page.waitForTimeout(1500)
+    // En el Plata nuevo (17/11) el formulario —y con él la cola del teléfono— se monta al tocar
+    // «Anotar un gasto»; antes bastaba con entrar a la pantalla.
+    await page.getByRole('button', { name: 'Anotar un gasto' }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Anotar un gasto' })).toBeVisible()
+    await page.waitForTimeout(800)
     await page.goto('/campo')
 
     // Un gasto pendiente en la cola, como si lo hubiera cargado sin señal.

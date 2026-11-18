@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
+import { todasLasFilas } from '@/lib/todas-las-filas'
 import type { Database } from '@/lib/supabase/types'
+import { errorDeBase } from '@/lib/error-de-base'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -54,11 +56,16 @@ export async function getPotreroDetalle(
         )
         .eq('id', id)
         .maybeSingle(),
-      supabase
-        .from('v_animal_con_caravana')
-        .select('id, categoria, caravana_rfid, caravana_visual, fecha_nacimiento')
-        .eq('potrero_id', id)
-        .eq('estado', 'activo'),
+      // De a tandas: un potrero grande pasa de 1000 cabezas.
+      todasLasFilas((desde, hasta) =>
+        supabase
+          .from('v_animal_con_caravana')
+          .select('id, categoria, caravana_rfid, caravana_visual, fecha_nacimiento')
+          .eq('potrero_id', id)
+          .eq('estado', 'activo')
+          .order('id')
+          .range(desde, hasta),
+      ).then((data) => ({ data, error: null })),
       supabase
         .from('v_rentabilidad_devengada')
         .select('ingresos, gastos, resultado')
@@ -67,9 +74,9 @@ export async function getPotreroDetalle(
       // sigue mostrando a todos: no se sabe cuál salió).
       supabase.from('v_composicion_potrero').select('categoria, cabezas').eq('potrero_id', id),
     ])
-  if (ePot) throw new Error(ePot.message)
-  if (eAni) throw new Error(eAni.message)
-  if (eRent) throw new Error(eRent.message)
+  if (ePot) throw errorDeBase(ePot)
+  if (eAni) throw errorDeBase(eAni)
+  if (eRent) throw errorDeBase(eRent)
   if (!potrero) return null
 
   const campo = potrero.campo as {
@@ -78,7 +85,7 @@ export async function getPotreroDetalle(
     tipo: TipoCampo
   } | null
 
-  if (eComp) throw new Error(eComp.message)
+  if (eComp) throw errorDeBase(eComp)
   // Stock por categoría
   const catMap = new Map<Categoria, number>()
   for (const a of compos ?? []) {
@@ -143,7 +150,7 @@ export async function listarLabores(potreroId: string): Promise<LaborRow[]> {
     .select('id, tipo, fecha, nota, cultivo, kg_cosechados, movimiento:movimiento_id(monto)')
     .eq('potrero_id', potreroId)
     .order('fecha', { ascending: false })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return (data ?? []).map((l) => ({
     id: l.id,
     tipo: l.tipo,
@@ -184,6 +191,6 @@ export async function registrarLabor(input: {
     p_monto: input.monto ?? undefined,
     p_categoria_id: input.categoriaId ?? undefined,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data as string
 }

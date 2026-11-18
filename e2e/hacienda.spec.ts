@@ -121,7 +121,7 @@ async function venderUnaVaca(page: Page) {
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await expect(panel).toBeHidden()
 }
 
@@ -148,7 +148,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
   await expect(panel.getByRole('heading', { name: 'Se vendió 1 vaca' })).toBeVisible()
   await expect(panel.getByText('1 sin identificar')).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
 
   // La salida aparece como fila propia; «No sé cuál fue» la cierra con una cualquiera.
   await abrirUltimaSalida(page)
@@ -167,7 +167,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: /Revisar: 2 terneros/ }).click()
   await panel.getByRole('button', { name: 'Sumar 2 terneros' }).click()
   await expect(panel.getByRole('heading', { name: 'Sumamos 2 terneros nacidos' })).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await page.getByRole('tab', { name: /Sin caravana/ }).click()
   // Sin caravana van juntos, por potrero y categoría (16/11).
   await expect(page.getByRole('row', { name: /\d+ terneros/ }).first()).toBeVisible()
@@ -248,7 +248,7 @@ test('planilla completa: ¿Es ésta?, Revisá con el antes y después, y Deshace
   // Deshacer: el ternero vuelve a estar sin caravana y el número queda libre.
   await panel.getByRole('button', { name: 'Deshacer esta carga' }).click()
   await expect(panel.getByRole('heading', { name: 'Se deshizo la carga' })).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await page.getByPlaceholder('Buscá una caravana').fill(n)
   await expect(page.getByRole('row', { name: new RegExp(n) })).toHaveCount(0)
 })
@@ -271,7 +271,7 @@ test('planilla con sólo números: se dice qué son y dónde estaban, sin supone
   await expect(panel.getByText(String(n + 1), { exact: true })).toBeVisible()
   await panel.getByRole('button', { name: 'Ponerle caravana a 2' }).click()
   await expect(panel.getByRole('heading', { name: 'Listo: 2 caravanas puestas' })).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await page.getByPlaceholder('Buscá una caravana').fill(String(n + 1))
   await expect(page.getByRole('row', { name: new RegExp(String(n + 1)) })).toContainText('Ternero')
 })

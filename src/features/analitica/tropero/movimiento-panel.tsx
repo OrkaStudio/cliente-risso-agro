@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { Boton, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoFecha } from '@/components/ui/campo-fecha'
@@ -52,24 +53,21 @@ function Detalle({ m, abierto, onCerrar }: { m: MovimientoConDetalle; abierto: b
 
   async function guardar() {
     const n = numeroDeFormateado(monto)
-    if (!n || n <= 0) return toast.error('El monto tiene que ser mayor a cero.')
-    try {
-      await corregir.mutateAsync({ id: m.id, monto: n, descripcion: detalle.trim(), fecha })
-      toast.success('Listo: el movimiento quedó corregido', { description: 'Los totales de Plata ya lo toman así.' })
-      onCerrar()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
+    if (!n || n <= 0) {
+      toast.error('El monto tiene que ser mayor a cero.')
+      return 'falta'
     }
+    await corregir.mutateAsync({ id: m.id, monto: n, descripcion: detalle.trim(), fecha })
+    return () => toast.success('Listo: el movimiento quedó corregido', { description: 'Los totales de Plata ya lo toman así.' })
   }
   async function anularlo() {
-    try {
-      await anular.mutateAsync(m.id)
-      toast.success('Listo: lo anulaste', { description: 'Ya no cuenta en Plata ni en la Agenda.' })
-      onCerrar()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo anular.')
-    }
+    await anular.mutateAsync(m.id)
+    return () => toast.success('Listo: lo anulaste', { description: 'Ya no cuenta en Plata ni en la Agenda.' })
   }
+  // Corregir dice «Listo». Anular no se puede deshacer: ya preguntó antes, y lo que confirma
+  // es que el movimiento ya no está (sin «Listo»). Si algo no sale, el motivo lo dice el botón.
+  const corregirAccion = useAccion(guardar, { alTerminar: onCerrar })
+  const anularAccion = useAccion(anularlo, { sinListo: true, alTerminar: onCerrar })
 
   return (
     <PanelLateral
@@ -80,16 +78,16 @@ function Detalle({ m, abierto, onCerrar }: { m: MovimientoConDetalle; abierto: b
       bajada={editando ? 'Lo que se tipeó mal. Los totales se actualizan solos.' : `${ingreso ? 'Entró' : 'Salió'} ${formatARS(Number(m.monto)).replace('-', '')}`}
       pie={
         !carga ? undefined : editando ? (
-          <BotonPrincipal icono="Guardar" cargando={corregir.isPending} disabled={corregir.isPending} onClick={() => void guardar()}>
+          <BotonPrincipal icono="Siguiente" accion={corregirAccion}>
             Guardar
           </BotonPrincipal>
         ) : seguro ? (
           <div className="flex flex-col gap-2 rounded-[16px] bg-estado-problema-suave p-4">
             <p className="text-[14.5px] font-semibold text-estado-problema-texto">¿Lo anulás? Deja de contar en Plata y en la Agenda; queda el rastro.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => void anularlo()} disabled={anular.isPending} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie disabled:opacity-50">
+              <Boton accion={anularAccion} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie hover:bg-estado-problema">
                 Sí, anularlo
-              </button>
+              </Boton>
               <button type="button" onClick={() => setSeguro(false)} className="h-11 flex-1 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
                 No
               </button>

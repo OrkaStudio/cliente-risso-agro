@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Boton } from '@/components/tropero/boton'
 import { Icono } from '@/components/tropero/icono'
+import { useAccion, type ResultadoAccion } from '@/components/tropero/use-accion'
 import { BotonVolver } from '@/components/tropero/panel-lateral'
 import { useAlElegirCampo, useCampoElegido } from '@/features/campos/campo-elegido'
 import { useAnimal, useEventos, useIdentificarAnimal, useLote, usePotreros, useReabrirSinSaber, useSalidasSinIdentificar } from '@/features/hacienda/hooks'
@@ -251,21 +253,16 @@ export function FichaPage() {
                 El {fecha} salió una del {potrero?.nombre ?? 'potrero'} y no se supo cuál; la eligió Troppero. Si la ves en el campo, no fue ésta: vuelve al rodeo y la salida queda otra vez sin identificar.
               </p>
             </div>
-            <button
-              type="button"
-              disabled={reabrir.isPending}
-              onClick={async () => {
-                try {
-                  await reabrir.mutateAsync(id)
-                  toast.success('Listo: volvió al rodeo', { description: 'La salida quedó otra vez sin identificar, ya sin ésta entre las posibles.' })
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : 'No se pudo.')
-                }
+            <BotonQueHace
+              tipo="secundario"
+              hacer={async () => {
+                await reabrir.mutateAsync(id)
+                return () => toast.success('Listo: volvió al rodeo', { description: 'La salida quedó otra vez sin identificar, ya sin ésta entre las posibles.' })
               }}
               className={SECUNDARIO}
             >
               Sigue en el campo
-            </button>
+            </BotonQueHace>
           </section>
         )
       })()}
@@ -291,21 +288,15 @@ export function FichaPage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={fueEsta.isPending}
-                    onClick={async () => {
-                      try {
-                        await fueEsta.mutateAsync({ animalId: id, salidaId: x.salidaId })
-                        toast.success(`Listo: quedó como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} el ${fecha}`, { description: 'El número del rodeo no cambia: ya estaba restado.' })
-                      } catch (e) {
-                        toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
-                      }
+                  <BotonQueHace
+                    hacer={async () => {
+                      await fueEsta.mutateAsync({ animalId: id, salidaId: x.salidaId })
+                      return () => toast.success(`Listo: quedó como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} el ${fecha}`, { description: 'El número del rodeo no cambia: ya estaba restado.' })
                     }}
-                    className="inline-flex h-10 items-center rounded-full bg-principal px-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-50"
+                    className="h-10 rounded-full px-4 text-[14.5px] font-bold"
                   >
                     Sí, fue ésta
-                  </button>
+                  </BotonQueHace>
                   <button type="button" onClick={() => navigate(`/hacienda?salida=${x.salidaId}`)} className={SECUNDARIO}>
                     Ver las {x.posibles} posibles
                   </button>
@@ -368,5 +359,16 @@ function Panel({ titulo, bajada, children }: { titulo: string; bajada?: string; 
       </h2>
       {children}
     </section>
+  )
+}
+
+/** Un botón de la ficha que guarda algo y, al salir, hace desaparecer su propio aviso: lo que
+ *  confirma es que el aviso se va (sin «Listo»). Si no sale, el motivo lo dice el botón. */
+function BotonQueHace({ hacer, tipo, className, children }: { hacer: () => Promise<ResultadoAccion>; tipo?: 'principal' | 'secundario'; className?: string; children: React.ReactNode }) {
+  const accion = useAccion(hacer, { sinListo: true })
+  return (
+    <Boton tipo={tipo} accion={accion} className={className}>
+      {children}
+    </Boton>
   )
 }

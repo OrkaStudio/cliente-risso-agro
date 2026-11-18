@@ -1,11 +1,14 @@
 import { Popover } from '@base-ui/react/popover'
 import { Tooltip } from '@base-ui/react/tooltip'
 import { BellIcon, CloudRain } from 'lucide-react'
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
 import { BotonChico } from '@/components/tropero/boton'
+import { useMovimiento } from '@/components/tropero/boton-movimiento'
+import { Giro } from '@/components/tropero/boton-partes'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import tranquera from '@/assets/tropero/tranquera.webp'
 import { Cabecera as CabeceraSeccion } from '@/components/tropero/cabecera'
@@ -20,6 +23,8 @@ import { useEmpresa } from '@/features/empresa/use-empresa'
 import { WmoIcon } from '@/features/cotizaciones/wmo-icon'
 import { categoriaNombre, especiePorCategoria } from '@/features/hacienda/labels'
 import { cn } from '@/lib/utils'
+import { useVencimientos } from '@/features/agenda/hooks'
+import { PagarPanel } from '@/features/agenda/tropero/pagar-panel'
 import type { CategoriaConteo, Vencimiento } from '../api'
 import { usePanoramaInicio } from '../hooks'
 import { invalidarAvisos, useDeshacerMarca, useMarcarSenal } from '../marcar-senal'
@@ -84,6 +89,17 @@ export function ElDia() {
   const lluvia = useLluviaDelMes(lugar?.ubicacion ?? null)
   const ganado = useGanadoCampania(campoId)
   const reducir = useReducedMotion()
+  // El pago que se está marcando, sobre el Inicio (con los datos que usa la Agenda).
+  // Se guarda el pago entero (no sólo el id): al marcarlo sale de la lista de pendientes y,
+  // si se buscara ahí, el panel se cerraría antes de mostrar el «Listo».
+  const vencAgenda = useVencimientos()
+  const [itemPago, setItemPago] = useState<NonNullable<typeof vencAgenda.data>[number] | null>(null)
+  const abrirPago = (id: string) => {
+    const v = vencAgenda.data?.find((x) => x.id === id)
+    if (!v) return false
+    setItemPago(v)
+    return true
+  }
 
   if (panorama.isLoading || atender.isLoading) return <div className="h-[132px] animate-pulse rounded-[22px] bg-superficie-hundida" aria-busy />
   if (panorama.error || !panorama.data) return <p className="text-texto-suave">No pudimos cargar el Inicio. Revisá la conexión y probá de nuevo.</p>
@@ -111,6 +127,7 @@ export function ElDia() {
     reducir ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4, delay: i * 0.06, ease: CURVA } }
 
   return (
+    <AbrirPago.Provider value={abrirPago}>
     <div className="mx-auto flex w-full ancho-pagina flex-col gap-5">
       <motion.div {...entra(0)}>
         <Cabecera veAlgo={veCampos || plata} titulo={saludo(new Date().getHours(), nombre)} cosas={cosas} lluvia={chips.find((c) => c.key === 'lluvia') ?? null} campos={inicio.campos} elegido={inicio.elegido} />
@@ -160,13 +177,23 @@ export function ElDia() {
         </motion.div>
       )}
     </div>
+    {membresia?.empresa_id && <PagarPanel item={itemPago} empresaId={membresia.empresa_id} onCerrar={() => setItemPago(null)} />}
+    </AbrirPago.Provider>
   )
 }
 
 /** Ir a una sección del Inicio («#clima») o a otra pantalla («/agenda»). */
+/** Abre el pago o cobro de un vencimiento sobre el Inicio (Lau, 18/11): «Ya lo pagué» antes
+ *  llevaba a la Agenda y al terminar quedabas ahí. Lo da ElDia; sin él, se navega como siempre. */
+const AbrirPago = createContext<((id: string) => boolean) | null>(null)
+
 function useIr() {
   const navigate = useNavigate()
+  const abrirPago = useContext(AbrirPago)
   return (destino: string) => {
+    // «/agenda?mov=<id>»: el pago se marca acá mismo, en el panel, y la fila se va del Inicio.
+    const mov = destino.match(/^\/agenda\?mov=([^&]+)$/)?.[1]
+    if (mov && abrirPago?.(mov)) return
     // «whatsapp:texto»: el WhatsApp de Troppero con el mensaje empezado (la recorrida se cuenta ahí).
     if (destino.startsWith('whatsapp:')) return void window.open(`https://wa.me/${WHATSAPP_TROPERO}?text=${encodeURIComponent(destino.slice(9))}`, '_blank', 'noopener')
     if (destino.startsWith('#')) document.getElementById(destino.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -622,12 +649,33 @@ function FilaCosa({ c, empresaId }: { c: Cosa; empresaId: string }) {
   )
 }
 
-/** «Se solucionó»: marca la señal de la recorrida. Queda confirmada con «Deshacer»; la lista se refresca después. */
+/** «Se solucionó»: marca la señal de la recorrida. Queda confirmada en el lugar («Solucionado»)
+ *  con «Deshacer» (deshacer existe de verdad: useDeshacerMarca); la lista se refresca después.
+ *  Si algo no sale, el botón gira, se sacude y dice el motivo (el compacto, sólo con el ícono). */
 export function SeSoluciono({ senal, empresaId, compacto = false }: { senal: NonNullable<Cosa['senal']>; empresaId: string; compacto?: boolean }) {
   const qc = useQueryClient()
   const marcar = useMarcarSenal()
   const deshacer = useDeshacerMarca()
   const [marca, setMarca] = useState<string | null>(null)
+  const marcarAccion = useAccion(
+    async () => {
+      const id = await marcar.mutateAsync({ empresaId, potreroId: senal.potreroId, observacionId: senal.observacionId, tipo: senal.tipo, estado: 'resuelto' })
+      setMarca(id)
+      // Primero se ve la confirmación; la lista se actualiza un rato después.
+      window.setTimeout(() => invalidarAvisos(qc, senal.potreroId), 6000)
+    },
+    { sinListo: true },
+  )
+  const deshacerAccion = useAccion(
+    async () => {
+      if (!marca) return 'falta'
+      await deshacer.mutateAsync(marca)
+      setMarca(null)
+    },
+    { sinListo: true },
+  )
+  const refMarcar = useMovimiento(marcarAccion)
+  const refDeshacer = useMovimiento(deshacerAccion)
   // Marcarlo solucionado es cargar en Campos (permisos, 13/11).
   const { carga } = usePermiso('campos')
   if (!carga) return null
@@ -636,39 +684,33 @@ export function SeSoluciono({ senal, empresaId, compacto = false }: { senal: Non
       <span className="flex shrink-0 items-center justify-center gap-1 text-[13.5px] font-bold text-estado-bien-texto">
         <Icono nombre="Guardar" tamano={16} /> {compacto ? '' : 'Solucionado'}
         <button
+          ref={refDeshacer}
           type="button"
-          className="rounded-full px-2 py-1 text-[13px] text-principal hover:bg-principal-suave"
-          onClick={() => deshacer.mutate(marca, { onSuccess: () => setMarca(null) })}
+          aria-busy={deshacerAccion.estado === 'cargando' || undefined}
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[13px] text-principal hover:bg-principal-suave"
+          onClick={() => void deshacerAccion.correr()}
         >
-          Deshacer
+          {deshacerAccion.estado === 'cargando' && <Giro className="size-3.5" />}
+          {deshacerAccion.estado === 'motivo' ? deshacerAccion.motivo : deshacerAccion.estado === 'fallo' ? 'Probar de nuevo' : 'Deshacer'}
         </button>
       </span>
     )
+  const fallo = marcarAccion.estado === 'motivo' || marcarAccion.estado === 'fallo'
   return (
     <button
+      ref={refMarcar}
       type="button"
-      disabled={marcar.isPending}
-      onClick={() =>
-        marcar.mutate(
-          { empresaId, potreroId: senal.potreroId, observacionId: senal.observacionId, tipo: senal.tipo, estado: 'resuelto' },
-          {
-            onSuccess: (id) => {
-              setMarca(id)
-              // Primero se ve la confirmación; la lista se actualiza un rato después.
-              window.setTimeout(() => invalidarAvisos(qc, senal.potreroId), 6000)
-            },
-          },
-        )
-      }
-      aria-label="Se solucionó"
-      title="Se solucionó"
+      onClick={() => void marcarAccion.correr()}
+      aria-busy={marcarAccion.estado === 'cargando' || undefined}
+      aria-label={fallo ? `No salió: ${marcarAccion.estado === 'motivo' ? marcarAccion.motivo : 'probá de nuevo'}` : 'Se solucionó'}
+      title={marcarAccion.estado === 'motivo' ? marcarAccion.motivo : 'Se solucionó'}
       className={cn(
         'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-neutro-300 bg-superficie text-[14.5px] font-bold text-texto transition-colors hover:border-neutro-500 hover:bg-superficie-hundida disabled:opacity-50',
         compacto ? 'size-9' : 'h-10 px-4',
       )}
     >
-      <Icono nombre="Guardar" tamano={16} />
-      {!compacto && 'Se solucionó'}
+      {marcarAccion.estado === 'cargando' ? <Giro className="size-4" /> : <Icono nombre={fallo ? 'Reintentar' : 'Guardar'} tamano={16} />}
+      {!compacto && (marcarAccion.estado === 'motivo' ? marcarAccion.motivo : marcarAccion.estado === 'fallo' ? 'Probar de nuevo' : 'Se solucionó')}
     </button>
   )
 }
@@ -713,7 +755,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   // Tamaño por monto (área ∝ plata), entre 16 y 48 px.
   const maxFuturo = Math.max(1, ...futuros.map((p) => p.monto))
   const tam = (m: number) => 16 + 32 * Math.sqrt(m / maxFuturo)
-  const reparto = (lista: PuntoPlata[]) => enCarriles(lista.map((p) => ({ id: p.id, x: xDe(p.dia), ancho: Math.max(tam(p.monto), ANCHO_ETIQUETA) })))
+  // Ninguna burbuja a la izquierda del eje: ahí está la columna de lo vencido.
+  const reparto = (lista: PuntoPlata[]) => enCarriles(lista.map((p) => ({ id: p.id, x: xDe(p.dia), ancho: Math.max(tam(p.monto), ANCHO_ETIQUETA) })), 10, VENCIDO + 4)
   const arriba = reparto(futuros.filter((p) => p.cobro))
   const abajo = reparto(futuros.filter((p) => !p.cobro))
   // Arriba se deja lugar para los carriles; abajo, además, la fila de fechas pegada a la línea.
@@ -728,7 +771,8 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
   const sinPagar = l.vencidos.filter((p) => !p.cobro).reduce((t, p) => t + p.monto, 0)
   const sinCobrar = l.vencidos.filter((p) => p.cobro).reduce((t, p) => t + p.monto, 0)
   // Uno solo abre «¿Lo pagaste?»; varios del mismo día, la Agenda en ese mes.
-  const abrir = (p: PuntoPlata & { grupo?: PuntoPlata[] }) => navigate(p.grupo ? `/agenda?mes=${(p.fecha ?? '').slice(0, 7)}` : `/agenda?mov=${p.id}`)
+  const ir = useIr()
+  const abrir = (p: PuntoPlata & { grupo?: PuntoPlata[] }) => (p.grupo ? navigate(`/agenda?mes=${(p.fecha ?? '').slice(0, 7)}`) : ir(`/agenda?mov=${p.id}`))
 
   return (
     <section className={TARJETA} aria-labelledby="la-plata">
@@ -788,9 +832,9 @@ function LaPlata({ vencimientos }: { vencimientos: Vencimiento[] }) {
                     ))}
                   {l.vencidos.length > 4 && (
                     <li>
-                      <button type="button" onClick={() => navigate('/agenda?revisar=1')} className="w-full rounded-[10px] px-2.5 py-1.5 text-left text-[13px] font-bold text-principal hover:bg-superficie">
+                      <BotonChico type="button" onClick={() => navigate('/agenda?revisar=1')} className="mt-1 min-h-8 self-start px-3 py-1 text-[13.5px]">
                         Ver los {l.vencidos.length}
-                      </button>
+                      </BotonChico>
                     </li>
                   )}
                 </ul>

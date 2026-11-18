@@ -70,21 +70,6 @@ const CampoInicioPage = lazy(() =>
     default: m.CampoInicioPage,
   })),
 )
-const MangaPage = lazy(() =>
-  import('@/features/campo/manga-page').then((m) => ({
-    default: m.MangaPage,
-  })),
-)
-const LectorPage = lazy(() =>
-  import('@/features/campo/lector-page').then((m) => ({
-    default: m.LectorPage,
-  })),
-)
-const RecorridaPage = lazy(() =>
-  import('@/features/campo/recorrida-page').then((m) => ({
-    default: m.RecorridaPage,
-  })),
-)
 const CamposCelu = lazy(() => import('@/features/campo/campos-celu').then((m) => ({ default: m.CamposCelu })))
 const AnimalCelu = lazy(() => import('@/features/campo/animal-celu').then((m) => ({ default: m.AnimalCelu })))
 const HaciendaCelu = lazy(() => import('@/features/campo/hacienda-celu').then((m) => ({ default: m.HaciendaCelu })))
@@ -249,11 +234,11 @@ export const router = createBrowserRouter([
                   element: <SeccionPermitida />,
                   children: [
                   { path: 'campo', element: <CampoInicioPage /> },
-                  { path: 'campo/manga', element: <MangaPage /> },
-                  // Laboratorio: probar un bastón RFID antes de comprarlo.
-                  // Fuera de la nav (no es una tarea del campo, es una prueba).
-                  { path: 'campo/lector', element: <LectorPage /> },
-                  { path: 'campo/recorrida', element: <RecorridaPage /> },
+                  // La manga, el lector de caravanas y la recorrida salieron de la app (Lau, 18/11:
+                  // se hacen por WhatsApp con el bot; el código está en archivo/). Un enlace viejo va a Hoy.
+                  { path: 'campo/manga', element: <Navigate to="/campo" replace /> },
+                  { path: 'campo/lector', element: <Navigate to="/campo" replace /> },
+                  { path: 'campo/recorrida', element: <Navigate to="/campo" replace /> },
                   { path: 'campo/plata', element: <PlataPage /> },
                   // Para mirar (Lau, 17/11): los campos y sus potreros, y la hacienda con su buscador.
                   { path: 'campo/campos', element: <CamposCelu /> },

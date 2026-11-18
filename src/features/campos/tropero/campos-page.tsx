@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
@@ -638,15 +639,11 @@ function CorregirCampo({ campo, abierto, onCerrar, empresaId, onDibujar }: { cam
   }
   const cambia = nombre.trim() !== campo.nombre || tipo !== campo.tipo
   async function guardar() {
-    try {
-      await mut.mutateAsync({ id: campo.id, nombre, tipo, hectareas: campo.hectareas, actividad: campo.actividad })
-      qc.invalidateQueries({ queryKey: ['mapa', empresaId] })
-      toast.success('Listo: el campo quedó corregido')
-      onCerrar()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
-    }
+    await mut.mutateAsync({ id: campo.id, nombre, tipo, hectareas: campo.hectareas, actividad: campo.actividad })
+    qc.invalidateQueries({ queryKey: ['mapa', empresaId] })
+    return () => toast.success('Listo: el campo quedó corregido')
   }
+  const guardarAccion = useAccion(guardar, { alTerminar: onCerrar })
   return (
     <PanelLateral chico
       abierto={abierto}
@@ -654,7 +651,7 @@ function CorregirCampo({ campo, abierto, onCerrar, empresaId, onDibujar }: { cam
       titulo="Corregir el campo"
       bajada="El nombre, si es propio o alquilado, y el dibujo de los potreros."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={!cambia || !nombre.trim() || mut.isPending} onClick={guardar}>
+        <BotonPrincipal icono="Siguiente" accion={guardarAccion} disabled={guardarAccion.estado === 'reposo' && (!cambia || !nombre.trim())}>
           Guardar
         </BotonPrincipal>
       }
@@ -703,15 +700,11 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
   const nHa = hectareas.trim() === '' ? null : Number(hectareas.replace(',', '.'))
   const haMal = nHa != null && (!Number.isFinite(nHa) || nHa <= 0)
   async function guardar() {
-    try {
-      await mut.mutateAsync({ id: p.id, estadoCiclo: usoToEstadoCiclo(uso, p.estadoCiclo), hectareas: nHa, cultivo: uso === 'agricola' ? cultivo.trim() || null : null })
-      qc.invalidateQueries({ queryKey: ['mapa'] })
-      toast.success(`Listo: el ${p.nombre} quedó corregido`)
-      onCerrar()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
-    }
+    await mut.mutateAsync({ id: p.id, estadoCiclo: usoToEstadoCiclo(uso, p.estadoCiclo), hectareas: nHa, cultivo: uso === 'agricola' ? cultivo.trim() || null : null })
+    qc.invalidateQueries({ queryKey: ['mapa'] })
+    return () => toast.success(`Listo: el ${p.nombre} quedó corregido`)
   }
+  const guardarAccion = useAccion(guardar, { alTerminar: onCerrar })
   return (
     <PanelLateral chico
       abierto={abierto}
@@ -719,7 +712,7 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
       titulo={`Corregir el ${p.nombre}`}
       bajada="Lo que está mal cargado. La hacienda se mueve desde Hacienda; el dibujo, en el satélite."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={haMal || mut.isPending} onClick={guardar}>
+        <BotonPrincipal icono="Siguiente" accion={guardarAccion} disabled={guardarAccion.estado === 'reposo' && haMal}>
           Guardar
         </BotonPrincipal>
       }

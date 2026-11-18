@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Aviso } from '@/components/tropero/aviso'
 import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
+import { textoDelMotivo } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Calendario } from '@/components/tropero/calendario'
 import { Icono } from '@/components/tropero/icono'
@@ -68,7 +69,8 @@ function useError() {
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
+      // El motivo real; lo dice el botón del paso (fallo={error}).
+      setError(textoDelMotivo(e))
     } finally {
       setOcupado(false)
     }
@@ -94,6 +96,7 @@ export function PasoEmpresa({ inicial, onCrear }: { inicial: string; onCrear: (n
           type="submit"
           icono="Siguiente"
           cargando={ocupado}
+          fallo={error}
           disabled={ocupado}
         >
           {ocupado ? 'Creando tu empresa…' : 'Crear mi empresa'}
@@ -183,7 +186,7 @@ export function PasoCampo({
       titulo={ordinal ? `Tu ${ordinal} campo` : 'Otro campo'}
       bajada="Con la ubicación te mostramos el clima de tu campo todos los días."
       pie={
-        <BotonPrincipal form="b2" type="submit" icono="Siguiente" cargando={ocupado} disabled={ocupado}>
+        <BotonPrincipal form="b2" type="submit" icono="Siguiente" cargando={ocupado} fallo={error} disabled={ocupado}>
           {ocupado ? 'Guardando…' : 'Guardar el campo'}
         </BotonPrincipal>
       }
@@ -233,7 +236,6 @@ export function PasoCampo({
           onChange={(e) => setHectareas(e.target.value.replace(/[^\d.,]/g, ''))}
           error={intento ? errores.hectareas : undefined}
         />
-        {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
       </form>
     </OnboardingLayout>
   )
@@ -322,7 +324,7 @@ export function PasoPotreros({
       titulo="¿Cómo lo tenés dividido?"
       bajada="Con el número con que los conocen. Las hectáreas dicen cuánta hacienda aguanta cada uno."
       pie={
-        <BotonPrincipal type="button" icono="Siguiente" cargando={ocupado} disabled={ocupado} onClick={guardar}>
+        <BotonPrincipal type="button" icono="Siguiente" cargando={ocupado} fallo={error} disabled={ocupado} onClick={guardar}>
           {ocupado ? 'Guardando…' : principal}
         </BotonPrincipal>
       }
@@ -406,7 +408,6 @@ export function PasoPotreros({
         ocupado={ocupado}
         onCampoMasGrande={(n) => void correr(() => onCorregirHectareas(n))}
       />
-      {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
     </OnboardingLayout>
   )
 }
@@ -480,6 +481,7 @@ export function PasoQueHay({
             type="button"
             icono="Siguiente"
             cargando={ocupado}
+            fallo={error}
             disabled={ocupado}
             onClick={() => {
               setIntento(true)
@@ -629,7 +631,6 @@ export function PasoQueHay({
           <Calendario valor={desde} onCambio={setDesde} max={haceDias(0, new Date())} etiqueta="Desde cuándo descansa" />
         </div>
       )}
-      {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
     </OnboardingLayout>
   )
 }

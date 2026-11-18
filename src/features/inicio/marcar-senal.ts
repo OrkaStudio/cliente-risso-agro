@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import type { TipoSenal } from '@/features/inicio/para-atender-api'
+import { errorDeBase } from '@/lib/error-de-base'
 
 type EstadoMarca = Database['public']['Enums']['estado_marca']
 
@@ -57,7 +58,7 @@ export function useMarcarSenal() {
         // El tipo generado espera `string | undefined`, no null: se omite si no hay nota.
         p_nota: input.nota,
       })
-      if (error) throw new Error(error.message)
+      if (error) throw errorDeBase(error)
       return data as string
     },
     /* A propósito NO invalida acá. Si el aviso desaparece en el momento, el
@@ -74,7 +75,7 @@ export function useDeshacerMarca() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('marca_senal').delete().eq('id', id)
-      if (error) throw new Error(error.message)
+      if (error) throw errorDeBase(error)
     },
     onSuccess: () => invalidarAvisos(qc),
   })
