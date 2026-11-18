@@ -71,10 +71,10 @@ export function MapaCampo({
     map.on('click', () => fondo.current?.())
     const puntos = [...(campo.contorno ?? []), ...campo.potreros.flatMap((p) => p.poligono ?? [])]
     // En la compu el mapa ocupa la pantalla y deja lugar arriba a la barra; en el celular es una
-    // tarjeta chica: ahí el campo la llena con un margen parejo.
+    // tarjeta chica: ahí el campo la llena, dejando arriba lugar al botón de volver a todos.
     const relleno = (): L.FitBoundsOptions => {
       const ancho = host.current?.clientWidth ?? 0
-      if (ancho < 600) return { paddingTopLeft: [20, 20], paddingBottomRight: [20, 20] }
+      if (ancho < 600) return { paddingTopLeft: [20, 54], paddingBottomRight: [20, 16] }
       const derecha = ancho > 900 ? margenDerecho : 0
       return { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70] }
     }
