@@ -107,6 +107,10 @@
     --color-estado-aviso: var(--estado-aviso);
     --color-estado-aviso-suave: var(--estado-aviso-suave);
     --color-estado-aviso-texto: var(--estado-aviso-texto);
+    --color-listo: var(--listo);
+    --color-listo-texto: var(--listo-texto);
+    --color-listo-suave: var(--listo-suave);
+    --color-listo-fuerte: var(--listo-fuerte);
     --color-barra-fondo: var(--barra-fondo);
     --color-barra-activo: var(--barra-activo);
     --color-barra-texto: var(--barra-texto);
@@ -120,6 +124,18 @@
     --color-terracota-700: #7a3a1c;
     --color-terracota-800: #592a14;
     --color-terracota-900: #3a1a0d;
+    /* Pasto: el verde de Troppero para «Listo» (18/11). Claro como el trigo, con el
+       tilde verde monte; la misma lógica de peso que el círculo trigo del botón. */
+    --color-pasto-50: #f6f8ec;
+    --color-pasto-100: #ecf1d6;
+    --color-pasto-200: #dde6b8;
+    --color-pasto-300: #cbd79a;
+    --color-pasto-400: #b2c376;
+    --color-pasto-500: #93a85a;
+    --color-pasto-600: #758c45;
+    --color-pasto-700: #5a6f37;
+    --color-pasto-800: #3a4f2a;
+    --color-pasto-900: #26341c;
     --color-trigo-50: #fef9eb;
     --color-trigo-100: #fcf2da;
     --color-trigo-200: #f7e3b6;
@@ -250,6 +266,14 @@
     --estado-aviso: #524c44;
     --estado-aviso-suave: #f4f1e9;
     --estado-aviso-texto: #524c44;
+    /* «Listo»: cómo dice un botón que lo que pediste salió. Sólo para el resultado de una
+       acción (guardar, anotar, mandar); los estados de un dato siguen con --estado-bien.
+       listo + listo-texto: el botón o su círculo lleno (contraste 5,9).
+       listo-suave + listo-fuerte: los botones de borde, de texto y de ícono (7,8). */
+    --listo: #cbd79a;                 /* pasto/300 */
+    --listo-texto: #3a4f2a;           /* pasto/800 */
+    --listo-suave: #ecf1d6;           /* pasto/100 */
+    --listo-fuerte: #3a4f2a;          /* pasto/800 */
     --barra-fondo: #f4f1e9;
     --barra-activo: #d9d4cb;
     --barra-texto: #131b16;
@@ -346,6 +370,11 @@
     --estado-aviso: #a59d91;
     --estado-aviso-suave: #37322d;
     --estado-aviso-texto: #bfb8ad;
+    /* De noche el pasto se queda claro y el tilde pasa a tinta, como el círculo trigo. */
+    --listo: #cbd79a;
+    --listo-texto: #131b16;
+    --listo-suave: #2a3420;
+    --listo-fuerte: #cbd79a;
     --barra-fondo: #1e1b18;
     --barra-activo: #2b2724;
     --barra-texto: #bfb8ad;

@@ -121,6 +121,9 @@ const AsistenteMuestra = lazy(() =>
 const LegalesPage = lazy(() =>
   import('@/features/legales/legales-page').then((m) => ({ default: m.LegalesPage })),
 )
+const ListoMuestra = lazy(() =>
+  import('@/components/tropero/listo-muestra').then((m) => ({ default: m.ListoMuestra })),
+)
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -130,6 +133,7 @@ export const router = createBrowserRouter([
   ...(import.meta.env.DEV
     ? [
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
+        { path: '/estilo/listo', element: <Suspense fallback={null}><ListoMuestra /></Suspense> },
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
       ]
     : []),
