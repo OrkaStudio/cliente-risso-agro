@@ -18,9 +18,10 @@ const ISOTIPO_SVG =
 // La palabra va por encima del lienzo (z-10): si no, cuando el vidrio se va, el lienzo la tapa.
 // Hueso es base/hueso del manual (#f4f1e9). «placa»: vidrio oscuro, como ícono de app, sobre hueso.
 const TONOS = {
-  dia: { look: "light", fondo: "#f4f1e9", placa: "#fbfaf6" },
-  placa: { look: "dark", fondo: "#f4f1e9", placa: "#131b16" },
-  noche: { look: "dark", fondo: "#131b16", placa: "#0d130f" },
+  dia: { look: "light", fondo: "#f4f1e9", placa: "#fbfaf6", quedaPlaca: false },
+  // Termina en la placa tinta firme, como el ícono: deshecha sobre hueso se veía gris y borrosa.
+  placa: { look: "dark", fondo: "#f4f1e9", placa: "#131b16", quedaPlaca: true },
+  noche: { look: "dark", fondo: "#131b16", placa: "#0d130f", quedaPlaca: false },
 } as const
 
 /** Cuándo suelta el vidrio la T (el motor la presenta 2,4 s): ahí entran la palabra y el lema. */
@@ -52,6 +53,7 @@ export function MarcaVidrio({ tono = "dia", conLema = true, className }: { tono?
         look={t.look}
         background={t.fondo}
         plateColor={t.placa}
+        keepPlate={t.quedaPlaca}
         logoColor="#b85c2e"
         logoScale={0.6}
         finalScale={0.78}
