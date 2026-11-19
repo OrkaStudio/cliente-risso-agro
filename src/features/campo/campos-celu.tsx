@@ -157,7 +157,6 @@ export function CamposCelu() {
             )}
           </motion.div>
         </AnimatePresence>
-        <div aria-hidden className="h-10" />
       </div>
     </div>
   )

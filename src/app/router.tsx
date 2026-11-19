@@ -109,6 +109,12 @@ const LegalesPage = lazy(() =>
 const ListoMuestra = lazy(() =>
   import('@/components/tropero/listo-muestra').then((m) => ({ default: m.ListoMuestra })),
 )
+const AvisosMuestra = lazy(() =>
+  import('@/components/tropero/avisos-muestra').then((m) => ({ default: m.AvisosMuestra })),
+)
+const BarraCeluMuestra = lazy(() =>
+  import('@/components/tropero/barra-celu-muestra').then((m) => ({ default: m.BarraCeluMuestra })),
+)
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -120,6 +126,8 @@ export const router = createBrowserRouter([
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
         { path: '/estilo/listo', element: <Suspense fallback={null}><ListoMuestra /></Suspense> },
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
+        { path: '/estilo/barra-celu', element: <Suspense fallback={null}><BarraCeluMuestra /></Suspense> },
+        { path: '/estilo/avisos', element: <Suspense fallback={null}><AvisosMuestra /></Suspense> },
       ]
     : []),
   // Acceso (A1–A5): se entra con un código por WhatsApp, sin contraseñas. Comparten la foto
@@ -249,6 +257,8 @@ export const router = createBrowserRouter([
                   { path: 'campo/historial', element: <Navigate to="/campo" replace /> },
                   ],
                   },
+                  // Una dirección del celular que no existe: se dice dentro del celular, no en el marco de la compu.
+                  { path: 'campo/*', element: <NoEncontrada /> },
                 ],
               },
             ],

@@ -205,7 +205,6 @@ export function HaciendaCelu() {
             </>
           )}
         </motion.section>
-        <div aria-hidden className="h-10" />
       </div>
     </div>
   )

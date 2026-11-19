@@ -318,7 +318,6 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
       )}
 
       {/* Lugar para que el asistente no tape lo último. */}
-      <div aria-hidden className="h-10" />
     </div>
   )
 }

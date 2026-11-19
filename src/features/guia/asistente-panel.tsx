@@ -68,7 +68,8 @@ function guardar(clave: string, valor: string) {
   }
 }
 
-export function AsistentePanel({ celular = false }: { celular?: boolean }) {
+/** `barra`: en el celular, el lugar de la barra de abajo donde vive el orbe (Lau, 18/11). Sin él, flota. */
+export function AsistentePanel({ celular = false, barra = null }: { celular?: boolean; barra?: HTMLElement | null }) {
   const quieto = !!useReducedMotion()
   const abierto = usePanelAbierto()
   const hayAyudaLocal = useHayAyudaLocal()
@@ -80,6 +81,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
   const empresa = useEmpresa()
   const quien = useQuienMira()
   const mandaCampos = ['carga', 'solo_manda'].includes(nivelDe(empresa.data, 'campos'))
+  const mandaPlata = ['carga', 'solo_manda'].includes(nivelDe(empresa.data, 'plata'))
   // Lo que ve quien pregunta: el asistente no sugiere ni contesta lo que no tiene habilitado.
   const ve = React.useMemo(() => ({ plata: veePlata(empresa.data), hacienda: puedeVer(empresa.data, 'hacienda'), campos: puedeVer(empresa.data, 'campos') }), [empresa.data])
   // Las fichas de ayuda: sólo de lo que ve, y el botón sólo si lleva a algo que puede hacer.
@@ -167,7 +169,7 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
       ro.disconnect()
       window.removeEventListener('resize', medir)
     }
-  }, [hayAyudaLocal])
+  }, [hayAyudaLocal, barra])
   const [marca, setMarca] = React.useState<Caja | null>(null)
   const destino = marca
     ? {
@@ -436,11 +438,14 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
                 <Burbuja>{nombre ? `Hola, ${nombre}. ¿Qué querés saber?` : '¡Hola! ¿Qué querés saber?'}</Burbuja>
 
                 {/* En el celular no hay recorrida (Lau, 17/11): lo que se ve en el campo se cuenta en un audio. */}
-                {celular && mandaCampos && (
+                {/* El audio a WhatsApp vive acá, no en la barra: una sola puerta abajo a la derecha (Lau, 18/11). */}
+                {celular && (mandaCampos || mandaPlata) && (
                   <section className="flex items-center gap-3 rounded-[18px] border border-borde bg-fondo/60 p-3.5">
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] leading-snug font-bold">Contame cómo está tu campo</span>
-                      <span className="block text-[13px] leading-snug text-texto-suave">El agua, el pasto, los animales: un audio y lo anoto en cada potrero.</span>
+                      <span className="block text-[14.5px] leading-snug font-bold">{mandaCampos ? 'Contame cómo está tu campo' : 'Contame un gasto o un cobro'}</span>
+                      <span className="block text-[13px] leading-snug text-texto-suave">
+                        {mandaCampos ? 'El agua, el pasto, los animales: un audio y lo anoto en cada potrero.' : 'Un audio con qué fue y cuánto, y lo anoto en la plata.'}
+                      </span>
                     </span>
                     <a href={`https://wa.me/${WHATSAPP_TROPERO}`} target="_blank" rel="noopener noreferrer" className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#25d366] px-3.5 text-[14px] font-bold text-white">
                       Audio
@@ -575,51 +580,90 @@ export function AsistentePanel({ celular = false }: { celular?: boolean }) {
         )}
       </AnimatePresence>
 
-      {/* Cerrado: la barra oscura con el orbe adentro. Se entiende que es una IA y a qué invita. */}
-      <button
-        type="button"
-        onClick={() => {
-          setGlobo(null)
-          if (abierto) cerrarPanel()
-          else abrirPanel()
-        }}
-        onMouseEnter={() => setSobre(true)}
-        onMouseLeave={() => setSobre(false)}
-        aria-label={etiqueta}
-        aria-expanded={abierto}
-        className={cn(
-          // En el celular, arriba de la barra de abajo y a mano del pulgar.
-          celular ? 'fixed right-4 bottom-[calc(100px+env(safe-area-inset-bottom))] w-14 justify-center' : 'fixed right-6 bottom-6',
-          'flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
-          verTexto ? (celular ? 'pr-4' : 'md:pr-3') : '',
-          celular && 'gap-0',
-          // En el celular el panel ocupa el ancho: abierto, la barra se esconde (el panel tiene su ×).
-          celular && abierto && 'pointer-events-none opacity-0',
-          arriba ? 'z-[76]' : 'z-[45]',
-        )}
-      >
-        <span ref={hueco} aria-hidden className="relative size-10 shrink-0">
-          {!vuela && (
-            <motion.span className="absolute inset-0 grid place-items-center" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
-              <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
-            </motion.span>
+      {/* El orbe: en el celular, en su lugar de la barra de abajo (Lau, 18/11). */}
+      {celular && barra ? createPortal(
+        <button
+          type="button"
+          onClick={() => {
+            setGlobo(null)
+            if (abierto) cerrarPanel()
+            else abrirPanel()
+          }}
+          aria-label={etiqueta}
+          aria-expanded={abierto}
+          className="flex h-[62px] flex-1 flex-col items-center justify-center gap-1 text-[12px] font-semibold text-texto"
+        >
+          <span className="grid size-11 place-items-center rounded-full bg-terracota-900 shadow-[0_4px_12px_rgba(58,26,13,0.35)] ring-1 ring-white/10">
+            <span ref={hueco} aria-hidden className="relative size-10 shrink-0">
+              {!vuela && (
+                <motion.span className="absolute inset-0 grid place-items-center" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
+                  <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+                </motion.span>
+              )}
+              {/* Tiene algo para contarte: un puntito en el orbe (antes un «1» que no se entendía). */}
+              <AnimatePresence>
+                {nAvisos > 0 && !abierto && (
+                  <motion.span
+                    className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-terracota-900"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                  />
+                )}
+              </AnimatePresence>
+            </span>
+          </span>
+          Asistente
+        </button>,
+        barra,
+      ) : (
+        // Cerrado: la barra oscura con el orbe adentro. Se entiende que es una IA y a qué invita.
+        <button
+          type="button"
+          onClick={() => {
+            setGlobo(null)
+            if (abierto) cerrarPanel()
+            else abrirPanel()
+          }}
+          onMouseEnter={() => setSobre(true)}
+          onMouseLeave={() => setSobre(false)}
+          aria-label={etiqueta}
+          aria-expanded={abierto}
+          className={cn(
+            // En el celular, arriba de la barra de abajo y a mano del pulgar.
+            celular ? 'fixed right-4 bottom-[calc(100px+env(safe-area-inset-bottom))] w-14 justify-center' : 'fixed right-6 bottom-6',
+            'flex h-14 items-center gap-3 rounded-full bg-terracota-900 p-2 text-white shadow-[0_12px_32px_rgba(58,26,13,0.38)] ring-1 ring-white/10 transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-terracota-800 hover:shadow-[0_16px_38px_rgba(58,26,13,0.45)] active:translate-y-0',
+            verTexto ? (celular ? 'pr-4' : 'md:pr-3') : '',
+            celular && 'gap-0',
+            // En el celular el panel ocupa el ancho: abierto, la barra se esconde (el panel tiene su ×).
+            celular && abierto && 'pointer-events-none opacity-0',
+            arriba ? 'z-[76]' : 'z-[45]',
           )}
-          {/* Tiene algo para contarte: un puntito en el orbe (antes un «1» que no se entendía). */}
-          <AnimatePresence>
-            {nAvisos > 0 && !abierto && (
-              <motion.span
-                className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-terracota-900"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-              />
+        >
+          <span ref={hueco} aria-hidden className="relative size-10 shrink-0">
+            {!vuela && (
+              <motion.span className="absolute inset-0 grid place-items-center" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
+                <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+              </motion.span>
             )}
-          </AnimatePresence>
-        </span>
-        {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
-        <TextoDeLaBarra texto={globo ?? 'Preguntale a Troppero'} visible={verTexto} estado={!!globo} celular={celular} />
-      </button>
+            {/* Tiene algo para contarte: un puntito en el orbe (antes un «1» que no se entendía). */}
+            <AnimatePresence>
+              {nAvisos > 0 && !abierto && (
+                <motion.span
+                  className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-principal ring-2 ring-terracota-900"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                />
+              )}
+            </AnimatePresence>
+          </span>
+          {/* El texto de la barra: mide el que viene y lleva el ancho hasta ahí con un resorte; los dos textos se cruzan en el mismo lugar. */}
+          <TextoDeLaBarra texto={globo ?? 'Preguntale a Troppero'} visible={verTexto} estado={!!globo} celular={celular} />
+        </button>
+      )}
 
       {/* El orbe: descansa en su hueco de la barra y sale a volar cuando hace algo. */}
       {vuela && <motion.div
