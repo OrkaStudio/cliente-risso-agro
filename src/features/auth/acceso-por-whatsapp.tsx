@@ -19,6 +19,9 @@ export function AccesoPorWhatsapp({ empresa, otrasCuentas = false }: { empresa: 
       texto={`${empresa ? `En ${empresa}, l` : 'L'}o tuyo lo mandás por WhatsApp: novedades, gastos o facturas. No hace falta usar la app.`}
       accion="Abrir WhatsApp"
       icono="Celular"
+      etiqueta={{ texto: 'Lo tuyo va por WhatsApp', tono: 'verde' }}
+      subrayar="WhatsApp"
+      principalWhatsapp
       onAccion={() => window.open(`https://wa.me/${WHATSAPP_TROPERO}`, '_blank', 'noopener')}
       secundaria={
         otrasCuentas && user
