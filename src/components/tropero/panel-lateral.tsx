@@ -48,23 +48,25 @@ export function PanelLateral({
             'fixed z-50 flex w-full flex-col transition-[max-width] duration-300',
             chico
               ? cn('top-4 right-4 max-h-[calc(100dvh-32px)] rounded-[28px] max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-3 max-sm:w-auto', ancho ? 'max-w-[600px]' : 'max-w-[460px]')
-              : cn('inset-y-0 right-0 h-[100dvh] rounded-l-[28px]', ancho ? 'max-w-[680px]' : 'max-w-[520px]'),
-            ' bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-closed:slide-out-to-right data-open:animate-in data-open:slide-in-from-right data-open:ease-[cubic-bezier(0.22,1,0.36,1)] data-closed:ease-[cubic-bezier(0.4,0,0.6,1)]',
+              : // En el celular, una hoja que sube desde abajo con las dos esquinas de arriba redondeadas
+                // (Lau, 19/11: entrando por la derecha a todo el ancho, los bordes se veían raros).
+                cn('right-0 sm:inset-y-0 sm:h-[100dvh] sm:rounded-l-[28px] max-sm:inset-x-0 max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:rounded-t-[28px]', ancho ? 'sm:max-w-[680px]' : 'sm:max-w-[520px]'),
+            ' bg-fondo shadow-[-12px_0_40px_rgba(19,27,22,0.18)] outline-none duration-300 data-closed:animate-out data-closed:fill-mode-forwards data-open:animate-in data-open:ease-[cubic-bezier(0.22,1,0.36,1)] data-closed:ease-[cubic-bezier(0.4,0,0.6,1)] sm:data-closed:slide-out-to-right sm:data-open:slide-in-from-right max-sm:data-closed:slide-out-to-bottom max-sm:data-open:slide-in-from-bottom',
             className,
           )}
         >
-          <header className={cn('flex items-start gap-4 px-8 pb-5', chico ? 'pt-7' : 'pt-8')}>
+          <header className={cn('flex items-start gap-4 px-8 pb-5 max-sm:px-5 max-sm:pb-4', chico ? 'pt-7 max-sm:pt-5' : 'pt-8 max-sm:pt-5')}>
             <div className="min-w-0 flex-1">
               {onVolver && <BotonVolver onClick={onVolver} className="mb-4">{volverTexto}</BotonVolver>}
-              <DialogPrimitive.Title className="font-heading text-[28px] leading-[1.05] font-extrabold tracking-[-0.02em] text-texto">{titulo}</DialogPrimitive.Title>
-              {bajada && <DialogPrimitive.Description className="mt-1.5 text-[15px] text-texto-suave">{bajada}</DialogPrimitive.Description>}
+              <DialogPrimitive.Title className="font-heading text-[28px] leading-[1.05] max-sm:text-[23px] font-extrabold tracking-[-0.02em] text-texto">{titulo}</DialogPrimitive.Title>
+              {bajada && <DialogPrimitive.Description className="mt-1.5 text-[15px] text-texto-suave max-sm:text-[14px]">{bajada}</DialogPrimitive.Description>}
             </div>
             <DialogPrimitive.Close aria-label="Cerrar" className="grid size-10 shrink-0 place-items-center rounded-full text-texto-suave transition-colors hover:bg-superficie-hundida hover:text-texto">
               <Icono nombre="Cerrar" />
             </DialogPrimitive.Close>
           </header>
-          <div className={cn('min-h-0 overflow-y-auto overscroll-contain px-8 pb-6', !chico && 'flex-1')}>{children}</div>
-          {pie && <footer className={cn('border-t border-borde px-8 py-5', chico ? 'rounded-b-[28px]' : 'bg-fondo')}>{pie}</footer>}
+          <div className={cn('min-h-0 overflow-y-auto overscroll-contain px-8 pb-6 max-sm:px-5 max-sm:pb-[max(20px,env(safe-area-inset-bottom))]', !chico && 'flex-1')}>{children}</div>
+          {pie && <footer className={cn('border-t border-borde px-8 py-5 max-sm:px-5 max-sm:pb-[max(16px,env(safe-area-inset-bottom))]', chico ? 'rounded-b-[28px]' : 'bg-fondo')}>{pie}</footer>}
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

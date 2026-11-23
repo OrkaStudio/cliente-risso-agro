@@ -231,7 +231,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
     if (falta) { setError(falta === SIN_NADA ? `${falta} Para que no entre más, sacale el acceso.` : falta); return 'falta' }
     {
       await cambiar.mutateAsync({ userId: p.userId!, niveles })
-      return () => toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Rige la próxima vez que abra Troppero.` })
+      return () => toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Le llega al instante.` })
     }
   }
   async function sacar() {

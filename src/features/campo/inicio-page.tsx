@@ -7,9 +7,7 @@ import { saludo } from '@/features/inicio/tropero/dia'
 import { useMapa } from '@/features/mapa/api'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
 import tranquera from '@/assets/tropero/tranquera.webp'
-import { Logo } from '@/components/tropero/logo'
 import { HoyCelu } from './hoy-celu'
-import { MenuCuenta } from './menu-cuenta'
 
 
 /**
@@ -39,16 +37,12 @@ function useEnLinea(): boolean {
 }
 
 function Hoy() {
-  const { user } = useAuth()
-  const { data: membresia } = useEmpresa()
   const enLinea = useEnLinea()
-  const crudo = String(user?.user_metadata?.nombre ?? '').trim().split(/\s+/)[0] ?? ''
 
   return (
     // Sin margen propio abajo: HoyCelu ya trae el suyo (pb-6), el mismo que Campos, Hacienda y Plata.
     <div className="h-full overflow-y-auto">
       <HoyCelu
-        cuenta={<MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />}
         antes={
           !enLinea && (
             <p className="flex items-center gap-2.5 rounded-[14px] bg-estado-atencion-suave px-4 py-3 text-[14px] font-semibold text-estado-atencion-texto">
@@ -71,11 +65,7 @@ function HoySinCampo() {
   const nombre = crudo.charAt(0).toLocaleUpperCase('es-AR') + crudo.slice(1)
   const primero = campos?.find((c) => !c.contorno) ?? campos?.[0]
   return (
-    <div className="flex h-full flex-col gap-8 overflow-y-auto px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-      <div className="flex items-center justify-between gap-2">
-        <Logo alto={24} />
-        <MenuCuenta inicial={(crudo || membresia?.empresa?.nombre || 'T').charAt(0)} />
-      </div>
+    <div className="flex h-full flex-col gap-8 overflow-y-auto px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
       {/* La misma portada que Hoy: el campo todavía está por armarse. */}
       <div className="relative h-[240px] overflow-hidden rounded-[20px] bg-[#de8c61]">
         <img src={tranquera} alt="" className="absolute bottom-0 left-0 w-full origin-bottom scale-[1.04] [mask-image:linear-gradient(180deg,transparent_0,transparent_6%,#000_14%)]" />

@@ -23,7 +23,7 @@ import { useMapa } from '@/features/mapa/api'
 import type { CampoMapa } from '@/features/mapa/reglas'
 import { cn } from '@/lib/utils'
 import { BAJADA, TARJETA } from './sistema'
-import { Barra, Encabezado } from './sistema-ui'
+import { Encabezado } from './sistema-ui'
 
 /**
  * Campos en el celular (Lau, 17/11): para ver los campos y lo que tienen
@@ -87,8 +87,7 @@ export function CamposCelu() {
 
   return (
     <div ref={scroll} className="h-full overflow-y-auto">
-      <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-        <Barra />
+      <div className="flex flex-col gap-8 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
         <section aria-labelledby="campos-titulo" className="flex flex-col gap-3">
           <h1 id="campos-titulo" className="flex h-9 items-center px-1 titulo-display text-[30px] leading-tight text-texto">
             Campos

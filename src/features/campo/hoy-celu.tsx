@@ -6,7 +6,6 @@ import { Giro, Texto } from '@/components/tropero/boton-partes'
 import { useAccion, type Accion } from '@/components/tropero/use-accion'
 import tranquera from '@/assets/tropero/tranquera.webp'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
-import { Logo } from '@/components/tropero/logo'
 import { ElegirCampo } from './elegir-campo'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { useLiquidar, useRevertirLiquidacion } from '@/features/agenda/hooks'
@@ -81,7 +80,7 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 /** Una fila de «Para hacer hoy»: una cosa del campo o de la plata, o lo que cargó alguien. */
 type Fila = { tipo: 'cosa'; cosa: Cosa } | { tipo: 'gente'; quien: string; por: string; cargas: CargaDeOtro[] }
 
-export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: React.ReactNode }) {
+export function HoyCelu({ antes }: { antes?: React.ReactNode }) {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const variasCuentas = (useCuentas().data?.cuentas.length ?? 0) > 1
@@ -145,12 +144,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
         <span className="absolute top-[760px] -left-24 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(232,150,110,0.22),transparent)]" />
       </div>
 
-      <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-        {/* Arriba: la marca y la cuenta (el campo se elige en la portada). */}
-        <div className="flex items-center justify-between gap-2">
-          <Logo alto={24} />
-          {cuenta}
-        </div>
+      <div className="flex flex-col gap-8 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
 
         {/* 1. La portada: la tranquera con el saludo en el cielo y el clima encima. */}
         <motion.div {...entra(0)} className="relative z-10 h-[310px] rounded-[20px] shadow-[0_16px_34px_-18px_rgba(90,40,15,0.5)]">
@@ -206,9 +200,11 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
           </motion.p>
         )}
 
-        {/* 3. Los números del día: lo suyo (rodeo y plata) y el mercado (gordo y dólar). */}
+        {/* 3. Los números del día: lo suyo (rodeo y plata) y el mercado (gordo y dólar).
+            Con un número impar de datos (sin el gordo, por ejemplo), el último ocupa el
+            ancho: sin el hueco vacío al lado (Lau, 19/11). */}
         {v && (
-          <motion.div {...entra(2)} className="grid grid-cols-2 gap-3">
+          <motion.div {...entra(2)} className="grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2">
             {ve.hacienda && (
               <Dato icono="Vaca" clase="bg-principal-suave text-principal" titulo="Hacienda" valor={v.totalCabezas.toLocaleString('es-AR')} unidad="cab">
                 <Franja cats={v.porCategoria} alto="h-2" />

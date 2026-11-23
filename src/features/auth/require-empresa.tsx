@@ -7,6 +7,7 @@ import { AccesoPorWhatsapp } from './acceso-por-whatsapp'
 import { useAuth } from './auth-context'
 import { fijarCuentaDelPedido } from '@/features/empresa/cuenta-activa'
 import { CargasDeOtraCuenta, ElegirCuentaPage } from '@/features/empresa/elegir-cuenta'
+import { useAccesoEnVivo } from '@/features/empresa/cambio-de-acceso'
 import { leerMembresiaPersistida, useCuentas, type Membresia } from '@/features/empresa/use-empresa'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 
@@ -44,6 +45,8 @@ function onboardingPendiente(m: Membresia): boolean {
 export function RequireEmpresa() {
   const { user } = useAuth()
   const { data, isSuccess, isError, error, fetchStatus, refetch } = useCuentas()
+  // El dueño le cambia el acceso y le llega al instante (Lau, 20/11).
+  useAccesoEnVivo(user?.id)
   const membresia = data?.activa ?? null
   // Lo guardado en el teléfono para andar sin señal tiene que ser de esta cuenta (varias cuentas, 14/11).
   const caches = useCachesDeLaCuenta(isSuccess ? (membresia?.empresa_id ?? null) : null, data?.cuentas)

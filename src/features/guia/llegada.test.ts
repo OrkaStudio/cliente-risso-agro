@@ -102,7 +102,7 @@ describe('linkWhatsapp — el mensaje ya escrito', () => {
     const url = linkWhatsapp({ nombre: 'Daniel', empresa: 'Risso Agro', seccion: 'Campos' })
     expect(url?.startsWith('https://wa.me/5492244472369?text=')).toBe(true)
     expect(decodeURIComponent(url!.split('text=')[1]!)).toBe(
-      'Hola, soy Daniel de Risso Agro. Uso la aplicación de Orka. Estoy en Campos de la aplicación. Tengo una consulta: ',
+      'Hola, soy Daniel de Risso Agro. Uso Troppero. Estoy en Campos. Tengo una consulta: ',
     )
     vi.unstubAllEnvs()
   })

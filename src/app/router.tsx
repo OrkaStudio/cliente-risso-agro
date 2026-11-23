@@ -71,6 +71,7 @@ const CampoInicioPage = lazy(() =>
   })),
 )
 const CamposCelu = lazy(() => import('@/features/campo/campos-celu').then((m) => ({ default: m.CamposCelu })))
+const ConfiguracionCelu = lazy(() => import('@/features/campo/configuracion-celu').then((m) => ({ default: m.ConfiguracionCelu })))
 const AnimalCelu = lazy(() => import('@/features/campo/animal-celu').then((m) => ({ default: m.AnimalCelu })))
 const HaciendaCelu = lazy(() => import('@/features/campo/hacienda-celu').then((m) => ({ default: m.HaciendaCelu })))
 const PlataPage = lazy(() =>
@@ -115,6 +116,7 @@ const AvisosMuestra = lazy(() =>
 const BarraCeluMuestra = lazy(() =>
   import('@/components/tropero/barra-celu-muestra').then((m) => ({ default: m.BarraCeluMuestra })),
 )
+const AccesosMuestra = lazy(() => import('@/components/tropero/accesos-muestra').then((m) => ({ default: m.AccesosMuestra })))
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -127,6 +129,7 @@ export const router = createBrowserRouter([
         { path: '/estilo/listo', element: <Suspense fallback={null}><ListoMuestra /></Suspense> },
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
         { path: '/estilo/barra-celu', element: <Suspense fallback={null}><BarraCeluMuestra /></Suspense> },
+        { path: '/estilo/accesos', element: <Suspense fallback={null}><AccesosMuestra /></Suspense> },
         { path: '/estilo/avisos', element: <Suspense fallback={null}><AvisosMuestra /></Suspense> },
       ]
     : []),
@@ -257,6 +260,8 @@ export const router = createBrowserRouter([
                   { path: 'campo/historial', element: <Navigate to="/campo" replace /> },
                   ],
                   },
+                  // Configuración (el engranaje del encabezado): la tiene todo el que entra, sin permisos de sección.
+                  { path: 'campo/configuracion', element: <ConfiguracionCelu /> },
                   // Una dirección del celular que no existe: se dice dentro del celular, no en el marco de la compu.
                   { path: 'campo/*', element: <NoEncontrada /> },
                 ],

@@ -36,17 +36,19 @@ export default defineConfig({
         'apple-touch-icon.png',
       ],
       manifest: {
-        name: 'Troppero — Gestión de campo',
+        // Lo que se ve al agregarla al celular (Lau, 19/11): el nombre bajo el ícono, la
+        // pantalla de arranque en la crema de la web y la barra del teléfono del mismo color.
+        id: '/',
+        name: 'Troppero',
         short_name: 'Troppero',
-        description:
-          'Hacienda, recorridas y plata del campo. Funciona sin señal.',
+        description: 'Tu campo, tu hacienda y tu plata, en el celular. Anda sin señal.',
         lang: 'es',
         start_url: '/',
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#0b5837',
-        theme_color: '#178a55',
+        background_color: '#fff8ec',
+        theme_color: '#fff8ec',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

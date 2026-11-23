@@ -2,6 +2,8 @@ import type { Niveles } from './secciones'
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { primeraMayuscula } from '@/lib/texto'
+import { queryClient } from '@/lib/query-client'
+import { aplicarCambioDeAcceso, cambioElAcceso } from './cambio-de-acceso'
 import { fijarCuentaDelPedido, leerCuentaElegida, olvidarCuentaElegida } from './cuenta-activa'
 
 /**
@@ -104,7 +106,14 @@ const opcionesCuentas = queryOptions({
   // Sin señal el fetch falla → isError, y el guard cae a la membresía
   // persistida en vez de colgarse en "Cargando…" para siempre.
   networkMode: 'offlineFirst',
+  // Que un cambio de acceso llegue rápido (Lau, 19/11): se vuelve a pedir al volver a la
+  // app (el celular la deja en segundo plano), cada minuto mientras está abierta y al
+  // pasar de pantalla después de 10 s. Es una consulta chica.
+  staleTime: 10_000,
+  refetchOnWindowFocus: true,
+  refetchInterval: 60_000,
   queryFn: async (): Promise<Cuentas> => {
+    const antes = queryClient.getQueryData<Cuentas>(['empresa'])?.activa
     const [{ data, error }, { data: sesion }] = await Promise.all([
       supabase.rpc('mis_cuentas'),
       supabase.auth.getSession(),
@@ -120,6 +129,8 @@ const opcionesCuentas = queryOptions({
     fijarCuentaDelPedido(activa?.empresa_id ?? null)
     // Sin cuenta elegida no queda ninguna guardada: sin señal no se entra a una al azar.
     guardarMembresiaPersistida(activa && userId ? { ...activa, user_id: userId } : null)
+    // El dueño le cambió el acceso mientras tenía la app abierta: después de guardar esto.
+    if (cambioElAcceso(antes, activa)) setTimeout(() => aplicarCambioDeAcceso(antes!, activa!), 0)
     return { cuentas, activa }
   },
 })

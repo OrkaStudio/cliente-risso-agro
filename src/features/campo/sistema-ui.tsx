@@ -1,8 +1,4 @@
-import { Logo } from '@/components/tropero/logo'
-import { useAuth } from '@/features/auth/auth-context'
-import { useEmpresa } from '@/features/empresa/use-empresa'
 import { ElegirCampo } from './elegir-campo'
-import { MenuCuenta } from './menu-cuenta'
 import { BAJADA, TITULO } from './sistema'
 
 /** El título de cada sección y, debajo, para qué sirve. */
@@ -13,19 +9,6 @@ export function Encabezado({ id, titulo, bajada }: { id: string; titulo: string;
         {titulo}
       </h2>
       <p className={BAJADA}>{bajada}</p>
-    </div>
-  )
-}
-
-/** Arriba de cada pantalla: la marca y la cuenta. */
-export function Barra() {
-  const { user } = useAuth()
-  const membresia = useEmpresa().data
-  const inicial = (String(user?.user_metadata?.nombre ?? '').trim() || membresia?.empresa?.nombre || 'T').charAt(0)
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <Logo alto={24} />
-      <MenuCuenta inicial={inicial} />
     </div>
   )
 }

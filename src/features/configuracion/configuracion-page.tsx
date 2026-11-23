@@ -8,7 +8,7 @@ import { Icono } from '@/components/tropero/icono'
 import { Logo } from '@/components/tropero/logo'
 import type { NombreIcono } from '@/components/tropero/iconos-svg'
 import { useAuth } from '@/features/auth/auth-context'
-import { ROLES, SECCIONES, SECCIONES_CON_PERMISO, esDueno, nombreNivel, nombreRol, resumenNiveles, type Rol } from '@/features/empresa/secciones'
+import { ROLES, SECCIONES, esDueno, nombreRol, resumenNiveles, type Rol } from '@/features/empresa/secciones'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { nombreDe } from '@/features/guia/nombre-usuario'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
@@ -19,17 +19,12 @@ import { cn } from '@/lib/utils'
 import { celularLindo, useBaja, useCambiarNombre, usePersonas, whatsappInvitacion, type Persona } from './api'
 import { nombrePropio } from '@/lib/texto'
 import { Baja } from './baja'
+import { ListaAccesos } from './accesos'
+import { PESTANAS, type Pestana } from './pestanas'
 import { EditarPanel, InvitarPanel } from './personas-paneles'
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 const BOTON_CHICO = 'inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto transition-colors hover:border-principal hover:text-principal'
-
-type Pestana = 'personas' | 'cuenta' | 'plan'
-const PESTANAS: { id: Pestana; texto: string; icono: NombreIcono; para: string }[] = [
-  { id: 'personas', texto: 'Personas', icono: 'Usuario', para: 'Quién entra y qué ve' },
-  { id: 'cuenta', texto: 'Tu cuenta', icono: 'Celular', para: 'Tu nombre y tu número' },
-  { id: 'plan', texto: 'Plan', icono: 'Comprobante', para: 'Lo que tenés y usás' },
-]
 
 /**
  * Configuración (Lau, 05/11), en pestañas, cada una armada para lo suyo:
@@ -88,7 +83,7 @@ export function ConfiguracionPage() {
 
 // ---------------------------------------------------------------- Personas: quién ve qué, de un vistazo
 
-function Personas({ empresa }: { empresa: string }) {
+export function Personas({ empresa }: { empresa: string }) {
   const personas = usePersonas(true)
   const [invitar, setInvitar] = useState<{ vez: number; rol?: Rol } | null>(null)
   const [vez, setVez] = useState(0)
@@ -105,9 +100,9 @@ function Personas({ empresa }: { empresa: string }) {
   if (personas.error) return <p className="text-texto-suave">No pudimos cargar las personas. Revisá la conexión y probá de nuevo.</p>
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-[17px] text-texto">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+        <p className="text-[15px] text-texto sm:text-[17px]">
           <b className="t-cifra">{adentro.length}</b> {adentro.length === 1 ? 'persona entra' : 'personas entran'} a tu campo
           {invitados.length > 0 && (
             <span className="text-texto-suave">
@@ -116,9 +111,9 @@ function Personas({ empresa }: { empresa: string }) {
             </span>
           )}
         </p>
-        <button type="button" onClick={() => abrir()} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
+        <button type="button" onClick={() => abrir()} className="inline-flex h-11 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-4 text-[14.5px] font-bold text-principal-texto hover:bg-terracota-600 sm:h-12 sm:gap-3 sm:pl-5 sm:text-[15.5px]">
           {sinMapa ? 'Terminar el mapa' : 'Invitar a alguien'}
-          <span className="grid size-10 place-items-center rounded-full bg-acento text-acento-texto">
+          <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto sm:size-10">
             <Icono nombre={sinMapa ? 'Campos' : 'Agregar'} tamano={16} />
           </span>
         </button>
@@ -129,76 +124,28 @@ function Personas({ empresa }: { empresa: string }) {
         </p>
       )}
 
-      {/* La tabla: una fila por persona, una columna por sección con su nivel. Se lee quién hace qué sin abrir nada. */}
-      <section aria-label="Quién ve qué" className="overflow-hidden rounded-[24px] border border-borde bg-superficie">
-        <div className="grid grid-cols-[minmax(0,2.2fr)_repeat(3,minmax(0,1fr))_150px] items-center border-b border-borde bg-superficie-hundida/60 px-5 py-3 text-[13px] font-bold tracking-[0.04em] text-texto-suave uppercase">
-          <span>Persona</span>
-          {SECCIONES_CON_PERMISO.map((s) => (
-            <span key={s.id} className="text-center">
-              {s.texto}
-            </span>
-          ))}
-          <span />
-        </div>
-        <ul className="divide-y divide-borde/70">
-          {adentro.map((p) => (
-            <li key={p.userId} className="grid grid-cols-[minmax(0,2.2fr)_repeat(3,minmax(0,1fr))_150px] items-center px-5 py-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className={cn('grid size-10 shrink-0 place-items-center rounded-full font-heading text-[15px] font-extrabold', p.rol === 'dueno' ? 'bg-principal text-principal-texto' : 'bg-acento text-acento-texto')}>{p.nombre.charAt(0).toUpperCase()}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-[16px] font-semibold text-texto">
-                    {p.nombre}
-                    {p.soyYo && <span className="font-normal text-texto-suave"> (vos)</span>}
-                  </p>
-                  <p className="truncate text-[14px] text-texto-suave">{[nombreRol(p.rol), p.acceso === 'whatsapp' ? 'Por WhatsApp' : null, celularLindo(p.celular)].filter(Boolean).join(' · ')}</p>
-                </div>
-              </div>
-              {SECCIONES_CON_PERMISO.map((s) => {
-                const nivel = p.niveles === null ? 'carga' : (p.niveles[s.id] ?? 'no')
-                return (
-                  <span key={s.id} className="flex justify-center" aria-label={`${s.texto}: ${nombreNivel(nivel)}`}>
-                    {nivel === 'no' ? (
-                      <span className="h-[2px] w-4 rounded-full bg-neutro-200" />
-                    ) : (
-                      <span className={cn('rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap', nivel === 'carga' ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-superficie-hundida text-texto')}>
-                        {nombreNivel(nivel)}
-                      </span>
-                    )}
-                  </span>
-                )
-              })}
-              <span className="flex justify-end">
-                {p.soyYo || p.rol === 'dueno' ? (
-                  <span className="text-[14px] font-semibold text-texto-suave">Ve todo</span>
-                ) : (
-                  <button type="button" onClick={() => setEditar(p)} className={BOTON_CHICO}>
-                    Cambiar
-                  </button>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* Quién ve qué: tocar a alguien abre su ficha y ahí se cambia (Lau, 19/11, opción A). */}
+      <ListaAccesos personas={adentro} />
 
       {invitados.length > 0 && (
-        <section aria-label="Invitaciones esperando" className="rounded-[24px] border border-dashed border-borde bg-superficie/60 px-5 py-2">
+        <section aria-label="Invitaciones esperando" className="rounded-[20px] border border-dashed border-borde bg-superficie/60 px-3 py-1 sm:rounded-[24px] sm:px-5 sm:py-2">
+          <p className="pt-2.5 pb-1 text-[12px] font-bold tracking-[0.04em] text-texto-suave uppercase sm:text-[13px]">Invitaciones esperando</p>
           <ul className="divide-y divide-borde/70">
             {invitados.map((p) => {
               const vencida = !!p.venceAt && new Date(p.venceAt) < new Date()
               return (
-                <li key={p.invitacionId} className="flex flex-wrap items-center gap-4 py-3.5">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full border-[1.5px] border-dashed border-borde font-heading text-[15px] font-extrabold text-texto-suave">{p.nombre.charAt(0).toUpperCase()}</span>
+                <li key={p.invitacionId} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:gap-4 sm:py-3.5">
+                  <span className="grid size-8 shrink-0 sm:size-10 place-items-center rounded-full border-[1.5px] border-dashed border-borde font-heading text-[15px] font-extrabold text-texto-suave">{p.nombre.charAt(0).toUpperCase()}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[16px] font-semibold text-texto">{p.nombre}</p>
-                    <p className="truncate text-[14px] text-texto-suave">
+                    <p className="truncate text-[14.5px] font-semibold text-texto sm:text-[16px]">{p.nombre}</p>
+                    <p className="truncate text-[12.5px] text-texto-suave sm:text-[14px]">
                       {nombreRol(p.rol)}{p.acceso === 'whatsapp' ? ' · por WhatsApp' : ''} · {resumenNiveles(p.niveles ?? {})}
                     </p>
-                    <p className={cn('text-[14px] font-semibold', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
+                    <p className={cn('text-[12.5px] font-semibold sm:text-[14px]', vencida ? 'text-estado-problema-texto' : 'text-estado-atencion-texto')}>
                       {p.rechazada ? 'No aceptó la invitación' : vencida ? 'El link venció: cancelala e invitalo de nuevo' : `Invitado, todavía no entró${p.venceAt ? ` · el link vence el ${fecha(p.venceAt)}` : ''}`}
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 gap-2 max-sm:w-full max-sm:pl-11">
                     {p.token && !vencida && (
                       <a href={whatsappInvitacion({ celular: p.celular, nombre: p.nombre, empresa, token: p.token })} target="_blank" rel="noreferrer" className={BOTON_CHICO}>
                         Mandar por WhatsApp
@@ -238,7 +185,11 @@ function Personas({ empresa }: { empresa: string }) {
 
 // ---------------------------------------------------------------- Tu cuenta: tu ficha
 
-function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
+/**
+ * `celular`: la misma pantalla en el teléfono (Lau, 19/11), con «Salir en este celular».
+ * `antesDeSalir`: lo que el celular suma antes de salir (cambiar de cuenta).
+ */
+export function TuCuenta({ empresa, rol, celular: enCelular = false, antesDeSalir }: { empresa: string; rol: string; celular?: boolean; antesDeSalir?: React.ReactNode }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const cambiar = useCambiarNombre()
@@ -290,9 +241,10 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
           </button>
         </section>
 
+        {antesDeSalir}
         <section aria-label="Salir" className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-borde bg-superficie p-6">
           <div>
-            <h2 className="t-tarjeta text-texto">Salir en esta compu</h2>
+            <h2 className="t-tarjeta text-texto">{enCelular ? 'Salir en este celular' : 'Salir en esta compu'}</h2>
             <p className="mt-1 text-[15px] text-texto-suave">Para volver a entrar te pedimos un código nuevo.</p>
           </div>
           <button type="button" onClick={() => void signOut()} className={BOTON_CHICO}>
@@ -308,7 +260,8 @@ function TuCuenta({ empresa, rol }: { empresa: string; rol: string }) {
 // ---------------------------------------------------------------- Plan: el estado y el uso
 
 /** Lo que es verdad hoy: el piloto, sin cargo, y lo que ya usa (Lau, 05/11: sin precios inventados). */
-function Plan() {
+/** `celular`: la misma pantalla, más compacta (Lau, 19/11: nada tan maximizado). */
+export function Plan({ celular = false }: { celular?: boolean } = {}) {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const mapa = useMapa(membresia?.empresa_id)
@@ -324,10 +277,10 @@ function Plan() {
     { titulo: 'Personas', valor: String(personas.data?.filter((p) => p.userId).length ?? '—'), icono: 'Usuario' },
   ]
   return (
-    <div className="flex flex-col gap-5">
+    <div className={cn('flex flex-col', celular ? 'gap-4' : 'gap-5')}>
       {/* El plan, como una tarjeta: qué tenés y desde cuándo. */}
-      <section aria-label="Tu plan" className="relative flex flex-wrap items-end justify-between gap-6 overflow-hidden rounded-[24px] bg-principal p-8 text-principal-texto">
-        <Logo soloIsotipo tono="hueso" alto={220} className="pointer-events-none absolute -top-6 -right-8 opacity-[0.12]" />
+      <section aria-label="Tu plan" className={cn('relative flex flex-wrap items-end justify-between overflow-hidden bg-principal text-principal-texto', celular ? 'gap-4 rounded-[20px] p-5' : 'gap-6 rounded-[24px] p-8')}>
+        <Logo soloIsotipo tono="hueso" alto={celular ? 150 : 220} className="pointer-events-none absolute -top-6 -right-8 opacity-[0.12]" />
         <div className="relative">
           {baja.data ? (
             <span className="inline-flex items-center gap-2 rounded-full bg-superficie px-3 py-1 text-[13.5px] font-bold text-estado-problema-texto">
@@ -340,12 +293,12 @@ function Plan() {
               Activo
             </span>
           )}
-          <p className="mt-4 text-[15px] text-principal-texto/80">Tu plan</p>
-          <p className="t-pagina">Piloto, sin cargo</p>
-          {desde && <p className="mt-3 text-[15.5px] text-principal-texto/85">Usás Troppero desde el {fecha(desde)}.</p>}
+          <p className={cn('text-principal-texto/80', celular ? 'mt-3 text-[13.5px]' : 'mt-4 text-[15px]')}>Tu plan</p>
+          <p className={celular ? 't-seccion' : 't-pagina'}>Piloto, sin cargo</p>
+          {desde && <p className={cn('text-principal-texto/85', celular ? 'mt-1.5 text-[13.5px]' : 'mt-3 text-[15.5px]')}>Usás Troppero desde el {fecha(desde)}.</p>}
         </div>
         {whatsapp && (
-          <a href={whatsapp} target="_blank" rel="noreferrer" className="relative inline-flex h-12 items-center gap-2 rounded-full bg-acento px-5 text-[15.5px] font-bold text-acento-texto hover:bg-trigo-300">
+          <a href={whatsapp} target="_blank" rel="noreferrer" className={cn('relative inline-flex items-center gap-2 rounded-full bg-acento font-bold text-acento-texto hover:bg-trigo-300', celular ? 'h-10 px-4 text-[14px]' : 'h-12 px-5 text-[15.5px]')}>
             <Icono nombre="Celular" tamano={16} />
             Hablar con nosotros
           </a>
@@ -353,7 +306,21 @@ function Plan() {
       </section>
 
       <section aria-label="Lo que usás">
-        <h2 className="mb-3 t-tarjeta text-texto">Lo que usás</h2>
+        <h2 className={cn('t-tarjeta text-texto', celular ? 'mb-2 px-1 !text-[16px]' : 'mb-3')}>Lo que usás</h2>
+        {/* En el celular, los tres números en una sola fila. */}
+        {celular ? (
+          <dl className="grid grid-cols-3 divide-x divide-borde rounded-[20px] bg-superficie py-3.5 shadow-[inset_0_0_0_1px_var(--borde)]">
+            {uso.map((u) => (
+              <div key={u.titulo} className="flex flex-col items-center gap-1 px-2">
+                <dt className="flex items-center gap-1.5 text-[12.5px] font-semibold text-texto-suave">
+                  <Icono nombre={u.icono} tamano={16} />
+                  {u.titulo}
+                </dt>
+                <dd className="t-seccion text-texto tabular-nums">{u.valor}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
         <dl className="grid gap-3 sm:grid-cols-3">
           {uso.map((u) => (
             <div key={u.titulo} className="flex items-center gap-4 rounded-[20px] border border-borde bg-superficie px-5 py-4">
@@ -367,14 +334,15 @@ function Plan() {
             </div>
           ))}
         </dl>
+        )}
       </section>
 
-      <section aria-label="Qué incluye" className="rounded-[24px] border border-borde bg-superficie p-6">
-        <h2 className="t-tarjeta text-texto">Qué incluye</h2>
-        <p className="mt-1 text-[15px] text-texto-suave">En el piloto usás Troppero entero.</p>
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+      <section aria-label="Qué incluye" className={cn('border border-borde bg-superficie', celular ? 'rounded-[20px] p-4' : 'rounded-[24px] p-6')}>
+        <h2 className={cn('t-tarjeta text-texto', celular && '!text-[16px]')}>Qué incluye</h2>
+        <p className={cn('mt-1 text-texto-suave', celular ? 'text-[13.5px]' : 'text-[15px]')}>En el piloto usás Troppero entero.</p>
+        <ul className={cn('grid sm:grid-cols-2', celular ? 'mt-3 gap-1.5' : 'mt-4 gap-2')}>
           {[...SECCIONES.map((s) => `${s.texto}: ${s.queVe.toLowerCase()}`), 'El asistente de Troppero, para tus dudas'].map((t) => (
-            <li key={t} className="flex items-center gap-2.5 text-[15px] text-texto">
+            <li key={t} className={cn('flex items-center gap-2.5 text-texto', celular ? 'text-[13.5px]' : 'text-[15px]')}>
               <span className="grid size-6 shrink-0 place-items-center rounded-full bg-estado-bien-suave text-estado-bien-texto">
                 <Icono nombre="Guardar" tamano={16} />
               </span>

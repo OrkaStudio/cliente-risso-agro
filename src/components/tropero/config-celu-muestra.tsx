@@ -27,7 +27,7 @@ export function Encabezado({ onConfig }: { onConfig?: () => void }) {
         aria-label="Configuración"
         className="grid size-11 place-items-center rounded-full bg-superficie text-terracota-900/80 shadow-[inset_0_0_0_1px_var(--borde)]"
       >
-        <Icono nombre="Usuario" />
+        <Icono nombre="Configuración" />
       </motion.button>
     </header>
   )

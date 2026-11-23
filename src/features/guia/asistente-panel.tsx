@@ -2,8 +2,11 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion, useMotionValue, useReducedMotion, useSpring, useVelocity } from 'framer-motion'
+import { AudioWhatsapp } from '@/components/tropero/audio-whatsapp'
+import { Logo } from '@/components/tropero/logo'
 import { Icono } from '@/components/tropero/icono'
 import { useAuth } from '@/features/auth/auth-context'
+import grano from '@/assets/tropero/grano.png'
 import { Mascota, type Animo } from '@/features/campos/tropero/mascota'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { avisoPermitido, avisosDe, progresoDe, type Aviso } from '@/features/guia/avisos'
@@ -35,6 +38,10 @@ import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 
 /** El orbe dentro de la barra; al volar se agranda un poco. */
 const TAM = 40
+/** En la barra del celular el orbe va más grande (Lau, 19/11: el cuerpo es la mitad de `tam`). Al volar
+ *  sale de su lugar con el mismo tamaño y se achica un poco al llegar al botón. */
+const TAM_BARRA_CELU = 86
+const TAM_VUELO_CELU = 64
 /** El viaje: el mismo resorte que en el mapa. */
 const VUELO = { stiffness: 34, damping: 12.5, mass: 1.15, restDelta: 0.2 }
 /** Cuánto muestra el botón antes de tocarlo, y cuánto se queda después. */
@@ -71,6 +78,8 @@ function guardar(clave: string, valor: string) {
 /** `barra`: en el celular, el lugar de la barra de abajo donde vive el orbe (Lau, 18/11). Sin él, flota. */
 export function AsistentePanel({ celular = false, barra = null }: { celular?: boolean; barra?: HTMLElement | null }) {
   const quieto = !!useReducedMotion()
+  // El tamaño con el que vuela: en la barra del celular, más grande (ver TAM_BARRA_CELU).
+  const tamV = celular && barra ? TAM_VUELO_CELU : TAM
   const abierto = usePanelAbierto()
   const hayAyudaLocal = useHayAyudaLocal()
   const navigate = useNavigate()
@@ -141,6 +150,7 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
       setPensando(false)
     }, quieto ? 0 : 700)
   }
+  const whatsappSoporte = linkWhatsapp({ nombre, empresa: empresa.data?.empresa?.nombre ?? null, seccion: seccion ? NOMBRE_SECCION[seccion] : null })
   const whatsappConsulta = linkWhatsapp({ nombre, empresa: empresa.data?.empresa?.nombre ?? null, seccion: seccion ? NOMBRE_SECCION[seccion] : null, consulta: ultimaPregunta })
 
   React.useEffect(() => {
@@ -174,8 +184,8 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
   const destino = marca
     ? {
         // Al lado del botón, del lado que tenga lugar.
-        x: marca.left - TAM - 10 > 8 ? marca.left - TAM - 10 : Math.min(marca.left + marca.width + 10, window.innerWidth - TAM - 8),
-        y: Math.max(8, Math.min(marca.top + marca.height / 2 - TAM / 2, window.innerHeight - TAM - 8)),
+        x: marca.left - tamV - 10 > 8 ? marca.left - tamV - 10 : Math.min(marca.left + marca.width + 10, window.innerWidth - tamV - 8),
+        y: Math.max(8, Math.min(marca.top + marca.height / 2 - tamV / 2, window.innerHeight - tamV - 8)),
       }
     : casa
   const metaX = useMotionValue(destino.x)
@@ -291,7 +301,7 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
       window.removeEventListener('keydown', activo)
     }
   }, [])
-  const centro = { x: destino.x + TAM / 2, y: destino.y + TAM / 2 }
+  const centro = { x: destino.x + tamV / 2, y: destino.y + tamV / 2 }
   const mira = marca
     ? { x: (marca.left + marca.width / 2 - centro.x) / 120, y: (marca.top + marca.height / 2 - centro.y) / 120 }
     : abierto
@@ -424,7 +434,12 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
             >
               {/* Cabecera: quién es y para qué sirve. */}
               <header className={cn('flex items-center gap-3 border-b border-borde/70', celular ? 'px-4 py-3' : 'px-5 py-4')}>
-                <Mascota tam={celular ? 32 : 40} parpadea={parpadea} />
+                {/* Más grande (Lau, 19/11: se veía muy chico): el cuerpo es la mitad de `tam`. */}
+                <span className="relative size-12 shrink-0">
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <Mascota tam={celular ? 84 : 88} parpadea={parpadea} />
+                  </span>
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[15.5px] leading-tight font-bold">Asistente de Troppero</p>
                   <p className="mt-0.5 text-[13px] leading-snug text-texto-suave">{celular ? 'Preguntame lo que quieras' : `Te respondo sobre ${quien.enLosCampos} y cómo usar la app`}</p>
@@ -440,17 +455,12 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
                 {/* En el celular no hay recorrida (Lau, 17/11): lo que se ve en el campo se cuenta en un audio. */}
                 {/* El audio a WhatsApp vive acá, no en la barra: una sola puerta abajo a la derecha (Lau, 18/11). */}
                 {celular && (mandaCampos || mandaPlata) && (
-                  <section className="flex items-center gap-3 rounded-[18px] border border-borde bg-fondo/60 p-3.5">
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] leading-snug font-bold">{mandaCampos ? 'Contame cómo está tu campo' : 'Contame un gasto o un cobro'}</span>
-                      <span className="block text-[13px] leading-snug text-texto-suave">
-                        {mandaCampos ? 'El agua, el pasto, los animales: un audio y lo anoto en cada potrero.' : 'Un audio con qué fue y cuánto, y lo anoto en la plata.'}
-                      </span>
-                    </span>
-                    <a href={`https://wa.me/${WHATSAPP_TROPERO}`} target="_blank" rel="noopener noreferrer" className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#25d366] px-3.5 text-[14px] font-bold text-white">
-                      Audio
-                    </a>
-                  </section>
+                  <AudioWhatsapp
+                    href={`https://wa.me/${WHATSAPP_TROPERO}`}
+                    antes={mandaCampos ? 'Contame cómo está' : 'Contame un gasto'}
+                    marcado={mandaCampos ? 'tu campo' : 'o un cobro'}
+                    bajada={mandaCampos ? 'Un audio por WhatsApp y lo anoto en cada potrero' : 'Un audio con qué fue y cuánto, y lo anoto'}
+                  />
                 )}
 
                 {/* Lo que la app detectó en sus datos, cada cosa con el botón que la resuelve (en la compu). */}
@@ -506,6 +516,26 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
                       ))}
                     </ul>
                   </section>
+                )}
+
+                {/* Soporte siempre a mano (Lau, 19/11: no estaba en ningún lado): una persona del equipo, por WhatsApp. */}
+                {mensajes.length === 0 && whatsappSoporte && (
+                  <a
+                    href={whatsappSoporte}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => registrar('soporte_whatsapp', { seccion, desde: 'asistente' })}
+                    // Distinto del audio (tarjeta blanca y verde): una pastilla terracota con la T del
+                    // equipo, que se lee como «gente de Troppero», no como otro WhatsApp (Lau, 19/11).
+                    className="flex items-center gap-2.5 self-start rounded-full bg-principal-suave/70 py-1.5 pr-4 pl-1.5 text-texto transition-colors hover:bg-principal-suave"
+                  >
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-principal">
+                      <Logo soloIsotipo tono="hueso" alto={14} />
+                    </span>
+                    <span className="text-[13.5px] leading-snug">
+                      ¿Preferís una persona? <b className="font-bold text-acento-texto underline decoration-principal/40 underline-offset-2">Escribile al equipo</b>
+                    </span>
+                  </a>
                 )}
 
                 {mensajes.map((m) =>
@@ -591,13 +621,22 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
           }}
           aria-label={etiqueta}
           aria-expanded={abierto}
-          className="flex h-[62px] flex-1 flex-col items-center justify-center gap-1 text-[12px] font-semibold text-texto"
+          className="relative grid size-[58px] place-items-center rounded-full"
         >
-          <span className="grid size-11 place-items-center rounded-full bg-terracota-900 shadow-[0_4px_12px_rgba(58,26,13,0.35)] ring-1 ring-white/10">
-            <span ref={hueco} aria-hidden className="relative size-10 shrink-0">
+          {/* Sin fondo: sólo el orbe, con un aura de trigo y terracota que se deshace en el
+              granulado de la web (Lau, 18/11). Quieta: nada titila. */}
+          <span aria-hidden className="absolute -inset-1 rounded-full" style={{ background: 'radial-gradient(circle, rgb(236 196 106 / .45) 0%, rgb(201 126 91 / .32) 42%, rgb(184 92 46 / 0) 70%)' }} />
+          <span
+            aria-hidden
+            className="absolute -inset-1 rounded-full opacity-70 mix-blend-multiply [background-size:60px_60px]"
+            style={{ backgroundImage: `url(${grano})`, maskImage: 'radial-gradient(circle, black 30%, transparent 68%)', WebkitMaskImage: 'radial-gradient(circle, black 30%, transparent 68%)' }}
+          />
+          <span className="relative grid place-items-center">
+            <span ref={hueco} aria-hidden className="relative shrink-0" style={{ width: TAM_VUELO_CELU, height: TAM_VUELO_CELU }}>
               {!vuela && (
-                <motion.span className="absolute inset-0 grid place-items-center" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
-                  <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+                // Centrado a mano: más grande que su hueco, un grid lo corría abajo a la derecha.
+                <motion.span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" animate={{ scale: abierto ? 0.92 : 1 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
+                  <Mascota tam={TAM_BARRA_CELU} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
                 </motion.span>
               )}
               {/* Tiene algo para contarte: un puntito en el orbe (antes un «1» que no se entendía). */}
@@ -614,7 +653,6 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
               </AnimatePresence>
             </span>
           </span>
-          Asistente
         </button>,
         barra,
       ) : (
@@ -669,11 +707,12 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
       {vuela && <motion.div
         aria-hidden
         className={cn('pointer-events-none fixed top-0 left-0', arriba ? 'z-[77]' : 'z-[46]')}
-        style={{ width: TAM, height: TAM, x: posX, y: posY }}
-        animate={{ scale: marca ? 1.35 : 1 }}
+        style={{ width: tamV, height: tamV, x: posX, y: posY }}
+        // En la barra del celular descansa a 86: sale con ese tamaño y llega al botón a 64.
+        animate={{ scale: celular && barra ? (marca ? 1 : TAM_BARRA_CELU / TAM_VUELO_CELU) : marca ? 1.35 : 1 }}
         transition={{ type: 'spring', stiffness: 120, damping: 16 }}
       >
-        <Mascota tam={TAM} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
+        <Mascota tam={tamV} mira={mira} parpadea={parpadea} animo={animo} habla={!!globo} viaje={{ vx: velX, vy: velY }} />
       </motion.div>}
     </MotionConfig>,
     document.body,

@@ -23,7 +23,7 @@ const TABS: { label: string; icono: NombreIcono }[] = [
 const TINTA = "#33261a"
 const GRIS = "#5c4e40"
 const VIDRIO =
-  "bg-[rgb(255_253_249/.74)] backdrop-blur-[18px] backdrop-saturate-150 shadow-[inset_0_0_0_1.5px_rgb(255_255_255/.9),0_14px_34px_-18px_rgb(168_80_16/.55)]"
+  "bg-[rgb(255_253_249/.8)] backdrop-blur-[18px] backdrop-saturate-150 shadow-[inset_0_0_0_1.5px_rgb(255_255_255/.9),0_0_0_1px_rgb(58_26_13/.09),0_14px_34px_-16px_rgb(168_80_16/.55)]"
 const RESORTE = { type: "spring", stiffness: 420, damping: 34, mass: 0.8 } as const
 
 function LogoWhatsapp({ className }: { className?: string }) {
@@ -98,14 +98,14 @@ function Barra({ activa, setActiva }: { activa: number; setActiva: (i: number) =
               <motion.span
                 layoutId="pastilla"
                 transition={RESORTE}
-                className="absolute inset-0 rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/.22),inset_0_-1px_0_rgb(58_26_13/.18),0_8px_18px_-8px_rgb(152_75_37/.75)]"
+                className="absolute inset-x-[2px] inset-y-[3px] rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/.22),inset_0_-1px_0_rgb(58_26_13/.18),0_4px_10px_-6px_rgb(152_75_37/.7)]"
                 style={{ background: "linear-gradient(180deg, #c46a3a 0%, #b85c2e 55%, #a9532a 100%)" }}
               />
             )}
-            <span className={cn("relative transition-colors duration-200", esta ? "text-trigo-300" : "text-terracota-900/60")}>
+            <span className={cn("relative transition-colors duration-200", esta ? "text-trigo-300" : "text-[#5c4e40]")}>
               <Icono nombre={t.icono} />
             </span>
-            <span className={cn("relative text-[11.5px] leading-none tracking-[-0.01em] transition-colors duration-200", esta ? "font-bold text-white" : "font-semibold text-terracota-900/60")}>
+            <span className={cn("relative text-[11.5px] leading-none tracking-[-0.01em] transition-colors duration-200", esta ? "font-bold text-white" : "font-semibold text-[#5c4e40]")}>
               {t.label}
             </span>
           </motion.button>
@@ -122,8 +122,8 @@ function Barra({ activa, setActiva }: { activa: number; setActiva: (i: number) =
             granulado de la web (Lau, 18/11). Quieta: nada titila. */}
         <span
           aria-hidden
-          className="absolute -inset-1.5 rounded-full"
-          style={{ background: "radial-gradient(circle, rgb(236 196 106 / .55) 0%, rgb(201 126 91 / .32) 42%, rgb(184 92 46 / 0) 70%)" }}
+          className="absolute -inset-1 rounded-full"
+          style={{ background: "radial-gradient(circle, rgb(236 196 106 / .45) 0%, rgb(201 126 91 / .32) 42%, rgb(184 92 46 / 0) 70%)" }}
         />
         <span
           aria-hidden
@@ -134,8 +134,9 @@ function Barra({ activa, setActiva }: { activa: number; setActiva: (i: number) =
             WebkitMaskImage: "radial-gradient(circle, black 30%, transparent 68%)",
           }}
         />
-        <span className="relative">
-          <Mascota tam={58} />
+        {/* El cuerpo del orbe es la mitad de su `tam`: con 86 queda un poco más chico que el botón (Lau, 19/11). */}
+        <span className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <Mascota tam={86} />
         </span>
       </motion.button>
     </nav>

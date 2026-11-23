@@ -77,9 +77,10 @@ test('el dueño invita eligiendo el nivel de cada sección, el invitado ve sólo
   // El dueño lo ve adentro y le saca el acceso.
   await page.reload()
   const fila = page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })
-  await expect(fila.getByLabel('Hacienda: Ve y carga')).toBeVisible()
+  await expect(fila.getByLabel('Hacienda: Anota')).toBeVisible()
   await expect(fila.getByLabel('Plata y Agenda: No ve')).toBeVisible()
-  await fila.getByRole('button', { name: 'Cambiar' }).click()
+  // Tocar a la persona abre su ficha (19/11): ahí se cambia y se le saca el acceso.
+  await fila.getByRole('button').click()
   await page.getByRole('button', { name: 'Sacarle el acceso' }).click()
   await page.getByRole('button', { name: 'Sí, sacarle el acceso' }).click()
   await expect(page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })).toHaveCount(0)

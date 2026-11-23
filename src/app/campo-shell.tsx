@@ -1,13 +1,13 @@
-import { Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Suspense, useEffect, useLayoutEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { useMapaPendiente } from '@/features/mapa/bloqueo'
-import { Leaf, LogOut } from 'lucide-react'
-import { useAuth } from '@/features/auth/auth-context'
-import { AvisoEstadoCampo, ChipEstadoCampo } from '@/features/campo/estado-campo'
+import { Logo } from '@/components/tropero/logo'
+import { AvisoEstadoCampo } from '@/features/campo/estado-campo'
+import { VIDRIO } from '@/features/campo/configuracion-celu'
 import { useSeedOffline } from '@/features/campo/use-seed-offline'
 import { prefetch, prefetchEnReposo, CHUNKS_CAMPO } from '@/lib/prefetch'
-import { MARCA } from '@/lib/marca'
 import { AsistentePanel } from '@/features/guia/asistente-panel'
 import { cn } from '@/lib/utils'
 import '@/features/campo/campo.css'
@@ -33,42 +33,51 @@ const NAV: { to: string; label: string; icono: NombreIcono; end: boolean }[] = [
   { to: '/campo/plata', label: 'Plata', icono: 'Plata', end: false },
 ]
 
-/**
- * Cerrar sesión con confirmación de dos toques — el mismo patrón que ya usa
- * "salir" de la recorrida. Antes era un botón de 32px, sin confirmación,
- * pegado al del croquis en la esquina superior derecha: el productor iba a
- * buscar el croquis para ubicarse y se deslogueaba. Prod juntó 9 recorridas
- * con cero observaciones con esa firma exacta. Target a 44px y armado.
- */
-function SalirDeLaCuenta() {
-  const { signOut } = useAuth()
-  const [armado, setArmado] = useState(false)
-
+/** Arriba, fijo en todo el celular (Lau, 19/11): el logo y el engranaje de Configuración.
+ *  Flota sobre lo que scrollea, como la barra de troppero.com. */
+function Encabezado() {
+  const navigate = useNavigate()
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (!armado) {
-          setArmado(true)
-          setTimeout(() => setArmado(false), 3500)
-          return
-        }
-        void signOut()
-      }}
-      title="Cerrar sesión"
-      aria-label="Cerrar sesión"
-      className={cn(
-        'flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-semibold transition-colors',
-        armado
-          ? 'bg-[var(--c-warn)] text-[#1c1400]'
-          : 'min-w-11 text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-      )}
-    >
-      <LogOut className="size-[17px]" />
-      {armado && '¿Cerrar sesión?'}
-    </button>
+    <div className="flex h-[58px] items-center justify-between rounded-full pr-[7px] pl-5">
+      <Logo alto={22} />
+      {/* Un botón (no un link): se hunde al tocarlo como todos (instalarHundir). */}
+      <button
+        type="button"
+        onClick={() => navigate('/campo/configuracion')}
+        aria-label="Configuración"
+        className="grid size-11 place-items-center rounded-full bg-superficie text-terracota-900/80 shadow-[inset_0_0_0_1px_var(--borde)]"
+      >
+        <Icono nombre="Configuración" />
+      </button>
+    </div>
   )
 }
+
+/** Mide un elemento y deja su alto en una variable CSS del marco: las pantallas la usan
+ *  para arrancar debajo del encabezado y terminar arriba de la barra. */
+function useAlto(nombre: string) {
+  const [el, setEl] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    const raiz = document.querySelector<HTMLElement>('.campo')
+    if (!raiz) return
+    if (!el) {
+      raiz.style.setProperty(nombre, '0px')
+      return
+    }
+    const medir = () => raiz.style.setProperty(nombre, `${el.offsetHeight}px`)
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      raiz.style.setProperty(nombre, '0px')
+    }
+  }, [el, nombre])
+  return setEl
+}
+
+/** La pastilla terracota de la sección elegida: viaja de una a otra. */
+const RESORTE = { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } as const
 
 export function CampoShell() {
   const { data: membresia } = useEmpresa()
@@ -80,12 +89,13 @@ export function CampoShell() {
   // chip del header y el cajón de detalle son dos vistas del mismo estado, así
   // que vive acá y no adentro de ninguno de los dos.
   const seed = useSeedOffline()
-  const [detalleAbierto, setDetalleAbierto] = useState(false)
   // El lugar del asistente en la barra de abajo (Lau, 18/11): el orbe se monta ahí.
   const [lugarAsistente, setLugarAsistente] = useState<HTMLDivElement | null>(null)
-  // Hoy y Plata traen su propia cabecera (la marca, el campo y la cuenta).
-  const ruta = useLocation().pathname
-  const enHoy = ruta === '/campo' || ['/campo/plata', '/campo/campos', '/campo/hacienda'].some((r) => ruta.startsWith(r))
+  // Lo que flota arriba y abajo deja su alto en --enc y --barra (ver useAlto).
+  const medirArriba = useAlto('--enc')
+  const medirAbajo = useAlto('--barra')
+  // Configuración tiene su propio «Volver»: ahí no va el encabezado.
+  const enConfig = useLocation().pathname.startsWith('/campo/configuracion')
   const mapaPendiente = useMapaPendiente()
   // Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos.
   // Mandar un audio: quien carga algo de los campos o la plata (lo demás no se carga por WhatsApp).
@@ -98,46 +108,32 @@ export function CampoShell() {
       {/* El granulado de troppero.com sobre su crema (#fff8ec), sin la aurora (Lau, 17/11): fijo, no se mueve con lo que scrollea.
           En pantallas de 3x, 120px deja el grano igual de fino que en la landing. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 opacity-90 [background-size:120px_120px]" style={{ backgroundImage: `url(${grano})` }} />
-      {/* Header — placa de máquina */}
-      {!enHoy && (
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--c-line)] bg-sidebar px-3 py-2.5 text-sidebar-foreground">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-primary">
-          <Leaf className="size-[18px] text-[var(--principal-texto)]" strokeWidth={2} />
+      {/* Arriba, flotando sobre lo que scrollea (como troppero.com): el encabezado y, si
+          algo pide atención, su franja. Detrás, un difuminado de la crema para que lo que
+          sube no se corte de golpe contra el vidrio (la «tapa» de la landing, Lau 19/11). */}
+      <div ref={medirArriba} className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col gap-2 px-4 pt-[max(10px,env(safe-area-inset-top))] pb-2">
+        {/* En Configuración no hay encabezado: sin difuminado, que tapaba el título. */}
+        {!enConfig && <div aria-hidden className="absolute inset-x-0 top-0 -z-10 h-[calc(100%+28px)] bg-[linear-gradient(to_bottom,#fff8ec_0,rgb(255_248_236/.92)_55%,rgb(255_248_236/0))]" />}
+        {!enConfig && <div className={cn('pointer-events-auto rounded-full', VIDRIO)}><Encabezado /></div>}
+        {/* Sólo lo que pide atención se lleva una franja; acá baja además su detalle. */}
+        <div className="pointer-events-auto">
+          <AvisoEstadoCampo
+            estado={seed.estado}
+            lastOk={seed.lastOk}
+            detalle={seed.detalle}
+            online={seed.online}
+            sembrar={() => void seed.sembrar()}
+            abierto={false}
+          />
         </div>
-        {/* Sólo el nombre. "Modo Campo" lo dice la nav de abajo con más fuerza
-            que un subtítulo, y a 390px —con el zoom 1.06 encima— esa segunda
-            línea le comía el ancho al nombre hasta dejarlo en "Riss…". */}
-        <div className="min-w-0 flex-1">
-          <span className="c-display block truncate text-[16px] leading-none text-sidebar-foreground">
-            {MARCA}
-          </span>
-        </div>
-        <ChipEstadoCampo
-          estado={seed.estado}
-          lastOk={seed.lastOk}
-          online={seed.online}
-          abierto={detalleAbierto}
-          onToggle={() => setDetalleAbierto((v) => !v)}
-        />
-        <SalirDeLaCuenta />
-      </header>
-      )}
-
-      {/* Sólo lo que pide atención se lleva una franja del alto; el estado
-          "listo" vive como punto en el header. Acá baja además su detalle. */}
-      <AvisoEstadoCampo
-        estado={seed.estado}
-        lastOk={seed.lastOk}
-        detalle={seed.detalle}
-        online={seed.online}
-        sembrar={() => void seed.sembrar()}
-        abierto={detalleAbierto}
-      />
+      </div>
 
       {/* Contenido — caja acotada (min-h-0 para que el flex hijo pueda encoger).
           Cada página se estructura como app: header fijo + región scrolleable
           interna + footer fijo. main NO scrollea; scrollea la región interna.
           `relative`: las hojas (CSheet) se posicionan contra esta caja. */}
+      {/* Ocupa todo el alto: el encabezado y la barra flotan encima, y cada pantalla deja
+          su lugar con --enc y --barra. */}
       <main className="relative min-h-0 flex-1 overflow-hidden">
         <Suspense
           fallback={
@@ -155,13 +151,14 @@ export function CampoShell() {
       {/* El asistente acompaña todo el celular (Lau, 16/11). */}
       <AsistentePanel celular barra={lugarAsistente} />
       {(navegables.length > 1 || puedeMandar) && (
-      <nav aria-label="Modo Campo" className="shrink-0 px-[18px] pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
-        <div className="flex items-center justify-between rounded-full bg-superficie p-1.5 shadow-[0_8px_28px_rgba(19,27,22,0.18)]">
-          {/* Sólo lo que puede cargar (permisos, 13/11): Hoy lo tienen todos. */}
-          {(() => {
-            const links = navegables.map(({ to, label, icono, end }) => {
-              const cerrada = mapaPendiente && to !== '/campo'
-              return (
+      <nav ref={medirAbajo} aria-label="Modo Campo" className="absolute inset-x-0 bottom-0 z-30 px-4 pt-2 pb-[max(14px,env(safe-area-inset-bottom))]">
+        {/* El mismo difuminado que arriba, de abajo para arriba. */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[calc(100%+28px)] bg-[linear-gradient(to_top,#fff8ec_0,rgb(255_248_236/.92)_55%,rgb(255_248_236/0))]" />
+        {/* Vidrio como la barra de troppero.com; lo elegido, una pastilla terracota que viaja (Lau, 19/11). */}
+        <div className={cn('flex items-center gap-0.5 rounded-full p-[5px]', VIDRIO)}>
+          {navegables.map(({ to, label, icono, end }) => {
+            const cerrada = mapaPendiente && to !== '/campo'
+            return (
               <NavLink
                 key={to}
                 to={cerrada ? '/campo' : to}
@@ -171,22 +168,35 @@ export function CampoShell() {
                   const t = CHUNKS_CAMPO[to]
                   if (t) prefetch(t)
                 }}
-                className={({ isActive }) =>
-                  cn(
-                    'flex h-[62px] flex-1 flex-col items-center justify-center gap-1 rounded-full text-[12px] font-semibold transition-colors',
-                    isActive && !cerrada ? 'bg-principal text-principal-texto' : cerrada ? 'text-texto-suave/40' : 'text-texto-suave',
-                  )
-                }
+                className="relative flex h-[58px] min-w-0 flex-1 flex-col items-center justify-center gap-[5px] rounded-full"
               >
-                <Icono nombre={icono} />
-                {label}
+                {({ isActive }) => {
+                  const esta = isActive && !cerrada
+                  return (
+                    <>
+                      {esta && (
+                        <motion.span
+                          layoutId="pastilla-celu"
+                          transition={RESORTE}
+                          className="absolute inset-x-0 inset-y-[3px] rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/.22),inset_0_-1px_0_rgb(58_26_13/.18),0_4px_10px_-6px_rgb(152_75_37/.7)]"
+                          style={{ background: 'linear-gradient(180deg, #c46a3a 0%, #b85c2e 55%, #a9532a 100%)' }}
+                        />
+                      )}
+                      <span className={cn('relative transition-colors duration-200', esta ? 'text-trigo-300' : cerrada ? 'text-[#5c4e40]/35' : 'text-[#5c4e40]')}>
+                        <Icono nombre={icono} />
+                      </span>
+                      <span className={cn('relative text-[11.5px] leading-none tracking-[-0.01em] transition-colors duration-200', esta ? 'font-bold text-white' : cerrada ? 'font-semibold text-[#5c4e40]/35' : 'font-semibold text-[#5c4e40]')}>
+                        {label}
+                      </span>
+                    </>
+                  )
+                }}
               </NavLink>
-              )
-            })
-            // A la derecha del todo, el asistente (antes el audio, que ahora se manda desde adentro del asistente: Lau, 18/11).
-            links.push(<div key="asistente" ref={setLugarAsistente} className="flex flex-1" />)
-            return links
-          })()}
+            )
+          })}
+          {/* A la derecha del todo, el asistente (antes el audio, que ahora se manda desde adentro del asistente: Lau, 18/11). */}
+          <span aria-hidden className="mx-0.5 h-8 w-px shrink-0 bg-terracota-900/10" />
+          <div ref={setLugarAsistente} className="flex size-[58px] shrink-0" />
         </div>
       </nav>
       )}

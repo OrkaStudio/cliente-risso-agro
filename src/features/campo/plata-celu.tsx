@@ -15,7 +15,7 @@ import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { PlataPage } from './plata-page'
 import { BAJADA, MONTO, TARJETA } from './sistema'
-import { Barra, Encabezado, Portada } from './sistema-ui'
+import { Encabezado, Portada } from './sistema-ui'
 
 /**
  * Plata en el celular (Lau, 17/11; maqueta elegida). Lo mismo que la Plata de
@@ -114,8 +114,7 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const verbo = periodo.enCurso ? (ganando ? 'Van ganando' : 'Van perdiendo') : ganando ? 'Ganaron' : 'Perdieron'
 
   return (
-    <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-      <Barra />
+    <div className="flex flex-col gap-8 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
 
       {/* 1. ¿Cómo vengo? */}
       <motion.section {...entra(0)} aria-labelledby="plata-titulo" className="flex flex-col gap-3">
