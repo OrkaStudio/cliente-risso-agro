@@ -228,96 +228,121 @@ function DelCampo({ campo, campoMapa, marca: m, veHacienda, elegido, elegir, det
     .filter((x) => x.n > 0)
   const potreros = [...campo.potreros].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
   const potrero = campo.potreros.find((p) => p.id === elegido) ?? null
-  return (
-    <>
-      {/* El potrero tocado, pegado al mapa. */}
-      <div ref={detalle} className="scroll-mt-4 empty:hidden">
-        {potrero && (
-          <DetallePotrero
-            key={potrero.id}
-            p={potrero}
-            dias={dias.get(potrero.id) ?? null}
-            obs={ultima.get(potrero.id) ?? null}
-            lluvias={datos.data?.lluvias ?? []}
-            movimientos={datos.data?.movimientos ?? []}
-            historia={historiaDelPotrero(potrero.id, datos.data?.observaciones ?? [], datos.data?.movimientos ?? [], datos.data?.labores ?? [])}
-            labores={(datos.data?.labores ?? []).filter((l) => l.potreroId === potrero.id)}
-            veHacienda={veHacienda}
-            onCerrar={() => elegir(null)}
-          />
+  // Una sola tarjeta debajo del mapa (Lau, 23/11: «¿por qué hay 3 cards?»): con un potrero
+  // tocado, sólo ese potrero (y los otros a un toque para saltar); si no, el campo con sus
+  // potreros adentro.
+  if (potrero)
+    return (
+      <div ref={detalle} className="flex scroll-mt-4 flex-col gap-3">
+        <DetallePotrero
+          key={potrero.id}
+          p={potrero}
+          dias={dias.get(potrero.id) ?? null}
+          obs={ultima.get(potrero.id) ?? null}
+          lluvias={datos.data?.lluvias ?? []}
+          movimientos={datos.data?.movimientos ?? []}
+          historia={historiaDelPotrero(potrero.id, datos.data?.observaciones ?? [], datos.data?.movimientos ?? [], datos.data?.labores ?? [])}
+          labores={(datos.data?.labores ?? []).filter((l) => l.potreroId === potrero.id)}
+          veHacienda={veHacienda}
+          onCerrar={() => elegir(null)}
+        />
+        {potreros.length > 1 && (
+          <nav aria-label="Otros potreros" className="flex flex-col gap-2">
+            <p className="px-1 text-[12px] font-bold tracking-[0.05em] text-texto-suave uppercase">Otros potreros de {campo.nombre}</p>
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+              {potreros
+                .filter((x) => x.id !== potrero.id)
+                .map((x) => (
+                  <button
+                    key={x.id}
+                    type="button"
+                    onClick={() => elegir(x.id)}
+                    className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-superficie py-1 pr-3.5 pl-1 text-[14px] font-semibold text-texto shadow-[inset_0_0_0_1px_var(--borde)]"
+                  >
+                    <span className="grid h-8 min-w-8 place-items-center rounded-full px-1.5 text-[12px] font-extrabold text-white" style={{ background: COLOR_USO[usoDeEstado(x.estadoCiclo)] }}>
+                      {x.nombre}
+                    </span>
+                    {usoDeEstado(x.estadoCiclo) === 'ganadero' ? (veHacienda && x.cabezas ? `${x.cabezas} cab` : 'Hacienda') : usoDeEstado(x.estadoCiclo) === 'agricola' ? (x.cultivo ?? 'Sembrado') : 'Descansa'}
+                  </button>
+                ))}
+            </div>
+          </nav>
         )}
       </div>
+    )
 
+  return (
+    <section aria-labelledby="campo-titulo" className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
       {/* El campo: cuál es, sus números y en qué están sus hectáreas. */}
-      <section aria-labelledby="campo-titulo" className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full text-[15px] font-extrabold text-white" style={{ background: m?.color ?? '#a9552c' }}>
-            {m?.letra}
-          </span>
-          <div className="min-w-0">
-            <h2 id="campo-titulo" className="titulo-display truncate text-[26px] leading-tight text-texto">
-              {campo.nombre}
-            </h2>
-            {campo.ubicacion.localidad && <p className={BAJADA}>{campo.ubicacion.localidad}</p>}
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full text-[15px] font-extrabold text-white" style={{ background: m?.color ?? '#a9552c' }}>
+          {m?.letra}
+        </span>
+        <div className="min-w-0">
+          <h2 id="campo-titulo" className="titulo-display truncate text-[24px] leading-tight text-texto">
+            {campo.nombre}
+          </h2>
+          {campo.ubicacion.localidad && <p className={BAJADA}>{campo.ubicacion.localidad}</p>}
+        </div>
+      </div>
+      <dl className="grid grid-cols-3 gap-2 border-y border-borde py-3">
+        <Num n={ha(campo.totalHa)} t="hectáreas" />
+        {veHacienda ? <Num n={campo.totalCabezas.toLocaleString('es-AR')} t="cabezas" /> : <Num n={String(campo.potreros.length)} t="potreros" />}
+        {/* Es la lluvia anotada en el pluviómetro: sin anotaciones, «0 mm» diría que no llovió. */}
+        {(datos.data?.lluvias.length ?? 0) > 0 ? <Num n={`${Math.round(lluvia30)} mm`} t="lluvia anotada, 30 d" /> : <Num n="—" t="sin lluvia anotada" />}
+      </dl>
+      {/* En qué están: sólo si hay hectáreas cargadas (sin eso, «0 hectáreas» no dice nada). */}
+      {usos.length > 0 && campo.totalHa > 0 && (
+        <div>
+          <div className="flex h-2.5 gap-1 overflow-hidden rounded-full">
+            {usos.map((x) => (
+              <span key={x.u} className="h-full rounded-full" style={{ flexGrow: x.ha || x.n, background: COLOR_USO[x.u] }} />
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13.5px] text-texto-suave">
+            {usos.map((x) => (
+              <span key={x.u} className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: COLOR_USO[x.u] }} />
+                {USO_TEXTO[x.u]} {ha(x.ha)} ha
+              </span>
+            ))}
           </div>
         </div>
-        <dl className="grid grid-cols-3 gap-2 border-y border-borde py-3">
-          <Num n={ha(campo.totalHa)} t="hectáreas" />
-          {veHacienda ? <Num n={campo.totalCabezas.toLocaleString('es-AR')} t="cabezas" /> : <Num n={String(campo.potreros.length)} t="potreros" />}
-          {/* Es la lluvia anotada en el pluviómetro: sin anotaciones, «0 mm» diría que no llovió. */}
-          {(datos.data?.lluvias.length ?? 0) > 0 ? <Num n={`${Math.round(lluvia30)} mm`} t="lluvia anotada, 30 d" /> : <Num n="—" t="sin lluvia anotada" />}
-        </dl>
-        {usos.length > 0 && (
-          <div>
-            <p className="text-[14px] font-semibold text-texto">En qué están las {ha(campo.totalHa)} hectáreas</p>
-            <div className="mt-2 flex h-2.5 gap-1 overflow-hidden rounded-full">
-              {usos.map((x) => (
-                <span key={x.u} className="h-full rounded-full" style={{ flexGrow: x.ha || x.n, background: COLOR_USO[x.u] }} />
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13.5px] text-texto-suave">
-              {usos.map((x) => (
-                <span key={x.u} className="inline-flex items-center gap-1.5">
-                  <span className="size-2 rounded-full" style={{ background: COLOR_USO[x.u] }} />
-                  {USO_TEXTO[x.u]} {ha(x.ha)} ha
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        {avisos.length > 0 && (
-          <ul className="flex flex-col gap-1.5" aria-label="Lo que pide atención">
-            {avisos.map((a) => (
-              <li key={a.texto}>
-                <button type="button" onClick={() => a.potreroId && elegir(a.potreroId)} className={cn('flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-[14px] font-semibold', a.tono === 'problema' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
-                  <span className={cn('size-2 shrink-0 rounded-full', a.tono === 'problema' ? 'bg-estado-problema' : 'bg-estado-atencion')} />
-                  {a.texto}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {dibujados.size === 0 && <p className={BAJADA}>Este campo todavía no está dibujado. Se arma en la compu.</p>}
-      </section>
+      )}
+      {avisos.length > 0 && (
+        <ul className="flex flex-col gap-1.5" aria-label="Lo que pide atención">
+          {avisos.map((a) => (
+            <li key={a.texto}>
+              <button type="button" onClick={() => a.potreroId && elegir(a.potreroId)} className={cn('flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-[14px] font-semibold', a.tono === 'problema' ? 'bg-estado-problema-suave text-estado-problema-texto' : 'bg-estado-atencion-suave text-estado-atencion-texto')}>
+                <span className={cn('size-2 shrink-0 rounded-full', a.tono === 'problema' ? 'bg-estado-problema' : 'bg-estado-atencion')} />
+                {a.texto}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {dibujados.size === 0 && <p className={BAJADA}>Este campo todavía no está dibujado. Se arma en la compu.</p>}
 
-      <section aria-labelledby="campo-potreros" className={cn(TARJETA, 'p-4')}>
-        <Encabezado id="campo-potreros" titulo="Potreros" bajada="Qué hay en cada uno y desde cuándo. Tocalo para ver más." />
-        <ul className="mt-3 divide-y divide-borde">
+      {/* Sus potreros, en la misma tarjeta. */}
+      <div aria-labelledby="campo-potreros">
+        <p id="campo-potreros" className="text-[14.5px] font-bold text-texto">
+          {potreros.length === 1 ? '1 potrero' : `${potreros.length} potreros`} <span className="font-normal text-texto-suave">· tocá uno para ver qué tiene</span>
+        </p>
+        <ul className="mt-1 divide-y divide-borde">
           {potreros.map((p) => {
             const u = usoDeEstado(p.estadoCiclo)
             const d = dias.get(p.id) ?? null
-            const activo = elegido === p.id
             const que = u === 'ganadero' ? (veHacienda && p.cabezas ? `${p.cabezas} ${p.cabezas === 1 ? 'cabeza' : 'cabezas'}` : 'Con hacienda') : u === 'agricola' ? (p.cultivo ?? 'Sembrado') : 'Descansa'
             const meta = [p.hectareas ? `${ha(p.hectareas)} ha` : null, d ? textoDias(d) : null].filter(Boolean).join(' · ')
             return (
               <li key={p.id}>
-                <button type="button" onClick={() => elegir(activo ? null : p.id)} aria-pressed={activo} className={cn('-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-[14px] px-2 py-3 text-left transition-colors', activo && 'bg-principal-suave/60')}>
+                <button type="button" onClick={() => elegir(p.id)} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-[14px] px-2 py-3 text-left">
                   <span className="grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-2 text-[13px] font-extrabold text-white" style={{ background: COLOR_USO[u] }}>
                     {p.nombre}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold text-texto">{que}</span>
-                    <span className={cn(BAJADA, 'block truncate')}>{meta || 'Sin datos todavía'}</span>
+                    {meta && <span className={cn(BAJADA, 'block truncate')}>{meta}</span>}
                   </span>
                   {ultima.get(p.id) && <span title="Tiene recorrida" className="size-2 shrink-0 rounded-full bg-salvia" />}
                   <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
@@ -326,8 +351,8 @@ function DelCampo({ campo, campoMapa, marca: m, veHacienda, elegido, elegir, det
             )
           })}
         </ul>
-      </section>
-    </>
+      </div>
+    </section>
   )
 }
 

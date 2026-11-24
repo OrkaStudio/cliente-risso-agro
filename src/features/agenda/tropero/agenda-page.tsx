@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -16,7 +16,8 @@ import { haceLabel, useParaAtender, type Nivel } from '@/features/inicio/para-at
 import { SeSoluciono } from '@/features/inicio/tropero/el-dia'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { cheques, pendiente, semanasQueVienen, tituloDe, mesCorto, type Semana } from './agenda'
+import { cheques, fechaDe, pendiente, semanasQueVienen, tituloDe, mesCorto, type Semana } from './agenda'
+import { Dia } from '@/features/analitica/tropero/revisar-movimientos'
 import { AgendaCalendario } from './agenda-calendario'
 import campoArriba from '@/assets/tropero/campo-de-arriba.webp'
 import { Cabecera } from '@/components/tropero/cabecera'
@@ -339,58 +340,75 @@ function SemanasVacias({ semanas }: { semanas: Semana[] }) {
   const b = semanas[semanas.length - 1]!
   const titulo = semanas.length === 1 ? a.titulo : `Del ${Number(a.desde.slice(8))} de ${mesCorto(a.desde)} al ${Number(b.hasta.slice(8))} de ${mesCorto(b.hasta)}`
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-borde bg-superficie-hundida/40 px-6 py-3.5 last:border-b-0">
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-borde bg-superficie-hundida/40 px-5 py-3.5 last:border-b-0">
       <span className="text-[15px] font-bold text-texto-suave">{titulo}</span>
       <span className="text-[14.5px] text-texto-suave/80">Nada que pagar ni cobrar.</span>
     </div>
   )
 }
 
-/** Una semana con cosas: a la izquierda cuál es y cuánto se mueve, destacado; a la derecha, cada cosa en su tarjeta. */
+/**
+ * Una semana con cosas, como un mes de Movimientos (Lau, 24/11): arriba cuál es y cuánto
+ * pagás y cobrás; debajo cada día como separador y sus cosas en filas.
+ */
 function FranjaSemana({ s, hoy, tareas, empresaId, onAbrir }: { s: Semana; hoy: string; tareas: Tarea[]; empresaId: string; onAbrir: (v: Vencimiento) => void }) {
   const rango = `${Number(s.desde.slice(8))} de ${mesCorto(s.desde)} al ${Number(s.hasta.slice(8))} de ${mesCorto(s.hasta)}`
   const actual = s.desde <= hoy && hoy <= s.hasta
+  const titulo = s.titulo.startsWith('Del') ? rango.charAt(0).toUpperCase() + rango.slice(1) : s.titulo
   return (
-    <div className="grid border-b border-borde last:border-b-0 md:grid-cols-[220px_minmax(0,1fr)]">
-      <div className="flex flex-col gap-0.5 px-6 pt-5 md:py-6">
-        {actual && <span className="text-[13px] font-semibold text-principal">Ahora</span>}
-        <h2 className="t-tarjeta text-texto">{s.titulo.startsWith('Del') ? rango.charAt(0).toUpperCase() + rango.slice(1) : s.titulo}</h2>
-        {!s.titulo.startsWith('Del') && <p className="text-[14px] font-semibold text-texto-suave">{rango}</p>}
+    <div className="border-b border-borde last:border-b-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 bg-superficie px-5 py-4">
+        <h2 className="flex flex-wrap items-baseline gap-x-2 text-[17px] font-bold text-texto">
+          {titulo}
+          {!s.titulo.startsWith('Del') && <span className="font-medium text-texto-suave">{rango}</span>}
+          {actual && <span className="self-center rounded-full bg-principal-suave px-2 py-0.5 text-[11.5px] font-bold text-principal">Ahora</span>}
+        </h2>
         {(s.sale > 0 || s.entra > 0) && (
-          <div className="mt-3 flex flex-col gap-0.5 text-[15px] text-texto-suave">
+          <p className="flex gap-3 text-[13.5px] text-texto-suave">
             {s.sale > 0 && (
               <span>
-                Pagás <span className="t-cifra text-estado-problema-texto">{fmtCompact(s.sale)}</span>
+                Pagás <b className="t-cifra text-texto">{fmtCompact(s.sale)}</b>
               </span>
             )}
             {s.entra > 0 && (
               <span>
-                Cobrás <span className="t-cifra text-estado-bien-texto">{fmtCompact(s.entra)}</span>
+                Cobrás <b className="t-cifra text-estado-bien-texto">{fmtCompact(s.entra)}</b>
               </span>
             )}
-          </div>
+          </p>
         )}
       </div>
-      <div className="px-3 pb-3 md:py-3 md:pr-5 md:pl-0">
-          <ul className="flex flex-col divide-y divide-borde/70">
-            {s.items.map((v) => (
-              <Cosa key={v.id} v={v} hoy={hoy} onAbrir={onAbrir} />
-            ))}
-            {tareas.map((t) => (
-              <li key={`${t.p.key}-${t.a.key}`} className="flex items-center gap-4 px-3 py-3.5">
-                <span className="w-10 shrink-0 text-center text-[12.5px] font-semibold text-texto-suave">Campo</span>
-                <span aria-hidden className={cn('h-11 w-1 shrink-0 rounded-full', COLOR_NIVEL[t.a.nivel])} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[16.5px] font-bold text-texto">
-                    {t.a.titulo} en el {t.p.potrero}
-                  </p>
-                  <p className="truncate text-[14.5px] text-texto/70">{[t.p.campo, t.p.cabezas > 0 ? `${t.p.cabezas} animales adentro` : null, `lo vio la recorrida ${haceLabel(t.p.hace)}`].filter(Boolean).join(' · ')}</p>
-                </div>
-                <SeSoluciono senal={{ potreroId: t.p.key, observacionId: t.p.observacionId, tipo: t.a.tipo }} empresaId={empresaId} />
-              </li>
-            ))}
-          </ul>
-      </div>
+      <ul className="flex flex-col divide-y divide-borde/60 border-t border-borde/60">
+        {s.items.map((v, i) => {
+          const f = fechaDe(v)
+          const nuevoDia = i === 0 || fechaDe(s.items[i - 1]!) !== f
+          return (
+            <Fragment key={v.id}>
+              {nuevoDia && <Dia ymd={f} />}
+              <Cosa v={v} hoy={hoy} onAbrir={onAbrir} />
+            </Fragment>
+          )
+        })}
+        {tareas.length > 0 && (
+          <li role="presentation" className="bg-fondo/60 px-5 pt-3 pb-1.5 text-[12px] font-bold tracking-[0.04em] text-texto-suave uppercase">
+            En el campo
+          </li>
+        )}
+        {tareas.map((t) => (
+          <li key={`${t.p.key}-${t.a.key}`} className="flex items-center gap-3.5 px-5 py-3.5">
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-superficie-hundida">
+              <span className={cn('size-2.5 rounded-full', COLOR_NIVEL[t.a.nivel])} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold text-texto">
+                {t.a.titulo} en el {t.p.potrero}
+              </p>
+              <p className="mt-0.5 truncate text-[13px] text-texto-suave">{[t.p.campo, t.p.cabezas > 0 ? `${t.p.cabezas} animales adentro` : null, `lo vio la recorrida ${haceLabel(t.p.hace)}`].filter(Boolean).join(' · ')}</p>
+            </div>
+            <SeSoluciono senal={{ potreroId: t.p.key, observacionId: t.p.observacionId, tipo: t.a.tipo }} empresaId={empresaId} />
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

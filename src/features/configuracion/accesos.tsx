@@ -31,7 +31,7 @@ const COLOR: Record<Nivel, string> = {
 const titulo = (n: Nivel) => COLS.find((c) => c.id === n)!.titulo
 
 /** El ícono de cada nivel en su círculo de color: el ojo tachado, el ojo, el lápiz y WhatsApp. */
-function IconoNivel({ n, chico = false }: { n: Nivel; chico?: boolean }) {
+export function IconoNivel({ n, chico = false }: { n: Nivel; chico?: boolean }) {
   return (
     <span aria-hidden className={cn('grid shrink-0 place-items-center rounded-full', chico ? 'size-7' : 'size-9', COLOR[n])}>
       {n === 'solo_manda' ? <LogoWhatsapp className={chico ? 'size-4' : 'size-[18px]'} /> : <Icono nombre={n === 'no' ? 'Ocultar' : n === 've' ? 'Ver' : 'Editar'} tamano={16} />}
@@ -49,7 +49,7 @@ function queCambio(nombre: string, s: SeccionConPermiso, n: Nivel): string {
 }
 
 /** Qué es cada nivel: plegado, para no repetirlo entero en la ficha de cada persona. */
-function Leyenda() {
+export function Leyenda() {
   const [abierta, setAbierta] = useState(false)
   return (
     <section aria-label="Qué significa cada una" className="rounded-[16px] bg-superficie-hundida/50">
@@ -81,6 +81,84 @@ function Leyenda() {
 
 const FILA = 'grid grid-cols-[6.4em_repeat(4,minmax(36px,1fr))] gap-x-1 px-3'
 
+/**
+ * La tabla de niveles: una fila por sección, una columna por nivel, un toque marca.
+ * La usan la ficha de cada persona y el formulario de invitar. `cuidarUltima`: la
+ * última sección con algo no puede quedar en «No ve» (para eso se saca el acceso).
+ * Sin nivel elegido (al invitar), la fila queda sin marcar.
+ */
+export function TablaNiveles({
+  etiqueta,
+  niveles,
+  whatsapp,
+  onElegir,
+  ocupado = false,
+  cuidarUltima = false,
+}: {
+  etiqueta: string
+  niveles: Niveles
+  whatsapp: boolean
+  onElegir: (s: SeccionConPermiso, n: Nivel) => void
+  ocupado?: boolean
+  cuidarUltima?: boolean
+}) {
+  const conAlgo = SECCIONES_CON_PERMISO.filter((s) => niveles[s.id] && niveles[s.id] !== 'no')
+  return (
+        <div role="table" aria-label={etiqueta} className="overflow-hidden rounded-[18px] bg-superficie shadow-[inset_0_0_0_1px_var(--borde)]">
+          <div role="row" className={cn(FILA, 'items-end border-b border-borde bg-superficie-hundida/60 py-2')}>
+            <span role="columnheader" />
+            {COLS.map((c) => (
+              <span key={c.id} role="columnheader" className="flex min-w-0 flex-col items-center gap-1 text-center text-[11.5px] leading-tight font-bold whitespace-nowrap text-texto-suave max-[350px]:text-[10.5px]">
+                <IconoNivel n={c.id} chico />
+                {c.titulo}
+              </span>
+            ))}
+          </div>
+          {SECCIONES_CON_PERMISO.map((s) => {
+            const actual = niveles[s.id]
+            const ultima = cuidarUltima && conAlgo.length === 1 && conAlgo[0]!.id === s.id
+            return (
+              <div key={s.id} role="row" className={cn(FILA, 'items-center border-b border-borde/70 py-1 last:border-b-0')}>
+                <span role="rowheader" className="text-[14.5px] leading-tight font-semibold text-texto">
+                  {s.texto}
+                </span>
+                {COLS.map((c) => {
+                  const si = actual === c.id
+                  // La última sección con algo no queda en «No ve»: para eso se le saca el acceso.
+                  const unica = ultima && c.id === 'no' && !si
+                  // Quien entra sólo por WhatsApp no usa la app: ni mira ni anota ahí.
+                  const porWhatsapp = whatsapp && (c.id === 've' || c.id === 'carga')
+                  const off = unica || porWhatsapp
+                  return (
+                    <span key={c.id} role="cell" className="flex justify-center">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={si}
+                        aria-label={`${s.texto}: ${c.titulo}`}
+                        title={unica ? 'Es lo único que le queda: para que no entre más, sacale el acceso.' : porWhatsapp ? 'Entra sólo por WhatsApp.' : undefined}
+                        disabled={off || ocupado}
+                        onClick={() => onElegir(s.id, c.id)}
+                        className={cn('grid size-10 place-items-center rounded-full transition-colors max-[350px]:size-9', !si && !off && 'hover:bg-superficie-hundida', off && 'opacity-30')}
+                      >
+                        <span className={cn('grid size-[22px] place-items-center rounded-full border-2 transition-colors', si ? (c.id === 'no' ? 'border-texto-suave bg-texto-suave' : 'border-principal bg-principal') : 'border-neutro-300 bg-white')}>
+                          {si && (
+                            <svg viewBox="0 0 24 24" className="size-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              {c.id === 'no' ? <path d="M7 12h10" /> : <path d="m5 12.5 4.5 4.5L19 7.5" />}
+                            </svg>
+                          )}
+                        </span>
+                      </button>
+                    </span>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+  )
+}
+
 /** La ficha de una persona: la tabla, lo que cambió y sacarle el acceso. */
 function Ficha({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerrar: () => void }) {
   const cambiar = useCambiarNiveles()
@@ -92,7 +170,6 @@ function Ficha({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerra
   const [seguro, setSeguro] = useState(false)
   const whatsapp = p.acceso === 'whatsapp'
   const nombre = p.nombre.split(' ')[0]!.replace(/^(Dra?|Ing)\.?$/i, p.nombre.split(' ')[1] ?? p.nombre)
-  const conAlgo = SECCIONES_CON_PERMISO.filter((s) => (niveles[s.id] ?? 'no') !== 'no')
 
   async function guardar(s: SeccionConPermiso, n: Nivel) {
     const antes = niveles
@@ -136,58 +213,7 @@ function Ficha({ p, abierto, onCerrar }: { p: Persona; abierto: boolean; onCerra
     <PanelLateral abierto={abierto} onCerrar={onCerrar} titulo={p.nombre} bajada={whatsapp ? `${detalle} · Entra sólo por WhatsApp` : detalle}>
       <div className="flex flex-col gap-4">
         {/* La tabla: una fila por sección, un toque marca el nivel. */}
-        <div role="table" aria-label={`Qué puede hacer ${nombre}`} className="overflow-hidden rounded-[18px] bg-superficie shadow-[inset_0_0_0_1px_var(--borde)]">
-          <div role="row" className={cn(FILA, 'items-end border-b border-borde bg-superficie-hundida/60 py-2')}>
-            <span role="columnheader" />
-            {COLS.map((c) => (
-              <span key={c.id} role="columnheader" className="flex min-w-0 flex-col items-center gap-1 text-center text-[11.5px] leading-tight font-bold whitespace-nowrap text-texto-suave max-[350px]:text-[10.5px]">
-                <IconoNivel n={c.id} chico />
-                {c.titulo}
-              </span>
-            ))}
-          </div>
-          {SECCIONES_CON_PERMISO.map((s) => {
-            const actual = niveles[s.id] ?? 'no'
-            const ultima = conAlgo.length === 1 && conAlgo[0]!.id === s.id
-            return (
-              <div key={s.id} role="row" className={cn(FILA, 'items-center border-b border-borde/70 py-1 last:border-b-0')}>
-                <span role="rowheader" className="text-[14.5px] leading-tight font-semibold text-texto">
-                  {s.texto}
-                </span>
-                {COLS.map((c) => {
-                  const si = actual === c.id
-                  // La última sección con algo no queda en «No ve»: para eso se le saca el acceso.
-                  const unica = ultima && c.id === 'no' && !si
-                  // Quien entra sólo por WhatsApp no usa la app: ni mira ni anota ahí.
-                  const porWhatsapp = whatsapp && (c.id === 've' || c.id === 'carga')
-                  const off = unica || porWhatsapp
-                  return (
-                    <span key={c.id} role="cell" className="flex justify-center">
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={si}
-                        aria-label={`${s.texto}: ${c.titulo}`}
-                        title={unica ? 'Es lo único que le queda: para que no entre más, sacale el acceso.' : porWhatsapp ? 'Entra sólo por WhatsApp.' : undefined}
-                        disabled={off || cambiar.isPending}
-                        onClick={() => void guardar(s.id, c.id)}
-                        className={cn('grid size-10 place-items-center rounded-full transition-colors max-[350px]:size-9', !si && !off && 'hover:bg-superficie-hundida', off && 'opacity-30')}
-                      >
-                        <span className={cn('grid size-[22px] place-items-center rounded-full border-2 transition-colors', si ? (c.id === 'no' ? 'border-texto-suave bg-texto-suave' : 'border-principal bg-principal') : 'border-neutro-300 bg-white')}>
-                          {si && (
-                            <svg viewBox="0 0 24 24" className="size-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              {c.id === 'no' ? <path d="M7 12h10" /> : <path d="m5 12.5 4.5 4.5L19 7.5" />}
-                            </svg>
-                          )}
-                        </span>
-                      </button>
-                    </span>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
+        <TablaNiveles etiqueta={`Qué puede hacer ${nombre}`} niveles={niveles} whatsapp={whatsapp} ocupado={cambiar.isPending} onElegir={(s, n) => void guardar(s, n)} cuidarUltima />
 
         {/* Lo que pasó, ahí mismo, con Deshacer. */}
         <AnimatePresence mode="wait">

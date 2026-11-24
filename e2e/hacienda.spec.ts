@@ -128,7 +128,9 @@ async function venderUnaVaca(page: Page) {
 /** Abre, desde la pestaña «Sin identificar», la salida más nueva (la última fila). */
 async function abrirUltimaSalida(page: Page) {
   await page.getByRole('tab', { name: /Sin identificar/ }).click()
-  await page.getByRole('row', { name: /vendida|murió/ }).last().click()
+  // La de hoy (la lista puede tardar un instante en traerla: sin esto se abría una vieja).
+  const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+  await page.getByRole('row', { name: /vendida|murió/ }).filter({ hasText: `el ${hoy}` }).last().click()
   await expect(page.getByRole('dialog')).toBeVisible()
 }
 

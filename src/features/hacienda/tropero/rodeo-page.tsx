@@ -509,30 +509,19 @@ export function RodeoPage() {
           </p>
         ) : (
           <table className="w-full text-left">
-            <thead>
-              {porPotrero ? (
-                <tr className="border-b border-borde text-[13px] font-semibold text-texto-suave">
-                  <th className="py-3 pl-5 font-semibold">Potrero</th>
-                  <th className="py-3 font-semibold">Qué hay</th>
-                  <th className="py-3 font-semibold max-md:hidden">Caravanas</th>
-                  <th className="py-3 font-semibold max-lg:hidden">Para hacer</th>
-                  <th className="py-3 pr-5 font-semibold" />
-                </tr>
-              ) : (
-                <tr className="border-b border-borde text-[13px] font-semibold text-texto-suave">
-                  <th className="py-3 pl-5 font-semibold">Caravana</th>
-                  <th className="py-3 font-semibold">Qué es</th>
-                  <th className="py-3 font-semibold max-md:hidden">{verSalieron ? 'De dónde salió' : 'Dónde está'}</th>
-                  <th className="py-3 font-semibold max-lg:hidden">{COLUMNA[filtroActivo ?? 'todos']}</th>
-                  {!filtroActivo && <th className="py-3 pr-5 font-semibold">Estado</th>}
-                </tr>
-              )}
+            {/* Sin encabezados a la vista (Lau, 24/11: menos ruido): cada fila dice lo suyo. */}
+            <thead className="sr-only">
+              <tr>
+                <th>{porPotrero ? 'Potrero' : 'Caravana'}</th>
+                <th>{porPotrero ? 'Qué hay' : 'Qué es y dónde está'}</th>
+                <th>{porPotrero ? 'Para hacer' : 'Estado'}</th>
+              </tr>
             </thead>
-            <tbody className="divide-y divide-borde">
+            <tbody className="divide-y divide-borde/60">
               {!q &&
                 !verSalieron &&
                 (verSinIdentificar || !estado) &&
-                salidas.map((x) => (
+                (verSinIdentificar ? salidas : salidas.slice(0, 3)).map((x) => (
                   <FilaDeSalida
                     key={x.salidaId}
                     x={x}
@@ -543,6 +532,16 @@ export function RodeoPage() {
                     }}
                   />
                 ))}
+              {!q && !verSalieron && !verSinIdentificar && !estado && salidas.length > 3 && (
+                <tr onClick={() => elegirEstado('sinIdentificar')} className="cursor-pointer transition-colors hover:bg-superficie-hundida/40">
+                  <td className="w-px py-3 pr-3.5 pl-5" />
+                  <td className="py-3 text-[14px] font-semibold text-texto-suave" colSpan={2}>
+                    <button type="button" onClick={(e) => (e.stopPropagation(), elegirEstado('sinIdentificar'))} className="inline-flex items-center gap-1 text-principal hover:underline">
+                      Ver las otras {salidas.length - 3} salidas sin decir cuál <Icono nombre="Siguiente" tamano={16} />
+                    </button>
+                  </td>
+                </tr>
+              )}
               {grupos.map((g) => (
                 <FilaPotrero key={g.potreroId ?? SIN_POTRERO} g={g} onClick={() => verPotrero(g.potreroId)} />
               ))}
@@ -606,57 +605,69 @@ function StockPorCategoria({ cats, total }: { cats: { categoria: string; cabezas
   )
 }
 
-/** Una fila: la caravana como se ve en la oreja, qué es, dónde, lo último y qué hacer. */
+// Las filas, con la visual de Movimientos (Lau, 24/11): a la izquierda la marca (caravana o
+// potrero); qué es, y debajo en gris y en una línea, dónde y el dato; a la derecha, el estado.
+const TR = 'group cursor-pointer transition-colors hover:bg-superficie-hundida/40'
+const TD1 = 'w-px py-3.5 pr-3.5 pl-5 align-middle'
+const TD3 = 'w-px py-3.5 pr-5 text-right align-middle whitespace-nowrap'
+const meta = (partes: (string | null | undefined | false)[]) => partes.filter(Boolean).join(' · ')
+
+/** El estado, como una pastilla chica con su punto. */
+function Estado({ punto, texto }: { punto: string; texto: string }) {
+  return (
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-superficie-hundida px-2.5 text-[12.5px] font-bold text-texto">
+      <span className={cn('size-2 rounded-full', punto)} />
+      {texto}
+    </span>
+  )
+}
+
+/** Una fila: la caravana como se ve en la oreja, qué es, dónde, el dato y qué hacer. */
 function Fila({ f, filtro, onClick, adentro = false }: { f: FilaRodeo; filtro: Filtro | null; onClick: () => void; adentro?: boolean }) {
-  // La columna del dato cambia con el filtro: lo que importa para esa decisión.
+  // El dato cambia con el filtro: lo que importa para esa decisión.
   const dato =
     filtro === 'retiro'
       ? f.retiro
-      : filtro === 'destetar'
+      : filtro === 'destetar' || filtro === 'vender'
         ? f.peso
         : filtro === 'vacia'
           ? f.tacto
-          : filtro === 'vender'
-            ? f.peso
-            : filtro === 'sinCaravana' || filtro === 'sinElectronica'
-              ? null
-              : f.ultimoDato
+          : filtro === 'sinCaravana' || filtro === 'sinElectronica'
+            ? 'se completa desde su ficha o con una planilla'
+            : f.ultimoDato
   return (
-    <tr onClick={onClick} className={cn('cursor-pointer transition-colors hover:bg-superficie-hundida/50', adentro && 'bg-fondo/60')}>
-      <td className={cn('py-3', adentro ? 'pl-10' : 'pl-5')}>
+    <tr onClick={onClick} className={cn(TR, adentro && 'bg-fondo/50')}>
+      <td className={cn(TD1, adentro && 'pl-10')}>
         <a
           href={`/hacienda/${f.id}`}
           onClick={(e) => {
             e.preventDefault()
             onClick()
           }}
-          className="inline-flex flex-col items-start"
+          className="inline-flex"
         >
           {f.visual ? (
-            <span className="t-cifra rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 font-bold text-principal">{f.visual}</span>
+            <span className="t-cifra inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-principal px-2 font-bold text-principal">{f.visual}</span>
           ) : f.rfid ? (
-            <span className="t-cifra-chica rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 font-bold text-texto">{f.rfid}</span>
+            <span className="t-cifra-chica inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-neutro-300 px-2 font-bold text-texto">{f.rfid}</span>
           ) : (
-            <span className="rounded-[8px] border-[1.5px] border-dashed border-neutro-300 px-2 py-1 text-[12.5px] font-semibold text-texto-suave">sin caravana</span>
+            <span className="inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-dashed border-neutro-300 px-2 text-[11.5px] font-semibold text-texto-suave">s/c</span>
           )}
-          {(f.visual || f.rfid) && <span className="t-cifra-mini mt-1 text-texto-suave">{f.visual ? (f.rfid ?? 'sin electrónica') : 'sin visible'}</span>}
         </a>
       </td>
-      <td className="py-3 pr-4 text-[15px] font-semibold text-texto">{f.queEs}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{f.donde ?? 'Sin potrero'}</td>
-      <td className={cn('py-3 pr-4 text-[14.5px] max-lg:hidden', filtro && filtro !== 'sinCaravana' && filtro !== 'sinElectronica' ? 'font-semibold text-texto' : 'text-texto-suave')}>
-        {filtro === 'sinCaravana' || filtro === 'sinElectronica' ? 'Desde su ficha o con una planilla' : (dato ?? '—')}
-      </td>
-      {!filtro && (
-        <td className="py-3 pr-5">
-          {f.estado !== 'nada' && (
-            <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-              <span className={cn('size-2 rounded-full', PUNTO[f.estado])} />
-              {ESTADO_TEXTO[f.estado]}
-            </span>
+      <td className="py-3.5 pr-4">
+        <span className="block text-[15px] font-semibold text-texto">{f.queEs}</span>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">
+          {meta([f.donde ?? 'Sin potrero', f.estado === 'sinElectronica' && !filtro ? null : f.visual ? (f.rfid ? null : 'sin electrónica') : f.rfid ? 'sin visible' : null])}
+          {dato && (
+            <>
+              {' · '}
+              <span className={cn(filtro && 'font-semibold text-texto')}>{filtro && filtro !== 'sinCaravana' && filtro !== 'sinElectronica' ? `${COLUMNA[filtro]}: ${dato}` : dato}</span>
+            </>
           )}
-        </td>
-      )}
+        </span>
+      </td>
+      <td className={TD3}>{!filtro && f.estado !== 'nada' && <Estado punto={PUNTO[f.estado]} texto={ESTADO_TEXTO[f.estado]} />}</td>
     </tr>
   )
 }
@@ -665,30 +676,28 @@ function Fila({ f, filtro, onClick, adentro = false }: { f: FilaRodeo; filtro: F
 function FilaPotrero({ g, onClick }: { g: GrupoPotrero; onClick: () => void }) {
   const [potrero, campo] = g.donde ? g.donde.split(', ') : ['Sin potrero', null]
   const que = g.porCategoria.map((c) => `${c.n} ${c.categoria ? categoriaNombre(c.categoria, c.n).toLowerCase() : c.n === 1 ? 'animal' : 'animales'}`).join(' · ')
-  const caravanas = g.conCaravana === 0 ? 'Sin caravanas' : g.conCaravana === g.total ? 'Todos con caravana' : `${g.conCaravana} con caravana`
+  const caravanas = g.conCaravana === 0 ? 'sin caravanas' : g.conCaravana === g.total ? 'todos con caravana' : `${g.conCaravana} con caravana`
   return (
-    <tr onClick={onClick} className="cursor-pointer transition-colors hover:bg-superficie-hundida/50">
-      <td className="py-3.5 pl-5">
+    <tr onClick={onClick} className={TR}>
+      <td className={TD1}>
         {/* Botón y no link (regla de la marca): el que se alcanza con el teclado. */}
-        <button type="button" onClick={(e) => (e.stopPropagation(), onClick())} className="flex flex-col text-left">
-          <span className="t-cifra font-bold text-texto">{potrero}</span>
-          {campo && <span className="text-[13px] text-texto-suave">{campo}</span>}
+        <button type="button" onClick={(e) => (e.stopPropagation(), onClick())} className={cn('t-cifra inline-grid h-10 min-w-12 place-items-center rounded-[10px] px-2 font-bold', g.donde ? 'bg-superficie-hundida text-texto' : 'border-[1.5px] border-dashed border-neutro-300 text-texto-suave')}>
+          {g.donde ? potrero : '?'}
         </button>
       </td>
       <td className="py-3.5 pr-4">
         <span className="block text-[15px] font-semibold text-texto">
           {g.total} {g.total === 1 ? 'animal' : 'animales'}
+          {!g.donde && <span className="font-medium text-texto-suave"> sin potrero</span>}
         </span>
-        <span className="block text-[14px] text-texto-suave">{que}</span>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">{meta([que, campo, caravanas])}</span>
       </td>
-      <td className="py-3.5 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{caravanas}</td>
-      <td className="py-3.5 pr-4 text-[14.5px] max-lg:hidden">
-        {g.atender ? <span className="font-semibold text-texto">{g.atender === 1 ? '1 para atender' : `${g.atender} para atender`}</span> : <span className="text-texto-suave">—</span>}
-      </td>
-      <td className="py-3.5 pr-5 text-right">
-        {/* Con forma de botón (Lau, 18/11: lo que se toca es un botón). Toda la fila lo abre. */}
-        <span className="inline-flex h-9 items-center gap-1 rounded-full border-[1.5px] border-principal/55 px-3.5 text-[14px] font-bold text-principal">
-          Ver <Icono nombre="Siguiente" tamano={16} />
+      <td className={TD3}>
+        <span className="inline-flex items-center gap-2.5">
+          {g.atender > 0 && <Estado punto="bg-estado-atencion" texto={g.atender === 1 ? '1 para atender' : `${g.atender} para atender`} />}
+          <span className="grid size-8 place-items-center rounded-full text-texto-suave transition-colors group-hover:bg-principal group-hover:text-principal-texto">
+            <Icono nombre="Siguiente" tamano={16} />
+          </span>
         </span>
       </td>
     </tr>
@@ -699,30 +708,20 @@ function FilaPotrero({ g, onClick }: { g: GrupoPotrero; onClick: () => void }) {
 function FilaSinCaravana({ g, filtro, abierto, onClick }: { g: GrupoSinCaravana; filtro: Filtro | null; abierto: boolean; onClick: () => void }) {
   const que = `${g.n} ${g.categoria ? categoriaNombre(g.categoria, g.n).toLowerCase() : g.n === 1 ? 'animal' : 'animales'}`
   return (
-    <tr onClick={onClick} aria-expanded={abierto} className="cursor-pointer transition-colors hover:bg-superficie-hundida/50">
-      <td className="py-3 pl-5">
-        <span className="rounded-[8px] border-[1.5px] border-dashed border-neutro-300 px-2 py-1 text-[12.5px] font-semibold text-texto-suave">sin caravana</span>
+    <tr onClick={onClick} aria-expanded={abierto} className={TR}>
+      <td className={TD1}>
+        <span className="inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-dashed border-neutro-300 px-2 text-[11.5px] font-semibold text-texto-suave">s/c</span>
       </td>
-      <td className="py-3 pr-4">
+      <td className="py-3.5 pr-4">
         <button type="button" onClick={(e) => (e.stopPropagation(), onClick())} className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-texto">
-          {que}
+          {que} sin caravana
           <span className={cn('text-texto-suave transition-transform', abierto ? '-rotate-90' : 'rotate-90')}>
             <Icono nombre="Siguiente" tamano={16} />
           </span>
         </button>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">{meta([g.donde ?? 'Sin potrero', abierto ? null : 'tocá para ver cada uno'])}</span>
       </td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{g.donde ?? 'Sin potrero'}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-lg:hidden">{abierto ? '' : 'Tocá para ver cada uno'}</td>
-      {!filtro && (
-        <td className="py-3 pr-5">
-          {g.estado !== 'nada' && (
-            <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-              <span className={cn('size-2 rounded-full', PUNTO[g.estado])} />
-              {ESTADO_TEXTO[g.estado]}
-            </span>
-          )}
-        </td>
-      )}
+      <td className={TD3}>{!filtro && g.estado !== 'nada' && <Estado punto={PUNTO[g.estado]} texto={ESTADO_TEXTO[g.estado]} />}</td>
     </tr>
   )
 }
@@ -733,22 +732,21 @@ const DIA = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 function FilaDeSalida({ x, onClick }: { x: FilaSalida; onClick: () => void }) {
   const que = `${x.pendientes} ${categoriaNombre(x.categoria, x.pendientes).toLowerCase()}`
   const verbo = x.motivo === 'muerte' ? (x.pendientes === 1 ? 'murió' : 'murieron') : x.pendientes === 1 ? 'vendida' : 'vendidas'
+  const cual = x.pendientes === 1 ? 'cuál' : 'cuáles'
   return (
-    <tr onClick={onClick} className="cursor-pointer bg-estado-atencion-suave/25 transition-colors hover:bg-estado-atencion-suave/50">
-      <td className="py-3 pl-5">
-        <span className="grid h-8 w-12 place-items-center rounded-[8px] border-[1.5px] border-dashed border-estado-atencion text-[16px] font-bold text-estado-atencion-texto">?</span>
+    <tr onClick={onClick} className={TR}>
+      <td className={TD1}>
+        <span className="inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-dashed border-estado-atencion text-[16px] font-bold text-estado-atencion-texto">?</span>
       </td>
-      <td className="py-3 pr-4 text-[15px] font-semibold text-texto">
-        {que} {verbo}
+      <td className="py-3.5 pr-4">
+        <span className="block text-[15px] font-semibold text-texto">
+          {que} {verbo}
+        </span>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">{meta([x.donde, `el ${DIA(x.fecha)}, sin decir ${cual}`, x.posibles ? `${x.posibles} pueden ser` : null])}</span>
       </td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{x.donde}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-lg:hidden">
-        El {DIA(x.fecha)}, sin decir {x.pendientes === 1 ? 'cuál' : 'cuáles'} · {x.posibles} posibles
-      </td>
-      <td className="py-3 pr-5">
-        <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-          <span className="size-2 rounded-full bg-estado-atencion" />
-          Decir {x.pendientes === 1 ? 'cuál' : 'cuáles'}
+      <td className={TD3}>
+        <span className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-bold text-texto shadow-[inset_0_0_0_1.5px_var(--borde)] transition-colors group-hover:bg-principal group-hover:text-principal-texto group-hover:shadow-none">
+          Decir {cual}
         </span>
       </td>
     </tr>
@@ -760,21 +758,15 @@ function FilaSalido({ a, b, donde, onClick, conEstado = true }: { conEstado?: bo
   const fem = ['vaca', 'vaquillona', 'ternera', 'oveja', 'cordera', 'yegua', 'potranca'].includes(a.categoria ?? '')
   const como = a.estado === 'muerto' ? 'Murió' : fem ? 'Vendida' : 'Vendido'
   return (
-    <tr onClick={onClick} className="cursor-pointer text-texto-suave transition-colors hover:bg-superficie-hundida/50">
-      <td className="py-3 pl-5">
-        <span className="t-cifra rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
+    <tr onClick={onClick} className={cn(TR, 'text-texto-suave')}>
+      <td className={TD1}>
+        <span className="t-cifra inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-neutro-300 px-2 font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
       </td>
-      <td className="py-3 pr-4 text-[15px] font-semibold">{a.categoria ? categoriaNombre(a.categoria as never, 1) : ''}</td>
-      <td className="py-3 pr-4 text-[14.5px] max-md:hidden">{donde ? (conEstado ? `Salió del ${donde}` : donde) : ''}</td>
-      <td className="py-3 pr-4 text-[14.5px] max-lg:hidden">{b ? `${como} el ${DIA(b.fecha)}${b.sinIdentificar ? ' · sin identificar' : ''}` : como}</td>
-      {conEstado && (
-        <td className="py-3 pr-5">
-          <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold">
-            <span className="size-2 rounded-full bg-neutro-400" />
-            {como}
-          </span>
-        </td>
-      )}
+      <td className="py-3.5 pr-4">
+        <span className="block text-[15px] font-semibold">{a.categoria ? categoriaNombre(a.categoria as never, 1) : 'Animal'}</span>
+        <span className="mt-0.5 block text-[13px]">{meta([b ? `${como} el ${DIA(b.fecha)}${b.sinIdentificar ? ', sin identificar' : ''}` : como, donde ? `salió del ${donde}` : null])}</span>
+      </td>
+      <td className={TD3}>{conEstado && <Estado punto="bg-neutro-400" texto={como} />}</td>
     </tr>
   )
 }

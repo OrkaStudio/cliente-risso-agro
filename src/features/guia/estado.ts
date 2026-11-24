@@ -153,7 +153,7 @@ export function itemsDe(r: Resumen): ItemChecklist[] {
                 : 'Cada pago está en la Agenda y en la cuenta del campo.',
             cta: 'Cargar el alquiler',
             ruta: '/analitica',
-            accion: 'analitica-alquiler',
+            accion: 'analitica-cargar',
             hecho: r.alquilerPendiente.length === 0,
           },
         ]

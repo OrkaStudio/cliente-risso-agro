@@ -18,6 +18,7 @@ import { hoyLocal } from '@/lib/fecha'
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import { cn } from '@/lib/utils'
+import { AlquilerDialog } from '@/features/analitica/alquiler-dialog'
 import { nombreMes } from './plata'
 import { usePermiso } from '@/features/empresa/use-permiso'
 
@@ -59,6 +60,10 @@ const enDias = (n: number) => new Date(Date.parse(`${hoyLocal()}T12:00:00`) + n 
 const sumarDias = (f: string, n: number) => new Date(Date.parse(`${f}T12:00:00`) + n * 86_400_000).toISOString().slice(0, 10)
 const fechaCorta = (f: string) => `${Number(f.slice(8))} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(f.slice(5, 7)) - 1]}`
 const PLAZOS = [30, 60, 90, 120, 150, 180]
+/** Cada cuánto se repite: los meses entre un pago y el siguiente. */
+const CADA: [number, string][] = [[1, 'Cada mes'], [2, 'Cada 2 meses'], [3, 'Cada 3 meses'], [6, 'Cada 6 meses'], [12, 'Cada año']]
+const FRECUENCIA: Record<number, 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'> = { 1: 'mensual', 2: 'bimestral', 3: 'trimestral', 6: 'semestral', 12: 'anual' }
+
 const sumarMeses = (f: string, n: number) => {
   const [y, m, d] = f.split('-').map(Number) as [number, number, number]
   const x = new Date(y, m - 1 + n, d)
@@ -114,6 +119,8 @@ export function AnotarPlata({
   const [abierto, setAbierto] = useState(false)
   const [vez, setVez] = useState(0)
   const [escanear, setEscanear] = useState(false)
+  const [alquiler, setAlquiler] = useState(false)
+  const [vezAlquiler, setVezAlquiler] = useState(0)
   // Anotar plata es cargar en Plata: con «Ve» no aparece (permisos, 13/11).
   if (!usePermiso('plata').carga) return null
   return (
@@ -123,8 +130,9 @@ export function AnotarPlata({
         setVez((v) => v + 1)
         setAbierto(true)
       })}
+      {<AlquilerDialog key={`alq${vezAlquiler}`} empresaId={empresaId} campoId={campoInicial} open={alquiler} onOpenChange={setAlquiler} />}
       {/* La key cambia al abrir: arranca de cero y sale con su animación. */}
-      <Formulario key={vez} tipoInicial={tipo ?? null} vence={vence} venceInicial={venceInicial} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
+      <Formulario key={vez} onAlquiler={() => (setAbierto(false), setVezAlquiler((v) => v + 1), setAlquiler(true))} tipoInicial={tipo ?? null} vence={vence} venceInicial={venceInicial} empresaId={empresaId} campoInicial={campoInicial} potreroInicial={potreroInicial} abierto={abierto} escanear={escanear && vez > 0} onCerrar={() => setAbierto(false)} />
     </>
   )
 }
@@ -139,6 +147,7 @@ function Formulario({
   abierto,
   escanear,
   onCerrar,
+  onAlquiler,
 }: {
   tipoInicial: Tipo | null
   vence: boolean
@@ -149,6 +158,8 @@ function Formulario({
   abierto: boolean
   escanear: boolean
   onCerrar: () => void
+  /** Abre el paso a paso del alquiler de un campo (al anotar en Plata y en la Agenda: sus pagos vencen). */
+  onAlquiler?: () => void
 }) {
   const { campos, elegido } = useCampoElegido()
   const categorias = useCategorias()
@@ -190,6 +201,8 @@ function Formulario({
   const [forma, setForma] = useState<'plazos' | 'mensual' | ''>('')
   const [plazos, setPlazos] = useState<number[]>([])
   const [otroPlazo, setOtroPlazo] = useState('')
+  // Se repite cada N meses (Lau, 24/11: no siempre es todos los meses; un alquiler suele ser cada 3 o 6).
+  const [cada, setCada] = useState(1)
   const [meses, setMeses] = useState('')
   const [otrosMeses, setOtrosMeses] = useState(false)
   const [primera, setPrimera] = useState(hoyLocal())
@@ -223,7 +236,7 @@ function Formulario({
 
   // Las fechas de cada pago: a N días desde «desde», o un pago por mes.
   const nMeses = Math.max(0, Math.min(60, Math.floor(Number(meses) || 0)))
-  const fechasSerie = forma === 'plazos' ? [...plazos].sort((a, b) => a - b).map((d) => sumarDias(primera, d)) : forma === 'mensual' ? Array.from({ length: nMeses }, (_, i) => sumarMeses(primera, i)) : []
+  const fechasSerie = forma === 'plazos' ? [...plazos].sort((a, b) => a - b).map((d) => sumarDias(primera, d)) : forma === 'mensual' ? Array.from({ length: nMeses }, (_, i) => sumarMeses(primera, i * cada)) : []
   const veces = fechasSerie.length
   const cuota = esTotal === 'cada' ? total : veces > 0 ? Math.round((total / veces) * 100) / 100 : 0
   const totalSerie = cuota * veces
@@ -367,8 +380,8 @@ function Formulario({
     setError(null)
     const f = faltante(true)
     if (f || !tipo) { setError(f ?? faltaTipo); return 'falta' }
-    if (!forma) { setError(`Tocá cómo ${esGasto ? 'se paga' : 'se cobra'}: a plazos o todos los meses.`); return 'falta' }
-    if (!veces) { setError(forma === 'plazos' ? 'Tocá a cuántos días es cada pago.' : 'Tocá cuántos meses.'); return 'falta' }
+    if (!forma) { setError(`Tocá cómo ${esGasto ? 'se paga' : 'se cobra'}: a plazos o que se repite.`); return 'falta' }
+    if (!veces) { setError(forma === 'plazos' ? 'Tocá a cuántos días es cada pago.' : 'Tocá cuántos pagos son.'); return 'falta' }
     const serieId = await crearSerie.mutateAsync({
       empresaId,
       tipo,
@@ -377,11 +390,11 @@ function Formulario({
       potreroId: potreroId || null,
       actividad: actividad || null,
       montoCuota: cuota,
-      frecuencia: 'mensual',
+      frecuencia: FRECUENCIA[cada] ?? 'mensual',
       primeraFecha: fechasSerie[0]!,
       cantidad: veces,
       fechas: fechasSerie,
-      // Un sueldo o un alquiler (lo mismo cada mes) no lleva «cuota 3/12».
+      // Un sueldo o un alquiler (lo mismo cada vez) no lleva «cuota 3/12».
       sinNumerar: forma === 'mensual' && esTotal === 'cada',
       descripcion: descripcion.trim() || nombreCategoria || (esGasto ? 'Gasto' : 'Ingreso'),
       medioPago: null,
@@ -456,7 +469,7 @@ function Formulario({
           {(
             [
               ['plazos', 'A plazos', esGasto ? 'A 30, 60, 90 días' : 'A 30, 60, 90 días, como pagan las consignatarias'],
-              ['mensual', 'Todos los meses', esGasto ? 'Un sueldo, un alquiler, una cuota' : 'Un alquiler que cobrás'],
+              ['mensual', 'Se repite', esGasto ? 'Un sueldo, una cuota, cada mes o cada tanto' : 'Un alquiler que cobrás cada tanto'],
             ] as const
           ).map(([v, t, ej]) => (
             <button key={v} type="button" role="radio" aria-checked={forma === v} onClick={() => elegirForma(v)} className={cn('flex flex-col gap-1 rounded-[18px] border-[1.5px] p-4 text-left transition-colors', forma === v ? 'border-principal bg-principal-suave/70' : 'border-borde bg-superficie hover:border-neutro-300')}>
@@ -493,9 +506,13 @@ function Formulario({
         )}
         {forma === 'mensual' && (
           <>
-            <Grupo titulo="Cuántos meses" className="mt-5">
-              <Opciones etiqueta="Cuántos meses" opciones={[...['3', '6', '12', '24'].map((v) => ({ valor: v, texto: v === '12' ? '12 · un año' : v === '24' ? '24 · dos años' : v })), { valor: 'otra', texto: 'Otro' }]} elegidas={[otrosMeses ? 'otra' : meses]} onTocar={(v) => (v === 'otra' ? (setOtrosMeses(true), setMeses('')) : (setOtrosMeses(false), setMeses(v)))} />
-              {otrosMeses && <CampoTexto className="mt-3" etiqueta="Cuántos meses" inputMode="numeric" value={meses} onChange={(e) => setMeses(e.target.value.replace(/\D/g, '').slice(0, 2))} autoFocus />}
+            <Grupo titulo="Cada cuánto" className="mt-5">
+              <Opciones etiqueta="Cada cuánto" opciones={CADA.map(([v, t]) => ({ valor: String(v), texto: t }))} elegidas={[String(cada)]} onTocar={(v) => setCada(Number(v))} />
+            </Grupo>
+            <Grupo titulo="Cuántos pagos">
+              <Opciones etiqueta="Cuántos pagos" opciones={[...['2', '3', '4', '6', '12'].map((v) => ({ valor: v, texto: v })), { valor: 'otra', texto: 'Otro' }]} elegidas={[otrosMeses ? 'otra' : meses]} onTocar={(v) => (v === 'otra' ? (setOtrosMeses(true), setMeses('')) : (setOtrosMeses(false), setMeses(v)))} />
+              {otrosMeses && <CampoTexto className="mt-3" etiqueta="Cuántos pagos" inputMode="numeric" value={meses} onChange={(e) => setMeses(e.target.value.replace(/\D/g, '').slice(0, 2))} autoFocus />}
+              {nMeses > 0 && <p className="mt-2 text-[13.5px] text-texto-suave">{nMeses} {nMeses === 1 ? 'pago' : 'pagos'} {CADA.find(([v]) => v === cada)![1].toLowerCase()}: del {fechaCorta(fechasSerie[0]!)}{fechasSerie[0]!.slice(0, 4) !== fechasSerie.at(-1)!.slice(0, 4) ? ` de ${fechasSerie[0]!.slice(0, 4)}` : ''} al {fechaCorta(fechasSerie.at(-1)!)} de {fechasSerie.at(-1)!.slice(0, 4)}.</p>}
             </Grupo>
             <Grupo titulo={esGasto ? 'El primero vence' : 'El primero lo cobrás'}>
               <CampoFecha value={primera} onChange={setPrimera} ariaLabel="El primero" />
@@ -761,6 +778,19 @@ function Formulario({
         </div>
       )}
 
+      {/* El alquiler de un campo tiene su propio paso a paso (kilos o quintales, por hectárea): entra por acá (Lau, 24/11). */}
+      {!leyo && paso === 1 && onAlquiler && (
+        <button type="button" onClick={onAlquiler} className="mb-4 flex w-full items-center gap-3 rounded-[16px] bg-superficie px-3.5 py-3 text-left shadow-[inset_0_0_0_1px_var(--borde)] hover:shadow-[inset_0_0_0_1px_var(--principal)]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-trigo-100 text-trigo-800">
+            <Icono nombre="Campos" tamano={16} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14.5px] font-bold text-texto">¿Es el alquiler de un campo?</span>
+            <span className="block text-[13px] text-texto-suave">En kilos, quintales o pesos, con todos sus pagos.</span>
+          </span>
+          <Icono nombre="Siguiente" tamano={16} className="shrink-0 text-texto-suave" />
+        </button>
+      )}
       {ve(1) && (
         <>
           {bloqueTipo}

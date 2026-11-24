@@ -459,7 +459,7 @@ export function AsistentePanel({ celular = false, barra = null }: { celular?: bo
                     href={`https://wa.me/${WHATSAPP_TROPERO}`}
                     antes={mandaCampos ? 'Contame cómo está' : 'Contame un gasto'}
                     marcado={mandaCampos ? 'tu campo' : 'o un cobro'}
-                    bajada={mandaCampos ? 'Un audio por WhatsApp y lo anoto en cada potrero' : 'Un audio con qué fue y cuánto, y lo anoto'}
+                    bajada={mandaCampos ? 'El agua, el pasto, los animales: lo anoto en cada potrero.' : 'Qué fue y cuánto: lo anoto en la plata.'}
                   />
                 )}
 

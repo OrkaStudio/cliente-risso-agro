@@ -1,26 +1,35 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Boton } from '@/components/tropero/boton'
+import { motion } from 'framer-motion'
+
 import { Icono } from '@/components/tropero/icono'
-import { useAccion } from '@/components/tropero/use-accion'
+import type { MovimientoConDetalle } from '@/features/analitica/api'
+import { fmtCompact } from '@/features/analitica/compute'
+import { useMovimientos } from '@/features/analitica/hooks'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { CampoVisto } from '@/features/campos/campo-visto'
-import { AnotarPlata } from './anotar-plata'
-import { fmtCompact, formatARS } from '@/features/analitica/compute'
-import { useMarcarRevisados, useMovimientos } from '@/features/analitica/hooks'
-import type { MovimientoConDetalle } from '@/features/analitica/api'
+import { useEmpresa } from '@/features/empresa/use-empresa'
 import { useNombres } from '@/features/empresa/use-nombres'
 import { usePermiso } from '@/features/empresa/use-permiso'
-import { MovimientoPanel } from './movimiento-panel'
-import { useEmpresa } from '@/features/empresa/use-empresa'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
-import { aCsv, coincide, comprobanteTexto, enRango, medioTexto, nombreMes, periodos, RANGOS_VALIDOS, type Rango } from './plata'
+import { AnotarPlata } from './anotar-plata'
+import { ElegirPeriodo } from './elegir-periodo'
+import { MovimientoPanel } from './movimiento-panel'
+import { aCsv, coincide, DESDE_EL_PRINCIPIO, enRango, nombreMes, periodoEntre, periodos, type Periodo } from './plata'
+import { fechaDe, useDarPorBueno } from './dar-por-bueno'
+import { Dia, FilaMovimiento, Grupo, RevisarMovimientos } from './revisar-movimientos'
+
+type Pestana = 'todos' | 'revisar'
+type Tipo = 'todo' | 'gasto' | 'ingreso'
+const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/
 
 /**
- * Plata · Los movimientos (Figma página 35): cuánto salió en el período, los
- * filtros de tiempo, la búsqueda por proveedor o CUIT, bajar a Excel y la
- * lista. El campo es el de la barra izquierda.
+ * Plata · Movimientos (Lau, 24/11: unificado con «Revisar», con su visual). Una sola página:
+ * arriba qué se mira y cuánto suma, con «Anotar un movimiento»; dos pestañas, «Todos» y
+ * «Para revisar» (lo que cargó el equipo); en «Todos», una fila de filtros (las fechas, como
+ * en Plata, salió o entró, quién cargó y la búsqueda) y la lista agrupada por mes, con lo
+ * nuevo marcado y resuelto en la misma fila. El campo es el de la barra izquierda.
  */
 export function MovimientosPage() {
   const empresaId = useEmpresa().data?.empresa_id ?? ''
@@ -29,61 +38,75 @@ export function MovimientosPage() {
   const campoId = identidad.elegido?.id ?? null
   const hoy = hoyLocal()
   const [params] = useSearchParams()
-  // El período: el que trae el link (desde Plata, el que se estaba mirando, Lau 16/11).
-  // Sin link, el mes; si el mes todavía no tiene nada, los 12 meses (no abrir en «$0»).
-  const [elegido, setRango] = useState<Rango | null>(() => (RANGOS_VALIDOS.includes(params.get('rango') as Rango) ? (params.get('rango') as Rango) : null))
-  const [q, setQ] = useState(() => params.get('q') ?? '')
-  // Quién cargó cada uno y lo nuevo que cargaron otros (permisos, entrega 4).
   const { quienCargo, nombreDe } = useNombres()
   const { carga } = usePermiso('plata')
-  const revisar = useMarcarRevisados()
-  const [quien, setQuien] = useState<string | null>(null)
-  const [soloNuevos, setSoloNuevos] = useState(() => params.get('nuevos') === '1')
-  const [abierto, setAbierto] = useState<MovimientoConDetalle | null>(null)
-  const nuevos = (movs.data ?? []).filter((m) => carga && !m.revisado_at)
-  // «Ya los vi»: lo que confirma es que el aviso se va (sin «Listo»); si no sale, lo dice el botón.
-  const yaLosVi = useAccion(
-    async () => {
-      await revisar.mutateAsync(nuevos.map((m) => m.id))
-    },
-    { sinListo: true, alTerminar: () => setSoloNuevos(false) },
-  )
-  // Los que cargaron algo (lo de antes del 13/11 no tiene autor: sólo entra en «Cargó cualquiera»).
-  const autores = [...new Set((movs.data ?? []).map((m) => m.created_by).filter((x): x is string => !!x))]
-  // Sin nuevos por ver, «sólo los nuevos» no tiene sentido: vuelve a todos.
-  if (soloNuevos && movs.data && nuevos.length === 0) setSoloNuevos(false)
+  const darPorBueno = useDarPorBueno()
+  const todos = periodos(hoy)
 
+  // El período: el que trae el link (desde Plata, el que se estaba mirando). Sin link, este mes;
+  // si este mes todavía no tiene nada, los 12 meses (no abrir en «$0»).
+  const [elegido, setElegido] = useState<Periodo | null>(() => {
+    const r = params.get('rango')
+    if (r === 'fechas' && ES_FECHA.test(params.get('desde') ?? '') && ES_FECHA.test(params.get('hasta') ?? '')) return periodoEntre(params.get('desde')!, params.get('hasta')!, hoy)
+    if (r === '12m') return todos[0]!
+    if (r === 'campana') return todos[1]!
+    if (r === 'pasada') return todos[2]!
+    if (r === 'todo') return periodoEntre(DESDE_EL_PRINCIPIO, hoy, hoy)
+    if (r === 'anio') return periodoEntre(`${hoy.slice(0, 4)}-01-01`, hoy, hoy)
+    if (r === 'mes') return periodoEntre(`${hoy.slice(0, 7)}-01`, hoy, hoy)
+    return null
+  })
   const hayEsteMes = (movs.data ?? []).some((m) => (!campoId || m.campo_id === campoId) && enRango(m, 'mes', hoy))
-  const rango: Rango = elegido ?? (movs.data && !hayEsteMes ? '12m' : 'mes')
-  const [campana, pasada] = periodos(hoy).slice(1)
+  const periodo = elegido ?? (movs.data && !hayEsteMes ? todos[0]! : periodoEntre(`${hoy.slice(0, 7)}-01`, hoy, hoy))
+
+  const [pestana, setPestana] = useState<Pestana>(() => (params.get('nuevos') === '1' ? 'revisar' : 'todos'))
+  const [q, setQ] = useState(() => params.get('q') ?? '')
+  const [tipo, setTipo] = useState<Tipo>('todo')
+  const [quien, setQuien] = useState<string | null>(null)
+  const [abierto, setAbierto] = useState<MovimientoConDetalle | null>(null)
+  const [editar, setEditar] = useState(false)
+  const abrir = (m: MovimientoConDetalle, e = false) => (setEditar(e), setAbierto(m))
+
+  const esNuevo = (m: MovimientoConDetalle) => carga && !m.revisado_at
+  const nuevos = (movs.data ?? []).filter(esNuevo)
+  // Quién cargó: por nombre (dos cuentas con el mismo nombre son una opción).
+  const nombresAutores = [...new Set((movs.data ?? []).map((m) => m.created_by).filter((x): x is string => !!x).map((a) => nombreDe(a)))].sort((a, b) => (a === 'Vos' ? -1 : b === 'Vos' ? 1 : a.localeCompare(b, 'es')))
 
   const lista = (movs.data ?? [])
-    .filter((m) => (soloNuevos ? !m.revisado_at : (!campoId || m.campo_id === campoId) && enRango(m, rango, hoy)) && coincide(m, q) && (quien === null || m.created_by === quien))
-    .sort((a, b) => (b.fecha_cobro_pago ?? b.fecha_devengo).localeCompare(a.fecha_cobro_pago ?? a.fecha_devengo))
-  const salio = lista.filter((m) => m.tipo === 'gasto').reduce((s, m) => s + Number(m.monto), 0)
-  const entro = lista.filter((m) => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
-  const cuando = { mes: `En ${nombreMes(hoy.slice(0, 7))}`, anio: `En ${hoy.slice(0, 4)}`, '12m': 'En los últimos 12 meses', campana: `En la ${campana!.nombre.toLowerCase()}`, pasada: `En la ${pasada!.nombre.toLowerCase()}`, todo: 'Desde el principio' }[rango]
-  const RANGOS: { v: Rango; t: string }[] = [
-    { v: 'mes', t: nombreMes(hoy.slice(0, 7)).replace(/^\w/, (c) => c.toUpperCase()) },
-    { v: 'anio', t: 'Este año' },
-    { v: '12m', t: '12 meses' },
-    { v: 'campana', t: campana!.nombre },
-    { v: 'pasada', t: pasada!.nombre },
-    { v: 'todo', t: 'Todo' },
-  ]
+    .filter(
+      (m) =>
+        (!campoId || m.campo_id === campoId) &&
+        enRango(m, 'fechas', hoy, { desde: periodo.desde, hasta: periodo.hasta }) &&
+        (tipo === 'todo' || m.tipo === tipo) &&
+        coincide(m, q) &&
+        (quien === null || (m.created_by ? nombreDe(m.created_by) : '') === quien),
+    )
+    .sort((a, b) => fechaDe(b).localeCompare(fechaDe(a)))
+  const suma = (xs: MovimientoConDetalle[], t: 'gasto' | 'ingreso') => xs.filter((m) => m.tipo === t).reduce((s, m) => s + Number(m.monto), 0)
+  const salio = suma(lista, 'gasto')
+  const entro = suma(lista, 'ingreso')
+  // Agrupado por mes, con lo que salió y entró en cada uno.
+  const meses: { clave: string; movs: MovimientoConDetalle[] }[] = []
+  for (const m of lista) {
+    const k = fechaDe(m).slice(0, 7)
+    const g = meses.at(-1)
+    if (g?.clave === k) g.movs.push(m)
+    else meses.push({ clave: k, movs: [m] })
+  }
+  const filtrando = tipo !== 'todo' || quien !== null || q.trim() !== ''
 
   function bajar() {
     const url = URL.createObjectURL(new Blob([aCsv(lista)], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `plata-${hoy}.csv`
+    a.download = `plata-${periodo.desde}-a-${periodo.hasta}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="mx-auto flex w-full ancho-pagina flex-col gap-7">
-      <div className="flex items-end justify-between gap-3">
+    <div className="mx-auto flex w-full ancho-pagina flex-col gap-6">
+      <div className="flex items-center justify-between gap-3">
         <Link to="/analitica" className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-borde bg-superficie pr-4 pl-3 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
           <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
           Volver a Plata
@@ -91,27 +114,37 @@ export function MovimientosPage() {
         <CampoVisto campos={identidad.campos} elegido={identidad.elegido} />
       </div>
 
-      <div className="flex flex-wrap items-end justify-between gap-6">
+      {/* Qué es, cuánto suma y la acción principal. */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[18px] font-semibold text-texto-suave">{cuando} salieron</p>
-          <h1 className="t-numero-hero text-texto">{fmtCompact(salio)}</h1>
-          <p className="mt-2 text-[16px] text-texto-suave">
-            en {lista.length} {lista.length === 1 ? 'movimiento' : 'movimientos'}
-            {entro > 0 && `, y entraron ${fmtCompact(entro)}`}
+          <h1 className="t-pagina text-texto">Movimientos</h1>
+          <p className="mt-2 text-[15.5px] text-texto-suave">
+            {pestana === 'todos' ? (
+              <>
+                <b className="text-texto">{lista.length === 1 ? '1 movimiento' : `${lista.length} movimientos`}</b>
+                {salio > 0 && <> · salieron <b className="text-estado-problema-texto">{fmtCompact(salio)}</b></>}
+                {entro > 0 && <> · entraron <b className="text-estado-bien-texto">{fmtCompact(entro)}</b></>}
+              </>
+            ) : (
+              'Lo que cargó tu equipo y todavía no miraste.'
+            )}
           </p>
         </div>
-        <div className="flex gap-2.5">
-          <button type="button" onClick={bajar} disabled={lista.length === 0} className="inline-flex h-12 items-center rounded-full border-[1.5px] border-principal px-5 text-[15.5px] font-bold text-principal hover:bg-principal-suave disabled:opacity-40">
-            Bajar a Excel
-          </button>
+        <div className="flex items-center gap-2">
+          {pestana === 'todos' && (
+            <button type="button" onClick={bajar} disabled={lista.length === 0} className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-[14.5px] font-semibold text-texto hover:bg-superficie disabled:opacity-40">
+              <Icono nombre="Descargar" tamano={16} />
+              Bajar a Excel
+            </button>
+          )}
           {empresaId && (
             <AnotarPlata
               empresaId={empresaId}
               campoInicial={campoId ?? undefined}
-              renderTrigger={(abrir) => (
-                <button type="button" onClick={() => abrir()} className="inline-flex h-12 items-center gap-3 rounded-full bg-principal py-1 pr-1 pl-5 text-[15.5px] font-bold text-principal-texto hover:bg-terracota-600">
-                  Anotar
-                  <span className="grid size-10 place-items-center rounded-full bg-acento text-acento-texto">
+              renderTrigger={(abrirAnotar) => (
+                <button type="button" onClick={() => abrirAnotar()} className="inline-flex h-11 items-center gap-2.5 rounded-full bg-principal py-1 pr-1 pl-5 text-[15px] font-bold text-principal-texto hover:bg-terracota-600">
+                  Anotar un movimiento
+                  <span className="grid size-9 place-items-center rounded-full bg-acento text-acento-texto">
                     <Icono nombre="Agregar" tamano={16} />
                   </span>
                 </button>
@@ -121,93 +154,142 @@ export function MovimientosPage() {
         </div>
       </div>
 
-      {/* Lo que cargaron otros y todavía no se miró: cuenta desde que entró. */}
-      {nuevos.length > 0 && (
-        <div className="flex flex-wrap items-center gap-4 rounded-[18px] border border-principal/30 bg-principal-suave/50 px-5 py-3.5">
-          <span className="rounded-full bg-principal px-2.5 py-0.5 text-[13px] font-bold text-principal-texto">Nuevo</span>
-          <p className="min-w-0 flex-1 text-[15px] text-texto">
-            <b>{nuevos.length === 1 ? 'Hay un movimiento que cargó otro' : `Hay ${nuevos.length} movimientos que cargaron otros`}</b>
-            <span className="block text-[13.5px] text-texto-suave">Ya cuentan en los totales. Revisalos y corregí lo que haga falta.</span>
-          </p>
-          <button type="button" onClick={() => setSoloNuevos((v) => !v)} className="inline-flex h-10 items-center rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave">
-            {soloNuevos ? 'Ver todos' : 'Ver sólo los nuevos'}
-          </button>
-          <Boton accion={yaLosVi} className="h-10 rounded-full px-4 text-[14.5px] font-bold">
-            Ya los vi
-          </Boton>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div role="tablist" aria-label="Período" className="flex flex-wrap gap-2">
-          {RANGOS.map((r) => (
-            <button key={r.v} type="button" role="tab" aria-selected={rango === r.v} onClick={() => setRango(r.v)} className={cn('h-11 rounded-full px-4 text-[15px] font-bold transition-colors', rango === r.v ? 'bg-acento text-acento-texto' : 'border-[1.5px] border-borde bg-superficie text-texto hover:border-neutro-300')}>
-              {r.t}
-            </button>
-          ))}
-        </div>
-        {/* Quién cargó: sólo si cargó más de una persona. */}
-        {autores.length > 1 && (
-          <div role="group" aria-label="Quién cargó" className="flex flex-wrap gap-2">
-            {[null, ...autores].map((a) => (
-              <button key={a ?? 'todos'} type="button" aria-pressed={quien === a} onClick={() => setQuien(a)} className={cn('h-11 rounded-full px-4 text-[15px] font-bold transition-colors', quien === a ? 'bg-principal-suave text-principal' : 'border-[1.5px] border-borde bg-superficie text-texto hover:border-neutro-300')}>
-                {a === null ? 'Cargó cualquiera' : nombreDe(a)}
-              </button>
-            ))}
-          </div>
-        )}
-        <label className="ml-auto flex h-11 min-w-[260px] items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 focus-within:border-principal/60">
-          <Icono nombre="Buscar" tamano={16} className="text-texto-suave" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Proveedor, detalle o CUIT" aria-label="Buscar un movimiento" className="w-full bg-transparent text-[15px] text-texto outline-none placeholder:text-texto-suave" />
-        </label>
-      </div>
-
-      {movs.isLoading ? (
-        <div className="h-[300px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
-      ) : lista.length === 0 ? (
-        <p className="border-t border-borde py-10 text-center text-[15.5px] text-texto-suave">{q ? 'No hay movimientos con esa búsqueda.' : 'No hay movimientos en este período.'}</p>
-      ) : (
-        <ul className="border-t border-borde">
-          {lista.map((m) => {
-            const f = m.fecha_cobro_pago ?? m.fecha_devengo
-            const ingreso = m.tipo === 'ingreso'
-            const medio = medioTexto(m)
-            // Como las filas de la Agenda: el título y, debajo, todo lo demás en una línea gris.
-            const detalle = [m.categoria?.nombre, m.campo?.nombre, m.contraparte, medio, comprobanteTexto(m)].filter(Boolean).join(' · ')
-            const autor = quienCargo(m.created_by, m.canal)
-            const nuevo = carga && !m.revisado_at
+      {/* Las dos pestañas: todo lo anotado, o lo que cargó el equipo para revisar. */}
+      {carga && (
+        <div role="tablist" aria-label="Movimientos" className="flex w-fit gap-1 rounded-full bg-superficie-hundida p-1">
+          {([
+            ['todos', 'Todos'],
+            ['revisar', 'Para revisar'],
+          ] as const).map(([id, texto]) => {
+            const si = pestana === id
             return (
-              <li key={m.id} className="border-b border-borde/70">
-                <button type="button" onClick={() => setAbierto(m)} className="flex w-full items-center gap-5 py-4 text-left transition-colors hover:bg-superficie-hundida/50">
-                <span className="t-cifra w-14 shrink-0 text-texto-suave">{`${f.slice(8, 10)}/${f.slice(5, 7)}`}
-                  {f.slice(0, 4) !== hoy.slice(0, 4) && <span className="block text-[13px] font-semibold">{f.slice(0, 4)}</span>}</span>
-                <span aria-hidden className={cn('h-10 w-1 shrink-0 rounded-full', ingreso ? 'bg-estado-bien' : 'bg-estado-problema/80')} />
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 truncate text-[16.5px] font-semibold text-texto">
-                    {nuevo && <span className="shrink-0 rounded-full bg-principal px-2 py-0.5 text-[12px] font-bold text-principal-texto">Nuevo</span>}
-                    <span className="truncate">{m.descripcion || m.categoria?.nombre || (ingreso ? 'Ingreso' : 'Gasto')}</span>
-                  </p>
-                  <p className="truncate text-[14.5px] text-texto-suave">{detalle}</p>
-                  {autor && <p className="truncate text-[13.5px] font-semibold text-acento-texto">{autor}</p>}
-                </div>
-                <span className={cn('t-cifra w-36 shrink-0 text-right', ingreso ? 'text-estado-bien-texto' : 'text-estado-problema-texto')}>
-                  {ingreso ? '+' : '−'}
-                  {formatARS(Number(m.monto)).replace('-', '').replace(/\s/g, '')}
-                </span>
-                </button>
-              </li>
+              <button key={id} type="button" role="tab" aria-selected={si} onClick={() => setPestana(id)} className="relative flex h-9 items-center gap-2 rounded-full px-4 text-[14.5px] font-bold">
+                {si && <motion.span layoutId="pestana-movs" transition={{ type: 'spring', stiffness: 420, damping: 34 }} className="absolute inset-0 rounded-full bg-superficie shadow-[0_1px_4px_rgb(58_26_13/.15)]" />}
+                <span className={cn('relative', si ? 'text-texto' : 'text-texto-suave')}>{texto}</span>
+                {id === 'revisar' && nuevos.length > 0 && <span className="relative rounded-full bg-principal px-1.5 text-[12px] leading-[18px] text-principal-texto">{nuevos.length}</span>}
+              </button>
             )
           })}
-        </ul>
+        </div>
       )}
-      <MovimientoPanel
-        m={abierto}
-        onCerrar={() => {
-          // Abrirlo es mirarlo: deja de ser nuevo.
-          if (abierto && carga && !abierto.revisado_at) revisar.mutate([abierto.id])
-          setAbierto(null)
-        }}
-      />
+
+      {pestana === 'revisar' ? (
+        movs.isLoading ? (
+          <div className="h-[300px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
+        ) : (
+          <RevisarMovimientos nuevos={nuevos} quienCargo={quienCargo} onAbrir={abrir} onVerTodos={() => setPestana('todos')} />
+        )
+      ) : (
+        <>
+          {/* Los filtros, en una fila: las fechas (como en Plata), salió o entró, quién y la búsqueda. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <ElegirPeriodo conTodo periodos={todos} periodo={periodo} onElegir={setElegido} hoy={hoy} />
+            <div role="radiogroup" aria-label="Salió o entró" className="flex h-10 gap-0.5 rounded-full bg-superficie p-1 shadow-[inset_0_0_0_1.5px_var(--borde)]">
+              {([
+                ['todo', 'Todo'],
+                ['gasto', 'Salió'],
+                ['ingreso', 'Entró'],
+              ] as const).map(([v, t]) => (
+                <button key={v} type="button" role="radio" aria-checked={tipo === v} onClick={() => setTipo(v)} className={cn('rounded-full px-3 text-[13.5px] font-bold transition-colors', tipo === v ? 'bg-principal text-principal-texto' : 'text-texto-suave hover:text-texto')}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            {nombresAutores.length > 1 && (
+              <label className={cn('flex h-10 items-center gap-2 rounded-full bg-superficie pr-2 pl-3.5 text-[14px] font-bold shadow-[inset_0_0_0_1.5px_var(--borde)]', quien && 'text-principal shadow-[inset_0_0_0_1.5px_var(--principal)]')}>
+                <Icono nombre="Usuario" tamano={16} />
+                <select aria-label="Quién cargó" value={quien ?? ''} onChange={(e) => setQuien(e.target.value || null)} className="bg-transparent pr-1 outline-none">
+                  <option value="">Cargó cualquiera</option>
+                  {nombresAutores.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="ml-auto flex h-10 min-w-[240px] items-center gap-2 rounded-full bg-superficie px-3.5 shadow-[inset_0_0_0_1.5px_var(--borde)] focus-within:shadow-[inset_0_0_0_1.5px_var(--principal)] max-sm:ml-0 max-sm:w-full">
+              <Icono nombre="Buscar" tamano={16} className="text-texto-suave" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Proveedor, detalle o CUIT" aria-label="Buscar un movimiento" className="w-full bg-transparent text-[14.5px] text-texto outline-none placeholder:text-texto-suave" />
+            </label>
+          </div>
+
+          {/* Lo nuevo dentro del período, a la vista: se resuelve en la misma fila o en «Para revisar». */}
+          {carga && nuevos.length > 0 && lista.some(esNuevo) && (
+            // Cuántos, qué son y la acción (Lau, 24/11: el copy anterior era una instrucción larga).
+            <button type="button" onClick={() => setPestana('revisar')} className="-mt-2 flex w-fit items-center gap-2.5 rounded-full bg-principal-suave/50 py-1.5 pr-2 pl-3 text-left text-[14px] text-texto hover:bg-principal-suave">
+              <span className="rounded-full bg-principal px-2 py-0.5 text-[11.5px] font-bold text-principal-texto">{lista.filter(esNuevo).length}</span>
+              <span>
+                {lista.filter(esNuevo).length === 1 ? 'Tu equipo cargó un movimiento que todavía no revisaste' : `Tu equipo cargó ${lista.filter(esNuevo).length} movimientos que todavía no revisaste`}
+              </span>
+              <span className="flex items-center gap-1 rounded-full bg-principal px-2.5 py-1 text-[13px] font-bold text-principal-texto">
+                Revisar
+                <Icono nombre="Siguiente" tamano={16} />
+              </span>
+            </button>
+          )}
+
+          {movs.isLoading ? (
+            <div className="h-[300px] animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
+          ) : lista.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-[24px] bg-superficie px-6 py-10 text-center shadow-[inset_0_0_0_1px_var(--borde)]">
+              <p className="text-[15.5px] text-texto-suave">{filtrando ? 'Nada con esos filtros en estas fechas.' : 'No hay movimientos en estas fechas.'}</p>
+              {filtrando ? (
+                <button type="button" onClick={() => (setTipo('todo'), setQuien(null), setQ(''))} className="text-[14.5px] font-bold text-principal underline underline-offset-2">
+                  Sacar los filtros
+                </button>
+              ) : (
+                <button type="button" onClick={() => setElegido(periodoEntre(DESDE_EL_PRINCIPIO, hoy, hoy))} className="text-[14.5px] font-bold text-principal underline underline-offset-2">
+                  Ver desde el principio
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {meses.map((g) => {
+                const s = suma(g.movs, 'gasto')
+                const e = suma(g.movs, 'ingreso')
+                const nombre = nombreMes(g.clave).replace(/^\w/, (c) => c.toUpperCase())
+                return (
+                  <Grupo
+                    key={g.clave}
+                    etiqueta={`${nombre} ${g.clave.slice(0, 4)}`}
+                    titulo={
+                      <>
+                        {nombre} <span className="font-normal text-texto-suave">{g.clave.slice(0, 4)}</span>
+                      </>
+                    }
+                    detalle={
+                      <span className="flex items-baseline gap-3 text-[13px]">
+                        {s > 0 && (
+                          <span>
+                            Salió <b className="t-cifra-chica text-texto">{fmtCompact(s)}</b>
+                          </span>
+                        )}
+                        {e > 0 && (
+                          <span>
+                            Entró <b className="t-cifra-chica text-estado-bien-texto">{fmtCompact(e)}</b>
+                          </span>
+                        )}
+                      </span>
+                    }
+                  >
+                    {/* Por día: la fecha una vez, como separador, no en cada fila. */}
+                    {g.movs.flatMap((m, i) => {
+                      const dia = fechaDe(m)
+                      const fila = <FilaMovimiento key={m.id} m={m} nuevo={esNuevo(m)} quien={quienCargo(m.created_by, m.canal)} sinCampo={!!campoId} onAbrir={abrir} onBien={(x) => void darPorBueno([x.id], 'lo diste por bueno')} />
+                      return i === 0 || fechaDe(g.movs[i - 1]!) !== dia ? [<Dia key={`d${dia}`} ymd={dia} />, fila] : [fila]
+                    })}
+                  </Grupo>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Mirarlo y cerrarlo no lo da por revisado: eso lo deciden «Está bien», «Corregir» o «Anular». */}
+      <MovimientoPanel m={abierto} editar={editar} onCerrar={() => setAbierto(null)} />
     </div>
   )
 }

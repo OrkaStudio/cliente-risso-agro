@@ -59,11 +59,31 @@ export async function marcarRevisados(ids: string[]): Promise<void> {
   if (error) throw errorDeBase(error)
 }
 
-/** Corregir un movimiento: lo que se tipea mal (monto, detalle, fecha). Queda revisado. */
-export async function corregirMovimiento(x: { id: string; monto: number; descripcion: string; fecha: string }): Promise<void> {
+/** Deshacer «Está bien»: vuelve a estar para revisar (y quien lo cargó puede volver a corregirlo). */
+export async function desmarcarRevisados(ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const { error } = await supabase.from('movimiento_financiero').update({ revisado_at: null }).in('id', ids)
+  if (error) throw errorDeBase(error)
+}
+
+/**
+ * Corregir un movimiento (Lau, 24/11): si salió o entró, en qué, de qué campo, cuánto, el
+ * detalle y la fecha. Queda revisado. La fecha mueve también la de pago, que es la que
+ * ordena Plata y Movimientos (antes cambiaba sólo la del registro y seguía en el mes viejo).
+ */
+export async function corregirMovimiento(x: { id: string; tipo: TipoMov; categoriaId: string; campoId: string; monto: number; descripcion: string; fecha: string; pagado: boolean }): Promise<void> {
   const { error } = await supabase
     .from('movimiento_financiero')
-    .update({ monto: x.monto, descripcion: x.descripcion, fecha_devengo: x.fecha, revisado_at: new Date().toISOString() })
+    .update({
+      tipo: x.tipo,
+      categoria_id: x.categoriaId,
+      campo_id: x.campoId,
+      monto: x.monto,
+      descripcion: x.descripcion,
+      fecha_devengo: x.fecha,
+      ...(x.pagado ? { fecha_cobro_pago: x.fecha } : {}),
+      revisado_at: new Date().toISOString(),
+    })
     .eq('id', x.id)
   if (error) throw errorDeBase(error)
 }

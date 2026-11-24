@@ -9,7 +9,7 @@ import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { ElegirCampo } from './elegir-campo'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { useLiquidar, useRevertirLiquidacion } from '@/features/agenda/hooks'
-import { useMarcarRevisados } from '@/features/analitica/hooks'
+import { useDesmarcarRevisados, useMarcarRevisados } from '@/features/analitica/hooks'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
@@ -484,12 +484,15 @@ function BotonChico({ lleno = false, accion, className, children, onClick, ...pr
 function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) {
   const [abierto, setAbierto] = useState(false)
   const revisar = useMarcarRevisados()
+  const desmarcar = useDesmarcarRevisados()
   const total = cargas.reduce((s, c) => s + (c.tipo === 'ingreso' ? c.monto : -c.monto), 0)
   // Darlo por bueno saca la fila: eso confirma (sin «Listo»). Si no sale, lo dice el botón.
   const darPorBueno = useAccion(
     async () => {
-      await revisar.mutateAsync(cargas.map((c) => c.id))
-      return () => toast.success(`Listo: revisaste lo de ${quien}`, { description: 'Ya está en tu plata, sin la marca de nuevo.' })
+      const ids = cargas.map((c) => c.id)
+      await revisar.mutateAsync(ids)
+      // Darlo por bueno cierra: quien lo cargó ya no lo puede cambiar. Por eso se puede deshacer (Lau, 24/11).
+      return () => toast.success(`Listo: revisaste lo de ${quien}`, { description: `Ya no figura como nuevo y ${quien} no lo puede cambiar.`, action: { label: 'Deshacer', onClick: () => desmarcar.mutate(ids) } })
     },
     { sinListo: true },
   )

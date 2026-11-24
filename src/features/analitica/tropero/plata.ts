@@ -40,7 +40,7 @@ export type Anio = {
 }
 
 /** El período que se mira en Plata y el mismo período un año antes, para comparar. */
-export type Periodo = { clave: 'doce' | 'campana' | 'pasada'; nombre: string; desde: string; hasta: string; antesDesde: string; antesHasta: string; enCurso: boolean }
+export type Periodo = { clave: 'doce' | 'campana' | 'pasada' | 'fechas'; nombre: string; desde: string; hasta: string; antesDesde: string; antesHasta: string; enCurso: boolean }
 
 const menosUnAnio = (ymd: string) => restarDias(ymd, 365)
 /** La campaña ganadera va de julio a junio; «26/27» es la que arrancó en julio de 2026. */
@@ -59,6 +59,38 @@ export function periodos(hoy: string): Periodo[] {
     { clave: 'pasada', nombre: `Campaña ${nombreCampana(inicioPasada)}`, desde: inicioPasada, hasta: finPasada, antesDesde: `${Number(inicioPasada.slice(0, 4)) - 1}-07-01`, antesHasta: restarDias(inicioPasada, 1), enCurso: false },
   ]
 }
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+/** «25 nov 2025»; sin el año si es el de `mismoAnio`. */
+export function fechaCorta(ymd: string, mismoAnio?: string): string {
+  const [a, m, d] = ymd.split('-')
+  return `${Number(d)} ${MESES_CORTOS[Number(m) - 1]}${a === mismoAnio ? '' : ` ${a}`}`
+}
+
+/**
+ * El rango en palabras, para que nunca quede duda de qué fechas se miran (Lau, 24/11):
+ * «Del 25 nov 2025 a hoy», «Del 1 jul 2025 al 30 jun 2026», «Del 1 al 30 sep 2026».
+ */
+/** «Desde el principio»: un rango que arranca antes de cualquier movimiento. */
+export const DESDE_EL_PRINCIPIO = '1900-01-01'
+
+export function textoRango(desde: string, hasta: string, hoy: string): string {
+  if (desde <= DESDE_EL_PRINCIPIO) return hasta === hoy ? 'Desde el principio' : `Hasta el ${fechaCorta(hasta)}`
+  const fin = hasta === hoy ? 'a hoy' : `al ${fechaCorta(hasta)}`
+  if (hasta !== hoy && desde.slice(0, 7) === hasta.slice(0, 7)) return `Del ${Number(desde.slice(8))} al ${fechaCorta(hasta)}`
+  return `Del ${fechaCorta(desde, desde.slice(0, 4) === hasta.slice(0, 4) && hasta !== hoy ? hasta.slice(0, 4) : undefined)} ${fin}`
+}
+
+/** Un período elegido con el calendario; se compara con las mismas fechas un año antes. */
+export function periodoEntre(desde: string, hasta: string, hoy: string): Periodo {
+  return { clave: 'fechas', nombre: textoRango(desde, hasta, hoy), desde, hasta, antesDesde: menosUnAnio(desde), antesHasta: menosUnAnio(hasta), enCurso: hasta >= hoy }
+}
+
+/** Contra qué se compara, dicho para el productor. */
+export const contraDe = (p: Periodo): string => ({ doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior', fechas: 'que las mismas fechas del año anterior' })[p.clave]
+
+/** «los últimos 12 meses», «la campaña 26/27», «del 1 al 30 sep 2026». */
+export const delPeriodoTexto = (p: Periodo): string => (p.clave === 'doce' ? 'los últimos 12 meses' : p.clave === 'fechas' ? p.nombre.replace(/^Del/, 'del') : `la ${p.nombre.toLowerCase()}`)
 
 /**
  * Lo que entró y salió en el período, y la comparación con el mismo período un
@@ -289,19 +321,19 @@ export function comparacionCorta(a: Anio): { sube: boolean; texto: string } | nu
   return { sube: d > 0, texto: `US$ ${mil.toLocaleString('es-AR')} mil ${d > 0 ? 'más' : 'menos'}` }
 }
 
-/** El período de la lista de movimientos. */
-/** Los períodos de Movimientos: los mismos de Plata (12 meses y las campañas) y los del calendario. */
-export type Rango = 'mes' | 'anio' | '12m' | 'campana' | 'pasada' | 'todo'
+/** Los períodos de Movimientos: los mismos de Plata (12 meses, las campañas y las fechas elegidas) y los del calendario. */
+export type Rango = 'mes' | 'anio' | '12m' | 'campana' | 'pasada' | 'todo' | 'fechas'
 export const RANGOS_VALIDOS: Rango[] = ['mes', 'anio', '12m', 'campana', 'pasada', 'todo']
 
-/** El período de Plata, como período de Movimientos (para abrir el detalle de lo que se miraba). */
-export const rangoDePeriodo = (clave: Periodo['clave']): Rango => (clave === 'doce' ? '12m' : clave)
+/** El período de Plata como link a Movimientos (para abrir el detalle de lo que se miraba). */
+export const rangoDePeriodo = (p: Periodo): string => (p.clave === 'doce' ? '12m' : p.clave === 'fechas' ? `fechas&desde=${p.desde}&hasta=${p.hasta}` : p.clave)
 
 /** Lo que ya entró o salió en el período (lo pendiente vive en «Lo que viene» y la Agenda). */
-export function enRango(m: MovimientoConDetalle, r: Rango, hoy: string): boolean {
+export function enRango(m: MovimientoConDetalle, r: Rango, hoy: string, fechas?: { desde: string; hasta: string }): boolean {
   if (!realizado(m)) return false
   const f = m.fecha_cobro_pago!
   if (r === 'todo') return true
+  if (r === 'fechas') return !!fechas && f >= fechas.desde && f <= fechas.hasta
   if (r === 'mes') return f.slice(0, 7) === hoy.slice(0, 7)
   if (r === 'anio') return f.slice(0, 4) === hoy.slice(0, 4)
   if (r === 'campana' || r === 'pasada') {
@@ -386,3 +418,6 @@ export function mesAMes(movs: MovimientoConDetalle[], pendientes: Pendiente[], h
   }
   return meses
 }
+
+/** «Cargó Tito Manda (encargado) · por WhatsApp» → «Tito Manda». */
+export const soloNombre = (quien: string) => quien.replace(/^Cargó /, '').replace(/ · por WhatsApp$/, '').replace(/ \([^)]*\)$/, '')

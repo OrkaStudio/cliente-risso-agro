@@ -48,38 +48,42 @@ export function Trazo({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * La tarjeta del audio: tocarla (o el micrófono) abre el chat de Troppero en WhatsApp.
- * `antes` y `marcado` arman el título: «Contame cómo está» + «tu campo» subrayado.
+ * La tarjeta del audio, con el llamado a la acción claro (Lau, 23/11): arriba qué es
+ * («Contame cómo está *tu campo*») y para qué; abajo, a todo el ancho, el botón verde
+ * que dice lo que hace —«Grabar un audio», con el micrófono— y abre el chat de
+ * Troppero en WhatsApp.
  */
 export function AudioWhatsapp({ href, antes, marcado, bajada, className, onClick }: { href: string; antes: string; marcado: string; bajada: string; className?: string; onClick?: () => void }) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={onClick}
-      aria-label={`${antes} ${marcado}: mandar un audio por WhatsApp`}
-      className={cn('flex items-center gap-2.5 rounded-[20px] bg-[#fffdf9] p-3 shadow-[inset_0_0_0_1px_#e6ddcc,0_18px_40px_-30px_rgb(168_80_16/.5)]', className)}
-    >
-      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#dcf8c6] text-[#1fae55]">
-        <LogoWhatsapp className="size-6" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[14.5px] leading-snug font-bold tracking-[-0.015em]" style={{ color: TINTA }}>
-          {antes} <Trazo>{marcado}</Trazo>
+    <section className={cn('flex flex-col gap-3 rounded-[20px] bg-[#fffdf9] p-3.5 shadow-[inset_0_0_0_1px_#e6ddcc,0_18px_40px_-30px_rgb(168_80_16/.5)]', className)}>
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#dcf8c6] text-[#1fae55]">
+          <LogoWhatsapp className="size-[22px]" />
         </span>
-        <span className="mt-1 block text-[12.5px] leading-snug" style={{ color: GRIS }}>
-          {bajada}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15.5px] leading-snug font-bold tracking-[-0.015em]" style={{ color: TINTA }}>
+            {antes} <Trazo>{marcado}</Trazo>
+          </span>
+          <span className="mt-1 block text-[13px] leading-snug" style={{ color: GRIS }}>
+            {bajada}
+          </span>
         </span>
-      </span>
-      <motion.span
-        whileTap={{ scale: 0.94 }}
-        aria-hidden
-        className="grid size-[48px] shrink-0 place-items-center rounded-full text-white shadow-[inset_0_1px_0_rgb(255_255_255/.25),0_10px_20px_-10px_rgb(31_174_85/.8)]"
+      </div>
+      <motion.a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onClick}
+        whileTap={{ scale: 0.98 }}
+        className="flex h-12 items-center justify-center gap-2.5 rounded-full text-[16px] font-bold text-white shadow-[inset_0_1px_0_rgb(255_255_255/.25),0_10px_20px_-12px_rgb(31_174_85/.9)]"
         style={{ background: 'linear-gradient(180deg, #2bd46d 0%, #1fae55 100%)' }}
       >
-        <Microfono className="size-[21px]" />
-      </motion.span>
-    </a>
+        <Microfono className="size-[20px]" />
+        Grabar un audio
+      </motion.a>
+      <p className="-mt-1 text-center text-[12px]" style={{ color: GRIS }}>
+        Se abre WhatsApp: tocá el micrófono y hablá.
+      </p>
+    </section>
   )
 }

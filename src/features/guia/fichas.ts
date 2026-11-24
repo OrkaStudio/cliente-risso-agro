@@ -106,8 +106,8 @@ export const FICHAS: Ficha[] = [
     categoria: 'plata',
     chip: '¿Cómo cargo el alquiler del campo?',
     respuesta:
-      'En Analítica, con «Cargar un alquiler»: elegís el campo y lo cargás como está en el contrato — kilos de novillo, quintales de soja o maíz, dólares o pesos; por hectárea o total; y cada cuánto se paga. Cada pago queda en la Agenda y, cuando lo pagás, se anota lo que pagaste de verdad.',
-    accion: { label: 'Cargar el alquiler', ruta: '/analitica', ancla: 'analitica-alquiler' },
+      'En Plata, con «Anotar un movimiento» → «¿Es el alquiler de un campo?»: elegís el campo y lo cargás como está en el contrato — kilos de novillo, quintales de soja o maíz, dólares o pesos; por hectárea o total; y cada cuánto se paga. Cada pago queda en la Agenda y, cuando lo pagás, se anota lo que pagaste de verdad.',
+    accion: { label: 'Cargar el alquiler', ruta: '/analitica', ancla: 'analitica-cargar' },
   },
   {
     id: 'precio-novillo',

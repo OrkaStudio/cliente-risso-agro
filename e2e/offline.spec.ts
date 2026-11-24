@@ -238,9 +238,9 @@ test.describe('la web funciona sin señal (caso del campo)', () => {
      * partir de acá la pantalla de Plata queda desmontada. */
     await page.goto('/campo/plata')
     // En el Plata nuevo (17/11) el formulario —y con él la cola del teléfono— se monta al tocar
-    // «Anotar un gasto»; antes bastaba con entrar a la pantalla.
-    await page.getByRole('button', { name: 'Anotar un gasto' }).first().click()
-    await expect(page.getByRole('dialog', { name: 'Anotar un gasto' })).toBeVisible()
+    // «Anotar un movimiento»; antes bastaba con entrar a la pantalla.
+    await page.getByRole('button', { name: 'Anotar un movimiento' }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Anotar un movimiento' })).toBeVisible()
     await page.waitForTimeout(800)
     await page.goto('/campo')
 

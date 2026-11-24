@@ -4,7 +4,7 @@ import { Boton, BotonPrincipal } from '@/components/tropero/boton'
 import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
-import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
+import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoCelular } from '@/features/acceso/campo-celular'
 import { NIVELES, ROLES, SECCIONES_CON_PERMISO, nombreRol, resumenNiveles, type Niveles, type Rol, type RolConocido } from '@/features/empresa/secciones'
 import { normalizarCelularAR } from '@/lib/telefono'
@@ -12,6 +12,8 @@ import { nombrePropio, primeraMayuscula } from '@/lib/texto'
 import { cn } from '@/lib/utils'
 import { celularLindo, linkInvitacion, useCambiarNiveles, useInvitar, whatsappInvitacionBot, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
+import { LogoWhatsapp } from '@/components/tropero/audio-whatsapp'
+import { Leyenda, TablaNiveles } from './accesos'
 
 /**
  * Qué puede hacer en cada sección (permisos, 13/11): una fila por sección, con
@@ -72,6 +74,19 @@ function faltaElegir(n: Niveles): string | null {
   if (SECCIONES_CON_PERMISO.some((s) => !n[s.id])) return SIN_ELEGIR
   if (SECCIONES_CON_PERMISO.every((s) => n[s.id] === 'no')) return SIN_NADA
   return null
+}
+
+/** Un paso del formulario: su número y qué se elige. */
+function Paso({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-6">
+      <p className="mb-2.5 flex items-center gap-2 text-[14.5px] font-bold text-texto">
+        <span className="grid size-6 place-items-center rounded-full bg-trigo-100 text-[12.5px] font-bold text-trigo-800">{n}</span>
+        {titulo}
+      </p>
+      {children}
+    </section>
+  )
 }
 
 /** Invitar: quién es, qué hace (sólo lo nombra) y qué puede hacer en cada sección (lo elige el dueño). */
@@ -140,7 +155,7 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
       abierto={abierto}
       onCerrar={onCerrar}
       titulo="Invitar a alguien"
-      bajada="Vos elegís cómo lo usa, qué ve y qué carga; lo cambiás cuando quieras."
+      bajada="Le llega por WhatsApp. Lo que elijas acá lo cambiás cuando quieras."
       ancho
       pie={
         <>
@@ -151,55 +166,88 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
         </>
       }
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-        <CampoTexto etiqueta="Cómo se llama" placeholder="Juan Pérez" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} autoFocus />
-        <CampoCelular etiqueta="Su celular, el que tiene WhatsApp" valor={celular} onCambio={setCelular} />
+      {/* 1. Quién es: uno abajo del otro en el celular, lado a lado en la compu. */}
+      <p className="mb-2.5 flex items-center gap-2 text-[14.5px] font-bold text-texto">
+        <span className="grid size-6 place-items-center rounded-full bg-trigo-100 text-[12.5px] font-bold text-trigo-800">1</span>
+        Quién es
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CampoTexto etiqueta="Nombre" placeholder="Juan Pérez" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} autoFocus />
+        <CampoCelular etiqueta="Celular con WhatsApp" valor={celular} onCambio={setCelular} />
       </div>
-      <Grupo titulo="Qué hace en el campo" className="mt-6">
-        <Opciones
-          etiqueta="Qué hace"
-          opciones={[...ROLES, { valor: 'otro' as const, texto: 'Otro' }]}
-          elegidas={tipoRol ? [tipoRol] : []}
-          // El rol sólo lo nombra: no trae permisos armados (Lau, 13/11).
-          onTocar={setTipoRol}
-        />
+
+      {/* 2. Qué hace: sólo lo nombra, no trae permisos armados (Lau, 13/11). */}
+      <Paso n={2} titulo="Qué hace en el campo">
+        <div role="radiogroup" aria-label="Qué hace" className="flex flex-wrap gap-1.5">
+          {[...ROLES, { valor: 'otro' as const, texto: 'Otro' }].map((r) => {
+            const si = tipoRol === r.valor
+            return (
+              <button
+                key={r.valor}
+                type="button"
+                role="radio"
+                aria-checked={si}
+                onClick={() => setTipoRol(r.valor)}
+                className={cn('h-9 rounded-full px-3.5 text-[14px] font-semibold transition-colors', si ? 'bg-principal text-principal-texto' : 'bg-superficie text-texto shadow-[inset_0_0_0_1px_var(--borde)] hover:shadow-[inset_0_0_0_1px_var(--color-neutro-300)]')}
+              >
+                {r.texto}
+              </button>
+            )
+          })}
+        </div>
         {tipoRol === 'otro' && (
           <CampoTexto className="mt-3" etiqueta="Qué hace" placeholder="Contador, ingeniero agrónomo…" value={otroRol} onChange={(e) => setOtroRol(primeraMayuscula(e.target.value))} autoFocus maxLength={40} />
         )}
-      </Grupo>
-      <Grupo titulo="Cómo va a usar Troppero">
+      </Paso>
+
+      {/* 3. Cómo lo usa: con su ícono y una marca clara de lo elegido. */}
+      <Paso n={3} titulo="Cómo va a usar Troppero">
         <div role="radiogroup" aria-label="Cómo va a usar Troppero" className="grid gap-2 sm:grid-cols-2">
           {(
             [
-              { id: 'app', titulo: 'En la app y por WhatsApp', texto: 'Entra con su celular, mira y carga lo que le habilites.' },
-              { id: 'whatsapp', titulo: 'Sólo por WhatsApp', texto: 'No se baja nada: te manda novedades, gastos o facturas por WhatsApp.' },
+              { id: 'app', titulo: 'En la app y por WhatsApp', texto: 'Entra con su celular y ve o carga lo que le habilites.' },
+              { id: 'whatsapp', titulo: 'Sólo por WhatsApp', texto: 'No se baja nada: te manda novedades, gastos o facturas.' },
             ] as const
-          ).map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="radio"
-              aria-checked={acceso === o.id}
-              onClick={() => {
-                setAcceso(o.id)
-                // Por WhatsApp no se ve: lo elegido que no sea «No ve» o «Solo manda» se vuelve a elegir.
-                if (o.id === 'whatsapp') setNiveles((n) => Object.fromEntries(Object.entries(n).filter(([, v]) => v === 'no' || v === 'solo_manda')))
-              }}
-              className={cn('flex flex-col gap-0.5 rounded-[16px] border-[1.5px] px-4 py-3 text-left transition-colors', acceso === o.id ? 'border-acento bg-acento/30' : 'border-borde bg-superficie hover:border-neutro-300')}
-            >
-              <span className="text-[15.5px] font-bold text-texto">{o.titulo}</span>
-              <span className="text-[13.5px] text-texto-suave">{o.texto}</span>
-            </button>
-          ))}
+          ).map((o) => {
+            const si = acceso === o.id
+            return (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={si}
+                onClick={() => {
+                  setAcceso(o.id)
+                  // Por WhatsApp no se ve: lo elegido que no sea «No ve» o «Avisa» se vuelve a elegir.
+                  if (o.id === 'whatsapp') setNiveles((n) => Object.fromEntries(Object.entries(n).filter(([, v]) => v === 'no' || v === 'solo_manda')))
+                }}
+                className={cn('flex items-start gap-3 rounded-[16px] bg-superficie px-3.5 py-3 text-left transition-shadow', si ? 'shadow-[inset_0_0_0_2px_var(--principal)]' : 'shadow-[inset_0_0_0_1px_var(--borde)]')}
+              >
+                <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', o.id === 'app' ? 'bg-principal-suave text-principal' : 'bg-[#dcf8c6] text-[#1fae55]')}>
+                  {o.id === 'app' ? <Icono nombre="Celular" tamano={16} /> : <LogoWhatsapp className="size-[18px]" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] leading-snug font-bold text-texto">{o.titulo}</span>
+                  <span className="block text-[13px] leading-snug text-texto-suave">{o.texto}</span>
+                </span>
+                <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2', si ? 'border-principal bg-principal' : 'border-neutro-300')}>
+                  {si && <span className="size-2 rounded-full bg-white" />}
+                </span>
+              </button>
+            )
+          })}
         </div>
-      </Grupo>
+      </Paso>
+
+      {/* 4. Qué puede hacer: la misma tabla que la ficha de cada persona. */}
       {acceso && (
-        <>
-          <Grupo titulo="Qué puede hacer en cada sección">
-            <ElegirNiveles niveles={niveles} onCambiar={setNiveles} soloWhatsapp={acceso === 'whatsapp'} />
-          </Grupo>
+        <Paso n={4} titulo="Qué puede hacer en cada sección">
+          <div className="flex flex-col gap-3">
+            <TablaNiveles etiqueta="Qué puede hacer en cada sección" niveles={niveles} whatsapp={acceso === 'whatsapp'} onElegir={(sec, n) => setNiveles((v) => ({ ...v, [sec]: n }))} />
+            <Leyenda />
+          </div>
           <Resumen niveles={niveles} nombre={nombre} />
-        </>
+        </Paso>
       )}
     </PanelLateral>
   )

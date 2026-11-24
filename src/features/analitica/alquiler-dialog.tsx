@@ -62,7 +62,7 @@ export function AlquilerDialog({
   onOpenChange,
 }: {
   empresaId: string
-  /** Campo ya elegido (desde la guía); si no, se pregunta. */
+  /** El campo que se estaba mirando: viene marcado, pero igual se pregunta (Lau, 24/11). */
   campoId?: string
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -74,14 +74,14 @@ export function AlquilerDialog({
   const canuelas = useNovilloCanuelas()
   const invalidar = useInvalidarMovimientos()
 
-  // Los alquilados primero; si no hay ninguno marcado así, cualquiera de sus campos
-  // (antes no preguntaba y «Guardar» no hacía nada).
-  const marcados = (campos.data ?? []).filter((c) => c.tipo === 'alquilado')
-  const alquilados = marcados.length ? marcados : (campos.data ?? [])
+  // Siempre primero de qué campo es (Lau, 24/11: «falta elegir el campo antes»), aunque
+  // haya uno elegido en la barra o uno solo: viene marcado y se confirma con un toque.
+  // Todos sus campos, los marcados como alquilados primero.
+  const alquilados = [...(campos.data ?? [])].sort((a, b) => Number(b.tipo === 'alquilado') - Number(a.tipo === 'alquilado'))
   const [campoId, setCampoId] = useState<string | null>(campoInicial ?? null)
-  const campo = (campos.data ?? []).find((c) => c.id === (campoId ?? campoInicial)) ?? (alquilados.length === 1 ? alquilados[0] : null)
+  const campo = (campos.data ?? []).find((c) => c.id === campoId) ?? null
 
-  const [sub, setSub] = useState<Sub>(campoInicial || alquilados.length <= 1 ? 'unidad' : 'campo')
+  const [sub, setSub] = useState<Sub>('campo')
   const [unidad, setUnidad] = useState<Unidad | null>(null)
   const [cantidad, setCantidad] = useState('')
   const [base, setBase] = useState<'ha' | 'total'>('ha')
@@ -112,7 +112,7 @@ export function AlquilerDialog({
   const montoCuota = unidadesCuota === null ? null : unidad === 'pesos' ? unidadesCuota : precioNum !== null ? unidadesCuota * precioNum : null
 
   const ORDEN: Sub[] = [
-    ...(campoInicial || alquilados.length <= 1 ? [] : ['campo' as Sub]),
+    'campo',
     'unidad',
     'cantidad',
     'pago',
@@ -133,7 +133,7 @@ export function AlquilerDialog({
   }
   function confirmarCantidad() {
     if (cant === null || cant <= 0) return setError('Cuánto, según el contrato')
-    if (base === 'ha' && !hectareas) return setError('Este campo no tiene hectáreas cargadas. Ponelas en Campos, o elegí "en total".')
+    if (base === 'ha' && !hectareas) return setError('Este campo no tiene hectáreas cargadas. Ponelas en Campos, o elegí «Todo el campo».')
     setError(null)
     setSub('pago')
   }
@@ -194,7 +194,12 @@ export function AlquilerDialog({
     precio: u ? `¿A cuánto está hoy ${u.precioDe}?` : '¿A cuánto está hoy?',
     resumen: 'Así queda',
   }
-  const confirmar = sub === 'cantidad' ? confirmarCantidad : sub === 'pago' ? confirmarPago : sub === 'precio' ? confirmarPrecio : null
+  function confirmarCampo() {
+    if (!campoId) return setError('Tocá de qué campo es el alquiler.')
+    setError(null)
+    setSub('unidad')
+  }
+  const confirmar = sub === 'campo' ? confirmarCampo : sub === 'cantidad' ? confirmarCantidad : sub === 'pago' ? confirmarPago : sub === 'precio' ? confirmarPrecio : null
   // Los próximos pagos, para ver cómo queda en la Agenda.
   const proximos = Array.from({ length: Math.min(3, cuotasAnio) }, (_, i) => {
     const [y, m, d] = primerPago.split('-').map(Number) as [number, number, number]
@@ -247,7 +252,7 @@ export function AlquilerDialog({
         {sub === 'campo' && (
           <div className="flex flex-col gap-3">
             {alquilados.map((c) => (
-              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" marca={(() => { const id = identidadCampos.find((x) => x.id === c.id); return id ? <MarcaCampo letra={id.letra} color={id.color} className="size-12 text-[18px] ring-2 ring-superficie" /> : undefined })()} titulo={c.nombre} detalle={c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : ''} onClick={() => (setCampoId(c.id), setSub('unidad'))} />
+              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" marca={(() => { const id = identidadCampos.find((x) => x.id === c.id); return id ? <MarcaCampo letra={id.letra} color={id.color} className="size-12 text-[18px] ring-2 ring-superficie" /> : undefined })()} titulo={c.nombre} detalle={[c.tipo === 'alquilado' ? 'Alquilado' : null, c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : null].filter(Boolean).join(' · ')} onClick={() => (setCampoId(c.id), setError(null), setSub('unidad'))} />
             ))}
           </div>
         )}
