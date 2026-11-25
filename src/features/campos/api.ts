@@ -7,6 +7,7 @@ import type {
 } from '@/lib/supabase/types'
 import type { PotreroCardData } from '@/features/potrero/potrero-card'
 import { ordenNaturalPotreros } from '@/features/potrero/orden'
+import { errorDeBase } from '@/lib/error-de-base'
 
 type TipoCampo = Database['public']['Enums']['tipo_campo']
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -81,10 +82,10 @@ export async function listCamposConPotreros(): Promise<CampoConPotreros[]> {
     // Las cabezas por categoría ya sin las salidas sin identificar.
     supabase.from('v_composicion_potrero').select('categoria, potrero_id, cabezas'),
   ])
-  if (eC) throw new Error(eC.message)
-  if (eP) throw new Error(eP.message)
-  if (eS) throw new Error(eS.message)
-  if (eA) throw new Error(eA.message)
+  if (eC) throw errorDeBase(eC)
+  if (eP) throw errorDeBase(eP)
+  if (eS) throw errorDeBase(eS)
+  if (eA) throw errorDeBase(eA)
 
   const cab = new Map((stock ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]))
   const catPorPotrero = new Map<string, Map<Categoria, number>>()
@@ -156,7 +157,7 @@ export async function listCampos() {
     .from('campo')
     .select('*, potrero(count)')
     .order('nombre')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -166,7 +167,7 @@ export async function getCampo(id: string): Promise<Campo | null> {
     .select('*')
     .eq('id', id)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -193,7 +194,7 @@ export async function crearCampo(input: {
     })
     .select('id, color_idx')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   // color_idx lo asigna el trigger de la DB (0, 1, 2… por empresa): de ahí
   // salen la letra (A, B, C…) y el color del campo. Ver colorDeCampo.
   return { id: data.id, colorIdx: data.color_idx ?? 0 }
@@ -225,7 +226,7 @@ export async function actualizarCampo(input: {
         : {}),
     })
     .eq('id', input.id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**
@@ -234,7 +235,7 @@ export async function actualizarCampo(input: {
  */
 export async function actualizarActividadCampo(id: string, actividad: ActividadCampo | null): Promise<void> {
   const { error } = await supabase.from('campo').update({ actividad }).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**
@@ -256,7 +257,7 @@ export async function actualizarPotreroMapa(input: {
       cultivo: input.cultivo ?? null,
     })
     .eq('id', input.id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export async function listPotreros(campoId: string): Promise<Potrero[]> {
@@ -265,7 +266,7 @@ export async function listPotreros(campoId: string): Promise<Potrero[]> {
     .select('*')
     .eq('campo_id', campoId)
     .order('nombre')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -315,7 +316,7 @@ export async function eliminarCampo(id: string): Promise<void> {
 
 export async function eliminarPotrero(id: string): Promise<void> {
   const { error } = await supabase.from('potrero').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export async function actualizarPotrero(input: {
@@ -373,9 +374,9 @@ export async function getCampoMapa(campoId: string): Promise<CampoMapa | null> {
         .order('nombre'),
       supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
     ])
-  if (eC) throw new Error(eC.message)
-  if (eP) throw new Error(eP.message)
-  if (eS) throw new Error(eS.message)
+  if (eC) throw errorDeBase(eC)
+  if (eP) throw errorDeBase(eP)
+  if (eS) throw errorDeBase(eS)
   if (!campo) return null
 
   const cab = new Map((stock ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]))
@@ -410,7 +411,7 @@ export async function setCampoContorno(
       ...(centroDelCampo({ lat: null, lon: null, contorno }) ?? {}),
     })
     .eq('id', campoId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export async function setPotreroPoligono(
@@ -421,7 +422,7 @@ export async function setPotreroPoligono(
     .from('potrero')
     .update({ poligono })
     .eq('id', potreroId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 // ===== Infraestructura (molino / laguna / tranquera / manga) =====
@@ -433,7 +434,7 @@ export async function listInfraestructura(
     .from('infraestructura')
     .select('*')
     .eq('campo_id', campoId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -445,7 +446,7 @@ export async function crearInfraestructura(
     .insert(input)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -457,12 +458,12 @@ export async function actualizarInfraestructura(
     .from('infraestructura')
     .update(patch)
     .eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export async function borrarInfraestructura(id: string): Promise<void> {
   const { error } = await supabase.from('infraestructura').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 // ===== Lotes (tropa dentro de un potrero) =====
@@ -472,7 +473,7 @@ export async function listLotes(campoId: string): Promise<Lote[]> {
     .from('lote')
     .select('*, potrero!inner(campo_id)')
     .eq('potrero.campo_id', campoId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   // Quitar el join anidado (solo se usó para filtrar por campo).
   return (data ?? []).map((row) => {
     const { potrero, ...lote } = row
@@ -506,8 +507,8 @@ export async function getLotesDelCampo(campoId: string): Promise<LoteReparto[]> 
       .eq('campo_id', campoId)
       .order('nombre'),
   ])
-  if (eP) throw new Error(eP.message)
-  if (eL) throw new Error(eL.message)
+  if (eP) throw errorDeBase(eP)
+  if (eL) throw errorDeBase(eL)
   const loteList = lotes ?? []
   if (loteList.length === 0) return []
 
@@ -522,8 +523,8 @@ export async function getLotesDelCampo(campoId: string): Promise<LoteReparto[]> 
       .in('lote_id', loteIds),
     supabase.from('lote_potrero').select('lote_id, potrero_id').in('lote_id', loteIds),
   ])
-  if (eA) throw new Error(eA.message)
-  if (eLP) throw new Error(eLP.message)
+  if (eA) throw errorDeBase(eA)
+  if (eLP) throw errorDeBase(eLP)
 
   const catPorLote = new Map<string, Map<Categoria, number>>()
   const potPorLote = new Map<string, Map<string, number>>()
@@ -575,7 +576,7 @@ export async function crearLote(input: TablesInsert<'lote'>): Promise<Lote> {
     .insert(input)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
@@ -584,12 +585,12 @@ export async function actualizarLote(
   patch: TablesUpdate<'lote'>,
 ): Promise<void> {
   const { error } = await supabase.from('lote').update(patch).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export async function borrarLote(id: string): Promise<void> {
   const { error } = await supabase.from('lote').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** Asigna (o desasigna con loteId=null) un conjunto de animales a un lote. */
@@ -602,7 +603,7 @@ export async function asignarAnimalesALote(
     .from('animal')
     .update({ lote_id: loteId })
     .in('id', animalIds)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**

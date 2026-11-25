@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { ymd } from '@/lib/fecha'
+import { errorDeBase } from '@/lib/error-de-base'
 
 // ===== Agrupación por semana (registro de "qué se hizo/cargó") =====
 
@@ -213,7 +214,7 @@ export async function fetchHistorialRecorridas(limit = 40): Promise<RecorridaHis
     .select('id, fecha, created_at, campo_id, campo:campo_id(nombre, color_idx)')
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const recs = data ?? []
   if (recs.length === 0) return []
 
@@ -226,7 +227,7 @@ export async function fetchHistorialRecorridas(limit = 40): Promise<RecorridaHis
       'recorrida_id',
       recs.map((r) => r.id),
     )
-  if (eObs) throw new Error(eObs.message)
+  if (eObs) throw errorDeBase(eObs)
 
   const conteo = new Map<string, { potreros: number; alertas: number }>()
   for (const o of obs ?? []) {
@@ -276,7 +277,7 @@ export async function fetchRecorridaDetalle(recorridaId: string): Promise<ObsDet
       'pasto, agua, electrico, cultivo, conteo, en_tratamiento, novedad, audio_url, potrero:potrero_id(nombre)',
     )
     .eq('recorrida_id', recorridaId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const obs = data ?? []
 
   // Firmamos los audios en lote.

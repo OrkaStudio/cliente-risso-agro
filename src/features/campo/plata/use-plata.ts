@@ -15,6 +15,17 @@ import { hoyLocal } from '@/lib/fecha'
 // Campo por defecto (el último usado): sobrevive entre sesiones.
 const CAMPO_KEY = 'plata-campo-default'
 
+/**
+ * Lo que se le dice cuando algo cargado sin señal no se pudo subir. Si mientras tanto el
+ * dueño le sacó el permiso de cargar la plata, la base lo rechaza: se dice eso, no el
+ * error en inglés de Postgres (Lau, 19/11).
+ */
+function motivoDelFallo(e: unknown): string {
+  const x = (e ?? {}) as { code?: string; message?: string }
+  if (x.code === '42501' || /row-level security|permission denied/i.test(x.message ?? '')) return 'Ya no tenés permiso para cargar la plata. Hablá con el dueño.'
+  return e instanceof Error ? e.message : (x.message ?? 'No se pudo subir')
+}
+
 export type NuevoGasto = {
   tipo: TipoMov
   monto: number
@@ -95,7 +106,7 @@ export async function drenarPlata(): Promise<void> {
           } catch (e) {
             await platadb.outbox.update(item.id, {
               estado: 'error',
-              error: e instanceof Error ? e.message : 'Error al subir',
+              error: motivoDelFallo(e),
             })
           }
         }
@@ -162,9 +173,10 @@ export function usePlata() {
 
   /** Encola el movimiento (local) y dispara el sync. */
   const guardar = useCallback(
-    async (n: NuevoGasto) => {
+    async (n: NuevoGasto): Promise<string> => {
+      const id = crypto.randomUUID()
       await platadb.outbox.add({
-        id: crypto.randomUUID(),
+        id,
         empresa_id: n.empresaId,
         campo_id: n.campoId,
         tipo: n.tipo,
@@ -185,6 +197,7 @@ export function usePlata() {
       })
       localStorage.setItem(CAMPO_KEY, n.campoId)
       void sincronizar()
+      return id
     },
     [sincronizar],
   )

@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // archivo/: pantallas que salieron de la app (recorrida, manga…), guardadas por las dudas.
+  globalIgnores(['dist', 'archivo']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

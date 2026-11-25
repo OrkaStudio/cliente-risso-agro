@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { Aviso } from '@/components/tropero/aviso'
@@ -70,16 +71,16 @@ export function CargarLaborDialog({
 
   async function guardar() {
     setError(null)
-    if (!empresaId) return
+    if (!empresaId) return 'falta'
 
     const montoNum = monto.trim() ? Number(monto) : null
     if (montoNum != null && (Number.isNaN(montoNum) || montoNum <= 0)) {
       setError('El monto tiene que ser un número mayor a cero.')
-      return
+      return 'falta'
     }
     if (labor.pideCultivo && !cultivo.trim()) {
       setError('Decí qué se sembró — es lo que se lee sobre el potrero en el mapa.')
-      return
+      return 'falta'
     }
 
     // La categoría se resuelve por NOMBRE: son globales y compartidas, así que
@@ -87,10 +88,10 @@ export function CargarLaborDialog({
     const categoriaId = montoNum ? (categorias.data?.find((c) => c.nombre === labor.categoria)?.id ?? null) : null
     if (montoNum && !categoriaId) {
       setError(`No encontré la categoría "${labor.categoria}" para imputar el gasto. Cargá la labor sin monto y sumá el gasto desde Plata.`)
-      return
+      return 'falta'
     }
 
-    try {
+    {
       await registrar.mutateAsync({
         empresaId,
         potreroId,
@@ -102,11 +103,9 @@ export function CargarLaborDialog({
         monto: montoNum,
         categoriaId,
       })
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar la labor')
     }
   }
+  const guardarLabor = useAccion(guardar, { alTerminar: () => onOpenChange(false) })
 
   return (
     <PanelLateral chico
@@ -115,8 +114,8 @@ export function CargarLaborDialog({
       titulo="Cargar labor"
       bajada={`Potrero ${potreroNombre}`}
       pie={
-        <BotonPrincipal icono="Guardar" cargando={registrar.isPending} disabled={registrar.isPending || !empresaId} onClick={() => void guardar()}>
-          {registrar.isPending ? 'Guardando…' : 'Guardar labor'}
+        <BotonPrincipal icono="Siguiente" accion={guardarLabor} disabled={guardarLabor.estado === 'reposo' && !empresaId}>
+          Guardar labor
         </BotonPrincipal>
       }
     >

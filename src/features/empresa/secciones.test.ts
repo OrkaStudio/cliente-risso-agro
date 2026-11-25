@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nivelDe, primeraRuta, puedeCargar, puedeVer, resumenNiveles, seccionDeRuta, veePlata, type Niveles } from './secciones'
+import { accesoDeNiveles, nivelDe, primeraRuta, puedeCargar, puedeVer, resumenNiveles, seccionDeRuta, veePlata, type Niveles } from './secciones'
 import type { Membresia } from './use-empresa'
 
 const m = (rol: string, niveles: Niveles | null): Membresia => ({ empresa_id: 'e', rol, niveles, empresa: null })
@@ -45,5 +45,24 @@ describe('qué ve y qué carga cada uno (permisos, 13/11)', () => {
     expect(seccionDeRuta('/campo/plata')).toBe('plata')
     expect(seccionDeRuta('/configuracion')).toBeNull()
     expect(seccionDeRuta('/campo/manga')).toBeNull()
+  })
+})
+
+describe('accesoDeNiveles (un solo ingreso, 25/11): igual que public.acceso_de_niveles', () => {
+  const N = ['no', 've', 'carga', 'solo_manda'] as const
+  it('recorre las 64 combinaciones: app si mira o anota algo; si no, WhatsApp', () => {
+    let app = 0
+    let wa = 0
+    for (const hacienda of N) for (const campos of N) for (const plata of N) {
+      const r = accesoDeNiveles({ hacienda, campos, plata })
+      const esperado = [hacienda, campos, plata].some((v) => v === 've' || v === 'carga') ? 'app' : 'whatsapp'
+      expect(r).toBe(esperado)
+      if (r === 'app') app++
+      else wa++
+    }
+    expect([app, wa]).toEqual([56, 8])
+  })
+  it('el dueño (sin niveles) usa la app', () => {
+    expect(accesoDeNiveles(null)).toBe('app')
   })
 })

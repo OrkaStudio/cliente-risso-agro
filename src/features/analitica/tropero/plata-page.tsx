@@ -4,7 +4,6 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { CampoVisto } from '@/features/campos/campo-visto'
 import { useCampoDesdeUrl, useCampoElegido } from '@/features/campos/campo-elegido'
-import { AlquilerDialog } from '@/features/analitica/alquiler-dialog'
 import { actividadLabel, fmtCompact, gastosPorCategoria, porActividad, porCampo } from '@/features/analitica/compute'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import { useCampos } from '@/features/campos/hooks'
@@ -17,7 +16,8 @@ import { Cabecera } from '@/components/tropero/cabecera'
 import { useDolarHistorico } from './dolar'
 import { AnotarPlata } from './anotar-plata'
 import { MesAMes } from './mes-a-mes'
-import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, rangoDePeriodo, resumenPeriodo, type Aviso, type Periodo } from './plata'
+import { ElegirPeriodo } from './elegir-periodo'
+import { avisosParaMejorar, campanas as porCampana, comparacionCorta, contraDe, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, rangoDePeriodo, resumenPeriodo, type Aviso, type Periodo } from './plata'
 import { usePermiso } from '@/features/empresa/use-permiso'
 import { useNuevosPlata } from '@/features/analitica/hooks'
 
@@ -48,10 +48,9 @@ export function PlataPage() {
   const campoId = pedido ?? identidad.elegido?.id ?? null
   const reducir = useReducedMotion()
   const navigate = useNavigate()
-  const [alquiler, setAlquiler] = useState(false)
-  const [vezAlquiler, setVezAlquiler] = useState(0)
   const [vista, setVista] = useState<'actividad' | 'campo'>('campo')
-  const [clave, setClave] = useState<Periodo['clave']>('doce')
+  // El período elegido: uno de los tres de siempre o las fechas del calendario (Lau, 24/11).
+  const [elegido, setElegido] = useState<Periodo | null>(null)
   const hoy = hoyLocal()
   const campos = useCampos()
   // El precio del gordo como en la barra de arriba: el más reciente, a igual fecha el manual.
@@ -62,7 +61,7 @@ export function PlataPage() {
   const gordo = (canuelas && (!manual || canuelas.fecha > manual.fecha) ? canuelas.valor : manual?.valor) ?? null
   const serie = useMemo(() => dolar.data ?? [], [dolar.data])
   const todos = useMemo(() => periodos(hoy), [hoy])
-  const periodo = todos.find((p) => p.clave === clave)!
+  const periodo = elegido ?? todos[0]!
 
   const delCampo = useMemo(() => (movs.data ?? []).filter((m) => !campoId || m.campo_id === campoId), [movs.data, campoId])
   const pendientes = useMemo(() => (pend.data ?? []).filter((p) => !campoId || p.campoId === campoId), [pend.data, campoId])
@@ -96,10 +95,9 @@ export function PlataPage() {
   const vacio = delCampo.length === 0
   const ganando = anio.resultado >= 0
   const comparacion = comparacionCorta(anio)
-  const contra = { doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior' }[clave]
+  const contra = contraDe(periodo)
   const verbo = periodo.enCurso ? (ganando ? 'Van ganando' : 'Van perdiendo') : ganando ? 'Ganaron' : 'Perdieron'
 
-  const BOTON_SEC = 'inline-flex h-12 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie/90 px-5 text-[15px] font-bold text-texto backdrop-blur-sm hover:border-principal hover:text-principal'
   const anotar = (abrir: () => void, texto: string, secundario = false) => (
     <button
       type="button"
@@ -124,7 +122,7 @@ export function PlataPage() {
       <motion.div {...entra(0)}>
         <Cabecera imagen={trigal} posicion="50% 62%" encima={<CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campoId) ?? null} />} derecha={
             <>
-              <Link to={`/analitica/movimientos?rango=${rangoDePeriodo(clave)}`} className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
+              <Link to={`/analitica/movimientos?rango=${rangoDePeriodo(periodo)}`} className="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-4 text-[14.5px] font-bold text-texto hover:border-principal hover:text-principal">
                 Ver los movimientos
                 <Icono nombre="Siguiente" tamano={16} />
               </Link>
@@ -133,12 +131,8 @@ export function PlataPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="t-pagina text-texto">Plata</h1>
             {!vacio && (
-              <div role="tablist" aria-label="Período" className="flex shrink-0 gap-5 self-end pb-1">
-                {todos.map((p) => (
-                  <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('border-b-2 pb-1 text-[14.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'border-principal text-texto' : 'border-transparent text-texto-suave hover:text-texto')}>
-                    {p.nombre}
-                  </button>
-                ))}
+              <div className="self-end pb-1">
+                <ElegirPeriodo periodos={todos} periodo={periodo} onElegir={setElegido} hoy={hoy} />
               </div>
             )}
           </div>
@@ -163,7 +157,7 @@ export function PlataPage() {
                 <p className="h-[24px]">
                   {comparacion && (
                     <span className={cn('inline-flex h-full items-center gap-1 rounded-full px-2.5 text-[13px] font-bold whitespace-nowrap', comparacion.sube ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
-                      {comparacion.sube ? '▲' : '▼'} {comparacion.texto} {contra}, en dólares
+                      {comparacion.sube ? '▲' : '▼'} {comparacion.texto} {contra}
                     </span>
                   )}
                 </p>
@@ -172,25 +166,7 @@ export function PlataPage() {
           )}
           {/* Lo que se hace con la plata, todo junto y a la vista. */}
           <div className="mt-5 flex flex-wrap gap-2.5">
-            {empresaId && <span data-guia="analitica-cargar" className="contents"><AnotarPlata empresaId={empresaId} campoInicial={campoId ?? undefined} tipo="gasto" renderTrigger={(abrir) => anotar(() => abrir(), 'Anotar un gasto')} /></span>}
-            {empresaId && (
-              <AnotarPlata
-                empresaId={empresaId}
-                campoInicial={campoId ?? undefined}
-                renderTrigger={(abrir) => (
-                  <button type="button" onClick={() => abrir(true)} className={BOTON_SEC}>
-                    <Icono nombre="Foto" tamano={16} />
-                    Escanear un comprobante
-                  </button>
-                )}
-              />
-            )}
-            {cargaPlata && (
-              <button type="button" data-guia="analitica-alquiler" onClick={() => (setVezAlquiler((v) => v + 1), setAlquiler(true))} className={BOTON_SEC}>
-                <Icono nombre="Comprobante" tamano={16} />
-                Cargar un alquiler
-              </button>
-            )}
+            {empresaId && <span data-guia="analitica-cargar" className="contents"><AnotarPlata empresaId={empresaId} campoInicial={campoId ?? undefined} renderTrigger={(abrir) => anotar(() => abrir(), 'Anotar un movimiento')} /></span>}
           </div>
         </Cabecera>
       </motion.div>
@@ -372,7 +348,6 @@ export function PlataPage() {
       )}
 
       {/* La key cambia al abrir: arranca de cero y sale con su animación. */}
-      {empresaId && <AlquilerDialog key={vezAlquiler} empresaId={empresaId} campoId={campoId ?? undefined} open={alquiler} onOpenChange={setAlquiler} />}
     </div>
   )
 }

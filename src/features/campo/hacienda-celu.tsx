@@ -14,7 +14,7 @@ type Categoria = Database['public']['Enums']['categoria_animal']
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { BAJADA, TARJETA } from './sistema'
-import { Barra, Encabezado, Portada } from './sistema-ui'
+import { Encabezado, Portada } from './sistema-ui'
 
 /**
  * Hacienda en el celular (Lau, 17/11): para ver el rodeo y encontrar un animal
@@ -98,8 +98,7 @@ export function HaciendaCelu() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-        <Barra />
+      <div className="flex flex-col gap-8 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
         <motion.section {...entra(0)} aria-labelledby="hacienda-titulo" className="flex flex-col gap-3">
           <Portada id="hacienda-titulo" titulo="Hacienda" imagen={arreo} posicion="70% 50%" />
           {/* Cuánto hay y de qué. */}
@@ -205,7 +204,6 @@ export function HaciendaCelu() {
             </>
           )}
         </motion.section>
-        <div aria-hidden className="h-10" />
       </div>
     </div>
   )

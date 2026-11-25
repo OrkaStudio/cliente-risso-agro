@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { Boton, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
@@ -64,31 +65,24 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
 
   async function marcar() {
     setError(null)
-    if (!(montoReal > 0)) return setError('Escribí cuánto fue.')
-    if (!cuando) return setError(`Tocá cuándo lo ${cobro ? 'cobraste' : 'pagaste'}.`)
+    if (!(montoReal > 0)) { setError('Escribí cuánto fue.'); return 'falta' }
+    if (!cuando) { setError(`Tocá cuándo lo ${cobro ? 'cobraste' : 'pagaste'}.`); return 'falta' }
     const dia = cuando === 'hoy' ? hoy : cuando === 'ayer' ? ayer() : fecha
-    try {
-      await liquidar.mutateAsync({ id: v.id, fecha: dia, monto: Math.round(montoReal) !== Math.round(v.monto) ? Math.round(montoReal) : undefined, extra: { medio: medio || undefined, empresaId, comprobanteImg: foto } })
-      onCerrar()
-      // El «plim»: queda confirmado con su resumen y se puede deshacer.
-      toast.success(`Listo: ${cobro ? 'cobraste' : 'pagaste'} ${titulo.toLowerCase()}`, {
-        description: `Pasó a Plata${v.categoria ? `, como ${v.categoria}` : ''}${v.campo ? ` de ${v.campo}` : ''}.`,
-        action: { label: 'Deshacer', onClick: () => revertir.mutate({ id: v.id, fechaVencimiento: v.fechaVencimiento, fechaCobroPago: dia }) },
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
-    }
+    await liquidar.mutateAsync({ id: v.id, fecha: dia, monto: Math.round(montoReal) !== Math.round(v.monto) ? Math.round(montoReal) : undefined, extra: { medio: medio || undefined, empresaId, comprobanteImg: foto } })
+    // El «plim»: después del «Listo», el aviso con su resumen y su Deshacer.
+    return () => toast.success(`Listo: ${cobro ? 'cobraste' : 'pagaste'} ${titulo.toLowerCase()}`, {
+      description: `Pasó a Plata${v.categoria ? `, como ${v.categoria}` : ''}${v.campo ? ` de ${v.campo}` : ''}.`,
+      action: { label: 'Deshacer', onClick: () => revertir.mutate({ id: v.id, fechaVencimiento: v.fechaVencimiento, fechaCobroPago: dia }) },
+    })
   }
 
   async function volverAPendiente() {
-    try {
-      await revertir.mutateAsync(v)
-      onCerrar()
-      toast.success(`Listo: ${titulo.toLowerCase()} volvió a la Agenda`, { description: 'Sale de Plata hasta que lo marques de nuevo.' })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo. Probá de nuevo.')
-    }
+    await revertir.mutateAsync(v)
+    return () => toast.success(`Listo: ${titulo.toLowerCase()} volvió a la Agenda`, { description: 'Sale de Plata hasta que lo marques de nuevo.' })
   }
+
+  const marcarAccion = useAccion(marcar, { alTerminar: onCerrar })
+  const volverAccion = useAccion(volverAPendiente, { alTerminar: onCerrar })
 
   const aviso = error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>
   const estado = estadoTexto(v, hoy)
@@ -107,14 +101,14 @@ function Formulario({ v, abierto, empresaId, onCerrar, onVolver }: { v: Vencimie
         ) : ya ? (
           <>
             {aviso}
-            <button type="button" onClick={() => void volverAPendiente()} disabled={revertir.isPending} className="h-14 w-full rounded-full border-[1.5px] border-borde bg-superficie text-[16px] font-bold text-texto hover:border-principal hover:text-principal disabled:opacity-50">
+            <Boton tipo="secundario" accion={volverAccion} className="h-14 w-full rounded-full border-borde text-[16px] font-bold text-texto hover:border-principal hover:text-principal">
               Lo marqué por error: volver a pendiente
-            </button>
+            </Boton>
           </>
         ) : (
           <>
             {aviso}
-            <BotonPrincipal icono="Guardar" cargando={liquidar.isPending} disabled={liquidar.isPending} onClick={() => void marcar()}>
+            <BotonPrincipal icono="Siguiente" accion={marcarAccion}>
               {cobro ? 'Marcar cobrado' : 'Marcar pagado'}
               {otroMonto && montoReal > 0 ? ` ${pesos(montoReal)}` : ''}
             </BotonPrincipal>

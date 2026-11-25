@@ -3,6 +3,7 @@
 // guardar de nuevo reescribe, no duplica.
 import { fijarCuentaDelPedido, guardarCuentaElegida } from '@/features/empresa/cuenta-activa'
 import { supabase } from '@/lib/supabase/client'
+import { todasLasFilas } from '@/lib/todas-las-filas'
 import {
   actualizarActividadCampo,
   actualizarCampo,
@@ -24,6 +25,7 @@ import {
   type PotreroOnb,
   type TipoCampo,
 } from './modelo'
+import { errorDeBase } from '@/lib/error-de-base'
 
 /**
  * B1: crea la empresa con el usuario como dueño. Desde acá se trabaja con ella:
@@ -32,7 +34,7 @@ import {
  */
 export async function crearEmpresa(nombre: string): Promise<string> {
   const { data, error } = await supabase.rpc('crear_empresa_con_dueno', { p_nombre: nombre.trim() })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   const { data: sesion } = await supabase.auth.getSession()
   if (sesion.session) guardarCuentaElegida(sesion.session.user.id, data)
   fijarCuentaDelPedido(data)
@@ -187,7 +189,7 @@ export async function cerrarCampo(campo: CampoOnb): Promise<void> {
 /** B6: el onboarding queda hecho; entrar ya no vuelve acá. */
 export async function terminarOnboarding(): Promise<void> {
   const { error } = await supabase.rpc('terminar_onboarding')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**
@@ -201,13 +203,17 @@ export async function leerDeLaBase(empresaId: string, hoy: Date): Promise<CampoO
     .select('id, nombre, localidad, provincia, lat, lon, tipo, hectareas, color_idx, potrero(id, nombre, hectareas, estado_ciclo, cultivo, descanso_desde, created_at)')
     .eq('empresa_id', empresaId)
     .order('color_idx')
-  if (error) throw new Error(error.message)
-  const { data: animales, error: e2 } = await supabase
-    .from('animal')
-    .select('potrero_id, categoria')
-    .eq('empresa_id', empresaId)
-    .eq('estado', 'activo')
-  if (e2) throw new Error(e2.message)
+  if (error) throw errorDeBase(error)
+  // De a tandas: un rodeo de más de 1000 cabezas se cortaba y las cuentas por potrero daban de menos.
+  const animales = await todasLasFilas((desde, hasta) =>
+    supabase
+      .from('animal')
+      .select('id, potrero_id, categoria')
+      .eq('empresa_id', empresaId)
+      .eq('estado', 'activo')
+      .order('id')
+      .range(desde, hasta),
+  )
   const porPotrero = new Map<string, Partial<Record<Categoria, number>>>()
   for (const a of animales ?? []) {
     if (!a.potrero_id) continue

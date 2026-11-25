@@ -12,10 +12,15 @@ export function LocalidadCampo({
   valor,
   onCambio,
   error,
+  enLinea = false,
+  etiqueta = 'Dónde está',
 }: {
   valor: Localidad | null
   onCambio: (l: Localidad | null) => void
   error?: string
+  /** La lista abajo, en el flujo de la página (dentro de un panel que scrollea no se corta). */
+  enLinea?: boolean
+  etiqueta?: string
 }) {
   const id = useId()
   const [texto, setTexto] = useState(valor ? etiquetaLocalidad(valor) : '')
@@ -59,7 +64,7 @@ export function LocalidadCampo({
   return (
     <div className="flex flex-col gap-[7px] md:gap-2">
       <label htmlFor={id} className="text-[14px] font-semibold text-texto md:text-[14.5px]">
-        Dónde está
+        {etiqueta}
       </label>
       <div className="relative">
         <div
@@ -100,7 +105,7 @@ export function LocalidadCampo({
           <ul
             id={`${id}-lista`}
             role="listbox"
-            className="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-2xl border border-borde bg-superficie py-1.5 shadow-[0_12px_32px_rgba(19,27,22,0.14)]"
+            className={cn('mt-1.5 max-h-64 w-full overflow-y-auto rounded-2xl border border-borde bg-superficie py-1.5', enLinea ? 'relative' : 'absolute z-30 shadow-[0_12px_32px_rgba(19,27,22,0.14)]')}
           >
             {lista.map((l, i) => (
               <li

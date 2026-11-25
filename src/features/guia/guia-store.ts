@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/auth-context'
 import { supabase } from '@/lib/supabase/client'
 import { registrar } from '@/lib/telemetria'
 import { useIsMobile } from '@/lib/use-is-mobile'
+import { errorDeBase } from '@/lib/error-de-base'
 
 // Store externo mínimo (useSyncExternalStore): la burbuja del asistente,
 // la invitación, la misión en curso y la pastilla viven en árboles distintos
@@ -92,7 +93,7 @@ export function useGuiasVistas() {
     staleTime: Infinity,
     queryFn: async (): Promise<Set<string>> => {
       const { data, error } = await supabase.from('guia_vista').select('clave')
-      if (error) throw new Error(error.message)
+      if (error) throw errorDeBase(error)
       return new Set((data ?? []).map((r) => r.clave))
     },
   })
@@ -126,7 +127,7 @@ export function useMarcarVista() {
         },
         { onConflict: 'user_id,clave' },
       )
-      if (error) throw new Error(error.message)
+      if (error) throw errorDeBase(error)
     },
     onMutate: (clave) => {
       qc.setQueryData<Set<string>>(queryKey(userId), (prev) => {

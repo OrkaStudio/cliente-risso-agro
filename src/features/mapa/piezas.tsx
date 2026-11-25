@@ -227,6 +227,8 @@ export function Partida({
         <CampoTexto className="min-w-0" etiqueta="Partido" inputMode="numeric" value={partido} placeholder="058" onChange={(e) => setPartido(e.target.value)} />
         <CampoTexto className="min-w-0" etiqueta="Partida" inputMode="numeric" value={partida} placeholder="000146" onChange={(e) => setPartida(e.target.value)} />
       </div>
+      {/* El resultado de la búsqueda («No encontramos esa partida…») es guía y es largo: va en el
+          cartel, no en el botón (no entra, y no es una falla al guardar). */}
       {error && <Aviso tipo="problema" titulo="No salió el borde">{error}</Aviso>}
       <BotonPrincipal type="submit" icono="Siguiente" cargando={ocupado} disabled={!listo || ocupado}>
         {ocupado ? 'Buscando en el catastro…' : 'Traer mi campo'}
@@ -272,6 +274,8 @@ export function Boleta({
         <CampoTexto etiqueta="Circunscripción" value={circ} placeholder="II" onChange={(e) => setCirc(e.target.value)} />
         <CampoTexto etiqueta="Parcela" value={parcela} placeholder="1758A" onChange={(e) => setParcela(e.target.value)} />
       </div>
+      {/* El resultado de la búsqueda («No encontramos esa partida…») es guía y es largo: va en el
+          cartel, no en el botón (no entra, y no es una falla al guardar). */}
       {error && <Aviso tipo="problema" titulo="No salió el borde">{error}</Aviso>}
       <BotonPrincipal type="submit" icono="Siguiente" cargando={ocupado} disabled={!listo || ocupado}>
         {ocupado ? 'Buscando en el catastro…' : 'Traer el borde'}

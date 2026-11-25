@@ -9,6 +9,7 @@ import { useParaAtender } from '../para-atender-api'
 import { cosasParaHoy, delCampo, inicioDeCampania, lluviaDelMes } from './dia'
 import { useEmpresa } from '@/features/empresa/use-empresa'
 import { puedeVer, veePlata } from '@/features/empresa/secciones'
+import { errorDeBase } from '@/lib/error-de-base'
 
 /**
  * La lluvia del último mes (30 días que terminan ayer) en la ubicación del campo,
@@ -27,7 +28,7 @@ export const useGanadoCampania = (campoId: string | null = null) =>
       let q = supabase.from('v_flujo_caja').select('neto').gte('mes', inicioDeCampania(new Date()))
       if (campoId) q = q.eq('campo_id', campoId)
       const { data, error } = await q
-      if (error) throw new Error(error.message)
+      if (error) throw errorDeBase(error)
       return (data ?? []).reduce((s, f) => s + (f.neto ?? 0), 0)
     },
   })

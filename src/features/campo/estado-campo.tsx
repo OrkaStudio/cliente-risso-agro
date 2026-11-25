@@ -3,10 +3,8 @@ import {
   Banknote,
   Check,
   CloudOff,
-  Footprints,
   LoaderCircle,
   RotateCw,
-  Syringe,
   Wifi,
   WifiOff,
 } from 'lucide-react'
@@ -60,11 +58,8 @@ function useHaceCuanto(ts: number | null): string {
   return formatHace(ahora - ts)
 }
 
-const ITEMS = [
-  { key: 'recorrida', label: 'Recorrida', desc: 'Campos y potreros', Icon: Footprints },
-  { key: 'manga', label: 'Manga', desc: 'Animales para caravanear', Icon: Syringe },
-  { key: 'plata', label: 'Plata', desc: 'Categorías y gastos', Icon: Banknote },
-] as const
+// Sólo Plata desde el 18/11: la recorrida y la manga salieron de la app (archivo/).
+const ITEMS = [{ key: 'plata', label: 'Plata', desc: 'Categorías y gastos', Icon: Banknote }] as const
 
 export type EstadoCampoProps = {
   estado: SeedEstado

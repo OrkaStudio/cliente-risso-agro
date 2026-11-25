@@ -29,6 +29,15 @@ export const SECCIONES_CON_PERMISO: { id: SeccionConPermiso; texto: string; icon
 export type Nivel = 'no' | 've' | 'carga' | 'solo_manda'
 export type Niveles = Partial<Record<SeccionConPermiso, Nivel>>
 
+/**
+ * Un solo ingreso (Lau, 25/11): cómo entra sale de los niveles, igual que en la base
+ * (public.acceso_de_niveles). Si mira o anota algo, usa la app; si no, sólo WhatsApp.
+ */
+export function accesoDeNiveles(n: Niveles | null): 'app' | 'whatsapp' {
+  if (n === null) return 'app'
+  return Object.values(n).some((v) => v === 've' || v === 'carga') ? 'app' : 'whatsapp'
+}
+
 /** Cómo se lo explicamos al productor (spec, «Los niveles»). */
 export const NIVELES: { id: Nivel; texto: string; explica: string }[] = [
   { id: 'no', texto: 'No ve', explica: 'No le aparece en la app y el bot no le contesta sobre esto.' },

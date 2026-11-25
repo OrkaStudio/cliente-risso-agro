@@ -14,7 +14,7 @@ import { CroquisDibujo } from '@/features/mapa/croquis-dibujo'
 import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { BAJADA, TARJETA } from './sistema'
-import { Barra, Encabezado } from './sistema-ui'
+import { Encabezado } from './sistema-ui'
 
 /**
  * La ficha del animal en el celular (Lau, 17/11), la misma de la compu para
@@ -79,8 +79,7 @@ export function AnimalCelu() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="flex flex-col gap-6 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-        <Barra />
+      <div className="flex flex-col gap-6 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
         <button type="button" onClick={volver} className="-mb-2 flex items-center gap-1 self-start text-[14px] font-bold text-principal">
           <Icono nombre="Siguiente" tamano={16} className="rotate-180" />
           Hacienda
@@ -178,7 +177,6 @@ export function AnimalCelu() {
             </ol>
           )}
         </section>
-        <div aria-hidden className="h-10" />
       </div>
     </div>
   )

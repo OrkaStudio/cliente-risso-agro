@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { Boton, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { linkWhatsapp } from '@/features/guia/whatsapp'
@@ -18,6 +19,22 @@ export function Baja({ empresaId, empresa, nombre }: { empresaId: string | undef
   const pedir = usePedirBaja(empresaId)
   const deshacer = useDeshacerBaja(empresaId)
   const [abierto, setAbierto] = useState(false)
+  // Pedir la baja y deshacerla cambian la pantalla (el aviso de la baja aparece o se va): eso
+  // confirma, sin «Listo». Si algo no sale, el motivo lo dice el botón.
+  const pedirAccion = useAccion(
+    async () => {
+      await pedir.mutateAsync(undefined)
+      return () => toast.success('Listo: pediste la baja', { description: 'Lo ves en el Plan, con la fecha y el número de trámite. Lo podés deshacer ahí.' })
+    },
+    { sinListo: true, alTerminar: () => setAbierto(false) },
+  )
+  const deshacerAccion = useAccion(
+    async () => {
+      await deshacer.mutateAsync(undefined)
+      return () => toast.success('Listo: seguís con Troppero', { description: 'Deshiciste la baja. No cambia nada.' })
+    },
+    { sinListo: true },
+  )
   const copia = linkWhatsapp({ nombre, empresa, seccion: 'Configuración, la baja', consulta: 'Me di de baja y quiero la copia de mis datos.' })
 
   if (baja.data)
@@ -30,20 +47,9 @@ export function Baja({ empresaId, empresa, nombre }: { empresaId: string | undef
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <button
-            type="button"
-            disabled={deshacer.isPending}
-            onClick={() =>
-              deshacer.mutate(undefined, {
-                onSuccess: () => toast.success('Listo: seguís con Troppero', { description: 'Deshiciste la baja. No cambia nada.' }),
-                onError: () => toast.error('No se pudo deshacer. Probá de nuevo.'),
-              })
-            }
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-principal px-5 text-[15px] font-bold text-principal-texto hover:bg-terracota-600 disabled:opacity-60"
-          >
-            <Icono nombre="Reintentar" tamano={16} />
+          <Boton icono="Reintentar" accion={deshacerAccion} className="h-11 gap-2 rounded-full px-5 text-[15px] font-bold">
             Deshacer la baja
-          </button>
+          </Boton>
           {copia && (
             <a href={copia} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-5 text-[15px] font-bold text-texto hover:border-principal hover:text-principal">
               <Icono nombre="Descargar" tamano={16} />
@@ -71,20 +77,7 @@ export function Baja({ empresaId, empresa, nombre }: { empresaId: string | undef
         titulo={`¿Das de baja ${empresa}?`}
         bajada="Sirve para dejar de usar Troppero. Lo podés deshacer durante 30 días."
         pie={
-          <BotonPrincipal
-            icono="Cerrar"
-            cargando={pedir.isPending}
-            disabled={pedir.isPending}
-            onClick={() =>
-              pedir.mutate(undefined, {
-                onSuccess: () => {
-                  setAbierto(false)
-                  toast.success('Listo: pediste la baja', { description: 'Lo ves en el Plan, con la fecha y el número de trámite. Lo podés deshacer ahí.' })
-                },
-                onError: () => toast.error('No se pudo pedir la baja. Probá de nuevo.'),
-              })
-            }
-          >
+          <BotonPrincipal icono="Cerrar" accion={pedirAccion}>
             Sí, dar de baja
           </BotonPrincipal>
         }

@@ -211,4 +211,11 @@ describe('la línea de la plata: nada se pisa', () => {
     expect(r.carriles).toBe(1)
     expect(r.ubicadas.every((u) => u.xb === u.x)).toBe(true)
   })
+
+  it('enCarriles con borde: ninguna burbuja (ni su etiqueta) queda a la izquierda de «desde»', () => {
+    // Muchas el mismo día, pegadas al borde: antes el reparto las corría a la izquierda.
+    const muchas = Array.from({ length: 30 }, (_, i) => ({ id: `p${i}`, x: 220 + (i % 3), ancho: 100 }))
+    const { ubicadas } = enCarriles(muchas, 10, 200)
+    for (const u of ubicadas) expect(u.xb - 50).toBeGreaterThanOrEqual(200)
+  })
 })

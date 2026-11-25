@@ -5,6 +5,7 @@
  *   tabla cotizacion_gordo con RLS por empresa.
  */
 import { supabase } from '@/lib/supabase/client'
+import { errorDeBase } from '@/lib/error-de-base'
 
 export type Dolar = {
   /** Casa de cambio (ej: "blue"). */
@@ -229,7 +230,7 @@ export async function getGordoActual(): Promise<Gordo | null> {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data ? { valor: data.valor, fecha: data.fecha } : null
 }
 
@@ -249,7 +250,7 @@ export async function cargarGordo(input: {
     fecha: input.fecha,
     nota: input.nota ?? null,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export type NovilloCanuelas = {
@@ -272,7 +273,7 @@ export async function getNovilloCanuelas(): Promise<NovilloCanuelas> {
   const { data, error } = await supabase.functions.invoke<NovilloCanuelas | { error: string }>('precio-novillo', {
     method: 'GET',
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   if (!data || 'error' in data) throw new Error((data as { error?: string })?.error ?? 'Sin precio')
   return data
 }

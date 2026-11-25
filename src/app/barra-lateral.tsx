@@ -177,7 +177,7 @@ export function BarraLateral({ hoy }: { hoy: number }) {
           <>
             {isActive && <span aria-hidden className="absolute inset-y-1.5 -left-3 w-[4px] rounded-r-full bg-principal" />}
             <span className={cn(isActive ? 'text-principal' : 'text-texto')}>
-              <Icono nombre="Usuario" />
+              <Icono nombre="Configuración" />
             </span>
             Configuración
           </>

@@ -1,6 +1,8 @@
 import { subirComprobante } from '@/features/analitica/api'
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { errorDeBase } from '@/lib/error-de-base'
+import { todasLasFilas } from '@/lib/todas-las-filas'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type EstadoMov = Database['public']['Enums']['estado_movimiento']
@@ -54,16 +56,20 @@ export function medioLabel(m: MedioPago | null, esEcheq = false): string {
  * Scope por RLS de la empresa.
  */
 export async function listVencimientos(): Promise<Vencimiento[]> {
-  const { data, error } = await supabase
-    .from('movimiento_financiero')
-    .select(
-      'id, tipo, estado, monto, fecha_vencimiento, fecha_cobro_pago, medio_pago, es_echeq, cheque_numero, cheque_banco, contraparte, descripcion, serie_id, campo_id, comprobante_url, created_by, canal, revisado_at, categoria:categoria_movimiento(nombre), campo(nombre)',
-    )
-    .neq('estado', 'anulado')
-    .or('fecha_vencimiento.not.is.null,fecha_cobro_pago.not.is.null')
-    .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((m) => ({
+  // Todos, de a tandas: con cuotas y alquileres a futuro se pasa de 1000 y se cortaba.
+  const data = await todasLasFilas((desde, hasta) =>
+    supabase
+      .from('movimiento_financiero')
+      .select(
+        'id, tipo, estado, monto, fecha_vencimiento, fecha_cobro_pago, medio_pago, es_echeq, cheque_numero, cheque_banco, contraparte, descripcion, serie_id, campo_id, comprobante_url, created_by, canal, revisado_at, categoria:categoria_movimiento(nombre), campo(nombre)',
+      )
+      .neq('estado', 'anulado')
+      .or('fecha_vencimiento.not.is.null,fecha_cobro_pago.not.is.null')
+      .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
+      .order('id')
+      .range(desde, hasta),
+  )
+  return data.map((m) => ({
     id: m.id,
     tipo: m.tipo,
     estado: m.estado,
@@ -111,7 +117,7 @@ export async function liquidarMovimiento(
       ...(comprobanteUrl ? { comprobante_url: comprobanteUrl } : {}),
     })
     .eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**
@@ -137,5 +143,5 @@ export async function revertirLiquidacion(
       fecha_vencimiento: fechas.fechaVencimiento ?? fechas.fechaCobroPago,
     })
     .eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }

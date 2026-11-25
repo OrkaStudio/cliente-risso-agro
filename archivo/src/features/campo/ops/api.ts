@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import type { OpMovimiento, OpNacimiento } from './db'
+import { errorDeBase } from '@/lib/error-de-base'
 
 /**
  * Sube un nacimiento: crea el/los animal/es en el potrero (sin caravana, origen
@@ -38,7 +39,7 @@ export async function subirNacimiento(op: OpNacimiento): Promise<void> {
       declarado_at: new Date(op.created_at).toISOString(),
     },
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /**
@@ -92,5 +93,5 @@ export async function subirMovimiento(op: OpMovimiento): Promise<void> {
       declarado_at: new Date(op.created_at).toISOString(),
     },
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }

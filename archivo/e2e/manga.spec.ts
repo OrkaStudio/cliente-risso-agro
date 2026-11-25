@@ -1,4 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
+
+// La manga sale del lanzamiento (Lau, 18/11): manga y recorrida se hacen por WhatsApp con el
+// bot, y el celular nuevo (17/11) ya no lleva a /campo/manga. Estas pruebas quedan apagadas
+// hasta que la manga vuelva a la app; no son una regresión (fallaban igual en la rama base).
+test.skip(true, 'Manga fuera del lanzamiento: se hace por WhatsApp con el bot (Lau, 18/11)')
 import { sesionDePrueba } from './helpers'
 
 /**

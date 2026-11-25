@@ -5,7 +5,8 @@ import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { actividadLabel, fmtCompact, gastosPorCategoria, porActividad, porCampo } from '@/features/analitica/compute'
 import { useMovimientos, usePendientes } from '@/features/analitica/hooks'
 import { useDolarHistorico } from '@/features/analitica/tropero/dolar'
-import { avisosParaMejorar, campanas as porCampana, comparacionCorta, delPeriodo, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Mes, type Periodo } from '@/features/analitica/tropero/plata'
+import { ElegirPeriodo } from '@/features/analitica/tropero/elegir-periodo'
+import { avisosParaMejorar, campanas as porCampana, comparacionCorta, contraDe, delPeriodo, delPeriodoTexto, gastosUsdPorCategoria, mesAMes, mesMasApretado, periodos, proximos, resumenPeriodo, type Aviso, type Mes, type Periodo } from '@/features/analitica/tropero/plata'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useCampos } from '@/features/campos/hooks'
 import { useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
@@ -15,13 +16,13 @@ import { hoyLocal } from '@/lib/fecha'
 import { cn } from '@/lib/utils'
 import { PlataPage } from './plata-page'
 import { BAJADA, MONTO, TARJETA } from './sistema'
-import { Barra, Encabezado, Portada } from './sistema-ui'
+import { Encabezado, Portada } from './sistema-ui'
 
 /**
  * Plata en el celular (Lau, 17/11; maqueta elegida). Lo mismo que la Plata de
  * la compu, en el orden en que se mira en el celular y con el sistema de Hoy:
  *   1. ¿Cómo vengo? El resultado del período, lo que entró y salió, en dólares.
- *   2. Anotar un gasto (el teclado del celular, anda sin señal) o con la foto.
+ *   2. Anotar un movimiento (el teclado del celular, anda sin señal; adentro, la foto).
  *   3. Para mejorar: un renglón por aviso; tocándolo se abre el detalle.
  *   4. Lo que viene, 5. mes a mes, 6. en qué se va, 7. qué rinde, 8. campañas.
  * Nada lleva a una pantalla de la compu (Lau, 17/11): lo que se hace, se hace acá.
@@ -34,9 +35,7 @@ const pesos = (n: number) => fmtCompact(n)
 const conSigno = (n: number) => (n >= 0 ? `+${fmtCompact(n)}` : fmtCompact(n))
 const diaYmes = (ymd: string) => new Date(`${ymd}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, (c) => c.toUpperCase())
 // La comparación ya está en dólares (US$): alcanza con decir contra qué.
-const CONTRA: Record<Periodo['clave'], string> = { doce: 'que el año anterior', campana: 'que la campaña pasada', pasada: 'que la anterior' }
 // En el celular, el período en palabras cortas que entran en una línea.
-const ETIQUETA_PERIODO: Record<Periodo['clave'], string> = { doce: '12 meses', campana: 'Esta campaña', pasada: 'La pasada' }
 const ICONO_AVISO: Record<string, NombreIcono> = { apretado: 'Agenda', subio: 'Plata', campo: 'Campos' }
 
 export function PlataCelu() {
@@ -53,7 +52,7 @@ export function PlataCelu() {
         <PlataNumeros carga={carga} onAnotar={setAnotar} />
       </div>
       {anotar && (
-        <div role="dialog" aria-modal="true" aria-label="Anotar un gasto" className="fixed inset-0 z-[60] flex flex-col bg-fondo">
+        <div role="dialog" aria-modal="true" aria-label="Anotar un movimiento" className="fixed inset-0 z-[60] flex flex-col bg-fondo">
           <PlataPage onCerrar={() => setAnotar(null)} conFoto={anotar === 'foto'} />
         </div>
       )}
@@ -72,7 +71,8 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const manualQ = useGordoActual(empresaId)
   const canuelasQ = useNovilloCanuelas()
   const reducir = useReducedMotion()
-  const [clave, setClave] = useState<Periodo['clave']>('doce')
+  // El período elegido: uno de los tres de siempre o las fechas del calendario (Lau, 24/11).
+  const [elegido, setElegido] = useState<Periodo | null>(null)
   const [vista, setVista] = useState<'campo' | 'actividad'>('campo')
   const [abierto, setAbierto] = useState<string | null>(null)
   const hoy = hoyLocal()
@@ -81,7 +81,7 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const gordo = (canuelas && (!manual || canuelas.fecha > manual.fecha) ? canuelas.valor : manual?.valor) ?? null
   const serie = useMemo(() => dolar.data ?? [], [dolar.data])
   const todos = useMemo(() => periodos(hoy), [hoy])
-  const periodo = todos.find((p) => p.clave === clave)!
+  const periodo = elegido ?? todos[0]!
 
   const delCampo = useMemo(() => (movs.data ?? []).filter((m) => !campoId || m.campo_id === campoId), [movs.data, campoId])
   const pendientes = useMemo(() => (pend.data ?? []).filter((p) => !campoId || p.campoId === campoId), [pend.data, campoId])
@@ -114,8 +114,7 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
   const verbo = periodo.enCurso ? (ganando ? 'Van ganando' : 'Van perdiendo') : ganando ? 'Ganaron' : 'Perdieron'
 
   return (
-    <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-      <Barra />
+    <div className="flex flex-col gap-8 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
 
       {/* 1. ¿Cómo vengo? */}
       <motion.section {...entra(0)} aria-labelledby="plata-titulo" className="flex flex-col gap-3">
@@ -123,15 +122,7 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
         {/* El resultado en una tarjeta: el período, cuánto, de dónde sale y qué se hace. */}
         <div className={cn(TARJETA, 'flex flex-col gap-4 p-4')}>
           {!vacio && (
-            <div className="flex items-center gap-2">
-            <div role="tablist" aria-label="Período" className="flex flex-1 gap-1 rounded-full bg-superficie-hundida p-1">
-              {todos.map((p) => (
-                <button key={p.clave} type="button" role="tab" aria-selected={clave === p.clave} onClick={() => setClave(p.clave)} className={cn('h-8 flex-1 rounded-full px-2 text-[13.5px] font-bold whitespace-nowrap transition-colors', clave === p.clave ? 'bg-principal text-principal-texto' : 'text-texto')}>
-                  {ETIQUETA_PERIODO[p.clave]}
-                </button>
-              ))}
-            </div>
-            </div>
+            <ElegirPeriodo celular periodos={todos} periodo={periodo} onElegir={setElegido} hoy={hoy} />
           )}
           {cargando ? (
             <div className="h-[140px] animate-pulse rounded-[14px] bg-superficie-hundida" aria-busy />
@@ -162,21 +153,18 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
               </div>
               {comparacion && (
                 <span className={cn('self-start rounded-full px-2.5 py-1 text-[13px] font-bold', comparacion.sube ? 'bg-estado-bien-suave text-estado-bien-texto' : 'bg-estado-problema-suave text-estado-problema-texto')}>
-                  {comparacion.sube ? '▲' : '▼'} {comparacion.texto.replace(', en dólares', '')} {CONTRA[clave]}
+                  {comparacion.sube ? '▲' : '▼'} {comparacion.texto.replace(', en dólares', '')} {contraDe(periodo)}
                 </span>
               )}
             </div>
           )}
           {/* Anotar: el teclado del celular, o con la foto del comprobante. */}
           {carga && (
-            <div className="flex gap-2 border-t border-borde pt-4">
-              <button type="button" onClick={() => onAnotar('teclado')} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-principal text-[15px] font-bold text-principal-texto">
+            // Un solo botón (Lau, 24/11): gasto o ingreso se elige adentro, y la foto también está adentro.
+            <div className="border-t border-borde pt-4">
+              <button type="button" onClick={() => onAnotar('teclado')} className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-principal text-[15px] font-bold text-principal-texto">
                 <Icono nombre="Agregar" tamano={16} />
-                Anotar un gasto
-              </button>
-              <button type="button" onClick={() => onAnotar('foto')} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
-                <Icono nombre="Foto" tamano={16} />
-                Con la foto
+                Anotar un movimiento
               </button>
             </div>
           )}
@@ -229,7 +217,7 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
 
           {/* 6. En qué se va. */}
           <motion.section {...entra(5)} aria-labelledby="plata-gastos" className={cn(TARJETA, 'p-4')}>
-            <Encabezado id="plata-gastos" titulo="En qué se va" bajada={`Los gastos de ${clave === 'doce' ? 'los últimos 12 meses' : `la ${periodo.nombre.toLowerCase()}`}`} />
+            <Encabezado id="plata-gastos" titulo="En qué se va" bajada={`Los gastos de ${delPeriodoTexto(periodo)}`} />
             {gastos.length === 0 ? (
               <p className={cn(BAJADA, 'mt-3')}>Cuando anotes gastos, acá ves en qué se va la plata.</p>
             ) : (
@@ -318,7 +306,6 @@ function PlataNumeros({ carga, onAnotar }: { carga: boolean; onAnotar: (modo: 't
       )}
 
       {/* Lugar para que el asistente no tape lo último. */}
-      <div aria-hidden className="h-10" />
     </div>
   )
 }

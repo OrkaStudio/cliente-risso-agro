@@ -347,7 +347,10 @@ export type Ubicada = { id: string; x: number; xb: number; carril: number }
  * `ancho(id)` px centrados en su x; va al primer carril donde entra con
  * `separacion` px de aire, o abre uno nuevo.
  */
-export function enCarriles(puntos: { id: string; x: number; ancho: number }[], separacion = 10): { ubicadas: Ubicada[]; carriles: number } {
+/** `desde`: el borde izquierdo que ninguna burbuja (con su etiqueta) puede pasar. En el Inicio es
+ *  donde empieza el eje: antes, con muchos pagos, el reparto las corría hacia la columna de
+ *  lo vencido y quedaban encima (18/11). */
+export function enCarriles(puntos: { id: string; x: number; ancho: number }[], separacion = 10, desde = -Infinity): { ubicadas: Ubicada[]; carriles: number } {
   // Lo ocupado en cada carril: cada burbuja con su etiqueta, y los tallos de las de más afuera que lo cruzan.
   const ocupado: [number, number][][] = []
   const libre = (c: number, a: number, b: number) => (ocupado[c] ?? []).every(([x, y]) => b + separacion <= x || a >= y + separacion)
@@ -361,11 +364,12 @@ export function enCarriles(puntos: { id: string; x: number; ancho: number }[], s
       const corrimientos = [0, ...Array.from({ length: 36 }, (_, i) => (i % 2 ? -1 : 1) * Math.ceil((i + 1) / 2) * (p.ancho / 6))]
       let lugar: { c: number; xb: number } | null = null
       for (const d of corrimientos) {
+        if (p.x + d - p.ancho / 2 < desde) continue
         for (let c = 0; c < 6 && !lugar; c++) if (entra(c, p.x + d, p.ancho)) lugar = { c, xb: p.x + d }
         if (lugar) break
       }
       // Sin lugar cerca (muchísimas en pocos días): a la derecha de todo, en el primer carril; ahí siempre entra.
-      lugar ??= { c: 0, xb: Math.max(...ocupado.flat().map(([, b]) => b)) + separacion + p.ancho / 2 }
+      lugar ??= { c: 0, xb: Math.max(desde, ...ocupado.flat().map(([, b]) => b)) + separacion + p.ancho / 2 }
       for (let k = 0; k <= lugar.c; k++) (ocupado[k] ??= []).push(k === lugar.c ? [lugar.xb - p.ancho / 2, lugar.xb + p.ancho / 2] : [lugar.xb - TALLO, lugar.xb + TALLO])
       return { id: p.id, x: p.x, xb: lugar.xb, carril: lugar.c }
     })

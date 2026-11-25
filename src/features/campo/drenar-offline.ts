@@ -1,7 +1,3 @@
-import { drenarRecorrida } from '@/features/campo/recorrida/use-recorrida'
-import { drenarOps } from '@/features/campo/ops/use-ops'
-import { drenarCaravaneo } from '@/features/campo/manga/use-manga'
-import { drenarTrabajos } from '@/features/campo/manga/use-trabajos'
 import { drenarPlata } from '@/features/campo/plata/use-plata'
 
 /**
@@ -20,7 +16,9 @@ import { drenarPlata } from '@/features/campo/plata/use-plata'
  * desde acá y desde la pantalla a la vez no duplica trabajo ni sube dos veces.
  */
 
-export type ColaCampo = 'recorrida' | 'ops' | 'caravaneo' | 'trabajos' | 'plata'
+// Sólo Plata desde el 18/11: la recorrida, los nacimientos/movimientos y la manga salieron
+// de la app (se hacen por WhatsApp con el bot; el código está en archivo/).
+export type ColaCampo = 'plata'
 
 export type DrenajeResultado = {
   /** Colas que fallaron. Vacío = subió todo lo que había. */
@@ -36,13 +34,7 @@ export function drenarOffline(): Promise<DrenajeResultado> {
   const corrida = (async (): Promise<DrenajeResultado> => {
     // En paralelo: son colas independientes y una que falla no puede frenar a
     // las otras — lo que se pueda subir, que suba.
-    const tareas: [ColaCampo, Promise<void>][] = [
-      ['recorrida', drenarRecorrida()],
-      ['ops', drenarOps()],
-      ['caravaneo', drenarCaravaneo()],
-      ['trabajos', drenarTrabajos()],
-      ['plata', drenarPlata()],
-    ]
+    const tareas: [ColaCampo, Promise<void>][] = [['plata', drenarPlata()]]
     const res = await Promise.allSettled(tareas.map(([, p]) => p))
     const fallaron = res
       .map((r, i) => (r.status === 'rejected' ? tareas[i][0] : null))

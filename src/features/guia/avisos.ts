@@ -70,7 +70,7 @@ export function avisosDe(r: Resumen, campos: CampoMapa[], mapaPendiente: boolean
       icono: 'Plata',
       titulo: `Falta el alquiler de ${c.nombre}`,
       detalle: 'Como está en el contrato. Cada pago queda en la Agenda.',
-      accion: { texto: 'Cargar el alquiler', ruta: '/analitica', ancla: 'analitica-alquiler' },
+      accion: { texto: 'Cargar el alquiler', ruta: '/analitica', ancla: 'analitica-cargar' },
     })
   }
   if (r.recorridas === 0) {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { BotonChico, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
@@ -150,25 +151,20 @@ export function CargarCaravanas({ empresaId, abierto, onCerrar }: { empresaId: s
   async function guardar() {
     setError(null)
     const lote = crypto.randomUUID()
-    try {
-      const x = await asignarM.mutateAsync({ empresaId, lote, filas: plan.filas, chips: plan.chips, altas: plan.altas })
-      const lineas = plan.grupos.map((g) => `${plural(g.categoria)} · ${lugar(g.potreroId)}: ${rangos(g.numeros)}${g.nuevas ? ` (${g.nuevas} nuevas)` : ''}`)
-      if (x.chips) lineas.push(x.chips === 1 ? 'Chip sumado a 1 que ya tenía caravana' : `Chip sumado a ${x.chips} que ya tenían caravana`)
-      setHecho({ lote, ...x, lineas, deshecho: false })
-      setPaso('listo')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
-    }
+    const x = await asignarM.mutateAsync({ empresaId, lote, filas: plan.filas, chips: plan.chips, altas: plan.altas })
+    const lineas = plan.grupos.map((g) => `${plural(g.categoria)} · ${lugar(g.potreroId)}: ${rangos(g.numeros)}${g.nuevas ? ` (${g.nuevas} nuevas)` : ''}`)
+    if (x.chips) lineas.push(x.chips === 1 ? 'Chip sumado a 1 que ya tenía caravana' : `Chip sumado a ${x.chips} que ya tenían caravana`)
+    setHecho({ lote, ...x, lineas, deshecho: false })
   }
   async function deshacer() {
     if (!hecho) return
-    try {
-      await deshacerM.mutateAsync(hecho.lote)
-      setHecho({ ...hecho, deshecho: true })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo deshacer.')
-    }
+    await deshacerM.mutateAsync(hecho.lote)
+    setHecho({ ...hecho, deshecho: true })
   }
+  // Guardar pasa a la pantalla de «listo», que dice qué quedó; deshacer cambia esa misma
+  // pantalla. Ninguno dice «Listo» en el botón; si no sale, el motivo lo dice el botón.
+  const guardarAccion = useAccion(guardar, { sinListo: true, alTerminar: () => setPaso('listo') })
+  const deshacerAccion = useAccion(deshacer, { sinListo: true })
 
   const cambiarR = (f: (x: Respuestas) => Respuestas) => setR((x) => f(structuredClone(x)))
   const aPoner = plan.filas.length + plan.altas.length
@@ -378,7 +374,7 @@ export function CargarCaravanas({ empresaId, abierto, onCerrar }: { empresaId: s
       </div>
     )
     pie = (
-      <BotonPrincipal icono="Guardar" cargando={asignarM.isPending} disabled={asignarM.isPending || aPoner + plan.chips.length === 0} onClick={guardar}>
+      <BotonPrincipal icono="Siguiente" accion={guardarAccion} disabled={guardarAccion.estado === 'reposo' && aPoner + plan.chips.length === 0}>
         {aPoner ? `Ponerle caravana a ${aPoner}` : plan.chips.length ? `Sumar ${plan.chips.length === 1 ? '1 chip' : `${plan.chips.length} chips`}` : 'No hay nada para poner'}
       </BotonPrincipal>
     )
@@ -423,14 +419,14 @@ export function CargarCaravanas({ empresaId, abierto, onCerrar }: { empresaId: s
             </div>
           )}
         </div>
-        <button type="button" disabled={deshacerM.isPending} onClick={deshacer} className={cn(CHICO, 'self-start')}>
-          <Icono nombre="Reintentar" tamano={16} /> Deshacer esta carga
-        </button>
+        <BotonChico icono="Reintentar" accion={deshacerAccion} className="self-start">
+          Deshacer esta carga
+        </BotonChico>
       </div>
     )
     pie = (
-      <BotonPrincipal icono="Guardar" onClick={cerrar}>
-        Listo
+      <BotonPrincipal icono="Siguiente" onClick={cerrar}>
+        Volver a Hacienda
       </BotonPrincipal>
     )
   }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
@@ -99,7 +100,6 @@ export function EntradasSalidas({
   const total = items.reduce((s, it) => s + it.cantidad, 0)
   const mueve = q && (q.modo === 'salieron' ? q.que === 'otroCampo' : q.que === 'deOtroCampo')
   const sacan = q?.modo === 'salieron' || (q?.modo === 'entraron' && q.que === 'deOtroCampo')
-  const ocupado = salida.isPending || alta.isPending || mover.isPending
   // Primero la especie, después la categoría. En una salida, sólo las que hay en el potrero.
   const especies: Especie[] = sacan
     ? (['bovino', 'ovino', 'equino'] as Especie[]).filter((e) => [...(enPotrero?.keys() ?? [])].some((c) => especiePorCategoria[c] === e && (enPotrero!.get(c)!.total ?? 0) > 0))
@@ -160,26 +160,26 @@ export function EntradasSalidas({
   }
 
   async function confirmar() {
-    if (!q || !potreroId || total === 0) return
+    if (!q || !potreroId || total === 0) return 'falta'
     setError(null)
     const antes = [...(enPotrero?.values() ?? [])].reduce((s, h) => s + h.total, 0)
-    try {
+    {
       if (q.modo === 'salieron' && q.que !== 'otroCampo') {
         const r = await salida.mutateAsync({ empresaId, potreroId, items, motivo: q.que === 'venta' ? 'venta' : q.que === 'muerte' ? 'muerte' : 'correccion', fecha: cuando === 'hoy' ? hoyLocal() : fecha, caravanas })
         setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} quedan ${antes - r.salieron}.`, sinIdentificar: r.sinIdentificar, mov: mov! })
       } else if (mueve) {
-        if (!destinoId) return
+        if (!destinoId) return 'falta'
         await mover.mutateAsync({ empresaId, potreroOrigenId: potreroId, potreroDestinoId: destinoId, loteId: null, seleccion: { items } })
         setHecho({ titulo: tituloListo(q, items), quedan: `Ahora están en el ${destino!.nombre} de ${destCampo!.nombre}.`, sinIdentificar: 0, mov: mov! })
       } else {
         await alta.mutateAsync({ empresaId, campoId, origen: q.que === 'compra' ? 'compra' : q.que === 'nacimiento' ? 'nacimiento' : 'correccion', bloques: [{ potreroId, items }] })
         setHecho({ titulo: tituloListo(q, items), quedan: `En el ${potrero!.nombre} ahora hay ${antes + total}.`, sinIdentificar: 0, mov: mov! })
       }
-      setPaso('listo')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
     }
   }
+  // Guarda y pasa a su pantalla de «listo», que ya dice qué cambió: el botón no dice «Listo».
+  // Si no sale, el motivo lo dice el botón.
+  const confirmarAccion = useAccion(confirmar, { sinListo: true, alTerminar: () => setPaso('listo') })
 
   const titulo =
     paso === 'que'
@@ -224,12 +224,12 @@ export function EntradasSalidas({
         {destino ? `Revisar: al ${destino.nombre}` : 'Tocá el potrero'}
       </BotonPrincipal>
     ) : paso === 'revisa' && q ? (
-      <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={confirmar}>
+      <BotonPrincipal icono="Siguiente" accion={confirmarAccion}>
         {botonConfirmar(q, items, destino?.nombre)}
       </BotonPrincipal>
     ) : paso === 'listo' ? (
-      <BotonPrincipal icono="Guardar" onClick={cerrar}>
-        Listo
+      <BotonPrincipal icono="Siguiente" onClick={cerrar}>
+        Volver a Hacienda
       </BotonPrincipal>
     ) : undefined
 

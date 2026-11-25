@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { errorDeBase } from '@/lib/error-de-base'
+import { todasLasFilas } from '@/lib/todas-las-filas'
 
 type Categoria = Database['public']['Enums']['categoria_animal']
 type EstadoCiclo = Database['public']['Enums']['estado_ciclo_potrero']
@@ -69,8 +71,8 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
     { data: potreros, error: ePot },
     { data: stock, error: eStock },
     { data: flujo, error: eFlujo },
-    { data: pendientes, error: ePend },
-    { data: movsIva, error: eIva },
+    pendientes,
+    movsIva,
   ] = await Promise.all([
     // Las cabezas ya sin las salidas sin identificar (la misma cuenta en toda la app).
     supabase.from('v_composicion_potrero').select('categoria, potrero_id, cabezas'),
@@ -88,22 +90,29 @@ export async function getPanoramaInicio(): Promise<PanoramaInicio> {
       .select('neto')
       .gte('mes', `${new Date().getFullYear()}-01-01`)
       .lt('mes', `${new Date().getFullYear() + 1}-01-01`),
-    supabase
-      .from('v_pendientes')
-      .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer, campo_id')
-      .order('dias_para_vencer', { ascending: true }),
-    supabase
-      .from('movimiento_financiero')
-      .select('tipo, iva_total')
-      .gt('iva_total', 0)
-      .neq('estado', 'anulado'),
+    // Estas dos crecen con el uso: de a tandas, que pasadas las 1000 se cortaban (18/11).
+    todasLasFilas((desde, hasta) =>
+      supabase
+        .from('v_pendientes')
+        .select('id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer, campo_id')
+        .order('dias_para_vencer', { ascending: true })
+        .order('id')
+        .range(desde, hasta),
+    ),
+    todasLasFilas((desde, hasta) =>
+      supabase
+        .from('movimiento_financiero')
+        .select('id, tipo, iva_total')
+        .gt('iva_total', 0)
+        .neq('estado', 'anulado')
+        .order('id')
+        .range(desde, hasta),
+    ),
   ])
-  if (eAni) throw new Error(eAni.message)
-  if (ePot) throw new Error(ePot.message)
-  if (eStock) throw new Error(eStock.message)
-  if (eFlujo) throw new Error(eFlujo.message)
-  if (ePend) throw new Error(ePend.message)
-  if (eIva) throw new Error(eIva.message)
+  if (eAni) throw errorDeBase(eAni)
+  if (ePot) throw errorDeBase(ePot)
+  if (eStock) throw errorDeBase(eStock)
+  if (eFlujo) throw errorDeBase(eFlujo)
 
   // Stock por categoría
   const catMap = new Map<Categoria, number>()

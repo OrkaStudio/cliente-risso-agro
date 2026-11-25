@@ -52,6 +52,11 @@ export function useMarcarRevisados() {
   return useMutation({ mutationFn: api.marcarRevisados, onSuccess: () => invalidarMovs(qc) })
 }
 
+export function useDesmarcarRevisados() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: api.desmarcarRevisados, onSuccess: () => invalidarMovs(qc) })
+}
+
 export function useCorregirMovimiento() {
   const qc = useQueryClient()
   return useMutation({ mutationFn: api.corregirMovimiento, onSuccess: () => invalidarMovs(qc) })

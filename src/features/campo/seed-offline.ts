@@ -1,7 +1,3 @@
-import { fetchRefs as fetchRecorridaRefs } from './recorrida/api'
-import { recdb } from './recorrida/db'
-import { fetchSinCaravana } from './manga/api'
-import { mangadb } from './manga/db'
 import { fetchRefs as fetchPlataRefs } from './plata/api'
 import { platadb } from './plata/db'
 
@@ -12,9 +8,12 @@ import { platadb } from './plata/db'
  * llaman de una, apenas hay login + señal (ver useSeedOffline), así el teléfono
  * queda listo para el campo sin que el productor tenga que acordarse de nada.
  *
+ * Desde el 18/11 sólo Plata: la recorrida y la manga salieron de la app (se hacen por
+ * WhatsApp con el bot) y están en archivo/. Bajar sus datos en cada carga era trabajo de más.
+ *
  * Cada una escribe en la Dexie de su feature. Idempotente (pisa el cache):
  * reintentar es inofensivo. Son la ÚNICA implementación del sembrado — los
- * hooks de cada feature (useRecorrida/useManga/usePlata) las reutilizan.
+ * hooks de cada feature (hoy, usePlata) las reutilizan.
  */
 
 /**
@@ -33,32 +32,6 @@ function unSoloVuelo(key: string, fn: () => Promise<void>): Promise<void> {
   return p
 }
 
-/** Campos + potreros (con stock y composición) de la recorrida. */
-export function sembrarRecorrida(): Promise<void> {
-  return unSoloVuelo('recorrida', async () => {
-    const { campos, potreros } = await fetchRecorridaRefs()
-    await recdb.refs.put({ id: 'refs', campos, potreros, updated_at: Date.now() })
-  })
-}
-
-/** Animales sin caravana + RFIDs en uso, para la manga. Preserva los que ya se
- *  caravanearon en el teléfono (subidos o no): no se pisan ni se pierden. */
-export function sembrarManga(): Promise<void> {
-  return unSoloVuelo('manga', async () => {
-    const { animales: frescos, rfidsEnUso } = await fetchSinCaravana()
-    const locales = await mangadb.animales.where('caravaneado').equals(1).toArray()
-    const hechosLocal = new Set(locales.map((a) => a.id))
-    await mangadb.animales.clear()
-    await mangadb.animales.bulkPut([
-      ...locales,
-      ...frescos
-        .filter((a) => !hechosLocal.has(a.id))
-        .map((a) => ({ ...a, caravaneado: 0 as const })),
-    ])
-    await mangadb.refs.put({ id: 'rfids', rfids: rfidsEnUso, updated_at: Date.now() })
-  })
-}
-
 /** Categorías + campos para cargar plata sin señal. */
 export function sembrarPlata(): Promise<void> {
   return unSoloVuelo('plata', async () => {
@@ -69,8 +42,6 @@ export function sembrarPlata(): Promise<void> {
 
 export type FeatureSeed = 'ok' | 'fallo'
 export type SeedDetalle = {
-  recorrida: FeatureSeed
-  manga: FeatureSeed
   plata: FeatureSeed
 }
 export type SeedResultado = {
@@ -86,25 +57,10 @@ export type SeedResultado = {
  * REAL por feature (`detalle`) para que la UI muestre qué quedó guardado.
  */
 export async function sembrarOffline(): Promise<SeedResultado> {
-  const [rec, man, pla] = await Promise.allSettled([
-    sembrarRecorrida(),
-    sembrarManga(),
-    sembrarPlata(),
-  ])
-  const est = (r: PromiseSettledResult<void>): FeatureSeed =>
-    r.status === 'fulfilled' ? 'ok' : 'fallo'
-  const detalle: SeedDetalle = {
-    recorrida: est(rec),
-    manga: est(man),
-    plata: est(pla),
+  try {
+    await sembrarPlata()
+    return { ok: true, parcial: false, detalle: { plata: 'ok' } }
+  } catch (e) {
+    return { ok: false, parcial: false, detalle: { plata: 'fallo' }, error: e instanceof Error ? e.message : 'No se pudo preparar todo' }
   }
-  const fallos = [rec, man, pla].filter(
-    (r): r is PromiseRejectedResult => r.status === 'rejected',
-  )
-  if (fallos.length === 0) return { ok: true, parcial: false, detalle }
-  const error =
-    fallos[0].reason instanceof Error
-      ? fallos[0].reason.message
-      : 'No se pudo preparar todo'
-  return { ok: false, parcial: fallos.length < 3, detalle, error }
 }

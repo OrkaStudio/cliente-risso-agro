@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoFecha } from '@/components/ui/campo-fecha'
@@ -61,7 +62,7 @@ export function AlquilerDialog({
   onOpenChange,
 }: {
   empresaId: string
-  /** Campo ya elegido (desde la guía); si no, se pregunta. */
+  /** El campo que se estaba mirando: viene marcado, pero igual se pregunta (Lau, 24/11). */
   campoId?: string
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -73,14 +74,14 @@ export function AlquilerDialog({
   const canuelas = useNovilloCanuelas()
   const invalidar = useInvalidarMovimientos()
 
-  // Los alquilados primero; si no hay ninguno marcado así, cualquiera de sus campos
-  // (antes no preguntaba y «Guardar» no hacía nada).
-  const marcados = (campos.data ?? []).filter((c) => c.tipo === 'alquilado')
-  const alquilados = marcados.length ? marcados : (campos.data ?? [])
+  // Siempre primero de qué campo es (Lau, 24/11: «falta elegir el campo antes»), aunque
+  // haya uno elegido en la barra o uno solo: viene marcado y se confirma con un toque.
+  // Todos sus campos, los marcados como alquilados primero.
+  const alquilados = [...(campos.data ?? [])].sort((a, b) => Number(b.tipo === 'alquilado') - Number(a.tipo === 'alquilado'))
   const [campoId, setCampoId] = useState<string | null>(campoInicial ?? null)
-  const campo = (campos.data ?? []).find((c) => c.id === (campoId ?? campoInicial)) ?? (alquilados.length === 1 ? alquilados[0] : null)
+  const campo = (campos.data ?? []).find((c) => c.id === campoId) ?? null
 
-  const [sub, setSub] = useState<Sub>(campoInicial || alquilados.length <= 1 ? 'unidad' : 'campo')
+  const [sub, setSub] = useState<Sub>('campo')
   const [unidad, setUnidad] = useState<Unidad | null>(null)
   const [cantidad, setCantidad] = useState('')
   const [base, setBase] = useState<'ha' | 'total'>('ha')
@@ -89,7 +90,6 @@ export function AlquilerDialog({
   const [primerPago, setPrimerPago] = useState(hoyISO())
   const [precio, setPrecio] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [ocupado, setOcupado] = useState(false)
 
   const u = UNIDADES.find((x) => x.valor === unidad) ?? null
   const esMoneda = unidad === 'pesos' || unidad === 'dolares'
@@ -112,7 +112,7 @@ export function AlquilerDialog({
   const montoCuota = unidadesCuota === null ? null : unidad === 'pesos' ? unidadesCuota : precioNum !== null ? unidadesCuota * precioNum : null
 
   const ORDEN: Sub[] = [
-    ...(campoInicial || alquilados.length <= 1 ? [] : ['campo' as Sub]),
+    'campo',
     'unidad',
     'cantidad',
     'pago',
@@ -133,7 +133,7 @@ export function AlquilerDialog({
   }
   function confirmarCantidad() {
     if (cant === null || cant <= 0) return setError('Cuánto, según el contrato')
-    if (base === 'ha' && !hectareas) return setError('Este campo no tiene hectáreas cargadas. Ponelas en Campos, o elegí "en total".')
+    if (base === 'ha' && !hectareas) return setError('Este campo no tiene hectáreas cargadas. Ponelas en Campos, o elegí «Todo el campo».')
     setError(null)
     setSub('pago')
   }
@@ -148,11 +148,9 @@ export function AlquilerDialog({
     setSub('resumen')
   }
 
-  async function guardar(e?: { preventDefault: () => void }) {
-    e?.preventDefault()
-    if (!campo || !u || montoCuota === null || cant === null) return
-    setOcupado(true)
-    try {
+  async function guardar() {
+    if (!campo || !u || montoCuota === null || cant === null) return 'falta'
+    {
       const cantidadConUnidad = esMoneda ? `${u.nombre} ${cantidad}` : `${cantidad} ${u.nombre}`
       const detalle = `${cantidadConUnidad}${base === 'ha' ? '/ha' : ''}/${periodo === 'mes' ? 'mes' : 'año'}`
       const estimado = unidad === 'pesos' ? '' : ` · est. a ${pesos(precioNum!)}${unidad === 'dolares' ? ' (blue)' : ''}`
@@ -173,14 +171,13 @@ export function AlquilerDialog({
         }
       }
       invalidar()
-      toast.success(`Listo: anotamos el alquiler de ${campo.nombre}`, { description: `${pesos(montoCuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}; cada pago lo ves en la Agenda.` })
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el alquiler.')
-    } finally {
-      setOcupado(false)
+      const nombre = campo.nombre
+      const cuota = montoCuota
+      return () => toast.success(`Listo: anotamos el alquiler de ${nombre}`, { description: `${pesos(cuota)} ${frecuenciaLabel[frecuencia].toLowerCase()}; cada pago lo ves en la Agenda.` })
     }
   }
+  // El botón dice «Listo» (o el motivo si no sale); después el aviso y se cierra.
+  const alquilar = useAccion(guardar, { alTerminar: () => onOpenChange(false) })
 
 
   const labelCantidad = !u
@@ -197,7 +194,12 @@ export function AlquilerDialog({
     precio: u ? `¿A cuánto está hoy ${u.precioDe}?` : '¿A cuánto está hoy?',
     resumen: 'Así queda',
   }
-  const confirmar = sub === 'cantidad' ? confirmarCantidad : sub === 'pago' ? confirmarPago : sub === 'precio' ? confirmarPrecio : null
+  function confirmarCampo() {
+    if (!campoId) return setError('Tocá de qué campo es el alquiler.')
+    setError(null)
+    setSub('unidad')
+  }
+  const confirmar = sub === 'campo' ? confirmarCampo : sub === 'cantidad' ? confirmarCantidad : sub === 'pago' ? confirmarPago : sub === 'precio' ? confirmarPrecio : null
   // Los próximos pagos, para ver cómo queda en la Agenda.
   const proximos = Array.from({ length: Math.min(3, cuotasAnio) }, (_, i) => {
     const [y, m, d] = primerPago.split('-').map(Number) as [number, number, number]
@@ -225,8 +227,8 @@ export function AlquilerDialog({
         sub === 'resumen' ? (
           <>
             {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-            <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado || montoCuota === null} onClick={() => void guardar()}>
-              {ocupado ? 'Guardando…' : 'Guardar el alquiler'}
+            <BotonPrincipal icono="Siguiente" accion={alquilar} disabled={alquilar.estado === 'reposo' && montoCuota === null}>
+              Guardar el alquiler
             </BotonPrincipal>
           </>
         ) : confirmar ? (
@@ -244,13 +246,13 @@ export function AlquilerDialog({
         onSubmit={(e) => {
           e.preventDefault()
           if (confirmar) confirmar()
-          else if (sub === 'resumen') void guardar(e)
+          else if (sub === 'resumen') void alquilar.correr()
         }}
       >
         {sub === 'campo' && (
           <div className="flex flex-col gap-3">
             {alquilados.map((c) => (
-              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" marca={(() => { const id = identidadCampos.find((x) => x.id === c.id); return id ? <MarcaCampo letra={id.letra} color={id.color} className="size-12 text-[18px] ring-2 ring-superficie" /> : undefined })()} titulo={c.nombre} detalle={c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : ''} onClick={() => (setCampoId(c.id), setSub('unidad'))} />
+              <OpcionGrande key={c.id} activa={campoId === c.id} icono="Campos" marca={(() => { const id = identidadCampos.find((x) => x.id === c.id); return id ? <MarcaCampo letra={id.letra} color={id.color} className="size-12 text-[18px] ring-2 ring-superficie" /> : undefined })()} titulo={c.nombre} detalle={[c.tipo === 'alquilado' ? 'Alquilado' : null, c.hectareas ? `${c.hectareas.toLocaleString('es-AR')} ha` : null].filter(Boolean).join(' · ')} onClick={() => (setCampoId(c.id), setError(null), setSub('unidad'))} />
             ))}
           </div>
         )}

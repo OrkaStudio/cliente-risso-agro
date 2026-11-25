@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { GORDO_FUENTE } from '@/features/cotizaciones/api'
 import { useCargarGordo, useGordoActual, useNovilloCanuelas } from '@/features/cotizaciones/hooks'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Grupo, PanelLateral } from '@/components/tropero/panel-lateral'
@@ -54,15 +55,11 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
     setError(null)
     const n = Number(valor)
     if (!valor || Number.isNaN(n) || n <= 0)
-      return setError('Ingresá un valor válido')
-    try {
-      await cargar.mutateAsync({ empresaId, valor: n, fecha })
-      toast.success('Listo: guardamos el precio del gordo', { description: `$${n.toLocaleString('es-AR')} por kilo; lo ves arriba, en la barra.` })
-      setOpen(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error')
-    }
+      { setError('Ingresá un valor válido'); return 'falta' }
+    await cargar.mutateAsync({ empresaId, valor: n, fecha })
+    return () => toast.success('Listo: guardamos el precio del gordo', { description: `$${n.toLocaleString('es-AR')} por kilo; lo ves arriba, en la barra.` })
   }
+  const guardarPrecio = useAccion(guardar, { alTerminar: () => setOpen(false) })
 
   return (
     <>
@@ -101,7 +98,7 @@ export function GordoSlot({ empresaId }: { empresaId: string }) {
         titulo="Precio del gordo"
         bajada={gordo.data ? `Hoy: $${Math.round(gordo.data.valor).toLocaleString('es-AR')}/kg, ${gordo.data.auto ? 'de Cañuelas' : 'cargado a mano'} el ${fmtFecha(gordo.data.fecha)}.` : undefined}
         pie={
-          <BotonPrincipal icono="Guardar" cargando={cargar.isPending} disabled={cargar.isPending || !empresaId} onClick={guardar}>
+          <BotonPrincipal icono="Siguiente" accion={guardarPrecio} disabled={guardarPrecio.estado === 'reposo' && !empresaId}>
             Guardar
           </BotonPrincipal>
         }

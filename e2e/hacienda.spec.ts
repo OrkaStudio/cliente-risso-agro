@@ -121,14 +121,16 @@ async function venderUnaVaca(page: Page) {
   await panel.getByRole('button', { name: 'Uno más: Vacas' }).click()
   await panel.getByRole('button', { name: /Revisar: 1 vaca/ }).click()
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await expect(panel).toBeHidden()
 }
 
 /** Abre, desde la pestaña «Sin identificar», la salida más nueva (la última fila). */
 async function abrirUltimaSalida(page: Page) {
   await page.getByRole('tab', { name: /Sin identificar/ }).click()
-  await page.getByRole('row', { name: /vendida|murió/ }).last().click()
+  // La de hoy (la lista puede tardar un instante en traerla: sin esto se abría una vieja).
+  const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+  await page.getByRole('row', { name: /vendida|murió/ }).filter({ hasText: `el ${hoy}` }).last().click()
   await expect(page.getByRole('dialog')).toBeVisible()
 }
 
@@ -148,7 +150,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: 'Vender 1 vaca' }).click()
   await expect(panel.getByRole('heading', { name: 'Se vendió 1 vaca' })).toBeVisible()
   await expect(panel.getByText('1 sin identificar')).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
 
   // La salida aparece como fila propia; «No sé cuál fue» la cierra con una cualquiera.
   await abrirUltimaSalida(page)
@@ -167,7 +169,7 @@ test('salieron y entraron por cantidad, sin leer caravanas', async ({ page }) =>
   await panel.getByRole('button', { name: /Revisar: 2 terneros/ }).click()
   await panel.getByRole('button', { name: 'Sumar 2 terneros' }).click()
   await expect(panel.getByRole('heading', { name: 'Sumamos 2 terneros nacidos' })).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await page.getByRole('tab', { name: /Sin caravana/ }).click()
   // Sin caravana van juntos, por potrero y categoría (16/11).
   await expect(page.getByRole('row', { name: /\d+ terneros/ }).first()).toBeVisible()
@@ -248,7 +250,7 @@ test('planilla completa: ¿Es ésta?, Revisá con el antes y después, y Deshace
   // Deshacer: el ternero vuelve a estar sin caravana y el número queda libre.
   await panel.getByRole('button', { name: 'Deshacer esta carga' }).click()
   await expect(panel.getByRole('heading', { name: 'Se deshizo la carga' })).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await page.getByPlaceholder('Buscá una caravana').fill(n)
   await expect(page.getByRole('row', { name: new RegExp(n) })).toHaveCount(0)
 })
@@ -271,7 +273,7 @@ test('planilla con sólo números: se dice qué son y dónde estaban, sin supone
   await expect(panel.getByText(String(n + 1), { exact: true })).toBeVisible()
   await panel.getByRole('button', { name: 'Ponerle caravana a 2' }).click()
   await expect(panel.getByRole('heading', { name: 'Listo: 2 caravanas puestas' })).toBeVisible()
-  await panel.getByRole('button', { name: 'Listo' }).click()
+  await panel.getByRole('button', { name: 'Volver a Hacienda' }).click()
   await page.getByPlaceholder('Buscá una caravana').fill(String(n + 1))
   await expect(page.getByRole('row', { name: new RegExp(String(n + 1)) })).toContainText('Ternero')
 })
@@ -396,10 +398,11 @@ test('en la ficha, elegir en la barra un campo donde el animal no está vuelve a
   const barra = page.getByRole('radiogroup', { name: 'Qué campo estás viendo' })
   await barra.getByRole('radio', { name: /E2E Campo base \d+ cab/ }).click()
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
-  // Por potrero: se entra al 1A y de ahí a un animal (16/11).
-  await page.getByRole('row').filter({ has: page.getByText('1A', { exact: true }) }).first().click()
-  await expect(page).toHaveURL(/potrero=/)
-  await page.getByRole('row').filter({ hasText: '1A' }).getByRole('link').first().click()
+  // Por potrero: el 1A se despliega ahí mismo (25/11) y de ahí a un animal.
+  await page.getByRole('button', { name: /Ver los animales del 1A/ }).click()
+  await expect(page.getByRole('button', { name: /Cerrar los animales del 1A/ })).toBeVisible()
+  await expect(page).toHaveURL(/\/hacienda$/)
+  await page.locator('a[href^="/hacienda/"]').first().click()
   await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
 
   // «Todos tus campos» incluye al animal: la ficha se queda.

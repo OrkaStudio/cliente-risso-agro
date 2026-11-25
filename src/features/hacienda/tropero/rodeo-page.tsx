@@ -1,6 +1,6 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Icono } from '@/components/tropero/icono'
 import { BotonChico } from '@/components/tropero/boton'
 import arreo from '@/assets/tropero/arreo.webp'
@@ -113,7 +113,11 @@ export function RodeoPage() {
   // Con animales con caravana, se puede pasar de «por potrero» a la lista de a uno.
   const [porAnimal, setPorAnimal] = useState(false)
   // Los grupos sin caravana abiertos (se ven sus animales, para llegar a cada ficha).
-  const [abiertos, setAbiertos] = useState<Set<string>>(new Set())
+  // Desde Campos («Ver los animales»): ese potrero llega abierto en la lista, en su
+  // lugar, y no en otra vista que no decía dónde estabas (Lau, 25/11).
+  const potreroPedido = params.get('potrero')
+  const keyPedido = potreroPedido ? `p:${potreroPedido === SIN_POTRERO ? '' : potreroPedido}` : null
+  const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set(keyPedido ? [keyPedido] : []))
   const abrirGrupo = (key: string) =>
     setAbiertos((a) => {
       const b = new Set(a)
@@ -147,8 +151,15 @@ export function RodeoPage() {
   const bajas = useBajas()
 
   const campoId = elegido.elegido?.id ?? null
-  const potreroId = params.get('potrero')
-  const potreroFiltro = potreroId ? potreros.data?.find((p) => p.id === potreroId) : undefined
+  // Ya cargada la lista, baja hasta ese potrero y saca el pedido de la dirección.
+  useEffect(() => {
+    if (!keyPedido || animales.isLoading || potreros.isLoading) return
+    const t = setTimeout(() => {
+      document.getElementById(keyPedido)?.scrollIntoView({ behavior: reducir ? 'auto' : 'smooth', block: 'start' })
+      setParams((p) => (p.delete('potrero'), p), { replace: true })
+    }, 250)
+    return () => clearTimeout(t)
+  }, [keyPedido, animales.isLoading, potreros.isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
   const base = useMemo(() => {
     const activos = (animales.data ?? []).filter((a) => a.estado === 'activo' && a.id)
     const filas = filasDelRodeo(
@@ -158,10 +169,8 @@ export function RodeoPage() {
       resumirEventos(eventos.data ?? []),
       hoyLocal(),
     )
-    // Desde Campos («Ver su hacienda»): sólo la de ese potrero.
-    if (potreroId) return filas.filter((f) => (potreroId === SIN_POTRERO ? !f.potreroId : f.potreroId === potreroId))
     return campoId ? filas.filter((f) => f.campoId === campoId) : filas
-  }, [animales.data, potreros.data, eventos.data, elegido.campos, campoId, potreroId])
+  }, [animales.data, potreros.data, eventos.data, elegido.campos, campoId])
 
   if (animales.isLoading || potreros.isLoading) return <div className="mx-auto h-[280px] w-full ancho-pagina animate-pulse rounded-[20px] bg-superficie-hundida" aria-busy />
   if (animales.error) return <p className="text-texto-suave">No pudimos cargar la hacienda. Revisá la conexión y probá de nuevo.</p>
@@ -199,17 +208,19 @@ export function RodeoPage() {
   // Sin buscar ni filtrar: cada potrero con lo que tiene. Si no, de a uno los de
   // caravana y juntos los que no tienen (Lau, 16/11).
   const hayConCaravana = lista.some((f) => f.visual || f.rfid)
-  const porPotrero = !q && !filtroActivoDe(verSalieron, verSinIdentificar, estado) && !potreroId && !(porAnimal && hayConCaravana)
+  const porPotrero = !q && !filtroActivoDe(verSalieron, verSinIdentificar, estado) && !(porAnimal && hayConCaravana)
   const grupos = porPotrero ? potrerosDelRodeo(lista) : []
   const items = porPotrero ? [] : juntarSinCaravana(lista)
   const visibles = todas ? items : items.slice(0, PRIMERAS)
-  const verPotrero = (id: string | null) => setParams((p) => (p.set('potrero', id ?? SIN_POTRERO), p))
   // «Todo el rodeo» sólo tiene sentido si hay más de una especie.
   const hayEspecies = (['bovino', 'ovino', 'equino'] as Especie[]).filter((e) => resumen.porEspecie[e] > 0)
   const especies = ESPECIES.filter((e) => (e.especie === 'todas' ? hayEspecies.length > 1 : e.especie === 'bovino' || resumen.porEspecie[e.especie] > 0))
   const vista: Vista = especie === 'todas' && hayEspecies.length <= 1 ? 'bovino' : especie
   // Sin animales en lo que se mira (y sin historia que mostrar): una de dos caras, no un 0 y una tabla vacía.
-  const vacio = base.length === 0 && !potreroId && nSalieron === 0 && sinIdentificar === 0
+  const vacio = base.length === 0 && nSalieron === 0 && sinIdentificar === 0
+  // Lo general que tiene todo potrero, aunque no se cargue nada más: hectáreas y su campo.
+  const infoPotrero = new Map<string, { ha: number | null; campo: CampoElegible | null }>()
+  for (const c of camposQ.data ?? []) for (const pt of c.potreros) infoPotrero.set(pt.id, { ha: pt.hectareas, campo: elegido.campos.find((x) => x.id === c.id) ?? null })
   const cara = caraSinHacienda(campoId ? (camposQ.data?.find((c) => c.id === campoId) ?? null) : null)
   const cuantosDe = (e: Vista) => (e === 'todas' ? resumen.total : resumen.porEspecie[e])
   const nombreVista = vista === 'todas' ? (r.total === 1 ? 'cabeza' : 'cabezas') : ESPECIES.find((e) => e.especie === vista)!.nombre.toLowerCase()
@@ -231,19 +242,6 @@ export function RodeoPage() {
           imagen={arreo}
           posicion="40% 78%"
           encima={<CampoVisto campos={elegido.campos} elegido={elegido.elegido} />}
-          derecha={
-            potreroId ? (
-                    <button
-                      type="button"
-                      onClick={() => setParams((p) => (p.delete('potrero'), p))}
-                      className="inline-flex h-10 items-center gap-2 rounded-full bg-texto px-4 text-[14.5px] font-bold text-superficie"
-                      aria-label={potreroFiltro ? `Ver toda la hacienda, no sólo la del ${potreroFiltro.nombre}` : 'Ver toda la hacienda, no sólo la que no está en un potrero'}
-                    >
-                      {potreroFiltro ? `Sólo el ${potreroFiltro.nombre}` : 'Sólo sin potrero'}
-                      <Icono nombre="Cerrar" tamano={16} />
-                    </button>
-                  ) : null
-          }
         >
           <h1 className="t-pagina text-texto">Hacienda</h1>
           {especies.length > 1 && (
@@ -482,7 +480,7 @@ export function RodeoPage() {
             <Icono nombre="Comprobante" tamano={16} /> Caravanas desde una planilla
           </button>
           )}
-          {!q && !filtroActivo && !potreroId && hayConCaravana && (
+          {!q && !filtroActivo && hayConCaravana && (
             <div role="radiogroup" aria-label="Cómo ver la lista" className="inline-flex h-10 rounded-full bg-superficie-hundida p-1">
               {[
                 { valor: false, texto: 'Por potrero' },
@@ -509,30 +507,19 @@ export function RodeoPage() {
           </p>
         ) : (
           <table className="w-full text-left">
-            <thead>
-              {porPotrero ? (
-                <tr className="border-b border-borde text-[13px] font-semibold text-texto-suave">
-                  <th className="py-3 pl-5 font-semibold">Potrero</th>
-                  <th className="py-3 font-semibold">Qué hay</th>
-                  <th className="py-3 font-semibold max-md:hidden">Caravanas</th>
-                  <th className="py-3 font-semibold max-lg:hidden">Para hacer</th>
-                  <th className="py-3 pr-5 font-semibold" />
-                </tr>
-              ) : (
-                <tr className="border-b border-borde text-[13px] font-semibold text-texto-suave">
-                  <th className="py-3 pl-5 font-semibold">Caravana</th>
-                  <th className="py-3 font-semibold">Qué es</th>
-                  <th className="py-3 font-semibold max-md:hidden">{verSalieron ? 'De dónde salió' : 'Dónde está'}</th>
-                  <th className="py-3 font-semibold max-lg:hidden">{COLUMNA[filtroActivo ?? 'todos']}</th>
-                  {!filtroActivo && <th className="py-3 pr-5 font-semibold">Estado</th>}
-                </tr>
-              )}
+            {/* Sin encabezados a la vista (Lau, 24/11: menos ruido): cada fila dice lo suyo. */}
+            <thead className="sr-only">
+              <tr>
+                <th>{porPotrero ? 'Potrero' : 'Caravana'}</th>
+                <th>{porPotrero ? 'Qué hay' : 'Qué es y dónde está'}</th>
+                <th>{porPotrero ? 'Para hacer' : 'Estado'}</th>
+              </tr>
             </thead>
-            <tbody className="divide-y divide-borde">
+            <tbody className="divide-y divide-borde/60">
               {!q &&
                 !verSalieron &&
                 (verSinIdentificar || !estado) &&
-                salidas.map((x) => (
+                (verSinIdentificar ? salidas : salidas.slice(0, 3)).map((x) => (
                   <FilaDeSalida
                     key={x.salidaId}
                     x={x}
@@ -543,9 +530,50 @@ export function RodeoPage() {
                     }}
                   />
                 ))}
-              {grupos.map((g) => (
-                <FilaPotrero key={g.potreroId ?? SIN_POTRERO} g={g} onClick={() => verPotrero(g.potreroId)} />
-              ))}
+              {!q && !verSalieron && !verSinIdentificar && !estado && salidas.length > 3 && (
+                <tr onClick={() => elegirEstado('sinIdentificar')} className="cursor-pointer transition-colors hover:bg-superficie-hundida/40">
+                  <td className="w-px py-3 pr-3.5 pl-5" />
+                  <td className="py-3 text-[14px] font-semibold text-texto-suave" colSpan={2}>
+                    <button type="button" onClick={(e) => (e.stopPropagation(), elegirEstado('sinIdentificar'))} className="inline-flex items-center gap-1 text-principal hover:underline">
+                      Ver las otras {salidas.length - 3} salidas sin decir cuál <Icono nombre="Siguiente" tamano={16} />
+                    </button>
+                  </td>
+                </tr>
+              )}
+              {/* Cada potrero se despliega ahí mismo con sus animales (Lau, 25/11): suave, sin sacudir la página. */}
+              {grupos.map((g) => {
+                const key = `p:${g.potreroId ?? ''}`
+                const abierto = abiertos.has(key)
+                const pot = g.potreroId ? infoPotrero.get(g.potreroId) : undefined
+                return (
+                  <Fragment key={key}>
+                    <FilaPotrero id={key} g={g} ha={pot?.ha ?? null} campo={pot?.campo ?? null} abierto={abierto} onClick={() => abrirGrupo(key)} />
+                    <tr aria-hidden={!abierto} className="border-0">
+                      <td colSpan={3} className="p-0">
+                        <AnimatePresence initial={false}>
+                          {abierto && (
+                            <motion.div
+                              key="adentro"
+                              initial={reducir ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                              animate={reducir ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+                              exit={reducir ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                              transition={{ height: { duration: 0.38, ease: CURVA }, opacity: { duration: 0.24 } }}
+                              className="overflow-hidden"
+                            >
+                              <AdentroPotrero
+                                items={juntarSinCaravana(lista.filter((f) => f.potreroId === g.potreroId))}
+                                abiertos={abiertos}
+                                onGrupo={abrirGrupo}
+                                onAnimal={(id) => navigate(`/hacienda/${id}`)}
+                              />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </td>
+                    </tr>
+                  </Fragment>
+                )
+              })}
               {visibles.map((it) =>
                 it.tipo === 'animal' ? (
                   <Fila key={it.f.id} f={it.f} filtro={filtroActivo} onClick={() => navigate(`/hacienda/${it.f.id}`)} />
@@ -566,7 +594,7 @@ export function RodeoPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-borde px-5 py-3.5">
             <p className="text-[14px] text-texto-suave">
               {porPotrero
-                ? `${grupos.length === 1 ? 'Un potrero' : `${grupos.length} potreros`}, ${lista.length} ${lista.length === 1 ? 'animal' : 'animales'}. Tocá uno para ver lo que tiene.`
+                ? `${grupos.length === 1 ? 'Un potrero' : `${grupos.length} potreros`}, ${lista.length} ${lista.length === 1 ? 'animal' : 'animales'}. Tocá uno para ver sus animales.`
                 : `${lista.length} ${lista.length === 1 ? 'animal' : 'animales'}${items.length < lista.length ? ', los sin caravana juntos' : ''}. Ordenados por lo que hay que hacer.`}
             </p>
             {!porPotrero && items.length > PRIMERAS && (
@@ -606,121 +634,270 @@ function StockPorCategoria({ cats, total }: { cats: { categoria: string; cabezas
   )
 }
 
-/** Una fila: la caravana como se ve en la oreja, qué es, dónde, lo último y qué hacer. */
-function Fila({ f, filtro, onClick, adentro = false }: { f: FilaRodeo; filtro: Filtro | null; onClick: () => void; adentro?: boolean }) {
-  // La columna del dato cambia con el filtro: lo que importa para esa decisión.
+// Las filas, con la visual de Movimientos (Lau, 24/11): a la izquierda la marca (caravana o
+// potrero); qué es, y debajo en gris y en una línea, dónde y el dato; a la derecha, el estado.
+const TR = 'group cursor-pointer transition-colors hover:bg-superficie-hundida/40'
+const TD1 = 'w-px py-3.5 pr-3.5 pl-5 align-middle'
+const TD3 = 'w-px py-3.5 pr-5 text-right align-middle whitespace-nowrap'
+const meta = (partes: (string | null | undefined | false)[]) => partes.filter(Boolean).join(' · ')
+
+/** El estado, como una pastilla chica con su punto. */
+function Estado({ punto, texto }: { punto: string; texto: string }) {
+  return (
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-superficie-hundida px-2.5 text-[12.5px] font-bold text-texto">
+      <span className={cn('size-2 rounded-full', punto)} />
+      {texto}
+    </span>
+  )
+}
+
+/** Una fila: la caravana como se ve en la oreja, qué es, dónde, el dato y qué hacer. */
+function Fila({ f, filtro, onClick, adentro = false, hondo = false, sinDonde = false }: { f: FilaRodeo; filtro: Filtro | null; onClick: () => void; adentro?: boolean; hondo?: boolean; sinDonde?: boolean }) {
+  // El dato cambia con el filtro: lo que importa para esa decisión.
   const dato =
     filtro === 'retiro'
       ? f.retiro
-      : filtro === 'destetar'
+      : filtro === 'destetar' || filtro === 'vender'
         ? f.peso
         : filtro === 'vacia'
           ? f.tacto
-          : filtro === 'vender'
-            ? f.peso
-            : filtro === 'sinCaravana' || filtro === 'sinElectronica'
-              ? null
-              : f.ultimoDato
+          : filtro === 'sinCaravana' || filtro === 'sinElectronica'
+            ? 'se completa desde su ficha o con una planilla'
+            : f.ultimoDato
+  // Dentro de su potrero no se repite dónde está; sin nada antes, el dato va sin «·».
+  const antes = meta([sinDonde ? null : (f.donde ?? 'Sin potrero'), f.estado === 'sinElectronica' && !filtro ? null : f.visual ? (f.rfid ? null : 'sin electrónica') : f.rfid ? 'sin visible' : null])
   return (
-    <tr onClick={onClick} className={cn('cursor-pointer transition-colors hover:bg-superficie-hundida/50', adentro && 'bg-fondo/60')}>
-      <td className={cn('py-3', adentro ? 'pl-10' : 'pl-5')}>
+    <tr onClick={onClick} className={cn(TR, adentro && 'bg-fondo/50')}>
+      <td className={cn(TD1, adentro && 'pl-10', hondo && 'pl-16')}>
         <a
           href={`/hacienda/${f.id}`}
           onClick={(e) => {
             e.preventDefault()
             onClick()
           }}
-          className="inline-flex flex-col items-start"
+          className="inline-flex"
         >
           {f.visual ? (
-            <span className="t-cifra rounded-[8px] border-[1.5px] border-principal px-2 py-0.5 font-bold text-principal">{f.visual}</span>
+            <span className="t-cifra inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-principal px-2 font-bold text-principal">{f.visual}</span>
           ) : f.rfid ? (
-            <span className="t-cifra-chica rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 font-bold text-texto">{f.rfid}</span>
+            <span className="t-cifra-chica inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-neutro-300 px-2 font-bold text-texto">{f.rfid}</span>
           ) : (
-            <span className="rounded-[8px] border-[1.5px] border-dashed border-neutro-300 px-2 py-1 text-[12.5px] font-semibold text-texto-suave">sin caravana</span>
+            <span className="inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-dashed border-neutro-300 px-2 text-[11.5px] font-semibold text-texto-suave">s/c</span>
           )}
-          {(f.visual || f.rfid) && <span className="t-cifra-mini mt-1 text-texto-suave">{f.visual ? (f.rfid ?? 'sin electrónica') : 'sin visible'}</span>}
         </a>
       </td>
-      <td className="py-3 pr-4 text-[15px] font-semibold text-texto">{f.queEs}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{f.donde ?? 'Sin potrero'}</td>
-      <td className={cn('py-3 pr-4 text-[14.5px] max-lg:hidden', filtro && filtro !== 'sinCaravana' && filtro !== 'sinElectronica' ? 'font-semibold text-texto' : 'text-texto-suave')}>
-        {filtro === 'sinCaravana' || filtro === 'sinElectronica' ? 'Desde su ficha o con una planilla' : (dato ?? '—')}
-      </td>
-      {!filtro && (
-        <td className="py-3 pr-5">
-          {f.estado !== 'nada' && (
-            <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-              <span className={cn('size-2 rounded-full', PUNTO[f.estado])} />
-              {ESTADO_TEXTO[f.estado]}
-            </span>
+      <td className="py-3.5 pr-4">
+        <span className="block text-[15px] font-semibold text-texto">{f.queEs}</span>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">
+          {antes}
+          {dato && (
+            <>
+              {antes && ' · '}
+              <span className={cn(filtro && 'font-semibold text-texto')}>{filtro && filtro !== 'sinCaravana' && filtro !== 'sinElectronica' ? `${COLUMNA[filtro]}: ${dato}` : dato}</span>
+            </>
           )}
-        </td>
-      )}
+        </span>
+      </td>
+      <td className={TD3}>{!filtro && f.estado !== 'nada' && <Estado punto={PUNTO[f.estado]} texto={ESTADO_TEXTO[f.estado]} />}</td>
     </tr>
   )
 }
 
-/** Un potrero de la lista: cuántos, qué hay, cuántos con caravana y si alguno pide hacer algo. */
-function FilaPotrero({ g, onClick }: { g: GrupoPotrero; onClick: () => void }) {
-  const [potrero, campo] = g.donde ? g.donde.split(', ') : ['Sin potrero', null]
-  const que = g.porCategoria.map((c) => `${c.n} ${c.categoria ? categoriaNombre(c.categoria, c.n).toLowerCase() : c.n === 1 ? 'animal' : 'animales'}`).join(' · ')
-  const caravanas = g.conCaravana === 0 ? 'Sin caravanas' : g.conCaravana === g.total ? 'Todos con caravana' : `${g.conCaravana} con caravana`
+/** «6,8 cab/ha»: la carga, con un decimal (o dos si es muy baja). */
+function carga(cabezas: number, ha: number | null): string | null {
+  if (!ha || ha <= 0) return null
+  const c = cabezas / ha
+  return `${c.toLocaleString('es-AR', { maximumFractionDigits: c < 1 ? 2 : 1 })} cab/ha`
+}
+
+/**
+ * Un potrero de la lista (Lau, 25/11: «no hay jerarquía»). Primero cuál es y
+ * cuántas cabezas tiene; abajo de qué son (barra y números) y la carga, que sale
+ * de las hectáreas y vale para todos aunque no se cargue nada más. A la derecha,
+ * sólo si hay algo para hacer, y la flecha que se despliega.
+ */
+function FilaPotrero({ id, g, ha, campo, abierto, onClick }: { id: string; g: GrupoPotrero; ha: number | null; campo: CampoElegible | null; abierto: boolean; onClick: () => void }) {
+  const [potrero, nombreCampo] = g.donde ? g.donde.split(', ') : ['Sin potrero', null]
+  const cats = g.porCategoria.slice(0, 4)
+  const resto = g.porCategoria.slice(4).reduce((t, c) => t + c.n, 0)
+  const cxh = carga(g.total, ha)
   return (
-    <tr onClick={onClick} className="cursor-pointer transition-colors hover:bg-superficie-hundida/50">
-      <td className="py-3.5 pl-5">
-        <a href="#" onClick={(e) => (e.preventDefault(), onClick())} className="flex flex-col">
-          <span className="t-cifra font-bold text-texto">{potrero}</span>
-          {campo && <span className="text-[13px] text-texto-suave">{campo}</span>}
-        </a>
+    <tr id={id} onClick={onClick} aria-expanded={abierto} className={cn('group scroll-mt-24 cursor-pointer transition-colors duration-300', abierto ? 'bg-superficie-hundida/45' : 'hover:bg-superficie-hundida/30')}>
+      <td className="w-px py-4 pr-4 pl-5 align-middle">
+        {/* Botón y no link (regla de la marca): el que se alcanza con el teclado. */}
+        <button
+          type="button"
+          aria-expanded={abierto}
+          aria-label={`${abierto ? 'Cerrar' : 'Ver'} los animales del ${g.donde ? potrero : 'que no está en un potrero'}`}
+          onClick={(e) => (e.stopPropagation(), onClick())}
+          className={cn(
+            'relative grid size-14 place-items-center rounded-[14px] font-heading text-[19px] font-extrabold tracking-[-0.01em] transition-colors duration-300',
+            !g.donde ? 'border-[1.5px] border-dashed border-neutro-300 text-texto-suave' : abierto ? 'bg-texto text-superficie' : 'bg-superficie-hundida text-texto group-hover:bg-neutro-200',
+          )}
+        >
+          {g.donde ? potrero : '?'}
+          {campo && (
+            <span className="absolute -right-1 -bottom-1 grid size-[18px] place-items-center rounded-[5px] text-[10px] font-extrabold text-white ring-2 ring-superficie" style={{ background: campo.color }}>
+              {campo.letra}
+            </span>
+          )}
+        </button>
       </td>
-      <td className="py-3.5 pr-4">
-        <span className="block text-[15px] font-semibold text-texto">
-          {g.total} {g.total === 1 ? 'animal' : 'animales'}
-        </span>
-        <span className="block text-[14px] text-texto-suave">{que}</span>
+      <td className="py-4 pr-4 align-middle">
+        <p className="flex flex-wrap items-baseline gap-x-2.5">
+          <span className="text-[19px] leading-none font-extrabold text-texto tabular-nums">{g.total.toLocaleString('es-AR')}</span>
+          <span className="text-[14.5px] font-semibold text-texto">{g.total === 1 ? 'cabeza' : 'cabezas'}</span>
+          {(cxh || ha) && (
+            <span className="text-[13.5px] text-texto-suave">
+              {meta([cxh, ha ? `${ha.toLocaleString('es-AR', { maximumFractionDigits: 1 })} ha` : null, nombreCampo])}
+            </span>
+          )}
+          {!g.donde && <span className="text-[13.5px] text-texto-suave">sin potrero asignado</span>}
+        </p>
+        {/* De qué son: la barra dice la proporción, los números lo exacto. */}
+        <div className="mt-2.5 flex max-w-[520px] flex-col gap-1.5">
+          <div className="flex h-1.5 gap-[2px] overflow-hidden rounded-full">
+            {g.porCategoria.map((c, i) => (
+              <span key={c.categoria ?? 'x'} className={cn('rounded-full', PALETA[i % PALETA.length])} style={{ flexGrow: c.n }} />
+            ))}
+          </div>
+          <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] text-texto-suave">
+            {cats.map((c, i) => (
+              <span key={c.categoria ?? 'x'} className="inline-flex items-center gap-1.5">
+                <span className={cn('size-1.5 rounded-full', PALETA[i % PALETA.length])} />
+                <b className="font-bold text-texto tabular-nums">{c.n}</b> {c.categoria ? categoriaNombre(c.categoria, c.n).toLowerCase() : c.n === 1 ? 'animal' : 'animales'}
+              </span>
+            ))}
+            {resto > 0 && <span>y {resto} más</span>}
+          </p>
+        </div>
       </td>
-      <td className="py-3.5 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{caravanas}</td>
-      <td className="py-3.5 pr-4 text-[14.5px] max-lg:hidden">
-        {g.atender ? <span className="font-semibold text-texto">{g.atender === 1 ? '1 para atender' : `${g.atender} para atender`}</span> : <span className="text-texto-suave">—</span>}
-      </td>
-      <td className="py-3.5 pr-5 text-right">
-        <span className="inline-flex items-center gap-1 text-[14.5px] font-bold text-principal">
-          Ver <Icono nombre="Siguiente" tamano={16} />
+      <td className="w-px py-4 pr-5 text-right align-middle whitespace-nowrap">
+        <span className="inline-flex items-center gap-3">
+          {g.atender > 0 && <Estado punto="bg-estado-atencion" texto={g.atender === 1 ? '1 para atender' : `${g.atender} para atender`} />}
+          {/* La flecha apunta adonde se abre y gira al cerrarse. */}
+          <span className={cn('grid size-9 place-items-center rounded-full transition-[transform,background-color,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]', abierto ? 'rotate-180 bg-texto text-superficie' : 'text-texto-suave group-hover:bg-superficie-hundida group-hover:text-texto')}>
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
         </span>
       </td>
     </tr>
+  )
+}
+
+/** El ícono de cada categoría, para que se reconozca sin leer. */
+function iconoCategoria(c: FilaRodeo['categoria']): 'Vaca' | 'Ternero' | 'Oveja' | 'Caballo' {
+  if (!c) return 'Vaca'
+  if (c === 'ternero' || c === 'ternera') return 'Ternero'
+  const e = especiePorCategoria[c]
+  return e === 'ovino' ? 'Oveja' : e === 'equino' ? 'Caballo' : 'Vaca'
+}
+
+/**
+ * Lo que hay adentro de un potrero desplegado: una lista propia, más chica y
+ * metida un nivel, de un solo renglón por animal (Lau, 25/11: si falta el peso o
+ * la edad no queda un hueco). Lo que se sabe va al lado del nombre; el estado, a
+ * la derecha. Los sin caravana, juntos por categoría, se abren igual que acá.
+ */
+function AdentroPotrero({ items, abiertos, onGrupo, onAnimal }: { items: ReturnType<typeof juntarSinCaravana>; abiertos: Set<string>; onGrupo: (k: string) => void; onAnimal: (id: string) => void }) {
+  return (
+    <div className="border-y border-borde/60 bg-fondo/70 px-5 py-3 pl-[92px]">
+      <ul className="divide-y divide-borde/50 overflow-hidden rounded-[14px] bg-superficie shadow-[inset_0_0_0_1px_var(--borde)]">
+        {items.map((it) =>
+          it.tipo === 'animal' ? (
+            <li key={it.f.id}>
+              <RenglonAnimal f={it.f} onClick={() => onAnimal(it.f.id)} />
+            </li>
+          ) : (
+            <li key={it.g.key}>
+              <button type="button" aria-expanded={abiertos.has(it.g.key)} onClick={() => onGrupo(it.g.key)} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-superficie-hundida/40">
+                <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-superficie-hundida text-texto">
+                  <Icono nombre={iconoCategoria(it.g.categoria)} tamano={16} />
+                </span>
+                <span className="min-w-0 flex-1 text-[14.5px] text-texto">
+                  <b className="font-bold tabular-nums">{it.g.n}</b> {it.g.categoria ? categoriaNombre(it.g.categoria, it.g.n).toLowerCase() : it.g.n === 1 ? 'animal' : 'animales'}
+                  <span className="text-texto-suave"> sin caravana</span>
+                </span>
+                {it.g.estado !== 'nada' && it.g.estado !== 'sinCaravana' && <Estado punto={PUNTO[it.g.estado]} texto={ESTADO_TEXTO[it.g.estado]} />}
+                <span className={cn('grid size-7 place-items-center rounded-full text-texto-suave transition-transform duration-300', abiertos.has(it.g.key) && 'rotate-180')}>
+                  <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </span>
+              </button>
+              <AnimatePresence initial={false}>
+                {abiertos.has(it.g.key) && (
+                  <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ height: { duration: 0.32, ease: CURVA }, opacity: { duration: 0.2 } }} className="overflow-hidden border-t border-borde/50 bg-fondo/50">
+                    {it.g.filas.map((f) => (
+                      <li key={f.id} className="pl-6">
+                        <RenglonAnimal f={f} onClick={() => onAnimal(f.id)} />
+                      </li>
+                    ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </li>
+          ),
+        )}
+      </ul>
+    </div>
+  )
+}
+
+/** Un animal en un renglón: la caravana (o su ícono), qué es y lo que se sepa, y su estado. */
+function RenglonAnimal({ f, onClick }: { f: FilaRodeo; onClick: () => void }) {
+  const dato = f.ultimoDato
+  return (
+    <a
+      href={`/hacienda/${f.id}`}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick()
+      }}
+      className="group/a flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-superficie-hundida/40"
+    >
+      {f.visual ? (
+        <span className="t-cifra inline-grid h-9 min-w-[52px] place-items-center rounded-[10px] border-[1.5px] border-principal px-2 text-[15px] font-bold text-principal">{f.visual}</span>
+      ) : f.rfid ? (
+        <span className="t-cifra-chica inline-grid h-9 min-w-[52px] place-items-center rounded-[10px] border-[1.5px] border-neutro-300 px-2 font-bold text-texto">{f.rfid.slice(-4)}</span>
+      ) : (
+        <span className="grid size-9 place-items-center rounded-[10px] bg-superficie-hundida text-texto-suave">
+          <Icono nombre={iconoCategoria(f.categoria)} tamano={16} />
+        </span>
+      )}
+      <span className="min-w-0 flex-1 truncate text-[14.5px]">
+        <span className="font-semibold text-texto">{f.queEs}</span>
+        {dato && <span className="text-texto-suave"> · {dato}</span>}
+      </span>
+      {/* Sin caravana ya lo dice el ícono en lugar del número. */}
+      {f.estado !== 'nada' && f.estado !== 'sinCaravana' && <Estado punto={PUNTO[f.estado]} texto={ESTADO_TEXTO[f.estado]} />}
+      <span className="text-texto-suave/50 transition-colors group-hover/a:text-texto">
+        <Icono nombre="Siguiente" tamano={16} />
+      </span>
+    </a>
   )
 }
 
 /** Los que no tienen caravana, juntos: no hay cómo distinguirlos uno de otro. Se abre para ver cada uno. */
-function FilaSinCaravana({ g, filtro, abierto, onClick }: { g: GrupoSinCaravana; filtro: Filtro | null; abierto: boolean; onClick: () => void }) {
+function FilaSinCaravana({ g, filtro, abierto, onClick, adentro = false }: { g: GrupoSinCaravana; filtro: Filtro | null; abierto: boolean; onClick: () => void; adentro?: boolean }) {
   const que = `${g.n} ${g.categoria ? categoriaNombre(g.categoria, g.n).toLowerCase() : g.n === 1 ? 'animal' : 'animales'}`
   return (
-    <tr onClick={onClick} aria-expanded={abierto} className="cursor-pointer transition-colors hover:bg-superficie-hundida/50">
-      <td className="py-3 pl-5">
-        <span className="rounded-[8px] border-[1.5px] border-dashed border-neutro-300 px-2 py-1 text-[12.5px] font-semibold text-texto-suave">sin caravana</span>
+    <tr onClick={onClick} aria-expanded={abierto} className={cn(TR, adentro && 'bg-fondo/50')}>
+      <td className={cn(TD1, adentro && 'pl-10')}>
+        <span className="inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-dashed border-neutro-300 px-2 text-[11.5px] font-semibold text-texto-suave">s/c</span>
       </td>
-      <td className="py-3 pr-4">
+      <td className="py-3.5 pr-4">
         <button type="button" onClick={(e) => (e.stopPropagation(), onClick())} className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-texto">
-          {que}
+          {que} sin caravana
           <span className={cn('text-texto-suave transition-transform', abierto ? '-rotate-90' : 'rotate-90')}>
             <Icono nombre="Siguiente" tamano={16} />
           </span>
         </button>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">{meta([adentro ? null : (g.donde ?? 'Sin potrero'), abierto ? null : 'tocá para ver cada uno'])}</span>
       </td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{g.donde ?? 'Sin potrero'}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-lg:hidden">{abierto ? '' : 'Tocá para ver cada uno'}</td>
-      {!filtro && (
-        <td className="py-3 pr-5">
-          {g.estado !== 'nada' && (
-            <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-              <span className={cn('size-2 rounded-full', PUNTO[g.estado])} />
-              {ESTADO_TEXTO[g.estado]}
-            </span>
-          )}
-        </td>
-      )}
+      <td className={TD3}>{!filtro && g.estado !== 'nada' && <Estado punto={PUNTO[g.estado]} texto={ESTADO_TEXTO[g.estado]} />}</td>
     </tr>
   )
 }
@@ -731,22 +908,21 @@ const DIA = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 function FilaDeSalida({ x, onClick }: { x: FilaSalida; onClick: () => void }) {
   const que = `${x.pendientes} ${categoriaNombre(x.categoria, x.pendientes).toLowerCase()}`
   const verbo = x.motivo === 'muerte' ? (x.pendientes === 1 ? 'murió' : 'murieron') : x.pendientes === 1 ? 'vendida' : 'vendidas'
+  const cual = x.pendientes === 1 ? 'cuál' : 'cuáles'
   return (
-    <tr onClick={onClick} className="cursor-pointer bg-estado-atencion-suave/25 transition-colors hover:bg-estado-atencion-suave/50">
-      <td className="py-3 pl-5">
-        <span className="grid h-8 w-12 place-items-center rounded-[8px] border-[1.5px] border-dashed border-estado-atencion text-[16px] font-bold text-estado-atencion-texto">?</span>
+    <tr onClick={onClick} className={TR}>
+      <td className={TD1}>
+        <span className="inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-dashed border-estado-atencion text-[16px] font-bold text-estado-atencion-texto">?</span>
       </td>
-      <td className="py-3 pr-4 text-[15px] font-semibold text-texto">
-        {que} {verbo}
+      <td className="py-3.5 pr-4">
+        <span className="block text-[15px] font-semibold text-texto">
+          {que} {verbo}
+        </span>
+        <span className="mt-0.5 block text-[13px] text-texto-suave">{meta([x.donde, `el ${DIA(x.fecha)}, sin decir ${cual}`, x.posibles ? `${x.posibles} pueden ser` : null])}</span>
       </td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-md:hidden">{x.donde}</td>
-      <td className="py-3 pr-4 text-[14.5px] text-texto-suave max-lg:hidden">
-        El {DIA(x.fecha)}, sin decir {x.pendientes === 1 ? 'cuál' : 'cuáles'} · {x.posibles} posibles
-      </td>
-      <td className="py-3 pr-5">
-        <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-texto">
-          <span className="size-2 rounded-full bg-estado-atencion" />
-          Decir {x.pendientes === 1 ? 'cuál' : 'cuáles'}
+      <td className={TD3}>
+        <span className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-bold text-texto shadow-[inset_0_0_0_1.5px_var(--borde)] transition-colors group-hover:bg-principal group-hover:text-principal-texto group-hover:shadow-none">
+          Decir {cual}
         </span>
       </td>
     </tr>
@@ -758,21 +934,15 @@ function FilaSalido({ a, b, donde, onClick, conEstado = true }: { conEstado?: bo
   const fem = ['vaca', 'vaquillona', 'ternera', 'oveja', 'cordera', 'yegua', 'potranca'].includes(a.categoria ?? '')
   const como = a.estado === 'muerto' ? 'Murió' : fem ? 'Vendida' : 'Vendido'
   return (
-    <tr onClick={onClick} className="cursor-pointer text-texto-suave transition-colors hover:bg-superficie-hundida/50">
-      <td className="py-3 pl-5">
-        <span className="t-cifra rounded-[8px] border-[1.5px] border-neutro-300 px-2 py-0.5 font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
+    <tr onClick={onClick} className={cn(TR, 'text-texto-suave')}>
+      <td className={TD1}>
+        <span className="t-cifra inline-grid h-9 min-w-12 place-items-center rounded-[10px] border-[1.5px] border-neutro-300 px-2 font-bold text-texto-suave">{a.caravana_visual ?? a.caravana_rfid?.slice(-4) ?? 's/c'}</span>
       </td>
-      <td className="py-3 pr-4 text-[15px] font-semibold">{a.categoria ? categoriaNombre(a.categoria as never, 1) : ''}</td>
-      <td className="py-3 pr-4 text-[14.5px] max-md:hidden">{donde ? (conEstado ? `Salió del ${donde}` : donde) : ''}</td>
-      <td className="py-3 pr-4 text-[14.5px] max-lg:hidden">{b ? `${como} el ${DIA(b.fecha)}${b.sinIdentificar ? ' · sin identificar' : ''}` : como}</td>
-      {conEstado && (
-        <td className="py-3 pr-5">
-          <span className="inline-flex items-center gap-2 text-[14.5px] font-semibold">
-            <span className="size-2 rounded-full bg-neutro-400" />
-            {como}
-          </span>
-        </td>
-      )}
+      <td className="py-3.5 pr-4">
+        <span className="block text-[15px] font-semibold">{a.categoria ? categoriaNombre(a.categoria as never, 1) : 'Animal'}</span>
+        <span className="mt-0.5 block text-[13px]">{meta([b ? `${como} el ${DIA(b.fecha)}${b.sinIdentificar ? ', sin identificar' : ''}` : como, donde ? `salió del ${donde}` : null])}</span>
+      </td>
+      <td className={TD3}>{conEstado && <Estado punto="bg-neutro-400" texto={como} />}</td>
     </tr>
   )
 }

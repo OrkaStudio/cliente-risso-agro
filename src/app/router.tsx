@@ -8,7 +8,6 @@ import { NoEncontrada } from '@/app/pantalla-aviso'
 import { SeccionPermitida } from '@/app/seccion-permitida'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
-import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
 import { CambieDeNumeroPage } from '@/features/acceso/cambie-de-numero-page'
 import { EntrarPage } from '@/features/acceso/entrar-page'
 import { FondoAcceso } from '@/features/acceso/fondo-acceso'
@@ -70,22 +69,8 @@ const CampoInicioPage = lazy(() =>
     default: m.CampoInicioPage,
   })),
 )
-const MangaPage = lazy(() =>
-  import('@/features/campo/manga-page').then((m) => ({
-    default: m.MangaPage,
-  })),
-)
-const LectorPage = lazy(() =>
-  import('@/features/campo/lector-page').then((m) => ({
-    default: m.LectorPage,
-  })),
-)
-const RecorridaPage = lazy(() =>
-  import('@/features/campo/recorrida-page').then((m) => ({
-    default: m.RecorridaPage,
-  })),
-)
 const CamposCelu = lazy(() => import('@/features/campo/campos-celu').then((m) => ({ default: m.CamposCelu })))
+const ConfiguracionCelu = lazy(() => import('@/features/campo/configuracion-celu').then((m) => ({ default: m.ConfiguracionCelu })))
 const AnimalCelu = lazy(() => import('@/features/campo/animal-celu').then((m) => ({ default: m.AnimalCelu })))
 const HaciendaCelu = lazy(() => import('@/features/campo/hacienda-celu').then((m) => ({ default: m.HaciendaCelu })))
 const PlataPage = lazy(() =>
@@ -121,6 +106,16 @@ const AsistenteMuestra = lazy(() =>
 const LegalesPage = lazy(() =>
   import('@/features/legales/legales-page').then((m) => ({ default: m.LegalesPage })),
 )
+const ListoMuestra = lazy(() =>
+  import('@/components/tropero/listo-muestra').then((m) => ({ default: m.ListoMuestra })),
+)
+const AvisosMuestra = lazy(() =>
+  import('@/components/tropero/avisos-muestra').then((m) => ({ default: m.AvisosMuestra })),
+)
+const BarraCeluMuestra = lazy(() =>
+  import('@/components/tropero/barra-celu-muestra').then((m) => ({ default: m.BarraCeluMuestra })),
+)
+const AccesosMuestra = lazy(() => import('@/components/tropero/accesos-muestra').then((m) => ({ default: m.AccesosMuestra })))
 const MuestraPage = lazy(() =>
   import('@/components/tropero/muestra-page').then((m) => ({ default: m.MuestraPage })),
 )
@@ -130,7 +125,11 @@ export const router = createBrowserRouter([
   ...(import.meta.env.DEV
     ? [
         { path: '/estilo', element: <Suspense fallback={null}><MuestraPage /></Suspense> },
+        { path: '/estilo/listo', element: <Suspense fallback={null}><ListoMuestra /></Suspense> },
         { path: '/estilo/asistente', element: <Suspense fallback={null}><AsistenteMuestra /></Suspense> },
+        { path: '/estilo/barra-celu', element: <Suspense fallback={null}><BarraCeluMuestra /></Suspense> },
+        { path: '/estilo/accesos', element: <Suspense fallback={null}><AccesosMuestra /></Suspense> },
+        { path: '/estilo/avisos', element: <Suspense fallback={null}><AvisosMuestra /></Suspense> },
       ]
     : []),
   // Acceso (A1–A5): se entra con un código por WhatsApp, sin contraseñas. Comparten la foto
@@ -160,9 +159,10 @@ export const router = createBrowserRouter([
     errorElement: <ErrorNuevaVersion />,
     children: [
       {
-        // A5 (adentro): cambiar el número con la sesión abierta y un código al nuevo.
+        // El número ya no se cambia desde adentro (Lau, 25/11): lo cambia el equipo.
+        // Los links viejos van a Tu cuenta, donde está «Escribinos».
         path: '/mi-cuenta/numero',
-        element: <CambiarNumeroPage />,
+        element: <Navigate to="/configuracion?tab=cuenta" replace />,
       },
       {
         // Recién registrado, sin empresa todavía: arma la suya acá.
@@ -245,11 +245,11 @@ export const router = createBrowserRouter([
                   element: <SeccionPermitida />,
                   children: [
                   { path: 'campo', element: <CampoInicioPage /> },
-                  { path: 'campo/manga', element: <MangaPage /> },
-                  // Laboratorio: probar un bastón RFID antes de comprarlo.
-                  // Fuera de la nav (no es una tarea del campo, es una prueba).
-                  { path: 'campo/lector', element: <LectorPage /> },
-                  { path: 'campo/recorrida', element: <RecorridaPage /> },
+                  // La manga, el lector de caravanas y la recorrida salieron de la app (Lau, 18/11:
+                  // se hacen por WhatsApp con el bot; el código está en archivo/). Un enlace viejo va a Hoy.
+                  { path: 'campo/manga', element: <Navigate to="/campo" replace /> },
+                  { path: 'campo/lector', element: <Navigate to="/campo" replace /> },
+                  { path: 'campo/recorrida', element: <Navigate to="/campo" replace /> },
                   { path: 'campo/plata', element: <PlataPage /> },
                   // Para mirar (Lau, 17/11): los campos y sus potreros, y la hacienda con su buscador.
                   { path: 'campo/campos', element: <CamposCelu /> },
@@ -260,6 +260,10 @@ export const router = createBrowserRouter([
                   { path: 'campo/historial', element: <Navigate to="/campo" replace /> },
                   ],
                   },
+                  // Configuración (el engranaje del encabezado): la tiene todo el que entra, sin permisos de sección.
+                  { path: 'campo/configuracion', element: <ConfiguracionCelu /> },
+                  // Una dirección del celular que no existe: se dice dentro del celular, no en el marco de la compu.
+                  { path: 'campo/*', element: <NoEncontrada /> },
                 ],
               },
             ],

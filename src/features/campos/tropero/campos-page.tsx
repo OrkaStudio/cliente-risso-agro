@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
@@ -183,13 +184,20 @@ export function CamposPage() {
   return (
     <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)] lg:-mb-14">
       {/* Arriba: qué campo se está viendo (se elige en la barra izquierda) y sumar otro. */}
-      <div className="flex items-end justify-between gap-3">
+      <div className="relative flex items-end justify-between gap-3">
         <div>
           <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
           <h1 className="t-pagina mt-1.5 text-texto">Campos</h1>
         </div>
         {/* En la misma fila: lo que falta para abrir la app, sin quitarle alto al mapa. */}
         {aTerminar && mapaQ.data && <ProgresoMapa campos={mapaQ.data} actual={aTerminar} />}
+        {/* Quien no es el dueño y el campo no está dibujado: se dice arriba del mapa, al medio (Lau, 25/11). */}
+        {!quien.dueno && !listo && !editando && (
+          <p className="mx-auto mb-1 hidden items-center gap-2.5 rounded-full bg-superficie px-4 py-2 text-[14px] text-texto shadow-[inset_0_0_0_1px_var(--borde)] md:inline-flex lg:absolute lg:bottom-1 lg:left-1/2 lg:-translate-x-1/2 lg:whitespace-nowrap">
+            <span className="size-2 shrink-0 rounded-full bg-estado-atencion" />
+            El dueño todavía está dibujando este campo. Cuando lo termine, vas a ver cada potrero.
+          </p>
+        )}
         <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
       </div>
 
@@ -370,7 +378,8 @@ function ResumenCampo({
           ))}
         </ul>
       )}
-      <p className="text-[14px] text-texto-suave">{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : quien.dueno ? 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.' : 'El dueño todavía está armando este campo en el mapa. Cuando lo termine, vas a ver cada potrero.'}</p>
+      {/* En la compu, lo de «el dueño lo está armando» va arriba del mapa; en el celular queda acá. */}
+      <p className={cn('text-[14px] text-texto-suave', !listo && !quien.dueno && 'md:hidden')}>{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : quien.dueno ? 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.' : 'El dueño todavía está armando este campo en el mapa. Cuando lo termine, vas a ver cada potrero.'}</p>
       {/* El nombre, la tenencia y el dibujo del campo son del dueño (permisos, 13/11). */}
       {quien.dueno && (
         <button type="button" onClick={onCorregir} className={cn(BOTON, 'self-start')}>
@@ -638,15 +647,11 @@ function CorregirCampo({ campo, abierto, onCerrar, empresaId, onDibujar }: { cam
   }
   const cambia = nombre.trim() !== campo.nombre || tipo !== campo.tipo
   async function guardar() {
-    try {
-      await mut.mutateAsync({ id: campo.id, nombre, tipo, hectareas: campo.hectareas, actividad: campo.actividad })
-      qc.invalidateQueries({ queryKey: ['mapa', empresaId] })
-      toast.success('Listo: el campo quedó corregido')
-      onCerrar()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
-    }
+    await mut.mutateAsync({ id: campo.id, nombre, tipo, hectareas: campo.hectareas, actividad: campo.actividad })
+    qc.invalidateQueries({ queryKey: ['mapa', empresaId] })
+    return () => toast.success('Listo: el campo quedó corregido')
   }
+  const guardarAccion = useAccion(guardar, { alTerminar: onCerrar })
   return (
     <PanelLateral chico
       abierto={abierto}
@@ -654,7 +659,7 @@ function CorregirCampo({ campo, abierto, onCerrar, empresaId, onDibujar }: { cam
       titulo="Corregir el campo"
       bajada="El nombre, si es propio o alquilado, y el dibujo de los potreros."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={!cambia || !nombre.trim() || mut.isPending} onClick={guardar}>
+        <BotonPrincipal icono="Siguiente" accion={guardarAccion} disabled={guardarAccion.estado === 'reposo' && (!cambia || !nombre.trim())}>
           Guardar
         </BotonPrincipal>
       }
@@ -703,15 +708,11 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
   const nHa = hectareas.trim() === '' ? null : Number(hectareas.replace(',', '.'))
   const haMal = nHa != null && (!Number.isFinite(nHa) || nHa <= 0)
   async function guardar() {
-    try {
-      await mut.mutateAsync({ id: p.id, estadoCiclo: usoToEstadoCiclo(uso, p.estadoCiclo), hectareas: nHa, cultivo: uso === 'agricola' ? cultivo.trim() || null : null })
-      qc.invalidateQueries({ queryKey: ['mapa'] })
-      toast.success(`Listo: el ${p.nombre} quedó corregido`)
-      onCerrar()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.')
-    }
+    await mut.mutateAsync({ id: p.id, estadoCiclo: usoToEstadoCiclo(uso, p.estadoCiclo), hectareas: nHa, cultivo: uso === 'agricola' ? cultivo.trim() || null : null })
+    qc.invalidateQueries({ queryKey: ['mapa'] })
+    return () => toast.success(`Listo: el ${p.nombre} quedó corregido`)
   }
+  const guardarAccion = useAccion(guardar, { alTerminar: onCerrar })
   return (
     <PanelLateral chico
       abierto={abierto}
@@ -719,7 +720,7 @@ function CorregirPotrero({ campoId, p, abierto, onCerrar }: { campoId: string; p
       titulo={`Corregir el ${p.nombre}`}
       bajada="Lo que está mal cargado. La hacienda se mueve desde Hacienda; el dibujo, en el satélite."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={haMal || mut.isPending} onClick={guardar}>
+        <BotonPrincipal icono="Siguiente" accion={guardarAccion} disabled={guardarAccion.estado === 'reposo' && haMal}>
           Guardar
         </BotonPrincipal>
       }

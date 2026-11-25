@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import type { PlataItem, RefCampo, RefCategoria } from './db'
+import { errorDeBase } from '@/lib/error-de-base'
 
 export type TipoMov = Database['public']['Enums']['tipo_movimiento']
 export type MedioPago = Database['public']['Enums']['medio_pago']
@@ -34,7 +35,7 @@ export async function fetchHistorial(limit = 50): Promise<HistItem[]> {
     )
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 
   // Firmamos los comprobantes en lote (1 h de validez).
   const paths = (data ?? [])
@@ -114,7 +115,7 @@ export async function subirAudioMovimiento(item: PlataItem): Promise<void> {
       upsert: false,
     })
   if (error && !/already exists|duplicate/i.test(error.message)) {
-    throw new Error(error.message)
+    throw errorDeBase(error)
   }
 }
 
@@ -131,7 +132,7 @@ export async function subirFoto(item: PlataItem): Promise<void> {
       upsert: false,
     })
   if (error && !/already exists|duplicate/i.test(error.message)) {
-    throw new Error(error.message)
+    throw errorDeBase(error)
   }
 }
 
@@ -157,7 +158,7 @@ export async function insertarMovimiento(item: PlataItem): Promise<void> {
     comprobante_url: item.foto || item.foto_subida ? pathComprobante(item) : null,
     audio_url: item.audio_path,
   })
-  if (error && error.code !== '23505') throw new Error(error.message)
+  if (error && error.code !== '23505') throw errorDeBase(error)
 }
 
 /**

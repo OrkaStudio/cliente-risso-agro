@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
+import { useMovimiento } from '@/components/tropero/boton-movimiento'
+import { Giro, Texto } from '@/components/tropero/boton-partes'
+import { useAccion, type Accion } from '@/components/tropero/use-accion'
 import tranquera from '@/assets/tropero/tranquera.webp'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
-import { Logo } from '@/components/tropero/logo'
 import { ElegirCampo } from './elegir-campo'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
 import { useLiquidar, useRevertirLiquidacion } from '@/features/agenda/hooks'
-import { useMarcarRevisados } from '@/features/analitica/hooks'
+import { useDesmarcarRevisados, useMarcarRevisados } from '@/features/analitica/hooks'
 import { useAuth } from '@/features/auth/auth-context'
 import { useCampoElegido } from '@/features/campos/campo-elegido'
 import { useCampoClima } from '@/features/cotizaciones/campo-clima'
@@ -78,7 +80,7 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 /** Una fila de «Para hacer hoy»: una cosa del campo o de la plata, o lo que cargó alguien. */
 type Fila = { tipo: 'cosa'; cosa: Cosa } | { tipo: 'gente'; quien: string; por: string; cargas: CargaDeOtro[] }
 
-export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: React.ReactNode }) {
+export function HoyCelu({ antes }: { antes?: React.ReactNode }) {
   const { user } = useAuth()
   const { data: membresia } = useEmpresa()
   const variasCuentas = (useCuentas().data?.cuentas.length ?? 0) > 1
@@ -142,12 +144,7 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
         <span className="absolute top-[760px] -left-24 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(232,150,110,0.22),transparent)]" />
       </div>
 
-      <div className="flex flex-col gap-8 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-6">
-        {/* Arriba: la marca y la cuenta (el campo se elige en la portada). */}
-        <div className="flex items-center justify-between gap-2">
-          <Logo alto={24} />
-          {cuenta}
-        </div>
+      <div className="flex flex-col gap-8 px-4 pt-[calc(var(--enc,0px)+12px)] pb-[calc(var(--barra,0px)+24px)]">
 
         {/* 1. La portada: la tranquera con el saludo en el cielo y el clima encima. */}
         <motion.div {...entra(0)} className="relative z-10 h-[310px] rounded-[20px] shadow-[0_16px_34px_-18px_rgba(90,40,15,0.5)]">
@@ -173,8 +170,11 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
                 <b className="cifra text-[20px] font-bold">{t.ahora.temp}°</b>
                 <span className="truncate">{t.ahora.descripcion}</span>
               </span>
-            ) : (
+            ) : lugar || dueno ? (
               <span className="rounded-full bg-superficie/92 px-3 py-2 text-[13.5px] font-semibold text-texto backdrop-blur-md">{lugar ? 'Buscando el clima…' : 'Ubicá tu campo para ver su clima'}</span>
+            ) : (
+              // Ubicar el campo es del dueño: a los demás no se les pide (Lau, 25/11).
+              <span />
             )}
             {manana && manana.lluviaProb >= 40 && (
               <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-sky px-3 py-2 text-[13px] font-bold text-white">
@@ -203,9 +203,11 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
           </motion.p>
         )}
 
-        {/* 3. Los números del día: lo suyo (rodeo y plata) y el mercado (gordo y dólar). */}
+        {/* 3. Los números del día: lo suyo (rodeo y plata) y el mercado (gordo y dólar).
+            Con un número impar de datos (sin el gordo, por ejemplo), el último ocupa el
+            ancho: sin el hueco vacío al lado (Lau, 19/11). */}
         {v && (
-          <motion.div {...entra(2)} className="grid grid-cols-2 gap-3">
+          <motion.div {...entra(2)} className="grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2">
             {ve.hacienda && (
               <Dato icono="Vaca" clase="bg-principal-suave text-principal" titulo="Hacienda" valor={v.totalCabezas.toLocaleString('es-AR')} unidad="cab">
                 <Franja cats={v.porCategoria} alto="h-2" />
@@ -252,10 +254,12 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
               </ul>
             )}
             {filas.length > PRIMERAS && (
-              <button type="button" onClick={() => setTodas((x) => !x)} className="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-borde pt-3 text-[14px] font-bold text-principal">
-                {todas ? 'Ver menos' : 'Ver más'}
-                <Icono nombre="Desplegar" tamano={16} className={cn('transition-transform', todas && 'rotate-180')} />
-              </button>
+              <div className="mt-3 flex justify-center border-t border-borde pt-3">
+                <button type="button" onClick={() => setTodas((x) => !x)} aria-expanded={todas} className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-principal/55 px-4 text-[14px] font-bold text-principal">
+                  {todas ? 'Ver menos' : 'Ver más'}
+                  <Icono nombre="Desplegar" tamano={16} className={cn('transition-transform', todas && 'rotate-180')} />
+                </button>
+              </div>
             )}
           </motion.section>
         )}
@@ -327,9 +331,6 @@ export function HoyCelu({ cuenta, antes }: { cuenta: React.ReactNode; antes?: Re
             </ul>
           </motion.section>
         )}
-
-        {/* Lugar para que el asistente no tape lo último. */}
-        <div aria-hidden className="h-10" />
       </div>
     </div>
   )
@@ -384,21 +385,19 @@ function FilaCosa({ c, primero, vencimiento, cargaPlata, cargaCampos, empresaId 
   const revertir = useRevertirLiquidacion()
   const [confirmar, setConfirmar] = useState(false)
   const cobro = vencimiento?.tipo === 'ingreso'
-  const pagar = (fecha: string) => {
+  // Pagar saca la fila de lo vencido: eso confirma (sin «Listo»). Si no sale, lo dice el botón.
+  const pagar = async (fecha: string) => {
     if (!vencimiento) return
-    liquidar.mutate(
-      { id: vencimiento.id, fecha },
-      {
-        onSuccess: () =>
-          toast.success(cobro ? 'Listo: quedó cobrado' : 'Listo: quedó pagado', {
-            description: `${vencimiento.descripcion} · ${pesos(vencimiento.monto ?? 0)}. Ya no está en lo vencido.`,
-            action: { label: 'Deshacer', onClick: () => revertir.mutate({ id: vencimiento.id, fechaVencimiento: vencimiento.fechaVencimiento, fechaCobroPago: fecha }) },
-          }),
-        onError: () => toast.error('No se pudo guardar. Probá de nuevo.'),
-      },
-    )
+    await liquidar.mutateAsync({ id: vencimiento.id, fecha })
+    return () =>
+      toast.success(cobro ? 'Listo: quedó cobrado' : 'Listo: quedó pagado', {
+        description: `${vencimiento.descripcion} · ${pesos(vencimiento.monto ?? 0)}. Ya no está en lo vencido.`,
+        action: { label: 'Deshacer', onClick: () => revertir.mutate({ id: vencimiento.id, fechaVencimiento: vencimiento.fechaVencimiento, fechaCobroPago: fecha }) },
+      })
   }
   const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+  const pagarHoy = useAccion(() => pagar(hoy), { sinListo: true })
+  const pagarElDia = useAccion(() => pagar(vencimiento?.fechaVencimiento ?? hoy), { sinListo: true })
   const esWhatsapp = c.accion.to.startsWith('whatsapp:')
   const accion =
     vencimiento && cargaPlata
@@ -416,17 +415,17 @@ function FilaCosa({ c, primero, vencimiento, cargaPlata, cargaCampos, empresaId 
           <div className="mt-2 flex flex-col gap-2">
             <span className={BAJADA}>{cobro ? '¿Cuándo lo cobraste?' : '¿Cuándo lo pagaste?'}</span>
             <div className="flex flex-wrap items-center gap-2">
-              <BotonChico lleno disabled={liquidar.isPending} onClick={() => pagar(hoy)}>
+              <BotonChico lleno accion={pagarHoy} disabled={pagarElDia.ocupado}>
                 Hoy
               </BotonChico>
               {vencimiento.fechaVencimiento && (
-                <BotonChico disabled={liquidar.isPending} onClick={() => pagar(vencimiento.fechaVencimiento!)}>
+                <BotonChico accion={pagarElDia} disabled={pagarHoy.ocupado}>
                   El {fechaCorta(vencimiento.fechaVencimiento)}
                 </BotonChico>
               )}
-              <button type="button" onClick={() => setConfirmar(false)} className="h-8 px-2 text-[13.5px] font-semibold text-texto-suave">
+              <BotonChico onClick={() => setConfirmar(false)} className="border-borde text-texto-suave">
                 Cancelar
-              </button>
+              </BotonChico>
             </div>
           </div>
         ) : (
@@ -463,21 +462,43 @@ function Renglon({ icono, iconoClase, titulo, meta, metaClase, monto, montoClase
   )
 }
 
-/** El botón de un renglón: chico, en una línea. */
-function BotonChico({ lleno = false, className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { lleno?: boolean }) {
-  return <button type="button" {...props} className={cn('h-8 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap disabled:opacity-60', lleno ? 'bg-principal text-principal-texto' : 'border-[1.5px] border-principal/55 text-principal', className)} />
+/** El botón de un renglón: chico, en una línea. Con `accion` gira mientras guarda, y si
+ *  no sale se sacude y dice el motivo (después «Probar de nuevo»). */
+function BotonChico({ lleno = false, accion, className, children, onClick, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { lleno?: boolean; accion?: Accion }) {
+  const ref = useMovimiento(accion)
+  const k = accion?.estado === 'motivo' ? `m${accion.sacudidas}` : accion?.estado === 'fallo' ? 'f' : 'r'
+  const texto = accion?.estado === 'motivo' ? accion.motivo : accion?.estado === 'fallo' ? 'Probar de nuevo' : children
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...props}
+      onClick={accion ? () => void accion.correr() : onClick}
+      aria-busy={accion?.estado === 'cargando' || undefined}
+      className={cn('inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-bold whitespace-nowrap disabled:opacity-60', lleno ? 'bg-principal text-principal-texto' : 'border-[1.5px] border-principal/55 text-principal', className)}
+    >
+      {accion?.estado === 'cargando' && <Giro className="size-3.5" />}
+      {accion ? <Texto k={k}>{texto}</Texto> : children}
+    </button>
+  )
 }
 
 /** Lo que cargó alguien de su gente y no se miró: se abre, se ve cada cosa y se da por buena. */
 function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) {
   const [abierto, setAbierto] = useState(false)
   const revisar = useMarcarRevisados()
+  const desmarcar = useDesmarcarRevisados()
   const total = cargas.reduce((s, c) => s + (c.tipo === 'ingreso' ? c.monto : -c.monto), 0)
-  const darPorBueno = () =>
-    revisar.mutate(
-      cargas.map((c) => c.id),
-      { onSuccess: () => toast.success(`Listo: revisaste lo de ${quien}`, { description: 'Ya está en tu plata, sin la marca de nuevo.' }), onError: () => toast.error('No se pudo guardar. Probá de nuevo.') },
-    )
+  // Darlo por bueno saca la fila: eso confirma (sin «Listo»). Si no sale, lo dice el botón.
+  const darPorBueno = useAccion(
+    async () => {
+      const ids = cargas.map((c) => c.id)
+      await revisar.mutateAsync(ids)
+      // Darlo por bueno cierra: quien lo cargó ya no lo puede cambiar. Por eso se puede deshacer (Lau, 24/11).
+      return () => toast.success(`Listo: revisaste lo de ${quien}`, { description: `Ya no figura como nuevo y ${quien} no lo puede cambiar.`, action: { label: 'Deshacer', onClick: () => desmarcar.mutate(ids) } })
+    },
+    { sinListo: true },
+  )
   const porWhatsapp = cargas.some((c) => c.canal === 'whatsapp')
   const que = cargas.length === 1 ? mayuscula(cargas[0]!.descripcion) || 'Un gasto' : `${plural(cargas.length, 'carga', 'cargas')}: ${[...new Set(cargas.map((c) => c.descripcion.split(/[:·]/)[0]!.trim()).filter(Boolean))].slice(0, 2).join(', ')}`
   const inicial = (
@@ -498,7 +519,7 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
         {cargas.length === 1 ? (
           // Una sola carga: ya se ve entera en el renglón, se da por buena de una.
           <div className="mt-2">
-            <BotonChico disabled={revisar.isPending} onClick={darPorBueno}>
+            <BotonChico accion={darPorBueno}>
               Está bien
             </BotonChico>
           </div>
@@ -524,7 +545,7 @@ function FilaGente({ quien, cargas }: { quien: string; cargas: CargaDeOtro[] }) 
                     </li>
                   ))}
                 </ul>
-                <BotonChico lleno className="mt-2" disabled={revisar.isPending} onClick={darPorBueno}>
+                <BotonChico lleno className="mt-2" accion={darPorBueno}>
                   Están bien
                 </BotonChico>
               </div>

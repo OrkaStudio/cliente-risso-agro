@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MovimientoConDetalle, Pendiente } from '@/features/analitica/api'
-import { aCsv, avisosParaMejorar, campanas, coincide, comparacionCorta, mesAMes, periodos, dolarDel, enRango, rangoDePeriodo, mesMasApretado, proximos, ultimoAnio, type DolarDia } from './plata'
+import { aCsv, avisosParaMejorar, campanas, coincide, comparacionCorta, contraDe, delPeriodoTexto, mesAMes, periodoEntre, periodos, dolarDel, enRango, rangoDePeriodo, mesMasApretado, proximos, textoRango, ultimoAnio, type DolarDia } from './plata'
 
 const mov = (x: Partial<MovimientoConDetalle>): MovimientoConDetalle =>
   ({
@@ -21,6 +21,19 @@ const SERIE: DolarDia[] = [
   { fecha: '2025-01-01', venta: 1000 },
   { fecha: '2026-01-01', venta: 1250 },
 ]
+
+describe('el rango en palabras (24/11)', () => {
+  it('dice siempre qué fechas se miran', () => {
+    expect(textoRango('2025-11-25', '2026-11-24', '2026-11-24')).toBe('Del 25 nov 2025 a hoy')
+    expect(textoRango('2025-07-01', '2026-06-30', '2026-11-24')).toBe('Del 1 jul 2025 al 30 jun 2026')
+    expect(textoRango('2026-09-01', '2026-09-30', '2026-11-24')).toBe('Del 1 al 30 sep 2026')
+    expect(textoRango('2026-02-01', '2026-09-30', '2026-11-24')).toBe('Del 1 feb al 30 sep 2026')
+    const p = periodoEntre('2026-09-01', '2026-09-30', '2026-11-24')
+    expect([p.antesDesde, p.antesHasta, p.enCurso]).toEqual(['2025-09-01', '2025-09-30', false])
+    expect(contraDe(p)).toBe('que las mismas fechas del año anterior')
+    expect(delPeriodoTexto(p)).toBe('del 1 al 30 sep 2026')
+  })
+})
 
 describe('Plata', () => {
   it('el dólar de un día sin cotización es el último anterior', () => {
@@ -73,7 +86,11 @@ describe('Plata', () => {
     expect(enRango(mov({ fecha_cobro_pago: '2026-06-30' }), 'campana', '2026-11-03')).toBe(false)
     expect(enRango(mov({ fecha_cobro_pago: '2026-06-30' }), 'pasada', '2026-11-03')).toBe(true)
     expect(enRango(mov({ fecha_cobro_pago: '2025-06-30' }), 'pasada', '2026-11-03')).toBe(false)
-    expect(rangoDePeriodo('doce')).toBe('12m')
+    expect(rangoDePeriodo(periodos('2026-11-03')[0]!)).toBe('12m')
+    // Las fechas del calendario viajan a Movimientos y se filtran ahí (24/11).
+    expect(rangoDePeriodo(periodoEntre('2026-09-01', '2026-09-30', '2026-11-03'))).toBe('fechas&desde=2026-09-01&hasta=2026-09-30')
+    expect(enRango(mov({ fecha_cobro_pago: '2026-09-15' }), 'fechas', '2026-11-03', { desde: '2026-09-01', hasta: '2026-09-30' })).toBe(true)
+    expect(enRango(mov({ fecha_cobro_pago: '2026-10-01' }), 'fechas', '2026-11-03', { desde: '2026-09-01', hasta: '2026-09-30' })).toBe(false)
     expect(coincide(m, 'shell')).toBe(true)
     expect(coincide(m, '50672834')).toBe(true)
     expect(coincide(m, 'ypf')).toBe(false)

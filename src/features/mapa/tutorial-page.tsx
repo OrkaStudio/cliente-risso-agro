@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Aviso } from '@/components/tropero/aviso'
 import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
+import { textoDelMotivo } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
@@ -132,7 +133,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
+      setError(textoDelMotivo(e))
     } finally {
       setOcupado(false)
     }
@@ -358,7 +359,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
       return (
         <LayoutMapa {...comun} encima={<PasoDe n={2} texto="el borde" />} titulo="¿Es este tu campo?">
           <Comparacion medido={ha} alta={campo?.hectareas ?? null} comp={comp} />
-          <BotonPrincipal icono="Guardar" onClick={() => ir({ e: 'borde-listo', borde: paso.borde, ajustando: false })}>
+          <BotonPrincipal icono="Siguiente" onClick={() => ir({ e: 'borde-listo', borde: paso.borde, ajustando: false })}>
             Sí, es este
           </BotonPrincipal>
           <p className="text-[14px] text-texto-suave">¿No es? {movil ? 'Tocá' : 'Hacé clic en'} otra parte del mapa.</p>
@@ -422,16 +423,16 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
           ) : (
             <Comparacion medido={ha} alta={alta} comp={comp} />
           )}
-          {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
           {paso.ajustando ? (
-            <BotonPrincipal icono="Guardar" onClick={() => setPaso({ ...paso, ajustando: false })}>
-              Listo, así queda
+            <BotonPrincipal icono="Siguiente" onClick={() => setPaso({ ...paso, ajustando: false })}>
+              Así queda
             </BotonPrincipal>
           ) : trabado ? (
             <>
               <BotonPrincipal
-                icono="Guardar"
+                icono="Siguiente"
                 cargando={ocupado}
+                fallo={error}
                 disabled={ocupado}
                 onClick={() =>
                   correr(async () => {
@@ -456,6 +457,7 @@ function Tutorial({ empresaId, campos }: { empresaId: string; campos: CampoMapa[
               <BotonPrincipal
                 icono="Siguiente"
                 cargando={ocupado}
+                fallo={error}
                 disabled={ocupado}
                 onClick={() =>
                   correr(async () => {
@@ -778,11 +780,11 @@ function Cual({
           revisar={`Revisá que hayas seguido el alambrado del ${sel.nombre}. Si mide eso, corregimos el alta.`}
         />
       )}
-      {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
       {sel ? (
         <BotonPrincipal
           icono="Siguiente"
           cargando={ocupado}
+          fallo={error}
           disabled={ocupado}
           onClick={() => onEs(sel.id, noCuadra ? ha : undefined)}
         >
@@ -847,9 +849,8 @@ function Nuevo({
         ]}
       />
       <p className="text-[13px] text-texto-suave">La hacienda se mueve a este potrero después, desde Hacienda o en la manga.</p>
-      {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
-      <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado || !numero || repetido} onClick={() => onGuardar(numero, uso)}>
-        {ocupado ? 'Guardando…' : 'Guardar el potrero'}
+      <BotonPrincipal icono="Siguiente" cargando={ocupado} fallo={error} disabled={ocupado || !numero || repetido} onClick={() => onGuardar(numero, uso)}>
+        Guardar el potrero
       </BotonPrincipal>
       <BotonChico type="button" icono="Reintentar" className="self-start" onClick={onRedibujar}>
         Lo dibujo de nuevo
@@ -871,10 +872,10 @@ function TodosListos({ comun, campos }: { comun: Comun; campos: CampoMapa[] }) {
       <p className="text-[15.5px] text-texto-suave">
         Se abrió toda la app. Empezá por la Hacienda: ahí están tus {t.cabezas} cabezas, potrero por potrero.
       </p>
-      {error && <Aviso tipo="problema" titulo="Falta algo">{error}</Aviso>}
       <BotonPrincipal
         icono="Siguiente"
         cargando={ocupado}
+        fallo={error}
         disabled={ocupado}
         onClick={async () => {
           setOcupado(true)
@@ -884,7 +885,7 @@ function TodosListos({ comun, campos }: { comun: Comun; campos: CampoMapa[] }) {
             await qc.invalidateQueries()
             navigate('/', { replace: true })
           } catch (e) {
-            setError(e instanceof Error ? e.message : 'No se pudo abrir la app.')
+            setError(textoDelMotivo(e))
             setOcupado(false)
           }
         }}

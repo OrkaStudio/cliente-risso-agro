@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Aviso } from '@/components/tropero/aviso'
 import { Boton, BotonChico, BotonPrincipal } from '@/components/tropero/boton'
+import { textoDelMotivo } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { Segmentos } from '@/components/tropero/segmentos'
@@ -191,7 +192,8 @@ export default function EditorCampo({
         ),
       )
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+      // El motivo lo dice el botón que guardó (fallo={error}); nunca un texto crudo.
+      setError(textoDelMotivo(e))
       throw e
     } finally {
       setOcupado(false)
@@ -636,7 +638,7 @@ export default function EditorCampo({
             texto={`Es la parcela del catastro${paso.partida ? ` de la partida ${paso.partida.replace('-', '\u2011')}` : ''}, de ${haTexto(paso.ha || ha(paso.borde))} ha. Fijate en el mapa que el borde siga tu alambrado.`}
           >
             <Comparacion medido={ha(paso.borde)} alta={mapa.hectareas} comp={compararBorde(ha(paso.borde), mapa.hectareas)} />
-            <BotonPrincipal icono="Guardar" data-acompana="es-este" onClick={() => ir({ e: 'borde-listo', borde: paso.borde, ajustando: false })}>
+            <BotonPrincipal icono="Siguiente" data-acompana="es-este" onClick={() => ir({ e: 'borde-listo', borde: paso.borde, ajustando: false })}>
               Sí, es mi campo
             </BotonPrincipal>
             <BotonChico
@@ -706,7 +708,8 @@ export default function EditorCampo({
             ajustando={paso.ajustando}
             corrigiendo={!!paso.corrigiendo}
             ocupado={ocupado}
-            problema={problema}
+            problema={null}
+            fallo={error}
             onAjustar={(si) => setPaso({ ...paso, ajustando: si })}
             onOtro={() => ir(esBA ? { e: 'tocar', buscando: false } : { e: 'marcar' })}
             onCorregirAlta={() => void intentar(() => corregirHectareasCampo(campo.id, ha(paso.borde)), () => setPaso({ ...paso, altaCorregida: true }))}
@@ -796,7 +799,8 @@ export default function EditorCampo({
             dibujo={paso.dibujo}
             faltan={faltan}
             ocupado={ocupado}
-            problema={problema}
+            problema={null}
+            fallo={error}
             onEs={(id, corregir) => void guardarDibujo(id, paso.dibujo, corregir || !de(id)?.hectareas)}
             onNuevo={() => ir({ e: 'nuevo', dibujo: paso.dibujo })}
             onRedibujar={() => ir({ e: 'dibujar', id: null })}
@@ -805,7 +809,6 @@ export default function EditorCampo({
 
         {paso.e === 'confirmar' && sel && (
           <Tarjeta titulo={`¿Es el ${sel.nombre}?`} texto={`Dibujaste ${haTexto(ha(paso.dibujo))} ha y en el alta pusiste ${haTexto(sel.hectareas ?? 0)}. Revisá que hayas seguido el alambrado.`}>
-            {problema}
             {lejosDelAlta(ha(paso.dibujo), sel.hectareas) ? (
               <>
                 <p className="text-[14.5px] text-texto">Es {cuantoSeAleja(ha(paso.dibujo), sel.hectareas!)}: lo más probable es que el dibujo no siga el alambrado.</p>
@@ -818,7 +821,7 @@ export default function EditorCampo({
               </>
             ) : (
               <>
-                <BotonPrincipal icono="Guardar" data-acompana="confirmar" cargando={ocupado} disabled={ocupado} onClick={() => void guardarDibujo(sel.id, paso.dibujo, true)}>
+                <BotonPrincipal icono="Siguiente" data-acompana="confirmar" cargando={ocupado} fallo={error} disabled={ocupado} onClick={() => void guardarDibujo(sel.id, paso.dibujo, true)}>
                   {ocupado ? 'Guardando…' : `Sí, mide ${haTexto(ha(paso.dibujo))} ha`}
                 </BotonPrincipal>
                 <BotonChico type="button" icono="Reintentar" className="self-start" disabled={ocupado} onClick={() => ir({ e: 'dibujar', id: sel.id })}>
@@ -896,8 +899,7 @@ export default function EditorCampo({
           <Tarjeta titulo={`Corregí el borde del ${sel.nombre}`} texto="Arrastrá cada punto hasta el alambrado. Para sumar un punto, arrastrá el del medio de un lado.">
             {paso.pts && <p className="text-[14.5px] text-texto">Ahora mide <b>{haTexto(ha(paso.pts))} ha</b> (antes {haTexto(ha(sel.poligono ?? []))}).</p>}
             {paso.aviso && <Aviso tipo="atencion" titulo={paso.aviso} />}
-            {problema}
-            <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={!paso.pts || ocupado} onClick={() => paso.pts && void guardarBordePotrero(sel.id, paso.pts)}>
+            <BotonPrincipal icono="Siguiente" cargando={ocupado} fallo={error} disabled={!paso.pts || ocupado} onClick={() => paso.pts && void guardarBordePotrero(sel.id, paso.pts)}>
               {ocupado ? 'Guardando…' : 'Guardar el borde'}
             </BotonPrincipal>
             <BotonChico type="button" className="self-start" disabled={ocupado} onClick={() => ir({ e: 'potrero', id: sel.id })}>
@@ -941,7 +943,7 @@ export default function EditorCampo({
         )}
 
         {paso.e === 'cierre' && (
-          <Cierre campo={mapa} campos={campos} siguiente={siguienteCampo ?? null} pendiente={pendiente} ocupado={ocupado} problema={problema} onSeguir={onSeguirCon} onAbrir={() => void abrirLaApp()} onSalir={onSalir} />
+          <Cierre campo={mapa} campos={campos} siguiente={siguienteCampo ?? null} pendiente={pendiente} ocupado={ocupado} problema={null} fallo={error} onSeguir={onSeguirCon} onAbrir={() => void abrirLaApp()} onSalir={onSalir} />
         )}
         {/* Si hay más abajo, la tarjeta se desvanece en vez de cortarse (Lau, 02/11). */}
         <div aria-hidden className="pointer-events-none sticky bottom-0 -mx-5 -mt-4 h-8 shrink-0 bg-gradient-to-t from-superficie via-superficie/80 to-transparent" />
@@ -1201,8 +1203,7 @@ function Nuevo({
         ]}
       />
       <p className="text-[13px] text-texto-suave">La hacienda se mueve a este potrero después, desde Hacienda o en la manga.</p>
-      {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
-      <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado || !numero || repetido} onClick={() => onGuardar(numero, uso)}>
+      <BotonPrincipal icono="Siguiente" cargando={ocupado} fallo={error} disabled={ocupado || !numero || repetido} onClick={() => onGuardar(numero, uso)}>
         {ocupado ? 'Guardando…' : `Guardar el ${numero}${letra}`}
       </BotonPrincipal>
       <BotonChico type="button" icono="Reintentar" className="self-start" disabled={ocupado} onClick={onRedibujar}>
@@ -1272,8 +1273,7 @@ function Revisar({
           ? `Las ${p.cabezas} cabezas quedan en el ${p.nombre}. Si alguna está en la otra parte, movela desde Hacienda.`
           : `El ${numero}${letra} arranca con ${haTexto(has[otra])} ha.`}
       </p>
-      {error && <Aviso tipo="problema" titulo="No se pudo guardar">{error}</Aviso>}
-      <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado || !numero || repetido} onClick={() => onGuardar(numero)}>
+      <BotonPrincipal icono="Siguiente" cargando={ocupado} fallo={error} disabled={ocupado || !numero || repetido} onClick={() => onGuardar(numero)}>
         {ocupado ? 'Guardando…' : `Dividir el ${p.nombre}`}
       </BotonPrincipal>
       <div className="flex flex-wrap gap-2">
@@ -1323,6 +1323,7 @@ function BordeListo({
   corrigiendo,
   ocupado,
   problema,
+  fallo,
   onAjustar,
   onOtro,
   onCorregirAlta,
@@ -1336,6 +1337,8 @@ function BordeListo({
   corrigiendo: boolean
   ocupado: boolean
   problema: React.ReactNode
+  /** El motivo si falló al guardar: lo dice el botón. */
+  fallo?: string | null
   onAjustar: (si: boolean) => void
   onOtro: () => void
   onCorregirAlta: () => void
@@ -1360,19 +1363,19 @@ function BordeListo({
       )}
       {problema}
       {ajustando && !corrigiendo ? (
-        <BotonPrincipal icono="Guardar" onClick={() => onAjustar(false)}>
-          Listo, así queda
+        <BotonPrincipal icono="Siguiente" onClick={() => onAjustar(false)}>
+          Así queda
         </BotonPrincipal>
       ) : lejos && !corrigiendo ? (
         <BotonPrincipal icono="Editar" data-acompana="ajustar-borde" onClick={() => onAjustar(true)}>
           Ajustar el borde
         </BotonPrincipal>
       ) : trabado && !corrigiendo ? (
-        <BotonPrincipal icono="Guardar" data-acompana="corregir-alta" cargando={ocupado} disabled={ocupado} onClick={onCorregirAlta}>
+        <BotonPrincipal icono="Siguiente" data-acompana="corregir-alta" cargando={ocupado} fallo={fallo} disabled={ocupado} onClick={onCorregirAlta}>
           Sí, mide {haTexto(ha)} ha: lo corrijo
         </BotonPrincipal>
       ) : (
-        <BotonPrincipal icono={corrigiendo ? 'Guardar' : 'Siguiente'} data-acompana="seguir-potreros" cargando={ocupado} disabled={ocupado} onClick={onGuardar}>
+        <BotonPrincipal icono="Siguiente" data-acompana="seguir-potreros" cargando={ocupado} fallo={fallo} disabled={ocupado} onClick={onGuardar}>
           {ocupado ? 'Guardando…' : corrigiendo ? 'Guardar el borde' : 'Seguir con los potreros'}
         </BotonPrincipal>
       )}
@@ -1408,6 +1411,7 @@ function Cual({
   faltan,
   ocupado,
   problema,
+  fallo,
   onEs,
   onNuevo,
   onRedibujar,
@@ -1416,6 +1420,8 @@ function Cual({
   faltan: PotreroM[]
   ocupado: boolean
   problema: React.ReactNode
+  /** El motivo si falló al guardar: lo dice el botón. */
+  fallo?: string | null
   /** `corregir`: el productor confirmó que las hectáreas del alta estaban mal. */
   onEs: (id: string, corregir: boolean) => void
   onNuevo: () => void
@@ -1465,7 +1471,7 @@ function Cual({
           Lo dibujo de nuevo
         </BotonPrincipal>
       ) : sel ? (
-        <BotonPrincipal icono="Siguiente" data-acompana="cual" cargando={ocupado} disabled={ocupado} onClick={() => onEs(sel.id, noCuadra)}>
+        <BotonPrincipal icono="Siguiente" data-acompana="cual" cargando={ocupado} fallo={fallo} disabled={ocupado} onClick={() => onEs(sel.id, noCuadra)}>
           {ocupado ? 'Guardando…' : noCuadra ? `Sí, el ${sel.nombre} mide ${haTexto(ha)} ha: lo corrijo` : `Es el ${sel.nombre}`}
         </BotonPrincipal>
       ) : (
@@ -1497,6 +1503,7 @@ function Cierre({
   pendiente,
   ocupado,
   problema,
+  fallo,
   onSeguir,
   onAbrir,
   onSalir,
@@ -1507,6 +1514,8 @@ function Cierre({
   pendiente: boolean
   ocupado: boolean
   problema: React.ReactNode
+  /** El motivo si falló al guardar: lo dice el botón. */
+  fallo?: string | null
   onSeguir: (id: string) => void
   onAbrir: () => void
   onSalir: (() => void) | null
@@ -1533,7 +1542,7 @@ function Cierre({
         <>
           <p className="text-[15px] text-texto-suave">Se abre toda la app. Empezá por la Hacienda: ahí están tus {t.cabezas} cabezas, potrero por potrero.</p>
           {problema}
-          <BotonPrincipal icono="Siguiente" data-acompana="cierre" cargando={ocupado} disabled={ocupado} onClick={onAbrir}>
+          <BotonPrincipal icono="Siguiente" data-acompana="cierre" cargando={ocupado} fallo={fallo} disabled={ocupado} onClick={onAbrir}>
             Ir al Inicio
           </BotonPrincipal>
         </>

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { errorDeBase } from '@/lib/error-de-base'
 
 export type PastoEstado = Database['public']['Enums']['pasto_estado']
 export type AguaEstado = Database['public']['Enums']['agua_estado']
@@ -256,7 +257,7 @@ export async function subirAudio(path: string, blob: Blob): Promise<void> {
     .from('comprobantes')
     .upload(path, blob, { contentType: blob.type || 'audio/webm', upsert: false })
   if (error && !/already exists|duplicate/i.test(error.message)) {
-    throw new Error(error.message)
+    throw errorDeBase(error)
   }
 }
 
@@ -290,7 +291,7 @@ export async function asegurarRecorridaRemota(meta: {
     empresa_id: meta.empresa_id,
     fecha: meta.fecha,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return meta.recorrida_id
 }
 
@@ -329,10 +330,10 @@ export async function guardarObservacion(input: {
       .from('observacion_potrero')
       .update(payload)
       .eq('id', existente.id)
-    if (error) throw new Error(error.message)
+    if (error) throw errorDeBase(error)
   } else {
     const { error } = await supabase.from('observacion_potrero').insert(payload)
-    if (error) throw new Error(error.message)
+    if (error) throw errorDeBase(error)
   }
 }
 

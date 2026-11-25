@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
+import { errorDeBase } from '@/lib/error-de-base'
+import { todasLasFilas } from '@/lib/todas-las-filas'
 
 type TipoMov = Database['public']['Enums']['tipo_movimiento']
 type MedioPago = Database['public']['Enums']['medio_pago']
@@ -29,20 +31,24 @@ export async function listCategorias(): Promise<CategoriaMov[]> {
     .select('*')
     .eq('activo', true)
     .order('grupo')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return data
 }
 
 export async function listMovimientos(): Promise<MovimientoConDetalle[]> {
-  const { data, error } = await supabase
-    .from('movimiento_financiero')
-    .select(
-      '*, categoria:categoria_movimiento(nombre, grupo), campo(nombre), potrero(nombre)',
-    )
-    // Lo anulado no es un movimiento: no se lista ni suma.
-    .neq('estado', 'anulado')
-    .order('fecha_devengo', { ascending: false })
-  if (error) throw new Error(error.message)
+  // Todos, de a tandas: con más de 1000 se cortaba en silencio (lista y totales de Plata).
+  const data = await todasLasFilas((desde, hasta) =>
+    supabase
+      .from('movimiento_financiero')
+      .select(
+        '*, categoria:categoria_movimiento(nombre, grupo), campo(nombre), potrero(nombre)',
+      )
+      // Lo anulado no es un movimiento: no se lista ni suma.
+      .neq('estado', 'anulado')
+      .order('fecha_devengo', { ascending: false })
+      .order('id')
+      .range(desde, hasta),
+  )
   return data as unknown as MovimientoConDetalle[]
 }
 
@@ -50,28 +56,48 @@ export async function listMovimientos(): Promise<MovimientoConDetalle[]> {
 export async function marcarRevisados(ids: string[]): Promise<void> {
   if (!ids.length) return
   const { error } = await supabase.from('movimiento_financiero').update({ revisado_at: new Date().toISOString() }).in('id', ids)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
-/** Corregir un movimiento: lo que se tipea mal (monto, detalle, fecha). Queda revisado. */
-export async function corregirMovimiento(x: { id: string; monto: number; descripcion: string; fecha: string }): Promise<void> {
+/** Deshacer «Está bien»: vuelve a estar para revisar (y quien lo cargó puede volver a corregirlo). */
+export async function desmarcarRevisados(ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const { error } = await supabase.from('movimiento_financiero').update({ revisado_at: null }).in('id', ids)
+  if (error) throw errorDeBase(error)
+}
+
+/**
+ * Corregir un movimiento (Lau, 24/11): si salió o entró, en qué, de qué campo, cuánto, el
+ * detalle y la fecha. Queda revisado. La fecha mueve también la de pago, que es la que
+ * ordena Plata y Movimientos (antes cambiaba sólo la del registro y seguía en el mes viejo).
+ */
+export async function corregirMovimiento(x: { id: string; tipo: TipoMov; categoriaId: string; campoId: string; monto: number; descripcion: string; fecha: string; pagado: boolean }): Promise<void> {
   const { error } = await supabase
     .from('movimiento_financiero')
-    .update({ monto: x.monto, descripcion: x.descripcion, fecha_devengo: x.fecha, revisado_at: new Date().toISOString() })
+    .update({
+      tipo: x.tipo,
+      categoria_id: x.categoriaId,
+      campo_id: x.campoId,
+      monto: x.monto,
+      descripcion: x.descripcion,
+      fecha_devengo: x.fecha,
+      ...(x.pagado ? { fecha_cobro_pago: x.fecha } : {}),
+      revisado_at: new Date().toISOString(),
+    })
     .eq('id', x.id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** Anular un movimiento: deja de contar, pero queda el rastro (no se borra). */
 export async function anularMovimiento(id: string): Promise<void> {
   const { error } = await supabase.from('movimiento_financiero').update({ estado: 'anulado', revisado_at: new Date().toISOString() }).eq('id', id)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** Cuántos movimientos cargados por otros todavía no se miraron (el número junto a Plata). */
 export async function contarNuevos(): Promise<number> {
   const { count, error } = await supabase.from('movimiento_financiero').select('id', { count: 'exact', head: true }).is('revisado_at', null).neq('estado', 'anulado')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return count ?? 0
 }
 
@@ -87,12 +113,15 @@ export type Pendiente = {
 
 /** Cobros y pagos pendientes (vista v_pendientes), por urgencia. */
 export async function listPendientes(): Promise<Pendiente[]> {
-  const { data, error } = await supabase
-    .from('v_pendientes')
-    .select('id, campo_id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
-    .order('dias_para_vencer', { ascending: true })
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((v) => ({
+  const data = await todasLasFilas((desde, hasta) =>
+    supabase
+      .from('v_pendientes')
+      .select('id, campo_id, descripcion, tipo, monto, fecha_vencimiento, dias_para_vencer')
+      .order('dias_para_vencer', { ascending: true })
+      .order('id')
+      .range(desde, hasta),
+  )
+  return data.map((v) => ({
     id: v.id ?? crypto.randomUUID(),
     campoId: v.campo_id,
     descripcion: v.descripcion ?? '—',
@@ -139,7 +168,7 @@ export async function subirComprobante(
   const { error } = await supabase.storage
     .from('comprobantes')
     .upload(path, img, { contentType: 'image/jpeg', upsert: true })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   return path
 }
 
@@ -196,7 +225,8 @@ export type NuevaSerie = {
 }
 
 /** Genera la serie completa de cuotas pendientes, unidas por serie_id. */
-export async function crearSerie(input: NuevaSerie): Promise<void> {
+/** Devuelve el id de la serie: con él se deshace (cancelarSerie). */
+export async function crearSerie(input: NuevaSerie): Promise<string> {
   const serieId = crypto.randomUUID()
   const off = MESES_FREQ[input.frecuencia]
   const fechas = input.fechas ?? Array.from({ length: input.cantidad }, (_, i) => addMeses(input.primeraFecha, i * off))
@@ -219,7 +249,8 @@ export async function crearSerie(input: NuevaSerie): Promise<void> {
     }
   })
   const { error } = await supabase.from('movimiento_financiero').insert(filas)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
+  return serieId
 }
 
 /** Cancela (anula) las cuotas pendientes de una serie. Las pagadas quedan. */
@@ -229,10 +260,11 @@ export async function cancelarSerie(serieId: string): Promise<void> {
     .update({ estado: 'anulado' })
     .eq('serie_id', serieId)
     .eq('estado', 'pendiente')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
-export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
+/** Devuelve el id del movimiento: con él se deshace (anularMovimiento). */
+export async function crearMovimiento(input: NuevoMovimiento): Promise<string> {
   // estado derivado: si tiene fecha de cobro/pago, ya pasó por caja → liquidado.
   const liquidado = !!input.fechaCobroPago
   const esCheque = input.medioPago === 'cheque'
@@ -274,7 +306,7 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
     neto_total: lineas.length ? netoTotal : null,
     iva_total: lineas.length ? ivaTotal : null,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 
   if (lineas.length) {
     const { error: eLineas } = await supabase.from('movimiento_iva_linea').insert(
@@ -288,8 +320,9 @@ export async function crearMovimiento(input: NuevoMovimiento): Promise<void> {
         orden: i,
       })),
     )
-    if (eLineas) throw new Error(eLineas.message)
+    if (eLineas) throw errorDeBase(eLineas)
   }
+  return id
 }
 
 /**
@@ -311,7 +344,7 @@ export async function crearAlquilerDeCampo(input: {
     .is('empresa_id', null)
     .eq('nombre', 'Alquiler de campo')
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   if (!cat) throw new Error('No encontramos la categoría "Alquiler de campo".')
   await crearSerie({
     empresaId: input.empresaId,

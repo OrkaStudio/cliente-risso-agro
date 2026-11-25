@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 import { normalizarRfid } from './rfid'
 import type { AnimalRodeo } from './db'
+import { errorDeBase } from '@/lib/error-de-base'
 
 export type CategoriaAnimal = Database['public']['Enums']['categoria_animal']
 
@@ -100,7 +101,7 @@ export async function subirAudioEvento(path: string, blob: Blob): Promise<void> 
     .from('comprobantes')
     .upload(path, blob, { contentType: blob.type || 'audio/webm', upsert: false })
   if (error && !/already exists|duplicate/i.test(error.message)) {
-    throw new Error(error.message)
+    throw errorDeBase(error)
   }
 }
 
@@ -117,7 +118,7 @@ export async function asignarCaravana(input: AsignarInput): Promise<void> {
     p_numero_visual: input.visual?.trim() || undefined,
     p_categoria: input.categoria,
   })
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 
   const nota = input.nota?.trim()
   if (nota || input.audioUrl) {
@@ -157,7 +158,7 @@ export async function deshacerCaravana(
     .delete()
     .eq('animal_id', animalId)
     .eq('vigente', true)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 
   const { data: a } = await supabase
     .from('animal')

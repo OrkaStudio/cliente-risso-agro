@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono, type NombreIcono } from '@/components/tropero/icono'
 import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
@@ -23,7 +24,6 @@ type Categoria = Database['public']['Enums']['categoria_animal']
 export type AnimalPanel = { id: string; empresaId: string; visual: string | null; rfid: string | null; potreroId: string | null }
 
 const nombreDe = (a: AnimalPanel) => a.visual ?? a.rfid?.slice(-4) ?? 'animal'
-const errorTexto = (e: unknown) => (e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
 
 /** Los potreros para elegir, agrupados por campo si hay más de uno. */
 function ElegirPotrero({ valor, onElegir, excepto, campoId }: { valor: string | null; onElegir: (id: string) => void; excepto?: string | null; campoId?: string | null }) {
@@ -106,7 +106,6 @@ export function AnotarleAlgo({ animal, abierto, onCerrar }: { animal: AnimalPane
   const potreros = usePotreros()
   const mover = useMoverAnimales()
   const baja = useDarBaja(animal.id)
-  const ocupado = evento.isPending || mover.isPending || baja.isPending
   const elegido = QUE.find((q) => q.valor === que)!
 
   const cerrar = () => {
@@ -116,41 +115,40 @@ export function AnotarleAlgo({ animal, abierto, onCerrar }: { animal: AnimalPane
 
   async function guardar() {
     setError(null)
-    try {
+    {
       if (que === 'movimiento') {
-        if (!destino) return setError('Tocá el potrero al que fue.')
+        if (!destino) { setError('Tocá el potrero al que fue.'); return 'falta' }
         await mover.mutateAsync({ empresaId: animal.empresaId, potreroDestinoId: destino, loteId: null, seleccion: { animalIds: [animal.id] } })
-        toast.success(`Listo: el ${nombreDe(animal)} quedó en su potrero nuevo`, { description: 'Lo ves en su historia.' })
+        return () => toast.success(`Listo: el ${nombreDe(animal)} quedó en su potrero nuevo`, { description: 'Lo ves en su historia.' })
       } else if (que === 'murio') {
         await baja.mutateAsync({ animalId: animal.id, estado: 'muerto', fecha, motivo: nota })
-        toast.success(`Listo: el ${nombreDe(animal)} quedó como muerto`, { description: 'Sale del rodeo; su ficha queda.' })
+        return () => toast.success(`Listo: el ${nombreDe(animal)} quedó como muerto`, { description: 'Sale del rodeo; su ficha queda.' })
       } else {
         let datos: Record<string, unknown> | undefined
         let tipo: 'sanidad' | 'pesaje' | 'destete' | 'tacto' | 'nota' = que
         if (que === 'sanidad') {
           const tratamiento = [...vacunas, otro.trim()].filter(Boolean).join(', ')
-          if (!tratamiento) return setError('Tocá qué le diste, o escribilo.')
-          if (conRetiro === 'si' && !retiro) return setError('Poné hasta cuándo dura el retiro.')
+          if (!tratamiento) { setError('Tocá qué le diste, o escribilo.'); return 'falta' }
+          if (conRetiro === 'si' && !retiro) { setError('Poné hasta cuándo dura el retiro.'); return 'falta' }
           datos = { tratamiento, ...(conRetiro === 'si' ? { retiro_hasta: retiro } : {}), ...(lote.trim() ? { lote: lote.trim() } : {}), ...(quien.trim() ? { quien: quien.trim() } : {}) }
         } else if (que === 'pesaje') {
           const n = Number(kg.replace(',', '.'))
-          if (!n || n <= 0 || n > 1500) return setError('Poné los kilos de la pesada.')
+          if (!n || n <= 0 || n > 1500) { setError('Poné los kilos de la pesada.'); return 'falta' }
           datos = { kg: Math.round(n) }
         } else if (que === 'tacto') {
-          if (!tacto) return setError('Tocá si está preñada o vacía.')
+          if (!tacto) { setError('Tocá si está preñada o vacía.'); return 'falta' }
           datos = { resultado: tacto, ...(tacto === 'prenada' && Number(meses) > 0 ? { meses: Number(meses) } : {}) }
         } else if (que === 'nota') {
-          if (!nota.trim()) return setError('Escribí qué pasó.')
+          if (!nota.trim()) { setError('Escribí qué pasó.'); return 'falta' }
           tipo = 'nota'
         }
         await evento.mutateAsync({ empresaId: animal.empresaId, animalId: animal.id, tipo, fecha, nota: que === 'nota' || que === 'destete' ? nota : '', datos })
-        toast.success(`Listo: ${elegido.texto.toLowerCase()} anotada al ${nombreDe(animal)}`.replace('destete anotada', 'destete anotado').replace('otra cosa anotada', 'nota anotada'), { description: 'Lo ves en su historia.' })
+        return () => toast.success(`Listo: ${elegido.texto.toLowerCase()} anotada al ${nombreDe(animal)}`.replace('destete anotada', 'destete anotado').replace('otra cosa anotada', 'nota anotada'), { description: 'Lo ves en su historia.' })
       }
-      cerrar()
-    } catch (e) {
-      setError(errorTexto(e))
     }
   }
+  // Si no sale, el motivo lo dice el botón (useAccion); al «Listo», el aviso y se cierra.
+  const accion = useAccion(guardar, { alTerminar: cerrar })
 
   return (
     <PanelLateral
@@ -158,7 +156,7 @@ export function AnotarleAlgo({ animal, abierto, onCerrar }: { animal: AnimalPane
       onCerrar={cerrar}
       titulo={`¿Qué le pasó al ${nombreDe(animal)}?`}
       pie={
-        <BotonPrincipal icono="Guardar" cargando={ocupado} disabled={ocupado} onClick={guardar}>
+        <BotonPrincipal icono="Siguiente" accion={accion}>
           {que === 'movimiento' && destino ? `Moverlo al ${potreros.data?.find((p) => p.id === destino)?.nombre ?? ''}` : elegido.boton}
         </BotonPrincipal>
       }
@@ -300,14 +298,11 @@ export function CorregirDatos({ animal, abierto, onCerrar }: { animal: AnimalCor
     if (d.raza.trim() !== antes.raza) c.raza = d.raza.trim() || null
     if (d.pelaje.trim() !== antes.pelaje) c.pelaje = d.pelaje.trim() || null
     if (cambia.potrero && d.potreroId) c.potrero_id = d.potreroId
-    try {
-      await mut.mutateAsync({ animalId: animal.id, cambios: c })
-      toast.success(lista.length === 1 ? 'Listo: 1 cambio guardado' : `Listo: ${lista.length} cambios guardados`, { description: 'Lo de antes queda en su historia.' })
-      onCerrar()
-    } catch (e) {
-      setError(errorTexto(e))
-    }
+    await mut.mutateAsync({ animalId: animal.id, cambios: c })
+    const n = lista.length
+    return () => toast.success(n === 1 ? 'Listo: 1 cambio guardado' : `Listo: ${n} cambios guardados`, { description: 'Lo de antes queda en su historia.' })
   }
+  const accion = useAccion(guardar, { alTerminar: onCerrar })
 
   return (
     <PanelLateral
@@ -318,7 +313,7 @@ export function CorregirDatos({ animal, abierto, onCerrar }: { animal: AnimalCor
       pie={
         <div className="flex flex-col gap-2">
           <p className="text-center text-[13.5px] text-texto-suave">{problema ?? (lista.length ? `Cambia: ${lista.join(', ')}.` : 'Cambiá lo que esté mal.')}</p>
-          <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={mut.isPending || lista.length === 0 || !!problema} onClick={guardar}>
+          <BotonPrincipal icono="Siguiente" accion={accion} disabled={accion.estado === 'reposo' && (lista.length === 0 || !!problema)}>
             {lista.length === 0 ? 'Guardar' : lista.length === 1 ? 'Guardar 1 cambio' : `Guardar ${lista.length} cambios`}
           </BotonPrincipal>
         </div>
@@ -393,15 +388,12 @@ export function DarDeBaja({ animal, abierto, onCerrar }: { animal: AnimalPanel; 
 
   async function guardar() {
     setError(null)
-    if (!por) return setError('Tocá si se vendió o murió.')
-    try {
-      await mut.mutateAsync({ animalId: animal.id, estado: por, fecha, motivo: nota })
-      toast.success(`Listo: el ${nombreDe(animal)} salió del rodeo`, { description: por === 'vendido' ? 'La plata de la venta se anota en Plata.' : 'Su ficha y su historia quedan.' })
-      onCerrar()
-    } catch (e) {
-      setError(errorTexto(e))
-    }
+    if (!por) { setError('Tocá si se vendió o murió.'); return 'falta' }
+    await mut.mutateAsync({ animalId: animal.id, estado: por, fecha, motivo: nota })
+    const vendido = por === 'vendido'
+    return () => toast.success(`Listo: el ${nombreDe(animal)} salió del rodeo`, { description: vendido ? 'La plata de la venta se anota en Plata.' : 'Su ficha y su historia quedan.' })
   }
+  const accion = useAccion(guardar, { alTerminar: onCerrar })
 
   return (
     <PanelLateral chico
@@ -410,7 +402,7 @@ export function DarDeBaja({ animal, abierto, onCerrar }: { animal: AnimalPanel; 
       titulo={`Sale el ${nombreDe(animal)}`}
       bajada="Deja de contar en el rodeo. Su ficha y su historia quedan para siempre."
       pie={
-        <BotonPrincipal icono="Guardar" cargando={mut.isPending} disabled={mut.isPending} onClick={guardar}>
+        <BotonPrincipal icono="Siguiente" accion={accion}>
           {por === 'muerto' ? 'Anotar que murió' : por === 'vendido' ? 'Anotar la venta' : 'Darlo de baja'}
         </BotonPrincipal>
       }
@@ -448,22 +440,25 @@ export function AnimalNuevo({ empresaId, especie, abierto, onCerrar, onVolver }:
 
   async function guardar() {
     setError(null)
-    if (!rfid.trim()) return setError('Escribí la caravana electrónica. Si todavía no tiene, sumalo con «Entraron»: entra sin caravana y se la cargás después.')
-    if (!categoria) return setError('Tocá qué es.')
-    if (!potrero) return setError('Tocá el potrero donde queda.')
-    try {
+    if (!rfid.trim()) { setError('Escribí la caravana electrónica. Si todavía no tiene, sumalo con «Entraron»: entra sin caravana y se la cargás después.'); return 'falta' }
+    if (!categoria) { setError('Tocá qué es.'); return 'falta' }
+    if (!potrero) { setError('Tocá el potrero donde queda.'); return 'falta' }
+    {
       await mut.mutateAsync({ empresaId, numeroRfid: rfid, numeroVisual: visual, categoria, potreroId: potrero, origen, fechaNacimiento: nacio || null })
-      toast.success(`Listo: ${categoriaLabel[categoria].toLowerCase()} sumada al rodeo`.replace(/(ternero|novillo|toro|carnero|cordero|padrillo|potrillo|capón) sumada/, '$1 sumado'), { description: 'Ya está en la lista y en su potrero.' })
+      const cat = categoria
+      return () => toast.success(`Listo: ${categoriaLabel[cat].toLowerCase()} sumada al rodeo`.replace(/(ternero|novillo|toro|carnero|cordero|padrillo|potrillo|capón) sumada/, '$1 sumado'), { description: 'Ya está en la lista y en su potrero.' })
+    }
+  }
+  const accion = useAccion(guardar, {
+    alTerminar: () => {
       setRfid('')
       setVisual('')
       setCategoria(null)
       setPotrero(null)
       setNacio('')
       onCerrar()
-    } catch (e) {
-      setError(errorTexto(e))
-    }
-  }
+    },
+  })
 
   return (
     <PanelLateral
@@ -473,7 +468,7 @@ export function AnimalNuevo({ empresaId, especie, abierto, onCerrar, onVolver }:
       titulo="Un animal nuevo"
       bajada="Para los que entran de a uno, con su caravana. Si son muchos, usá «Entraron»."
       pie={
-        <BotonPrincipal icono="Agregar" cargando={mut.isPending} disabled={mut.isPending} onClick={guardar}>
+        <BotonPrincipal icono="Agregar" accion={accion}>
           Sumar al rodeo
         </BotonPrincipal>
       }

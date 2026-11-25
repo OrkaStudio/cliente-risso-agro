@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { BotonPrincipal } from '@/components/tropero/boton'
+import { Boton, BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
-import { Grupo, Opciones, PanelLateral } from '@/components/tropero/panel-lateral'
+import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoCelular } from '@/features/acceso/campo-celular'
-import { NIVELES, ROLES, SECCIONES_CON_PERMISO, nombreRol, resumenNiveles, type Niveles, type Rol, type RolConocido } from '@/features/empresa/secciones'
+import { NIVELES, ROLES, SECCIONES_CON_PERMISO, accesoDeNiveles, nombreRol, resumenNiveles, type Niveles, type Rol, type RolConocido } from '@/features/empresa/secciones'
 import { normalizarCelularAR } from '@/lib/telefono'
 import { nombrePropio, primeraMayuscula } from '@/lib/texto'
 import { cn } from '@/lib/utils'
 import { celularLindo, linkInvitacion, useCambiarNiveles, useInvitar, whatsappInvitacionBot, useQuitarPersona, whatsappInvitacion, type Persona } from './api'
 import { WHATSAPP_TROPERO } from '@/features/acceso/reglas'
+import { LogoWhatsapp } from '@/components/tropero/audio-whatsapp'
+import { Leyenda, TablaNiveles } from './accesos'
 
 /**
  * Qué puede hacer en cada sección (permisos, 13/11): una fila por sección, con
@@ -73,6 +76,19 @@ function faltaElegir(n: Niveles): string | null {
   return null
 }
 
+/** Un paso del formulario: su número y qué se elige. */
+function Paso({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-6">
+      <p className="mb-2.5 flex items-center gap-2 text-[14.5px] font-bold text-texto">
+        <span className="grid size-6 place-items-center rounded-full bg-trigo-100 text-[12.5px] font-bold text-trigo-800">{n}</span>
+        {titulo}
+      </p>
+      {children}
+    </section>
+  )
+}
+
 /** Invitar: quién es, qué hace (sólo lo nombra) y qué puede hacer en cada sección (lo elige el dueño). */
 export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abierto: boolean; empresa: string; rolInicial?: Rol; onCerrar: () => void }) {
   const invitar = useInvitar()
@@ -83,28 +99,26 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   const [otroRol, setOtroRol] = useState('')
   const rol: Rol | '' = tipoRol === 'otro' ? otroRol.trim() : tipoRol
   const [niveles, setNiveles] = useState<Niveles>({})
-  // Cómo va a usar Troppero: en la app, o sólo mandando por WhatsApp (Lau, 13/11). Nada viene elegido.
-  const [acceso, setAcceso] = useState<'app' | 'whatsapp' | ''>('')
+  // Un solo ingreso (Lau, 25/11): cómo entra sale de los niveles que elige el dueño.
+  const acceso = accesoDeNiveles(niveles)
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function enviar() {
     setError(null)
-    if (!nombre.trim()) return setError('Escribí cómo se llama.')
-    if (!cel) return setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.')
-    if (!tipoRol) return setError('Tocá qué hace en el campo.')
-    if (tipoRol === 'otro' && otroRol.trim().length < 2) return setError('Escribí qué hace en el campo.')
-    if (!acceso) return setError('Elegí cómo va a usar Troppero.')
+    if (!nombre.trim()) { setError('Escribí cómo se llama.'); return 'falta' }
+    if (!cel) { setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.'); return 'falta' }
+    if (!tipoRol) { setError('Tocá qué hace en el campo.'); return 'falta' }
+    if (tipoRol === 'otro' && otroRol.trim().length < 2) { setError('Escribí qué hace en el campo.'); return 'falta' }
     const falta = faltaElegir(niveles)
-    if (falta) return setError(falta)
-    try {
-      setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles, acceso }))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo invitar. Probá de nuevo.')
-    }
+    if (falta) { setError(falta); return 'falta' }
+    setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles, acceso }))
   }
 
   const cel = normalizarCelularAR(celular)?.slice(1) ?? null
+  // Invitar pasa a la pantalla con el link para mandarle: eso confirma (sin «Listo»).
+  const invitarAccion = useAccion(enviar, { sinListo: true })
+
   if (token && cel)
     return (
       <PanelLateral
@@ -140,67 +154,69 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
       abierto={abierto}
       onCerrar={onCerrar}
       titulo="Invitar a alguien"
-      bajada="Vos elegís cómo lo usa, qué ve y qué carga; lo cambiás cuando quieras."
+      bajada="Le llega por WhatsApp. Lo que elijas acá lo cambiás cuando quieras."
       ancho
       pie={
         <>
           {error && <p role="alert" className="mb-3 rounded-[14px] bg-estado-problema-suave px-4 py-2.5 text-[14px] font-semibold text-estado-problema-texto">{error}</p>}
-          <BotonPrincipal icono="Siguiente" cargando={invitar.isPending} disabled={invitar.isPending} onClick={() => void enviar()}>
+          <BotonPrincipal icono="Siguiente" accion={invitarAccion}>
             {nombre.trim() ? `Invitar a ${nombre.trim().split(' ')[0]}` : 'Invitar'}
           </BotonPrincipal>
         </>
       }
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-        <CampoTexto etiqueta="Cómo se llama" placeholder="Juan Pérez" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} autoFocus />
-        <CampoCelular etiqueta="Su celular, el que tiene WhatsApp" valor={celular} onCambio={setCelular} />
+      {/* 1. Quién es: uno abajo del otro en el celular, lado a lado en la compu. */}
+      <p className="mb-2.5 flex items-center gap-2 text-[14.5px] font-bold text-texto">
+        <span className="grid size-6 place-items-center rounded-full bg-trigo-100 text-[12.5px] font-bold text-trigo-800">1</span>
+        Quién es
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CampoTexto etiqueta="Nombre" placeholder="Juan Pérez" autoCapitalize="words" value={nombre} onChange={(e) => setNombre(nombrePropio(e.target.value))} autoFocus />
+        <CampoCelular etiqueta="Celular con WhatsApp" valor={celular} onCambio={setCelular} />
       </div>
-      <Grupo titulo="Qué hace en el campo" className="mt-6">
-        <Opciones
-          etiqueta="Qué hace"
-          opciones={[...ROLES, { valor: 'otro' as const, texto: 'Otro' }]}
-          elegidas={tipoRol ? [tipoRol] : []}
-          // El rol sólo lo nombra: no trae permisos armados (Lau, 13/11).
-          onTocar={setTipoRol}
-        />
+
+      {/* 2. Qué hace: sólo lo nombra, no trae permisos armados (Lau, 13/11). */}
+      <Paso n={2} titulo="Qué hace en el campo">
+        <div role="radiogroup" aria-label="Qué hace" className="flex flex-wrap gap-1.5">
+          {[...ROLES, { valor: 'otro' as const, texto: 'Otro' }].map((r) => {
+            const si = tipoRol === r.valor
+            return (
+              <button
+                key={r.valor}
+                type="button"
+                role="radio"
+                aria-checked={si}
+                onClick={() => setTipoRol(r.valor)}
+                className={cn('h-9 rounded-full px-3.5 text-[14px] font-semibold transition-colors', si ? 'bg-principal text-principal-texto' : 'bg-superficie text-texto shadow-[inset_0_0_0_1px_var(--borde)] hover:shadow-[inset_0_0_0_1px_var(--color-neutro-300)]')}
+              >
+                {r.texto}
+              </button>
+            )
+          })}
+        </div>
         {tipoRol === 'otro' && (
           <CampoTexto className="mt-3" etiqueta="Qué hace" placeholder="Contador, ingeniero agrónomo…" value={otroRol} onChange={(e) => setOtroRol(primeraMayuscula(e.target.value))} autoFocus maxLength={40} />
         )}
-      </Grupo>
-      <Grupo titulo="Cómo va a usar Troppero">
-        <div role="radiogroup" aria-label="Cómo va a usar Troppero" className="grid gap-2 sm:grid-cols-2">
-          {(
-            [
-              { id: 'app', titulo: 'En la app y por WhatsApp', texto: 'Entra con su celular, mira y carga lo que le habilites.' },
-              { id: 'whatsapp', titulo: 'Sólo por WhatsApp', texto: 'No se baja nada: te manda novedades, gastos o facturas por WhatsApp.' },
-            ] as const
-          ).map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="radio"
-              aria-checked={acceso === o.id}
-              onClick={() => {
-                setAcceso(o.id)
-                // Por WhatsApp no se ve: lo elegido que no sea «No ve» o «Solo manda» se vuelve a elegir.
-                if (o.id === 'whatsapp') setNiveles((n) => Object.fromEntries(Object.entries(n).filter(([, v]) => v === 'no' || v === 'solo_manda')))
-              }}
-              className={cn('flex flex-col gap-0.5 rounded-[16px] border-[1.5px] px-4 py-3 text-left transition-colors', acceso === o.id ? 'border-acento bg-acento/30' : 'border-borde bg-superficie hover:border-neutro-300')}
-            >
-              <span className="text-[15.5px] font-bold text-texto">{o.titulo}</span>
-              <span className="text-[13.5px] text-texto-suave">{o.texto}</span>
-            </button>
-          ))}
+      </Paso>
+
+      {/* 3. Qué puede hacer: la misma tabla que la ficha de cada persona. Cómo entra sale de acá. */}
+      <Paso n={3} titulo="Qué puede hacer en cada sección">
+        <div className="flex flex-col gap-3">
+          <TablaNiveles etiqueta="Qué puede hacer en cada sección" niveles={niveles} onElegir={(sec, n) => setNiveles((v) => ({ ...v, [sec]: n }))} />
+          <Leyenda />
         </div>
-      </Grupo>
-      {acceso && (
-        <>
-          <Grupo titulo="Qué puede hacer en cada sección">
-            <ElegirNiveles niveles={niveles} onCambiar={setNiveles} soloWhatsapp={acceso === 'whatsapp'} />
-          </Grupo>
-          <Resumen niveles={niveles} nombre={nombre} />
-        </>
-      )}
+        {!faltaElegir(niveles) && (
+          <p className="mt-4 flex items-start gap-2.5 rounded-[16px] bg-superficie px-4 py-3 text-[14.5px] text-texto shadow-[inset_0_0_0_1px_var(--borde)]">
+            {acceso === 'app' ? <Icono nombre="Celular" tamano={16} className="mt-0.5 shrink-0 text-principal" /> : <LogoWhatsapp className="mt-0.5 size-4 shrink-0 text-[#1fae55]" />}
+            <span>
+              {acceso === 'app'
+                ? 'Va a usar la app: le llega un link por WhatsApp para entrar con su celular.'
+                : 'Va sólo por WhatsApp: no se baja nada, te manda lo que pasa. Si después le das «Mira» o «Anota», pasa a usar la app.'}
+            </span>
+          </p>
+        )}
+        <Resumen niveles={niveles} nombre={nombre} />
+      </Paso>
     </PanelLateral>
   )
 }
@@ -228,24 +244,23 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
   async function guardar() {
     setError(null)
     const falta = faltaElegir(niveles)
-    if (falta) return setError(falta === SIN_NADA ? `${falta} Para que no entre más, sacale el acceso.` : falta)
-    try {
+    if (falta) { setError(falta === SIN_NADA ? `${falta} Para que no entre más, sacale el acceso.` : falta); return 'falta' }
+    {
       await cambiar.mutateAsync({ userId: p.userId!, niveles })
-      onCerrar()
-      toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Rige la próxima vez que abra Troppero.` })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+      return () => toast.success(`Listo: cambiaste lo que puede hacer ${nombre}`, { description: `${resumenNiveles(niveles)} Le llega al instante.` })
     }
   }
   async function sacar() {
-    try {
+    {
       await quitar.mutateAsync(p)
-      onCerrar()
-      toast.success(pendiente ? `Listo: cancelaste la invitación de ${nombre}` : `Listo: ${nombre} ya no entra a tu campo`, { description: pendiente ? 'El link ya no sirve.' : 'Para que vuelva, invitalo de nuevo.' })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo.')
+      return () => toast.success(pendiente ? `Listo: cancelaste la invitación de ${nombre}` : `Listo: ${nombre} ya no entra a tu campo`, { description: pendiente ? 'El link ya no sirve.' : 'Para que vuelva, invitalo de nuevo.' })
     }
   }
+  // Guardar dice «Listo» y cierra. Sacar no se puede deshacer: ya preguntó, y lo que confirma
+  // es que la persona deja de estar (sin «Listo»). Si algo no sale, el motivo va en el botón.
+  const guardarAccion = useAccion(guardar, { alTerminar: onCerrar })
+  const sacarAccion = useAccion(sacar, { sinListo: true, alTerminar: onCerrar })
+
 
   return (
     <PanelLateral
@@ -267,7 +282,7 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
             </a>
           )}
           {!pendiente && (
-            <BotonPrincipal icono="Guardar" cargando={cambiar.isPending} disabled={cambiar.isPending} onClick={() => void guardar()}>
+            <BotonPrincipal icono="Siguiente" accion={guardarAccion}>
               Guardar
             </BotonPrincipal>
           )}
@@ -275,9 +290,9 @@ function Editar({ p, empresa, abierto, onCerrar }: { p: Persona; empresa: string
             <div className="mt-3 flex flex-col gap-2 rounded-[16px] bg-estado-problema-suave p-4">
               <p className="text-[14.5px] font-semibold text-estado-problema-texto">{pendiente ? `¿Cancelás la invitación? El link ya no va a servir.` : `¿Le sacás el acceso a ${nombre}? Deja de entrar a tu campo; lo que cargó queda.`}</p>
               <div className="flex gap-2">
-                <button type="button" onClick={() => void sacar()} disabled={quitar.isPending} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie disabled:opacity-50">
+                <Boton accion={sacarAccion} className="h-11 flex-1 rounded-full bg-estado-problema text-[15px] font-bold text-superficie hover:bg-estado-problema">
                   {pendiente ? 'Sí, cancelarla' : 'Sí, sacarle el acceso'}
-                </button>
+                </Boton>
                 <button type="button" onClick={() => setSeguro(false)} className="h-11 flex-1 rounded-full border-[1.5px] border-borde bg-superficie text-[15px] font-bold text-texto">
                   No
                 </button>

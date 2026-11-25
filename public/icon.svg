@@ -1,18 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Ícono provisional de la app (verde campo). El nombre/branding del producto
-       está pendiente de decisión; cuando se elija, reemplazar este archivo. -->
+  <!-- Troppero (19/11): la T del isotipo en hueso sobre terracota, como el ícono de Configuración. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#178a55"/>
-      <stop offset="1" stop-color="#0b5837"/>
+      <stop offset="0" stop-color="#c46a3a"/>
+      <stop offset="1" stop-color="#a9532a"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <!-- Brote: un tallo con dos hojas, sobre la línea del campo -->
-  <g fill="none" stroke="#f4f1e9" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M256 372 V210"/>
-    <path d="M256 250 C 256 196, 300 168, 356 168 C 356 222, 312 250, 256 250 Z" fill="#f4f1e9" stroke="none"/>
-    <path d="M256 288 C 256 234, 212 206, 156 206 C 156 260, 200 288, 256 288 Z" fill="#f4f1e9" stroke="none"/>
-    <path d="M150 372 H362"/>
-  </g>
+  <path transform="translate(128.00 122.08) scale(2.1795)" fill="#fbfaf6" d="M0 5.0625H117.456V33.2519H81.0444C61.582 33.2519 45.8077 49.0262 45.8077 68.4886V117.82H14.0947V33.2519H0V5.0625Z"/>
 </svg>

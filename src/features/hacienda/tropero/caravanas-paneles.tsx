@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BotonPrincipal } from '@/components/tropero/boton'
+import { useAccion } from '@/components/tropero/use-accion'
 import { Icono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { Segmentos } from '@/components/tropero/segmentos'
@@ -46,7 +47,6 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
   const nombrePotrero = (id: string | null) => potreros.data?.find((p) => p.id === id)?.nombre ?? ''
   const posiblesIds = new Set(x?.posiblesIds ?? [])
   const posibles = usePosibles((a) => posiblesIds.has(a.id ?? ''))
-  const ocupado = identificar.isPending || sinSaber.isPending || corregir.isPending
   const { data: mapa } = useMapa(empresaId)
   const camposMapa = (mapa ?? []).filter((c) => c.potreros.length > 0)
   const [campoMapaId, setCampoMapaId] = useState<string | null>(null)
@@ -77,19 +77,20 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
   const elegidosInfo = ids.map((id) => rodeo.find((a) => a.id === id)).filter(Boolean) as typeof rodeo
 
   async function confirmar() {
-    if (!x) return
+    if (!x) return 'falta'
     setError(null)
-    try {
+    let avisar: (() => void) | undefined
+    {
       if (modo === 'sabe') {
         for (const id of ids) await identificar.mutateAsync({ animalId: id, salidaId: x.salidaId })
         const fuera = elegidosInfo.filter((a) => a.potrero_id !== x.potreroId)
-        toast.success(`Listo: ${ids.length === 1 ? 'fue' : 'fueron'} ${nums(elegidosInfo.map((a) => ({ visual: a.caravana_visual, rfid: a.caravana_rfid })))}`, {
+        avisar = () => toast.success(`Listo: ${ids.length === 1 ? 'fue' : 'fueron'} ${nums(elegidosInfo.map((a) => ({ visual: a.caravana_visual, rfid: a.caravana_rfid })))}`, {
           description: fuera.length ? `El ${nombrePotrero(x.potreroId)} recuperó su número y ${fuera.map((a) => `el ${nombrePotrero(a.potrero_id)}`).join(' y ')} perdió la que salió.` : 'La ves en Hacienda, pestaña «Salieron».',
           action: ids.length === 1 ? { label: 'Ver su ficha', onClick: () => navigate(`/hacienda/${ids[0]}`) } : undefined,
         })
       } else if (modo === 'nosabe') {
         await sinSaber.mutateAsync({ salidaId: x.salidaId, animalIds: quedan.map((p) => p.id) })
-        toast.success(`Listo: ${nums(quedan)} ${quedan.length === 1 ? 'quedó' : 'quedaron'} como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} sin identificar`, {
+        avisar = () => toast.success(`Listo: ${nums(quedan)} ${quedan.length === 1 ? 'quedó' : 'quedaron'} como ${x.motivo === 'muerte' ? 'muerta' : 'vendida'} sin identificar`, {
           description: 'La ves en Hacienda, pestaña «Salieron».',
           action: quedan.length === 1 ? { label: 'Ver su ficha', onClick: () => navigate(`/hacienda/${quedan[0]!.id}`) } : undefined,
         })
@@ -97,7 +98,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
         const cant = mal === 'nosalio' ? 0 : mal === 'cantidad' ? (cantCorrecta ?? x.pendientes) : x.pendientes
         const potDestino = mal === 'potrero' ? potCorrecto! : x.potreroId
         await corregir.mutateAsync({ salidaId: x.salidaId, categoria: x.categoria, potreroId: potDestino, cantidad: cant })
-        toast.success('Listo: quedó corregida', {
+        avisar = () => toast.success('Listo: quedó corregida', {
           description:
             mal === 'nosalio'
               ? `El ${nombrePotrero(x.potreroId)} vuelve a tener lo que se había restado.`
@@ -106,13 +107,18 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
                 : `Ahora son ${cant} ${categoriaNombre(x.categoria, cant).toLowerCase()} del ${nombrePotrero(x.potreroId)}.`,
         })
       }
+    }
+    return avisar
+  }
+  // «Listo» en el botón; después el aviso, y se cierra o vuelve a la lista de salidas.
+  const confirmarAccion = useAccion(confirmar, {
+    alTerminar: () => {
       reiniciar()
       if (salidaFoco || todas.length <= 1) cerrar()
       else setElegida(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar. Probá de nuevo.')
-    }
-  }
+    },
+  })
+
 
   // ===== Varias salidas: primero se elige cuál =====
   if (!x) {
@@ -179,7 +185,7 @@ export function IdentificarSalidas({ empresaId, abierto, onCerrar, salidaFoco = 
       titulo={`¿Qué ${n === 1 ? cat : `${n} ${cat}`} ${verbo} del ${pot}?`}
       bajada={`Lo anotaste el ${ddmm(x.fecha)} sin decir ${n === 1 ? 'cuál' : 'cuáles'}. El número del rodeo ya está bien.`}
       pie={
-        <BotonPrincipal icono={modo === 'error' && mal === 'nosalio' ? 'Borrar' : 'Guardar'} cargando={ocupado} disabled={ocupado || !listoParaConfirmar} onClick={confirmar}>
+        <BotonPrincipal icono={modo === 'error' && mal === 'nosalio' ? 'Borrar' : 'Siguiente'} accion={confirmarAccion} disabled={confirmarAccion.estado === 'reposo' && !listoParaConfirmar}>
           {boton}
         </BotonPrincipal>
       }

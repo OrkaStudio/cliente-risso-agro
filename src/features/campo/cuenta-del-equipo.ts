@@ -1,7 +1,4 @@
-import { mangadb } from './manga/db'
-import { opsdb } from './ops/db'
 import { platadb } from './plata/db'
-import { recdb } from './recorrida/db'
 
 /**
  * Lo que el Modo Campo guarda en el teléfono para andar sin señal (campos,
@@ -15,14 +12,16 @@ import { recdb } from './recorrida/db'
 const DUENA = 'troppero.cuenta.caches'
 const SEMBRADO = 'campo.seed.lastOk.v1' // el de use-seed-offline: sin él se vuelve a bajar todo
 
-const BASES = [recdb, mangadb, platadb, opsdb]
+// Sólo Plata desde el 18/11: la recorrida y la manga salieron de la app (archivo/). Contar sus
+// colas viejas trabaría el cambio de cuenta para siempre, porque ya no hay cómo subirlas.
+const BASES = [platadb]
 // Lo cargado sin señal que espera subir: nunca se borra solo.
-const COLAS = [recdb.outbox, mangadb.outbox, mangadb.trabajos, mangadb.apartes, platadb.outbox, opsdb.outbox] as const
+const COLAS = [platadb.outbox] as const
 
 /** Cuántas cargas hechas sin señal todavía no subieron (las que fallaron también: no se pierden). */
 export async function cargasSinSubir(): Promise<number> {
   const cuentas = await Promise.all(
-    COLAS.map((t) => (t as typeof platadb.outbox).filter((x: { estado: string }) => x.estado !== 'sincronizada').count()),
+    COLAS.map((t) => t.filter((x: { estado: string }) => x.estado !== 'sincronizada').count()),
   )
   return cuentas.reduce((s, n) => s + n, 0)
 }

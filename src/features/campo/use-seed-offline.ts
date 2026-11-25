@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/features/auth/auth-context'
 import { drenarOffline, type ColaCampo } from '@/features/campo/drenar-offline'
+import { limpiarBasesViejas } from '@/features/campo/limpiar-bases-viejas'
 import { sembrarOffline, type SeedDetalle } from '@/features/campo/seed-offline'
 export type { FeatureSeed } from '@/features/campo/seed-offline'
 
 /**
- * Prepara el teléfono para el campo: baja TODO el cache offline (recorrida +
- * manga + plata) apenas hay usuario + señal — al login y en cada apertura con
+ * Prepara el teléfono para el campo: baja el cache offline (desde el 18/11 sólo
+ * Plata: la recorrida y la manga salieron de la app) apenas hay usuario + señal — al login y en cada apertura con
  * red. Persiste la última vez que quedó completo, para poder mostrar "listo
  * para usar sin señal" incluso ya offline. Vive en el CampoShell (una sola
  * instancia para todo el Modo Campo).
@@ -34,6 +35,8 @@ function useOnline(): boolean {
 export function useSeedOffline() {
   const { user } = useAuth()
   const online = useOnline()
+  // Una vez: las bases viejas de recorrida/manga del teléfono no se usan más.
+  useEffect(() => limpiarBasesViejas(), [])
   const [estado, setEstado] = useState<SeedEstado>('idle')
   const [lastOk, setLastOk] = useState<number | null>(() => {
     const v = localStorage.getItem(LS_KEY)

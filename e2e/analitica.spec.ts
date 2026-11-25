@@ -17,8 +17,10 @@ test('plata: anotar un gasto, verlo en los movimientos y buscarlo', async ({ pag
   await expect(page.getByRole('heading', { name: 'En qué se va' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Qué rinde' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Anotar un gasto' }).click()
+  // «Anotar un movimiento» (24/11): no dice si salió o entró, se toca.
+  await page.getByRole('button', { name: 'Anotar un movimiento' }).click()
   const panel = page.getByRole('dialog', { name: 'Anotar plata' })
+  await panel.getByRole('radio', { name: 'Salió' }).click()
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('12345')
   // En pasos: sin decir en qué, no sigue: lo dice.
   await panel.getByRole('button', { name: 'Seguir' }).click()
@@ -40,15 +42,18 @@ test('plata: anotar un gasto, verlo en los movimientos y buscarlo', async ({ pag
   // En los movimientos del mes, y se encuentra buscándolo.
   await page.getByRole('link', { name: 'Ver los movimientos' }).click()
   await page.getByRole('textbox', { name: 'Buscar un movimiento' }).fill(desc)
-  await expect(page.getByText(desc)).toBeVisible()
-  await expect(page.getByText('−$12.345')).toBeVisible()
+  const fila = page.getByRole('listitem').filter({ hasText: desc })
+  await expect(fila).toHaveCount(1)
+  await expect(fila).toContainText('−$12.345')
+  await expect(fila).toContainText('Combustible')
 })
 
 test('plata: un gasto en cuotas va a la Agenda', async ({ page }) => {
   await entrar(page)
   await page.getByRole('link', { name: 'Plata', exact: true }).click()
-  await page.getByRole('button', { name: 'Anotar un gasto' }).click()
+  await page.getByRole('button', { name: 'Anotar un movimiento' }).click()
   const panel = page.getByRole('dialog', { name: 'Anotar plata' })
+  await panel.getByRole('radio', { name: 'Salió' }).click()
   await panel.getByRole('textbox', { name: 'Cuánto' }).fill('90000')
   await enQue(panel, 'Combustible')
   await panel.getByRole('button', { name: 'Seguir' }).click()
@@ -74,7 +79,9 @@ test('plata: el alquiler de un campo, paso a paso, queda en la Agenda', async ({
   await entrar(page)
   await page.getByRole('radiogroup', { name: 'Qué campo estás viendo' }).getByRole('radio', { name: /^Todos tus campos/ }).click()
   await page.getByRole('link', { name: 'Plata', exact: true }).click()
-  await page.getByRole('button', { name: 'Cargar un alquiler' }).click()
+  // El alquiler entra por «Anotar un movimiento» (24/11).
+  await page.getByRole('button', { name: 'Anotar un movimiento' }).click()
+  await page.getByRole('dialog', { name: 'Anotar plata' }).getByRole('button', { name: /¿Es el alquiler de un campo\?/ }).click()
   // Sin campo elegido en la barra, pregunta cuál (aunque ninguno esté marcado como alquilado).
   await page.getByRole('dialog', { name: '¿De qué campo?' }).getByRole('button', { name: /E2E Campo base/ }).click()
   await page.getByRole('dialog', { name: '¿En qué está pactado?' }).getByRole('button', { name: /En pesos/ }).click()
@@ -105,9 +112,10 @@ test('plata: un sueldo que se repite queda con el mismo monto cada mes', async (
   await panel.getByRole('group', { name: 'De qué campo' }).getByRole('button', { name: 'E2E Campo base' }).click()
   await panel.getByRole('group', { name: 'Cuándo vence' }).getByRole('button', { name: 'En varios pagos' }).click()
   const repite = page.getByRole('dialog', { name: 'Lo pagás en varios pagos' })
-  // Todos los meses: lo escrito es lo de cada mes.
-  await repite.getByRole('radio', { name: /^Todos los meses/ }).click()
-  await repite.getByRole('group', { name: 'Cuántos meses' }).getByRole('button', { name: '6', exact: true }).click()
+  // Se repite cada mes (viene elegido); lo escrito es lo de cada pago.
+  await repite.getByRole('radio', { name: /^Se repite/ }).click()
+  await expect(repite.getByRole('group', { name: 'Cada cuánto' }).getByRole('button', { name: 'Cada mes' })).toHaveAttribute('aria-pressed', 'true')
+  await repite.getByRole('group', { name: 'Cuántos pagos' }).getByRole('button', { name: '6', exact: true }).click()
   await expect(repite.getByRole('radio', { name: 'Lo de cada pago' })).toBeChecked()
   await repite.getByRole('button', { name: /^Anotar 6 pagos de/ }).click()
   await expect(repite).toBeHidden()

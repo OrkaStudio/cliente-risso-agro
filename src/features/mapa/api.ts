@@ -3,6 +3,7 @@ import { usePermiso } from '@/features/empresa/use-permiso'
 import { supabase } from '@/lib/supabase/client'
 import { crearPotrero, setCampoContorno, setPotreroPoligono } from '@/features/campos/api'
 import type { CampoMapa, LatLng, PotreroMapa } from './reglas'
+import { errorDeBase } from '@/lib/error-de-base'
 
 /** Lo que se ve de cada potrero para reconocerlo: «60 cabezas», «Trigo», «En descanso». */
 function queTiene(estado: string, cultivo: string | null, cabezas: number): string {
@@ -33,7 +34,7 @@ export async function leerMapa(empresaId: string, veHacienda = true): Promise<Ca
       .order('color_idx'),
     supabase.from('v_stock_potrero').select('potrero_id, cabezas'),
   ])
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
   if (e2) throw new Error(e2.message)
   const cab = new Map((stock ?? []).map((s) => [s.potrero_id, s.cabezas ?? 0]))
   return (campos ?? []).map((c) => ({
@@ -87,14 +88,14 @@ export const guardarBorde = setCampoContorno
 /** «Sí, mide 198 ha: lo corrijo»: el alta toma lo medido en el mapa. */
 export async function corregirHectareasCampo(campoId: string, hectareas: number): Promise<void> {
   const { error } = await supabase.from('campo').update({ hectareas }).eq('id', campoId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 export const asignarDibujo = setPotreroPoligono
 
 /** «Sí, el 1A mide 8,5 ha: lo corrijo»: el potrero toma lo medido en el mapa. */
 export async function corregirHectareasPotrero(potreroId: string, hectareas: number): Promise<void> {
   const { error } = await supabase.from('potrero').update({ hectareas }).eq('id', potreroId)
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 /** Un potrero dibujado que no estaba en el alta («No está en la lista: es uno nuevo»). */
@@ -132,7 +133,7 @@ export async function campoDeUnSoloPotrero(empresaId: string, campo: CampoMapa, 
 /** Todos los campos en el mapa: se abre la app. La base vuelve a verificarlo. */
 export async function terminarMapa(): Promise<void> {
   const { error } = await supabase.rpc('terminar_mapa')
-  if (error) throw new Error(error.message)
+  if (error) throw errorDeBase(error)
 }
 
 export type Lugar = { nombre: string; lat: number; lon: number }
