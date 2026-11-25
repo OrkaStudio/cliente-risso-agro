@@ -4,7 +4,8 @@
 // la planilla la llama cada hora y dibuja dos hojas.
 // Spec: clientes/risso-agro/especificaciones/2026-09-19-telemetria-onboarding-activacion
 //
-//  · Tablero: lo que miramos juntos para decidir. Cinco preguntas:
+//  · Tablero: lo que miramos juntos para decidir. Seis preguntas:
+//    0. ¿La landing trae gente? (visitas → WhatsApp → horario, y de dónde vienen)
 //    1. ¿El que llega, llega a ver su campo? (el camino, contra metas)
 //    2. ¿Dónde se traba? (las fugas más grandes, con qué hacer)
 //    3. ¿A quién ayudamos hoy? (los trabados, con qué hacer)
@@ -146,6 +147,34 @@ const FUGAS_SQL = `
          'Proponerles la primera recorrida o cargar una factura'
 `
 
+/** 0 · La landing: últimos 7 y 30 días, de dónde vienen y las visitas por día. */
+const LANDING_SQL = `
+  select
+    coalesce(sum(visitas) filter (where dia > hoy - 7), 0) as v7,
+    coalesce(sum(whatsapp) filter (where dia > hoy - 7), 0) as w7,
+    coalesce(sum(horario) filter (where dia > hoy - 7), 0) as h7,
+    coalesce(sum(visitas), 0) as v30,
+    coalesce(sum(whatsapp), 0) as w30,
+    coalesce(sum(horario), 0) as h30
+  from interno.v_landing_dia, (select (now() at time zone 'America/Argentina/Buenos_Aires')::date as hoy) h
+  where dia > hoy - 30
+`
+const LANDING_ORIGENES_SQL = `
+  select coalesce(origen, 'directo') as origen,
+         count(*) filter (where tipo = 'visita') as visitas,
+         count(*) filter (where tipo in ('whatsapp', 'horario')) as whatsapp
+  from interno.landing_evento
+  where ts > now() - interval '30 days'
+  group by 1 order by 2 desc, 3 desc limit 5
+`
+const LANDING_DIAS_SQL = `
+  select d::date as dia, coalesce(l.visitas, 0) as visitas
+  from generate_series((now() at time zone 'America/Argentina/Buenos_Aires')::date - 29,
+                       (now() at time zone 'America/Argentina/Buenos_Aires')::date, interval '1 day') d
+  left join interno.v_landing_dia l on l.dia = d::date
+  order by 1
+`
+
 /** Esta semana contra la anterior: mediana de cuánto tardan. */
 const COMPARA_SQL = `
   with t as (
@@ -270,6 +299,16 @@ Deno.serve(async (req) => {
             : `Sin eventos hace ${duracion(horasDesdeUltimo)}: si hubo uso, algo se rompió`,
     }
 
+    // 0 · ¿La landing trae gente?
+    const [l] = await sql.unsafe(LANDING_SQL)
+    const tramo = (v: number, w: number, h: number) => ({ visitas: v, whatsapp: w, horario: h, pctWhatsapp: pct(w, v), pctHorario: pct(h, w) })
+    const landing = {
+      d7: tramo(n(l.v7), n(l.w7), n(l.h7)),
+      d30: tramo(n(l.v30), n(l.w30), n(l.h30)),
+      origenes: (await sql.unsafe(LANDING_ORIGENES_SQL)).map((o) => ({ origen: String(o.origen), visitas: n(o.visitas), whatsapp: n(o.whatsapp) })),
+      dias: (await sql.unsafe(LANDING_DIAS_SQL)).map((d) => n(d.visitas)),
+    }
+
     // 1 · El camino, etapa por etapa, contra su meta.
     const embudo = await sql.unsafe('select orden, total from interno.v_activacion_embudo order by orden')
     const cant = embudo.map((e) => n(e.total))
@@ -335,10 +374,11 @@ Deno.serve(async (req) => {
 
     return json({
       generado: new Date().toISOString(),
-      version: 2,
+      version: 3,
       tablero: {
         salud,
         titular,
+        landing,
         productores: n(g.productores),
         medidos: n(g.medidos),
         camino,

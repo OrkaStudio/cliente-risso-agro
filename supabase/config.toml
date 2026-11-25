@@ -447,3 +447,7 @@ verify_jwt = false
 [functions.wa-webhook]
 verify_jwt = false
 static_files = ["./functions/wa-webhook/mapa-assets/*"]
+
+# Los avisos anónimos de la landing (troppero.com): la llama el navegador sin sesión.
+[functions.landing-evento]
+verify_jwt = false

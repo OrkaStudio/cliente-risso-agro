@@ -217,6 +217,7 @@ export const PRIVACIDAD: Seccion[] = [
         'La videollamada para armar tu campo: la grabamos, y te avisamos al empezar, para no perder nada de lo que nos contás y cargarlo bien. La grabación la ve sólo nuestro equipo y la borramos cuando nos lo pidas.',
         'Tu ubicación: sólo cuando usás la recorrida en el celular y le das permiso, para saber en qué potrero estás. No la seguimos en segundo plano.',
         'Datos técnicos: tipo de dispositivo y navegador, dirección IP, cuándo entrás y qué errores aparecen, para que la aplicación funcione y sea segura.',
+        'La página troppero.com: contamos las visitas, los toques en «Probalo por WhatsApp» y los horarios elegidos, sin cookies ni datos que te identifiquen; sólo de qué sitio llegaste y si fue desde el celular o la compu.',
       ],
     ],
   },

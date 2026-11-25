@@ -3,7 +3,7 @@
  * de la planilla. Cada hora trae los datos de la edge function
  * `planilla-telemetria` y dibuja dos hojas:
  *
- *  · Tablero: lo que miramos juntos para decidir (cinco preguntas).
+ *  · Tablero: lo que miramos juntos para decidir (seis preguntas, la 0 es la landing).
  *  · Productores: una fila por productor con toda su historia.
  *
  * Qué se muestra lo decide la función; este script sólo dibuja.
@@ -203,7 +203,8 @@ function linea(h, fila) {
 function dibujarTablero(h, hojaProductores, datos) {
   var t = datos.tablero
   var filas = 12 + t.camino.length + 4 + Math.max(t.fugas.length, 1) + 4 + Math.max(t.ayudar.length, 1) +
-    6 + t.comparaciones.length + Math.max(t.cohortes.length, 1) + 2 + 6 + 4
+    6 + t.comparaciones.length + Math.max(t.cohortes.length, 1) + 2 + 6 + 4 +
+    (t.landing ? 13 + Math.max(t.landing.origenes.length, 1) : 0)
   limpiar(h, filas, 8)
   h.setTabColor(VERDE)
   h.setColumnWidth(1, 28)
@@ -222,6 +223,9 @@ function dibujarTablero(h, hojaProductores, datos) {
     .setBackground(GRIS_CLARO).setVerticalAlignment('middle')
   h.setRowHeight(5, 48)
   var f = 7
+
+  // 0 · La landing.
+  if (t.landing) f = dibujarLanding(h, f, t.landing)
 
   // 1 · El camino.
   f = seccion(h, f, '1 · ¿El que llega, llega a ver su campo?',
@@ -348,6 +352,47 @@ function dibujarTablero(h, hojaProductores, datos) {
       .setText('El detalle de cada productor está en la pestaña Productores →')
       .setLinkUrl('#gid=' + hojaProductores.getSheetId()).build())
     .setFontSize(9)
+}
+
+function dibujarLanding(h, f, l) {
+  f = seccion(h, f, '0 · ¿La landing trae gente?',
+    'Visitas a troppero.com, cuántas tocaron «Probalo por WhatsApp» y cuántas eligieron un horario para la videollamada. ' +
+    'Anónimo y sin cookies. Para saber qué canal funciona, compartí el link con ?utm_source=instagram (o el canal que sea).')
+  encabezado(h, f, ['', 'Visitas', 'Tocaron WhatsApp', 'Eligieron horario', '', ''], 2)
+  f++
+  var pc = function (x) { return x === null ? '' : '  (' + x + ' %)' }
+  ;[['Últimos 7 días', l.d7], ['Últimos 30 días', l.d30]].forEach(function (x) {
+    var d = x[1]
+    h.getRange(f, 2, 1, 4).setValues([[x[0], d.visitas, d.whatsapp + pc(d.pctWhatsapp), d.horario + pc(d.pctHorario)]])
+    h.getRange(f, 2).setFontWeight('bold')
+    h.getRange(f, 3, 1, 3).setHorizontalAlignment('center')
+    linea(h, f)
+    f++
+  })
+  f++
+  encabezado(h, f, ['De dónde vienen (30 días)', 'Visitas', 'Tocaron WhatsApp', '', '', ''], 2)
+  f++
+  if (l.origenes.length === 0) {
+    h.getRange(f, 2, 1, 6).merge().setValue('Todavía no llegó ninguna visita.').setFontColor(GRIS).setFontStyle('italic')
+    f++
+  }
+  l.origenes.forEach(function (o) {
+    h.getRange(f, 2, 1, 3).setValues([[o.origen, o.visitas, o.whatsapp]])
+    h.getRange(f, 3, 1, 2).setHorizontalAlignment('center')
+    linea(h, f)
+    f++
+  })
+  var pico = l.dias.length ? Math.max.apply(null, l.dias) : 0
+  if (pico > 0) {
+    h.getRange(f, 2, 1, 6).merge().setValue(chispa(l.dias)).setFontColor(VERDE).setFontSize(18)
+    h.setRowHeight(f, 34)
+    f++
+    h.getRange(f, 2, 1, 6).merge()
+      .setValue('Visitas por día, últimos 30 días · hoy ' + l.dias[l.dias.length - 1] + ' · el día con más: ' + pico)
+      .setFontColor(GRIS).setFontSize(9)
+    f++
+  }
+  return f + 1
 }
 
 // ── Productores ────────────────────────────────────────────────────────────
