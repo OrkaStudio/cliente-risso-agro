@@ -241,7 +241,7 @@ export const PRIVACIDAD: Seccion[] = [
       'Para funcionar, Troppero usa estos proveedores, que procesan datos en nuestro nombre y sólo para lo que les pedimos:',
       [
         'Supabase: base de datos, archivos e inicio de sesión.',
-        'Vercel: publica la aplicación web.',
+        'Vercel: publica la aplicación web y la página de Troppero, y cuenta las visitas a la página sin cookies ni datos que te identifiquen.',
         'Google: la videollamada para armar tu campo, su grabación y nuestro mail.',
         'Meta (WhatsApp Business): transporta los mensajes y los códigos para entrar.',
         'Anthropic: entiende los mensajes y lee las fotos de comprobantes y planillas.',
