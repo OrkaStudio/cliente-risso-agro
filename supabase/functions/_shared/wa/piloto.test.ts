@@ -79,7 +79,7 @@ describe('mapa compacto y acercamiento',()=>{
     expect(r.svg).toContain('12B');expect(r.svg).not.toContain('<circle');expect(g.mapW*g.mapH/(g.width*g.height)).toBeGreaterThan(.9)
     expect(r.svg).not.toContain('1242')
     // Cabecera y pie se pintan después del mapa, sin clip-path (la capa del recorte agotaba la memoria de Edge).
-    expect(r.svg).not.toContain('clip-path');expect(r.svg.indexOf('TROPPERO')).toBeGreaterThan(r.svg.indexOf('12B'))
+    expect(r.svg).not.toContain('clip-path');expect(r.svg.indexOf('troppero')).toBeGreaterThan(r.svg.indexOf('12B'))
   })
   it('el detalle cambia el encuadre y un ID que no pertenece al campo se rechaza',()=>{
     const a=geometriaMapa(data)!,z=geometriaMapa(data,'p')!

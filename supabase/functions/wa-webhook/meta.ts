@@ -121,11 +121,13 @@ export async function enviarImagen(to: string, mediaId: string, caption: string)
 }
 
 /** PDF privado: se sube a Meta por bytes; no publica un link de los datos del campo. */
-export async function subirDocumento(bytes: Uint8Array, filename: string): Promise<string> {
+export async function subirDocumento(bytes: Uint8Array, filename: string, mime = 'application/pdf'): Promise<string> {
+  if(!['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','text/plain','text/csv'].includes(mime))throw new Error('Tipo de documento no disponible')
+  const tipo=mime==='text/csv'?'text/plain':mime
   const form = new FormData()
   form.set('messaging_product', 'whatsapp')
-  form.set('type', 'application/pdf')
-  form.set('file', new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }), filename)
+  form.set('type', tipo)
+  form.set('file', new Blob([bytes as Uint8Array<ArrayBuffer>], { type: tipo }), filename)
   const res = await fetch(`${GRAPH}/${phoneId()}/media`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form, signal: AbortSignal.timeout(30_000) })
   const json = await res.json() as { id?: string; error?: { code?: number } }
   if (!res.ok || !json.id) throw new Error(`Meta documento ${res.status} / ${json.error?.code ?? 'sin id'}`)
@@ -179,10 +181,10 @@ class Pasajero extends Error {}
  * pedir el media (pasó el 02/10 con una foto que al reenviarla anduvo):
  * hasta 3 intentos antes de darlo por perdido.
  */
-export async function descargarMedia(mediaId: string): Promise<{ bytes: Uint8Array; mime: string }> {
+export async function descargarMedia(mediaId: string, maxBytes?: number): Promise<{ bytes: Uint8Array; mime: string }> {
   for (let intento = 1; ; intento++) {
     try {
-      return await descargarUnaVez(mediaId)
+      return await descargarUnaVez(mediaId, maxBytes)
     } catch (e) {
       if (!(e instanceof Pasajero) || intento >= 3) throw e
       console.warn('descargarMedia reintento', intento, e.message)
@@ -191,7 +193,7 @@ export async function descargarMedia(mediaId: string): Promise<{ bytes: Uint8Arr
   }
 }
 
-async function descargarUnaVez(mediaId: string): Promise<{ bytes: Uint8Array; mime: string }> {
+async function descargarUnaVez(mediaId: string, maxBytes?: number): Promise<{ bytes: Uint8Array; mime: string }> {
   const pedir = async (url: string, ms: number) => {
     try {
       return await fetch(url, { headers: { Authorization: `Bearer ${token()}` }, signal: AbortSignal.timeout(ms) })
@@ -207,7 +209,30 @@ async function descargarUnaVez(mediaId: string): Promise<{ bytes: Uint8Array; mi
   if (!meta.ok || !info.url) throw fallo('Meta media', meta.status)
   const res = await pedir(info.url, 30_000)
   if (!res.ok) throw fallo('Meta media descarga', res.status)
-  return { bytes: new Uint8Array(await res.arrayBuffer()), mime: info.mime_type ?? 'image/jpeg' }
+  const mime = info.mime_type ?? 'image/jpeg'
+  if (maxBytes == null) return { bytes: new Uint8Array(await res.arrayBuffer()), mime }
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('Meta devolvió un archivo vacío')
+  const partes: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) throw new Error('El archivo excede el tamaño admitido')
+      partes.push(value)
+    }
+  } finally {
+    await reader.cancel().catch(() => {})
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const parte of partes) {
+    bytes.set(parte, offset)
+    offset += parte.byteLength
+  }
+  return { bytes, mime }
 }
 
 /** Firma X-Hub-Signature-256: HMAC-SHA256 del cuerpo crudo con el secreto de la app. */

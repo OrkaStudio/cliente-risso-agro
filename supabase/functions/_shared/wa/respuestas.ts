@@ -209,10 +209,10 @@ export function resumenGastos(desde: string, hasta: string, filas: { campo: stri
     'Sumé por fecha del gasto. Los pendientes de pago están incluidos y los anulados quedan afuera.'
 }
 
-export function cargasRecientes(filas: { fecha: string; tipo: string; campo: string; cantidad: number | null }[]): string {
+export function cargasRecientes(filas: { fecha: string; tipo: string; campo: string; cantidad: number | null; contenido?: string | null }[]): string {
   if (!filas.length) return 'No encontré cargas tuyas de WhatsApp con un registro guardado para esa consulta.'
   return 'Tus últimas cargas guardadas por WhatsApp:\n' + filas.map((f) => {
-    const valor = f.tipo === 'lluvia' ? `${mmTexto(Number(f.cantidad))} mm` : f.tipo === 'gasto' ? pesos(Number(f.cantidad)) : 'recorrida'
+    const valor = f.tipo === 'lluvia' ? `${mmTexto(Number(f.cantidad))} mm` : f.tipo === 'gasto' ? pesos(Number(f.cantidad)) : f.tipo === 'nota' ? f.contenido ?? 'nota' : 'recorrida'
     return `• ${ddmm(f.fecha)} · ${f.campo}: ${valor}.`
   }).join('\n')
 }

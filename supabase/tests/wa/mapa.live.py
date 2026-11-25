@@ -44,7 +44,7 @@ before=business();initial_pending=pending()
 def image_case():
     row=send('mapa de La Porteña',True)
     if '--expect-satellite' in sys.argv:
-        assert not row['cuerpo']['image']['caption'].startswith('Croquis'),'El proveedor no respondió: llegó el croquis de respaldo.'
+        assert not row['cuerpo']['image']['caption'].casefold().startswith(('croquis', 'te mando el croquis')),'El proveedor no respondió: llegó el croquis de respaldo.'
     assert row['cuerpo']['tropero_mapa']['campo_id']==LP
     assert pending()==initial_pending,'Mapa cambió el pendiente.'
     assert business()==before,'Consulta de mapa modificó datos de campo.'

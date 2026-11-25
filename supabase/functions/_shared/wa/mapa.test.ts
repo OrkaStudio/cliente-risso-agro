@@ -19,6 +19,12 @@ const datos: MapaCampo = { id: 'lp', nombre: 'La Porteña', potreros: [
 describe('pedido de mapa sin consumir la carga', () => {
   it.each(['mapa', 'Mandame el mapa', 'Mostrame el mapa!', 'ver mapa', 'enviame un mapa', 'quiero ver el mapa'])('reconoce %s', t => expect(comandoMapa(t)).toEqual({}))
   it('resuelve un campo nombrado', () => expect(campoParaMapa(comandoMapa('mapa de La Porteña')!, ctx, pendiente)?.id).toBe('lp'))
+  it.each(['Me mostras el campo la porteña por favor', '¿Me pasás la vista completa de La Porteña?', 'Mostrame el campo La Porteña, por favor'])('muestra el campo completo al recibir %s', t => {
+    expect(comandoMapa(t, undefined, ctx.campos)).toEqual({ campoId: 'lp' })
+  })
+  it('deja que el intérprete maneje el mapa más una carga en el mismo mensaje', () => {
+    expect(comandoMapa('mostrame el campo La Porteña y anotá 15 mm', undefined, ctx.campos)).toBeNull()
+  })
   it('el botón apunta al campo ofrecido', () => expect(campoParaMapa(comandoMapa('', 'ver_mapa@dg')!, ctx, pendiente)?.id).toBe('dg'))
   it('no traga una carga que menciona el mapa', () => expect(comandoMapa('En el 7B según el mapa llovieron 20')).toBeNull())
   it.each(['Mostrarme el potrero 3B', 'mostrame el potrero 3B', 'ver el potrero 3B', 'quiero ver el potrero 3B'])('«%s» pide el acercamiento', t => expect(comandoMapa(t)).toEqual({ potrero: '3b' }))
@@ -126,8 +132,28 @@ describe('imagen privada y borrador de audio preservado', () => {
     expect(body.image).not.toHaveProperty('link')
     expect([...(body.image as { caption: string }).caption]).toHaveLength(1024)
   })
-  it('el alcance de hacienda está bloqueado deliberadamente', () => {
+  it('conserva un pedido de hacienda como nota para revisar', () => {
     const it = { intent: 'no_soportado' as const }
-    expect(arrancar(it as Parameters<typeof arrancar>[0], ctx)).toMatchObject({ estado: 'descartada' })
+    expect(arrancar(it as Parameters<typeof arrancar>[0], ctx, 'Asigná estas caravanas al 7B')).toMatchObject({ borrador: { tipo: 'nota', seccionNota: 'hacienda', descripcion: 'Asigná estas caravanas al 7B' } })
   })
 })
+
+
+it('general y detalle dejan visible el satélite, muestran cabezas separadas y avisos fechados', () => {
+  const conDatos = { ...datos, potreros: datos.potreros.map((p, i) => ({
+    ...p, cabezas: i ? 0 : 15,
+    ultimaObservacion: i ? null : { fecha: '2026-11-17', agua: 'baja', electrico: 'cortado', novedad: 'Molino no anda' },
+  })) }
+  const fondo = { dataUri: 'data:image/jpeg;base64,/9j/2Q==', atribucion: 'Fuente de prueba' }
+  for (const foco of [undefined, datos.potreros[0].id]) {
+    const r = svgMapa(conDatos, '2026-11-17', fondo, foco)!
+    expect(r.svg).toContain('15 cabezas')
+    expect(r.svg).toContain('17/11/2026')
+    expect(r.svg).toContain('Eléctrico cortado')
+    expect(r.svg).toContain('Molino no anda')
+    expect(r.svg.match(/<polygon [^>]*fill-opacity="0"/g)?.length).toBe(2)
+    expect(r.svg).not.toContain('nunca')
+  }
+})
+
+

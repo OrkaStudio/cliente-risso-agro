@@ -109,19 +109,56 @@ const radio = 6378137
 export function proyectarMapa([lat, lng]: Pt): Pt {
   return [radio * lng * Math.PI / 180, radio * Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360))]
 }
+const USO_MAPA = {
+  ganadero: { color: '#b85c2e', nombre: 'Con hacienda' },
+  agricola: { color: '#ecc46a', nombre: 'Sembrado' },
+  descanso: { color: '#8aa5c4', nombre: 'Descansa' },
+} as const
+
+// Mismos grupos que Campos en rediseno/tropero. Un ciclo ausente queda sin color.
+function usoVisual(estado?: string | null) {
+  switch (estado) {
+    case 'ganadero': return USO_MAPA.ganadero
+    case 'siembra':
+    case 'cultivo':
+    case 'cosecha': return USO_MAPA.agricola
+    case 'descanso':
+    case 'preparacion':
+    case 'rastrojo': return USO_MAPA.descanso
+    default: return null
+  }
+}
+
+
+/** Avisos de una observación guardada, vinculados al potrero y a su fecha. */
+function avisosDelMapa(datos: MapaCampo, focoId?: string) {
+  return datos.potreros.filter(p => !focoId || p.id === focoId).flatMap(p => {
+    const o = p.ultimaObservacion
+    if (!o) return []
+    const detalles = [
+      o.agua === 'seca' ? 'Aguada seca' : o.agua === 'baja' ? 'Agua baja' : '',
+      o.electrico === 'cortado' ? 'Eléctrico cortado' : '',
+      o.novedad ?? '',
+    ].filter(Boolean)
+    return detalles.length ? [{ potrero: p.nombre, fecha: o.fecha, detalle: detalles.join(' · ') }] : []
+  }).sort((a, b) => b.fecha.localeCompare(a.fecha) || a.potrero.localeCompare(b.potrero, 'es', { numeric: true }))
+}
+
 export function geometriaMapa(datos: MapaCampo, focoId?: string) {
   if (datos.potreros.length > 100) throw new Error('El mapa admite hasta 100 potreros por imagen')
   const valid = datos.potreros.map(p => ({ ...p, points: poligonoMapa(p.poligono) })).filter((p): p is typeof p & { points: Pt[] } => p.points !== null)
   const faltantes = datos.potreros.filter(p => !valid.some(v => v.id === p.id)).map(p => p.nombre)
-  if (!valid.length) return null
+  const contorno = poligonoMapa(datos.contorno)
+  if (!valid.length && !contorno) return null
   valid.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
   const foco = focoId ? valid.find(p => p.id === focoId) : null
   if (focoId && !foco) throw new Error('El potrero solicitado no tiene un dibujo disponible')
-  const projected = (foco ? [foco] : valid).flatMap(p => p.points).map(proyectarMapa)
+  const projected = (foco ? foco.points : [...valid.flatMap(p => p.points), ...(contorno ?? [])]).map(proyectarMapa)
   const bounds = projected.reduce((b, p) => [Math.min(b[0], p[0]), Math.max(b[1], p[0]), Math.min(b[2], p[1]), Math.max(b[3], p[1])], [Infinity, -Infinity, Infinity, -Infinity])
   const [minX, maxX, minY, maxY] = bounds
   const width = 1400, mapW = 1400, mapH = 1100, mapX = 0, mapY = 82
-  const height = 1220
+  const avisos = avisosDelMapa(datos, focoId)
+  const height = 1220 + (avisos.length ? 45 + Math.min(avisos.length, 3) * 66 : 0)
   let scale = Math.min((mapW - (foco ? 350 : 90)) / Math.max(maxX - minX, 1e-8), (mapH - (foco ? 350 : 90)) / Math.max(maxY - minY, 1e-8))
   let cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
   if(foco){
@@ -143,28 +180,32 @@ export function svgMapa(datos: MapaCampo, fecha: string, fondo?: FondoSatelital,
   if (fondo && (!/^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(fondo.dataUri) || fondo.dataUri.length > 6 * 1024 * 1024)) throw Error('Fondo satelital inválido')
   const { valid, faltantes, width, height, mapW, mapH, mapX, mapY, point, foco } = geo
   const elements: string[] = []
+  const contorno = poligonoMapa(datos.contorno)
+  if (contorno) {
+    const puntos = contorno.map(point).map(([x, y]) => x.toFixed(2) + ',' + y.toFixed(2)).join(' ')
+    elements.push(`<polygon points="${puntos}" fill="none" stroke="${fondo ? '#fbfaf6' : '#59645c'}" stroke-width="3.5" stroke-linejoin="round"/>`)
+  }
   const labels: string[] = []
   const ocupados: { x: number; y: number; w: number; h: number }[] = []
   const infra = capaInfraestructura(datos.infraestructura ?? [], point, Boolean(foco), { x: mapX, y: mapY, w: mapW, h: mapH })
-  for (const [i, p] of valid.entries()) {
+  for (const p of valid) {
     const points = p.points.map(point), at = interior(points)
     const coords = points.map(v => v.map(n => n.toFixed(2)).join(',')).join(' ')
-    // El borde oscuro bajo el claro contrasta tanto en cultivos como en caminos.
-    if (fondo) elements.push(`<polyline points="${coords} ${points[0].map(n => n.toFixed(2)).join(',')}" fill="none" stroke="#131b16" stroke-opacity=".75" stroke-width="7" stroke-linejoin="round"/>`)
-    elements.push(`<polygon points="${coords}" fill="${fondo ? 'none' : i % 2 ? '#e9e9d9' : '#e2e9dc'}" stroke="${fondo ? '#fff3b3' : '#4b574e'}" stroke-width="3" stroke-linejoin="round"/>`)
+    const uso = usoVisual(p.estadoCiclo)
+    const elegido = foco?.id === p.id
+    const otro = Boolean(foco && !elegido)
+    if (fondo) elements.push(`<polyline points="${coords} ${points[0].map(n => n.toFixed(2)).join(',')}" fill="none" stroke="#131b16" stroke-opacity=".4" stroke-width="4" stroke-linejoin="round"/>`)
+    elements.push(`<polygon points="${coords}" fill="${otro && fondo ? '#131b16' : uso?.color ?? (fondo ? 'none' : '#e6ebe5')}" fill-opacity="${fondo ? 0 : .12}" stroke="${fondo ? '#fbfaf6' : '#4b574e'}" stroke-width="${elegido ? 4 : 2}" stroke-linejoin="round"/>`)
     if (datos.alertas?.includes(p.id)) elements.push(`<polygon points="${coords}" fill="none" stroke="#ce4936" stroke-width="6" stroke-linejoin="round"/>`)
     const label = p.nombre.replace(/\s+/g, ' ').trim()
     if (at[0] < 0 || at[0] > width || at[1] < mapY || at[1] > mapY + mapH) continue
-    const rows = lines(label, 20), size = label.length > 12 ? 28 : 38
-    // Cabezas al lado del nombre; recorrida vieja como segunda línea (terracota: atención, no falla).
-    const cab = p.cabezas && p.cabezas > 0 ? ` · ${p.cabezas}` : '', cabSize = Math.round(size * .7)
-    const dias = p.ultimaRecorrida ? Math.round((Date.parse(fecha) - Date.parse(p.ultimaRecorrida)) / 86400000) : null
-    // Una sola línea: en los potreros chicos dos renglones se pisan con los vecinos.
-    // Los días van en un recuadro aparte: «30 64 d» se leía como un solo número.
-    const viejo = p.ultimaRecorrida === null ? 'nunca' : dias !== null && dias > 14 ? `${dias} d` : ''
-    const extra = cab.length * cabSize * .55
-    const bw = Math.min(600, Math.max(82, Math.max(...rows.map((r, j) => r.length * size * .57 + (j === rows.length - 1 ? extra : 0))) + 22)), bh = rows.length * (size + 3) + 14
-    const pw = viejo ? Math.round(viejo.length * cabSize * .6 + 18) : 0, tw = bw + (pw ? pw - 6 : 0)
+    const rows = lines(label, 20), size = label.length > 12 ? 26 : foco ? 38 : 30
+    const stock = typeof p.cabezas === 'number' && Number.isFinite(p.cabezas) && p.cabezas >= 0 ? `${p.cabezas} ${p.cabezas === 1 ? 'cabeza' : 'cabezas'}` : ''
+    const secundaria = stock || uso?.nombre || ''
+    const secundarioSize = foco ? 24 : 19
+    const bw = Math.min(600, Math.max(110, ...rows.map(r => r.length * size * .57 + 28),
+      secundaria.length * secundarioSize * .55 + 28))
+    const bh = rows.length * (size + 3) + (secundaria ? secundarioSize + 16 : 12), tw = bw
     const candidates = [[0, 0], [0, -60], [0, 60], [-80, 0], [80, 0], [-70, -55], [70, 55], [70, -55], [-70, 55], [-140, 0], [140, 0], [0, -95], [0, 95], [-190, -90], [190, 90], [-270, 0], [270, 0], [0, -150], [0, 150], [-260, -150], [260, 150], [260, -150], [-260, 150], [-360, 0], [360, 0]]
       .map(([dx, dy]) => ({ x: Math.max(8, Math.min(width - tw - 8, at[0] + dx - tw / 2)), y: Math.max(mapY + 8, Math.min(mapY + mapH - bh - 8, at[1] + dy - bh / 2)), w: tw, h: bh }))
     const overlaps = (a: typeof candidates[number]) => ocupados.some(b => a.x < b.x + b.w + 8 && a.x + a.w + 8 > b.x && a.y < b.y + b.h + 8 && a.y + a.h + 8 > b.y)
@@ -177,7 +218,14 @@ export function svgMapa(datos: MapaCampo, fecha: string, fondo?: FondoSatelital,
     ocupados.push(box)
     const cx = box.x + bw / 2
     if (!fits(box) && !centro(box)) labels.push(`<path d="M${at[0].toFixed(2)} ${at[1].toFixed(2)} L${cx.toFixed(2)} ${(box.y + bh / 2).toFixed(2)}" stroke="#131b16" stroke-width="7"/><path d="M${at[0].toFixed(2)} ${at[1].toFixed(2)} L${cx.toFixed(2)} ${(box.y + bh / 2).toFixed(2)}" stroke="#fff" stroke-width="3"/>`)
-    labels.push(`<rect x="${box.x}" y="${box.y}" width="${bw}" height="${bh}" rx="7" fill="#fbfaf6" stroke="${p.id === foco?.id || viejo ? '#b85c2e' : '#131b16'}" stroke-width="${p.id === foco?.id ? 3 : viejo ? 2 : 1}"/><text text-anchor="middle" font-size="${size}" font-weight="600">${rows.map((r, j) => `<tspan x="${cx}" y="${box.y + size + 4 + j * (size + 3)}">${xml(r)}</tspan>${j === rows.length - 1 && cab ? `<tspan font-size="${cabSize}" font-weight="500" fill="#536359">${cab}</tspan>` : ''}`).join('')}</text>${viejo ? `<rect x="${box.x + bw - 6}" y="${box.y + (bh - cabSize - 14) / 2}" width="${pw}" height="${cabSize + 14}" rx="${(cabSize + 14) / 2}" fill="#b85c2e" stroke="#fbfaf6" stroke-width="2"/><text x="${box.x + bw - 6 + pw / 2}" y="${box.y + bh / 2 + cabSize * .36}" text-anchor="middle" font-size="${cabSize}" font-weight="700" fill="#fff">${viejo}</text>` : ''}`)
+    const texto = rows.map((r, j) => `<tspan x="${cx}" y="${box.y + size + 2 + j * (size + 3)}">${xml(r)}</tspan>`).join('')
+    labels.push(`<rect x="${box.x.toFixed(1)}" y="${box.y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh}" rx="14" fill="#fff8ed" fill-opacity=".96" stroke="${elegido ? '#b85c2e' : '#c6bcae'}" stroke-width="${elegido ? 3 : 1.3}"/><text text-anchor="middle" font-size="${size}" font-weight="800" fill="#30291f">${texto}</text>`)
+    if (p.ultimaObservacion && (p.ultimaObservacion.electrico === 'cortado'
+      || p.ultimaObservacion.agua === 'baja' || p.ultimaObservacion.agua === 'seca' || p.ultimaObservacion.novedad)) {
+      labels.push(`<circle cx="${box.x + bw - 4}" cy="${box.y + 4}" r="13" fill="#b85c2e" stroke="#fff8ed" stroke-width="2"/><text x="${box.x + bw - 4}" y="${box.y + 11}" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">!</text>`)
+    }
+    if (secundaria) labels.push(`<text x="${cx}" y="${box.y + bh - 12}" text-anchor="middle" font-size="${secundarioSize}" font-weight="500" fill="#65584a">${xml(secundaria)}</text>`)
+
   }
   const raster=fondo?.extent ?? geo.extent
   const rasterScale=mapW/(geo.extent[2]-geo.extent[0])
@@ -192,6 +240,15 @@ export function svgMapa(datos: MapaCampo, fecha: string, fondo?: FondoSatelital,
   // Sin clip-path: resvg reserva una capa del tamaño de todo lo recortado y, al
   // acercar un potrero chico, el campo ampliado pedía ~300 MB (Edge corta sin
   // responder). Cabecera y pie se pintan encima y cubren lo que se sale.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${infra.lineas.join('')}${infra.sanos.join('')}${labels.join('')}${infra.destacados.join('')}${infra.textos([...ocupados, ...infra.cajas]).join('')}<rect width="${width}" height="${mapY}" fill="#131b16"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#131b16"/><text x="24" y="53" font-size="32" font-weight="600" fill="#fff">TROPPERO · ${xml(datos.nombre.slice(0, 48))}${foco ? ` · ${xml(foco.nombre)}` : ''}</text><rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#fff">${fondo ? 'Imagen de referencia' : 'Croquis de respaldo · satélite no disponible'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
+  const avisos = avisosDelMapa(datos, focoId)
+  const inicioAvisos = mapY + mapH
+  const detalles = avisos.slice(0, 3).map((a, i) => {
+    const y = inicioAvisos + 42 + i * 66
+    return `<circle cx="30" cy="${y - 8}" r="6" fill="#b85c2e"/><text x="48" y="${y}" font-size="23" font-weight="700" fill="#30291f">${xml(a.potrero)} · ${xml(a.fecha.split('-').reverse().join('/'))}</text><text x="48" y="${y + 27}" font-size="22" fill="#65584a">${xml(a.detalle.slice(0, 106))}</text>`
+  }).join('')
+  const leyenda = avisos.length > 3 ? `<text x="${width - 225}" y="${inicioAvisos + 34}" font-size="20" fill="#65584a">${avisos.length - 3} avisos más</text>` : ''
+  const total = !foco && datos.potreros.every(p => typeof p.cabezas === 'number' && Number.isFinite(p.cabezas))
+    ? `<text x="${width - 26}" y="54" text-anchor="end" font-size="25" fill="#65584a">${datos.potreros.reduce((n, p) => n + p.cabezas!, 0)} cabezas · ${datos.potreros.length} potreros</text>` : ''
+  const svg =`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#131b16"/><g font-family="Inter" fill="#131b16">${background}${elements.join('')}${infra.lineas.join('')}${infra.sanos.join('')}${labels.join('')}${infra.destacados.join('')}${infra.textos([...ocupados, ...infra.cajas]).join('')}<rect width="${width}" height="${mapY}" fill="#fbfaf6"/><rect y="${mapY + mapH}" width="${width}" height="${height - mapY - mapH}" fill="#fff8ed"/>${detalles}<text x="26" y="24" font-size="15" font-weight="700" letter-spacing=".4" fill="#a9552c">troppero</text><text x="26" y="62" font-size="33" font-weight="800">${xml(datos.nombre.slice(0, 38))}${foco ? ` · ${xml(foco.nombre.slice(0, 12))}` : ''}</text>${total}${leyenda}<rect x="16" y="94" width="44" height="72" rx="8" fill="#fbfaf6" fill-opacity=".9"/><path d="M38 152 L38 119 M29 133 L38 119 L47 133" fill="none" stroke="#131b16" stroke-width="3"/><text x="31" y="114" font-size="18">N</text><text x="16" y="${height - 14}" font-size="17" fill="#65584a">${fondo ? 'Imagen de referencia' : 'Croquis sin fondo satelital'} · ${fondo ? xml(fondo.atribucion.slice(0, 155)) : 'Contornos según la app.'}</text></g></svg>`
   return { svg, dibujados: valid.length, faltantes, width, height }
 }

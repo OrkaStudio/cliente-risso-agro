@@ -1,15 +1,17 @@
 import type { EstadoCarga } from '../_shared/wa/confirmacion.ts'
-import { arrancar, corregir, leer, siguientePaso } from '../_shared/wa/conversacion.ts'
+import { arrancar, corregir, detalleObs, esCharla, leer, siguientePaso } from '../_shared/wa/conversacion.ts'
 import { nombraHacienda } from '../_shared/wa/consulta-lluvia.ts'
 import { limpiarInterpretacion } from '../_shared/wa/interpretar.ts'
+import { campoExacto, campoPorId, potreroPorId, resolverReferenciaPotrero } from '../_shared/wa/resolver.ts'
 import { norm } from '../_shared/wa/texto.ts'
-import type { Borrador, Contexto, Mensaje, PasoTurno, Pendiente, PendienteTurno } from '../_shared/wa/tipos.ts'
+import type { AspectoRecorrida, Borrador, Contexto, Mensaje, ObsBorrador, PasoTurno, Pendiente, PendienteTurno } from '../_shared/wa/tipos.ts'
 import * as db from './db.ts'
 import { interpretar } from './llm.ts'
-import { permiso } from '../_shared/wa/permisos.ts'
+import { permiso, permisoBorrador } from '../_shared/wa/permisos.ts'
 
 export type IOCompuesto = {
   responder: (mensaje: Mensaje) => Promise<void>
+  conversar: (texto: string, motivo: 'saludo' | 'otro') => Promise<string>
   consultar: (borrador: Borrador) => Promise<string>
   confirmar: (capturaId: string, borrador: Borrador, pendiente: Pendiente,
     turno: PendienteTurno, siguiente: db.Vinculo['pendiente']) => Promise<EstadoCarga | null>
@@ -20,7 +22,7 @@ export type BorradorTurno = { capturaId: string; borrador: Borrador }
 
 async function preparar(ctx: Contexto, { capturaId, borrador }: BorradorTurno, io: IOCompuesto): Promise<Preparado> {
   // Cada pedido del mensaje, con el mismo permiso que uno solo (permisos, 13/11).
-  const habilitado = permiso(ctx.niveles ?? null, borrador.tipo)
+  const habilitado = permisoBorrador(ctx.niveles ?? null, borrador)
   if (!habilitado.ok) return { aviso: habilitado.texto, cambio: { estado: 'respondida', notas: ['No habilitado para quien escribe.'] } }
   const paso = siguientePaso(capturaId, borrador, ctx, true)
   if (paso.k === 'consultar') {
@@ -57,10 +59,9 @@ async function preparar(ctx: Contexto, { capturaId, borrador }: BorradorTurno, i
 async function mostrar(estado: db.Vinculo['pendiente'], avisos: string[], io: IOCompuesto): Promise<void> {
   const actual = estado?.tipo === 'turno' ? estado.pasos[0]?.mensaje : null
   const otros = estado?.tipo === 'turno' ? estado.pasos.length - 1 : 0
-  const instrucciones = otros > 0
-    ? `${otros === 1 ? 'Queda otro pedido pendiente' : `Quedan ${otros} pedidos más`}. Escribí «siguiente pendiente» para cambiar.`
-    : ''
-  const texto = [...avisos, actual?.texto, instrucciones].filter(Boolean).join('\n\n')
+  const adicionales = estado?.tipo === 'turno' ? estado.pasos.slice(1).map(p => p.mensaje.texto) : []
+  const instrucciones = otros > 0 ? 'Podés revisar todas las cargas acá. El botón confirma la primera. Para elegir otra, escribí «siguiente pendiente».' : ''
+  const texto = [...avisos, actual?.texto, ...adicionales, instrucciones].filter(Boolean).join('\n\n')
   if (texto) await io.responder({ ...actual, texto })
 }
 
@@ -98,13 +99,27 @@ export async function incorporarTurno(
   const capturas: { id: string; cambio: db.CambioCaptura }[] = []
   for (const b of borradores) {
     const resultado = await preparar(ctx, b, io)
+    if ('paso' in resultado && estado?.tipo === 'turno') {
+      const candidato = resultado.paso.pendiente.borrador
+      const yaIncluida = candidato.tipo === 'recorrida' && candidato.observaciones?.length && estado.pasos.some(p => {
+        const previo = p.pendiente.borrador
+        return previo.tipo === 'recorrida' && previo.fecha === candidato.fecha && candidato.observaciones!.every(o =>
+          previo.observaciones?.some(a => a.potreroId === o.potreroId && a.campoId === o.campoId
+            && (['agua', 'pasto', 'electrico', 'conteo', 'novedad'] as const).every(k => o[k] == null || o[k] === a[k])))
+      })
+      if (yaIncluida) {
+        capturas.push({ id: b.capturaId, cambio: { estado: 'respondida', notas: ['El dato ya estaba en una propuesta pendiente.'] } })
+        continue
+      }
+    }
     capturas.push({ id: b.capturaId, cambio: resultado.cambio })
     if ('paso' in resultado) nuevos.push(resultado.paso)
     else avisos.push(resultado.aviso)
   }
   if (!nuevos.length) {
     for (const c of capturas) await db.actualizarCaptura(c.id, c.cambio)
-    await mostrar(estado, avisos, io)
+    if (estado?.tipo === 'turno') await mostrar(estado, avisos, io)
+    else if (avisos.length) await io.responder({ texto: avisos.join('\n\n') })
     return
   }
   const nuevo: PendienteTurno = estado?.tipo === 'turno'
@@ -124,6 +139,80 @@ export async function actualizarPasoTurno(
   if (await reemplazar(v, esperado, nuevo, io, [{ id: b.capturaId, cambio: resultado.cambio }])) await mostrar(nuevo, avisos, io)
 }
 
+type Reubicacion = { aspecto?: AspectoRecorrida | null; potrero: string | null; campo?: string | null }
+
+const aspectos = {
+  agua: { titulo: 'agua', referencia: /\b(?:aguada|agua|bebedero|tanque)\b/ },
+  pasto: { titulo: 'pasto', referencia: /\b(?:pasto|pastura)\b/ },
+  electrico: { titulo: 'eléctrico', referencia: /\b(?:electrico|boyero)\b/ },
+  conteo: { titulo: 'conteo', referencia: /\b(?:conteo|recuento)\b/ },
+  novedad: { titulo: 'novedad', referencia: /\b(?:novedad|nota)\b/ },
+} satisfies Record<AspectoRecorrida, { titulo: string; referencia: RegExp }>
+
+function reubicacionDirecta(texto: string): Reubicacion | null {
+  const frase = /^(?:no[, ]+)?(?:lo (?:de|del|de la|de los|de las)|(?:el|la))\s+(.+?)\s+(?:era|fue)\s+en\s+(.+)$/.exec(texto)
+  if (!frase) return null
+  const candidatas = (Object.entries(aspectos) as [AspectoRecorrida, typeof aspectos.agua][])
+    .filter(([, dato]) => dato.referencia.test(frase[1]))
+  return candidatas.length === 1 ? { aspecto: candidatas[0][0], potrero: frase[2] } : null
+}
+
+/** Reubica el dato señalado y vuelve a emitir únicamente la propuesta afectada. */
+export async function reubicarObservacion(
+  v: db.Vinculo, ctx: Contexto, turno: PendienteTurno, pedido: Reubicacion, io: IOCompuesto,
+): Promise<PendienteTurno | null> {
+  const avisar = async (texto: string) => { await io.responder({ texto }); return null }
+  const habilitado = permiso(ctx.niveles ?? null, 'recorrida')
+  if (!habilitado.ok) return avisar(habilitado.texto)
+  const aspecto = pedido.aspecto
+  if (!aspecto) return avisar('¿Qué dato de la recorrida querés cambiar de potrero?')
+  const titulo = aspectos[aspecto].titulo
+  const posibles = turno.pasos.flatMap(({ pendiente }, paso) => (pendiente.borrador.tipo === 'recorrida'
+    ? (pendiente.borrador.observaciones ?? []).flatMap((observacion, indice) =>
+      observacion[aspecto] != null ? [{ pendiente, paso, observacion, indice }] : [])
+    : []))
+  if (!posibles.length) return avisar(`No tengo un dato de ${titulo} en la recorrida pendiente. ¿Cuál querés mover?`)
+  if (posibles.length > 1) return avisar(`Hay varios datos de ${titulo} pendientes. ¿De qué potrero es el que querés corregir?`)
+  if (!pedido.potrero) return avisar(`¿En qué potrero fue lo de ${titulo}?`)
+  const [{ pendiente, paso, observacion, indice }] = posibles
+  const campo = pedido.campo ? campoExacto(pedido.campo, ctx.campos) : null
+  if (pedido.campo && !campo) return avisar('¿En qué campo está el potrero de destino?')
+  const destino = resolverReferenciaPotrero(pedido.potrero, ctx.campos, campo?.id ?? observacion.campoId)
+  if (!('ok' in destino) || (campo && destino.ok.campo.id !== campo.id)) {
+    return avisar(`¿Me decís cómo figura «${pedido.potrero}» y en qué campo? Dejé el borrador pendiente.`)
+  }
+  const { potrero, campo: campoDestino } = destino.ok
+  if (observacion.potreroId === potrero.id) {
+    await io.responder({ texto: `El dato de ${titulo} ya figura en el ${potrero.nombre}.` })
+    return turno
+  }
+  const borrador = pendiente.borrador
+  const observaciones = [...borrador.observaciones!]
+  const existente = observaciones.findIndex(o => o.potreroId === potrero.id)
+  if (existente >= 0 && observaciones[existente][aspecto] != null && observaciones[existente][aspecto] !== observacion[aspecto]) {
+    return avisar(`El ${potrero.nombre} ya tiene otro dato de ${titulo}. ¿Qué dato querés conservar ahí?`)
+  }
+  const resto = { ...observacion, [aspecto]: null }
+  observaciones[indice] = resto
+  const movida: ObsBorrador = {
+    agua: null, pasto: null, electrico: null, conteo: null, novedad: null,
+    potreroId: potrero.id, campoId: campoDestino.id, [aspecto]: observacion[aspecto],
+  }
+  if (existente >= 0) observaciones[existente] = { ...observaciones[existente], [aspecto]: observacion[aspecto] }
+  else observaciones.push(movida)
+
+  const resultado = await preparar(ctx, { capturaId: pendiente.capturaId, borrador: {
+    ...borrador, observaciones: observaciones.filter((o, i) => i !== indice || detalleObs(o)),
+  } }, io)
+  if (!('paso' in resultado)) return avisar(resultado.aviso)
+  const nuevo = { ...turno, pasos: [resultado.paso, ...turno.pasos.filter((_, i) => i !== paso)] }
+  if (!await reemplazar(v, turno, nuevo, io, [{ id: pendiente.capturaId, cambio: resultado.cambio }])) return null
+  const origen = potreroPorId(ctx.campos, observacion.potreroId)
+  const cambio = `Pasé lo de ${titulo} ${origen ? 'del ' + origen.potrero.nombre + ' ' : ''}al ${potrero.nombre} de ${campoDestino.nombre} en el borrador.`
+  await mostrar(nuevo, [cambio], io)
+  return nuevo
+}
+
 const PEDIR_CAMBIO = { texto: 'Decime qué querés cambiar en este pendiente.' }
 
 export async function continuarTurno(
@@ -132,7 +221,20 @@ export async function continuarTurno(
   const actual = turno.pasos[0]
   if (!actual) return false
   const comando = norm(entrada.texto).replace(/^[¿¡]+|[.!?]+$/g, '').trim()
+  if (!entrada.botonId) {
+    const cambio = reubicacionDirecta(comando)
+    if (cambio) {
+      await reubicarObservacion(v, ctx, turno, cambio, io)
+      return true
+    }
+  }
+  // El permiso se mide sobre lo que está abierto: si se lo sacaron, no se sigue (unión, 18/11).
+  const habilitado = permisoBorrador(ctx.niveles ?? null, actual.pendiente.borrador)
   if (!entrada.botonId && comando === 'ver pendientes') {
+    if (!habilitado.ok) {
+      await io.responder({ texto: habilitado.texto })
+      return true
+    }
     await mostrar(turno, [], io)
     return true
   }
@@ -172,6 +274,10 @@ export async function continuarTurno(
     }
     return true
   }
+  if (!habilitado.ok) {
+    await io.responder({ texto: habilitado.texto })
+    return true
+  }
   if (l.k === 'seguir') {
     if (!entrada.botonId && actual.pendiente.tipo === 'dato'
       && !/^(?:(?:son|fueron|eran|llovieron|pague) )?\$?\s*-?\d[\d.,]*(?:\s*(?:mm|pesos|mil|k|lucas))?[.!?]*$/.test(comando)) return false
@@ -195,6 +301,16 @@ export async function continuarTurno(
     return true
   }
   const { interpretacion } = await interpretar(l.texto, ctx, b.tipo === 'recorrida' ? undefined : b)
+  if (interpretacion.intent === 'reubicar_observacion') {
+    await reubicarObservacion(v, ctx, nuevo, {
+      aspecto: interpretacion.aspectoObservacion, potrero: interpretacion.potrero, campo: interpretacion.campo,
+    }, io)
+    return true
+  }
+  if (esCharla(interpretacion.intent)) {
+    await io.responder({ texto: await io.conversar(l.texto, interpretacion.intent) })
+    return true
+  }
   if (interpretacion.intent.startsWith('consulta_')) {
     const a = arrancar(interpretacion, ctx, l.texto)
     if (!('respuesta' in a) && (!entrada.porAudio || interpretacion.intent !== 'consulta_hacienda' || nombraHacienda(l.texto))) {

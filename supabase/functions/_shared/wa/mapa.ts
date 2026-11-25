@@ -1,23 +1,43 @@
-import { campoEnTexto, campoPorId, resolverCampo } from './resolver.ts'
+import { campoEnTexto, campoExacto, campoPorId, resolverCampo } from './resolver.ts'
 import { norm } from './texto.ts'
 import type { Campo, Contexto, Mensaje, Pendiente } from './tipos.ts'
 
-export type PedidoMapa = { campoId?: string; nombre?: string; potrero?: string; potreroId?: string }
+export type PedidoMapa = { campoId?: string; nombre?: string; potrero?: string; potreroId?: string; conHacienda?: boolean; campoComoAlternativa?: boolean }
 /** Consulta lateral: sólo comandos completos; no consume una carga que menciona un mapa. */
-export function comandoMapa(texto: string, botonId?: string): PedidoMapa | null {
+export function comandoMapa(texto: string, botonId?: string, campos: Campo[] = []): PedidoMapa | null {
   if (botonId === 'ver_mapa') return {}
   if (botonId?.startsWith('ver_mapa@')) return { campoId: botonId.slice(9) }
   if (botonId?.startsWith('acercar@')) return { potreroId: botonId.slice(8) }
   if (botonId) return null
-  const t = norm(texto).replace(/[¿?¡!.,]+$/g, '').trim()
-  const detalle = t.match(/^(?:acerca|acercar|amplia|ampliar|mostrame el detalle de|detalle de)(?:\s+(?:el|del))?\s+(?:potrero\s+)?(.+)$/)
-  if (detalle) return { potrero: detalle[1] }
-  // «Mostrame el potrero 3B» pide verlo, no sus observaciones (Fran, 15/10). Exige «potrero».
-  const ver = t.match(/^(?:mostrame|mostrarme|mostra|mostrar|ver|quiero ver|mandame|pasame)\s+(?:el\s+)?potrero\s+(.+)$/)
-  if (ver) return { potrero: ver[1] }
+  const t = norm(texto).replace(/^[¿¡]+|[¿?¡!.,]+$/g, '').trim()
+  if (/^(?:(?:no me podes|me podes|podes) mostrar|(?:mostrame|mostrarme|mostra|mostrar|quiero ver|ver))\s+(?:el campo|los potreros)$/.test(t)) return {}
+  // Un campo conocido puede mostrarse directo. Si el mensaje tiene otro
+  // pedido además del nombre, el intérprete se ocupa de ambos.
+  const vista = t.match(/^(?:me (?:mostras|mostrarias|pasas|mandas|podes mostrar|podrias mostrar|podes mandar)|podes mostrar|mostrame|pasame|mandame|quiero ver|ver)\s+(?:el campo|la vista(?: completa| general)? (?:del campo|de|del))\s+(.+)$/)
+  if (vista) {
+    const nombre = vista[1].replace(/(?:,?\s+por favor)$/, '').trim()
+    const campo = campoExacto(nombre, campos)
+    if (campo) return { campoId: campo.id }
+  }
+  const detalle = t.match(/^(?:acerca|acercame|acercar|amplia|ampliame|ampliar|mostrame el detalle de|detalle de)(?:\s+(?:el|del))?\s+(?:potrero\s+)?(.+)$/)
+  // «Mostrame el potrero 3B» pide verlo. El resto de la frase puede contener otro pedido.
+  const ver = t.match(/^(?:mostrame|mostrarme|mostra|mostrar|ver|quiero ver|mandame|pasame|me (?:mostras|mandas|mostrarias))\s+(?:el\s+)?potrero\s+(.+)$/)
+  const destino = (detalle ?? ver)?.[1]
+  if (destino) {
+    const pedido = destino.replace(/,?\s+por favor$/, '')
+    const consulta = /\s+y\s+(?:(?:saber|decime|quiero saber)\s+)?(?:que (?:tengo|hay)(?: ahi)? (?:adentro|dentro)|cuant(?:as cabezas|os animales) hay(?: ahi)?)$/.exec(pedido)
+    const nombre = (consulta ? pedido.slice(0, consulta.index) : pedido)
+      .replace(/\s+(?:con (?:el )?satelite|en (?:vista )?satelital|con (?:la )?vista satelital)$/, '').trim()
+    const existe = campos.some(c => c.potreros.some(p => norm(p.nombre) === nombre))
+    if (consulta) return existe ? { potrero: nombre, conHacienda: true } : null
+    if (existe || /^[\p{L}\p{N}_ -]+$/u.test(nombre) && !/\b(?:y|o|ademas|tambien|con|de|del)\b/.test(nombre)) return { potrero: nombre }
+    return null
+  }
   const m = t.match(/^(?:mapa|ver (?:el )?mapa|(?:mandame|enviame|mostrame|pasame|mostra|mostrar|quiero ver) (?:el |un )?mapa)(?:\s+(.*))?$/)
   if (!m) return null
-  const nombre = (m[1] ?? '').replace(/^(?:del campo|de la estancia|del establecimiento|de|del)\s+/, '').trim()
+  const nombre = (m[1] ?? '').replace(/^(?:del campo|de la estancia|del establecimiento|de|del)\s+/, '')
+    .replace(/,?\s+por favor$/, '').trim()
+  if (/[,;?!]|\s(?:y|o|ademas|tambien)\s/.test(nombre) && !campoExacto(nombre, campos)) return null
   return nombre && !['campo', 'del campo', 'mi campo', 'el campo'].includes(nombre) ? { nombre } : {}
 }
 
@@ -62,7 +82,7 @@ export function noRecuerdaPotrero(texto: string, p: Pendiente | null): boolean {
  * en la imagen basta el tipo, porque el potrero ya se ve. El apodo sólo distingue dos iguales. */
 export type ElementoMapa = { id: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'; nombre: string; apodo?: string | null; nuevo?: boolean; punto?: [number, number]; linea?: [number, number][] | null; falla?: string | null }
 /** cabezas y ultimaRecorrida son opcionales: si no vienen, el cartel queda como siempre. null = nunca recorrido. */
-export type MapaCampo = { id: string; nombre: string; potreros: { id: string; nombre: string; poligono: unknown; cabezas?: number; ultimaRecorrida?: string | null }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
+export type MapaCampo = { id: string; nombre: string; contorno?: unknown; potreros: { id: string; nombre: string; poligono: unknown; estadoCiclo?: string | null; cabezas?: number; ultimaRecorrida?: string | null; ultimaObservacion?: { fecha: string; agua: string | null; electrico: string | null; novedad: string | null } | null }[]; alertas?: string[]; equipos?: {id:string;lat:number;lng:number}[]; infraestructura?: ElementoMapa[] }
 
 export type MapaIO = {
   datos: (campoId: string) => Promise<MapaCampo | null>
@@ -81,10 +101,10 @@ export async function atenderMapa(campo: Campo, io: MapaIO, pregunta?: string): 
     await io.responder({ texto: `Todavía no hay potreros dibujados en ${datos.nombre}. Potreros registrados: ${datos.potreros.map(p => p.nombre).join(', ') || 'ninguno'}. Podés escribir el nombre del potrero; tu carga pendiente se conserva.` }); return false
   }
   const incompleto = imagen.faltantes.length ? ` Sin dibujo: ${imagen.faltantes.join(', ')}.` : ''
-  const respaldo = imagen.satelital ? '' : 'Croquis: el satélite no está disponible ahora. '
+  const respaldo = imagen.satelital ? '' : 'Te mando el croquis porque no pude obtener la imagen satelital.\n'
   const abiertas = datos.infraestructura?.filter(e => e.falla).length ?? 0
   const conDatos = datos.potreros.some(p => p.cabezas !== undefined || p.ultimaRecorrida !== undefined)
-  const leyenda = conDatos ? '\nAl lado del potrero: cabezas y, en naranja, días sin recorrer.' : ''
+  const leyenda = conDatos ? '\nCada etiqueta muestra el potrero y sus cabezas. Los avisos llevan la fecha de la observación.' : ''
   const fallas = abiertas ? `\nEn rojo: ${abiertas === 1 ? 'un problema abierto' : `${abiertas} problemas abiertos`}.` : ''
   const problemas = datos.alertas?.length ? '\nEl borde rojo indica potreros con problemas abiertos. Para verlos, escribí «problemas».' : ''
   const caption = `${respaldo}${pregunta ?? `${datos.nombre}. Para ver un detalle, escribí «acercá» y el nombre del potrero.`}${incompleto}${leyenda}${fallas}${problemas}`

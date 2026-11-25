@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es-AR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Troppero · Símbolos en el mapa</title><link rel="icon" href="./troppero.svg" type="image/svg+xml"><link rel="stylesheet" href="./vista.css"></head>
+<body>
+<header class="page-header"><img src="./troppero.svg" width="181" height="30" alt="Troppero"><span>Diseño del mapa de WhatsApp</span></header>
+<main>
+<section class="intro"><h1>Los avisos, en su lugar.</h1><p>Probá los dibujos sobre el campo y al tamaño del teléfono.</p></section>
+<div class="workspace">
+<aside class="controls">
+<label for="symbol">Qué pasó</label><select id="symbol"></select>
+<label for="state">Estado del aviso</label><select id="state"><option value="revisar">Por revisar</option><option value="registrado">Registrado</option><option value="resuelto">Resuelto</option></select>
+<label for="background">Fondo del mapa</label><select id="background"><option value="satelite">Satélite</option><option value="hueso">Croquis sobre hueso</option></select>
+<label for="field">Forma del campo</label><select id="field"><option value="original">La Porteña · 12 potreros</option><option value="alargado">Campo alargado · 9 potreros</option><option value="denso">Campo dividido · 24 potreros</option></select>
+<label for="zoom">Vista</label><select id="zoom"><option value="general">Todo el campo</option><option value="detalle">Detalle del potrero</option></select>
+<label for="size">Tamaño del símbolo <output id="size-value">30 px</output></label><input id="size" type="range" min="20" max="44" value="30">
+<button id="download" type="button">Descargar esta vista en SVG</button>
+<p class="scope">Vista de diseño con datos de prueba. Las situaciones muestran los ejemplos de la landing.</p>
+<p id="status" role="status"></p>
+</aside>
+<section class="preview-region" aria-label="Vista al tamaño de WhatsApp">
+<div class="map-card"><header><img src="./troppero.svg" width="150" height="25" alt="Troppero"><h2 id="field-name">La Porteña</h2><p id="field-caption">Campo completo</p></header><div id="map"></div>
+<div class="under-map"><div id="notice"></div><h3>Cabezas por potrero</h3><div id="stock"></div><small>Referencia de diseño · fotografía del archivo de Troppero</small></div></div>
+</section>
+<section class="library"><h2>Símbolos del campo</h2><p>Elegí uno para verlo en el mapa.</p><div id="symbols"></div><h3>Las historias de la landing</h3><div id="roles" role="group" aria-label="Elegir un ejemplo"></div><div class="chat"><p id="source-message"></p><p id="reply-message"></p></div></section>
+</div></main><script type="module" src="./vista.js"></script></body></html>

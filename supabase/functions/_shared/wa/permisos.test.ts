@@ -76,3 +76,42 @@ describe('la ayuda ofrece sólo lo habilitado', () => {
     expect(ayuda('Daniel', {})).toContain('gasto')
   })
 })
+
+describe('unión con la rama de Fran (18/11)', () => {
+  it('la nota libre se mide en la sección que trae', async () => {
+    const { permisoBorrador } = await import('./permisos')
+    expect(permisoBorrador(vet, { tipo: 'nota', seccionNota: 'hacienda' }).ok).toBe(true)
+    expect(permisoBorrador(vet, { tipo: 'nota', seccionNota: 'plata' }).ok).toBe(false)
+    // Sin sección, Campos: el veterinario no carga Campos.
+    expect(permisoBorrador(vet, { tipo: 'nota' }).ok).toBe(false)
+    expect(permisoBorrador(encargado, { tipo: 'nota', seccionNota: 'plata' }).ok).toBe(true)
+  })
+  it('la consulta de campos pide ver Campos', () => {
+    expect(permiso(vet, 'consulta_campos').ok).toBe(false)
+    expect(permiso(encargado, 'consulta_campos').ok).toBe(true)
+  })
+  it('sólo el que ve todo recibe el historial completo', async () => {
+    const { veTodo } = await import('./permisos')
+    expect(veTodo(dueno)).toBe(true)
+    expect(veTodo(encargado)).toBe(false)
+    expect(veTodo({ hacienda: 've', campos: 've', plata: 'carga' })).toBe(true)
+  })
+  it('«tiene algo» en la sección: ve o manda, no «No ve»', async () => {
+    const { tieneSeccion } = await import('./permisos')
+    expect(tieneSeccion(encargado, 'plata')).toBe(true)
+    expect(tieneSeccion(vet, 'campos')).toBe(false)
+    expect(tieneSeccion({}, 'hacienda')).toBe(false)
+  })
+  it('sin membresía no es dueño: un invitado sin niveles no tiene nada', async () => {
+    const { nivelesDe, cargaSeccion, veSeccion } = await import('./permisos')
+    expect(nivelesDe({ rol: 'dueno', niveles: { plata: 'no' } })).toBe(null)
+    const nada = nivelesDe({ rol: 'invitado', niveles: undefined })
+    expect(veSeccion(nada, 'campos') || cargaSeccion(nada, 'plata')).toBe(false)
+  })
+  it('el texto por sección es el mismo que el de un borrador', async () => {
+    const { noHabilitado } = await import('./permisos')
+    expect(noHabilitado(vet, 'plata', 'ver')).toBe((permiso(vet, 'consulta_gastos') as { texto: string }).texto)
+    expect(noHabilitado(encargado, 'plata', 'ver')).toContain('los ve el dueño')
+    expect(noHabilitado(vet, 'campos', 'cargar')).toBe((permiso(vet, 'lluvia') as { texto: string }).texto)
+  })
+})
