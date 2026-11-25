@@ -1,0 +1,10 @@
+{
+  "name": "tropero_resumen_semanal",
+  "language": "es_AR",
+  "category": "UTILITY",
+  "components": [
+    {"type": "HEADER", "format": "DOCUMENT", "example": {"header_handle": ["REEMPLAZAR_CON_HANDLE_DEL_PDF_SINTETICO"]}},
+    {"type": "BODY", "text": "Adjuntamos el resumen semanal de tus campos que solicitaste en Tropero. Incluye registros de lluvia, recorridas, novedades, gastos, hacienda y vencimientos. Para dejar de recibirlo, respondé: desactivar resumen semanal."},
+    {"type": "FOOTER", "text": "Tropero · Tu campo, a mano."}
+  ]
+}

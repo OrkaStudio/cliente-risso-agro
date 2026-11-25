@@ -1,0 +1,272 @@
+// Tipos del bot de WhatsApp. Spec:
+// orka-brain/clientes/risso-agro/especificaciones/2026-09-24-whatsapp-captura-fase1.md
+
+export type Potrero = { id: string; nombre: string }
+export type Campo = { id: string; nombre: string; potreros: Potrero[] }
+export type Categoria = { id: string; nombre: string }
+
+/** Lo que el bot sabe de la empresa del número vinculado. */
+import type { Niveles } from './permisos.ts'
+
+export type Contexto = {
+  hoy: string
+  fechaMensaje?: string
+  nombre: string | null
+  campos: Campo[]
+  categoriasGasto: Categoria[]
+  semanalHabilitado?: boolean
+  pilotoHabilitado?: boolean
+  /**
+   * Lo que el dueño le habilitó a quien escribe; null = el dueño (todo). Sin dato,
+   * como dueño: el webhook corta antes a quien ya no es miembro de la cuenta.
+   */
+  niveles?: Niveles
+}
+
+export const INTENTS = [
+  'lluvia',
+  'novedad',
+  'reubicar_observacion',
+  'gasto',
+  'nota',
+  'vacunacion_planilla',
+  'revisar_pdf',
+  'guardar_pdf',
+  'consulta_hacienda',
+  'consulta_mapa',
+  'consulta_campos',
+  'consulta_lluvia',
+  'consulta_vencimientos',
+  'consulta_dias_potrero',
+  'consulta_recorrida',
+  'consulta_observacion',
+  'consulta_novedades',
+  'consulta_gastos',
+  'consulta_cargas',
+  'no_soportado',
+  'ayuda_gasto',
+  'ayuda_lluvia',
+  'saludo',
+  'ayuda_general',
+  'otro',
+] as const
+export type Intent = (typeof INTENTS)[number]
+
+export const AGUA = ['llena', 'normal', 'baja', 'seca'] as const
+export const PASTO = ['abundante', 'normal', 'escaso', 'pelado'] as const
+export const ELECTRICO = ['ok', 'cortado'] as const
+export type Agua = (typeof AGUA)[number]
+export type Pasto = (typeof PASTO)[number]
+export type Electrico = (typeof ELECTRICO)[number]
+
+/** Lo que vio en un potrero, como lo devuelve el modelo. Los estados son los enums de la base. */
+export type ObsInterpretada = {
+  potrero: string | null
+  campo: string | null
+  /** Dijo "acá", "en este" o "en el que estoy": el potrero sale de la ubicación. */
+  aca: boolean
+  agua: Agua | null
+  pasto: Pasto | null
+  electrico: Electrico | null
+  /** Total de animales del potrero, sólo si contó todos. */
+  conteo: number | null
+  novedad: string | null
+}
+
+export const CATEGORIAS_MORTANDAD = [
+  'vaca', 'vaquillona', 'novillo', 'ternero', 'ternera', 'toro', 'capon',
+  'oveja', 'carnero', 'cordero', 'cordera', 'yegua', 'padrillo', 'potrillo', 'potranca',
+] as const
+export type GrupoMortandad = { categoria: typeof CATEGORIAS_MORTANDAD[number]; cantidad: number }
+export type ReporteMortandad = {
+  campo: string | null
+  potrero: string | null
+  detalle: string | null
+  grupos: GrupoMortandad[]
+  otrosGrupos?: { nombre: string; cantidad: number }[]
+}
+export type PendienteMortandad = { tipo: 'mortandad'; capturaId: null; reporte: ReporteMortandad }
+
+export const ASPECTOS_RECORRIDA = ['agua', 'pasto', 'electrico', 'conteo', 'novedad'] as const
+export type AspectoRecorrida = (typeof ASPECTOS_RECORRIDA)[number]
+
+/** Lo que devuelve el modelo, ya limpio. Nunca se escribe tal cual: es una propuesta. */
+export type Interpretacion = {
+  intent: Intent
+  campo: string | null
+  potrero: string | null
+  mm: number | null
+  fecha: string | null
+  fechaInvalida?: boolean
+  monto: number | null
+  categoria: string | null
+  archivo?: number | null
+  vacuna?: string | null
+  aspectoObservacion?: AspectoRecorrida | null
+  categoriaAnimal?: GrupoMortandad['categoria'] | null
+  contraparte: string | null
+  descripcion: string | null
+  periodo: 'semana' | 'mes' | 'anio' | null
+  /** Sólo en "novedad": una por potrero. */
+  observaciones: ObsInterpretada[]
+  otrosRegistros?: string[]
+  mortandad?: ReporteMortandad | null
+}
+
+export type PedidoInterpretado = { fragmento: string; interpretacion: Interpretacion; campoComoAlternativa?: boolean; sinInterpretar?: boolean }
+
+export type TipoBorrador =
+  | 'recorrida'
+  | 'nota'
+  | 'lluvia'
+  | 'gasto'
+  | 'consulta_hacienda'
+  | 'consulta_campos'
+  | 'consulta_lluvia'
+  | 'consulta_vencimientos'
+  | 'consulta_dias_potrero'
+  | 'consulta_recorrida'
+  | 'consulta_observacion'
+  | 'consulta_novedades'
+  | 'consulta_gastos'
+  | 'consulta_cargas'
+
+/** Una observación de la recorrida mientras se resuelve su potrero. */
+export type ObsBorrador = {
+  potreroId?: string | null
+  campoId?: string | null
+  potreroMencion?: string | null
+  campoMencion?: string | null
+  aca?: boolean
+  agua: Agua | null
+  pasto: Pasto | null
+  electrico: Electrico | null
+  conteo: number | null
+  novedad: string | null
+}
+
+/** Dónde dijo la ubicación compartida que está el productor. */
+/** punto: la ubicación compartida, para cargar ahí un molino o un tanque. */
+export type Ubicado = { potreroId: string; campoId: string; punto?: [number, number] }
+
+export type IvaLinea = { concepto: string | null; neto: number; alicuota: number; iva: number }
+
+/** Lo que se va juntando hasta poder proponer (o consultar). Vive en `wa_vinculo.pendiente`. */
+export type Borrador = {
+  tipo: TipoBorrador
+  campoId?: string | null
+  potreroId?: string | null
+  requierePotrero?: boolean
+  /** Lo que escribió el productor y todavía no se resolvió contra la base. */
+  campoMencion?: string | null
+  potreroMencion?: string | null
+  mm?: number | null
+  fecha?: string | null
+  fechaInvalida?: boolean
+  monto?: number | null
+  categoriaId?: string | null
+  categoriaMencion?: string | null
+  categoriaAnimal?: GrupoMortandad['categoria'] | null
+  contraparte?: string | null
+  descripcion?: string | null
+  seccionNota?: 'campos' | 'hacienda' | 'plata'
+  cuit?: string | null
+  comprobanteTipo?: 'a' | 'b' | 'c' | 'otro' | null
+  ivaLineas?: IvaLinea[]
+  /** id del medio en Meta, para subir la foto al bucket al confirmar. */
+  fotoMediaId?: string | null
+  periodo?: 'semana' | 'mes' | 'anio' | null
+  semanaPasada?: boolean
+  observaciones?: ObsBorrador[]
+  mortandad?: ReporteMortandad
+  sesionId?: string
+  cerrarSesion?: boolean
+  /** Gasto de un invitado (permisos, 14/11): lo pagó el campo, lo adelantó él (reintegro) o hay que pagarlo. */
+  pago?: 'campo' | 'yo' | 'a_pagar' | null
+  /** Hay que pagarlo: en cuántos días vence (0 = hoy). */
+  venceDias?: number | null
+}
+
+/** Qué le preguntó el bot al productor y todavía espera. */
+export type Pendiente =
+  | { tipo: 'propuesta'; capturaId: string; borrador: Borrador; revision?: string }
+  | { tipo: 'dato'; capturaId: string; borrador: Borrador; dato: 'mm' | 'monto' }
+  | {
+      tipo: 'campo'; capturaId: string; borrador: Borrador
+      /** Sólo se guarda si la pregunta avisó explícitamente que elegir confirma. */
+      confirmaAlElegir?: boolean
+      camposOfrecidos?: string[]
+    }
+  | {
+      tipo: 'potrero'; capturaId: string; borrador: Borrador; opciones?: string[]
+      /** En una recorrida: a qué observación le falta el potrero. */
+      obsIndex?: number
+    }
+  /** La recorrida espera la ubicación (o el nombre) del potrero donde está. */
+  | { tipo: 'ubicacion'; capturaId: string; borrador: Borrador; obsIndex?: number; confirmaAlElegir?: boolean }
+  /** Compartió la ubicación sin decir nada más: vale para el próximo mensaje. */
+  | { tipo: 'ubicado'; capturaId: null; ubicado: Ubicado }
+  | { tipo: 'categoria'; capturaId: string; borrador: Borrador }
+  | { tipo: 'pago'; capturaId: string; borrador: Borrador }
+  | { tipo: 'vence'; capturaId: string; borrador: Borrador }
+  | { tipo: 'corregir'; capturaId: string; borrador: Borrador }
+
+/** Inventario: elegir qué es lo de la ubicación, confirmar el alta o la baja.
+ * Va aparte de Pendiente: el webhook lo separa al leerlo y el resto del flujo no lo ve. */
+export type PendienteInfra =
+  | { tipo: 'infra'; capturaId: string | null; paso: 'tipo'; punto: [number, number]; campoId: string }
+  | { tipo: 'infra'; capturaId: string; paso: 'confirmar'; elemento: InfraNueva }
+  | { tipo: 'infra'; capturaId: string; paso: 'borrar'; id: string; nombre: string }
+  /** Dijo qué es antes de mandar la ubicación (sin señal salen juntas y llegan en cualquier orden). */
+  | { tipo: 'infra'; capturaId: null; paso: 'ubicacion'; elemento: { tipo: InfraNueva['tipo']; apodo: string | null }; origen: { texto: string; entrada: 'texto' | 'audio' } }
+
+export type PasoTurno = {
+  pendiente: Exclude<Pendiente, { tipo: 'ubicado' }>
+  mensaje: Mensaje
+}
+
+export type PendienteTurno = {
+  tipo: 'turno'
+  capturaId: null
+  pasos: PasoTurno[]
+  anterior: Pendiente | PendienteInfra | PendienteMortandad | null
+}
+
+export type InfraNueva = {
+  campoId: string; tipo: 'molino' | 'tanque' | 'bebedero' | 'energizador' | 'tranquera' | 'electrico'
+  apodo: string | null; lat: number; lng: number; linea: [number, number][] | null; nombre: string; focoId: string | null
+}
+
+export type Boton = { id: string; titulo: string; detalle?: string }
+
+/** Un mensaje del bot. Con ≤3 opciones van botones; con más, una lista (máx. 10). */
+export type Mensaje = {
+  texto: string
+  /** Botón de WhatsApp para compartir la ubicación. */
+  pedirUbicacion?: boolean
+  botones?: Boton[]
+  lista?: { boton: string; filas: Boton[] }
+}
+
+/** Una cuenta de quien escribe (varias cuentas, 14/11). */
+export type Cuenta = { id: string; nombre: string }
+
+/**
+ * Quien está en varias cuentas (un veterinario que atiende varios campos) mandó
+ * algo nuevo: antes de entenderlo en una cuenta, se le pregunta de cuál es. Se
+ * guarda el mensaje (y lo que dijo el audio) para seguir con él al elegir, y lo
+ * que estaba abierto antes, que vuelve si elige la misma cuenta.
+ */
+export type PendienteCuenta = {
+  tipo: 'cuenta'
+  capturaId: null
+  /** La pregunta: un botón de otra pregunta no elige. */
+  revision: string
+  /** Lo que mandó sin decir la cuenta, en orden: la que elija vale para todo. */
+  mensajes: MensajeSinCuenta[]
+  /** Lo que estaba abierto (en la cuenta del vínculo) cuando llegó lo nuevo. */
+  anterior: Pendiente | PendienteInfra | PendienteMortandad | PendienteTurno | null
+  cuentas: Cuenta[]
+}
+
+export type MensajeSinCuenta = { mensajeId: string; mensaje: unknown; texto: string | null; porAudio: boolean }

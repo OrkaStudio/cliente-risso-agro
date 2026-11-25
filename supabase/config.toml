@@ -442,3 +442,8 @@ enabled = true
 # Lo llama Supabase Auth (firmado), no el navegador: sin JWT.
 [functions.enviar-codigo]
 verify_jwt = false
+
+# El bot de WhatsApp: lo llama Meta (firmado con su secreto), no el navegador.
+[functions.wa-webhook]
+verify_jwt = false
+static_files = ["./functions/wa-webhook/mapa-assets/*"]
