@@ -1,8 +1,8 @@
 /**
  * Términos, privacidad y el resumen «en simple» de Troppero (Lau, 12/11).
  *
- * BORRADOR: falta que lo revise un abogado. Mientras sea borrador, a quien ya
- * tenía cuenta no se le pide aceptar de nuevo.
+ * BORRADOR: con true se muestra «Borrador» y a quien ya tenía cuenta no se le pide
+ * aceptar de nuevo. Lau lo sacó el 25/11 (pruebas gratis); falta igual una revisión legal.
  *
  * 25/11 (Lau): mientras Troppero sea gratis no hace falta sociedad ni CUIT; los
  * responsables son Lautaro Risso y Francisco Lerra. La videollamada del alta se graba.
@@ -13,7 +13,7 @@
 
 export const VERSION_LEGALES = '2026-11-25'
 export const FECHA_LEGALES = '25 de noviembre de 2026'
-export const BORRADOR = true
+export const BORRADOR = false
 
 /** Lo que falta decidir. null = «a definir». */
 export const DATOS: Record<string, string | null> = {
