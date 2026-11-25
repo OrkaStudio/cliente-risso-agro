@@ -121,11 +121,13 @@ export async function enviarImagen(to: string, mediaId: string, caption: string)
 }
 
 /** PDF privado: se sube a Meta por bytes; no publica un link de los datos del campo. */
-export async function subirDocumento(bytes: Uint8Array, filename: string): Promise<string> {
+export async function subirDocumento(bytes: Uint8Array, filename: string, mime = 'application/pdf'): Promise<string> {
+  if(!['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','text/plain','text/csv'].includes(mime))throw new Error('Tipo de documento no disponible')
+  const tipo=mime==='text/csv'?'text/plain':mime
   const form = new FormData()
   form.set('messaging_product', 'whatsapp')
-  form.set('type', 'application/pdf')
-  form.set('file', new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }), filename)
+  form.set('type', tipo)
+  form.set('file', new Blob([bytes as Uint8Array<ArrayBuffer>], { type: tipo }), filename)
   const res = await fetch(`${GRAPH}/${phoneId()}/media`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form, signal: AbortSignal.timeout(30_000) })
   const json = await res.json() as { id?: string; error?: { code?: number } }
   if (!res.ok || !json.id) throw new Error(`Meta documento ${res.status} / ${json.error?.code ?? 'sin id'}`)

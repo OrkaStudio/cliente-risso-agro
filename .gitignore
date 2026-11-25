@@ -59,3 +59,6 @@ auditoria-shots/
 /supabase/.temp/
 /supabase/tests/wa/piloto/resultado.json
 .vitest/
+
+# Reportes, conversaciones y respaldos privados de QA
+/output/

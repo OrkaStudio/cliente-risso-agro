@@ -54,6 +54,7 @@ import { actualizarPasoTurno, continuarTurno, incorporarTurno, reubicarObservaci
 import * as meta from './meta.ts'
 import { atenderMapa, campoParaMapa, comandoMapa, elegirMapa, noRecuerdaPotrero, type PedidoMapa } from '../_shared/wa/mapa.ts'
 import { imagenMapa } from './mapa-imagen.ts'
+import { asistenteHabilitado,atenderAsistente,botonAsistente } from './asistente.ts'
 import { conContextoRecorrida } from '../_shared/wa/recorrida-turno.ts'
 import { poligonoMapa } from '../_shared/wa/mapa-svg.ts'
 import { colaHabilitada, tomarTrabajo, terminarTrabajo, canalEnRevision,canalesConTrabajo } from './cola.ts'
@@ -86,6 +87,7 @@ type MensajeMeta = {
   document?: { id: string; mime_type?: string; filename?: string; caption?: string }
   context?: { id?: string }
   audio?: { id: string }
+  troppero_origen?: { actor_id?: string; vinculo_id?: string }
   location?: { latitude: number; longitude: number; name?: string; address?: string }
 }
 
@@ -179,6 +181,8 @@ async function drenarCola(vinculo:db.Vinculo,avisar=false):Promise<void>{
         // La cuenta de la conversación puede cambiar entre mensajes (varias cuentas, 14/11): la persona no.
         if (!actual || actual.id !== vinculo.id || actual.user_id !== vinculo.user_id) throw new Error('El vínculo cambió; revisar antes de procesar')
         if ((job.cuerpo as MensajeMeta).from !== vinculo.telefono) throw new Error('Mensaje de otro vínculo')
+        const origen=(job.cuerpo as MensajeMeta).troppero_origen
+        if(origen&&(origen.actor_id!==actual!.user_id||origen.vinculo_id!==actual!.id))throw new Error('El titular del mensaje cambió; requiere revisión')
         await procesar(job.cuerpo as MensajeMeta, job.mensajeId, actual)
         await terminarTrabajo(job.mensajeId, job.token)
       } catch (e) { await terminarTrabajo(job.mensajeId, job.token, true); throw e }
@@ -269,7 +273,7 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
   // Mientras espera la cuenta de lo anterior, nada sigue un hilo: todo se suma a la pregunta.
   // Los botones de la planilla de vacunación y de los documentos responden a una propuesta
   // abierta en la cuenta actual (cada uno lo comprueba contra su captura): son hilo (unión, 18/11).
-  const botonDelHilo = /^(?:vacplan|vetdoc):/.test(m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? m.button?.payload ?? '')
+  const botonDelHilo = /^(?:(?:vacplan|vetdoc):|waas\|)/.test(m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id ?? m.button?.payload ?? '')
   const hilo = !sinCuenta && (botonDelHilo || v.pendiente !== null || (varias && pilotoHabilitado && (await pilotoStore.pendiente(v).catch(() => null)) !== null))
   if (varias && (confirmada || hilo)) {
     v = { ...v, cuenta: cuentas.find((c) => c.id === v!.empresa_id)?.nombre ?? null }
@@ -349,6 +353,18 @@ async function procesarMensaje(m: MensajeMeta, mensajeId: string, v: db.Vinculo 
     nuevo: async () => !(await pedirCuenta(texto, porAudio)),
   }
   try {
+    const botonNuevo=botonAsistente(m)
+    const botonExistente=m.interactive?.button_reply?.id??m.interactive?.list_reply?.id??m.button?.payload
+    const textoActual=m.text?.body??''
+    const confirmacionAnterior=!asistenteHabilitado(v.empresa_id)&&Boolean(crudo)&&['confirmar','cancelar','pedir_correccion'].includes(leer({texto:textoActual},pendiente,ctx).k)
+    const nuevo=asistenteHabilitado(v.empresa_id)&&!botonExistente&&!confirmacionAnterior&&['text','audio','image','document','video','sticker','location'].includes(m.type)
+    if(botonNuevo||nuevo){
+      if(!botonNuevo&&await pedirCuenta(m.text?.body??m.document?.caption??m.image?.caption??previo?.texto??null,m.type==='audio'))return
+      if(!botonNuevo&&!colaHabilitada(v.empresa_id))throw new Error('El asistente requiere la cola durable habilitada para esta cuenta')
+      await atenderAsistente(m,mensajeId,v,ctx,{responder:ioCompuesto.responder,consultar:ioCompuesto.consultar,
+        enviarImagen:(bytes,caption,campoId)=>enviarImagenMapa(v,bytes,caption,campoId,null),textoPrevio:previo?.texto})
+      return
+    }
     if (m.type === 'location' && m.location) {
       // La ubicación que el bot pidió sigue en esa cuenta; cualquier otra es algo nuevo.
       const pedida = pendienteInfra?.paso === 'ubicacion' || (turno?.pasos[0]?.pendiente ?? pendiente)?.tipo === 'ubicacion'

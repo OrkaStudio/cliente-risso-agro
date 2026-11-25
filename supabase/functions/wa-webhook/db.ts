@@ -74,7 +74,7 @@ type CuentaConUso = Cuenta & { usa: boolean }
 // Sus membresías, por nombre, y si en cada una puede hacer algo por WhatsApp.
 const consultaCuentas = (q: Tx | typeof sql, userId: string) => q`
   select e.id, e.nombre,
-    (m.rol = 'dueno' or exists (select 1 from jsonb_each_text(coalesce(m.niveles, '{}'::jsonb)) j where j.value <> 'no')) as usa
+    (m.rol = 'dueno' or exists (select 1 from jsonb_each_text(coalesce(nullif(to_jsonb(m)->'niveles','null'::jsonb), '{}'::jsonb)) j where j.value <> 'no')) as usa
   from miembro_empresa m join empresa e on e.id = m.empresa_id
   where m.user_id = ${userId} order by lower(e.nombre), e.id`
 
@@ -155,7 +155,7 @@ export async function vincularAccesoWhatsapp(telefono: string): Promise<Vinculo 
  * tomada hasta el final de la transacción: el dueño no la cambia en el medio.
  */
 export async function nivelesVinculados(v: Vinculo, tx: Tx | typeof sql = sql, bloquear = false): Promise<Niveles | undefined> {
-  const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select m.rol, m.niveles
+  const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select m.rol, to_jsonb(m)->'niveles' as niveles
     from wa_vinculo w join miembro_empresa m on m.user_id=w.user_id and m.empresa_id=w.empresa_id
     where w.id=${v.id} and w.telefono=${v.telefono} and w.user_id=${v.user_id} and w.empresa_id=${v.empresa_id} and w.activo
     ${bloquear ? tx`for share of w,m` : tx``}`
@@ -184,7 +184,9 @@ export async function guardarEntrante(m: {
   const [r] = await tx<{ id: string }[]>`
     insert into wa_mensaje (wamid, direccion, telefono, vinculo_id, empresa_id, tipo, cuerpo)
     values (${m.wamid}, 'entrante', ${m.telefono}, ${m.vinculo?.id ?? null}, ${cuentaDelRegistro(m.vinculo)},
-            ${m.tipo}, ${sql.json(m.cuerpo as postgres.JSONValue)})
+            ${m.tipo}, ${sql.json({ ...(m.cuerpo as Record<string,postgres.JSONValue>),troppero_origen:m.vinculo?{
+              actor_id:m.vinculo.user_id,vinculo_id:m.vinculo.id,
+            }:null } as postgres.JSONValue)})
     on conflict (wamid) do nothing
     returning id`
   if (r && m.vinculo && Deno.env.get('WA_QUEUE_ENABLED') === 'true' && empresaEnPiloto(Deno.env.get('WA_PILOT_TENANTS'),m.vinculo.empresa_id))
@@ -442,7 +444,7 @@ export async function datosSemana(v: Vinculo, periodo: PeriodoSemana): Promise<S
       m.descripcion,m.contraparte,cat.nombre as categoria from movimiento_financiero m
       left join categoria_movimiento cat on cat.id=m.categoria_id where m.empresa_id=${v.empresa_id} and m.estado='pendiente'
       and m.fecha_vencimiento is not null and m.fecha_vencimiento<=${periodo.vencimientosHasta} order by m.fecha_vencimiento,m.id`
-    const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select rol, niveles from miembro_empresa where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
+    const [m] = await tx<{ rol: string; niveles: Niveles }[]>`select m.rol, to_jsonb(m)->'niveles' as niveles from miembro_empresa m where user_id=${v.user_id} and empresa_id=${v.empresa_id}`
     const niveles: Niveles = m ? nivelesDe(m) : {}
     const ve = { campos: veSeccion(niveles, 'campos'), hacienda: veSeccion(niveles, 'hacienda'), plata: veSeccion(niveles, 'plata') }
     return { empresa: empresa.nombre, periodo, lluvia, recorridas, observaciones, gastos, hacienda, vencimientos, ve }
@@ -473,7 +475,7 @@ export async function contexto(v: Vinculo, hoy: string): Promise<Contexto & { ca
       .filter((c) => c.aplica_a === null || c.aplica_a === 'gasto')
       .map((c) => ({ id: c.id, nombre: c.nombre }))
     const [m] = await tx<{ rol: string; niveles: Niveles }[]>`
-      select rol, niveles from miembro_empresa where user_id = ${v.user_id} and empresa_id = ${v.empresa_id}`
+      select m.rol, to_jsonb(m)->'niveles' as niveles from miembro_empresa m where user_id = ${v.user_id} and empresa_id = ${v.empresa_id}`
     return { hoy, nombre: u?.nombre ?? null, campos, categoriasGasto, categoriasOcr: cats, niveles: m ? nivelesDe(m) : {} }
   })
 }
