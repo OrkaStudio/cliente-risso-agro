@@ -1,36 +1,30 @@
 /**
  * Términos, privacidad y el resumen «en simple» de Troppero (Lau, 12/11).
  *
- * BORRADOR: falta que lo revise un abogado y completar los datos de `DATOS`
- * que están en null (se muestran resaltados como «a definir»). Mientras sea
- * borrador, a quien ya tenía cuenta no se le pide aceptar de nuevo.
+ * BORRADOR: falta que lo revise un abogado. Mientras sea borrador, a quien ya
+ * tenía cuenta no se le pide aceptar de nuevo.
+ *
+ * 25/11 (Lau): mientras Troppero sea gratis no hace falta sociedad ni CUIT; los
+ * responsables son Lautaro Risso y Francisco Lerra. La videollamada del alta se graba.
  *
  * Al cambiar algo que importe, subir `VERSION_LEGALES`: a todos se les pide
  * aceptar la versión nueva la próxima vez que entran.
  */
 
-export const VERSION_LEGALES = '2026-11-12'
-export const FECHA_LEGALES = '12 de noviembre de 2026'
+export const VERSION_LEGALES = '2026-11-25'
+export const FECHA_LEGALES = '25 de noviembre de 2026'
 export const BORRADOR = true
 
 /** Lo que falta decidir. null = «a definir». */
 export const DATOS: Record<string, string | null> = {
-  razonSocial: null,
-  cuit: null,
-  domicilio: null,
-  mail: 'orka.arg@gmail.com',
-  tribunales: null,
-  diasPrueba: null,
+  responsables: 'Lautaro Risso y Francisco Lerra',
+  mail: 'info@troppero.com',
   diasBorrado: '30',
 }
 
 export const ETIQUETAS: Record<string, string> = {
-  razonSocial: 'razón social',
-  cuit: 'CUIT',
-  domicilio: 'domicilio',
+  responsables: 'responsables',
   mail: 'mail de contacto',
-  tribunales: 'ciudad de los tribunales',
-  diasPrueba: 'días de prueba',
   diasBorrado: 'días',
 }
 
@@ -65,7 +59,8 @@ export const TERMINOS: Seccion[] = [
     id: 'quienes',
     titulo: 'Quiénes somos',
     bloques: [
-      'Troppero es una aplicación para manejar un campo: hacienda, potreros, lluvias, plata y tareas, desde la compu, el celular y WhatsApp. La desarrolla y presta Orka ({razonSocial}, CUIT {cuit}, con domicilio en {domicilio}), a quien en estos términos llamamos «Troppero» o «nosotros».',
+      'Troppero es una aplicación para manejar un campo: hacienda, potreros, lluvias, plata y tareas, desde la compu, el celular y WhatsApp. La crean y la prestan {responsables}, a quienes en estos términos llamamos «Troppero» o «nosotros».',
+      'Si más adelante Troppero pasa a una sociedad formada por nosotros, te avisamos y este acuerdo sigue con ella, en las mismas condiciones.',
       'Estos términos son el acuerdo entre vos y nosotros para usar Troppero. La Política de privacidad, que explica qué hacemos con tus datos, es parte de este acuerdo.',
     ],
   },
@@ -135,20 +130,18 @@ export const TERMINOS: Seccion[] = [
   },
   {
     id: 'plan',
-    titulo: 'Plan, prueba y pagos',
+    titulo: 'Es gratis',
     bloques: [
-      'Podés probar Troppero gratis durante {diasPrueba} días, sin dar una tarjeta. Al terminar la prueba, para seguir usándolo hay que contratar un plan; si no lo hacés, tus datos quedan guardados y podés pedir tu copia.',
-      'El precio de cada plan, qué incluye y cómo se paga se informan antes de contratar. Los impuestos que correspondan se suman según la ley. Te mandamos la factura por cada pago.',
-      'Si subimos el precio, te avisamos con al menos 30 días. Si no estás de acuerdo, podés darte de baja antes de que rija, sin costo.',
+      'Por ahora Troppero es gratis y no te pedimos tarjeta.',
+      'Si en algún momento empezamos a cobrar, te avisamos antes, te contamos el precio y qué incluye, y sólo pagás si lo aceptás. Si no, podés pedir la copia de tus datos y darte de baja sin costo.',
     ],
   },
   {
     id: 'baja',
-    titulo: 'Baja, arrepentimiento y tu copia',
+    titulo: 'Baja y tu copia',
     bloques: [
       'Podés darte de baja cuando quieras, sin dar explicaciones, desde la aplicación (Configuración → Plan → Dar de baja), escribiéndonos a {mail} o por WhatsApp. Te damos un número de trámite.',
-      'Si contrataste a distancia, tenés 10 días corridos desde que contrataste para arrepentirte, sin costo y con la devolución de lo que hayas pagado.',
-      'Después de la baja, tenés {diasBorrado} días para pedirnos una copia de tus datos. Pasado ese plazo los borramos, salvo lo que la ley nos obligue a guardar (por ejemplo, las facturas).',
+      'Después de la baja, tenés {diasBorrado} días para pedirnos una copia de tus datos. Pasado ese plazo los borramos, salvo lo que la ley nos obligue a guardar.',
     ],
   },
   {
@@ -157,7 +150,7 @@ export const TERMINOS: Seccion[] = [
     bloques: [
       'Hacemos lo posible para que Troppero ande siempre, pero puede haber cortes por mantenimiento, por fallas de proveedores o de internet. Te avisamos con anticipación de los cortes programados.',
       'En el campo, parte de la aplicación anda sin señal y guarda lo que cargás en el celular hasta que vuelve la conexión. Si el celular se pierde, se rompe o se borra antes de sincronizar, eso se puede perder.',
-      'Troppero va a cambiar con el tiempo: podemos sumar, mejorar o sacar funciones. Si sacamos algo importante que estás pagando, te avisamos antes.',
+      'Troppero va a cambiar con el tiempo: podemos sumar, mejorar o sacar funciones. Si sacamos algo importante, te avisamos antes.',
     ],
   },
   {
@@ -165,7 +158,7 @@ export const TERMINOS: Seccion[] = [
     titulo: 'Hasta dónde respondemos',
     bloques: [
       'Respondemos por los daños que causemos por no cumplir este acuerdo. Lo que no podemos garantizar es que Troppero no tenga nunca errores ni que sirva para todo lo que te propongas.',
-      'En lo que la ley permita, no respondemos por ganancias que dejaste de tener ni por daños indirectos, y nuestra responsabilidad total no va a superar lo que nos pagaste en los 12 meses anteriores al reclamo. Esto no limita tus derechos como consumidor ni lo que la ley no permite excluir, como el daño causado con intención o culpa grave.',
+      'En lo que la ley permita, no respondemos por ganancias que dejaste de tener ni por daños indirectos. Esto no limita tus derechos como consumidor ni lo que la ley no permite excluir, como el daño causado con intención o culpa grave.',
     ],
   },
   {
@@ -179,21 +172,21 @@ export const TERMINOS: Seccion[] = [
     id: 'propiedad',
     titulo: 'La marca y la aplicación',
     bloques: [
-      'Troppero, su marca, su diseño y su software son de Orka. Usarlos no te da ningún derecho sobre ellos más allá de usar el servicio. Si nos mandás ideas o sugerencias, las podemos usar libremente.',
+      'Troppero, su marca, su diseño y su software son nuestros. Usarlos no te da ningún derecho sobre ellos más allá de usar el servicio. Si nos mandás ideas o sugerencias, las podemos usar libremente.',
     ],
   },
   {
     id: 'cambios',
     titulo: 'Cambios en estos términos',
     bloques: [
-      'Si cambiamos algo importante, te avisamos por WhatsApp, por mail o dentro de la aplicación, al menos 15 días antes, y te pedimos que aceptes la versión nueva. Si no estás de acuerdo, podés darte de baja sin costo. Los cambios menores, como corregir una palabra, rigen al publicarse.',
+      'Si cambiamos algo importante, te avisamos por WhatsApp, por mail o dentro de la aplicación antes de que rija, y te pedimos que aceptes la versión nueva. Si no estás de acuerdo, podés darte de baja sin costo. Los cambios menores, como corregir una palabra, rigen al publicarse.',
     ],
   },
   {
     id: 'ley',
     titulo: 'Ley y tribunales',
     bloques: [
-      'Este acuerdo se rige por las leyes de la República Argentina. Ante un conflicto, primero tratemos de resolverlo hablando; si no se puede, intervienen los tribunales ordinarios de {tribunales}, sin perjuicio de que, si sos consumidor, puedas reclamar en los tribunales de tu domicilio.',
+      'Este acuerdo se rige por las leyes de la República Argentina. Ante un conflicto, primero tratemos de resolverlo hablando; si no se puede, intervienen los tribunales ordinarios de tu domicilio.',
       'Si alguna parte de estos términos no fuera válida, el resto sigue vigente.',
     ],
   },
@@ -209,7 +202,7 @@ export const PRIVACIDAD: Seccion[] = [
     id: 'responsable',
     titulo: 'Quién cuida tus datos',
     bloques: [
-      'El responsable de tus datos personales es Orka ({razonSocial}, CUIT {cuit}, {domicilio}). Para cualquier consulta o pedido sobre tus datos, escribinos a {mail}.',
+      'Tus datos personales los cuidan {responsables}, creadores de Troppero y responsables de sus datos. Para cualquier consulta o pedido sobre tus datos, escribinos a {mail}.',
       'Esta política explica qué datos usamos cuando usás Troppero (la aplicación o su WhatsApp), para qué, con quién los compartimos y qué derechos tenés. Cumple la Ley 25.326 de Protección de los Datos Personales.',
     ],
   },
@@ -220,7 +213,8 @@ export const PRIVACIDAD: Seccion[] = [
       [
         'Tu cuenta: nombre, apellido, celular, mail si lo diste, y la empresa a la que pertenecés con tu rol.',
         'Tu campo: lo que cargás o nos mandás (campos, potreros y sus límites en el mapa, hacienda, sanidad, lluvias, movimientos de plata, comprobantes, tareas).',
-        'WhatsApp: tu número y los mensajes, fotos y audios que le mandás a Troppero.',
+        'WhatsApp: tu número y los mensajes, fotos y audios que le mandás a Troppero, y lo que nos escribís para coordinar el alta.',
+        'La videollamada para armar tu campo: la grabamos, y te avisamos al empezar, para no perder nada de lo que nos contás y cargarlo bien. La grabación la ve sólo nuestro equipo y la borramos cuando nos lo pidas.',
         'Tu ubicación: sólo cuando usás la recorrida en el celular y le das permiso, para saber en qué potrero estás. No la seguimos en segundo plano.',
         'Datos técnicos: tipo de dispositivo y navegador, dirección IP, cuándo entrás y qué errores aparecen, para que la aplicación funcione y sea segura.',
       ],
@@ -248,6 +242,7 @@ export const PRIVACIDAD: Seccion[] = [
       [
         'Supabase: base de datos, archivos e inicio de sesión.',
         'Vercel: publica la aplicación web.',
+        'Google: la videollamada para armar tu campo, su grabación y nuestro mail.',
         'Meta (WhatsApp Business): transporta los mensajes y los códigos para entrar.',
         'Anthropic: entiende los mensajes y lee las fotos de comprobantes y planillas.',
         'OpenAI: pasa a texto los audios.',
@@ -274,7 +269,7 @@ export const PRIVACIDAD: Seccion[] = [
     id: 'tiempo',
     titulo: 'Cuánto tiempo los guardamos',
     bloques: [
-      'Mientras tu cuenta esté activa. Si te das de baja, tenés {diasBorrado} días para pedir una copia y después los borramos, salvo lo que una ley nos obligue a conservar (por ejemplo, datos de facturación) y por el plazo que esa ley indique.',
+      'Mientras tu cuenta esté activa. Si te das de baja, tenés {diasBorrado} días para pedir una copia y después los borramos, salvo lo que una ley nos obligue a conservar, por el plazo que esa ley indique.',
     ],
   },
   {
