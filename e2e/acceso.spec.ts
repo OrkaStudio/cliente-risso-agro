@@ -107,37 +107,21 @@ test('A4: un link que no es de una invitación avisa', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Esta invitación ya no sirve' }).filter({ visible: true }).first()).toBeVisible()
 })
 
-test('A5 afuera: explica los tres caminos, sin pedir el CUIT', async ({ page }) => {
+test('A5 afuera: un solo camino, escribirnos desde el número nuevo, sin pedir el CUIT', async ({ page }) => {
   await page.goto('/login')
   await page.getByRole('button', { name: 'Te ayudamos' }).click()
   await expect(page).toHaveURL(/\/cambie-de-numero$/)
-  await expect(page.getByText('Todavía tengo Troppero abierto')).toBeVisible()
-  await expect(page.getByText('Me invitó el dueño')).toBeVisible()
-  await expect(page.getByText('Soy el dueño y no puedo entrar')).toBeVisible()
+  await expect(page.getByText(/Escribinos y lo cambiamos/).filter({ visible: true }).first()).toBeVisible()
+  // Ya no se cambia solo (Lau, 25/11): ni «lo cambiás vos» ni «lo cambia el dueño».
+  await expect(page.getByText('Todavía tengo Troppero abierto')).toHaveCount(0)
+  await expect(page.getByText('Me invitó el dueño')).toHaveCount(0)
   await expect(page.getByText(/CUIT/)).toHaveCount(0)
 })
 
-test('A5 adentro: con la sesión abierta, el número se cambia con un código al número nuevo', async ({ page }) => {
-  const viejo = `22417${String(Date.now()).slice(-5)}`
-  const nuevo = `22418${String(Date.now()).slice(-5)}`
-  await page.setViewportSize({ width: 390, height: 844 })
-  // Una cuenta nueva (no la de prueba, que usan los demás tests).
-  await page.goto('/registro')
-  await page.getByLabel('Nombre').fill('Cambio')
-  await page.getByLabel('Apellido').fill('Número')
-  await page.getByLabel('Tu celular, el que tiene WhatsApp').fill(viejo)
-  await page.getByRole('button', { name: 'Mandame el código' }).click()
-  await page.waitForURL('**/login/codigo')
-  await page.waitForTimeout(800)
-  await page.locator('#codigo').fill(codigoDelLog(`549${viejo}`))
-  await page.waitForURL((u) => !u.pathname.startsWith('/login'))
-  await expect.poll(() => aceptacionesDe(`549${viejo}`)).toEqual([`${VERSION_LEGALES}:registro`])
-
+test('A5 adentro: el número no se cambia solo; el link viejo lleva a Tu cuenta', async ({ page }) => {
+  await entrar(page)
   await page.goto('/mi-cuenta/numero')
-  await page.getByLabel('Tu número nuevo, el que tiene WhatsApp').fill(nuevo)
-  await page.getByRole('button', { name: 'Mandame el código' }).click()
-  await expect(page.locator('#codigo-nuevo')).toBeVisible()
-  await page.waitForTimeout(800)
-  await page.locator('#codigo-nuevo').fill(codigoDelLog(`549${nuevo}`))
-  await expect(page.getByText('Listo, ya entrás con el número nuevo')).toBeVisible()
+  await expect(page).toHaveURL(/\/configuracion\?tab=cuenta$/)
+  await expect(page.getByText(/Escribinos y lo cambiamos/).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cambiar mi número' })).toHaveCount(0)
 })

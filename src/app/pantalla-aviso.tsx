@@ -34,13 +34,17 @@ export function PantallaAviso({
   subrayar,
   whatsapp,
   principalWhatsapp = false,
+  detalle,
 }: {
   titulo: string
   texto: string
   accion: string
   icono: NombreIcono
   onAccion: () => void
-  secundaria?: { texto: string; onClick: () => void }
+  /** `volver`: es un paso atrás (lleva la flecha); si no, es otro camino y va sin flecha. */
+  secundaria?: { texto: string; onClick: () => void; volver?: boolean }
+  /** Algo propio del caso, debajo del texto (por ejemplo, qué manda por WhatsApp). */
+  detalle?: React.ReactNode
   pantallaEntera?: boolean
   /** Sin la tranquera: para avisos sin señal (la imagen no está guardada en el equipo). */
   conImagen?: boolean
@@ -76,6 +80,7 @@ export function PantallaAviso({
           <ConTrazo texto={titulo} subrayar={subrayar} />
         </h1>
         <p className="mt-3 max-w-[320px] text-[16.5px] leading-snug text-pretty text-texto-suave">{texto}</p>
+        {detalle && <div className="mt-5 w-full max-w-[340px]">{detalle}</div>}
       </div>
       <div className="flex flex-col items-center gap-3">
         {principalWhatsapp ? (
@@ -133,13 +138,26 @@ export function PantallaAviso({
           </span>
           <h1 className="t-pagina mt-5 text-texto md:mt-0 md:text-[52px]">{titulo}</h1>
           <p className="mt-4 max-w-[460px] text-[18px] leading-snug text-texto-suave">{texto}</p>
+          {detalle && <div className="mt-6 w-full max-w-[460px]">{detalle}</div>}
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <BotonPrincipal icono={icono} onClick={onAccion} className="sm:w-auto sm:min-w-[220px]">
-              {accion}
-            </BotonPrincipal>
+            {principalWhatsapp ? (
+              <button
+                type="button"
+                onClick={onAccion}
+                className="inline-flex h-14 items-center justify-center gap-2.5 rounded-full px-7 text-[16px] font-bold text-white shadow-[inset_0_1px_0_rgb(255_255_255/.25),0_12px_24px_-12px_rgb(31_174_85/.8)] transition-[filter] hover:brightness-105 sm:min-w-[220px]"
+                style={{ background: 'linear-gradient(180deg, #2bd46d 0%, #1fae55 100%)' }}
+              >
+                <LogoWhatsapp className="size-[21px]" />
+                {accion}
+              </button>
+            ) : (
+              <BotonPrincipal icono={icono} onClick={onAccion} className="sm:w-auto sm:min-w-[220px]">
+                {accion}
+              </BotonPrincipal>
+            )}
             {secundaria && (
               <button type="button" onClick={secundaria.onClick} className="inline-flex h-14 items-center justify-center gap-2 rounded-full border-[1.5px] border-borde bg-superficie px-6 text-[16px] font-bold text-texto hover:border-principal hover:text-principal">
-                <Icono nombre="Atrás" tamano={16} />
+                {secundaria.volver && <Icono nombre="Atrás" tamano={16} />}
                 {secundaria.texto}
               </button>
             )}
@@ -170,7 +188,7 @@ export function NoEncontrada() {
       accion="Ir al Inicio"
       icono="Inicio"
       onAccion={() => navigate('/')}
-      secundaria={window.history.length > 1 ? { texto: 'Volver a donde estabas', onClick: () => navigate(-1) } : undefined}
+      secundaria={window.history.length > 1 ? { texto: 'Volver a donde estabas', onClick: () => navigate(-1), volver: true } : undefined}
     />
   )
 }

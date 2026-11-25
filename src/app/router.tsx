@@ -8,7 +8,6 @@ import { NoEncontrada } from '@/app/pantalla-aviso'
 import { SeccionPermitida } from '@/app/seccion-permitida'
 import { CodigoPage } from '@/features/acceso/codigo-page'
 import { CrearCuentaPage } from '@/features/acceso/crear-cuenta-page'
-import { CambiarNumeroPage } from '@/features/acceso/cambiar-numero-page'
 import { CambieDeNumeroPage } from '@/features/acceso/cambie-de-numero-page'
 import { EntrarPage } from '@/features/acceso/entrar-page'
 import { FondoAcceso } from '@/features/acceso/fondo-acceso'
@@ -160,9 +159,10 @@ export const router = createBrowserRouter([
     errorElement: <ErrorNuevaVersion />,
     children: [
       {
-        // A5 (adentro): cambiar el número con la sesión abierta y un código al nuevo.
+        // El número ya no se cambia desde adentro (Lau, 25/11): lo cambia el equipo.
+        // Los links viejos van a Tu cuenta, donde está «Escribinos».
         path: '/mi-cuenta/numero',
-        element: <CambiarNumeroPage />,
+        element: <Navigate to="/configuracion?tab=cuenta" replace />,
       },
       {
         // Recién registrado, sin empresa todavía: arma la suya acá.

@@ -35,8 +35,6 @@ test('el dueño invita eligiendo el nivel de cada sección, el invitado ve sólo
   await panel.getByRole('radiogroup', { name: 'Qué hace' }).getByRole('radio', { name: 'Peón' }).click()
   // El rol sólo nombra: no marca ningún nivel.
   await expect(panel.getByRole('radio', { name: /^(Hacienda|Campos|Plata y Agenda): /, checked: true })).toHaveCount(0)
-  // Primero, cómo va a usar Troppero; recién ahí aparecen las secciones.
-  await panel.getByRole('radio', { name: /En la app y por WhatsApp/ }).click()
   // Sin elegir todas las secciones no deja invitar.
   await nivel('Hacienda: Anota').click()
   await panel.getByRole('button', { name: `Invitar a ${nombre.split(' ')[0]}` }).click()
@@ -80,12 +78,18 @@ test('el dueño invita eligiendo el nivel de cada sección, el invitado ve sólo
   // El dueño lo ve adentro y le saca el acceso.
   await page.reload()
   const fila = page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })
-  await expect(fila.getByLabel('Hacienda: Anota')).toBeVisible()
-  await expect(fila.getByLabel('Plata y Agenda: No ve')).toBeVisible()
-  // Tocar a la persona abre su ficha (19/11): ahí se cambia y se le saca el acceso.
-  await fila.getByRole('button').click()
+  // En la compu se edita en la misma tabla (25/11): cada celda dice el nivel.
+  await expect(fila.getByRole('button', { name: 'Hacienda: Anota. Cambiar' })).toBeVisible()
+  await expect(fila.getByRole('button', { name: 'Plata y Agenda: No ve. Cambiar' })).toBeVisible()
+  // Cambiar un nivel ahí mismo: se guarda y avisa con Deshacer.
+  await fila.getByRole('button', { name: 'Plata y Agenda: No ve. Cambiar' }).click()
+  await page.getByRole('radio', { name: /^Mira/ }).click()
+  await expect(page.getByText(/ahora mira la Plata y la Agenda/)).toBeVisible()
+  await expect(fila.getByRole('button', { name: 'Plata y Agenda: Mira. Cambiar' })).toBeVisible()
+  // «⋯» al final de la fila: sacarle el acceso.
+  await fila.getByRole('button', { name: /Más opciones de/ }).click()
   await page.getByRole('button', { name: 'Sacarle el acceso' }).click()
-  await page.getByRole('button', { name: 'Sí, sacarle el acceso' }).click()
+  await page.getByRole('button', { name: 'Sí, sacárselo' }).click()
   await expect(page.getByRole('region', { name: 'Quién ve qué' }).getByRole('listitem').filter({ hasText: nombre })).toHaveCount(0)
 })
 
@@ -192,7 +196,7 @@ test('lo que manda un invitado le llega al dueño como nuevo, con su nombre, y l
   await expect(page.getByRole('listitem').filter({ hasText: detalle })).toContainText('Combustible')
 })
 
-test('invitar «Sólo por WhatsApp»: sólo se manda, sin link a la app, y si entra le dice dónde está lo suyo (permisos, 14/11)', async ({ page, browser }) => {
+test('invitar con sólo «No ve» y «Avisa» es por WhatsApp: sin link a la app, y si entra le dice dónde está lo suyo (un solo ingreso, 25/11)', async ({ page, browser }) => {
   const numero = `22414${String(Date.now()).slice(-5)}`
   await entrar(page)
   await page.goto('/configuracion?tab=personas')
@@ -201,13 +205,11 @@ test('invitar «Sólo por WhatsApp»: sólo se manda, sin link a la app, y si en
   await panel.getByLabel('Nombre').fill('Vete Rinaria')
   await panel.getByLabel('Celular con WhatsApp').fill(numero)
   await panel.getByRole('radiogroup', { name: 'Qué hace' }).getByRole('radio', { name: 'Veterinario' }).click()
-  await panel.getByRole('radio', { name: /Sólo por WhatsApp/ }).click()
-  // Por WhatsApp no se ve: «Mira» y «Anota» quedan apagados; se elige «No ve» o «Avisa».
-  await expect(panel.getByRole('radio', { name: 'Hacienda: Mira', exact: true })).toBeDisabled()
-  await expect(panel.getByRole('radio', { name: 'Hacienda: Anota', exact: true })).toBeDisabled()
+  // No hay paso aparte: con sólo «No ve» y «Avisa», va por WhatsApp (lo dice antes de invitar).
   await panel.getByRole('radio', { name: 'Hacienda: Avisa', exact: true }).click()
   await panel.getByRole('radio', { name: 'Campos: No ve', exact: true }).click()
   await panel.getByRole('radio', { name: 'Plata y Agenda: Avisa', exact: true }).click()
+  await expect(panel).toContainText('Va sólo por WhatsApp')
   await panel.getByRole('button', { name: 'Invitar a Vete' }).click()
   const listo = page.getByRole('dialog', { name: /Listo: invitaste a/ })
   await expect(listo).toContainText('Mandale el número de Troppero')

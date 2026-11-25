@@ -6,7 +6,7 @@ import { CampoTexto } from '@/components/tropero/campo-texto'
 import { Icono } from '@/components/tropero/icono'
 import { PanelLateral } from '@/components/tropero/panel-lateral'
 import { CampoCelular } from '@/features/acceso/campo-celular'
-import { NIVELES, ROLES, SECCIONES_CON_PERMISO, nombreRol, resumenNiveles, type Niveles, type Rol, type RolConocido } from '@/features/empresa/secciones'
+import { NIVELES, ROLES, SECCIONES_CON_PERMISO, accesoDeNiveles, nombreRol, resumenNiveles, type Niveles, type Rol, type RolConocido } from '@/features/empresa/secciones'
 import { normalizarCelularAR } from '@/lib/telefono'
 import { nombrePropio, primeraMayuscula } from '@/lib/texto'
 import { cn } from '@/lib/utils'
@@ -99,8 +99,8 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
   const [otroRol, setOtroRol] = useState('')
   const rol: Rol | '' = tipoRol === 'otro' ? otroRol.trim() : tipoRol
   const [niveles, setNiveles] = useState<Niveles>({})
-  // Cómo va a usar Troppero: en la app, o sólo mandando por WhatsApp (Lau, 13/11). Nada viene elegido.
-  const [acceso, setAcceso] = useState<'app' | 'whatsapp' | ''>('')
+  // Un solo ingreso (Lau, 25/11): cómo entra sale de los niveles que elige el dueño.
+  const acceso = accesoDeNiveles(niveles)
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -110,7 +110,6 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
     if (!cel) { setError('Ese número no parece un celular argentino: característica y número, sin el 0 ni el 15.'); return 'falta' }
     if (!tipoRol) { setError('Tocá qué hace en el campo.'); return 'falta' }
     if (tipoRol === 'otro' && otroRol.trim().length < 2) { setError('Escribí qué hace en el campo.'); return 'falta' }
-    if (!acceso) { setError('Elegí cómo va a usar Troppero.'); return 'falta' }
     const falta = faltaElegir(niveles)
     if (falta) { setError(falta); return 'falta' }
     setToken(await invitar.mutateAsync({ nombre: nombre.trim(), celular: cel, rol, niveles, acceso }))
@@ -200,55 +199,24 @@ export function InvitarPanel({ abierto, empresa, rolInicial, onCerrar }: { abier
         )}
       </Paso>
 
-      {/* 3. Cómo lo usa: con su ícono y una marca clara de lo elegido. */}
-      <Paso n={3} titulo="Cómo va a usar Troppero">
-        <div role="radiogroup" aria-label="Cómo va a usar Troppero" className="grid gap-2 sm:grid-cols-2">
-          {(
-            [
-              { id: 'app', titulo: 'En la app y por WhatsApp', texto: 'Entra con su celular y ve o carga lo que le habilites.' },
-              { id: 'whatsapp', titulo: 'Sólo por WhatsApp', texto: 'No se baja nada: te manda novedades, gastos o facturas.' },
-            ] as const
-          ).map((o) => {
-            const si = acceso === o.id
-            return (
-              <button
-                key={o.id}
-                type="button"
-                role="radio"
-                aria-checked={si}
-                onClick={() => {
-                  setAcceso(o.id)
-                  // Por WhatsApp no se ve: lo elegido que no sea «No ve» o «Avisa» se vuelve a elegir.
-                  if (o.id === 'whatsapp') setNiveles((n) => Object.fromEntries(Object.entries(n).filter(([, v]) => v === 'no' || v === 'solo_manda')))
-                }}
-                className={cn('flex items-start gap-3 rounded-[16px] bg-superficie px-3.5 py-3 text-left transition-shadow', si ? 'shadow-[inset_0_0_0_2px_var(--principal)]' : 'shadow-[inset_0_0_0_1px_var(--borde)]')}
-              >
-                <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', o.id === 'app' ? 'bg-principal-suave text-principal' : 'bg-[#dcf8c6] text-[#1fae55]')}>
-                  {o.id === 'app' ? <Icono nombre="Celular" tamano={16} /> : <LogoWhatsapp className="size-[18px]" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] leading-snug font-bold text-texto">{o.titulo}</span>
-                  <span className="block text-[13px] leading-snug text-texto-suave">{o.texto}</span>
-                </span>
-                <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2', si ? 'border-principal bg-principal' : 'border-neutro-300')}>
-                  {si && <span className="size-2 rounded-full bg-white" />}
-                </span>
-              </button>
-            )
-          })}
+      {/* 3. Qué puede hacer: la misma tabla que la ficha de cada persona. Cómo entra sale de acá. */}
+      <Paso n={3} titulo="Qué puede hacer en cada sección">
+        <div className="flex flex-col gap-3">
+          <TablaNiveles etiqueta="Qué puede hacer en cada sección" niveles={niveles} onElegir={(sec, n) => setNiveles((v) => ({ ...v, [sec]: n }))} />
+          <Leyenda />
         </div>
+        {!faltaElegir(niveles) && (
+          <p className="mt-4 flex items-start gap-2.5 rounded-[16px] bg-superficie px-4 py-3 text-[14.5px] text-texto shadow-[inset_0_0_0_1px_var(--borde)]">
+            {acceso === 'app' ? <Icono nombre="Celular" tamano={16} className="mt-0.5 shrink-0 text-principal" /> : <LogoWhatsapp className="mt-0.5 size-4 shrink-0 text-[#1fae55]" />}
+            <span>
+              {acceso === 'app'
+                ? 'Va a usar la app: le llega un link por WhatsApp para entrar con su celular.'
+                : 'Va sólo por WhatsApp: no se baja nada, te manda lo que pasa. Si después le das «Mira» o «Anota», pasa a usar la app.'}
+            </span>
+          </p>
+        )}
+        <Resumen niveles={niveles} nombre={nombre} />
       </Paso>
-
-      {/* 4. Qué puede hacer: la misma tabla que la ficha de cada persona. */}
-      {acceso && (
-        <Paso n={4} titulo="Qué puede hacer en cada sección">
-          <div className="flex flex-col gap-3">
-            <TablaNiveles etiqueta="Qué puede hacer en cada sección" niveles={niveles} whatsapp={acceso === 'whatsapp'} onElegir={(sec, n) => setNiveles((v) => ({ ...v, [sec]: n }))} />
-            <Leyenda />
-          </div>
-          <Resumen niveles={niveles} nombre={nombre} />
-        </Paso>
-      )}
     </PanelLateral>
   )
 }

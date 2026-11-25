@@ -398,10 +398,11 @@ test('en la ficha, elegir en la barra un campo donde el animal no está vuelve a
   const barra = page.getByRole('radiogroup', { name: 'Qué campo estás viendo' })
   await barra.getByRole('radio', { name: /E2E Campo base \d+ cab/ }).click()
   await page.getByRole('link', { name: 'Hacienda', exact: true }).click()
-  // Por potrero: se entra al 1A y de ahí a un animal (16/11).
-  await page.getByRole('row').filter({ has: page.getByText('1A', { exact: true }) }).first().click()
-  await expect(page).toHaveURL(/potrero=/)
-  await page.getByRole('row').filter({ hasText: '1A' }).getByRole('link').first().click()
+  // Por potrero: el 1A se despliega ahí mismo (25/11) y de ahí a un animal.
+  await page.getByRole('button', { name: /Ver los animales del 1A/ }).click()
+  await expect(page.getByRole('button', { name: /Cerrar los animales del 1A/ })).toBeVisible()
+  await expect(page).toHaveURL(/\/hacienda$/)
+  await page.locator('a[href^="/hacienda/"]').first().click()
   await expect(page).toHaveURL(/\/hacienda\/[0-9a-f-]{36}$/)
 
   // «Todos tus campos» incluye al animal: la ficha se queda.

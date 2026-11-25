@@ -64,7 +64,8 @@ function guardarMembresiaPersistida(m: Membresia | null): void {
 }
 
 /** Lo que hace falta para entrar: todas sus cuentas y la elegida (null = hay que elegir). */
-export type Cuentas = { cuentas: Membresia[]; activa: Membresia | null }
+/** `quitadas`: las cuentas de las que lo sacaron y todavía no se le dijo (25/11). */
+export type Cuentas = { cuentas: Membresia[]; activa: Membresia | null; quitadas: { empresa_id: string; nombre: string }[] }
 
 type FilaCuenta = {
   empresa_id: string
@@ -113,14 +114,22 @@ const opcionesCuentas = queryOptions({
   refetchOnWindowFocus: true,
   refetchInterval: 60_000,
   queryFn: async (): Promise<Cuentas> => {
-    const antes = queryClient.getQueryData<Cuentas>(['empresa'])?.activa
-    const [{ data, error }, { data: sesion }] = await Promise.all([
+    const enMemoria = queryClient.getQueryData<Cuentas>(['empresa'])?.activa
+    const [{ data, error }, { data: sesion }, quitadasR] = await Promise.all([
       supabase.rpc('mis_cuentas'),
       supabase.auth.getSession(),
+      // Si esto falla no frena la entrada: sólo no se avisa.
+      supabase.rpc('accesos_quitados' as never).then((r) => r, () => ({ data: null })),
     ])
     if (error) throw error
+    const quitadas = ((quitadasR.data ?? []) as { empresa_id: string; nombre: string }[]).map((q) => ({ empresa_id: q.empresa_id, nombre: primeraMayuscula(q.nombre) }))
     const cuentas = ((data ?? []) as FilaCuenta[]).map(aMembresia)
     const userId = sesion.session?.user.id ?? null
+    // Si no tenía la app abierta cuando el dueño le cambió algo, se compara con lo último
+    // que vio en este dispositivo: entra horas después y se le dice igual (Lau, 25/11).
+    // Sólo una guardada suya y con niveles (las de antes de los permisos no los traen).
+    const guardada = enMemoria ? null : leerMembresiaPersistida()
+    const antes = enMemoria ?? (guardada && guardada.user_id === userId && 'niveles' in guardada ? guardada : undefined)
     const elegida = userId ? leerCuentaElegida(userId) : null
     // Una elegida que ya no es suya (lo sacaron) se olvida: si vuelve a tener varias, se pregunta.
     if (userId && elegida && !cuentas.some((c) => c.empresa_id === elegida)) olvidarCuentaElegida(userId)
@@ -131,7 +140,7 @@ const opcionesCuentas = queryOptions({
     guardarMembresiaPersistida(activa && userId ? { ...activa, user_id: userId } : null)
     // El dueño le cambió el acceso mientras tenía la app abierta: después de guardar esto.
     if (cambioElAcceso(antes, activa)) setTimeout(() => aplicarCambioDeAcceso(antes!, activa!), 0)
-    return { cuentas, activa }
+    return { cuentas, activa, quitadas }
   },
 })
 

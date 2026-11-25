@@ -203,13 +203,12 @@ begin
   exception when raise_exception then null;
   end;
   perform public.crear_invitacion('2241000001', 'Pedro', 'peon', '{"hacienda": "no", "campos": "solo_manda", "plata": "no"}');
-  -- Sólo por WhatsApp: se manda, no se ve.
-  begin
-    perform public.crear_invitacion('2241000002', 'Vet', 'vet', '{"hacienda": "ve", "campos": "no", "plata": "no"}', 'whatsapp');
-    assert false, 'por WhatsApp no debería poder «ver»';
-  exception when raise_exception then null;
-  end;
-  perform public.crear_invitacion('2241000002', 'Vet', 'vet', '{"hacienda": "solo_manda", "campos": "no", "plata": "solo_manda"}', 'whatsapp');
+  -- Un solo ingreso (25/11): cómo entra sale de los niveles, no de lo que se pida.
+  -- Con «Mira» usa la app aunque se pida WhatsApp; con sólo «Avisa», WhatsApp.
+  perform public.crear_invitacion('2241000003', 'Vet que mira', 'vet', '{"hacienda": "ve", "campos": "no", "plata": "no"}', 'whatsapp');
+  assert (select acceso from public.invitacion where celular = '5492241000003') = 'app', 'con «Mira» la invitación debería ser para la app';
+  perform public.crear_invitacion('2241000002', 'Vet', 'vet', '{"hacienda": "solo_manda", "campos": "no", "plata": "solo_manda"}', 'app');
+  assert (select acceso from public.invitacion where celular = '5492241000002') = 'whatsapp', 'con sólo «Avisa» la invitación debería ser por WhatsApp';
 end $$;
 reset role;
 

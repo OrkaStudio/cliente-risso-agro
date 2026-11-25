@@ -64,13 +64,18 @@ function useAlto(nombre: string) {
       raiz.style.setProperty(nombre, '0px')
       return
     }
-    const medir = () => raiz.style.setProperty(nombre, `${el.offsetHeight}px`)
+    // La barra de abajo también en la raíz: los avisos (fuera de .campo) se ponen arriba de ella.
+    const medir = () => {
+      raiz.style.setProperty(nombre, `${el.offsetHeight}px`)
+      if (nombre === '--barra') document.documentElement.style.setProperty('--alto-barra', `${el.offsetHeight}px`)
+    }
     medir()
     const ro = new ResizeObserver(medir)
     ro.observe(el)
     return () => {
       ro.disconnect()
       raiz.style.setProperty(nombre, '0px')
+      if (nombre === '--barra') document.documentElement.style.removeProperty('--alto-barra')
     }
   }, [el, nombre])
   return setEl

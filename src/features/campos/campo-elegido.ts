@@ -9,19 +9,24 @@ import { useMapa } from '@/features/mapa/api'
  * Qué campo mira la Oficina: uno, o todos juntos. Se elige sólo desde la barra
  * izquierda y es el primer filtro de todas las pantallas (Lau, 29/10): Inicio,
  * Hacienda, Campos, Plata, Agenda y el clima de arriba. Con un solo campo no hay
- * nada que elegir. Se recuerda en este dispositivo.
+ * nada que elegir. Vale mientras la app está abierta: al recargar o volver a
+ * entrar arranca en «Todos los campos» (Lau, 25/11: elegía uno, recargaba y
+ * seguía en ese, y Campos tiene que abrir mostrando todos).
  */
 const CLAVE = 'inicio-campo-id' // el nombre viejo se conserva: no se pierde lo elegido
 const TODOS = 'todos'
 const oyentes = new Set<() => void>()
 
-// Cada cuenta recuerda su campo (varias cuentas, 14/11); lo elegido antes queda para la primera.
+// Sólo en memoria, uno por cuenta (varias cuentas, 14/11): al recargar, todos.
+const elegidos = new Map<string, string>()
 function leer(): string | null {
-  try {
-    return localStorage.getItem(claveDeCuenta(CLAVE)) ?? localStorage.getItem(CLAVE)
-  } catch {
-    return null
-  }
+  return elegidos.get(claveDeCuenta(CLAVE)) ?? null
+}
+// Lo que quedó guardado de antes en el dispositivo ya no se usa: se borra una vez.
+try {
+  for (const k of Object.keys(localStorage)) if (k.startsWith(CLAVE)) localStorage.removeItem(k)
+} catch {
+  /* sin storage: nada que borrar */
 }
 /** El id elegido tal como está guardado (`'todos'`, un id o nada), para quien no necesita los campos. */
 export function useCampoElegidoId(): string | null {
@@ -35,11 +40,7 @@ export function elegirCampo(id: string | null) {
 }
 
 function guardar(v: string) {
-  try {
-    localStorage.setItem(claveDeCuenta(CLAVE), v)
-  } catch {
-    /* sin storage: queda sólo en esta sesión */
-  }
+  elegidos.set(claveDeCuenta(CLAVE), v)
   oyentes.forEach((f) => f())
 }
 function suscribir(f: () => void) {

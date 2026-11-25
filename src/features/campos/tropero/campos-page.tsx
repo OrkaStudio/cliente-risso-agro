@@ -184,13 +184,20 @@ export function CamposPage() {
   return (
     <div className="mx-auto flex w-full max-w-[1400px] min-[2100px]:max-w-[1720px] flex-col gap-3 lg:h-[calc(100dvh-57px-80px)] lg:-mb-14">
       {/* Arriba: qué campo se está viendo (se elige en la barra izquierda) y sumar otro. */}
-      <div className="flex items-end justify-between gap-3">
+      <div className="relative flex items-end justify-between gap-3">
         <div>
           <CampoVisto campos={identidad.campos} elegido={identidad.campos.find((c) => c.id === campo.id) ?? null} />
           <h1 className="t-pagina mt-1.5 text-texto">Campos</h1>
         </div>
         {/* En la misma fila: lo que falta para abrir la app, sin quitarle alto al mapa. */}
         {aTerminar && mapaQ.data && <ProgresoMapa campos={mapaQ.data} actual={aTerminar} />}
+        {/* Quien no es el dueño y el campo no está dibujado: se dice arriba del mapa, al medio (Lau, 25/11). */}
+        {!quien.dueno && !listo && !editando && (
+          <p className="mx-auto mb-1 hidden items-center gap-2.5 rounded-full bg-superficie px-4 py-2 text-[14px] text-texto shadow-[inset_0_0_0_1px_var(--borde)] md:inline-flex lg:absolute lg:bottom-1 lg:left-1/2 lg:-translate-x-1/2 lg:whitespace-nowrap">
+            <span className="size-2 shrink-0 rounded-full bg-estado-atencion" />
+            El dueño todavía está dibujando este campo. Cuando lo termine, vas a ver cada potrero.
+          </p>
+        )}
         <SumarCampo empresaId={empresaId} clase="inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] border-principal bg-superficie px-4 text-[14.5px] font-bold text-principal hover:bg-principal-suave" onCreado={(id) => (qc.invalidateQueries({ queryKey: ['mapa'] }), elegirCampo(id))} />
       </div>
 
@@ -371,7 +378,8 @@ function ResumenCampo({
           ))}
         </ul>
       )}
-      <p className="text-[14px] text-texto-suave">{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : quien.dueno ? 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.' : 'El dueño todavía está armando este campo en el mapa. Cuando lo termine, vas a ver cada potrero.'}</p>
+      {/* En la compu, lo de «el dueño lo está armando» va arriba del mapa; en el celular queda acá. */}
+      <p className={cn('text-[14px] text-texto-suave', !listo && !quien.dueno && 'md:hidden')}>{listo ? 'Tocá un potrero para ver qué hay adentro y desde cuándo.' : quien.dueno ? 'Cuando estén todos los potreros dibujados, el mapa muestra qué tiene cada uno.' : 'El dueño todavía está armando este campo en el mapa. Cuando lo termine, vas a ver cada potrero.'}</p>
       {/* El nombre, la tenencia y el dibujo del campo son del dueño (permisos, 13/11). */}
       {quien.dueno && (
         <button type="button" onClick={onCorregir} className={cn(BOTON, 'self-start')}>

@@ -170,8 +170,11 @@ export function HoyCelu({ antes }: { antes?: React.ReactNode }) {
                 <b className="cifra text-[20px] font-bold">{t.ahora.temp}°</b>
                 <span className="truncate">{t.ahora.descripcion}</span>
               </span>
-            ) : (
+            ) : lugar || dueno ? (
               <span className="rounded-full bg-superficie/92 px-3 py-2 text-[13.5px] font-semibold text-texto backdrop-blur-md">{lugar ? 'Buscando el clima…' : 'Ubicá tu campo para ver su clima'}</span>
+            ) : (
+              // Ubicar el campo es del dueño: a los demás no se les pide (Lau, 25/11).
+              <span />
             )}
             {manana && manana.lluviaProb >= 40 && (
               <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-sky px-3 py-2 text-[13px] font-bold text-white">

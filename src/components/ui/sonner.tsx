@@ -18,6 +18,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       position="bottom-center"
       offset={28}
+      // En el celular, arriba de la barra de abajo: no tapa las secciones (Lau, 25/11).
+      mobileOffset={{ bottom: "calc(var(--alto-barra, 0px) + 12px)", left: 16, right: 16 }}
       gap={10}
       icons={{
         success: circulo("bg-estado-bien text-superficie", "Guardar"),

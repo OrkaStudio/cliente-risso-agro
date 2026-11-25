@@ -4,6 +4,8 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { PantallaCargando } from '@/components/tropero/cargando'
 import { PantallaAviso } from '@/app/pantalla-aviso'
 import { AccesoPorWhatsapp } from './acceso-por-whatsapp'
+import { AccesoQuitado } from './acceso-quitado'
+import { useAvisarAccesoQuitado } from './acceso-quitado-aviso'
 import { useAuth } from './auth-context'
 import { fijarCuentaDelPedido } from '@/features/empresa/cuenta-activa'
 import { CargasDeOtraCuenta, ElegirCuentaPage } from '@/features/empresa/elegir-cuenta'
@@ -48,11 +50,15 @@ export function RequireEmpresa() {
   // El dueño le cambia el acceso y le llega al instante (Lau, 20/11).
   useAccesoEnVivo(user?.id)
   const membresia = data?.activa ?? null
+  // Lo sacaron de una cuenta pero tiene otras: se le dice una vez (25/11).
+  useAvisarAccesoQuitado(data?.cuentas.length ? data.quitadas : [])
   // Lo guardado en el teléfono para andar sin señal tiene que ser de esta cuenta (varias cuentas, 14/11).
   const caches = useCachesDeLaCuenta(isSuccess ? (membresia?.empresa_id ?? null) : null, data?.cuentas)
 
   // Consulta exitosa: la verdad del servidor manda.
   if (isSuccess) {
+    // Sin cuentas porque lo sacaron: se le dice, en vez de mandarlo a armar un campo (25/11).
+    if (!data.cuentas.length && data.quitadas?.length) return <AccesoQuitado empresa={data.quitadas[0]!} />
     if (!data.cuentas.length) return <Navigate to="/onboarding" replace />
     // Varias cuentas y ninguna elegida en este equipo: se pregunta, nunca se elige sola.
     if (!membresia) return <ElegirCuentaPage />
@@ -60,7 +66,7 @@ export function RequireEmpresa() {
     // no a una app a medio cargar (regla de destino de Acceso).
     if (onboardingPendiente(membresia)) return <Navigate to="/onboarding" replace />
     // Invitado «Sólo por WhatsApp»: lo suyo no está en la app (permisos, 14/11).
-    if (membresia.acceso === 'whatsapp') return <AccesoPorWhatsapp empresa={membresia.empresa?.nombre ?? null} otrasCuentas={data.cuentas.length > 1} />
+    if (membresia.acceso === 'whatsapp') return <AccesoPorWhatsapp empresa={membresia.empresa?.nombre ?? null} niveles={membresia.niveles ?? null} otrasCuentas={data.cuentas.length > 1} />
     if (!caches) return <div className="h-full bg-fondo" aria-busy />
     if (!caches.listo) {
       const duena = data.cuentas.find((c) => c.empresa_id === caches.duena)

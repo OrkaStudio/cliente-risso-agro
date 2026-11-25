@@ -79,7 +79,13 @@ export function MapaCampo({
       return { paddingTopLeft: [40, 120], paddingBottomRight: [derecha + 40, 70] }
     }
     const encuadrar = () => {
-      if (!puntos.length) return
+      // Sin nada dibujado todavía, el satélite de la zona del campo (su localidad) y no un fondo vacío (25/11).
+      if (!puntos.length) {
+        if (campo.lat != null && campo.lon != null) map.setView([campo.lat, campo.lon], 13, { animate: false })
+        // Ni dibujo ni localidad: la provincia de Buenos Aires de lejos, nunca un recuadro vacío.
+        else map.setView([-36.6, -60.2], 6, { animate: false })
+        return
+      }
       map.fitBounds(L.latLngBounds(puntos), relleno())
     }
     const desde = entrando ? vistaGeneral() : null

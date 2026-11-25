@@ -7,7 +7,6 @@
 // demás (lo que ya no ve vuelve vacío y la pantalla lo saca, ver SeccionPermitida),
 // se borra del teléfono la plata guardada si dejó de verla, y se le dice qué cambió.
 import { useEffect } from 'react'
-import { toast } from 'sonner'
 
 import { queryClient } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase/client'
@@ -17,20 +16,30 @@ import type { Membresia } from './use-empresa'
 const ARTICULO: Record<SeccionConPermiso, string> = { hacienda: 'la Hacienda', campos: 'los Campos', plata: 'la Plata y la Agenda' }
 const ve = (n: Nivel) => n === 've' || n === 'carga'
 
-/** Qué cambió, dicho para quien lo recibe. Vacío si no cambió nada que se note. */
-export function queCambio(antes: Membresia, ahora: Membresia): string[] {
-  const frases: string[] = []
+export type Cambio = { seccion: SeccionConPermiso; nivel: Nivel; texto: string }
+
+/** Qué cambió en cada sección, dicho para quien lo recibe. Vacío si no cambió nada que se note. */
+export function cambiosDe(antes: Membresia, ahora: Membresia): Cambio[] {
+  const cambios: Cambio[] = []
   for (const { id } of SECCIONES_CON_PERMISO) {
     const a = nivelDe(antes, id)
     const b = nivelDe(ahora, id)
     if (a === b) continue
-    if (!ve(a) && ve(b)) frases.push(`Ahora ves ${ARTICULO[id]}${b === 'carga' ? ' y podés cargar' : ''}.`)
-    else if (ve(a) && !ve(b)) frases.push(`Ya no ves ${ARTICULO[id]}.`)
-    else if (a === 've' && b === 'carga') frases.push(`Ahora podés cargar en ${ARTICULO[id]}.`)
-    else if (a === 'carga' && b === 've') frases.push(`En ${ARTICULO[id]} ahora sólo mirás.`)
-    else if (b === 'solo_manda') frases.push(`Lo de ${ARTICULO[id]} ahora lo mandás por WhatsApp.`)
+    const texto =
+      !ve(a) && ve(b) ? `Ahora ves ${ARTICULO[id]}${b === 'carga' ? ' y podés cargar' : ''}.`
+      : ve(a) && !ve(b) ? `Ya no ves ${ARTICULO[id]}.`
+      : a === 've' && b === 'carga' ? `Ahora podés cargar en ${ARTICULO[id]}.`
+      : a === 'carga' && b === 've' ? `En ${ARTICULO[id]} ahora sólo mirás.`
+      : b === 'solo_manda' ? `Lo de ${ARTICULO[id]} ahora lo mandás por WhatsApp.`
+      : null
+    if (texto) cambios.push({ seccion: id, nivel: b, texto })
   }
-  return frases
+  return cambios
+}
+
+/** Lo mismo, en frases. */
+export function queCambio(antes: Membresia, ahora: Membresia): string[] {
+  return cambiosDe(antes, ahora).map((c) => c.texto)
 }
 
 /** ¿La misma cuenta con otros niveles? (Una cuenta distinta es otro camino: cambiar de cuenta.) */
@@ -46,8 +55,13 @@ export function aplicarCambioDeAcceso(antes: Membresia, ahora: Membresia) {
   if (ve(nivelDe(antes, 'plata')) && !ve(nivelDe(ahora, 'plata'))) {
     void import('@/features/campo/plata/db').then(({ platadb }) => platadb.refs.clear()).catch(() => {})
   }
-  const frases = queCambio(antes, ahora)
-  if (frases.length) toast.info('Cambió lo que podés ver', { description: `${frases.join(' ')} Te lo cambió el dueño.`, duration: 8000 })
+  // Si con esto pasa a ir sólo por WhatsApp, lo dice su pantalla: no se repite en un aviso (Lau, 25/11).
+  if (ahora.acceso === 'whatsapp' && antes.acceso !== 'whatsapp') {
+    void import('./aviso-de-acceso').then(({ cerrarAvisoDeAcceso }) => cerrarAvisoDeAcceso())
+    return
+  }
+  const cambios = cambiosDe(antes, ahora)
+  if (cambios.length) void import('./aviso-de-acceso').then(({ avisarCambioDeAcceso }) => avisarCambioDeAcceso(cambios, antes.acceso === 'whatsapp' && ahora.acceso !== 'whatsapp'))
 }
 
 /**

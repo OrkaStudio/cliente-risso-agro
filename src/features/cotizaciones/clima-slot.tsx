@@ -12,6 +12,7 @@ import { useCamposConPotreros } from '@/features/campos/hooks'
 import type { CampoConPotreros } from '@/features/campos/api'
 import { useActualizarCampo } from '@/features/campos/hooks'
 import { useCampoElegidoId } from '@/features/campos/campo-elegido'
+import { useQuienMira } from '@/features/empresa/use-quien-mira'
 import { LocalidadCampo } from '@/features/onboarding/tropero/localidad-campo'
 import type { Localidad } from '@/lib/geocoding'
 import { ICONO_PILDORA, PILDORA } from './pildora'
@@ -40,10 +41,13 @@ function Pildora({ onUbicar }: { onUbicar: () => void }) {
   const navigate = useNavigate()
   const campos = useCamposConPotreros()
   const elegidoId = useCampoElegidoId()
+  const quien = useQuienMira()
   // El campo elegido en la barra sin ubicar: se pide ubicar ése, no se muestra el clima de otro.
   const elegidoSinUbicar = (campos.data ?? []).find((c) => c.id === elegidoId && (c.ubicacion.lat == null || c.ubicacion.lon == null))
 
   if (cargando) return null
+  // Ubicar un campo es del dueño: a los demás no se les ofrece algo que no pueden hacer (Lau, 25/11).
+  if ((!actual || elegidoSinUbicar) && !quien.dueno) return null
   if (!actual || elegidoSinUbicar) {
     return (
       <>

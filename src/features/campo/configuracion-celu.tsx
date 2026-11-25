@@ -27,6 +27,8 @@ import { instalar, useComoInstalar } from '@/lib/instalar'
 import { nombrePropio } from '@/lib/texto'
 import { cn } from '@/lib/utils'
 import { AgregarIphone } from './agregar-iphone'
+import { whatsappCambioDeNumero } from '@/features/acceso/cambio-de-numero'
+import { LogoWhatsapp } from '@/components/tropero/audio-whatsapp'
 
 export const VIDRIO =
   'bg-[rgb(255_253_249/.8)] backdrop-blur-[18px] backdrop-saturate-150 shadow-[inset_0_0_0_1.5px_rgb(255_255_255/.9),0_0_0_1px_rgb(58_26_13/.09),0_14px_34px_-16px_rgb(168_80_16/.55)]'
@@ -180,15 +182,15 @@ function EditarNombre({ abierto, onCerrar, actual }: { abierto: boolean; onCerra
 
 /** Tu cuenta, en el celular: tenerlo como app, quién sos, tus datos y salir. */
 function TuCuentaCelu() {
-  const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const { data: membresia } = useEmpresa()
   const varias = (useCuentas().data?.cuentas.length ?? 0) > 1
   const nombre = nombreDe(user?.user_metadata) ?? ''
   const empresa = membresia?.empresa?.nombre ?? ''
   const celular = user?.phone ? celularLindo(user.phone) : null
-  const [panel, setPanel] = useState<'nombre' | 'cuentas' | null>(null)
+  const [panel, setPanel] = useState<'nombre' | 'cuentas' | 'numero' | null>(null)
   const [salir, setSalir] = useState(false)
+  const cambioDeNumero = whatsappCambioDeNumero({ nombre: nombre || null, empresa: empresa || null, actual: celular })
   const soporte = linkWhatsapp({ nombre: nombre || null, empresa: empresa || null, seccion: 'Configuración', consulta: '' })
 
   return (
@@ -209,7 +211,7 @@ function TuCuentaCelu() {
             </span>
           </div>
           <Fila icono="Usuario" titulo="Tu nombre" valor={nombre || 'Ponelo'} onClick={() => setPanel('nombre')} />
-          <Fila icono="Celular" titulo="Tu número" valor={celular} onClick={() => navigate('/mi-cuenta/numero')} />
+          <Fila icono="Celular" titulo="Tu número" valor={celular} onClick={() => setPanel('numero')} />
           {varias && <Fila icono="Campos" titulo="Cambiar de cuenta" valor={empresa} onClick={() => setPanel('cuentas')} />}
         </div>
         <p className="mt-2 px-1 text-[12.5px] leading-snug text-texto-suave">Entrás con tu número y un código por WhatsApp. Sin contraseña.</p>
@@ -229,6 +231,28 @@ function TuCuentaCelu() {
         <Fila icono="Salir" tono="aviso" titulo={salir ? 'Tocá de nuevo para salir' : 'Salir en este celular'} onClick={() => (salir ? void signOut() : setSalir(true))} />
       </div>
 
+      {/* Tu número: lo cambia el equipo (Lau, 25/11). Se dice por qué y se escribe con un toque. */}
+      <PanelLateral
+        chico
+        abierto={panel === 'numero'}
+        onCerrar={() => setPanel(null)}
+        titulo="¿Cambiaste de número?"
+        bajada="Escribinos y lo cambiamos."
+        pie={
+          cambioDeNumero ? (
+            <a href={cambioDeNumero} target="_blank" rel="noreferrer" onClick={() => setPanel(null)} className="inline-flex h-14 w-full items-center justify-between rounded-full bg-principal py-2 pr-2 pl-[26px] text-[16.5px] font-bold text-principal-texto">
+              Escribinos por WhatsApp
+              <span className="grid size-12 place-items-center rounded-full bg-[#dcf8c6] text-[#1fae55]">
+                <LogoWhatsapp className="size-5" />
+              </span>
+            </a>
+          ) : null
+        }
+      >
+        <p className="text-[14px] text-texto-suave">
+          Hoy entrás con el <b className="whitespace-nowrap text-texto">{celular}</b>.
+        </p>
+      </PanelLateral>
       <EditarNombre key={String(panel === 'nombre')} abierto={panel === 'nombre'} onCerrar={() => setPanel(null)} actual={nombre} />
       <PanelLateral chico abierto={panel === 'cuentas'} onCerrar={() => setPanel(null)} titulo="Tus cuentas" bajada="Elegí con cuál trabajar en este celular.">
         <ListaCambiarCuenta onElegido={() => setPanel(null)} />
