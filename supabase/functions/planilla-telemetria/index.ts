@@ -147,32 +147,49 @@ const FUGAS_SQL = `
          'Proponerles la primera recorrida o cargar una factura'
 `
 
-/** 0 · La landing: últimos 7 y 30 días, de dónde vienen y las visitas por día. */
+/** 0 · La landing. Todo en hora argentina; «whatsapp» incluye a los que eligieron horario. */
+const HOY_AR = `(now() at time zone 'America/Argentina/Buenos_Aires')::date`
 const LANDING_SQL = `
+  with e as (
+    select (ts at time zone 'America/Argentina/Buenos_Aires')::date as dia, * from interno.landing_evento
+    where ts > now() - interval '31 days'
+  )
   select
-    coalesce(sum(visitas) filter (where dia > hoy - 7), 0) as v7,
-    coalesce(sum(whatsapp) filter (where dia > hoy - 7), 0) as w7,
-    coalesce(sum(horario) filter (where dia > hoy - 7), 0) as h7,
-    coalesce(sum(visitas), 0) as v30,
-    coalesce(sum(whatsapp), 0) as w30,
-    coalesce(sum(horario), 0) as h30
-  from interno.v_landing_dia, (select (now() at time zone 'America/Argentina/Buenos_Aires')::date as hoy) h
-  where dia > hoy - 30
+    count(*) filter (where tipo = 'visita' and dia > ${HOY_AR} - 7) as v7,
+    count(*) filter (where tipo <> 'visita' and dia > ${HOY_AR} - 7) as w7,
+    count(*) filter (where tipo = 'horario' and dia > ${HOY_AR} - 7) as h7,
+    count(*) filter (where tipo = 'visita' and dia > ${HOY_AR} - 7 and dispositivo = 'movil') as m7,
+    count(*) filter (where tipo = 'visita' and dia between ${HOY_AR} - 13 and ${HOY_AR} - 7) as v7a,
+    count(*) filter (where tipo <> 'visita' and dia between ${HOY_AR} - 13 and ${HOY_AR} - 7) as w7a,
+    count(*) filter (where tipo = 'visita' and dia > ${HOY_AR} - 30) as v30,
+    count(*) filter (where tipo <> 'visita' and dia > ${HOY_AR} - 30) as w30,
+    count(*) filter (where tipo = 'horario' and dia > ${HOY_AR} - 30) as h30,
+    count(*) filter (where tipo = 'visita' and dia > ${HOY_AR} - 30 and dispositivo = 'movil') as m30
+  from e
 `
 const LANDING_ORIGENES_SQL = `
   select coalesce(origen, 'directo') as origen,
          count(*) filter (where tipo = 'visita') as visitas,
-         count(*) filter (where tipo in ('whatsapp', 'horario')) as whatsapp
+         count(*) filter (where tipo <> 'visita') as whatsapp,
+         count(*) filter (where tipo = 'horario') as horario
   from interno.landing_evento
   where ts > now() - interval '30 days'
-  group by 1 order by 2 desc, 3 desc limit 5
+  group by 1 order by 2 desc, 3 desc limit 6
+`
+const LANDING_DONDE_SQL = `
+  select case when tipo = 'horario' then 'horario' else coalesce(donde, 'otro') end as donde, count(*) as n
+  from interno.landing_evento
+  where tipo <> 'visita' and ts > now() - interval '30 days'
+  group by 1 order by 2 desc
 `
 const LANDING_DIAS_SQL = `
-  select d::date as dia, coalesce(l.visitas, 0) as visitas
-  from generate_series((now() at time zone 'America/Argentina/Buenos_Aires')::date - 29,
-                       (now() at time zone 'America/Argentina/Buenos_Aires')::date, interval '1 day') d
-  left join interno.v_landing_dia l on l.dia = d::date
-  order by 1
+  select d::date as dia,
+         count(e.*) filter (where e.tipo = 'visita') as visitas,
+         count(e.*) filter (where e.tipo <> 'visita') as whatsapp,
+         count(e.*) filter (where e.tipo = 'horario') as horario
+  from generate_series(${HOY_AR} - 29, ${HOY_AR}, interval '1 day') d
+  left join interno.landing_evento e on (e.ts at time zone 'America/Argentina/Buenos_Aires')::date = d::date
+  group by 1 order by 1
 `
 
 /** Esta semana contra la anterior: mediana de cuánto tardan. */
@@ -301,12 +318,22 @@ Deno.serve(async (req) => {
 
     // 0 · ¿La landing trae gente?
     const [l] = await sql.unsafe(LANDING_SQL)
-    const tramo = (v: number, w: number, h: number) => ({ visitas: v, whatsapp: w, horario: h, pctWhatsapp: pct(w, v), pctHorario: pct(h, w) })
+    const tramo = (v: number, w: number, h: number, m: number) => ({
+      visitas: v, whatsapp: w, horario: h, pctWhatsapp: pct(w, v), pctHorario: pct(h, w), pctCelular: pct(m, v),
+    })
+    const DONDE: Record<string, string> = {
+      barra: 'Botón de arriba (barra)', portada: 'Portada', preguntas: 'Preguntas', cierre: 'Cierre', pie: 'Pie', horario: 'Eligió un horario', otro: 'Otro',
+    }
     const landing = {
-      d7: tramo(n(l.v7), n(l.w7), n(l.h7)),
-      d30: tramo(n(l.v30), n(l.w30), n(l.h30)),
-      origenes: (await sql.unsafe(LANDING_ORIGENES_SQL)).map((o) => ({ origen: String(o.origen), visitas: n(o.visitas), whatsapp: n(o.whatsapp) })),
-      dias: (await sql.unsafe(LANDING_DIAS_SQL)).map((d) => n(d.visitas)),
+      d7: { ...tramo(n(l.v7), n(l.w7), n(l.h7), n(l.m7)), antes: { visitas: n(l.v7a), whatsapp: n(l.w7a) } },
+      d30: tramo(n(l.v30), n(l.w30), n(l.h30), n(l.m30)),
+      origenes: (await sql.unsafe(LANDING_ORIGENES_SQL)).map((o) => ({
+        origen: String(o.origen), visitas: n(o.visitas), whatsapp: n(o.whatsapp), horario: n(o.horario), pct: pct(n(o.whatsapp), n(o.visitas)),
+      })),
+      donde: (await sql.unsafe(LANDING_DONDE_SQL)).map((d) => ({ donde: DONDE[String(d.donde)] ?? String(d.donde), n: n(d.n) })),
+      dias: (await sql.unsafe(LANDING_DIAS_SQL)).map((d) => ({
+        dia: (d.dia as Date).toISOString().slice(0, 10), visitas: n(d.visitas), whatsapp: n(d.whatsapp), horario: n(d.horario),
+      })),
     }
 
     // 1 · El camino, etapa por etapa, contra su meta.

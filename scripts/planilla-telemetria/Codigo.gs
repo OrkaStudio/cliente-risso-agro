@@ -204,7 +204,7 @@ function dibujarTablero(h, hojaProductores, datos) {
   var t = datos.tablero
   var filas = 12 + t.camino.length + 4 + Math.max(t.fugas.length, 1) + 4 + Math.max(t.ayudar.length, 1) +
     6 + t.comparaciones.length + Math.max(t.cohortes.length, 1) + 2 + 6 + 4 +
-    (t.landing ? 13 + Math.max(t.landing.origenes.length, 1) : 0)
+    (t.landing ? 30 + Math.max(t.landing.origenes.length, 1) + Math.max(t.landing.donde.length, 1) : 0)
   limpiar(h, filas, 8)
   h.setTabColor(VERDE)
   h.setColumnWidth(1, 28)
@@ -356,43 +356,100 @@ function dibujarTablero(h, hojaProductores, datos) {
 
 function dibujarLanding(h, f, l) {
   f = seccion(h, f, '0 · ¿La landing trae gente?',
-    'Visitas a troppero.com, cuántas tocaron «Probalo por WhatsApp» y cuántas eligieron un horario para la videollamada. ' +
-    'Anónimo y sin cookies. Para saber qué canal funciona, compartí el link con ?utm_source=instagram (o el canal que sea).')
-  encabezado(h, f, ['', 'Visitas', 'Tocaron WhatsApp', 'Eligieron horario', '', ''], 2)
+    'Visitas a troppero.com, cuántas tocaron «Probalo por WhatsApp» (contando las que eligieron horario) y cuántas eligieron ' +
+    'un horario para la videollamada. Anónimo y sin cookies. Para saber qué canal funciona, compartí el link con ' +
+    '?utm_source=instagram (o el canal que sea).')
+  var pc = function (x) { return x === null || x === undefined ? '—' : x + ' %' }
+  var conPct = function (n, p) { return p === null || p === undefined ? String(n) : n + '  (' + p + ' %)' }
+  var cambio = function (ahora, antes) {
+    if (!antes && !ahora) return '—'
+    if (!antes) return '▲ nuevo'
+    var d = Math.round((100 * (ahora - antes)) / antes)
+    return (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + d + ' % (' + antes + ')'
+  }
+
+  // El resumen.
+  encabezado(h, f, ['', 'Visitas', 'Tocaron WhatsApp', 'Eligieron horario', 'Desde el celular', 'Visitas vs. 7 días antes'], 2)
   f++
-  var pc = function (x) { return x === null ? '' : '  (' + x + ' %)' }
-  ;[['Últimos 7 días', l.d7], ['Últimos 30 días', l.d30]].forEach(function (x) {
+  var filasRes = [
+    ['Últimos 7 días', l.d7, cambio(l.d7.visitas, l.d7.antes.visitas)],
+    ['Últimos 30 días', l.d30, ''],
+  ]
+  filasRes.forEach(function (x) {
     var d = x[1]
-    h.getRange(f, 2, 1, 4).setValues([[x[0], d.visitas, d.whatsapp + pc(d.pctWhatsapp), d.horario + pc(d.pctHorario)]])
+    h.getRange(f, 2, 1, 6).setValues([[x[0], d.visitas, conPct(d.whatsapp, d.pctWhatsapp), conPct(d.horario, d.pctHorario),
+      pc(d.pctCelular), x[2]]])
     h.getRange(f, 2).setFontWeight('bold')
-    h.getRange(f, 3, 1, 3).setHorizontalAlignment('center')
+    h.getRange(f, 3).setFontWeight('bold').setFontSize(12)
+    h.getRange(f, 3, 1, 5).setHorizontalAlignment('center')
+    if (x[2] && x[2].charAt(0) === '▲') h.getRange(f, 7).setFontColor(ESTADOS.bien.tinta)
+    if (x[2] && x[2].charAt(0) === '▼') h.getRange(f, 7).setFontColor(ESTADOS.mal.tinta)
     linea(h, f)
     f++
   })
-  f++
-  encabezado(h, f, ['De dónde vienen (30 días)', 'Visitas', 'Tocaron WhatsApp', '', '', ''], 2)
+  h.getRange(f, 2, 1, 6).merge()
+    .setValue('El % de WhatsApp es sobre las visitas; el de horario, sobre los que tocaron WhatsApp.')
+    .setFontColor(GRIS).setFontSize(9)
+  f += 2
+
+  // De dónde vienen.
+  encabezado(h, f, ['De dónde vienen (30 días)', 'Visitas', 'Tocaron WhatsApp', '% que escribe', 'Eligieron horario', ''], 2)
   f++
   if (l.origenes.length === 0) {
     h.getRange(f, 2, 1, 6).merge().setValue('Todavía no llegó ninguna visita.').setFontColor(GRIS).setFontStyle('italic')
     f++
   }
   l.origenes.forEach(function (o) {
-    h.getRange(f, 2, 1, 3).setValues([[o.origen, o.visitas, o.whatsapp]])
-    h.getRange(f, 3, 1, 2).setHorizontalAlignment('center')
+    h.getRange(f, 2, 1, 5).setValues([[o.origen, o.visitas, o.whatsapp, pc(o.pct), o.horario]])
+    h.getRange(f, 2).setFontWeight('bold')
+    h.getRange(f, 3, 1, 4).setHorizontalAlignment('center')
     linea(h, f)
     f++
   })
-  var pico = l.dias.length ? Math.max.apply(null, l.dias) : 0
-  if (pico > 0) {
-    h.getRange(f, 2, 1, 6).merge().setValue(chispa(l.dias)).setFontColor(VERDE).setFontSize(18)
-    h.setRowHeight(f, 34)
-    f++
-    h.getRange(f, 2, 1, 6).merge()
-      .setValue('Visitas por día, últimos 30 días · hoy ' + l.dias[l.dias.length - 1] + ' · el día con más: ' + pico)
-      .setFontColor(GRIS).setFontSize(9)
+  f++
+
+  // Dónde tocaron.
+  encabezado(h, f, ['Dónde tocaron WhatsApp (30 días)', 'Toques', '', '', '', ''], 2)
+  f++
+  var maxDonde = l.donde.length ? Math.max.apply(null, l.donde.map(function (d) { return d.n })) : 0
+  if (l.donde.length === 0) {
+    h.getRange(f, 2, 1, 6).merge().setValue('Todavía nadie tocó WhatsApp.').setFontColor(GRIS).setFontStyle('italic')
     f++
   }
-  return f + 1
+  l.donde.forEach(function (d) {
+    h.getRange(f, 2, 1, 2).setValues([[d.donde, d.n]])
+    h.getRange(f, 3).setHorizontalAlignment('center')
+    h.getRange(f, 4, 1, 3).merge().setValue(barra(d.n, maxDonde, 26)).setFontColor(VERDE)
+    linea(h, f)
+    f++
+  })
+  f++
+
+  // Día por día: los últimos 14, del más nuevo al más viejo.
+  encabezado(h, f, ['Día por día (14 días)', 'Visitas', '', 'Tocaron WhatsApp', 'Eligieron horario', ''], 2)
+  h.getRange(f, 3, 1, 2).merge()
+  f++
+  var ultimos = l.dias.slice(-14).reverse()
+  var maxDia = Math.max.apply(null, ultimos.map(function (d) { return d.visitas }).concat([0]))
+  var nombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  ultimos.forEach(function (d, i) {
+    var p = d.dia.split('-'), fecha = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
+    var etiqueta = (i === 0 ? 'Hoy · ' : '') + nombres[fecha.getDay()] + ' ' + p[2] + '/' + p[1]
+    h.getRange(f, 2).setValue(etiqueta).setFontWeight(i === 0 ? 'bold' : 'normal')
+    h.getRange(f, 3, 1, 2).merge().setValue((d.visitas ? d.visitas + '  ' : '0  ') + barra(d.visitas, maxDia, 18))
+      .setFontColor(d.visitas ? VERDE : GRIS)
+    h.getRange(f, 5, 1, 2).setValues([[d.whatsapp || '', d.horario || '']]).setHorizontalAlignment('center')
+    if (!d.visitas && !d.whatsapp) h.getRange(f, 2, 1, 6).setFontColor(GRIS)
+    linea(h, f)
+    f++
+  })
+  var total30 = l.dias.reduce(function (a, d) { return a + d.visitas }, 0)
+  var pico = l.dias.reduce(function (a, d) { return d.visitas > a.visitas ? d : a }, { visitas: 0, dia: '' })
+  h.getRange(f, 2, 1, 6).merge()
+    .setValue('Últimos 30 días: ' + total30 + ' visitas' + (pico.visitas ? ' · el día con más: ' +
+      pico.dia.split('-').reverse().slice(0, 2).join('/') + ' (' + pico.visitas + ')' : ''))
+    .setFontColor(GRIS).setFontSize(9)
+  return f + 2
 }
 
 // ── Productores ────────────────────────────────────────────────────────────
