@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Imagen para compartir app.troppero.com (WhatsApp, redes): 1200×630. No se publica.
+     Mismo estilo que la de la landing (troppero-web/scripts/og.html), sin la oferta:
+     el link de la app lo reciben quienes ya tienen campo o a quienes invitaron.
+     Para regenerarla: node scripts/og/og.mjs -->
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: "Geist"; src: url(Geist-Variable.woff2) format("woff2"); font-weight: 100 900; }
+:root { --tinta: #33261a; --rojo: #c8401a; --gris: #6b5d50; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1200px; height: 630px; overflow: hidden; }
+body { position: relative; font-family: "Geist", system-ui, sans-serif; color: var(--tinta); -webkit-font-smoothing: antialiased;
+  background: radial-gradient(48% 70% at 96% 0, #ff9d57 0, transparent 72%), radial-gradient(46% 70% at 0 100%, #9fd39b 0, transparent 72%), radial-gradient(44% 60% at 62% 112%, #ffd25e 0, transparent 74%), radial-gradient(36% 46% at 28% 0, #ffe3b8 0, transparent 75%), #fff1da; }
+.texto { position: absolute; left: 72px; top: 40px; bottom: 0; width: 540px; display: flex; flex-direction: column; justify-content: center; }
+.logo { position: absolute; left: 72px; top: 56px; width: 190px; }
+.entrada { display: inline-flex; align-self: flex-start; align-items: center; gap: 10px; margin-bottom: 28px; padding: 10px 18px 10px 12px; border-radius: 999px; background: rgb(255 255 255 / .75); box-shadow: 0 0 0 1px rgb(51 38 26 / .08), 0 10px 22px -14px rgb(80 40 10 / .55); font-size: 21px; font-weight: 650; }
+.entrada i { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #25d366; }
+.entrada svg { width: 20px; height: 20px; fill: #fff; }
+h1 { font-size: 72px; line-height: 1.02; font-weight: 700; letter-spacing: -.045em; }
+.trazo { position: relative; white-space: nowrap; }
+.trazo svg { position: absolute; left: -2%; bottom: -10px; width: 104%; height: 16px; overflow: visible; }
+.trazo path { fill: none; stroke: var(--rojo); stroke-width: 5; stroke-linecap: round; }
+.bajada { margin-top: 28px; font-size: 25px; line-height: 1.35; color: var(--gris); }
+.bajada b { color: var(--tinta); font-weight: 650; }
+.escena { position: absolute; right: 56px; top: 50%; width: 500px; transform: translateY(-50%) rotate(1.5deg); padding: 16px; border-radius: 30px; background: rgb(255 255 255 / .6); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / .9), 0 40px 80px -30px rgb(168 80 16 / .6); }
+.escena img { display: block; width: 100%; border-radius: 16px; }
+.msj { position: absolute; right: -22px; bottom: -40px; width: 300px; padding: 12px 14px; border-radius: 14px; background: #dcf8c6; box-shadow: 0 14px 28px -14px rgb(40 60 20 / .5); font-size: 16px; line-height: 1.35; transform: rotate(-1.5deg); }
+.msj b { display: block; margin-bottom: 3px; font-size: 14px; color: #b85c2e; }
+</style>
+</head>
+<body>
+  <img class="logo" src="troppero-logo.svg" alt="">
+  <div class="texto">
+    <div class="entrada"><i><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.8-1.1-4.6-4-4.8-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2.1 1-2.4c.3-.3.6-.3.8-.3h.6c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.3.5-.4.4c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.7-.1l1-1.2c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.3.1.2.1.8-.1 1.4Z"/></svg></i>Entrás con un código por WhatsApp</div>
+    <h1>Tu campo, <span class="trazo">donde estés<svg viewBox="0 0 200 14" preserveAspectRatio="none"><path d="M3 9.5C40 4 92 3.2 130 5.2c24 1.3 44 3.1 67 1.6"/></svg></span>.</h1>
+    <p class="bajada">La hacienda, los potreros y la plata, con <b>lo que tu gente manda por WhatsApp</b>.</p>
+  </div>
+  <div class="escena"><img src="og-mapa.png" alt=""><div class="msj"><b>Encargado</b>Se rompió el bebedero del 7B. Pasé las vacas al 8B.</div></div>
+</body>
+</html>
