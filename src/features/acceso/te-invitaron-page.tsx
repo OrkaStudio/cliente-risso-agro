@@ -110,10 +110,11 @@ export function TeInvitaronPage() {
 
   return (
     <AccesoLayout
-      tituloCompu={`${inv.invita} te sumó a ${inv.empresa}.`}
-      tituloCelu={`${inv.invita} te sumó a ${inv.empresa}.`}
+      tituloCompu="Te esperan en el campo."
+      tituloCelu="Te esperan en el campo."
       encabezado={{
-        titulo: 'Te invitaron',
+        // Lo personal va en el título del formulario: se ve también en el celular (27/11).
+        titulo: `${inv.invita} te sumó a ${inv.empresa}.`,
         bajada: `Te llega un código al ${formatearCelularAR(inv.celular)} para entrar.`,
       }}
     >

@@ -13,11 +13,11 @@ export function FondoAcceso() {
   const outlet = useOutlet()
   return (
     <DentroDelFondo.Provider value>
-      <div className="relative isolate flex h-full flex-col bg-terracota-800">
+      <div className="relative isolate flex h-full flex-col">
         <FotoDeFondo />
         {/* El sello acompaña todo el recorrido y manda sobre el título (Lau 13/11): en el celular es el
             encabezado y el contenido se desliza debajo de él; en la compu, arriba a la izquierda. */}
-        <header className="relative z-20 shrink-0 px-6 pt-[max(20px,calc(env(safe-area-inset-top)+12px))] pb-3 md:pointer-events-none md:absolute md:top-12 md:left-14 md:p-0">
+        <header className="relative z-20 shrink-0 px-[22px] pt-[max(20px,calc(env(safe-area-inset-top)+12px))] pb-3 md:pointer-events-none md:absolute md:top-12 md:left-[clamp(40px,6vw,96px)] md:p-0">
           <Sello />
         </header>
         <AnimatePresence mode="wait" initial={false}>

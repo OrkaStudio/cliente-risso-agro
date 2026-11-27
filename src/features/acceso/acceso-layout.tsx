@@ -1,8 +1,6 @@
 import { useContext, useEffect, useRef } from 'react'
+import { ConTrazo, EscenaAcceso, FranjaMapa } from './escena-acceso'
 import { Logo } from '@/components/tropero/logo'
-import { cn } from '@/lib/utils'
-// Foto aérea del Figma (nodo 217:40587): caminos de tierra, la aguada y la hacienda.
-import fotoCampo from '@/assets/tropero/campo-aereo.webp'
 import { DentroDelFondo } from './fondo-contexto'
 
 // Marco de las pantallas de Acceso (página 35, sección Acceso).
@@ -13,7 +11,7 @@ import { DentroDelFondo } from './fondo-contexto'
 // tarjeta crema sobre la foto (abajo en el celular, a la derecha en la compu).
 // No hay corte entre foto y formulario que resolver.
 
-const FOTOS = { campo: fotoCampo } as const
+const FOTOS = { campo: 'campo' } as const
 
 export function AccesoLayout({
   foto = 'campo',
@@ -34,10 +32,8 @@ export function AccesoLayout({
   pie?: React.ReactNode
   children: React.ReactNode
 }) {
-  const src = FOTOS[foto]
+  void FOTOS[foto]
   const enFondo = useContext(DentroDelFondo)
-  // Si el título del celular es la misma frase de la foto, en la hoja va el del formulario.
-  const tituloHoja = tituloCelu !== tituloCompu ? tituloCelu : encabezado?.titulo
   const raiz = useRef<HTMLDivElement>(null)
   // Con el teclado abierto, el botón principal queda a la vista (QA 10/11, A2).
   useEffect(() => {
@@ -60,67 +56,47 @@ export function AccesoLayout({
     }
   }, [])
   return (
-    <div ref={raiz} className={cn('sin-barra relative isolate flex h-full flex-col overflow-y-auto md:flex-row md:overflow-hidden', !enFondo && 'bg-terracota-800')}>
-      {/* Fuera de <FondoAcceso> (cambiar el número, ya adentro) la pantalla pone su propia foto. */}
-      {!enFondo && <FotoDeFondo src={src} />}
-
-      {/* Arriba el sello de la marca, solo. La frase va lejos de él (Lau 13/11: pegados competían):
-          en el celular, justo sobre la tarjeta; en la compu, abajo a la izquierda. */}
-      <div className={cn('flex shrink-0 flex-col items-start px-6 md:flex-1 md:justify-between md:px-14 md:pt-12 md:pb-16', !enFondo && 'pt-[max(24px,calc(env(safe-area-inset-top)+16px))]')}>
-        {/* Dentro del fondo el sello real es el de <FondoAcceso>, que no se mueve al navegar: acá sólo guarda su lugar (en la compu). */}
-        {enFondo ? <span aria-hidden className="invisible hidden md:inline-flex"><Sello /></span> : <Sello />}
-        {/* En dos renglones anchos, no tres apretados (Lau 13/11). */}
-        <h1 className="titulo-display hidden max-w-[min(820px,100%)] text-[clamp(48px,4.4vw,64px)] leading-[1] tracking-[-0.035em] text-pretty text-superficie md:block">{tituloCompu}</h1>
-      </div>
-
-      {/* El formulario: una tarjeta sobre la foto; abajo en el celular, un panel a la derecha en la compu. */}
-      <div className="mt-auto flex w-full flex-col px-3 pt-10 pb-[max(12px,env(safe-area-inset-bottom))] md:mt-0 md:w-[min(560px,46%)] md:flex-none md:justify-center md:py-6 md:pr-6 md:pl-0 bajo:py-4">
-        <h1 className="titulo-display mx-auto mb-5 w-full max-w-[444px] px-3 text-[clamp(32px,9.5vw,44px)] leading-[0.98] tracking-[-0.03em] text-superficie md:hidden">{tituloCompu}</h1>
-        {/* La tarjeta tiene el alto de lo que lleva: nunca vacía ni apretada. */}
-        <main className="relative mx-auto w-full max-w-[444px] rounded-[28px] bg-fondo px-5 pt-6 pb-5 shadow-[0_20px_50px_rgba(19,27,22,0.35)] sin-barra md:flex md:max-h-full md:max-w-none md:flex-col md:overflow-y-auto md:rounded-[32px] md:px-10 md:py-8 bajo:py-5">
-          <div className="mx-auto flex w-full max-w-[420px] flex-col gap-[18px] md:my-auto bajo:gap-3">
-            {/* En el celular, el título y la bajada arriba del formulario (B1, M2). */}
-            {(tituloHoja || encabezado?.bajada) && (
-              <div className="flex flex-col gap-1 md:hidden">
-                {tituloHoja && <h2 className="t-seccion text-texto">{tituloHoja}</h2>}
-                {encabezado?.bajada && <p className="text-[15px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>}
-              </div>
-            )}
-            {encabezado && (
-              <div className="hidden flex-col gap-1.5 md:flex">
-                <h2 className="t-pagina text-texto bajo:!text-[34px]">
-                  {encabezado.titulo}
-                </h2>
-                {encabezado.bajada && (
-                  <p className="text-[16px] leading-[1.4] text-texto-suave">{encabezado.bajada}</p>
-                )}
-              </div>
-            )}
-            {children}
-          {pie && <div className="hidden md:block">{pie}</div>}
-          </div>
-        </main>
-        {pie && <div className="mx-auto mt-3 w-full max-w-[444px] md:hidden">{pie}</div>}
-      </div>
+    <div ref={raiz} className="sin-barra relative isolate flex h-full flex-col overflow-y-auto md:w-[54%] md:overflow-y-auto">
+      {/* Fuera de <FondoAcceso> la pantalla pone su propia escena. */}
+      {!enFondo && <EscenaAcceso />}
+      {/* En la compu, la frase de cada pantalla va sobre el mapa, a la derecha (Lau, 26/11). */}
+      <p className="titulo-display pointer-events-none fixed top-[52px] left-[calc(54%+40px)] z-0 hidden max-w-[min(440px,calc(46%-80px))] text-[clamp(28px,2.4vw,36px)] leading-[1.02] tracking-[-0.035em] text-superficie md:block">
+        <ConTrazo texto={tituloCompu} claro />
+      </p>
+      {/* El formulario, directo sobre la aurora: sin tarjeta, como la landing. */}
+      <main className="flex w-full flex-1 flex-col px-[22px] pt-3 pb-[max(20px,env(safe-area-inset-bottom))] md:px-[clamp(40px,6vw,96px)] md:pt-28 md:pb-10">
+        <div className="mx-auto flex w-full max-w-[400px] flex-col gap-[16px] md:my-auto md:mx-0 bajo:gap-3">
+          <FranjaMapa />
+          {encabezado ? (
+            <div className="flex flex-col gap-2">
+              <h1 className="titulo-display text-[clamp(36px,9.5vw,52px)] leading-[1] tracking-[-0.035em] text-balance text-texto md:text-[clamp(32px,2.6vw,40px)]">
+                <ConTrazo texto={encabezado.titulo} />
+              </h1>
+              {encabezado.bajada && <p className="mt-1.5 text-[16px] leading-[1.4] text-texto-suave md:text-[17px]">{encabezado.bajada}</p>}
+            </div>
+          ) : (
+            <h1 className="titulo-display text-[clamp(36px,9.5vw,52px)] leading-[1] tracking-[-0.035em] text-texto">
+              <ConTrazo texto={tituloCelu} />
+            </h1>
+          )}
+          {children}
+          {pie}
+        </div>
+      </main>
     </div>
   )
 }
 
-/** La foto del campo a pantalla completa, quieta detrás. Mientras carga, terracota oscuro (M5). */
-export function FotoDeFondo({ src = fotoCampo }: { src?: string }) {
-  return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <img src={src} alt="" className="foto-llega absolute -top-[20%] h-[120%] w-full object-cover md:top-0 md:left-[-20%] md:h-full md:w-[120%] md:max-w-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(19,27,22,0.3)_0%,rgba(19,27,22,0.05)_28%,rgba(19,27,22,0.5)_62%,rgba(19,27,22,0.72)_100%)] md:bg-[radial-gradient(ellipse_75%_60%_at_0%_100%,rgba(19,27,22,0.9),transparent)]" />
-    </div>
-  )
+/** El fondo del acceso: la escena de la landing con el campo (ver escena-acceso). */
+export function FotoDeFondo() {
+  return <EscenaAcceso />
 }
 
-/** El logo en sus colores, sobre una pastilla crema: se distingue del título blanco sin agrandarse. */
+/** El logo en sus colores, sobre la aurora (26/11: sin pastilla, el fondo ya es claro). */
 export function Sello() {
   return (
-    <span className="inline-flex items-center rounded-full bg-fondo px-4 py-2.5 shadow-[0_6px_20px_rgba(19,27,22,0.25)] md:px-5 md:py-3">
-      <Logo alto={22} className="md:hidden" />
+    <span className="inline-flex items-center">
+      <Logo alto={24} className="md:hidden" />
       <Logo alto={26} className="hidden md:block" />
     </span>
   )
@@ -186,11 +162,11 @@ export function TarjetaWhatsApp({
 /** Términos y privacidad en letra chica (QA 10/11, A6). En registro e invitación, con «Al seguir aceptás…». */
 export function Legales({ aceptas = false, sobreFoto = false }: { aceptas?: boolean; sobreFoto?: boolean }) {
   // Sobre la foto sólo en el celular; en la compu el pie va adentro del panel, con los colores de siempre.
-  const link = sobreFoto
-    ? 'underline decoration-superficie/40 underline-offset-2 hover:text-superficie md:decoration-borde md:hover:text-principal'
-    : 'underline decoration-borde underline-offset-2 hover:text-principal'
+  // Desde el 26/11 el fondo es la aurora clara: los mismos colores en celu y compu.
+  void sobreFoto
+  const link = 'underline decoration-borde underline-offset-2 hover:text-principal'
   return (
-    <p className={cn('text-center text-[12px] leading-snug', sobreFoto ? 'text-superficie/80 md:text-texto-suave' : '-mt-2 text-texto-suave')}>
+    <p className="text-center text-[12px] leading-snug text-texto-suave">
       {aceptas && 'Al seguir aceptás los '}
       <a href="/terminos" target="_blank" rel="noreferrer" className={link}>
         Términos

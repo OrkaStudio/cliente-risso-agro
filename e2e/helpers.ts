@@ -84,6 +84,10 @@ export async function despejarGuia(page: Page) {
   await page.addLocatorHandler(page.getByTitle('Achicar'), async (b) => {
     await b.click()
   })
+  // Si la cuenta de prueba todavía no aceptó la versión vigente de los legales, se aceptan.
+  await page.addLocatorHandler(page.getByRole('dialog', { name: 'Actualizamos los términos' }), async (d) => {
+    await d.getByRole('button', { name: /Acepto, sigamos/ }).click()
+  })
 }
 
 /** Elige una opción en un Dropdown propio (botón con aria-label + listbox). */
